@@ -181,31 +181,11 @@ func BuildSpan(args BuildSpanArgs) OtlpSpan {
 	// Pad to the requested size. The marker overhead is subtracted so
 	// PayloadBytes describes the whole attribute payload, which is what the
 	// whole-command spool check measures.
-	markerBytes := jsonLen(attributes)
-	remaining := args.PayloadBytes - markerBytes
-
-	if remaining > 0 {
-		if args.SingleOversizedAttribute {
-			attributes = append(attributes, OtlpKeyValue{
-				Key:   "langwatch.benchmark.filler",
-				Value: stringValue(FillerOfBytes(remaining, args.Rng)),
-			})
-		} else {
-			index := 0
-			for remaining > 0 {
-				chunk := remaining
-				if chunk > fillerChunkBytes {
-					chunk = fillerChunkBytes
-				}
-				attributes = append(attributes, OtlpKeyValue{
-					Key:   fmt.Sprintf("langwatch.benchmark.filler.%d", index),
-					Value: stringValue(FillerOfBytes(chunk, args.Rng)),
-				})
-				remaining -= chunk
-				index++
-			}
-		}
-	}
+	attributes = append(attributes, fillerAttributes(fillerRequest{
+		Bytes:           args.PayloadBytes - jsonLen(attributes),
+		SingleAttribute: args.SingleOversizedAttribute,
+		Rng:             args.Rng,
+	})...)
 
 	span := OtlpSpan{
 		TraceID:           args.TraceID,
@@ -219,6 +199,42 @@ func BuildSpan(args BuildSpanArgs) OtlpSpan {
 	}
 	span.Status.Code = 1
 	return span
+}
+
+// fillerRequest is a span's padding: how many bytes, and in how many pieces.
+type fillerRequest struct {
+	Bytes int
+	// SingleAttribute puts the whole payload in one value, which exercises the
+	// per-attribute truncation path rather than the whole-command spool path.
+	SingleAttribute bool
+	Rng             Rng
+}
+
+// fillerAttributes builds the padding attributes for one span, or none when the
+// markers already fill the requested size.
+func fillerAttributes(request fillerRequest) []OtlpKeyValue {
+	remaining := request.Bytes
+	if remaining <= 0 {
+		return nil
+	}
+
+	if request.SingleAttribute {
+		return []OtlpKeyValue{{
+			Key:   "langwatch.benchmark.filler",
+			Value: stringValue(FillerOfBytes(remaining, request.Rng)),
+		}}
+	}
+
+	var attributes []OtlpKeyValue
+	for index := 0; remaining > 0; index++ {
+		chunk := min(remaining, fillerChunkBytes)
+		attributes = append(attributes, OtlpKeyValue{
+			Key:   fmt.Sprintf("langwatch.benchmark.filler.%d", index),
+			Value: stringValue(FillerOfBytes(chunk, request.Rng)),
+		})
+		remaining -= chunk
+	}
+	return attributes
 }
 
 // jsonLen is the serialized length of a value, matching what the TypeScript

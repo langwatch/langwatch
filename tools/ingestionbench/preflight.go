@@ -37,7 +37,8 @@ const preflightTimeout = 90 * time.Second
 // verification to notice: a stage that finds nothing has already spent its
 // wall-clock budget generating and sending tens of thousands of spans, and its
 // violations say "lost spans", which is the wrong diagnosis.
-func preflight(ctx context.Context, sender *http.Client, client *chClient, args RunArgs, timeout time.Duration, log io.Writer) error {
+func preflight(ctx context.Context, check preflightCheck) error {
+	args, log := check.Args, check.Log
 	tenant := args.Tenants[0]
 	nowMs := time.Now().UnixMilli()
 	rng := CreateRng(args.Seed)
@@ -61,7 +62,7 @@ func preflight(ctx context.Context, sender *http.Client, client *chClient, args 
 
 	fmt.Fprintln(log, "[benchmark] preflight: checking one span makes it end to end")
 
-	result, err := postSpans(ctx, sender, spanPost{
+	result, err := postSpans(ctx, check.Sender, spanPost{
 		Endpoint: args.Endpoint,
 		Tenant:   tenant,
 		Spans:    []OtlpSpan{span},
@@ -76,40 +77,56 @@ func preflight(ctx context.Context, sender *http.Client, client *chClient, args 
 			args.Endpoint, result.accepted)
 	}
 
-	// The window matches the stage windows: these bound the PARTITION KEY, so
-	// padding generously keeps partition pruning without excluding the span.
-	window := TimeWindow{FromMs: nowMs - 60*60_000, ToMs: nowMs + 60*60_000}
+	return awaitCanary(ctx, canaryWait{
+		Client: check.Client,
+		Read: traceWindowRead{
+			Tenant:   tenant,
+			TraceIDs: []string{traceID},
+			// The window matches the stage windows: these bound the PARTITION
+			// KEY, so padding generously keeps partition pruning without
+			// excluding the span.
+			Window: TimeWindow{FromMs: nowMs - 60*60_000, ToMs: nowMs + 60*60_000},
+		},
+		Timeout: check.Timeout,
+		Log:     log,
+	})
+}
 
-	deadline := time.Now().Add(timeout)
+// preflightCheck is the canary's inputs.
+type preflightCheck struct {
+	Sender  *http.Client
+	Client  *chClient
+	Args    RunArgs
+	Timeout time.Duration
+	Log     io.Writer
+}
+
+// canaryWait is the poll that waits for the canary span to land.
+type canaryWait struct {
+	Client  *chClient
+	Read    traceWindowRead
+	Timeout time.Duration
+	Log     io.Writer
+}
+
+// awaitCanary polls until the canary span is stored, or the timeout expires.
+//
+// A read error is remembered rather than returned: ClickHouse may still be
+// settling right after the cluster comes up, so the poll keeps trying and only
+// reports the last failure if it runs out of time.
+func awaitCanary(ctx context.Context, wait canaryWait) error {
+	deadline := time.Now().Add(wait.Timeout)
 	interval := 250 * time.Millisecond
 	var lastErr error
 
 	for time.Now().Before(deadline) {
-		var rows []countRow
-		queryErr := queryJSON(ctx, client, chQuery{
-			SQL: StoredSpansPerTraceQuery(),
-			Params: map[string]any{
-				"tenantId": tenant.ProjectID,
-				"traceIds": []string{traceID},
-				"fromMs":   window.FromMs,
-				"toMs":     window.ToMs,
-			},
-			Into: &rows,
-		})
-
-		if queryErr != nil {
-			// ClickHouse may still be settling right after the cluster comes
-			// up; keep trying, but remember why in case we time out.
-			lastErr = queryErr
-		} else {
-			stored := 0
-			for _, row := range rows {
-				stored += row.spans()
-			}
-			if stored > 0 {
-				fmt.Fprintln(log, "[benchmark] preflight: ok — the pipeline is draining")
-				return nil
-			}
+		stored, err := storedSpanCount(ctx, wait.Client, wait.Read)
+		switch {
+		case err != nil:
+			lastErr = err
+		case stored > 0:
+			fmt.Fprintln(wait.Log, "[benchmark] preflight: ok — the pipeline is draining")
+			return nil
 		}
 
 		sleep(ctx, interval)
@@ -129,5 +146,5 @@ func preflight(ctx context.Context, sender *http.Client, client *chClient, args 
 			"workflow sets START_WORKERS=true). Also check that app and worker share REDIS_URL,\n"+
 			"REDIS_DB_INDEX and CLICKHOUSE_URL.\n"+
 			"Aborting before the stages so this is not reported as data loss.",
-		errNothingDraining, timeout)
+		errNothingDraining, wait.Timeout)
 }

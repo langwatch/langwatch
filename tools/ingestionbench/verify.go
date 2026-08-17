@@ -485,8 +485,27 @@ func SummarizeViolations(violations []Violation) string {
 		return "No correctness violations."
 	}
 
-	// Grouped in first-seen order: Go map iteration is randomized, and a
-	// summary whose sections shuffle between runs is not diffable.
+	order, byKind := groupViolationsByKind(violations)
+
+	var b strings.Builder
+	for i, kind := range order {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		writeViolationGroup(&b, kind, byKind[kind])
+	}
+	return b.String()
+}
+
+// maxViolationsPerKind caps the detail dump. A systemic bug produces thousands
+// of identical lines, and burying the summary under them helps nobody.
+const maxViolationsPerKind = 10
+
+// groupViolationsByKind groups violations, keeping first-seen order.
+//
+// The order matters because Go map iteration is randomized, and a summary whose
+// sections shuffle between runs is not diffable.
+func groupViolationsByKind(violations []Violation) ([]ViolationKind, map[ViolationKind][]Violation) {
 	order := []ViolationKind{}
 	byKind := map[ViolationKind][]Violation{}
 	for _, v := range violations {
@@ -495,30 +514,26 @@ func SummarizeViolations(violations []Violation) string {
 		}
 		byKind[v.Kind] = append(byKind[v.Kind], v)
 	}
+	return order, byKind
+}
 
-	var b strings.Builder
-	for i, kind := range order {
-		if i > 0 {
-			b.WriteString("\n")
-		}
-		list := byKind[kind]
-		fmt.Fprintf(&b, "**%s** — %d occurrence(s)", kind, len(list))
-		// Cap the detail dump; a systemic bug produces thousands of identical
-		// lines and burying the summary helps nobody.
-		capped := list
-		if len(capped) > 10 {
-			capped = capped[:10]
-		}
-		for _, v := range capped {
-			trace := ""
-			if v.TraceId != "" {
-				trace = fmt.Sprintf(" trace `%s`", v.TraceId)
-			}
-			fmt.Fprintf(&b, "\n  - tenant `%s`%s: %s", v.TenantId, trace, v.Detail)
-		}
-		if len(list) > 10 {
-			fmt.Fprintf(&b, "\n  - …and %d more", len(list)-10)
-		}
+// writeViolationGroup renders one kind's heading and its capped detail lines.
+func writeViolationGroup(b *strings.Builder, kind ViolationKind, list []Violation) {
+	fmt.Fprintf(b, "**%s** — %d occurrence(s)", kind, len(list))
+
+	capped := list
+	if len(capped) > maxViolationsPerKind {
+		capped = capped[:maxViolationsPerKind]
 	}
-	return b.String()
+	for _, v := range capped {
+		trace := ""
+		if v.TraceId != "" {
+			trace = fmt.Sprintf(" trace `%s`", v.TraceId)
+		}
+		fmt.Fprintf(b, "\n  - tenant `%s`%s: %s", v.TenantId, trace, v.Detail)
+	}
+
+	if len(list) > maxViolationsPerKind {
+		fmt.Fprintf(b, "\n  - …and %d more", len(list)-maxViolationsPerKind)
+	}
 }

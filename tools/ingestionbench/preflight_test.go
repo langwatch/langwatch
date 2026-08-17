@@ -51,6 +51,18 @@ func preflightArgs(endpoint string) RunArgs {
 	}
 }
 
+// runPreflight wires the two stubs into a check, so each test states only the
+// timeout it cares about.
+func runPreflight(collector *httptest.Server, ch *chClient, timeout time.Duration) error {
+	return preflight(context.Background(), preflightCheck{
+		Sender:  collector.Client(),
+		Client:  ch,
+		Args:    preflightArgs(collector.URL),
+		Timeout: timeout,
+		Log:     io.Discard,
+	})
+}
+
 func TestPreflight(t *testing.T) {
 	accepted := `{"message":"Trace received successfully.","partialSuccess":{"rejectedSpans":0,"errorMessage":""}}`
 
@@ -59,8 +71,7 @@ func TestPreflight(t *testing.T) {
 			collector := collectorStub(t, http.StatusOK, accepted)
 			ch := clickhouseStub(t, `{"TraceId":"abc","SpanCount":"1"}`+"\n")
 
-			err := preflight(context.Background(), collector.Client(), ch,
-				preflightArgs(collector.URL), 5*time.Second, io.Discard)
+			err := runPreflight(collector, ch, 5*time.Second)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -76,8 +87,7 @@ func TestPreflight(t *testing.T) {
 			t.Helper()
 			collector := collectorStub(t, http.StatusOK, accepted)
 			ch := clickhouseStub(t, "")
-			return preflight(context.Background(), collector.Client(), ch,
-				preflightArgs(collector.URL), 300*time.Millisecond, io.Discard)
+			return runPreflight(collector, ch, 300*time.Millisecond)
 		}
 
 		t.Run("fails rather than proceeding into the stages", func(t *testing.T) {
@@ -115,8 +125,7 @@ func TestPreflight(t *testing.T) {
 			ch := clickhouseStub(t, "")
 
 			started := time.Now()
-			err := preflight(context.Background(), collector.Client(), ch,
-				preflightArgs(collector.URL), 10*time.Second, io.Discard)
+			err := runPreflight(collector, ch, 10*time.Second)
 			if err == nil {
 				t.Fatal("expected preflight to fail on a rejected span")
 			}
@@ -137,8 +146,7 @@ func TestPreflight(t *testing.T) {
 			collector := collectorStub(t, http.StatusOK, partial)
 			ch := clickhouseStub(t, "")
 
-			err := preflight(context.Background(), collector.Client(), ch,
-				preflightArgs(collector.URL), 2*time.Second, io.Discard)
+			err := runPreflight(collector, ch, 2*time.Second)
 			if err == nil || !strings.Contains(err.Error(), "rejected by the collector") {
 				t.Errorf("got %v, want a collector-rejection error", err)
 			}

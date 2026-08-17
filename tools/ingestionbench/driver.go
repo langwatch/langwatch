@@ -647,7 +647,7 @@ func verifyTenant(ctx context.Context, client *chClient, v tenantVerify) ([]Viol
 }
 
 // verifyLayerCounts compares what was accepted, what the event log recorded,
-// and what was finally stored. A divergence localises the loss to one hop.
+// and what was finally stored. A divergence localizes the loss to one hop.
 func verifyLayerCounts(ctx context.Context, client *chClient, v tenantVerify) ([]Violation, error) {
 	params := v.params()
 
@@ -836,7 +836,13 @@ func RunBenchmark(ctx context.Context, args RunArgs, out streams) ([]Violation, 
 	// Prove the whole path works on ONE span before spending the run on it.
 	// A misconfigured harness that reaches the stages reports "lost spans",
 	// which is the wrong diagnosis and the expensive one to chase.
-	if err := preflight(ctx, sender, client, args, preflightTimeout, out.Err); err != nil {
+	if err := preflight(ctx, preflightCheck{
+		Sender:  sender,
+		Client:  client,
+		Args:    args,
+		Timeout: preflightTimeout,
+		Log:     out.Err,
+	}); err != nil {
 		return nil, err
 	}
 
@@ -1239,29 +1245,14 @@ func startSampling(ctx context.Context, namespace string) func() []ResourceSampl
 // even when the run failed — a failed run's numbers are still the most recent
 // reading at this scale on this runner.
 func writeArtifacts(args RunArgs, plan BenchmarkPlan, results []StageResult) error {
-	payload, err := json.MarshalIndent(map[string]any{"plan": plan, "results": results}, "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(args.Out, "results.json"), payload, 0o644); err != nil {
+	if err := writeJSONFile(filepath.Join(args.Out, "results.json"), map[string]any{
+		"plan":    plan,
+		"results": results,
+	}); err != nil {
 		return err
 	}
 
-	type stampedSample struct {
-		Stage StageName `json:"stage"`
-		ResourceSample
-	}
-	var flattened []stampedSample
-	for _, result := range results {
-		for _, sample := range result.Samples {
-			flattened = append(flattened, stampedSample{Stage: result.Stage, ResourceSample: sample})
-		}
-	}
-	samplesJSON, err := json.MarshalIndent(flattened, "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(args.Out, "samples.json"), samplesJSON, 0o644); err != nil {
+	if err := writeJSONFile(filepath.Join(args.Out, "samples.json"), stampedSamples(results)); err != nil {
 		return err
 	}
 
@@ -1271,20 +1262,66 @@ func writeArtifacts(args RunArgs, plan BenchmarkPlan, results []StageResult) err
 		ProjectedPayloadBytes: int64(plan.ProjectedPayloadBytes),
 		RunnerLabel:           args.RunnerLabel,
 	})
-	if err := os.WriteFile(filepath.Join(args.Out, "summary.md"), []byte(summary), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(args.Out, "summary.md"), []byte(summary), artifactFileMode); err != nil {
 		return err
 	}
 
-	if path := os.Getenv("GITHUB_STEP_SUMMARY"); path != "" {
-		file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-		if _, err := file.WriteString(summary); err != nil {
-			return err
+	return appendJobSummary(summary)
+}
+
+// artifactFileMode is world-readable on purpose: these are CI artifacts, meant
+// to be collected by the runner and attached to the job.
+const artifactFileMode = 0o644
+
+// writeJSONFile writes value as indented JSON.
+func writeJSONFile(path string, value any) error {
+	payload, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, payload, artifactFileMode)
+}
+
+// stampedSample is a resource sample tagged with the stage it was taken during,
+// since samples.json is flat and a sample means little without its stage.
+type stampedSample struct {
+	Stage StageName `json:"stage"`
+	ResourceSample
+}
+
+// stampedSamples flattens every stage's samples into one stamped list.
+func stampedSamples(results []StageResult) []stampedSample {
+	var flattened []stampedSample
+	for _, result := range results {
+		for _, sample := range result.Samples {
+			flattened = append(flattened, stampedSample{Stage: result.Stage, ResourceSample: sample})
 		}
 	}
+	return flattened
+}
 
-	return nil
+// appendJobSummary appends the summary to the GitHub job summary, when running
+// somewhere that has one.
+//
+// The close error is returned rather than deferred away. This handle is open
+// for writing, so a failure to flush would otherwise be reported as a
+// successful run that quietly published a truncated summary.
+func appendJobSummary(summary string) (err error) {
+	path := os.Getenv("GITHUB_STEP_SUMMARY")
+	if path == "" {
+		return nil
+	}
+
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, artifactFileMode)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
+
+	_, err = file.WriteString(summary)
+	return err
 }

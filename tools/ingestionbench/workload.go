@@ -72,7 +72,7 @@ type StageName string
 
 const (
 	// StageSerial sends one request at a time, in order, so a fault here is
-	// never a concurrency artefact.
+	// never a concurrency artifact.
 	StageSerial StageName = "serial"
 	// StageConcurrent sends in parallel, which is where contention and
 	// interleaving faults appear.
@@ -167,98 +167,13 @@ func PlanBenchmark(scale float64, byteBudget int) (BenchmarkPlan, error) {
 		byteBudget = DefaultByteBudget
 	}
 
-	mul := func(n float64) int {
-		v := int(math.Round(n * scale))
-		if v < 1 {
-			return 1
-		}
-		return v
-	}
+	scaled := traceScale(scale)
 
-	// --- Stage 1: serial stream -------------------------------------------
-	// One tenant, one long trace, spans strictly in order, one span per
-	// request. This is the per-aggregate FIFO hot path: every span lands on
-	// the SAME aggregate, so the fold is re-entered continuously and any
-	// per-aggregate ordering bug shows up as a wrong SpanCount.
-	serialSpans := mul(2000)
-	serial := StagePlan{
-		Stage:                 StageSerial,
-		Tenants:               1,
-		TracesPerTenant:       1,
-		SpansPerTrace:         serialSpans,
-		Concurrency:           1,
-		SpansPerRequest:       1,
-		ScatterAcrossRequests: false,
-		ResendFraction:        0,
-		BurstSize:             0,
-		SizeMix:               SpanSizeMix{SmallSpans: serialSpans},
-		Description:           "One long trace, spans strictly sequential — fold hot path and per-aggregate FIFO.",
+	stages := []StagePlan{
+		planSerialStage(scaled),
+		planConcurrentStage(scaled),
+		planAdversarialStage(scaled),
 	}
-
-	// --- Stage 2: concurrent influx ---------------------------------------
-	// Many traces across several tenants, all in flight together. This is
-	// where dispatch fairness and the per-tenant soft cap are exercised: one
-	// tenant is given far more traces than the others so an unfair scheduler
-	// starves the quiet ones visibly.
-	concurrentTenants := 4
-	concurrentTraces := mul(50)
-	concurrentSpansPerTrace := 40
-	concurrentSpans := concurrentTenants * concurrentTraces * concurrentSpansPerTrace
-	concurrent := StagePlan{
-		Stage:                 StageConcurrent,
-		Tenants:               concurrentTenants,
-		TracesPerTenant:       concurrentTraces,
-		SpansPerTrace:         concurrentSpansPerTrace,
-		Concurrency:           16,
-		SpansPerRequest:       10,
-		ScatterAcrossRequests: false,
-		ResendFraction:        0,
-		BurstSize:             0,
-		SizeMix:               SpanSizeMix{SmallSpans: concurrentSpans},
-		Description:           "Many traces ingesting at once across tenants — dispatch fairness and the per-tenant soft cap.",
-	}
-
-	// --- Stage 3: adversarial ---------------------------------------------
-	// Bursty, out-of-order, multi-tenant, and straddling the inline/offload
-	// threshold. This is the stage expected to find real bugs: the
-	// out-of-order fraction reproduces the shape of the 2026-07-09 re-fold
-	// storm, and the size mix walks both sides of the offload branch.
-	advTenants := 3
-	advTraces := mul(60)
-	advSpansPerTrace := 30
-	advTotal := advTenants * advTraces * advSpansPerTrace
-	// Large spans are a small, FIXED count — they dominate bytes, so scaling
-	// them would blow the byte budget long before the small spans mattered.
-	nearThreshold := 60
-	overThreshold := 60
-	smallSpans := advTotal - nearThreshold - overThreshold
-	if smallSpans < 0 {
-		smallSpans = 0
-	}
-	adversarial := StagePlan{
-		Stage:           StageAdversarial,
-		Tenants:         advTenants,
-		TracesPerTenant: advTraces,
-		SpansPerTrace:   advSpansPerTrace,
-		Concurrency:     24,
-		SpansPerRequest: 5,
-		// Scatter each trace's spans across concurrent requests so the same
-		// aggregate is processed by several workers at once — the only lever a
-		// client has on out-of-order folding.
-		ScatterAcrossRequests: true,
-		// A tenth of the stream is sent twice. The dedup lock must swallow it and
-		// SpanCount must not move.
-		ResendFraction: 0.1,
-		BurstSize:      200,
-		SizeMix: SpanSizeMix{
-			SmallSpans:         smallSpans,
-			NearThresholdSpans: nearThreshold,
-			OverThresholdSpans: overThreshold,
-		},
-		Description: "Bursty, scattered across concurrent arrivals, interleaved tenants, resends, and payloads straddling the offload threshold.",
-	}
-
-	stages := []StagePlan{serial, concurrent, adversarial}
 	totalSpans := 0
 	projectedPayloadBytes := 0
 	for _, s := range stages {
@@ -278,6 +193,106 @@ func PlanBenchmark(scale float64, byteBudget int) (BenchmarkPlan, error) {
 		return BenchmarkPlan{}, err
 	}
 	return plan, nil
+}
+
+// traceScale returns the multiplier applied to TRACE COUNTS.
+//
+// Never to span sizes and never to the out-of-order skew: both are calibrated
+// against real thresholds and would stop testing the boundary if they moved.
+// Floored at one, so no scale can plan a stage with nothing in it.
+func traceScale(scale float64) func(float64) int {
+	return func(n float64) int {
+		return max(1, int(math.Round(n*scale)))
+	}
+}
+
+// planSerialStage is one tenant, one long trace, spans strictly in order, one
+// span per request.
+//
+// This is the per-aggregate FIFO hot path: every span lands on the SAME
+// aggregate, so the fold is re-entered continuously and any per-aggregate
+// ordering bug shows up as a wrong SpanCount.
+func planSerialStage(scaled func(float64) int) StagePlan {
+	spans := scaled(2000)
+	return StagePlan{
+		Stage:                 StageSerial,
+		Tenants:               1,
+		TracesPerTenant:       1,
+		SpansPerTrace:         spans,
+		Concurrency:           1,
+		SpansPerRequest:       1,
+		ScatterAcrossRequests: false,
+		ResendFraction:        0,
+		BurstSize:             0,
+		SizeMix:               SpanSizeMix{SmallSpans: spans},
+		Description:           "One long trace, spans strictly sequential — fold hot path and per-aggregate FIFO.",
+	}
+}
+
+// planConcurrentStage is many traces across several tenants, all in flight
+// together.
+//
+// This is where dispatch fairness and the per-tenant soft cap are exercised: one
+// tenant is given far more traces than the others so an unfair scheduler starves
+// the quiet ones visibly.
+func planConcurrentStage(scaled func(float64) int) StagePlan {
+	tenants := 4
+	traces := scaled(50)
+	spansPerTrace := 40
+	return StagePlan{
+		Stage:                 StageConcurrent,
+		Tenants:               tenants,
+		TracesPerTenant:       traces,
+		SpansPerTrace:         spansPerTrace,
+		Concurrency:           16,
+		SpansPerRequest:       10,
+		ScatterAcrossRequests: false,
+		ResendFraction:        0,
+		BurstSize:             0,
+		SizeMix:               SpanSizeMix{SmallSpans: tenants * traces * spansPerTrace},
+		Description:           "Many traces ingesting at once across tenants — dispatch fairness and the per-tenant soft cap.",
+	}
+}
+
+// planAdversarialStage is bursty, out-of-order, multi-tenant, and straddles the
+// inline/offload threshold.
+//
+// This is the stage expected to find real bugs: the out-of-order fraction
+// reproduces the shape of the 2026-07-09 re-fold storm, and the size mix walks
+// both sides of the offload branch.
+func planAdversarialStage(scaled func(float64) int) StagePlan {
+	tenants := 3
+	traces := scaled(60)
+	spansPerTrace := 30
+
+	// Large spans are a small, FIXED count — they dominate bytes, so scaling
+	// them would blow the byte budget long before the small spans mattered.
+	const nearThreshold = 60
+	const overThreshold = 60
+	smallSpans := max(0, tenants*traces*spansPerTrace-nearThreshold-overThreshold)
+
+	return StagePlan{
+		Stage:           StageAdversarial,
+		Tenants:         tenants,
+		TracesPerTenant: traces,
+		SpansPerTrace:   spansPerTrace,
+		Concurrency:     24,
+		SpansPerRequest: 5,
+		// Scatter each trace's spans across concurrent requests so the same
+		// aggregate is processed by several workers at once — the only lever a
+		// client has on out-of-order folding.
+		ScatterAcrossRequests: true,
+		// A tenth of the stream is sent twice. The dedup lock must swallow it and
+		// SpanCount must not move.
+		ResendFraction: 0.1,
+		BurstSize:      200,
+		SizeMix: SpanSizeMix{
+			SmallSpans:         smallSpans,
+			NearThresholdSpans: nearThreshold,
+			OverThresholdSpans: overThreshold,
+		},
+		Description: "Bursty, scattered across concurrent arrivals, interleaved tenants, resends, and payloads straddling the offload threshold.",
+	}
 }
 
 // AssertWithinBudget refuses a plan that would exceed the byte budget. Fails at
