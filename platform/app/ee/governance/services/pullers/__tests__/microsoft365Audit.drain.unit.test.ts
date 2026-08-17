@@ -407,4 +407,31 @@ describe("Microsoft365AuditPuller window advance", () => {
     expect(span).toBeLessThanOrEqual(MAX_WINDOW_MS);
     expect(span).toBeGreaterThan(0);
   });
+
+  /** @scenario A window the run never listed is not advanced past */
+  it("leaves the window in place when the run was out of time before it started", async () => {
+    const puller = await loadPuller();
+    seedBlobs(3);
+
+    const t0 = Date.parse("2026-05-03T12:00:00.000Z");
+    vi.spyOn(Date, "now").mockImplementation(() => t0);
+
+    // A job that sat in a backed-up queue: its deadline had already passed by
+    // the time it ran.
+    const run = await puller.runOnce(
+      { cursor: null, deadlineMs: t0 - 1_000 },
+      CONFIG,
+    );
+
+    expect(fx.listingFetches).toBe(0);
+    expect(run.events).toHaveLength(0);
+
+    const cursor = JSON.parse(run.cursor!);
+    // The regression this pins: an untouched cursor looks exactly like a
+    // finished one — queue empty, nothing deferred — so advancing on shape
+    // alone skipped the whole interval, and no later run ever asks for it
+    // again. Silent loss, in the adapter that exists to end silent loss.
+    expect(Date.parse(cursor.windowStart)).toBeLessThan(t0);
+    expect(Date.parse(cursor.windowEnd)).toBe(t0);
+  });
 });
