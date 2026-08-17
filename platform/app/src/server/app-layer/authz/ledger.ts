@@ -230,6 +230,32 @@ const CONVERGENCE_TIMEOUT_MS = 8_000;
 export type LedgerBindingAttach = Omit<RoleBindingWrite, "organizationId">;
 
 /**
+ * The audience a resource fact names. `ShareVisibility`'s three values in
+ * the ledger's own vocabulary — PUBLIC is "anyone" (id null, because there
+ * is nobody to name), and the other two name the organization or project
+ * whose members the link is for. A union rather than the general principal
+ * shape, so a resource mint cannot accidentally state a user or a key.
+ */
+export type LedgerResourcePrincipal =
+  | { type: "anyone"; id: null }
+  | { type: "organization"; id: string }
+  | { type: "project"; id: string };
+
+/**
+ * A resource fact's own terms, minus the `projectId` the verb takes
+ * separately (it is also the compat head's tenancy, so the writer needs it
+ * in its own right rather than buried in the terms).
+ */
+export type LedgerResourceTerms = {
+  token: string;
+  permission: string;
+  kind: "trace" | "thread";
+  expiresAtMs?: number;
+  maxViews?: number;
+  createdByUserId?: string;
+};
+
+/**
  * The one principal a write names, in the port's exactly-one shape. Call
  * sites carry three optional columns (the legacy row shape); the port carries
  * a union that makes "two principals on one row" unrepresentable, and this is
@@ -610,6 +636,110 @@ export class GrantsLedgerWriter {
         throw error;
       }
     }
+  }
+
+  /**
+   * INSERT one resource fact — a share link, as the ledger states it
+   * (ADR-057's possession model intact, delivery-plan decision 22).
+   *
+   * Resource facts differ from binding facts in three ways, and all three
+   * are visible in the shape here: they carry no role (their single
+   * permission rides in the terms), their principal is an AUDIENCE rather
+   * than an identity (anyone / an organization / a project), and their
+   * compat head is `ShareLink` rather than `RoleBinding`. So the
+   * read-your-writes wait watches the share row: the caller mints the id,
+   * sends the fact, and then returns the row the fold wrote — which is the
+   * row the customer's token already resolves to, because the id is shared.
+   *
+   * Timing out is not a failure here either (the append is durable); it
+   * means the caller's read-back will come up empty and it is the caller's
+   * business what to say about that.
+   *
+   * No write-gate ask, on purpose: the only caller is the share
+   * repository's per-organization fork, which fires solely for a CUT-OVER
+   * organization — and cutover requires the genesis import finalized, a
+   * strictly stronger condition than the write gate's migrated-or-finalized.
+   * An organization that is not on ledger writes never reaches this verb.
+   */
+  async attachResourceGrant({
+    organizationId,
+    grantId,
+    projectId,
+    resource,
+    principal,
+    scopeId,
+    actor,
+    commandId,
+  }: {
+    organizationId: string;
+    /** The compat `ShareLink` row's id: minted by the caller, adopted here. */
+    grantId: string;
+    /** Where the shared resource lives — the compat head's tenancy column. */
+    projectId: string;
+    resource: LedgerResourceTerms;
+    principal: LedgerResourcePrincipal;
+    /** The shared resource's id, and nothing else — the RESOURCE scope. */
+    scopeId: string;
+    actor: LedgerActor;
+    commandId?: string;
+  }): Promise<void> {
+    await (await this.commands()).commands.attachGrants.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId: commandId ?? newLedgerCommandId(),
+      grants: [
+        {
+          grantId,
+          principal,
+          roleKey: null,
+          scope: { type: "RESOURCE", id: scopeId },
+          resource: { ...resource, projectId },
+          source: "grants-service",
+          actor,
+          occurredAtMs: this.now(),
+        },
+      ],
+    });
+    await this.awaitProjection({
+      what: `attach of resource grant ${grantId}`,
+      organizationId,
+      check: async () => {
+        const row = await this.prisma.shareLink.findFirst({
+          where: { id: grantId, projectId },
+          select: { id: true },
+        });
+        return row !== null;
+      },
+    });
+    await bumpAuthzEpoch({ organizationId });
+  }
+
+  /**
+   * DELETE resource facts. This is `revokeBindings` under the name the
+   * resource tier calls it by — revocation is keyed on grant ids and knows
+   * nothing about tiers, so the command, the synchronous enforcement
+   * (decision 7) and the epoch bump are literally the same ones. What the
+   * enforcement additionally does for a resource id is delete the compat
+   * `ShareLink` head, which is why a revoked link stops resolving before
+   * this returns, queue running or not.
+   */
+  async revokeResourceGrants({
+    organizationId,
+    grantIds,
+    actor,
+    reason,
+  }: {
+    organizationId: string;
+    grantIds: string[];
+    actor: LedgerActor;
+    reason?: string;
+  }): Promise<void> {
+    await this.revokeBindings({
+      organizationId,
+      bindingIds: grantIds,
+      actor,
+      ...(reason ? { reason } : {}),
+    });
   }
 
   /**
