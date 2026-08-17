@@ -245,7 +245,9 @@ beforeAll(async () => {
   annotationFindMany = vi.mocked(prisma.annotation.findMany);
   annotationScoreFindMany = vi.mocked(prisma.annotationScore.findMany);
   service = new ClickHouseTraceService({
-    prisma: prisma as ConstructorParameters<typeof ClickHouseTraceService>[0]["prisma"],
+    prisma: prisma as ConstructorParameters<
+      typeof ClickHouseTraceService
+    >[0]["prisma"],
   });
 
   await insert({

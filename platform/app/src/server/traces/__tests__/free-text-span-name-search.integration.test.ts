@@ -182,7 +182,9 @@ beforeAll(async () => {
   ch = containers.clickHouseClient;
   vi.mocked(getClickHouseClientForProject).mockResolvedValue(ch);
   service = new ClickHouseTraceService({
-    prisma: prisma as ConstructorParameters<typeof ClickHouseTraceService>[0]["prisma"],
+    prisma: prisma as ConstructorParameters<
+      typeof ClickHouseTraceService
+    >[0]["prisma"],
   });
 
   await ch.insert({
