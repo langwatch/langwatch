@@ -46,7 +46,7 @@ func HexID(bytes int, rng Rng) string {
 	var out strings.Builder
 	for i := 0; i < bytes; i++ {
 		b := int(math.Floor(rng() * 256))
-		out.WriteString(fmt.Sprintf("%02x", b))
+		fmt.Fprintf(&out, "%02x", b)
 	}
 	return out.String()
 }
@@ -128,7 +128,7 @@ const MaxAttributeValueBytes = 256 * 1024
 // fillerChunkBytes keeps filler chunks comfortably under the per-attribute cap
 // so a large payload crosses the WHOLE-COMMAND spool threshold without any
 // single value tripping truncation. These are two different 256 KB constants
-// with two different behaviours, and conflating them produces a benchmark that
+// with two different behaviors, and conflating them produces a benchmark that
 // thinks it is testing the offload path while actually testing the truncation
 // path.
 const fillerChunkBytes = 48 * 1024
@@ -221,7 +221,7 @@ func BuildSpan(args BuildSpanArgs) OtlpSpan {
 	return span
 }
 
-// jsonLen is the serialised length of a value, matching what the TypeScript
+// jsonLen is the serialized length of a value, matching what the TypeScript
 // original measured with `JSON.stringify(...).length`.
 func jsonLen(v any) int {
 	buf, err := json.Marshal(v)
@@ -287,7 +287,7 @@ func ChunkSpans(spans []OtlpSpan, perRequest int) ([][]OtlpSpan, error) {
 // batch behind newer work — the fold sees an event whose `occurredAt`
 // precedes its persisted checkpoint.
 //
-// The only lever a load driver has is to maximise the chance of that
+// The only lever a load driver has is to maximize the chance of that
 // concurrency: scatter one trace's spans across many in-flight requests so
 // they contend for the same aggregate. That is what this does. Sorting the
 // spans back into order would remove the contention and quietly turn the

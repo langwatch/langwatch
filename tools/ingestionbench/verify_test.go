@@ -255,7 +255,7 @@ func TestFindMissingSummaries(t *testing.T) {
 			got := FindMissingSummaries(FindMissingSummariesOptions{
 				TenantId:           "t1",
 				ExpectedTraceIds:   []string{"a", "b"},
-				SummarisedTraceIds: traceIdSet("a"),
+				SummarizedTraceIds: traceIdSet("a"),
 			})
 			if len(got) != 1 {
 				t.Fatalf("got %d violations, want 1", len(got))
@@ -274,7 +274,7 @@ func TestFindMissingSummaries(t *testing.T) {
 			got := FindMissingSummaries(FindMissingSummariesOptions{
 				TenantId:           "t1",
 				ExpectedTraceIds:   []string{"a"},
-				SummarisedTraceIds: traceIdSet("a"),
+				SummarizedTraceIds: traceIdSet("a"),
 			})
 			if len(got) != 0 {
 				t.Errorf("got %d violations, want 0", len(got))
@@ -439,10 +439,10 @@ func TestIsFailure(t *testing.T) {
 	})
 }
 
-func TestSummariseViolations(t *testing.T) {
+func TestSummarizeViolations(t *testing.T) {
 	t.Run("given no violations", func(t *testing.T) {
 		t.Run("says so plainly", func(t *testing.T) {
-			if !strings.Contains(SummariseViolations(nil), "No correctness violations") {
+			if !strings.Contains(SummarizeViolations(nil), "No correctness violations") {
 				t.Errorf("empty summary does not say so plainly")
 			}
 		})
@@ -459,7 +459,7 @@ func TestSummariseViolations(t *testing.T) {
 					Detail:   "lost",
 				})
 			}
-			summary := SummariseViolations(violations)
+			summary := SummarizeViolations(violations)
 			for _, want := range []string{"50 occurrence(s)", "and 40 more"} {
 				if !strings.Contains(summary, want) {
 					t.Errorf("summary does not contain %q", want)
@@ -473,7 +473,7 @@ func TestSummariseViolations(t *testing.T) {
 
 	t.Run("given violations of several kinds", func(t *testing.T) {
 		t.Run("groups them by kind", func(t *testing.T) {
-			summary := SummariseViolations([]Violation{
+			summary := SummarizeViolations([]Violation{
 				{Kind: ViolationLostSpans, TenantId: "t", Detail: "a"},
 				{Kind: ViolationCrossTenantLeak, TenantId: "t", Detail: "b"},
 			})

@@ -31,13 +31,24 @@ type generatedTrace struct {
 // would report a correctness violation that is really a billing limit.
 var errPlanLimit = errors.New("project hit its plan limit (ERR_PLAN_LIMIT)")
 
+// stageGen is one stage's generation inputs.
+type stageGen struct {
+	Plan    StagePlan
+	Tenants []Tenant
+	// Seed makes a run replayable: the same seed regenerates the same spans.
+	Seed int64
+	// NowMs anchors every span time, so a whole stage shares one clock reading.
+	NowMs int64
+}
+
 // generateStage builds every span for a stage up front.
 //
 // Span start times are anchored near now and only ever move FORWARD from a
 // base slightly in the past, so nothing can drift past the receiver's
 // SPAN_MAX_PAST_MS cutoff and be rejected by design.
-func generateStage(plan StagePlan, tenants []Tenant, seed int64, nowMs int64) ([]generatedTrace, error) {
-	rng := CreateRng(seed)
+func generateStage(gen stageGen) ([]generatedTrace, error) {
+	plan, tenants := gen.Plan, gen.Tenants
+	rng := CreateRng(gen.Seed)
 
 	if len(tenants) < plan.Tenants {
 		return nil, fmt.Errorf(
@@ -46,60 +57,29 @@ func generateStage(plan StagePlan, tenants []Tenant, seed int64, nowMs int64) ([
 	}
 	active := tenants[:plan.Tenants]
 
-	largeNearRemaining := plan.SizeMix.NearThresholdSpans
-	largeOverRemaining := plan.SizeMix.OverThresholdSpans
+	// One budget for the whole stage, consumed as traces are built, so the
+	// stage's size mix is spent across its traces rather than repeated in each.
+	budget := spanBudget{
+		nearThreshold: plan.SizeMix.NearThresholdSpans,
+		overThreshold: plan.SizeMix.OverThresholdSpans,
+	}
 
 	traces := make([]generatedTrace, 0, len(active)*plan.TracesPerTenant)
 	for _, tenant := range active {
 		for range plan.TracesPerTenant {
 			traceID := HexID(16, rng)
-			spans := make([]OtlpSpan, 0, plan.SpansPerTrace)
-			// Base the trace a few minutes back so all its spans stay in the
-			// past but nowhere near the cutoff.
-			traceStartMs := nowMs - 5*60_000
-
-			for s := range plan.SpansPerTrace {
-				payloadBytes := SmallSpanBytes
-				singleOversizedAttribute := false
-
-				switch {
-				case largeOverRemaining > 0 && s == 0:
-					payloadBytes = OverThresholdBytes
-					largeOverRemaining--
-					// Every other over-threshold span uses one giant attribute
-					// instead of chunks, so the truncation path is exercised
-					// alongside the whole-command spool path.
-					singleOversizedAttribute = largeOverRemaining%2 == 0
-				case largeNearRemaining > 0 && s == 1:
-					payloadBytes = NearThresholdBytes
-					largeNearRemaining--
-				}
-
-				startMs := traceStartMs + int64(s)*10
-				if err := AssertSpanTimestampIsAccepted(startMs, nowMs); err != nil {
-					return nil, err
-				}
-
-				parentSpanID := ""
-				if s > 0 && len(spans) > 0 {
-					parentSpanID = spans[0].SpanID
-				}
-
-				spans = append(spans, BuildSpan(BuildSpanArgs{
-					TraceID:                  traceID,
-					SpanID:                   HexID(8, rng),
-					ParentSpanID:             parentSpanID,
-					Name:                     fmt.Sprintf("%s-span-%d", plan.Stage, s),
-					StartMs:                  startMs,
-					DurationMs:               5,
-					PayloadBytes:             payloadBytes,
-					SingleOversizedAttribute: singleOversizedAttribute,
-					Markers: map[string]string{
-						"langwatch.benchmark.stage": string(plan.Stage),
-						"langwatch.benchmark.seq":   strconv.Itoa(s),
-					},
-					Rng: rng,
-				}))
+			spans, err := buildTraceSpans(traceBuild{
+				Plan:    plan,
+				TraceID: traceID,
+				// Base the trace a few minutes back so all its spans stay in
+				// the past but nowhere near the cutoff.
+				TraceStartMs: gen.NowMs - 5*60_000,
+				NowMs:        gen.NowMs,
+				Budget:       &budget,
+				Rng:          rng,
+			})
+			if err != nil {
+				return nil, err
 			}
 
 			traces = append(traces, generatedTrace{Tenant: tenant, TraceID: traceID, Spans: spans})
@@ -107,6 +87,84 @@ func generateStage(plan StagePlan, tenants []Tenant, seed int64, nowMs int64) ([
 	}
 
 	return traces, nil
+}
+
+// spanBudget is a stage's remaining allowance of oversized spans. It is
+// consumed as traces are built, which is why it is passed by pointer.
+type spanBudget struct {
+	nearThreshold int
+	overThreshold int
+}
+
+// payloadFor decides one span's payload size and spends the budget.
+//
+// Only span 0 can be over-threshold and only span 1 near-threshold, so no trace
+// carries two large spans and each path is reached at most once per trace.
+func (b *spanBudget) payloadFor(index int) (payloadBytes int, singleOversizedAttribute bool) {
+	switch {
+	case b.overThreshold > 0 && index == 0:
+		b.overThreshold--
+		// Every other over-threshold span uses one giant attribute instead of
+		// chunks, so the truncation path is exercised alongside the
+		// whole-command spool path.
+		return OverThresholdBytes, b.overThreshold%2 == 0
+	case b.nearThreshold > 0 && index == 1:
+		b.nearThreshold--
+		return NearThresholdBytes, false
+	default:
+		return SmallSpanBytes, false
+	}
+}
+
+// traceBuild is everything one trace's spans are built from.
+type traceBuild struct {
+	Plan         StagePlan
+	TraceID      string
+	TraceStartMs int64
+	NowMs        int64
+	// Budget is shared across the stage and mutated here.
+	Budget *spanBudget
+	Rng    Rng
+}
+
+// buildTraceSpans builds one trace's spans, in order.
+func buildTraceSpans(build traceBuild) ([]OtlpSpan, error) {
+	plan := build.Plan
+	spans := make([]OtlpSpan, 0, plan.SpansPerTrace)
+
+	for s := range plan.SpansPerTrace {
+		payloadBytes, singleOversizedAttribute := build.Budget.payloadFor(s)
+
+		startMs := build.TraceStartMs + int64(s)*10
+		if err := AssertSpanTimestampIsAccepted(startMs, build.NowMs); err != nil {
+			return nil, err
+		}
+
+		// Every span after the first hangs off the first, so a trace is one
+		// root with siblings rather than a chain.
+		parentSpanID := ""
+		if s > 0 && len(spans) > 0 {
+			parentSpanID = spans[0].SpanID
+		}
+
+		spans = append(spans, BuildSpan(BuildSpanArgs{
+			TraceID:                  build.TraceID,
+			SpanID:                   HexID(8, build.Rng),
+			ParentSpanID:             parentSpanID,
+			Name:                     fmt.Sprintf("%s-span-%d", plan.Stage, s),
+			StartMs:                  startMs,
+			DurationMs:               5,
+			PayloadBytes:             payloadBytes,
+			SingleOversizedAttribute: singleOversizedAttribute,
+			Markers: map[string]string{
+				"langwatch.benchmark.stage": string(plan.Stage),
+				"langwatch.benchmark.seq":   strconv.Itoa(s),
+			},
+			Rng: build.Rng,
+		}))
+	}
+
+	return spans, nil
 }
 
 // sendOutcome is what a stage's send phase actually achieved.
@@ -132,13 +190,25 @@ type sendResult struct {
 	ok       bool
 }
 
+// spanPost is one OTLP request: where it goes, whose it is, and what is in it.
+type spanPost struct {
+	// Endpoint is the platform base URL; the OTLP path is appended.
+	Endpoint string
+	// Tenant owns the spans and supplies the API key.
+	Tenant Tenant
+	// Spans travel as a single resourceSpans batch.
+	Spans []OtlpSpan
+}
+
 // postSpans POSTs one OTLP request and counts what the receiver actually took.
 //
 // A 2xx does NOT mean the spans landed: the receiver reports drops in
 // partialSuccess.rejectedSpans while still returning success. Counting a 2xx
 // as "all accepted" would make the correctness check report phantom data
 // loss, so rejections are subtracted here at the source.
-func postSpans(ctx context.Context, client *http.Client, endpoint string, tenant Tenant, spans []OtlpSpan) (sendResult, error) {
+func postSpans(ctx context.Context, client *http.Client, post spanPost) (sendResult, error) {
+	endpoint, tenant, spans := post.Endpoint, post.Tenant, post.Spans
+
 	body, err := json.Marshal(BuildResourceSpans(spans))
 	if err != nil {
 		return sendResult{}, err
@@ -194,12 +264,48 @@ type stageRequest struct {
 	Spans   []OtlpSpan
 }
 
-// sendStage sends a whole stage, at the stage's configured concurrency.
-func sendStage(ctx context.Context, client *http.Client, endpoint string, plan StagePlan, traces []generatedTrace, seed int64) (sendOutcome, error) {
-	rng := CreateRng(seed + 1)
+// stageSend is one stage's send inputs.
+type stageSend struct {
+	Endpoint string
+	Plan     StagePlan
+	Traces   []generatedTrace
+	// Seed is offset from the generation seed so the send order is replayable
+	// without repeating the span-generation sequence.
+	Seed int64
+}
 
-	// Build the full request list, one entry per (tenant, trace, chunk). The
-	// trace id rides along so accepted counts can be attributed back to a trace.
+// sendStage sends a whole stage, at the stage's configured concurrency.
+func sendStage(ctx context.Context, client *http.Client, send stageSend) (sendOutcome, error) {
+	plan := send.Plan
+	rng := CreateRng(send.Seed + 1)
+
+	requests, err := buildStageRequests(plan, send.Traces, rng)
+	if err != nil {
+		return sendOutcome{}, err
+	}
+
+	// Interleave tenants so no tenant's work is contiguous — a fair-dispatch
+	// bug is invisible if each tenant is served in its own uninterrupted block.
+	interleaved := ScatterAcrossConcurrentArrivals(requests, rng)
+
+	results, err := runStageRequests(ctx, client, stageDispatch{
+		Endpoint:    send.Endpoint,
+		Requests:    interleaved,
+		Concurrency: plan.Concurrency,
+	})
+	if err != nil {
+		return sendOutcome{}, err
+	}
+
+	return tallyStage(interleaved, results), nil
+}
+
+// buildStageRequests expands a stage's traces into the POSTs that carry them,
+// one entry per (tenant, trace, chunk).
+//
+// The trace id rides along on each request so accepted counts can be attributed
+// back to a trace, which is what the correctness check compares against.
+func buildStageRequests(plan StagePlan, traces []generatedTrace, rng Rng) ([]stageRequest, error) {
 	var requests []stageRequest
 	for _, trace := range traces {
 		ordered := trace.Spans
@@ -208,35 +314,80 @@ func sendStage(ctx context.Context, client *http.Client, endpoint string, plan S
 		}
 		chunks, err := ChunkSpans(ordered, plan.SpansPerRequest)
 		if err != nil {
-			return sendOutcome{}, err
+			return nil, err
 		}
 		for _, chunk := range chunks {
 			requests = append(requests, stageRequest{Tenant: trace.Tenant, TraceID: trace.TraceID, Spans: chunk})
 		}
 	}
+	return requests, nil
+}
 
-	// Interleave tenants so no tenant's work is contiguous — a fair-dispatch
-	// bug is invisible if each tenant is served in its own uninterrupted block.
-	interleaved := ScatterAcrossConcurrentArrivals(requests, rng)
+// stageDispatch is one stage's send phase: where to, what, and how many at once.
+type stageDispatch struct {
+	Endpoint    string
+	Requests    []stageRequest
+	Concurrency int
+}
 
-	results := make([]sendResult, len(interleaved))
+// runStageRequests sends every request, at most Concurrency at a time, and
+// returns one result per request in the order they were given.
+//
+// Only a plan limit aborts the stage. Anything else — a socket reset, a
+// timeout — is a failed request recorded in its result: the pipeline never saw
+// those spans, so they are not counted as expected either, and treating an
+// infrastructure blip as data loss is how a benchmark starts crying wolf.
+func runStageRequests(ctx context.Context, client *http.Client, dispatch stageDispatch) ([]sendResult, error) {
+	requests := dispatch.Requests
+	results := make([]sendResult, len(requests))
+
 	var (
 		mu       sync.Mutex
 		firstErr error
 	)
-
-	limit := plan.Concurrency
-	if limit > len(interleaved) {
-		limit = len(interleaved)
+	sender := stageSender{
+		client:   client,
+		endpoint: dispatch.Endpoint,
+		fatal: func(err error) {
+			mu.Lock()
+			defer mu.Unlock()
+			if firstErr == nil {
+				firstErr = err
+			}
+		},
 	}
-	if limit < 1 {
-		limit = 1
-	}
 
+	next := feedIndices(ctx, len(requests))
+
+	var wait sync.WaitGroup
+	for range max(1, min(dispatch.Concurrency, len(requests))) {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			for index := range next {
+				results[index] = sender.send(ctx, requests[index])
+			}
+		}()
+	}
+	wait.Wait()
+
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	return results, nil
+}
+
+// feedIndices hands request indices to the workers one at a time, and stops
+// early if the run is canceled.
+//
+// A channel rather than a slice split: the requests are deliberately unequal in
+// size, so handing each worker a fixed share would leave some idle while one
+// worked through the oversized payloads.
+func feedIndices(ctx context.Context, count int) <-chan int {
 	next := make(chan int)
 	go func() {
 		defer close(next)
-		for i := range interleaved {
+		for i := range count {
 			select {
 			case next <- i:
 			case <-ctx.Done():
@@ -244,43 +395,42 @@ func sendStage(ctx context.Context, client *http.Client, endpoint string, plan S
 			}
 		}
 	}()
+	return next
+}
 
-	var wait sync.WaitGroup
-	for range limit {
-		wait.Add(1)
-		go func() {
-			defer wait.Done()
-			for index := range next {
-				request := interleaved[index]
-				result, err := postSpans(ctx, client, endpoint, request.Tenant, request.Spans)
-				if err != nil {
-					// Only a plan limit is fatal. Anything else (a socket
-					// reset, a timeout) is a failed request the outcome
-					// records; the pipeline never saw those spans, so they are
-					// not counted as expected either.
-					if errors.Is(err, errPlanLimit) {
-						mu.Lock()
-						if firstErr == nil {
-							firstErr = err
-						}
-						mu.Unlock()
-					}
-					results[index] = sendResult{ok: false}
-					continue
-				}
-				results[index] = result
-			}
-		}()
+// stageSender sends one request and classifies its failure.
+type stageSender struct {
+	client   *http.Client
+	endpoint string
+	// fatal reports an error that must abort the whole stage. Called at most
+	// once per stage in effect, since the caller keeps only the first.
+	fatal func(error)
+}
+
+// send posts one request. A failure that is not a plan limit is recorded in the
+// result rather than raised: the spans were never offered to the pipeline, so
+// they are not counted as expected either.
+func (s stageSender) send(ctx context.Context, request stageRequest) sendResult {
+	result, err := postSpans(ctx, s.client, spanPost{
+		Endpoint: s.endpoint,
+		Tenant:   request.Tenant,
+		Spans:    request.Spans,
+	})
+	if err != nil {
+		if errors.Is(err, errPlanLimit) {
+			s.fatal(err)
+		}
+		return sendResult{ok: false}
 	}
-	wait.Wait()
+	return result
+}
 
-	if firstErr != nil {
-		return sendOutcome{}, firstErr
-	}
-
+// tallyStage folds per-request results into the stage's outcome, attributing
+// accepted spans back to the trace that carried them.
+func tallyStage(requests []stageRequest, results []sendResult) sendOutcome {
 	outcome := sendOutcome{AcceptedByTrace: map[string]map[string]int{}}
 	for index, result := range results {
-		request := interleaved[index]
+		request := requests[index]
 		outcome.Requests++
 		outcome.Accepted += result.accepted
 		outcome.Rejected += result.rejected
@@ -293,8 +443,7 @@ func sendStage(ctx context.Context, client *http.Client, endpoint string, plan S
 		}
 		outcome.AcceptedByTrace[tenantID][request.TraceID] += result.accepted
 	}
-
-	return outcome, nil
+	return outcome
 }
 
 // countRow is the shape every per-trace count query returns. ClickHouse sends
@@ -321,47 +470,12 @@ func numberToInt(value json.Number) int {
 // Polls rather than sleeping a flat interval: a fixed sleep is either wasteful
 // or (much worse) too short under load, which turns a slow pipeline into a
 // false "lost spans" failure.
-func waitForSettle(ctx context.Context, client *chClient, tenants []Tenant, tracesByTenant map[string][]string, expectedByTenant map[string]int, window TimeWindow, timeout time.Duration, log io.Writer) {
-	deadline := time.Now().Add(timeout)
+func waitForSettle(ctx context.Context, client *chClient, watch settleWatch) {
+	deadline := time.Now().Add(watch.Timeout)
 	interval := 250 * time.Millisecond
 
 	for time.Now().Before(deadline) {
-		settled := true
-
-		for _, tenant := range tenants {
-			traceIDs := tracesByTenant[tenant.ProjectID]
-			if len(traceIDs) == 0 {
-				continue
-			}
-
-			var rows []countRow
-			err := queryJSON(ctx, client, StoredSpansPerTraceQuery(), map[string]any{
-				"tenantId": tenant.ProjectID,
-				"traceIds": traceIDs,
-				"fromMs":   window.FromMs,
-				"toMs":     window.ToMs,
-			}, &rows)
-			if err != nil {
-				// A replica restarting or a merge stalling a query mid-settle
-				// is not a benchmark result — keep polling. If ClickHouse is
-				// genuinely gone, the verification queries after this loop
-				// fail loudly rather than silently reporting every span lost.
-				fmt.Fprintf(log, "[benchmark] settle poll failed, retrying: %v\n", err)
-				settled = false
-				break
-			}
-
-			stored := 0
-			for _, row := range rows {
-				stored += row.spans()
-			}
-			if stored < expectedByTenant[tenant.ProjectID] {
-				settled = false
-				break
-			}
-		}
-
-		if settled {
+		if storedCaughtUp(ctx, client, watch) {
 			// One extra beat so any in-flight fold write lands before we read
 			// the summaries; reading a half-written projection looks like a bug.
 			sleep(ctx, time.Second)
@@ -372,12 +486,77 @@ func waitForSettle(ctx context.Context, client *chClient, tenants []Tenant, trac
 		interval = min(time.Duration(float64(interval)*1.5), 3*time.Second)
 	}
 
-	fmt.Fprintf(log,
+	fmt.Fprintf(watch.Log,
 		"[benchmark] settle timeout after %s — verifying anyway. Shortfalls below may be lag "+
-			"rather than loss; check the stage duration.\n", timeout)
+			"rather than loss; check the stage duration.\n", watch.Timeout)
 }
 
-// sleep waits, but gives up early if the run is cancelled.
+// settleWatch is what one settle loop is waiting on.
+type settleWatch struct {
+	Tenants        []Tenant
+	TracesByTenant map[string][]string
+	// ExpectedByTenant is what the send phase saw ACCEPTED, never what it sent.
+	ExpectedByTenant map[string]int
+	Window           TimeWindow
+	Timeout          time.Duration
+	Log              io.Writer
+}
+
+// storedCaughtUp reports whether every tenant's stored spans have reached what
+// the receiver accepted.
+//
+// A query failure counts as "not yet" rather than as an answer: a replica
+// restarting or a merge stalling mid-settle is not a benchmark result. If
+// ClickHouse is genuinely gone, the verification queries after the loop fail
+// loudly rather than silently reporting every span lost.
+func storedCaughtUp(ctx context.Context, client *chClient, watch settleWatch) bool {
+	for _, tenant := range watch.Tenants {
+		traceIDs := watch.TracesByTenant[tenant.ProjectID]
+		if len(traceIDs) == 0 {
+			continue
+		}
+
+		stored, err := storedSpanCount(ctx, client, traceWindowRead{
+			Tenant:   tenant,
+			TraceIDs: traceIDs,
+			Window:   watch.Window,
+		})
+		if err != nil {
+			fmt.Fprintf(watch.Log, "[benchmark] settle poll failed, retrying: %v\n", err)
+			return false
+		}
+		if stored < watch.ExpectedByTenant[tenant.ProjectID] {
+			return false
+		}
+	}
+	return true
+}
+
+// storedSpanCount totals the spans stored for one tenant's traces in a window.
+func storedSpanCount(ctx context.Context, client *chClient, read traceWindowRead) (int, error) {
+	var rows []countRow
+	err := queryJSON(ctx, client, chQuery{
+		SQL: StoredSpansPerTraceQuery(),
+		Params: map[string]any{
+			"tenantId": read.Tenant.ProjectID,
+			"traceIds": read.TraceIDs,
+			"fromMs":   read.Window.FromMs,
+			"toMs":     read.Window.ToMs,
+		},
+		Into: &rows,
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	stored := 0
+	for _, row := range rows {
+		stored += row.spans()
+	}
+	return stored, nil
+}
+
+// sleep waits, but gives up early if the run is canceled.
 func sleep(ctx context.Context, duration time.Duration) {
 	timer := time.NewTimer(duration)
 	defer timer.Stop()
@@ -387,111 +566,191 @@ func sleep(ctx context.Context, duration time.Duration) {
 	}
 }
 
+// stageVerify is one stage's verification inputs.
+type stageVerify struct {
+	Tenants []Tenant
+	Traces  []generatedTrace
+	// AcceptedByTrace is what the receiver took, keyed tenant -> trace. Every
+	// check compares against this rather than against what was sent.
+	AcceptedByTrace map[string]map[string]int
+	Window          TimeWindow
+	// SpanEventType is the event_log type counted for the layer check.
+	SpanEventType string
+}
+
 // verifyStage runs every correctness check for one stage.
-func verifyStage(ctx context.Context, client *chClient, tenants []Tenant, traces []generatedTrace, acceptedByTrace map[string]map[string]int, window TimeWindow, spanEventType string) ([]Violation, error) {
+func verifyStage(ctx context.Context, client *chClient, verify stageVerify) ([]Violation, error) {
 	var violations []Violation
 
-	for _, tenant := range tenants {
-		var traceIDs []string
-		for _, trace := range traces {
-			if trace.Tenant.ProjectID == tenant.ProjectID {
-				traceIDs = append(traceIDs, trace.TraceID)
-			}
-		}
+	for _, tenant := range verify.Tenants {
+		_, traceIDs := tracesOwnedBy(verify.Traces, tenant)
 		if len(traceIDs) == 0 {
 			continue
 		}
 
-		params := map[string]any{
-			"tenantId": tenant.ProjectID,
-			"traceIds": traceIDs,
-			"fromMs":   window.FromMs,
-			"toMs":     window.ToMs,
+		found, err := verifyTenant(ctx, client, tenantVerify{
+			Stage:    verify,
+			Tenant:   tenant,
+			TraceIDs: traceIDs,
+		})
+		if err != nil {
+			return nil, err
 		}
-
-		var storedRows []countRow
-		if err := queryJSON(ctx, client, StoredSpansPerTraceQuery(), params, &storedRows); err != nil {
-			return nil, fmt.Errorf("stored-span query failed for %s: %w", tenant.ProjectID, err)
-		}
-		stored := map[string]int{}
-		for _, row := range storedRows {
-			stored[row.TraceID] = row.spans()
-		}
-
-		eventParams := map[string]any{}
-		for key, value := range params {
-			eventParams[key] = value
-		}
-		eventParams["eventType"] = spanEventType
-
-		var eventRows []countRow
-		if err := queryJSON(ctx, client, EventLogCountsQuery(), eventParams, &eventRows); err != nil {
-			return nil, fmt.Errorf("event-log query failed for %s: %w", tenant.ProjectID, err)
-		}
-		events := map[string]int{}
-		for _, row := range eventRows {
-			events[row.TraceID] = row.events()
-		}
-
-		violations = append(violations, FindLayerDivergence(FindLayerDivergenceOptions{
-			TenantId:    tenant.ProjectID,
-			Accepted:    acceptedByTrace[tenant.ProjectID],
-			EventLog:    events,
-			StoredSpans: stored,
-		})...)
-
-		var summaryRows []SummaryRow
-		if err := queryJSON(ctx, client, SummaryVsStoredQuery(), params, &summaryRows); err != nil {
-			return nil, fmt.Errorf("summary query failed for %s: %w", tenant.ProjectID, err)
-		}
-		violations = append(violations, FindCountMismatches(FindCountMismatchesOptions{
-			TenantId: tenant.ProjectID,
-			Rows:     summaryRows,
-		})...)
-
-		summarised := map[string]struct{}{}
-		for _, row := range summaryRows {
-			summarised[row.TraceId] = struct{}{}
-		}
-		violations = append(violations, FindMissingSummaries(FindMissingSummariesOptions{
-			TenantId:           tenant.ProjectID,
-			ExpectedTraceIds:   traceIDs,
-			SummarisedTraceIds: summarised,
-		})...)
-
-		var foreignRows []countRow
-		foreignParams := map[string]any{
-			"tenantId":    tenant.ProjectID,
-			"ownTraceIds": traceIDs,
-			"fromMs":      window.FromMs,
-			"toMs":        window.ToMs,
-		}
-		if err := queryJSON(ctx, client, ForeignTracesQuery(), foreignParams, &foreignRows); err != nil {
-			return nil, fmt.Errorf("cross-tenant query failed for %s: %w", tenant.ProjectID, err)
-		}
-		foreign := make([]string, 0, len(foreignRows))
-		for _, row := range foreignRows {
-			foreign = append(foreign, row.TraceID)
-		}
-		violations = append(violations, FindCrossTenantLeaks(FindCrossTenantLeaksOptions{
-			TenantId:        tenant.ProjectID,
-			ForeignTraceIds: foreign,
-		})...)
+		violations = append(violations, found...)
 	}
 
 	return violations, nil
 }
 
+// tenantVerify narrows a stage's verification to a single tenant.
+type tenantVerify struct {
+	Stage    stageVerify
+	Tenant   Tenant
+	TraceIDs []string
+}
+
+// params are the bound values every per-tenant query shares.
+func (v tenantVerify) params() map[string]any {
+	return map[string]any{
+		"tenantId": v.Tenant.ProjectID,
+		"traceIds": v.TraceIDs,
+		"fromMs":   v.Stage.Window.FromMs,
+		"toMs":     v.Stage.Window.ToMs,
+	}
+}
+
+// verifyTenant runs all three checks for one tenant.
+//
+// A query error aborts rather than being recorded as a violation: not knowing
+// what ClickHouse holds is not the same as knowing it holds the wrong thing,
+// and reporting the first as the second is how a benchmark loses its authority.
+func verifyTenant(ctx context.Context, client *chClient, v tenantVerify) ([]Violation, error) {
+	var violations []Violation
+
+	layers, err := verifyLayerCounts(ctx, client, v)
+	if err != nil {
+		return nil, err
+	}
+	violations = append(violations, layers...)
+
+	summaries, err := verifySummaries(ctx, client, v)
+	if err != nil {
+		return nil, err
+	}
+	violations = append(violations, summaries...)
+
+	leaks, err := verifyTenantIsolation(ctx, client, v)
+	if err != nil {
+		return nil, err
+	}
+	return append(violations, leaks...), nil
+}
+
+// verifyLayerCounts compares what was accepted, what the event log recorded,
+// and what was finally stored. A divergence localises the loss to one hop.
+func verifyLayerCounts(ctx context.Context, client *chClient, v tenantVerify) ([]Violation, error) {
+	params := v.params()
+
+	var storedRows []countRow
+	if err := queryJSON(ctx, client, chQuery{SQL: StoredSpansPerTraceQuery(), Params: params, Into: &storedRows}); err != nil {
+		return nil, fmt.Errorf("stored-span query failed for %s: %w", v.Tenant.ProjectID, err)
+	}
+	stored := map[string]int{}
+	for _, row := range storedRows {
+		stored[row.TraceID] = row.spans()
+	}
+
+	eventParams := v.params()
+	eventParams["eventType"] = v.Stage.SpanEventType
+
+	var eventRows []countRow
+	if err := queryJSON(ctx, client, chQuery{SQL: EventLogCountsQuery(), Params: eventParams, Into: &eventRows}); err != nil {
+		return nil, fmt.Errorf("event-log query failed for %s: %w", v.Tenant.ProjectID, err)
+	}
+	events := map[string]int{}
+	for _, row := range eventRows {
+		events[row.TraceID] = row.events()
+	}
+
+	return FindLayerDivergence(FindLayerDivergenceOptions{
+		TenantId:    v.Tenant.ProjectID,
+		Accepted:    v.Stage.AcceptedByTrace[v.Tenant.ProjectID],
+		EventLog:    events,
+		StoredSpans: stored,
+	}), nil
+}
+
+// verifySummaries checks the trace-summary projection against stored spans,
+// both for a wrong count and for a summary that never appeared at all.
+func verifySummaries(ctx context.Context, client *chClient, v tenantVerify) ([]Violation, error) {
+	var summaryRows []SummaryRow
+	if err := queryJSON(ctx, client, chQuery{SQL: SummaryVsStoredQuery(), Params: v.params(), Into: &summaryRows}); err != nil {
+		return nil, fmt.Errorf("summary query failed for %s: %w", v.Tenant.ProjectID, err)
+	}
+
+	violations := FindCountMismatches(FindCountMismatchesOptions{
+		TenantId: v.Tenant.ProjectID,
+		Rows:     summaryRows,
+	})
+
+	summarized := map[string]struct{}{}
+	for _, row := range summaryRows {
+		summarized[row.TraceId] = struct{}{}
+	}
+
+	return append(violations, FindMissingSummaries(FindMissingSummariesOptions{
+		TenantId:           v.Tenant.ProjectID,
+		ExpectedTraceIds:   v.TraceIDs,
+		SummarizedTraceIds: summarized,
+	})...), nil
+}
+
+// verifyTenantIsolation looks for traces visible under this tenant that this
+// tenant never sent.
+func verifyTenantIsolation(ctx context.Context, client *chClient, v tenantVerify) ([]Violation, error) {
+	var foreignRows []countRow
+	foreignParams := map[string]any{
+		"tenantId":    v.Tenant.ProjectID,
+		"ownTraceIds": v.TraceIDs,
+		"fromMs":      v.Stage.Window.FromMs,
+		"toMs":        v.Stage.Window.ToMs,
+	}
+	if err := queryJSON(ctx, client, chQuery{SQL: ForeignTracesQuery(), Params: foreignParams, Into: &foreignRows}); err != nil {
+		return nil, fmt.Errorf("cross-tenant query failed for %s: %w", v.Tenant.ProjectID, err)
+	}
+
+	foreign := make([]string, 0, len(foreignRows))
+	for _, row := range foreignRows {
+		foreign = append(foreign, row.TraceID)
+	}
+
+	return FindCrossTenantLeaks(FindCrossTenantLeaksOptions{
+		TenantId:        v.Tenant.ProjectID,
+		ForeignTraceIds: foreign,
+	}), nil
+}
+
+// traceWindowRead names one tenant's traces over one window.
+type traceWindowRead struct {
+	Tenant   Tenant
+	TraceIDs []string
+	Window   TimeWindow
+}
+
 // readSummaryCounts reads current summary SpanCounts, for the resend
 // before/after comparison.
-func readSummaryCounts(ctx context.Context, client *chClient, tenant Tenant, traceIDs []string, window TimeWindow) (map[string]int, error) {
+func readSummaryCounts(ctx context.Context, client *chClient, read traceWindowRead) (map[string]int, error) {
 	var rows []SummaryRow
-	err := queryJSON(ctx, client, SummaryVsStoredQuery(), map[string]any{
-		"tenantId": tenant.ProjectID,
-		"traceIds": traceIDs,
-		"fromMs":   window.FromMs,
-		"toMs":     window.ToMs,
-	}, &rows)
+	err := queryJSON(ctx, client, chQuery{
+		SQL: SummaryVsStoredQuery(),
+		Params: map[string]any{
+			"tenantId": read.Tenant.ProjectID,
+			"traceIds": read.TraceIDs,
+			"fromMs":   read.Window.FromMs,
+			"toMs":     read.Window.ToMs,
+		},
+		Into: &rows,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -552,7 +811,7 @@ func leadingInt(value string) int {
 // the caller as a non-zero exit, not as an error — an error here means the
 // benchmark could not be run at all, which is a different thing from the
 // benchmark finding a bug.
-func RunBenchmark(ctx context.Context, args RunArgs, stdout, stderr io.Writer) ([]Violation, error) {
+func RunBenchmark(ctx context.Context, args RunArgs, out streams) ([]Violation, error) {
 	// 0 takes the default byte budget.
 	plan, err := PlanBenchmark(args.Scale, 0)
 	if err != nil {
@@ -577,93 +836,30 @@ func RunBenchmark(ctx context.Context, args RunArgs, stdout, stderr io.Writer) (
 	// Prove the whole path works on ONE span before spending the run on it.
 	// A misconfigured harness that reaches the stages reports "lost spans",
 	// which is the wrong diagnosis and the expensive one to chase.
-	if err := preflight(ctx, sender, client, args, preflightTimeout, stderr); err != nil {
+	if err := preflight(ctx, sender, client, args, preflightTimeout, out.Err); err != nil {
 		return nil, err
 	}
 
 	var results []StageResult
 
 	for _, stagePlan := range plan.Stages {
-		fmt.Fprintf(stdout, "[benchmark] stage %s: %s\n", stagePlan.Stage, stagePlan.Description)
+		fmt.Fprintf(out.Out, "[benchmark] stage %s: %s\n", stagePlan.Stage, stagePlan.Description)
 
-		nowMs := time.Now().UnixMilli()
-		traces, err := generateStage(stagePlan, args.Tenants, args.Seed, nowMs)
-		if err != nil {
-			return nil, err
-		}
-
-		stopSampling := startSampling(ctx, args.Namespace)
-
-		startedAtMs := time.Now().UnixMilli()
-		outcome, err := sendStage(ctx, sender, args.Endpoint, stagePlan, traces, args.Seed)
-		if err != nil {
-			stopSampling()
-			return nil, err
-		}
-
-		// The verification window bounds the PARTITION KEY columns, which for
-		// stored_spans and trace_summaries are span start times — not ingest
-		// time. Padding generously on both sides keeps partition pruning while
-		// never excluding a span we sent.
-		window := TimeWindow{
-			FromMs: nowMs - 60*60_000,
-			ToMs:   time.Now().UnixMilli() + 60*60_000,
-		}
-
-		// Expectations come from what the receiver ACCEPTED, not what was sent.
-		tracesByTenant := map[string][]string{}
-		for _, trace := range traces {
-			tracesByTenant[trace.Tenant.ProjectID] = append(tracesByTenant[trace.Tenant.ProjectID], trace.TraceID)
-		}
-		expectedByTenant := map[string]int{}
-		for tenantID, perTrace := range outcome.AcceptedByTrace {
-			total := 0
-			for _, count := range perTrace {
-				total += count
-			}
-			expectedByTenant[tenantID] = total
-		}
-
-		active := args.Tenants[:stagePlan.Tenants]
-		waitForSettle(ctx, client, active, tracesByTenant, expectedByTenant, window, args.SettleTimeout, stderr)
-
-		violations, err := verifyStage(ctx, client, active, traces, outcome.AcceptedByTrace, window, args.SpanEventType)
-		if err != nil {
-			stopSampling()
-			return nil, err
-		}
-
-		resendViolations, err := runResendProbe(ctx, client, sender, args, stagePlan, traces, window)
-		if err != nil {
-			stopSampling()
-			return nil, err
-		}
-		violations = append(violations, resendViolations...)
-
-		collected := stopSampling()
-
-		spansSent := 0
-		for _, trace := range traces {
-			spansSent += len(trace.Spans)
-		}
-
-		results = append(results, StageResult{
-			Stage:          stagePlan.Stage,
-			Description:    stagePlan.Description,
-			StartedAtMs:    startedAtMs,
-			FinishedAtMs:   time.Now().UnixMilli(),
-			SpansSent:      spansSent,
-			SpansAccepted:  outcome.Accepted,
-			SpansRejected:  outcome.Rejected,
-			RequestsSent:   outcome.Requests,
-			RequestsFailed: outcome.Failures,
-			Violations:     violations,
-			Samples:        collected,
+		result, err := runStage(ctx, stageRun{
+			Args:   args,
+			Plan:   stagePlan,
+			Client: client,
+			Sender: sender,
+			Out:    out,
 		})
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, result)
 
-		fmt.Fprintf(stdout,
+		fmt.Fprintf(out.Out,
 			"[benchmark] stage %s finished: %d accepted, %d rejected, %d violation(s)\n",
-			stagePlan.Stage, outcome.Accepted, outcome.Rejected, len(violations))
+			stagePlan.Stage, result.SpansAccepted, result.SpansRejected, len(result.Violations))
 	}
 
 	if err := writeArtifacts(args, plan, results); err != nil {
@@ -677,10 +873,199 @@ func RunBenchmark(ctx context.Context, args RunArgs, stdout, stderr io.Writer) (
 	return all, nil
 }
 
+// stageRun is everything one stage needs to execute.
+type stageRun struct {
+	Args   RunArgs
+	Plan   StagePlan
+	Client *chClient
+	Sender *http.Client
+	Out    streams
+}
+
+// runStage generates, sends, settles and verifies one stage.
+//
+// Resource sampling is started before the first request and stopped on every
+// exit path, including the error ones — a sampler left running would keep
+// shelling out to kubectl for the rest of the process.
+func runStage(ctx context.Context, run stageRun) (StageResult, error) {
+	args, stagePlan := run.Args, run.Plan
+
+	nowMs := time.Now().UnixMilli()
+	traces, err := generateStage(stageGen{
+		Plan:    stagePlan,
+		Tenants: args.Tenants,
+		Seed:    args.Seed,
+		NowMs:   nowMs,
+	})
+	if err != nil {
+		return StageResult{}, err
+	}
+
+	stopSampling := startSampling(ctx, args.Namespace)
+	sampling := true
+	defer func() {
+		if sampling {
+			stopSampling()
+		}
+	}()
+
+	startedAtMs := time.Now().UnixMilli()
+	outcome, err := sendStage(ctx, run.Sender, stageSend{
+		Endpoint: args.Endpoint,
+		Plan:     stagePlan,
+		Traces:   traces,
+		Seed:     args.Seed,
+	})
+	if err != nil {
+		return StageResult{}, err
+	}
+
+	// The verification window bounds the PARTITION KEY columns, which for
+	// stored_spans and trace_summaries are span start times — not ingest
+	// time. Padding generously on both sides keeps partition pruning while
+	// never excluding a span we sent.
+	window := TimeWindow{
+		FromMs: nowMs - 60*60_000,
+		ToMs:   time.Now().UnixMilli() + 60*60_000,
+	}
+
+	violations, err := settleAndVerify(ctx, run, stageSettle{
+		Traces:  traces,
+		Outcome: outcome,
+		Window:  window,
+	})
+	if err != nil {
+		return StageResult{}, err
+	}
+
+	sampling = false
+
+	return stageResultOf(stagePlan, stageTally{
+		StartedAtMs: startedAtMs,
+		Traces:      traces,
+		Outcome:     outcome,
+		Violations:  violations,
+		Samples:     stopSampling(),
+	}), nil
+}
+
+// stageTally is everything a finished stage has to report.
+type stageTally struct {
+	StartedAtMs int64
+	Traces      []generatedTrace
+	Outcome     sendOutcome
+	Violations  []Violation
+	Samples     []ResourceSample
+}
+
+// stageResultOf assembles the record written to results.json. FinishedAtMs is
+// read here rather than passed in, so it is the moment the stage was actually
+// done rather than whenever the caller got around to building the result.
+func stageResultOf(plan StagePlan, tally stageTally) StageResult {
+	spansSent := 0
+	for _, trace := range tally.Traces {
+		spansSent += len(trace.Spans)
+	}
+
+	return StageResult{
+		Stage:          plan.Stage,
+		Description:    plan.Description,
+		StartedAtMs:    tally.StartedAtMs,
+		FinishedAtMs:   time.Now().UnixMilli(),
+		SpansSent:      spansSent,
+		SpansAccepted:  tally.Outcome.Accepted,
+		SpansRejected:  tally.Outcome.Rejected,
+		RequestsSent:   tally.Outcome.Requests,
+		RequestsFailed: tally.Outcome.Failures,
+		Violations:     tally.Violations,
+		Samples:        tally.Samples,
+	}
+}
+
+// stageSettle is what one stage produced, ready to be settled and checked.
+type stageSettle struct {
+	Traces  []generatedTrace
+	Outcome sendOutcome
+	Window  TimeWindow
+}
+
+// settleAndVerify waits for the pipeline to catch up, then runs every
+// correctness check including the resend probe.
+func settleAndVerify(ctx context.Context, run stageRun, settle stageSettle) ([]Violation, error) {
+	args := run.Args
+	tracesByTenant, expectedByTenant := stageExpectations(settle.Traces, settle.Outcome)
+	active := args.Tenants[:run.Plan.Tenants]
+
+	waitForSettle(ctx, run.Client, settleWatch{
+		Tenants:          active,
+		TracesByTenant:   tracesByTenant,
+		ExpectedByTenant: expectedByTenant,
+		Window:           settle.Window,
+		Timeout:          args.SettleTimeout,
+		Log:              run.Out.Err,
+	})
+
+	violations, err := verifyStage(ctx, run.Client, stageVerify{
+		Tenants:         active,
+		Traces:          settle.Traces,
+		AcceptedByTrace: settle.Outcome.AcceptedByTrace,
+		Window:          settle.Window,
+		SpanEventType:   args.SpanEventType,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	resendViolations, err := runResendProbe(ctx, run.Client, stageResend{
+		Args:   args,
+		Plan:   run.Plan,
+		Traces: settle.Traces,
+		Window: settle.Window,
+		Sender: run.Sender,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return append(violations, resendViolations...), nil
+}
+
+// stageExpectations derives what the settle loop should wait for: which traces
+// each tenant owns, and how many spans that tenant should end up with.
+//
+// The counts come from what the receiver ACCEPTED, never from what was sent.
+func stageExpectations(traces []generatedTrace, outcome sendOutcome) (tracesByTenant map[string][]string, expectedByTenant map[string]int) {
+	tracesByTenant = map[string][]string{}
+	for _, trace := range traces {
+		tracesByTenant[trace.Tenant.ProjectID] = append(tracesByTenant[trace.Tenant.ProjectID], trace.TraceID)
+	}
+
+	expectedByTenant = map[string]int{}
+	for tenantID, perTrace := range outcome.AcceptedByTrace {
+		total := 0
+		for _, count := range perTrace {
+			total += count
+		}
+		expectedByTenant[tenantID] = total
+	}
+
+	return tracesByTenant, expectedByTenant
+}
+
+// stageResend is one stage's resend probe inputs.
+type stageResend struct {
+	Args   RunArgs
+	Plan   StagePlan
+	Traces []generatedTrace
+	Window TimeWindow
+	Sender *http.Client
+}
+
 // runResendProbe re-POSTs a fraction of the stage's spans and checks the
 // summary counter did not move — the shape a retried batch takes in
 // production, and the one that double-counts while every span is still present.
-func runResendProbe(ctx context.Context, client *chClient, sender *http.Client, args RunArgs, stagePlan StagePlan, traces []generatedTrace, window TimeWindow) ([]Violation, error) {
+func runResendProbe(ctx context.Context, client *chClient, resend stageResend) ([]Violation, error) {
+	args, stagePlan := resend.Args, resend.Plan
 	if stagePlan.ResendFraction <= 0 {
 		return nil, nil
 	}
@@ -689,50 +1074,121 @@ func runResendProbe(ctx context.Context, client *chClient, sender *http.Client, 
 	var violations []Violation
 
 	for _, tenant := range args.Tenants[:stagePlan.Tenants] {
-		var tenantTraces []generatedTrace
-		var traceIDs []string
-		for _, trace := range traces {
-			if trace.Tenant.ProjectID == tenant.ProjectID {
-				tenantTraces = append(tenantTraces, trace)
-				traceIDs = append(traceIDs, trace.TraceID)
-			}
-		}
-
-		before, err := readSummaryCounts(ctx, client, tenant, traceIDs, window)
+		found, err := probeTenantResend(ctx, client, resendProbe{
+			Args:   args,
+			Plan:   stagePlan,
+			Tenant: tenant,
+			Traces: resend.Traces,
+			Window: resend.Window,
+			Rng:    rng,
+			Sender: resend.Sender,
+		})
 		if err != nil {
 			return nil, err
 		}
-
-		for _, trace := range tenantTraces {
-			resend := SelectForResend(trace.Spans, stagePlan.ResendFraction, rng)
-			if len(resend) == 0 {
-				continue
-			}
-			chunks, err := ChunkSpans(resend, stagePlan.SpansPerRequest)
-			if err != nil {
-				return nil, err
-			}
-			for _, chunk := range chunks {
-				if _, err := postSpans(ctx, sender, args.Endpoint, tenant, chunk); err != nil {
-					return nil, err
-				}
-			}
-		}
-
-		sleep(ctx, 5*time.Second)
-
-		after, err := readSummaryCounts(ctx, client, tenant, traceIDs, window)
-		if err != nil {
-			return nil, err
-		}
-		violations = append(violations, FindResendDrift(FindResendDriftOptions{
-			TenantId: tenant.ProjectID,
-			Before:   before,
-			After:    after,
-		})...)
+		violations = append(violations, found...)
 	}
 
 	return violations, nil
+}
+
+// resendProbe is one tenant's resend probe.
+type resendProbe struct {
+	Args   RunArgs
+	Plan   StagePlan
+	Tenant Tenant
+	Traces []generatedTrace
+	Window TimeWindow
+	Rng    Rng
+	Sender *http.Client
+}
+
+// probeTenantResend resends a fraction of one tenant's spans and checks the
+// summary counter did not move.
+//
+// The counter staying still only means dedup worked if the resend was actually
+// ACCEPTED. A receiver that refused the whole resend leaves the counter exactly
+// as still as a correctly deduped one, so acceptance is proven first and a
+// short resend aborts the probe rather than passing it.
+func probeTenantResend(ctx context.Context, client *chClient, probe resendProbe) ([]Violation, error) {
+	tenantTraces, traceIDs := tracesOwnedBy(probe.Traces, probe.Tenant)
+	if len(traceIDs) == 0 {
+		return nil, nil
+	}
+
+	read := traceWindowRead{Tenant: probe.Tenant, TraceIDs: traceIDs, Window: probe.Window}
+	before, err := readSummaryCounts(ctx, client, read)
+	if err != nil {
+		return nil, err
+	}
+
+	sent, accepted, err := resendSpans(ctx, probe, tenantTraces)
+	if err != nil {
+		return nil, err
+	}
+	if sent == 0 {
+		return nil, nil
+	}
+	if accepted < sent {
+		// Not a correctness violation: the pipeline was never given the
+		// chance to double-count. Reported as a failed run so the result is
+		// never mistaken for evidence that dedup holds.
+		return nil, fmt.Errorf(
+			"resend probe inconclusive for %s: the receiver accepted %d of %d resent spans, "+
+				"so an unmoved summary counter would prove nothing about dedup",
+			probe.Tenant.ProjectID, accepted, sent)
+	}
+
+	sleep(ctx, 5*time.Second)
+
+	after, err := readSummaryCounts(ctx, client, read)
+	if err != nil {
+		return nil, err
+	}
+	return FindResendDrift(FindResendDriftOptions{
+		TenantId: probe.Tenant.ProjectID,
+		Before:   before,
+		After:    after,
+	}), nil
+}
+
+// resendSpans re-POSTs the selected fraction of each trace, and reports how
+// many spans were offered and how many the receiver took.
+func resendSpans(ctx context.Context, probe resendProbe, tenantTraces []generatedTrace) (sent, accepted int, err error) {
+	for _, trace := range tenantTraces {
+		resend := SelectForResend(trace.Spans, probe.Plan.ResendFraction, probe.Rng)
+		if len(resend) == 0 {
+			continue
+		}
+		chunks, chunkErr := ChunkSpans(resend, probe.Plan.SpansPerRequest)
+		if chunkErr != nil {
+			return 0, 0, chunkErr
+		}
+		for _, chunk := range chunks {
+			result, postErr := postSpans(ctx, probe.Sender, spanPost{
+				Endpoint: probe.Args.Endpoint,
+				Tenant:   probe.Tenant,
+				Spans:    chunk,
+			})
+			if postErr != nil {
+				return 0, 0, postErr
+			}
+			sent += len(chunk)
+			accepted += result.accepted
+		}
+	}
+	return sent, accepted, nil
+}
+
+// tracesOwnedBy splits out one tenant's traces and their ids.
+func tracesOwnedBy(traces []generatedTrace, tenant Tenant) (owned []generatedTrace, traceIDs []string) {
+	for _, trace := range traces {
+		if trace.Tenant.ProjectID == tenant.ProjectID {
+			owned = append(owned, trace)
+			traceIDs = append(traceIDs, trace.TraceID)
+		}
+	}
+	return owned, traceIDs
 }
 
 // startSampling polls `kubectl top` every 5s until the returned stop function

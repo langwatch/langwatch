@@ -209,7 +209,7 @@ func RenderCorrectnessSection(results []StageResult) string {
 		if len(r.Violations) == 0 {
 			continue
 		}
-		fmt.Fprintf(&b, "\n### `%s`\n\n%s\n", r.Stage, SummariseViolations(r.Violations))
+		fmt.Fprintf(&b, "\n### `%s`\n\n%s\n", r.Stage, SummarizeViolations(r.Violations))
 	}
 	return b.String()
 }

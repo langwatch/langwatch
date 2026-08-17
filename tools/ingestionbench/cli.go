@@ -35,6 +35,17 @@ Commands:
 Run "ingestionbench <command> -h" for the flags of each command.
 `
 
+// streams are the command's two output channels, kept together because the
+// split between them is a contract rather than a convenience: the workflow
+// captures stdout and pipes it straight into the next step, so anything that is
+// not the machine-readable result belongs on stderr.
+type streams struct {
+	// Out carries the result, and nothing else.
+	Out io.Writer
+	// Err carries progress, diagnostics and usage.
+	Err io.Writer
+}
+
 // Run is the ingestionbench CLI. It returns the process exit code: 0 when the
 // benchmark passed, 1 when it found a correctness violation, 2 when it could
 // not be run at all.
@@ -43,8 +54,9 @@ Run "ingestionbench <command> -h" for the flags of each command.
 // look; exit 2 means the benchmark itself could not reach ClickHouse, or was
 // misconfigured, and says nothing about the code under test.
 func Run(args []string, stdout, stderr io.Writer) int {
+	out := streams{Out: stdout, Err: stderr}
 	if len(args) == 0 {
-		fmt.Fprint(stderr, usage)
+		fmt.Fprint(out.Err, usage)
 		return 2
 	}
 
@@ -52,14 +64,14 @@ func Run(args []string, stdout, stderr io.Writer) int {
 
 	switch args[0] {
 	case "seed":
-		return runSeedCommand(ctx, args[1:], stdout, stderr)
+		return runSeedCommand(ctx, args[1:], out)
 	case "run":
-		return runBenchmarkCommand(ctx, args[1:], stdout, stderr)
+		return runBenchmarkCommand(ctx, args[1:], out)
 	case "-h", "-help", "--help", "help":
-		fmt.Fprint(stdout, usage)
+		fmt.Fprint(out.Out, usage)
 		return 0
 	default:
-		fmt.Fprintf(stderr, "unknown command %q\n\n%s", args[0], usage)
+		fmt.Fprintf(out.Err, "unknown command %q\n\n%s", args[0], usage)
 		return 2
 	}
 }
@@ -68,9 +80,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 //
 // stdout carries ONLY the JSON so the workflow can capture it directly;
 // progress goes to stderr.
-func runSeedCommand(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+func runSeedCommand(ctx context.Context, args []string, out streams) int {
 	flags := flag.NewFlagSet("ingestionbench seed", flag.ContinueOnError)
-	flags.SetOutput(stderr)
+	flags.SetOutput(out.Err)
 	count := flags.Int("count", 4, "how many projects to seed (minimum 2)")
 	databaseURL := flags.String("database-url", os.Getenv("DATABASE_URL"), "Postgres URL to seed into")
 	if err := flags.Parse(args); err != nil {
@@ -79,50 +91,50 @@ func runSeedCommand(ctx context.Context, args []string, stdout, stderr io.Writer
 
 	resolved := seedArgs{DatabaseURL: *databaseURL, Count: *count}
 	if err := resolved.validate(); err != nil {
-		fmt.Fprintln(stderr, err)
+		fmt.Fprintln(out.Err, err)
 		return 2
 	}
 
 	runID, err := nanoid(8)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		fmt.Fprintln(out.Err, err)
 		return 2
 	}
 
 	plan, err := buildSeedPlan(runID, resolved.Count)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		fmt.Fprintln(out.Err, err)
 		return 2
 	}
 	if err := applySeed(ctx, resolved.DatabaseURL, plan.SQL); err != nil {
-		fmt.Fprintln(stderr, err)
+		fmt.Fprintln(out.Err, err)
 		return 2
 	}
 
 	for _, tenant := range plan.Tenants {
-		fmt.Fprintf(stderr, "[seed] project %s\n", tenant.ProjectID)
+		fmt.Fprintf(out.Err, "[seed] project %s\n", tenant.ProjectID)
 	}
 
 	encoded, err := json.Marshal(plan.Tenants)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		fmt.Fprintln(out.Err, err)
 		return 2
 	}
-	fmt.Fprintln(stdout, string(encoded))
+	fmt.Fprintln(out.Out, string(encoded))
 	return 0
 }
 
 // runBenchmarkCommand parses the run flags and executes the benchmark.
-func runBenchmarkCommand(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+func runBenchmarkCommand(ctx context.Context, args []string, out streams) int {
 	flags := flag.NewFlagSet("ingestionbench run", flag.ContinueOnError)
-	flags.SetOutput(stderr)
+	flags.SetOutput(out.Err)
 
 	endpoint := flags.String("endpoint", envOr("LANGWATCH_ENDPOINT", "http://localhost:5560"), "platform base URL to ingest against")
 	clickhouse := flags.String("clickhouse", os.Getenv("CLICKHOUSE_URL"), "ClickHouse URL the correctness checks read from")
 	tenants := flags.String("tenants", os.Getenv("BENCHMARK_TENANTS"), "tenants as JSON, from `ingestionbench seed`")
 	scale := flags.Float64("scale", 1, "workload multiplier (trace counts only; payload sizes are fixed)")
 	seed := flags.Int64("seed", 1337, "PRNG seed; reuse a failing run's seed to replay it exactly")
-	out := flags.String("out", "/tmp/ingestion-benchmark", "directory for results.json, samples.json, and summary.md")
+	outDir := flags.String("out", "/tmp/ingestion-benchmark", "directory for results.json, samples.json, and summary.md")
 	runnerLabel := flags.String("runner-label", envOr("RUNNER_LABEL", "unknown"), "runner the numbers were measured on, recorded in the report")
 	// The trace aggregate carries several event types; only the span-recording
 	// one is counted. Overridable so a rename does not silently zero the
@@ -137,7 +149,7 @@ func runBenchmarkCommand(ctx context.Context, args []string, stdout, stderr io.W
 
 	parsedTenants, err := parseTenants(*tenants)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		fmt.Fprintln(out.Err, err)
 		return 2
 	}
 
@@ -147,30 +159,30 @@ func runBenchmarkCommand(ctx context.Context, args []string, stdout, stderr io.W
 		Tenants:       parsedTenants,
 		Scale:         *scale,
 		Seed:          *seed,
-		Out:           *out,
+		Out:           *outDir,
 		RunnerLabel:   *runnerLabel,
 		SpanEventType: *spanEventType,
 		SettleTimeout: *settleTimeout,
 		Namespace:     *namespace,
 	}
 	if err := resolved.validate(); err != nil {
-		fmt.Fprintln(stderr, err)
+		fmt.Fprintln(out.Err, err)
 		return 2
 	}
 
-	violations, err := RunBenchmark(ctx, resolved, stdout, stderr)
+	violations, err := RunBenchmark(ctx, resolved, out)
 	if err != nil {
-		fmt.Fprintf(stderr, "[benchmark] could not run: %v\n", err)
+		fmt.Fprintf(out.Err, "[benchmark] could not run: %v\n", err)
 		return 2
 	}
 
 	if IsFailure(violations) {
-		fmt.Fprintf(stderr, "[benchmark] FAILED with %d correctness violation(s).\n%s\n",
-			len(violations), SummariseViolations(violations))
+		fmt.Fprintf(out.Err, "[benchmark] FAILED with %d correctness violation(s).\n%s\n",
+			len(violations), SummarizeViolations(violations))
 		return 1
 	}
 
-	fmt.Fprintln(stdout, "[benchmark] all stages passed.")
+	fmt.Fprintln(out.Out, "[benchmark] all stages passed.")
 	return 0
 }
 

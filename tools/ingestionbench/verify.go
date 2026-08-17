@@ -169,7 +169,7 @@ func ForeignTracesQuery() string {
 //
 // event_log is ground truth for "did the span become an event at all",
 // independent of any projection's lag or health. Comparing the three layers —
-// event_log, then trace_summaries, then stored_spans — localises a regression
+// event_log, then trace_summaries, then stored_spans — localizes a regression
 // precisely:
 //
 //	accepted > event_log            → the span never became an event (ingest)
@@ -206,11 +206,22 @@ func EventLogCountsQuery() string {
 // ViolationKind classifies a correctness violation.
 type ViolationKind string
 
+// The kinds, in the order a reader should care about them: losing a span and
+// leaking one across tenants are the two that make the benchmark's answer
+// worthless, and the counting kinds say by how much.
 const (
-	ViolationLostSpans       ViolationKind = "lost-spans"
-	ViolationDoubleCounted   ViolationKind = "double-counted"
-	ViolationUnderCounted    ViolationKind = "under-counted"
-	ViolationMissingSummary  ViolationKind = "missing-summary"
+	// ViolationLostSpans is a span that was accepted and never stored.
+	ViolationLostSpans ViolationKind = "lost-spans"
+	// ViolationDoubleCounted is a span stored more times than it was sent,
+	// which is what a broken dedup looks like from the outside.
+	ViolationDoubleCounted ViolationKind = "double-counted"
+	// ViolationUnderCounted is a stored count below what was accepted, short of
+	// outright loss.
+	ViolationUnderCounted ViolationKind = "under-counted"
+	// ViolationMissingSummary is a trace whose spans landed but which never
+	// produced a summary, so the projection did not run.
+	ViolationMissingSummary ViolationKind = "missing-summary"
+	// ViolationCrossTenantLeak is one tenant's data visible under another's id.
 	ViolationCrossTenantLeak ViolationKind = "cross-tenant-leak"
 )
 
@@ -229,7 +240,7 @@ type Violation struct {
 
 // sortedKeys returns a map's keys in ascending order.
 //
-// Go map iteration is randomised, so every rule below walks its input in a
+// Go map iteration is randomized, so every rule below walks its input in a
 // deterministic order. Two runs over the same data must produce the same
 // violation list — the detail dump is capped at ten entries, and a shuffled
 // cap would show a different ten every time.
@@ -330,8 +341,8 @@ type FindMissingSummariesOptions struct {
 	TenantId string
 	// ExpectedTraceIds are the traces the driver sent. Treat as read-only.
 	ExpectedTraceIds []string
-	// SummarisedTraceIds are the traces that produced a summary. Read-only.
-	SummarisedTraceIds map[string]struct{}
+	// SummarizedTraceIds are the traces that produced a summary. Read-only.
+	SummarizedTraceIds map[string]struct{}
 }
 
 // FindMissingSummaries reports traces the driver sent that produced no summary
@@ -339,7 +350,7 @@ type FindMissingSummariesOptions struct {
 func FindMissingSummaries(opts FindMissingSummariesOptions) []Violation {
 	violations := []Violation{}
 	for _, traceId := range opts.ExpectedTraceIds {
-		if _, ok := opts.SummarisedTraceIds[traceId]; ok {
+		if _, ok := opts.SummarizedTraceIds[traceId]; ok {
 			continue
 		}
 		violations = append(violations, Violation{
@@ -384,7 +395,7 @@ type FindLayerDivergenceOptions struct {
 	StoredSpans map[string]int
 }
 
-// FindLayerDivergence localises a shortfall to the layer that lost it.
+// FindLayerDivergence localizes a shortfall to the layer that lost it.
 //
 // Reports at most ONE violation per trace — the earliest layer that went
 // wrong. A span missing from event_log is also missing from stored_spans and
@@ -467,14 +478,14 @@ func IsFailure(violations []Violation) bool {
 	return len(violations) > 0
 }
 
-// SummariseViolations renders a human-readable violation summary, grouped by
+// SummarizeViolations renders a human-readable violation summary, grouped by
 // kind, for the job summary.
-func SummariseViolations(violations []Violation) string {
+func SummarizeViolations(violations []Violation) string {
 	if len(violations) == 0 {
 		return "No correctness violations."
 	}
 
-	// Grouped in first-seen order: Go map iteration is randomised, and a
+	// Grouped in first-seen order: Go map iteration is randomized, and a
 	// summary whose sections shuffle between runs is not diffable.
 	order := []ViolationKind{}
 	byKind := map[ViolationKind][]Violation{}

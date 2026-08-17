@@ -42,7 +42,7 @@ import (
 // where a span goes missing.
 //
 // NOT to be confused with the identically-valued per-attribute truncation cap
-// (MaxAttributeValueBytes in otlp.go) — different behaviour. See the comment
+// (MaxAttributeValueBytes in otlp.go) — different behavior. See the comment
 // there.
 const CommandInlineThresholdBytes = 256 * 1024
 
@@ -71,8 +71,14 @@ const SmallSpanBytes = 1024
 type StageName string
 
 const (
-	StageSerial      StageName = "serial"
-	StageConcurrent  StageName = "concurrent"
+	// StageSerial sends one request at a time, in order, so a fault here is
+	// never a concurrency artefact.
+	StageSerial StageName = "serial"
+	// StageConcurrent sends in parallel, which is where contention and
+	// interleaving faults appear.
+	StageConcurrent StageName = "concurrent"
+	// StageAdversarial sends the shapes designed to break ingestion: oversized
+	// payloads, resends, and cross-tenant ids.
 	StageAdversarial StageName = "adversarial"
 )
 
@@ -102,7 +108,7 @@ type StagePlan struct {
 	SpansPerRequest int
 	// ScatterAcrossRequests, when true, scatters a trace's spans across
 	// concurrent in-flight requests instead of sending them as an ordered run,
-	// maximising concurrent processing of the same aggregate. That contention —
+	// maximizing concurrent processing of the same aggregate. That contention —
 	// not anything in the payload — is what produces out-of-order folds. See
 	// ScatterAcrossConcurrentArrivals.
 	ScatterAcrossRequests bool

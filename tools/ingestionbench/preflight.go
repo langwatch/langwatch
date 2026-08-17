@@ -61,7 +61,11 @@ func preflight(ctx context.Context, sender *http.Client, client *chClient, args 
 
 	fmt.Fprintln(log, "[benchmark] preflight: checking one span makes it end to end")
 
-	result, err := postSpans(ctx, sender, args.Endpoint, tenant, []OtlpSpan{span})
+	result, err := postSpans(ctx, sender, spanPost{
+		Endpoint: args.Endpoint,
+		Tenant:   tenant,
+		Spans:    []OtlpSpan{span},
+	})
 	if err != nil {
 		return fmt.Errorf("preflight span was not accepted: %w", err)
 	}
@@ -82,12 +86,16 @@ func preflight(ctx context.Context, sender *http.Client, client *chClient, args 
 
 	for time.Now().Before(deadline) {
 		var rows []countRow
-		queryErr := queryJSON(ctx, client, StoredSpansPerTraceQuery(), map[string]any{
-			"tenantId": tenant.ProjectID,
-			"traceIds": []string{traceID},
-			"fromMs":   window.FromMs,
-			"toMs":     window.ToMs,
-		}, &rows)
+		queryErr := queryJSON(ctx, client, chQuery{
+			SQL: StoredSpansPerTraceQuery(),
+			Params: map[string]any{
+				"tenantId": tenant.ProjectID,
+				"traceIds": []string{traceID},
+				"fromMs":   window.FromMs,
+				"toMs":     window.ToMs,
+			},
+			Into: &rows,
+		})
 
 		if queryErr != nil {
 			// ClickHouse may still be settling right after the cluster comes

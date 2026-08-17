@@ -85,11 +85,23 @@ func formatParam(value any) string {
 	}
 }
 
-// queryJSON runs a query and decodes the JSONEachRow response into rows.
+// chQuery is one JSONEachRow read: the statement, the values bound into it,
+// and where the rows land.
+type chQuery struct {
+	// SQL is the statement text.
+	SQL string
+	// Params are bound as ClickHouse query parameters rather than interpolated,
+	// so a tenant id can never become query syntax.
+	Params map[string]any
+	// Into must be a pointer to a slice; each NDJSON line is decoded into one
+	// element.
+	Into any
+}
+
+// queryJSON runs a query and decodes the JSONEachRow response into q.Into.
 //
-// rows must be a pointer to a slice; each NDJSON line is decoded into one
-// element. An empty result set yields an empty slice, never an error.
-func queryJSON(ctx context.Context, client *chClient, query string, params map[string]any, rows any) error {
+// An empty result set yields an empty slice, never an error.
+func queryJSON(ctx context.Context, client *chClient, q chQuery) error {
 	target, err := url.Parse(client.endpoint)
 	if err != nil {
 		return err
@@ -99,12 +111,12 @@ func queryJSON(ctx context.Context, client *chClient, query string, params map[s
 		values.Set("database", client.database)
 	}
 	values.Set("default_format", "JSONEachRow")
-	for name, value := range params {
+	for name, value := range q.Params {
 		values.Set("param_"+name, formatParam(value))
 	}
 	target.RawQuery = values.Encode()
 
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, target.String(), strings.NewReader(query))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, target.String(), strings.NewReader(q.SQL))
 	if err != nil {
 		return err
 	}
@@ -128,7 +140,7 @@ func queryJSON(ctx context.Context, client *chClient, query string, params map[s
 		return fmt.Errorf("clickhouse %d: %s", response.StatusCode, strings.TrimSpace(string(body)))
 	}
 
-	return decodeNDJSON(body, rows)
+	return decodeNDJSON(body, q.Into)
 }
 
 // decodeNDJSON decodes newline-delimited JSON into a pointer-to-slice.
