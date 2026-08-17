@@ -51,7 +51,19 @@ try {
 
 // Now safe to import application code
 import { afterAll, beforeAll } from "vitest";
-import { tryGetApp } from "../../../app-layer/app";
+import { selectedGraphLane } from "../../../../test-utils/integrationModuleGraph";
+
+/**
+ * Whether this worker is running the shared-registry lane.
+ *
+ * Read from the same environment the config reads, rather than passed through
+ * vitest, because a setup file has no access to the resolved config. The two
+ * must agree — a shared registry with per-file singleton teardown is exactly
+ * the broken combination — so both go through selectedGraphLane().
+ */
+const SHARES_MODULE_GRAPH = selectedGraphLane(process.env) === "shared";
+
+import { resetApp, tryGetApp } from "../../../app-layer/app";
 import { startTestContainers, stopTestContainers } from "./testContainers";
 
 /**
@@ -59,6 +71,7 @@ import { startTestContainers, stopTestContainers } from "./testContainers";
  * Connects to containers (env vars already set at module load time).
  */
 export async function setup(): Promise<void> {
+  if (SHARES_MODULE_GRAPH) registerWorkerExitClose();
   try {
     await startTestContainers();
   } catch (error) {
@@ -140,7 +153,40 @@ function unrefRedisSockets(): void {
  */
 export async function teardown(): Promise<void> {
   await stopTestContainers();
+
+  // With a shared module registry these singletons outlive the file, so
+  // closing them here would hand the next file a disconnected Prisma and a
+  // quit Redis — the failure this suite used to hit whenever `isolate: false`
+  // was tried. The App container IS per-file state, so it still gets reset;
+  // the process-wide clients are closed once, by the exit hook below.
+  // See src/test-utils/integrationModuleGraph.ts.
+  if (SHARES_MODULE_GRAPH) {
+    await resetApp();
+    return;
+  }
+
   await closeAppRuntimeSingletons();
+}
+
+/**
+ * Close the process-wide singletons once, when the worker is finishing.
+ *
+ * Only needed when files share a registry: with a fresh graph per file the
+ * per-file teardown above already did it. Registered at most once per worker,
+ * and unrefs the Redis sockets first so they cannot pin the loop open — the
+ * hazard that made the per-file close necessary in the first place is a socket
+ * keeping the process alive past the last test, not the close itself.
+ */
+let workerExitHookRegistered = false;
+
+function registerWorkerExitClose(): void {
+  if (workerExitHookRegistered) return;
+  workerExitHookRegistered = true;
+
+  process.once("beforeExit", () => {
+    unrefRedisSockets();
+    void closeAppRuntimeSingletons();
+  });
 }
 
 /**

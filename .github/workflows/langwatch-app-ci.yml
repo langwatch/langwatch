@@ -106,8 +106,19 @@ jobs:
       # files that genuinely talk to something, so the same per-shard file count
       # fits in fewer shards — and two runners come off the critical path,
       # which is its own win while every shard is queueing 5-10 minutes for one.
-      integration-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4]' || '[1]' }}
-      integration-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '4' || '1' }}
+      #
+      # The lane splits again by whether a file can share a module registry.
+      # Import was 42% of this lane's runner time — ~1.6s per file rebuilding
+      # the same Prisma client and server graph — and 331 of the 477 files can
+      # share one. The other 146 call `vi.mock`, which cannot apply to a
+      # registry an earlier file already populated, so they keep isolation.
+      # See platform/app/src/test-utils/integrationModuleGraph.ts.
+      #
+      # Two shards each rather than four of one kind: measured on src/app/api,
+      # the shared lane runs ~4x faster per file, so 331 shared files and 146
+      # mocking ones are close to balanced at 2+2 — the same four runners as
+      # before, finishing sooner.
+      integration-matrix: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[{"lane":"shared","shard":1,"count":2},{"lane":"shared","shard":2,"count":2},{"lane":"mocking","shard":1,"count":2},{"lane":"mocking","shard":2,"count":2}]' || '[{"lane":"shared","shard":1,"count":1},{"lane":"mocking","shard":1,"count":1}]' }}
       # The component lane is unit-shaped: forked VM workers and concurrent
       # files, with no service containers to wait on, so a shard gets through
       # its files far faster than a datastore shard does. Two is enough for
@@ -594,13 +605,19 @@ jobs:
         run: bash ../../.github/scripts/notify-slack-test-failure.sh test-component
 
   test-integration:
+    name: "test-integration (${{ matrix.lane }} ${{ matrix.shard }}/${{ matrix.count }})"
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON(needs.changes.outputs.integration-shards) }}
+        include: ${{ fromJSON(needs.changes.outputs.integration-matrix) }}
     env:
+      # Which half of the datastore lane this shard runs, and — because the
+      # config derives `include` and `isolate` from this one variable — whether
+      # it may share a module registry. Setting it anywhere else, or setting it
+      # to something these two jobs do not, silently changes what runs.
+      INTEGRATION_GRAPH_LANE: ${{ matrix.lane }}
       # VITEST_INTEGRATION_PARALLEL is deliberately NOT set, so a shard runs
       # its files one at a time.
       #
@@ -768,7 +785,7 @@ jobs:
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
           helm repo add langwatch https://langwatch.github.io/langwatch
 
-      - name: Run integration tests (shard ${{ matrix.shard }}/4)
+      - name: Run integration tests (${{ matrix.lane }} ${{ matrix.shard }}/${{ matrix.count }})
         id: integration-tests
         working-directory: platform/app
         # Integration files run sequentially in a single long-lived fork worker
@@ -806,7 +823,7 @@ jobs:
               --outputFile=test-results.json
           else
             # shellcheck disable=SC2086
-            pnpm test:integration --shard=${{ matrix.shard }}/${{ needs.changes.outputs.integration-shard-count }} $COV $DUR \
+            pnpm test:integration --shard=${{ matrix.shard }}/${{ matrix.count }} $COV $DUR \
               --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
               --outputFile=test-results.json
           fi
@@ -817,7 +834,12 @@ jobs:
         if: always() && needs.changes.outputs.durations == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: shard-durations-integration-${{ matrix.shard }}
+          # The lane is in the name because the two lanes both number their
+          # shards from 1: without it, `shared 1/2` and `mocking 1/2` would both
+          # upload `shard-durations-integration-1`, and upload-artifact rejects
+          # a duplicate name within one run. The merge job below globs
+          # `shard-durations-*`, so it picks both up either way.
+          name: shard-durations-integration-${{ matrix.lane }}-${{ matrix.shard }}
           path: platform/app/vitest.durations.delta.json
           if-no-files-found: ignore
 
