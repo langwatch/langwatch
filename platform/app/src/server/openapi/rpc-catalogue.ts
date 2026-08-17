@@ -103,6 +103,55 @@ function successResponse(operation: JsonObject): {
   return { status: 200, schema: null };
 }
 
+/**
+ * The prose the document carries about an operation, copied only where it is
+ * actually a string. Omitted rather than set to undefined, so the catalogue's
+ * JSON has no null-valued keys a client has to reason about.
+ */
+function describedFields(operation: JsonObject): {
+  operationId?: string;
+  summary?: string;
+  description?: string;
+} {
+  const fields: {
+    operationId?: string;
+    summary?: string;
+    description?: string;
+  } = {};
+  for (const key of ["operationId", "summary", "description"] as const) {
+    const value = operation[key];
+    if (typeof value === "string") fields[key] = value;
+  }
+  return fields;
+}
+
+/** One path's RPC operation, or null when the path is not an RPC at all. */
+function rpcOperationFor({
+  path,
+  methods,
+}: {
+  path: string;
+  methods: unknown;
+}): RpcOperation | null {
+  const name = rpcNameFor(path);
+  if (!name) return null;
+
+  // An RPC is always a POST. Anything else on a dotted path is not one, and
+  // reporting it as one would advertise a call that does not work.
+  const operation = asObject(asObject(methods)?.post);
+  if (!operation) return null;
+
+  const { status, schema } = successResponse(operation);
+  return {
+    name,
+    path,
+    ...describedFields(operation),
+    input: jsonSchemaOf(operation.requestBody),
+    output: schema,
+    status,
+  };
+}
+
 /** Projects the RPC-named operations out of an OpenAPI document. */
 export function buildRpcCatalogue({
   document,
@@ -112,37 +161,12 @@ export function buildRpcCatalogue({
   openapiUrl: string;
 }): RpcCatalogue {
   const paths = asObject(document.paths) ?? {};
-  const operations: RpcOperation[] = [];
-
-  for (const [path, methods] of Object.entries(paths)) {
-    const name = rpcNameFor(path);
-    if (!name) continue;
-
-    // An RPC is always a POST. Anything else on a dotted path is not one, and
-    // reporting it as one would advertise a call that does not work.
-    const operation = asObject(asObject(methods)?.post);
-    if (!operation) continue;
-
-    const { status, schema } = successResponse(operation);
-    operations.push({
-      name,
-      path,
-      ...(typeof operation.operationId === "string"
-        ? { operationId: operation.operationId }
-        : {}),
-      ...(typeof operation.summary === "string"
-        ? { summary: operation.summary }
-        : {}),
-      ...(typeof operation.description === "string"
-        ? { description: operation.description }
-        : {}),
-      input: jsonSchemaOf(operation.requestBody),
-      output: schema,
-      status,
-    });
-  }
-
-  operations.sort((a, b) => a.path.localeCompare(b.path));
+  const operations = Object.entries(paths)
+    .map(([path, methods]) => rpcOperationFor({ path, methods }))
+    .filter((operation): operation is RpcOperation => operation !== null)
+    // Sorted so the response is stable between requests: the catalogue is
+    // derived per call, and Object.entries order is the document's, not ours.
+    .sort((a, b) => a.path.localeCompare(b.path));
 
   return {
     openapi: openapiUrl,
