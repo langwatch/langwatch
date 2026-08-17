@@ -6,7 +6,16 @@ import base64
 
 import pytest
 
-from langwatch.utils.auth import build_auth_headers, is_personal_access_token
+from langwatch.utils.auth import (
+    build_auth_headers,
+    is_personal_access_token,
+    requires_project_id,
+)
+
+# A token whose body matches the server's strict new-format shape:
+# {16 alphanumerics}_{48 alphanumerics}.
+NEW_FORMAT_KEY = "sk-lw-" + "a" * 16 + "_" + "b" * 48
+INGEST_KEY = "ik-lw-" + "c" * 16 + "_" + "d" * 48
 
 
 class TestIsPersonalAccessToken:
@@ -18,6 +27,34 @@ class TestIsPersonalAccessToken:
 
     def test_returns_false_for_empty_string(self) -> None:
         assert is_personal_access_token("") is False
+
+
+class TestRequiresProjectId:
+    def test_new_format_api_key_requires_a_project(self) -> None:
+        assert requires_project_id(NEW_FORMAT_KEY) is True
+
+    def test_ingest_key_requires_a_project(self) -> None:
+        assert requires_project_id(INGEST_KEY) is True
+
+    def test_legacy_project_key_does_not(self) -> None:
+        assert requires_project_id("sk-lw-" + "a" * 48) is False
+
+    def test_underscore_alone_does_not_make_a_key_new_format(self) -> None:
+        # Legacy keys were minted from alphabets that include `_` and `-`, so
+        # the mere presence of an underscore must not reclassify them.
+        assert requires_project_id("sk-lw-abc_def") is False
+        assert requires_project_id("sk-lw-" + "a" * 16 + "_" + "b" * 47) is False
+        assert requires_project_id("sk-lw-" + "a" * 15 + "_" + "b" * 48) is False
+
+    def test_dash_in_body_is_not_new_format(self) -> None:
+        assert requires_project_id("sk-lw-" + "a" * 16 + "_" + "b" * 47 + "-") is False
+
+    def test_pat_does_not_use_the_project_header(self) -> None:
+        # PATs need a project too, but carry it via Basic auth instead.
+        assert requires_project_id("pat-lw-abc_secret") is False
+
+    def test_empty_string(self) -> None:
+        assert requires_project_id("") is False
 
 
 class TestBuildAuthHeaders:
@@ -57,4 +94,48 @@ class TestBuildAuthHeaders:
         assert headers == {
             "Authorization": "Bearer pat-lw-nopid",
             "X-Auth-Token": "pat-lw-nopid",
+        }
+
+    def test_new_format_key_emits_project_header(self) -> None:
+        headers = build_auth_headers(
+            api_key=NEW_FORMAT_KEY,
+            project_id="project_123",
+        )
+        assert headers == {
+            "Authorization": f"Bearer {NEW_FORMAT_KEY}",
+            "X-Auth-Token": NEW_FORMAT_KEY,
+            "X-Project-Id": "project_123",
+        }
+
+    def test_new_format_key_falls_back_to_env_project_id(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("LANGWATCH_PROJECT_ID", "env_project")
+        headers = build_auth_headers(api_key=NEW_FORMAT_KEY)
+        assert headers["X-Project-Id"] == "env_project"
+
+    def test_new_format_key_without_project_id_omits_the_header(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("LANGWATCH_PROJECT_ID", raising=False)
+        headers = build_auth_headers(api_key=NEW_FORMAT_KEY)
+        assert headers == {
+            "Authorization": f"Bearer {NEW_FORMAT_KEY}",
+            "X-Auth-Token": NEW_FORMAT_KEY,
+        }
+
+    def test_ingest_key_emits_project_header(self) -> None:
+        headers = build_auth_headers(api_key=INGEST_KEY, project_id="project_123")
+        assert headers["X-Project-Id"] == "project_123"
+
+    def test_legacy_key_with_project_id_omits_the_header(self) -> None:
+        # Legacy keys are self-identifying and the server ignores a supplied
+        # project for them, so their header shape must not change.
+        headers = build_auth_headers(
+            api_key="sk-lw-legacy",
+            project_id="project_123",
+        )
+        assert headers == {
+            "Authorization": "Bearer sk-lw-legacy",
+            "X-Auth-Token": "sk-lw-legacy",
         }
