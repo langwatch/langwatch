@@ -128,9 +128,25 @@ const findKeyAnyIndent = (
     return keys.some((key) => new RegExp(`^(['"]?)${key}\\1\\s*:`).test(trimmed));
   });
 
-/** The text after `key:` on its own line. */
+/**
+ * The text after `key:` on its own line, with any trailing comment removed.
+ *
+ * `paths:  # only the Go tree` is a block list with a note on the key line, not
+ * an inline value. Without the strip it read as the value `# only the Go tree`,
+ * which is not decomposable, so the guard reported R3 against a perfectly legal
+ * shape — a false positive, and the kind that teaches people to ignore it.
+ *
+ * Only a comment preceded by whitespace is stripped, so a `#` inside a quoted
+ * entry (`["a#b"]`) survives.
+ */
 const inlineValue = (line: string): string =>
-  line.trim().replace(/^(['"]?)[a-z_-]+\1\s*:\s*/i, "").trim();
+  line
+    .trim()
+    // Comment first, THEN the key: stripping the key first would leave a bare
+    // `# note` with no preceding whitespace for `\s+#` to match.
+    .replace(/\s+#.*$/, "")
+    .replace(/^(['"]?)[a-z_-]+\1\s*:\s*/i, "")
+    .trim();
 
 /**
  * Does the pull-request trigger filter by path, and if so, on what?
@@ -201,23 +217,18 @@ export const pullRequestFilter = (source: string): FilterResult => {
 export const gateFilters = (source: string): FilterResult => {
   const lines = source.split("\n");
   const out: string[] = [];
-  let sawBlock = false;
+  let hasInlineBlock = false;
 
   for (let i = 0; i < lines.length; i++) {
     const match = lines[i]!.match(/^\s*filters:\s*(.*)$/);
     if (!match) continue;
     const value = match[1]!.trim();
 
-    // Block scalars: `|`, `|-`, `>`, `>-`, `|+` … all introduce the literal
-    // filter body this guard can read.
-    if (/^[|>][-+]?\d*$/.test(value)) {
-      sawBlock = true;
-      out.push(...listEntries(blockUnder(lines, i, indentOf(lines[i]!))));
-      continue;
-    }
-
-    if (value === "") {
-      sawBlock = true;
+    // Two spellings of the same thing: a block scalar (`|`, `|-`, `>`, `>-`,
+    // `|+` …) or nothing at all, both introducing a filter body on the lines
+    // beneath that this guard can read.
+    if (value === "" || /^[|>][-+]?\d*$/.test(value)) {
+      hasInlineBlock = true;
       out.push(...listEntries(blockUnder(lines, i, indentOf(lines[i]!))));
       continue;
     }
@@ -232,17 +243,31 @@ export const gateFilters = (source: string): FilterResult => {
     };
   }
 
-  if (!sawBlock) return { kind: "none" };
+  if (!hasInlineBlock) return { kind: "none" };
   return { kind: "filtered", entries: out };
 };
 
-/** Job names at the two-space level that end in `-complete`. */
+/**
+ * Job names ending in `-complete`.
+ *
+ * The job-key indent is read from the `jobs:` block rather than assumed to be
+ * two, because two-space is a convention and not a rule. Hardcoding it meant a
+ * four-space workflow had no detectable aggregators, so R2 could not fire and
+ * the aggregator-plus-filter contradiction passed silently — the same fail-open
+ * R3 exists to prevent, one rule over.
+ */
 export const aggregatorJobs = (source: string): string[] => {
   const lines = source.split("\n");
   const jobsIndex = findKeyIndex(lines, "jobs", 0);
   if (jobsIndex === -1) return [];
-  return blockUnder(lines, jobsIndex, 0)
-    .filter((l) => indentOf(l) === 2 && /^[a-z0-9_-]+:\s*$/i.test(l.trim()))
+
+  const block = blockUnder(lines, jobsIndex, 0);
+  const first = block.find((l) => !isBlank(l));
+  if (first === undefined) return [];
+  const jobIndent = indentOf(first);
+
+  return block
+    .filter((l) => !isBlank(l) && indentOf(l) === jobIndent && /^[a-z0-9_-]+:\s*$/i.test(l.trim()))
     .map((l) => l.trim().slice(0, -1))
     .filter((name) => name.endsWith("-complete"));
 };
@@ -308,13 +333,19 @@ export const covers = (patterns: string[], target: string): boolean => {
 
 export const inspect = (file: string, source: string): WorkflowIssue[] => {
   const filter = pullRequestFilter(source);
-
-  if (filter.kind === "unparsed") {
-    return [{ file, rule: "R3", detail: filter.detail }];
-  }
   if (filter.kind === "none") return [];
 
   const issues: WorkflowIssue[] = [];
+
+  // An unparsed filter is still a FILTER — `pullRequestFilter` only reaches
+  // this state having found a paths-like key under the pull-request trigger.
+  // So R2 still applies and is still checked below; only R1 is impossible,
+  // because there are no entries to compare against. Returning here instead
+  // would let the aggregator contradiction through on exactly the files the
+  // guard has already admitted it cannot fully read.
+  if (filter.kind === "unparsed") {
+    issues.push({ file, rule: "R3", detail: filter.detail });
+  }
 
   for (const aggregator of aggregatorJobs(source)) {
     issues.push({
@@ -326,6 +357,10 @@ export const inspect = (file: string, source: string): WorkflowIssue[] => {
         `reports; a path filter is what stops it reporting. Drop one.`,
     });
   }
+
+  // R1 compares the gate's paths against the trigger's. With an unparsed
+  // trigger there is nothing to compare, and R3 has already said so.
+  if (filter.kind !== "filtered") return issues;
 
   const gate = gateFilters(source);
   if (gate.kind === "unparsed") {

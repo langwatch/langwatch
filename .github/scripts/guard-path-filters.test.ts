@@ -132,6 +132,45 @@ describe("given a filter shape this guard cannot decompose", () => {
       assert.equal(issues[0]?.rule, "R3");
     });
   });
+
+  describe("when the workflow also declares an aggregator", () => {
+    it("still reports R2, because an unreadable filter is still a filter", () => {
+      const source = [
+        "on:",
+        "  pull_request:",
+        "    paths-ignore:",
+        '      - "docs/**"',
+        "jobs:",
+        "  work:",
+        "  example-complete:",
+      ].join("\n");
+      const rules = inspect("example.yml", source).map((i) => i.rule).sort();
+      assert.deepEqual(rules, ["R2", "R3"]);
+    });
+  });
+});
+
+describe("given a paths key carrying a trailing comment", () => {
+  it("reads the block list beneath it instead of reporting R3", () => {
+    const source = [
+      "on:",
+      "  pull_request:",
+      "    paths: # only the Go tree",
+      '      - "pkg/**"',
+    ].join("\n");
+    assert.deepEqual(pullRequestFilter(source), {
+      kind: "filtered",
+      entries: ["pkg/**"],
+    });
+  });
+
+  it("still reads a flow list with a comment after it", () => {
+    const source = ["on:", "  pull_request:", '    paths: ["pkg/**"] # why'].join("\n");
+    assert.deepEqual(pullRequestFilter(source), {
+      kind: "filtered",
+      entries: ["pkg/**"],
+    });
+  });
 });
 
 describe("pullRequestFilter", () => {
@@ -248,5 +287,15 @@ describe("aggregatorJobs", () => {
   it("finds only job names ending in -complete", () => {
     const source = ["jobs:", "  build:", "  thing-complete:", "  other:"].join("\n");
     assert.deepEqual(aggregatorJobs(source), ["thing-complete"]);
+  });
+
+  it("reads the job indent from the file rather than assuming two spaces", () => {
+    const source = ["jobs:", "    build:", "    thing-complete:"].join("\n");
+    assert.deepEqual(aggregatorJobs(source), ["thing-complete"]);
+  });
+
+  it("does not mistake a nested key for a job", () => {
+    const source = ["jobs:", "  build:", "    steps:", "    nested-complete:"].join("\n");
+    assert.deepEqual(aggregatorJobs(source), []);
   });
 });
