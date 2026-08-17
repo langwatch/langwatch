@@ -15,7 +15,13 @@ from typing import (
 )
 
 from pydantic import BaseModel, ConfigDict, Field
-from tenacity import Retrying, stop_after_attempt, wait_random_exponential
+import litellm
+from tenacity import (
+    Retrying,
+    retry_if_not_exception_type,
+    stop_after_attempt,
+    wait_random_exponential,
+)
 from tqdm.auto import tqdm as tqdm_auto
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from langevals_core.litellm_patch import patch_litellm
@@ -282,6 +288,13 @@ class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
         _disable_tqdm()
         try:
             retryer = Retrying(
+                # A 400 from the model provider is deterministic: a content
+                # policy block, a bad parameter, an oversized prompt. Retrying
+                # it only burns time and can push a single evaluation past the
+                # caller's request timeout, which turns a clear "content policy
+                # violation" into an opaque timeout. Fail fast and return the
+                # real error instead.
+                retry=retry_if_not_exception_type(litellm.BadRequestError),
                 stop=stop_after_attempt(retries),
                 wait=wait_random_exponential(multiplier=1, min=4, max=10),
                 reraise=True,
