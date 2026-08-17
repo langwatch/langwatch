@@ -181,6 +181,7 @@ jobs:
       # --disable below drops the three house-rule linters; they are gated on
       # changed lines only in the step after this one.
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        id: golangci
         if: ${{ !cancelled() && needs.changes.outputs.go == 'true' }}
         with:
           version: v2.11.4
@@ -203,6 +204,7 @@ jobs:
       # a v1 golangci-lint binary refuses this v2 config outright, which is why
       # the make target resolves the pinned version instead of trusting PATH.
       - name: House rules (new/changed lines only)
+        id: house_rules
         if: ${{ !cancelled() && needs.changes.outputs.go == 'true' }}
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
@@ -226,6 +228,7 @@ jobs:
       # would have silently ended govet on it. `./tools/ciguard/...` goes the
       # other way and is linted but was never vetted, so it needs nothing here.
       - name: "go vet (tools/thuishaven — the one package lint does not cover)"
+        id: vet_thuishaven
         if: ${{ !cancelled() && needs.changes.outputs.go == 'true' }}
         run: go vet ./tools/thuishaven/...
 
@@ -236,6 +239,7 @@ jobs:
       # runs cannot drift apart.
       # Spec: specs/ci/herr-codes-generation.feature
       - name: Generated herr codes are current
+        id: herrgen
         if: ${{ !cancelled() && needs.changes.outputs.go == 'true' }}
         run: make herrgen-check
 
@@ -245,12 +249,51 @@ jobs:
       # reviewed. Runs on a workflow-only change too, which is why this job's
       # `if:` is the union of the two gates.
       - name: CI guards
+        id: ci_guards
         if: ${{ !cancelled() }}
         run: go test ./tools/ciguard/...
 
       - name: CI guards (live repo)
+        id: ci_guards_live
         if: ${{ !cancelled() }}
         run: go run ./cmd/ciguard
+
+      # Four checks in one job means four places to look when it goes red, and
+      # the step list does not say which of them mattered without scrolling.
+      # This names every failure in one line, at the end, the way four separate
+      # jobs did on the PR's check list.
+      #
+      # It re-fails on purpose. The job is already red — a failed step fails its
+      # job even with `!cancelled()` letting the rest run — so this adds no
+      # gating, only a readable verdict at the bottom of the log.
+      - name: Summary
+        if: ${{ !cancelled() }}
+        env:
+          GOLANGCI: ${{ steps.golangci.outcome }}
+          HOUSE_RULES: ${{ steps.house_rules.outcome }}
+          VET_THUISHAVEN: ${{ steps.vet_thuishaven.outcome }}
+          HERRGEN: ${{ steps.herrgen.outcome }}
+          CI_GUARDS: ${{ steps.ci_guards.outcome }}
+          CI_GUARDS_LIVE: ${{ steps.ci_guards_live.outcome }}
+        run: |
+          set -uo pipefail
+          failed=()
+          for check in \
+            GOLANGCI HOUSE_RULES VET_THUISHAVEN HERRGEN CI_GUARDS CI_GUARDS_LIVE
+          do
+            outcome="${!check}"
+            case "$outcome" in
+              success) echo "ok       ${check}" ;;
+              skipped|"") echo "skipped  ${check}" ;;
+              *) echo "FAIL     ${check}"; failed+=("${check}") ;;
+            esac
+          done
+
+          if [ "${#failed[@]}" -gt 0 ]; then
+            echo
+            echo "checks that failed: ${failed[*]}"
+            exit 1
+          fi
 
   # The single required status check. Every job above is `if:`-gated and so
   # cannot be required directly — a skipped job never reports, and branch
