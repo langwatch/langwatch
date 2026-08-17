@@ -34,9 +34,8 @@ jobs:
       # ciguard reads workflow files, not Go source, so it needs its own key:
       # a checkout added to langwatch-app-ci touches no .go file.
       ciguards: ${{ steps.filter.outputs.ciguards || steps.force.outputs.go }}
-      # Draft PRs keep the cheap signal — lint, the generated-code check, the
-      # CI guards — and skip the race-detector test run and the build. Both
-      # come back on ready_for_review.
+      # Draft PRs keep lint + vet (seconds) and skip the race-detector test
+      # run and the build. Both come back on ready_for_review.
       heavy: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -157,7 +156,7 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
       # tools/thuishaven is deliberately absent here while it is present in the
-      # build and test jobs. Measured at v2.11.4 it carries 231 pre-existing
+      # build, test and vet jobs. Measured at v2.11.4 it carries 231 pre-existing
       # findings: misspell 75 (US spelling enforced against prose written in
       # British English), gosec 72 (of which 41 are file modes on a local dev
       # tool and 23 are G204 on locally-built argv), gocritic 30, noctx 19,
@@ -165,9 +164,8 @@ jobs:
       # outside .golangci.yml's excludes was reviewed by hand; none is an
       # exploitable defect in a single-user local CLI.
       # Clearing them is a judgement-heavy sweep that belongs in its own change,
-      # not bundled into unrelated work — but building and testing it costs
-      # nothing and is worth having now. (It was vetted too until the `vet` job
-      # went; see the note where that job used to be.) That sweep should also decide
+      # not bundled into unrelated work — but building, testing and vetting it
+      # costs nothing and is worth having now. That sweep should also decide
       # whether adapters/dashboard's gosec G203/G704 hits are false positives
       # and record it, since this exclusion currently silences them too.
       #
@@ -208,22 +206,29 @@ jobs:
             ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/...
             ./tools/...
 
-  # There is no `vet` job. govet is one of golangci-lint's always-on defaults
-  # (.golangci.yml: "Defaults (always on): errcheck, govet, ineffassign,
-  # staticcheck, unused"), and `lint` runs golangci-lint over the same package
-  # list this job used, so it was running the same analyser twice for 103s and
-  # a runner lease.
-  #
-  # One package is NOT covered by that argument and is now unvetted:
-  # `./tools/thuishaven/...`, which `lint` deliberately excludes (231
-  # pre-existing findings — see the note in that job). It is a local dev CLI,
-  # so the exposure is a printf or lock-copy mistake shipping to developers
-  # rather than to production. To restore it, the whole job is one step:
-  #
-  #     - run: go vet ./tools/thuishaven/...
-  #
-  # `./tools/ciguard/...` goes the other way — linted but never vetted — so it
-  # loses nothing here.
+  vet:
+    needs: changes
+    if: ${{ needs.changes.outputs.go == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      # `go vet` type-checks everything it inspects, so it benefits from the
+      # same build cache as `build`. Plain, not `race`: it compiles the same
+      # objects `build` does.
+      #
+      # This job overlaps heavily with `lint` — govet is one of golangci-lint's
+      # always-on defaults and `lint` covers every package below except
+      # tools/thuishaven. It is kept anyway: golangci-lint runs govet with its
+      # OWN default analyser set, and .golangci.yml has no `govet` block
+      # pinning that to what `go vet` runs, so "already covered" is likely but
+      # not guaranteed. A cheap job is the wrong thing to bet coverage on.
+      - uses: ./.github/actions/go-build-cache
+      - run: go vet ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/linkcheck/...
 
   # packages/handled-error/src/codes.generated.ts mirrors the services' herr
   # codes; the TypeScript presentation registry is keyed off it, so a Go code
@@ -248,11 +253,11 @@ jobs:
   # cannot be required directly — a skipped job never reports, and branch
   # protection would wait forever. This one always runs and consolidates them.
   go-ci-complete:
-    needs: [changes, build, test, lint, generated, ci-guards]
+    needs: [changes, build, test, lint, vet, generated, ci-guards]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: build, test, lint, generated, ci-guards
+          allowed-skips: build, test, lint, vet, generated, ci-guards
