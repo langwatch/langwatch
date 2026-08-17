@@ -97,10 +97,16 @@ jobs:
       - run: helm repo add langwatch https://langwatch.github.io/langwatch
       - run: helm dependency build .
 
-      # No `set -e`: a preset that fails to render must not abort the ones
-      # after it, or a chart broken in three places reports one.
+      # `set +e` is deliberate and load-bearing. Actions runs `run:` steps with
+      # `-e` already on, and `set -uo pipefail` does not clear it — so without
+      # this line a preset that fails to render would abort the ones after it,
+      # and a chart broken in three places would report one. The `if` around
+      # the helm call below is exempt from `-e` on its own, but that exemption
+      # is a property of `if`, not of this step: the next unguarded command
+      # anyone adds would silently reintroduce fail-fast.
       - name: "render every published preset"
         run: |
+          set +e
           set -uo pipefail
           failed=()
           render() {

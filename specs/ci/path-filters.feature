@@ -45,6 +45,25 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
     And it says the job that filter guards would silently not run
 
   @unit
+  Scenario: A negated path filter entry removes the coverage it appears to grant
+    Given a workflow's "on.pull_request.paths" contains "pkg/**" and "!pkg/ssrf/**"
+    When its gate filters on a path under "pkg/ssrf"
+    Then the path-filter guard fails
+    # GitHub applies the exclusion, so the workflow never starts for that path.
+    # Checking each entry independently would let the exact R1 failure through
+    # the rule written to catch it.
+
+  @unit
+  Scenario: A filter the guard cannot read is reported, never passed
+    Given a workflow declares a pull-request path filter
+    When the guard cannot decompose it into entries
+    Then the guard fails and says which shape it could not read
+    # The guard hand-parses YAML, because it runs on a bare runner with no
+    # dependencies. Hand parsing has blind spots, and returning "not filtered"
+    # for one would make the guard's own green meaningless — the same silent
+    # pass that R1 and R2 exist to prevent, reproduced inside the guard.
+
+  @unit
   Scenario: A push filter is not treated as a pull-request filter
     Given a workflow declares "paths" under "push" but not under "pull_request"
     Then the path-filter guard does not treat it as filtered

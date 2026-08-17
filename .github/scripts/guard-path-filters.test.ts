@@ -4,9 +4,10 @@ import { describe, it } from "node:test";
 import {
   aggregatorJobs,
   covers,
-  gateFilterPaths,
+  gateFilters,
   inspect,
-  pullRequestPaths,
+  listEntries,
+  pullRequestFilter,
 } from "./guard-path-filters.ts";
 
 const gated = (onPaths: string[], filterPaths: string[]): string =>
@@ -30,7 +31,7 @@ const gated = (onPaths: string[], filterPaths: string[]): string =>
     "    runs-on: ubuntu-latest",
   ].join("\n");
 
-describe("given a workflow that filters in on.pull_request.paths", () => {
+describe("given a workflow that filters the pull-request trigger by path", () => {
   describe("when every gate filter path is covered", () => {
     it("reports no issue", () => {
       const source = gated(["pkg/**", "go.mod"], ["pkg/ssrf/address.go", "go.mod"]);
@@ -46,6 +47,17 @@ describe("given a workflow that filters in on.pull_request.paths", () => {
       assert.equal(issues.length, 1);
       assert.equal(issues[0]?.rule, "R1");
       assert.match(issues[0]?.detail ?? "", /charts\/gateway\/values\.yaml/);
+    });
+  });
+
+  describe("when a negated entry excludes a path a broader entry matched", () => {
+    /** @scenario "A negated path filter entry removes the coverage it appears to grant" */
+    it("reports R1, because GitHub applies the exclusion and the job never runs", () => {
+      const source = gated(["pkg/**", "!pkg/ssrf/**"], ["pkg/ssrf/address.go"]);
+      const issues = inspect("example.yml", source);
+      assert.equal(issues.length, 1);
+      assert.equal(issues[0]?.rule, "R1");
+      assert.match(issues[0]?.detail ?? "", /pkg\/ssrf\/address\.go/);
     });
   });
 
@@ -73,40 +85,91 @@ describe("given a workflow that filters in on.pull_request.paths", () => {
   });
 });
 
-describe("given a workflow with no on.pull_request.paths", () => {
-  describe("when it keeps the always-run gate and aggregator", () => {
-    it("reports nothing, because that is the pattern required checks need", () => {
+describe("given a filter shape this guard cannot decompose", () => {
+  describe("when the trigger uses paths-ignore", () => {
+    /** @scenario "A filter the guard cannot read is reported, never passed" */
+    it("reports R3 rather than reading as unfiltered", () => {
       const source = [
-        "name: example",
         "on:",
         "  pull_request:",
+        "    paths-ignore:",
+        '      - "docs/**"',
+        "jobs:",
+        "  a:",
+      ].join("\n");
+      const issues = inspect("example.yml", source);
+      assert.equal(issues.length, 1);
+      assert.equal(issues[0]?.rule, "R3");
+      assert.match(issues[0]?.detail ?? "", /paths-ignore/);
+    });
+  });
+
+  describe("when filters names a file instead of an inline block", () => {
+    it("reports R3, because the declared paths are not visible here", () => {
+      const source = [
+        "on:",
+        "  pull_request:",
+        "    paths:",
+        '      - "pkg/**"',
         "jobs:",
         "  changes:",
-        "    runs-on: ubuntu-latest",
         "    steps:",
-        "      - uses: dorny/paths-filter@v4",
-        "        with:",
-        "          filters: |",
-        "            relevant:",
-        "              - 'anything/at/all'",
-        "  example-complete:",
-        "    runs-on: ubuntu-latest",
+        "      - with:",
+        "          filters: .github/filters.yml",
       ].join("\n");
-      assert.deepEqual(inspect("example.yml", source), []);
+      const issues = inspect("example.yml", source);
+      assert.equal(issues.length, 1);
+      assert.equal(issues[0]?.rule, "R3");
+      assert.match(issues[0]?.detail ?? "", /filters\.yml/);
+    });
+  });
+
+  describe("when paths is declared but empty", () => {
+    it("reports R3 rather than treating it as covering nothing", () => {
+      const source = ["on:", "  pull_request:", "    paths:", "jobs:", "  a:"].join("\n");
+      const issues = inspect("example.yml", source);
+      assert.equal(issues.length, 1);
+      assert.equal(issues[0]?.rule, "R3");
     });
   });
 });
 
-describe("pullRequestPaths", () => {
-  describe("when the workflow declares none", () => {
-    it("returns null rather than an empty list", () => {
-      assert.equal(pullRequestPaths("on:\n  pull_request:\njobs:\n  a:\n"), null);
+describe("pullRequestFilter", () => {
+  describe("when the trigger key is quoted", () => {
+    it("still finds the filter, because YAML 1.1 makes \"on\" a common spelling", () => {
+      const source = ['"on":', "  pull_request:", "    paths:", '      - "pkg/**"'].join("\n");
+      assert.deepEqual(pullRequestFilter(source), { kind: "filtered", entries: ["pkg/**"] });
+    });
+  });
+
+  describe("when paths uses flow style", () => {
+    it("reads the entries", () => {
+      const source = ["on:", "  pull_request:", '    paths: ["pkg/**", go.mod]'].join("\n");
+      assert.deepEqual(pullRequestFilter(source), {
+        kind: "filtered",
+        entries: ["pkg/**", "go.mod"],
+      });
+    });
+  });
+
+  describe("when the workflow uses pull_request_target", () => {
+    it("is filtered just the same", () => {
+      const source = ["on:", "  pull_request_target:", "    paths:", "      - a/**"].join("\n");
+      assert.deepEqual(pullRequestFilter(source), { kind: "filtered", entries: ["a/**"] });
+    });
+  });
+
+  describe("when the workflow declares no path filter", () => {
+    it("reports none", () => {
+      assert.deepEqual(pullRequestFilter("on:\n  pull_request:\njobs:\n  a:\n"), {
+        kind: "none",
+      });
     });
   });
 
   describe("when push declares paths but pull_request does not", () => {
     /** @scenario "A push filter is not treated as a pull-request filter" */
-    it("still returns null, because only the PR filter is guarded", () => {
+    it("reports none, because only the PR filter is guarded", () => {
       const source = [
         "on:",
         "  push:",
@@ -116,36 +179,68 @@ describe("pullRequestPaths", () => {
         "jobs:",
         "  a:",
       ].join("\n");
-      assert.equal(pullRequestPaths(source), null);
+      assert.deepEqual(pullRequestFilter(source), { kind: "none" });
     });
   });
 });
 
 describe("covers", () => {
   it("treats a /** suffix as covering everything beneath it", () => {
-    assert.equal(covers("pkg/**", "pkg/ssrf/address.go"), true);
-    assert.equal(covers("pkg/**", "pkgother/x.go"), false);
+    assert.equal(covers(["pkg/**"], "pkg/ssrf/address.go"), true);
+    assert.equal(covers(["pkg/**"], "pkgother/x.go"), false);
   });
 
-  it("requires an exact match otherwise", () => {
-    assert.equal(covers("go.mod", "go.mod"), true);
-    assert.equal(covers("go.mod", "go.sum"), false);
+  it("lets a later negation remove coverage an earlier entry granted", () => {
+    assert.equal(covers(["pkg/**", "!pkg/ssrf/**"], "pkg/ssrf/address.go"), false);
+    assert.equal(covers(["pkg/**", "!pkg/ssrf/**"], "pkg/other/x.go"), true);
+  });
+
+  it("matches a leading double-star", () => {
+    assert.equal(covers(["**/*.go"], "tools/x/y.go"), true);
+    assert.equal(covers(["**/*.go"], "tools/x/y.ts"), false);
+  });
+
+  it("matches a middle single-star without crossing a separator", () => {
+    assert.equal(covers(["platform/*/prisma/**"], "platform/app/prisma/schema.prisma"), true);
+    assert.equal(covers(["platform/*/prisma/**"], "platform/a/b/prisma/schema.prisma"), false);
+  });
+
+  it("requires an exact match for a literal", () => {
+    assert.equal(covers(["go.mod"], "go.mod"), true);
+    assert.equal(covers(["go.mod"], "go.sum"), false);
   });
 });
 
-describe("gateFilterPaths", () => {
+describe("listEntries", () => {
   it("ignores commented-out entries", () => {
+    const lines = ["  # - 'commented/out.go'", "  - 'real/path.go'"];
+    assert.deepEqual(listEntries(lines), ["real/path.go"]);
+  });
+
+  it("drops a trailing comment, quoted or not", () => {
+    assert.deepEqual(listEntries(["  - 'pkg/**' # why", "  - go.mod # also"]), [
+      "pkg/**",
+      "go.mod",
+    ]);
+  });
+});
+
+describe("gateFilters", () => {
+  it("reads a folded block scalar", () => {
     const source = [
       "jobs:",
       "  changes:",
       "    steps:",
       "      - with:",
-      "          filters: |",
+      "          filters: >-",
       "            relevant:",
-      "              # - 'commented/out.go'",
       "              - 'real/path.go'",
     ].join("\n");
-    assert.deepEqual(gateFilterPaths(source), ["real/path.go"]);
+    assert.deepEqual(gateFilters(source), { kind: "filtered", entries: ["real/path.go"] });
+  });
+
+  it("reports none when the workflow has no gate", () => {
+    assert.deepEqual(gateFilters("jobs:\n  a:\n"), { kind: "none" });
   });
 });
 
