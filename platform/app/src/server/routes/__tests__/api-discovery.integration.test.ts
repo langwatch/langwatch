@@ -181,6 +181,90 @@ describe("API discovery", () => {
     });
   });
 
+  /**
+   * The document is a build artifact, so the bytes are prepared once at startup
+   * rather than re-serialised per request — 2.8 ms and 1.3 MB of garbage a hit,
+   * on the one surface an agent polls speculatively.
+   */
+  describe("given the document is served from prepared bytes", () => {
+    describe("when it is requested more than once", () => {
+      /** @scenario "Fetching the document twice returns the same document" */
+      it("returns byte-identical responses declaring their own length", async () => {
+        const first = await rootApp.request(WELL_KNOWN);
+        const second = await rootApp.request(WELL_KNOWN);
+
+        const firstBody = await first.text();
+        const secondBody = await second.text();
+
+        expect(firstBody).toBe(secondBody);
+        expect(first.headers.get("content-length")).toBe(
+          String(Buffer.byteLength(firstBody, "utf8")),
+        );
+      });
+    });
+
+    describe("when the caller already holds the document", () => {
+      /** @scenario "A caller that already holds the document is told so" */
+      it("answers not-modified with no body", async () => {
+        const first = await rootApp.request(WELL_KNOWN);
+        const etag = first.headers.get("etag");
+        expect(etag).toBeTruthy();
+
+        const second = await rootApp.request(WELL_KNOWN, {
+          headers: { "If-None-Match": etag as string },
+        });
+
+        expect(second.status).toBe(304);
+        expect(await second.text()).toBe("");
+      });
+
+      /**
+       * `If-None-Match` is a list and may carry the weak prefix. Missing a hit
+       * is not a wrong status so much as 688 KB sent to a client that did not
+       * need it — a failure that looks exactly like success.
+       */
+      /** @scenario "A caller that already holds the document is told so" */
+      it("recognises the tag in a list and behind a weak prefix", async () => {
+        const etag = (await rootApp.request(WELL_KNOWN)).headers.get(
+          "etag",
+        ) as string;
+
+        for (const header of [`W/${etag}`, `"other", ${etag}`, "*"]) {
+          const res = await rootApp.request(WELL_KNOWN, {
+            headers: { "If-None-Match": header },
+          });
+          expect(res.status).toBe(304);
+        }
+      });
+    });
+
+    describe("when the caller offers a tag that is not current", () => {
+      /** @scenario "A caller holding a stale tag gets the document" */
+      it("sends the document rather than not-modified", async () => {
+        const res = await rootApp.request(WELL_KNOWN, {
+          headers: { "If-None-Match": '"not-the-current-tag"' },
+        });
+
+        expect(res.status).toBe(200);
+        expect((await res.text()).length).toBeGreaterThan(0);
+      });
+    });
+
+    describe("when the document is served from each location", () => {
+      /** @scenario "Every location offers the same entity tag for the same document" */
+      it("offers the same tag everywhere", async () => {
+        const wellKnown = await rootApp.request(WELL_KNOWN);
+        const underApi = await app.request(UNDER_API);
+        const canonical = await gatewayApp.request(CANONICAL);
+
+        const tag = wellKnown.headers.get("etag");
+        expect(tag).toBeTruthy();
+        expect(underApi.headers.get("etag")).toBe(tag);
+        expect(canonical.headers.get("etag")).toBe(tag);
+      });
+    });
+  });
+
   describe("given a caller that wants only the RPC operations", () => {
     describe("when it POSTs to the catalogue", () => {
       /** @scenario "Discovering the catalogue is itself an RPC" */

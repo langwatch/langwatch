@@ -338,16 +338,36 @@ function assertStatusInvariant({
  * True for the schemas whose ONLY accepted value is `undefined`, which declare
  * an endpoint that never sends a body.
  *
- * Read off zod's internal `typeName` deliberately: probing with sample values
+ * Read off zod's internal type tag deliberately: probing with sample values
  * cannot tell `z.undefined()` from `z.object({ id: z.string() }).optional()`,
  * since both reject every probe a caller could think to try — `{}` included.
- * `status-invariant.unit.test.ts` pins this against the pinned zod, so an
- * upgrade that renames the tag fails there rather than silently reclassifying
- * every no-body endpoint as ambiguous.
+ *
+ * BOTH ZOD MAJORS, because they name the tag differently and the failure is
+ * silent. v3 carries `_def.typeName: "ZodVoid"`; v4 carries `_def.type: "void"`
+ * and no `typeName` at all. Reading only v3's spelling meant a v4 `z.void()`
+ * output was not recognised as no-body, fell through to the ambiguity check,
+ * accepted `undefined` and parsed it to `undefined` — and was refused at
+ * registration. The service would fail to build, and the message would talk
+ * about a schema accepting undefined as well as a value, which is not what
+ * happened and sends the reader somewhere else entirely.
+ *
+ * Nothing in this repo authors v4 schemas yet; `zod@3.25.76` ships the v4
+ * engine at `zod/v4`, and a migration is being planned. This is here so the
+ * framework is not the thing that breaks when a family arrives on it.
+ * `status-invariant.unit.test.ts` pins both spellings, so a future zod that
+ * renames either fails there rather than reclassifying every no-body endpoint.
  */
 function isNoBodySchema(output: ZodType): boolean {
-  const typeName = (output._def as { typeName?: string } | undefined)?.typeName;
-  return typeName === "ZodUndefined" || typeName === "ZodVoid";
+  const def = output._def as
+    | { typeName?: string; type?: string }
+    | undefined;
+
+  return (
+    def?.typeName === "ZodUndefined" ||
+    def?.typeName === "ZodVoid" ||
+    def?.type === "undefined" ||
+    def?.type === "void"
+  );
 }
 
 function assertEndpointPath(path: string): void {

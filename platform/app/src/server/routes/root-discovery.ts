@@ -27,7 +27,7 @@ import {
   WELL_KNOWN_OPENAPI_PATH,
   WHY_DISCOVERY_IS_PUBLIC,
 } from "~/server/openapi/discovery-locations";
-import { apiDocument } from "~/server/openapi/document";
+import { respondWithApiDocument } from "~/server/openapi/serve-document";
 
 /**
  * Links are relative on purpose. A self-hosted instance behind a proxy has no
@@ -84,7 +84,7 @@ const bothSpellings = (path: string) => [path, `${path}/`];
 for (const path of bothSpellings(WELL_KNOWN_OPENAPI_PATH)) {
   secured
     .access(publicEndpoint(WHY_DISCOVERY_IS_PUBLIC))
-    .get(path, (c) => c.json(apiDocument));
+    .get(path, respondWithApiDocument);
 }
 
 for (const path of bothSpellings(LLMS_TXT_PATH)) {

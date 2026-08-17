@@ -51,6 +51,35 @@ Feature: An agent can find the API description without being told where it is
     When the document is fetched from each of the three locations
     Then all three responses carry the same operations
 
+  # The document is a build artifact: it cannot change while the process runs.
+  # So it is serialised to bytes once at startup rather than rebuilt per
+  # request, which was costing 2.8 ms and 1.3 MB of garbage on every hit of a
+  # surface agents poll. The bytes are what goes on the wire — a string would
+  # be re-encoded to UTF-8 on every response, which is most of the saving.
+
+  @integration
+  Scenario: Fetching the document twice returns the same document
+    When the document is requested twice
+    Then both responses carry identical content
+    And each declares the exact length of what it sent
+
+  @integration
+  Scenario: A caller that already holds the document is told so
+    Given a caller that has fetched the document and kept its entity tag
+    When it asks again, offering that tag
+    Then it is answered "not modified" with no body
+
+  @integration
+  Scenario: Every location offers the same entity tag for the same document
+    When the document is served from any of its locations
+    Then they all offer the same entity tag
+
+  @integration
+  Scenario: A caller holding a stale tag gets the document
+    Given a caller offering an entity tag that is not the current one
+    When it requests the document
+    Then it receives the document rather than "not modified"
+
   # No credential, on purpose and for the same reason the gateway location has
   # none: a caller reads the description to learn how to authenticate, so
   # requiring authentication to read it would be circular.
