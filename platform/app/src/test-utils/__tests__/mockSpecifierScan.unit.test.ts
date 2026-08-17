@@ -385,9 +385,17 @@ describe("every tracked test file", () => {
   // and reads the whole tree, and both it and the alias reader can throw. In
   // the body those throws abort collection and surface as a file-level error
   // with no test name attached.
+  //
+  // The explicit timeout is not slack for a slow machine. Parsing moved into
+  // the compiler process with TypeScript 7, so this walk is one exchange
+  // carrying every candidate file's text, and it takes appreciably longer than
+  // vitest's 10s default for a hook — around 15s for the tree as it stands.
+  // Batched it is 20x cheaper per file than asking file by file, which does not
+  // finish at all (ADR-099); the remaining cost is the price of the native
+  // compiler having no in-process parser to lend.
   beforeAll(() => {
     result = scanTrackedTestFiles();
-  });
+  }, 120_000);
 
   describe("given the walk itself", () => {
     it("sees the test tree and the alias tables", () => {
