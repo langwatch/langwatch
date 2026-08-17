@@ -14,6 +14,7 @@ import {
   CURSOR_VERSION,
   decodeCursor,
   encodeCursor,
+  MAX_CURSOR_BLOBS,
   MAX_QUEUED_BLOBS,
   type Microsoft365AuditCursor,
 } from "../shared/microsoft365AuditCursor";
@@ -124,21 +125,43 @@ describe("microsoft365AuditCursor", () => {
     expect(decodeCursor("   ")).toEqual({ cursor: null });
   });
 
-  /** @scenario Blob queue carried in the cursor is bounded */
-  it("caps the queue it writes so the cursor cannot grow with tenant volume", () => {
-    const oversized = cursor({
+  /** @scenario A queue above the listing cap survives the round trip intact */
+  it("carries every queued blob through the round trip rather than dropping the tail", () => {
+    // One listing page can push the queue past MAX_QUEUED_BLOBS, because the
+    // cap is checked after the page is appended. This used to be sliced back
+    // down on the way out, which is not deferral: nothing re-lists a dropped
+    // URI, and the window then advances past the records it pointed at.
+    const overCap = cursor({
       blobQueue: Array.from(
         { length: MAX_QUEUED_BLOBS + 500 },
         (_, i) => `https://blob.test/${i}`,
       ),
     });
 
-    const encoded = encodeCursor(oversized);
-    const decoded = decodeCursor(encoded);
+    const decoded = decodeCursor(encodeCursor(overCap));
 
-    expect(decoded.cursor?.blobQueue).toHaveLength(MAX_QUEUED_BLOBS);
-    // The kept entries are the head of the listing, so what was dropped is
-    // recoverable by listing again — deferred, not lost.
-    expect(decoded.cursor?.blobQueue[0]).toBe("https://blob.test/0");
+    expect(decoded.cursor?.blobQueue).toHaveLength(MAX_QUEUED_BLOBS + 500);
+    expect(decoded.cursor?.blobQueue.at(0)).toBe("https://blob.test/0");
+    expect(decoded.cursor?.blobQueue.at(-1)).toBe(
+      `https://blob.test/${MAX_QUEUED_BLOBS + 499}`,
+    );
+  });
+
+  /** @scenario A queue above the corruption ceiling is rejected, not truncated */
+  it("resumes from the watermark when the queue is implausibly large", () => {
+    const corrupt = cursor({
+      blobQueue: Array.from(
+        { length: MAX_CURSOR_BLOBS + 1 },
+        (_, i) => `https://blob.test/${i}`,
+      ),
+    });
+
+    const decoded = decodeCursor(JSON.stringify(corrupt));
+
+    // Salvaged, not silently trimmed — the watermark is the honest resume
+    // point when the queue cannot be trusted.
+    expect(decoded.cursor?.blobQueue).toEqual([]);
+    expect(decoded.cursor?.watermark).toBe(WATERMARK);
+    expect(decoded.recoveredFrom).toContain("ceiling");
   });
 });
