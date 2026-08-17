@@ -74,7 +74,7 @@ describe("microsoft_365_audit credential seam", () => {
     const service = IngestionSourceService.create(prisma);
     const clientSecret = `secret-${nanoid(12)}`;
 
-    const { source } = await service.create({
+    const { source } = await service.createSource({
       organizationId,
       sourceType: "microsoft_365_audit",
       name: `acme-m365-${nanoid(6)}`,
