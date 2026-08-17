@@ -31,6 +31,23 @@ type generatedTrace struct {
 // would report a correctness violation that is really a billing limit.
 var errPlanLimit = errors.New("project hit its plan limit (ERR_PLAN_LIMIT)")
 
+// stageSeed derives a per-stage seed from the run's seed.
+//
+// Every stage used to build its RNG from the run seed directly, which made the
+// three stages generate the SAME sequence — so stage 2's first trace carried
+// the identical trace id to stage 1's, against the same tenant. The stages then
+// shared rows in ClickHouse: stage 2 read stage 1's spans inside its own trace
+// and reported a count mismatch the pipeline never caused.
+//
+// Derived rather than random so a run stays replayable from one -seed.
+func stageSeed(runSeed int64, stage StageName) int64 {
+	var offset int64
+	for _, b := range []byte(stage) {
+		offset = offset*31 + int64(b)
+	}
+	return runSeed + offset
+}
+
 // stageGen is one stage's generation inputs.
 type stageGen struct {
 	Plan    StagePlan
@@ -48,7 +65,7 @@ type stageGen struct {
 // SPAN_MAX_PAST_MS cutoff and be rejected by design.
 func generateStage(gen stageGen) ([]generatedTrace, error) {
 	plan, tenants := gen.Plan, gen.Tenants
-	rng := CreateRng(gen.Seed)
+	rng := CreateRng(stageSeed(gen.Seed, plan.Stage))
 
 	if len(tenants) < plan.Tenants {
 		return nil, fmt.Errorf(
@@ -277,7 +294,7 @@ type stageSend struct {
 // sendStage sends a whole stage, at the stage's configured concurrency.
 func sendStage(ctx context.Context, client *http.Client, send stageSend) (sendOutcome, error) {
 	plan := send.Plan
-	rng := CreateRng(send.Seed + 1)
+	rng := CreateRng(stageSeed(send.Seed, plan.Stage) + 1)
 
 	requests, err := buildStageRequests(plan, send.Traces, rng)
 	if err != nil {
@@ -286,18 +303,27 @@ func sendStage(ctx context.Context, client *http.Client, send stageSend) (sendOu
 
 	// Interleave tenants so no tenant's work is contiguous — a fair-dispatch
 	// bug is invisible if each tenant is served in its own uninterrupted block.
-	interleaved := ScatterAcrossConcurrentArrivals(requests, rng)
+	//
+	// Only where the stage asked for scattering. The serial stage exists to send
+	// 2000 requests in order at concurrency 1, and shuffling them here destroyed
+	// exactly the property it was built to test: a per-aggregate FIFO bug would
+	// have been indistinguishable from the driver's own shuffle.
+	ordered := requests
+	if plan.ScatterAcrossRequests {
+		ordered = ScatterAcrossConcurrentArrivals(requests, rng)
+	}
 
 	results, err := runStageRequests(ctx, client, stageDispatch{
 		Endpoint:    send.Endpoint,
-		Requests:    interleaved,
+		Requests:    ordered,
 		Concurrency: plan.Concurrency,
+		BurstSize:   plan.BurstSize,
 	})
 	if err != nil {
 		return sendOutcome{}, err
 	}
 
-	return tallyStage(interleaved, results), nil
+	return tallyStage(ordered, results), nil
 }
 
 // buildStageRequests expands a stage's traces into the POSTs that carry them,
@@ -328,6 +354,10 @@ type stageDispatch struct {
 	Endpoint    string
 	Requests    []stageRequest
 	Concurrency int
+	// BurstSize sends the stage in dense clusters of this many requests with a
+	// pause between them, instead of one continuous stream. Zero is steady
+	// arrival.
+	BurstSize int
 }
 
 // runStageRequests sends every request, at most Concurrency at a time, and
@@ -357,24 +387,66 @@ func runStageRequests(ctx context.Context, client *http.Client, dispatch stageDi
 		},
 	}
 
-	next := feedIndices(ctx, len(requests))
+	// One window per burst, or a single window over everything when the stage
+	// asked for steady arrival. The pause between windows is what makes a burst
+	// a burst: without it the requests merge back into one continuous stream
+	// and the stage stops testing arrival shape at all.
+	for offset := 0; offset < len(requests); {
+		size := len(requests) - offset
+		if dispatch.BurstSize > 0 {
+			size = min(dispatch.BurstSize, size)
+		}
+		window := requests[offset : offset+size]
 
-	var wait sync.WaitGroup
-	for range max(1, min(dispatch.Concurrency, len(requests))) {
-		wait.Add(1)
-		go func() {
-			defer wait.Done()
-			for index := range next {
-				results[index] = sender.send(ctx, requests[index])
-			}
-		}()
+		sendWindow(ctx, sendWindowArgs{
+			Sender:      sender,
+			Requests:    window,
+			Results:     results[offset : offset+size],
+			Concurrency: dispatch.Concurrency,
+		})
+
+		offset += size
+		if dispatch.BurstSize > 0 && offset < len(requests) {
+			sleep(ctx, burstGap)
+		}
 	}
-	wait.Wait()
 
 	if firstErr != nil {
 		return nil, firstErr
 	}
 	return results, nil
+}
+
+// burstGap is the idle stretch between bursts. Long enough that the queue
+// visibly drains and refills, short enough that a stage still finishes inside
+// the job's wall-clock budget.
+const burstGap = 2 * time.Second
+
+// sendWindowArgs is one burst's worth of work.
+type sendWindowArgs struct {
+	Sender   stageSender
+	Requests []stageRequest
+	// Results is the slice this window writes into, aligned with Requests.
+	Results     []sendResult
+	Concurrency int
+}
+
+// sendWindow sends one window of requests, at most Concurrency at a time, and
+// returns once every one of them has finished.
+func sendWindow(ctx context.Context, args sendWindowArgs) {
+	next := feedIndices(ctx, len(args.Requests))
+
+	var wait sync.WaitGroup
+	for range max(1, min(args.Concurrency, len(args.Requests))) {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			for index := range next {
+				args.Results[index] = args.Sender.send(ctx, args.Requests[index])
+			}
+		}()
+	}
+	wait.Wait()
 }
 
 // feedIndices hands request indices to the workers one at a time, and stops
@@ -570,6 +642,15 @@ func sleep(ctx context.Context, duration time.Duration) {
 type stageVerify struct {
 	Tenants []Tenant
 	Traces  []generatedTrace
+	// TenantOwnTraceIds is every trace id this run has generated for a tenant,
+	// across ALL stages so far, keyed by project id.
+	//
+	// The cross-tenant check asks ClickHouse for rows under a tenant that are
+	// not the tenant's own, so it needs the whole run's ids and not just this
+	// stage's. Given only the current stage, stage 2 would see stage 1's traces
+	// sitting under the same tenant and report them as leakage from another
+	// tenant — a false positive on the check that matters most.
+	TenantOwnTraceIds map[string][]string
 	// AcceptedByTrace is what the receiver took, keyed tenant -> trace. Every
 	// check compares against this rather than against what was sent.
 	AcceptedByTrace map[string]map[string]int
@@ -708,10 +789,17 @@ func verifySummaries(ctx context.Context, client *chClient, v tenantVerify) ([]V
 // verifyTenantIsolation looks for traces visible under this tenant that this
 // tenant never sent.
 func verifyTenantIsolation(ctx context.Context, client *chClient, v tenantVerify) ([]Violation, error) {
+	// Every id this RUN has given the tenant, not just this stage's — anything
+	// this run generated under this tenant is the tenant's own by definition.
+	own := v.Stage.TenantOwnTraceIds[v.Tenant.ProjectID]
+	if len(own) == 0 {
+		own = v.TraceIDs
+	}
+
 	var foreignRows []countRow
 	foreignParams := map[string]any{
 		"tenantId":    v.Tenant.ProjectID,
-		"ownTraceIds": v.TraceIDs,
+		"ownTraceIds": own,
 		"fromMs":      v.Stage.Window.FromMs,
 		"toMs":        v.Stage.Window.ToMs,
 	}
@@ -821,32 +909,16 @@ func RunBenchmark(ctx context.Context, args RunArgs, out streams) ([]Violation, 
 		return nil, err
 	}
 
-	client, err := newCHClient(args.ClickHouse)
+	client, sender, err := openRun(ctx, args, out)
 	if err != nil {
-		return nil, err
-	}
-	if err := os.MkdirAll(args.Out, 0o755); err != nil {
-		return nil, err
-	}
-
-	// One shared client so connections are reused across the whole run; a
-	// fresh transport per request would measure connection setup.
-	sender := &http.Client{Timeout: 2 * time.Minute}
-
-	// Prove the whole path works on ONE span before spending the run on it.
-	// A misconfigured harness that reaches the stages reports "lost spans",
-	// which is the wrong diagnosis and the expensive one to chase.
-	if err := preflight(ctx, preflightCheck{
-		Sender:  sender,
-		Client:  client,
-		Args:    args,
-		Timeout: preflightTimeout,
-		Log:     out.Err,
-	}); err != nil {
 		return nil, err
 	}
 
 	var results []StageResult
+
+	// One ledger for the whole run: every trace id given to a tenant, so a
+	// later stage does not read an earlier stage's traces as another tenant's.
+	ledger := map[string][]string{}
 
 	for _, stagePlan := range plan.Stages {
 		fmt.Fprintf(out.Out, "[benchmark] stage %s: %s\n", stagePlan.Stage, stagePlan.Description)
@@ -857,6 +929,7 @@ func RunBenchmark(ctx context.Context, args RunArgs, out streams) ([]Violation, 
 			Client: client,
 			Sender: sender,
 			Out:    out,
+			Ledger: ledger,
 		})
 		if err != nil {
 			return nil, err
@@ -879,6 +952,43 @@ func RunBenchmark(ctx context.Context, args RunArgs, out streams) ([]Violation, 
 	return all, nil
 }
 
+// openRun builds the two clients the run needs, prepares the output directory,
+// and proves the whole path works on ONE span before the stages spend an hour
+// on it.
+//
+// The preflight is the reason this is a step of its own. A misconfigured
+// harness that reaches the stages reports "lost spans", which is both the wrong
+// diagnosis and the expensive one to chase.
+func openRun(ctx context.Context, args RunArgs, out streams) (*chClient, *http.Client, error) {
+	client, err := newCHClient(args.ClickHouse)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := os.MkdirAll(args.Out, artifactDirMode); err != nil {
+		return nil, nil, err
+	}
+
+	// One shared client so connections are reused across the whole run; a
+	// fresh transport per request would measure connection setup.
+	sender := &http.Client{Timeout: 2 * time.Minute}
+
+	if err := preflight(ctx, preflightCheck{
+		Sender:  sender,
+		Client:  client,
+		Args:    args,
+		Timeout: preflightTimeout,
+		Log:     out.Err,
+	}); err != nil {
+		return nil, nil, err
+	}
+
+	return client, sender, nil
+}
+
+// artifactDirMode matches artifactFileMode: the runner has to be able to walk
+// this directory to collect what it holds.
+const artifactDirMode = 0o755
+
 // stageRun is everything one stage needs to execute.
 type stageRun struct {
 	Args   RunArgs
@@ -886,6 +996,10 @@ type stageRun struct {
 	Client *chClient
 	Sender *http.Client
 	Out    streams
+	// Ledger accumulates every trace id the run has generated per tenant, and
+	// is added to by each stage before that stage verifies. Shared across the
+	// run on purpose: see stageVerify.TenantOwnTraceIds.
+	Ledger map[string][]string
 }
 
 // runStage generates, sends, settles and verifies one stage.
@@ -1002,6 +1116,12 @@ func settleAndVerify(ctx context.Context, run stageRun, settle stageSettle) ([]V
 	tracesByTenant, expectedByTenant := stageExpectations(settle.Traces, settle.Outcome)
 	active := args.Tenants[:run.Plan.Tenants]
 
+	// Record this stage's ids before verifying, so the cross-tenant check sees
+	// everything the run has put under each tenant, including earlier stages.
+	for tenantID, traceIDs := range tracesByTenant {
+		run.Ledger[tenantID] = append(run.Ledger[tenantID], traceIDs...)
+	}
+
 	waitForSettle(ctx, run.Client, settleWatch{
 		Tenants:          active,
 		TracesByTenant:   tracesByTenant,
@@ -1012,11 +1132,12 @@ func settleAndVerify(ctx context.Context, run stageRun, settle stageSettle) ([]V
 	})
 
 	violations, err := verifyStage(ctx, run.Client, stageVerify{
-		Tenants:         active,
-		Traces:          settle.Traces,
-		AcceptedByTrace: settle.Outcome.AcceptedByTrace,
-		Window:          settle.Window,
-		SpanEventType:   args.SpanEventType,
+		Tenants:           active,
+		Traces:            settle.Traces,
+		AcceptedByTrace:   settle.Outcome.AcceptedByTrace,
+		Window:            settle.Window,
+		SpanEventType:     args.SpanEventType,
+		TenantOwnTraceIds: run.Ledger,
 	})
 	if err != nil {
 		return nil, err
