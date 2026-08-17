@@ -340,6 +340,16 @@ export default defineConfig(async (): Promise<UserConfig> => {
         changeOrigin: true,
         secure: false,
       },
+      // Root-level API discovery — `/.well-known/openapi` and `/llms.txt`
+      // (src/server/routes/api-discovery.ts). Same split as the OTLP paths
+      // above: start.ts routes them in production, the frontend owns the root
+      // in dev. Left out, they fall to the SPA, which answers an agent's
+      // discovery request with the HTML shell and a 200.
+      "^/(?:\\.well-known/openapi|llms\\.txt)(?:\\?.*)?$": {
+        target: API_TARGET,
+        changeOrigin: true,
+        secure: false,
+      },
       // Exact-match only ("^...$") — a plain "/mcp" prefix also swallows the
       // /mcp/authorize frontend page route (src/pages/mcp/authorize.tsx),
       // sending it to the API server, which has no dev-mode page fallback.

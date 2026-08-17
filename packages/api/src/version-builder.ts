@@ -233,6 +233,16 @@ export type RpcConfig = EndpointConfig & {
  */
 const RPC_PATH_RE = /^\/[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$/;
 
+/**
+ * True when `path` is a legal RPC name. Exported so a consumer that has to
+ * recognise one after the fact — the discovery catalogue reads them back out of
+ * the published OpenAPI document — asks this grammar rather than writing a
+ * second one that agrees until it doesn't.
+ */
+export function isRpcPath(path: string): boolean {
+  return RPC_PATH_RE.test(path);
+}
+
 function assertRpcPath(path: string): void {
   if (!RPC_PATH_RE.test(path)) {
     throw new Error(

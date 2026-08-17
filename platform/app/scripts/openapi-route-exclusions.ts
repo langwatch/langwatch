@@ -234,4 +234,16 @@ export const UNPUBLISHED = [
     category: "elsewhere",
     why: "AI Governance source receivers, addressed with a per-source ingestion key. Documented today in the governance sources guide rather than the API reference",
   },
+
+  // ── Elsewhere: the discovery surface, which points AT the document ─────
+  {
+    match: "GET /api/openapi.json",
+    category: "elsewhere",
+    why: "serves the document itself. An operation inside the document describing where to fetch that same document is circular, and a reader holding it has already answered the question",
+  },
+  {
+    match: "POST /api/rpc.discover",
+    category: "gap",
+    why: "the RPC catalogue, a projection of this document filtered to dotted operations. It should be published once a family actually adopts RPC naming and the catalogue stops being empty — describing an operation whose response is always `{operations: []}` teaches a reader nothing",
+  },
 ] as const satisfies readonly Exclusion[];

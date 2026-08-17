@@ -300,6 +300,8 @@ v.rpc("/endpoints.get", { params: idSchema, output }, handler);    // ✗ Type '
 
 The asserts are not redundant with the types. Types are erased, so they are what still holds for a JavaScript caller, for a config widened to `EndpointConfig` on its way through a helper, and for anything that arrived behind an `any`. `rpc-types.unit.test.ts` drives both statements from one table of names, so a change to either that forgets the other fails there.
 
+`isRpcPath` exports the same grammar for a consumer that has to recognise an RPC name after the fact rather than refuse one up front — the platform's discovery catalogue reads them back out of the published OpenAPI document. Ask it rather than writing a second regex that agrees until one of them changes.
+
 Versioning, forward-copying and withdrawal need no special handling: endpoint identity is `` `${method}:${path}` ``, so `post:/endpoints.create` is unique and `v.withdraw("post", "/endpoints.create")` works unmodified.
 
 ## Error handling
