@@ -89,13 +89,17 @@ CREATE TABLE "AuthzCutoverProjection" (
 -- CreateIndex
 CREATE UNIQUE INDEX "Grant_token_key" ON "Grant"("token");
 
--- The resource tier's two columns travel together or not at all: `token` IS
--- the credential and `permission` is the single thing it may do, so a row
--- holding one without the other names a capability nobody can name back.
+-- The resource tier's two columns travel together, and they belong to that
+-- tier alone: `token` IS the credential and `permission` is the single thing
+-- it may do, so a row holding one without the other names a capability nobody
+-- can name back, and a tokenized ORGANIZATION or TEAM row is a share
+-- credential for a scope no share link may reach. Tied to `scopeType` rather
+-- than merely paired, so neither shape is representable.
 -- Prisma cannot express this, hence the hand-written constraint (same shape
 -- as "RoleBinding_principal_check").
 ALTER TABLE "Grant" ADD CONSTRAINT "Grant_resource_terms_check" CHECK (
-    num_nonnulls("token", "permission") IN (0, 2)
+    ("scopeType" = 'RESOURCE' AND num_nonnulls("token", "permission") = 2)
+    OR ("scopeType" <> 'RESOURCE' AND num_nonnulls("token", "permission") = 0)
 );
 
 -- CreateIndex

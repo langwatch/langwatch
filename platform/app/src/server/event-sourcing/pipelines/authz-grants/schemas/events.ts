@@ -100,21 +100,38 @@ export const resourceGrantTermsSchema = z.object({
  * arrived WITH terms mints a share token against an organization- or
  * team-wide grant, which is a public credential for a scope no share link is
  * ever supposed to reach.
+ *
+ * The `anyone` and `project` principals are resource-tier only (delivery plan,
+ * the `Grant` shape: "project | anyone -- last two: resource tier only"). That
+ * one is a security boundary rather than a tidiness rule: `anyone` names no
+ * subject, so an `anyone` grant at ORGANIZATION or TEAM scope is a standing
+ * public grant over the whole tenant, held by nobody and revocable by no
+ * principal. It is only meaningful paired with a token, and tokens exist at
+ * RESOURCE scope alone.
  */
+const RESOURCE_ONLY_PRINCIPALS = new Set(["anyone", "project"]);
+
 export const grantShapeRefinement = {
   check: (grant: {
+    principal: { type: string };
     roleKey: string | null;
     scope: { type: string };
     resource?: unknown;
   }): boolean => {
     const isResourceScope = grant.scope.type === "RESOURCE";
+    if (
+      RESOURCE_ONLY_PRINCIPALS.has(grant.principal.type) &&
+      !isResourceScope
+    ) {
+      return false;
+    }
     return (
       isResourceScope === (grant.resource !== undefined) &&
       isResourceScope === (grant.roleKey === null)
     );
   },
   message:
-    "a RESOURCE grant carries resource terms and a null roleKey; every other scope carries a roleKey and no resource terms",
+    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms, and the `anyone` and `project` principals exist only at RESOURCE scope",
   path: ["resource"] as const,
 };
 
