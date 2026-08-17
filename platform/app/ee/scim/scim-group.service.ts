@@ -17,6 +17,16 @@ import type {
 const logger = createLogger("langwatch:scim:group");
 
 /**
+ * What a PATCH operation said about a group's membership. `absent` and
+ * `malformed` both mean "change nothing", but only one of them is a payload
+ * anybody needs to hear about.
+ */
+type MemberInstruction =
+  | { kind: "list"; ids: string[] }
+  | { kind: "malformed" }
+  | { kind: "absent" };
+
+/**
  * Handles SCIM 2.0 Group resources backed by the Group / GroupMembership tables.
  * Groups pushed from an IdP arrive here unmapped — admins assign role bindings
  * via the Groups settings page.
@@ -340,6 +350,7 @@ export class ScimGroupService {
       }
 
       // Handle value object containing "displayName" (no path variant)
+      let renamed = false;
       if (
         !operation.path &&
         typeof operation.value === "object" &&
@@ -354,26 +365,35 @@ export class ScimGroupService {
             where: { id: group.id },
             data: { name: valueObj.displayName },
           });
+          renamed = true;
         }
       }
 
       // Full member replace (path="members" or no path with members in value).
       // Only when the operation actually carries a member list: an operation
       // that never mentions members carries no membership instruction at all.
-      const members = this.extractRequestedMemberIds(operation);
-      // `null` is "said nothing about members", `[]` is "said: no members".
-      // Checked explicitly because `[]` is falsy and must not be read as silence.
-      if (members === null) {
+      const instruction = this.extractRequestedMemberIds(operation);
+      if (instruction.kind !== "list") {
         // Doing nothing is the safe answer, but it is also a silent one: an IdP
         // sending a shape we do not parse would otherwise look like a success
         // forever. Logged so a misconfigured sync is findable without an
         // access-loss incident pointing at it.
-        logger.warn(
-          { groupId: group.id, path: operation.path },
-          "SCIM group replace matched no known attribute; leaving the group unchanged",
-        );
+        if (instruction.kind === "malformed") {
+          logger.warn(
+            { groupId: group.id, path: operation.path },
+            "SCIM group replace named members but did not give a list; membership left unchanged",
+          );
+        } else if (!renamed) {
+          // Nothing recognised at all. A rename that mentions no members is a
+          // complete, supported operation, so it must not warn.
+          logger.warn(
+            { groupId: group.id, path: operation.path },
+            "SCIM group replace matched no known attribute; leaving the group unchanged",
+          );
+        }
         return;
       }
+      const members = instruction.ids;
 
       const current = await this.prisma.groupMembership.findMany({
         where: { groupId: group.id },
@@ -458,8 +478,7 @@ export class ScimGroupService {
   }
 
   /**
-   * The member list a `replace` operation asks us to install, or `null` when it
-   * asks for nothing about membership.
+   * What a `replace` operation asks us to do about membership.
    *
    * Absent is not the same as empty. An IdP replacing an unrelated attribute,
    * or renaming a group with the no-path form Entra ID writes, sends no member
@@ -472,10 +491,14 @@ export class ScimGroupService {
    * string where an array belongs) states no membership we can act on, and
    * reading it as "clear the group" turns a malformed payload into revoked
    * access. Only `null` is honoured as a written-out empty list.
+   *
+   * `malformed` and `absent` both leave membership alone, but they are told
+   * apart so the logs can be: one is a payload worth fixing, the other is an
+   * ordinary operation that simply had nothing to say about members.
    */
   private extractRequestedMemberIds(
     operation: ScimPatchOperation,
-  ): string[] | null {
+  ): MemberInstruction {
     if (operation.path === "members")
       return this.readMemberList(operation.value);
 
@@ -490,14 +513,14 @@ export class ScimGroupService {
       );
     }
 
-    return null;
+    return { kind: "absent" };
   }
 
-  /** A written-out member list, or `null` when the value is not one. */
-  private readMemberList(value: unknown): string[] | null {
-    if (value === null) return [];
-    if (!Array.isArray(value)) return null;
-    return this.extractMemberIds(value);
+  /** A written-out member list, or `malformed` when the value is not one. */
+  private readMemberList(value: unknown): MemberInstruction {
+    if (value === null) return { kind: "list", ids: [] };
+    if (!Array.isArray(value)) return { kind: "malformed" };
+    return { kind: "list", ids: this.extractMemberIds(value) };
   }
 
   private extractMemberIdsFromPath(path: string, value: unknown): string[] {

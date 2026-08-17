@@ -28,6 +28,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { scimPatchRequestSchema } from "../scim.types";
 import { ScimGroupService } from "../scim-group.service";
 
+/**
+ * The warn log is behaviour here, not decoration. Leaving membership alone is
+ * the safe answer to a payload we cannot read, but it is a silent one, so the
+ * log is the only thing that makes a misconfigured sync findable. That makes
+ * two things worth pinning: that it fires when we genuinely understood nothing,
+ * and that it stays quiet on a supported operation — a warning on every rename
+ * trains people to ignore the one that matters.
+ */
+const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => ({
+    warn,
+    info: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  }),
+}));
+
 const PATCH_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 
 function parsePatch(operations: unknown[]) {
@@ -93,6 +111,7 @@ describe("SCIM group PATCH membership", () => {
 
   beforeEach(() => {
     prisma = createMockPrisma();
+    warn.mockClear();
   });
 
   describe("given a replace operation that names no members", () => {
@@ -109,6 +128,17 @@ describe("SCIM group PATCH membership", () => {
         expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
         expect(prisma.groupMembership.upsert).not.toHaveBeenCalled();
       });
+
+      it("says in the logs that it understood nothing", async () => {
+        await patchGroup([
+          { op: "replace", path: "externalId", value: "abc-123" },
+        ]);
+
+        expect(warn).toHaveBeenCalledWith(
+          expect.objectContaining({ groupId: "group-1" }),
+          expect.stringContaining("matched no known attribute"),
+        );
+      });
     });
 
     describe("when it renames the group with no path", () => {
@@ -122,6 +152,16 @@ describe("SCIM group PATCH membership", () => {
           data: { name: "Platform" },
         });
         expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
+      });
+
+      // A rename that mentions no members is complete and supported. Warning on
+      // it would fire on every ordinary Entra rename, which is most of them.
+      it("does not warn, because it understood the operation", async () => {
+        await patchGroup([
+          { op: "replace", value: { displayName: "Platform" } },
+        ]);
+
+        expect(warn).not.toHaveBeenCalled();
       });
     });
 
@@ -158,9 +198,7 @@ describe("SCIM group PATCH membership", () => {
     // []` is false, and the operation is correctly read as naming nothing.
     describe("when its value is a bare array rather than an attribute object", () => {
       it("leaves the group's membership untouched", async () => {
-        await patchGroup([
-          { op: "replace", value: [{ value: "user-1" }] },
-        ]);
+        await patchGroup([{ op: "replace", value: [{ value: "user-1" }] }]);
 
         expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
       });
@@ -178,19 +216,27 @@ describe("SCIM group PATCH membership", () => {
 
     describe("when a members path carries something that is not a list", () => {
       it("leaves the group's membership untouched", async () => {
-        await patchGroup([
-          { op: "replace", path: "members", value: "user-1" },
-        ]);
+        await patchGroup([{ op: "replace", path: "members", value: "user-1" }]);
 
         expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
+      });
+
+      // Distinct from the unrecognised-attribute warning: this payload did name
+      // members, so it is an IdP sending a shape worth fixing, not an operation
+      // that was simply about something else.
+      it("says in the logs that the member list was the problem", async () => {
+        await patchGroup([{ op: "replace", path: "members", value: "user-1" }]);
+
+        expect(warn).toHaveBeenCalledWith(
+          expect.objectContaining({ groupId: "group-1", path: "members" }),
+          expect.stringContaining("did not give a list"),
+        );
       });
     });
 
     describe("when a no-path value object holds a members key that is not a list", () => {
       it("leaves the group's membership untouched", async () => {
-        await patchGroup([
-          { op: "replace", value: { members: "user-1" } },
-        ]);
+        await patchGroup([{ op: "replace", value: { members: "user-1" } }]);
 
         expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
       });
