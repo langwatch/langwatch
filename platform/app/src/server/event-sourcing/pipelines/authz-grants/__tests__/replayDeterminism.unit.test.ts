@@ -13,7 +13,7 @@ import {
 import { describe, expect, it } from "vitest";
 import { createTenantId } from "../../..";
 import { AttachGrantsCommand } from "../commands/grantsLedgerCommands";
-import { createAuthzGrantsStateProjection } from "../projections/authzGrantsState.projection";
+import { AuthzGrantsStateFoldProjection } from "../projections/authzGrantsState.foldProjection";
 import type { AuthzGrantsEvent } from "../schemas/events";
 
 const ORG = "org_acme";
@@ -131,7 +131,7 @@ async function replayToRows(emissions: BackfillGrantEmission[]) {
       grants: emissions,
     },
   } as never);
-  const projection = createAuthzGrantsStateProjection({
+  const projection = new AuthzGrantsStateFoldProjection({
     store: {
       load: () => Promise.resolve(null),
       store: () => Promise.resolve(),

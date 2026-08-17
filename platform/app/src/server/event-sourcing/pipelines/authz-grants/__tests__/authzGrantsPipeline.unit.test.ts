@@ -6,7 +6,7 @@ import {
   RecordMigrationTenantStateCommand,
   RollBackCutoverCommand,
 } from "../commands/grantsLedgerCommands";
-import { createAuthzGrantsStateProjection } from "../projections/authzGrantsState.projection";
+import { AuthzGrantsStateFoldProjection } from "../projections/authzGrantsState.foldProjection";
 import type { AttachGrantsCommandData } from "../schemas/commands";
 import {
   AUTHZ_GRANTS_AGGREGATE_TYPE,
@@ -110,7 +110,7 @@ describe("attachGrants command", () => {
 });
 
 describe("authzGrantsState projection", () => {
-  const projection = createAuthzGrantsStateProjection({
+  const projection = new AuthzGrantsStateFoldProjection({
     store: {
       load: () => Promise.resolve(null),
       store: () => Promise.resolve(),
@@ -179,7 +179,10 @@ describe("authzGrantsState projection", () => {
       expect(state.cutover.onEngine).toBe(true);
     });
 
-    it("refuses an event from another aggregate instead of skipping it", () => {
+    it("leaves state untouched for an event from another aggregate", () => {
+      // The base class's contract: routing guarantees only declared types
+      // arrive, so an undeclared type is returned unfolded — the SAME
+      // state reference, proving nothing was applied or stamped.
       const foreign = {
         ...ledgerEvent(GRANT_REVOKED_EVENT_TYPE, {
           grantId: "grant_1",
@@ -187,7 +190,8 @@ describe("authzGrantsState projection", () => {
         }),
         type: "lw.obs.trace.span_received",
       } as unknown as AuthzGrantsEvent;
-      expect(() => projection.apply(projection.init(), foreign)).toThrow();
+      const initial = projection.init();
+      expect(projection.apply(initial, foreign)).toBe(initial);
     });
   });
 });

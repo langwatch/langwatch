@@ -1,4 +1,3 @@
-import type { GrantsLedgerState } from "@langwatch/authz-server";
 import { definePipeline } from "../..";
 import type { StateProjectionStore } from "../../projections/stateProjection.types";
 import {
@@ -8,7 +7,10 @@ import {
   RecordMigrationTenantStateCommand,
   RollBackCutoverCommand,
 } from "./commands/grantsLedgerCommands";
-import { createAuthzGrantsStateProjection } from "./projections/authzGrantsState.projection";
+import {
+  type AuthzGrantsFoldState,
+  AuthzGrantsStateFoldProjection,
+} from "./projections/authzGrantsState.foldProjection";
 import {
   AUTHZ_GRANTS_AGGREGATE_TYPE,
   AUTHZ_GRANTS_PIPELINE_NAME,
@@ -16,7 +18,7 @@ import {
 import type { AuthzGrantsEvent } from "./schemas/events";
 
 export interface AuthzGrantsPipelineDeps {
-  authzGrantsProjectionStore: StateProjectionStore<GrantsLedgerState>;
+  authzGrantsProjectionStore: StateProjectionStore<AuthzGrantsFoldState>;
 }
 
 /**
@@ -33,7 +35,7 @@ export function createAuthzGrantsPipeline(deps: AuthzGrantsPipelineDeps) {
     .withAggregateType(AUTHZ_GRANTS_AGGREGATE_TYPE)
     .withProjection(
       "authzGrantsState",
-      createAuthzGrantsStateProjection({
+      new AuthzGrantsStateFoldProjection({
         store: deps.authzGrantsProjectionStore,
       }),
     )

@@ -8,6 +8,7 @@ import {
   roleRowToFact,
 } from "@langwatch/authz-server";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
+import type { AuthzGrantsFoldState } from "~/server/event-sourcing/pipelines/authz-grants/projections/authzGrantsState.foldProjection";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {
   StateProjectionStore,
@@ -52,14 +53,14 @@ async function inChunks<T>(
  * its id is not a grant id.
  */
 export class PrismaAuthzGrantsProjectionRepository
-  implements StateProjectionStore<GrantsLedgerState>
+  implements StateProjectionStore<AuthzGrantsFoldState>
 {
   constructor(private readonly prisma: PrismaClient) {}
 
   async load(
     key: string,
     _context: ProjectionStoreContext,
-  ): Promise<StoredProjection<GrantsLedgerState> | null> {
+  ): Promise<StoredProjection<AuthzGrantsFoldState> | null> {
     const organizationId = key;
     const cursor = await this.prisma.authzProjectionCursor.findUnique({
       where: { organizationId },
@@ -77,7 +78,12 @@ export class PrismaAuthzGrantsProjectionRepository
       }),
     ]);
 
-    const state: GrantsLedgerState = {
+    const state: AuthzGrantsFoldState = {
+      // The base class's bookkeeping stamps are not persisted as columns —
+      // they re-derive from the cursor envelope, which the executor keeps.
+      CreatedAt: cursor.createdAt.getTime(),
+      UpdatedAt: cursor.updatedAt.getTime(),
+      LastEventOccurredAt: cursor.occurredAt.getTime(),
       organizationId,
       grants: Object.fromEntries(
         grantRows.map((row) => {
@@ -159,7 +165,7 @@ export class PrismaAuthzGrantsProjectionRepository
   }
 
   async store(
-    projection: StoredProjection<GrantsLedgerState>,
+    projection: StoredProjection<AuthzGrantsFoldState>,
     context: ProjectionStoreContext,
   ): Promise<void> {
     const organizationId = context.aggregateId;
