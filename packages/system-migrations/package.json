@@ -1,8 +1,8 @@
 {
-  "name": "@langwatch/authz-server",
+  "name": "@langwatch/system-migrations",
   "version": "0.1.0",
   "private": true,
-  "description": "The server-side runtime of the unified authorization engine (ADR-092): AuthzService, GrantsService, shadow mode, and the storage ports they run on. Storage-engine-free - the app implements the repository interfaces with Prisma.",
+  "description": "In-place, one-time data migrations the system runs on itself: a per-tenant state machine driven by a leased runner at worker boot. Storage-engine-free - the app implements the repository interfaces with Prisma and Redis. First rider: the ADR-092 stage-B authorization backfill.",
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -21,10 +21,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/authz": "workspace:*",
-    "@langwatch/handled-error": "workspace:*",
-    "@langwatch/observability": "workspace:*",
-    "@langwatch/system-migrations": "workspace:*"
+    "@langwatch/observability": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24",

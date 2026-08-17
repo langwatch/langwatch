@@ -503,6 +503,10 @@ export async function startWorkers(
     await bootAnomalyWorker(shutdownHandles);
     await bootSpendSpikeAnomalyWorker(shutdownHandles);
     await bootUsageStatsWorker(shutdownHandles);
+    // One-time in-place data migrations (ADR-092 stage B and successors) are
+    // NOT booted here: they are a worker-only background loop like the
+    // scheduler, so the app layer starts them and the App's graceful
+    // closeables stop them (see presets.ts).
     if (shouldStartMetricsServer) {
       await bootMetricsServer(shutdownHandles);
     }

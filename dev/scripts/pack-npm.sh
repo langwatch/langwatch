@@ -305,6 +305,7 @@ if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
       mcp/typescript/src \
       packages/authz/src packages/authz-server/src \
       packages/handled-error/src packages/langy/src \
+      packages/system-migrations/src \
       skills dev/scripts \
     | { grep -vE '__tests__|\.test\.|\.spec\.|(^|/)tests?/|(^|/)\.npmrc$|\.env\.example$' || true; } | sort > "$tracked"
   missing="$(comm -23 "$tracked" "$in_tar")"

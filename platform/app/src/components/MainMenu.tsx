@@ -2,6 +2,7 @@ import { Box, VStack } from "@chakra-ui/react";
 import {
   Activity,
   Anvil,
+  DatabaseZap,
   Flag,
   GitPullRequest,
   History,
@@ -450,6 +451,13 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         label="Feature Flags"
         href="/ops/feature-flags"
         isActive={router.pathname.startsWith("/ops/feature-flags")}
+        showLabel={showExpanded}
+      />
+      <SideMenuLink
+        icon={DatabaseZap}
+        label="Migrations"
+        href="/ops/migrations"
+        isActive={router.pathname.startsWith("/ops/migrations")}
         showLabel={showExpanded}
       />
       {isAdminUser && (

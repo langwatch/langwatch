@@ -108,6 +108,7 @@
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/scenario": "file:vendor/langwatch-scenario-1.1.0.tgz",
     "@langwatch/ssrf": "workspace:*",
+    "@langwatch/system-migrations": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/api-logs": "0.205.0",

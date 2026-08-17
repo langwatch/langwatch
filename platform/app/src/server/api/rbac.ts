@@ -11,6 +11,7 @@ import {
   ProjectPermissionDeniedError,
 } from "~/server/app-layer/permissions/errors";
 import type { Session } from "~/server/auth";
+import { legacyTeamFallbackDisabled } from "~/server/authz/legacy-fallback-gate";
 import { authzShadowFor } from "~/server/authz/shadow";
 import { isAdmin } from "../../../ee/admin/isAdmin";
 import { CUSTOM_ROLE_KIND } from "../role/role-kind";
@@ -888,6 +889,11 @@ async function checkPermissionFromBindings({
 
   if (bindings.length === 0) {
     // Fall back to legacy TeamUser for users not yet migrated to RoleBindings
+    // - unless stage B's in-place migration finalized this organization, in
+    // which case bindings are the whole story (parity proven per org).
+    if (await legacyTeamFallbackDisabled({ prisma, organizationId })) {
+      return false;
+    }
     const teamScope = scopes.find(
       (s) => s.scopeType === RoleBindingScopeType.TEAM,
     );
@@ -1439,6 +1445,11 @@ async function hasOrganizationPermissionLegacy(
   if (!bindingScopeCanGrant(RoleBindingScopeType.TEAM, permission)) {
     return false;
   }
+  if (
+    await legacyTeamFallbackDisabled({ prisma: ctx.prisma, organizationId })
+  ) {
+    return false;
+  }
   const teamMemberships = await ctx.prisma.teamUser.findMany({
     where: { userId, team: { organizationId, isPersonal: false } },
     select: { role: true, assignedRoleId: true },
@@ -1603,8 +1614,13 @@ async function loadScopeResolution(
 
   // Legacy fallback: a user with NO RoleBindings anywhere in the org falls back
   // to their TeamUser role. Mirrored here so the batch paths keep exact parity
-  // with the per-call helpers.
-  const needsLegacyFallback = bindings.length === 0;
+  // with the per-call helpers - including the stage-B per-organization gate.
+  const needsLegacyFallback =
+    bindings.length === 0 &&
+    !(await legacyTeamFallbackDisabled({
+      prisma: ctx.prisma,
+      organizationId: args.organizationId,
+    }));
   const legacyTeamUser = needsLegacyFallback
     ? await ctx.prisma.teamUser.findMany({
         where: { userId, team: { organizationId: args.organizationId } },
