@@ -130,24 +130,7 @@ export const spendAttributionWireSchema = z.object({
  *  off an outcome gets the same shape admission gives it. */
 export const spendControlPlaneAttributionSchema = z.object({
   principal_user_id: z.string().max(256).default(""),
-  /**
-   * NULLABLE where its neighbours are empty-string, deliberately.
-   *
-   * The empty string is this contract's "not stated" only because the wire
-   * fields cross into Go, whose string zero value IS `""` — a nullable field
-   * there would mean a `*string` and a three-state wire for nothing. `team_id`
-   * never crosses that boundary: the gateway cannot see it, and the ingest
-   * seam is what fills it. So nothing here is paying for the compromise, and
-   * a project genuinely has NO team rather than a team named "".
-   *
-   * The rest of the stack already agrees — the gateway JWT signs
-   * `team_id: traceProject?.teamId ?? null`, and the debits process resolves
-   * budgets against `teamId ?? null`. This was the one layer still coercing.
-   *
-   * Legacy `""` still parses, because durable outbox rows and appended events
-   * written by earlier builds carry it.
-   */
-  team_id: z.string().max(256).nullable().default(null),
+  team_id: z.string().max(256).default(""),
 });
 
 export const admitSpendWireSchema = z.object({
@@ -201,7 +184,7 @@ export const admitSpendWireSchema = z.object({
  *  manager and the delivered envelope keep the shapes they were frozen at;
  *  adopting the team on any of them later costs no wire change. */
 export const admitSpendCommandDataSchema = admitSpendWireSchema.extend({
-  team_id: spendControlPlaneAttributionSchema.shape.team_id,
+  team_id: z.string().max(256).default(""),
 });
 export type AdmitSpendCommandData = z.infer<typeof admitSpendCommandDataSchema>;
 

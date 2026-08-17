@@ -181,13 +181,7 @@ function runSweep(deps: SpendSettlementProcessDeps) {
           organization_id: admission.organizationId,
           virtual_key_id: admission.virtualKeyId,
           principal_user_id: admission.principalUserId,
-          // Null, not empty: the spend record has no TeamId column, so a
-          // sweep genuinely cannot know the team rather than knowing it to
-          // be absent. Nothing reads it on a settlement today — the debits
-          // process is its only reader and never sees a settled event — but
-          // stating "unknown" as "" is what would quietly resolve no team
-          // if it ever did.
-          team_id: null,
+          team_id: "",
           end_user_id: admission.endUserId,
           trace_id: admission.traceId,
           request_type: admission.requestType,

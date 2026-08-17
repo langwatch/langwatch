@@ -64,9 +64,7 @@ export interface GatewayDebitsState {
   endUserId: string;
   virtualKeyId: string;
   organizationId: string;
-  /** Null when the project has no team, never "". A project genuinely has
-   *  no team rather than one named empty. */
-  teamId: string | null;
+  teamId: string;
   principalUserId: string;
   /**
    * Whether the admit event has been folded in. Attribution alone cannot
@@ -89,7 +87,7 @@ const INITIAL_STATE: GatewayDebitsState = {
   endUserId: "",
   virtualKeyId: "",
   organizationId: "",
-  teamId: null,
+  teamId: "",
   principalUserId: "",
   admitted: false,
   pendingOutcome: null,
@@ -105,10 +103,7 @@ export const writeGatewayDebitsSchema = z.object({
   gateway_request_id: z.string(),
   project_id: z.string(),
   organization_id: z.string(),
-  /** Nullable, and legacy `""` still parses: this is a durable outbox
-   *  payload, so rows written before the field went nullable are read back
-   *  by this build and must not become a permanent parse failure. */
-  team_id: z.string().nullable().default(null),
+  team_id: z.string().default(""),
   virtual_key_id: z.string(),
   principal_user_id: z.string().default(""),
   end_user_id: z.string().default(""),
@@ -168,9 +163,6 @@ async function resolveDebitedBudgets(
     client: prisma,
     target: {
       organizationId: payload.organization_id,
-      // `|| null` rather than a straight pass-through: a payload written
-      // before the field went nullable carries "", which must resolve as no
-      // team rather than as a team whose id is empty.
       teamId: payload.team_id || null,
       projectId: payload.project_id,
       virtualKeyId: payload.virtual_key_id,
@@ -429,7 +421,7 @@ function movedNothing(outcome: SpendOutcome): boolean {
  *  see them: the outcome event itself, or the admission it remembered. */
 interface DebitAttribution {
   organizationId: string;
-  teamId: string | null;
+  teamId: string;
   virtualKeyId: string;
   principalUserId: string;
   endUserId: string;
@@ -524,7 +516,7 @@ function onAdmission<Intent>(
   const stashed = state.pendingOutcome;
   const attributed = {
     organization_id: admitted.organization_id,
-    team_id: admitted.team_id ?? null,
+    team_id: admitted.team_id ?? "",
     virtual_key_id: admitted.virtual_key_id,
     principal_user_id: admitted.principal_user_id ?? "",
     end_user_id: admitted.end_user_id ?? "",

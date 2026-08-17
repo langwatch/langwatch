@@ -38,21 +38,8 @@ describe("spend command schemas", () => {
 
   it("reads an admission appended before the team was carried", () => {
     // A pre-deploy event, replayed by a post-deploy consumer: the enriched
-    // field has to default rather than fail the read. It defaults to NULL —
-    // an event that never carried a team states no team, rather than one
-    // whose id is empty.
+    // field has to default rather than fail the read.
     const parsed = admitSpendCommandDataSchema.parse(wireAdmission);
-
-    expect(parsed.team_id).toBeNull();
-  });
-
-  it("still reads an admission whose team was written as an empty string", () => {
-    // The shape earlier builds wrote. It has to keep parsing, because the
-    // events and durable outbox rows carrying it outlive the deploy.
-    const parsed = admitSpendCommandDataSchema.parse({
-      ...wireAdmission,
-      team_id: "",
-    });
 
     expect(parsed.team_id).toBe("");
   });
