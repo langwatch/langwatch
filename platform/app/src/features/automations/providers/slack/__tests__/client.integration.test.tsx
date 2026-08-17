@@ -377,23 +377,52 @@ describe("SlackConfigForm channel picker", () => {
     const typist = () => userEvent.setup({ delay: 10 });
 
     /**
-     * Type into the combobox, then wait for the box to actually hold it.
+     * Put a channel in the box in ONE input event, for the tests that are not
+     * about typing.
      *
-     * The cadence above makes the resync race unlikely, not impossible: on a
-     * loaded CI runner a keystroke is still occasionally lost, and a fixed
-     * delay only moves the threshold rather than removing it.
+     * The race costs a character only because each keystroke is appended to
+     * whatever the box is holding at that moment: if a resync rewrites the box
+     * from stale text between two keystrokes, the next character lands on the
+     * stale text and the one before it is gone from the combobox's own state
+     * for good. A single event has no "between", so there is nothing to lose —
+     * and this holds whatever it is that makes the resync late, which is worth
+     * something, because that has not been pinned down.
      *
-     * What this changes is WHERE the loss shows up. A test that types and then
-     * goes on to tab, click or press Enter carries the corrupted value forward,
-     * so the drop surfaces several interactions later as something that reads
-     * like a real defect — "expected ['#ahoc'] to deeply equal ['#adhoc']"
-     * about which item carries a tick. Settling on the typed value keeps the
-     * failure at the point the typing failed, and lets the retry that the
-     * `waitFor` performs absorb a race that is not what any of these tests are
-     * about.
+     * This is a real thing authors do (paste a channel name or an ID), and for
+     * a test that goes on to blur, press Enter or pick from the list it says
+     * exactly as much as typing did: the box holds the channel.
+     */
+    const enterChannel = async ({
+      user,
+      input,
+      text,
+    }: {
+      user: ReturnType<typeof typist>;
+      input: HTMLElement;
+      text: string;
+    }): Promise<void> => {
+      await user.click(input);
+      await user.paste(text);
+      await waitFor(() => expect(input).toHaveValue(text));
+    };
+
+    /**
+     * Type one character at a time, waiting for the box to hold each prefix
+     * before sending the next.
      *
-     * Tests that type and immediately assert the value do NOT need this: there
-     * the dropped character IS the assertion, and it should fail.
+     * Only for the test whose subject IS the per-keystroke path — that the
+     * search filters on the whole term rather than the last letter, which is
+     * the defect that made a long channel name unreachable. Pasting would walk
+     * straight past it, so that test keeps typing and this keeps it honest:
+     * nothing is typed onto a box that is not already holding what came
+     * before, so a stale value is caught while it is still recoverable rather
+     * than being carried into the assertion.
+     *
+     * The tests that type and immediately assert the value use neither helper.
+     * There the dropped character IS the assertion, and it should fail.
+     *
+     * `text` is literal text — key descriptors like `{Enter}` do not survive
+     * being split per character.
      */
     const typeAndSettle = async ({
       user,
@@ -404,8 +433,12 @@ describe("SlackConfigForm channel picker", () => {
       input: HTMLElement;
       text: string;
     }): Promise<void> => {
-      await user.type(input, text);
-      await waitFor(() => expect(input).toHaveValue(text));
+      let typed = "";
+      for (const character of text) {
+        await user.type(input, character);
+        typed += character;
+        await waitFor(() => expect(input).toHaveValue(typed));
+      }
     };
 
     describe("when the author types a channel name to search", () => {
@@ -449,7 +482,7 @@ describe("SlackConfigForm channel picker", () => {
         const onChangeSpy = vi.fn();
         renderForm({ initial: botSlice({ channelId: "" }), onChangeSpy });
 
-        await typeAndSettle({
+        await enterChannel({
           user,
           input: screen.getByPlaceholderText(/#alerts or c0123/i),
           text: "#adhoc",
@@ -466,10 +499,7 @@ describe("SlackConfigForm channel picker", () => {
         const onChangeSpy = vi.fn();
         renderForm({ initial: botSlice({ channelId: "" }), onChangeSpy });
 
-        // Enter is sent separately so the settle can assert the typed value —
-        // with `#adhoc{Enter}` in one call there is no point at which the box
-        // is expected to hold exactly `#adhoc`.
-        await typeAndSettle({
+        await enterChannel({
           user,
           input: screen.getByPlaceholderText(/#alerts or c0123/i),
           text: "#adhoc",
@@ -509,8 +539,7 @@ describe("SlackConfigForm channel picker", () => {
         renderForm({ initial: botSlice({ channelId: "" }), onChangeSpy });
         const input = screen.getByPlaceholderText(/#alerts or c0123/i);
 
-        await user.click(input);
-        await typeAndSettle({ user, input, text: "signoff" });
+        await enterChannel({ user, input, text: "signoff" });
         await user.keyboard("{ArrowDown}{Enter}");
 
         expect(onChangeSpy).toHaveBeenLastCalledWith(
@@ -532,7 +561,7 @@ describe("SlackConfigForm channel picker", () => {
         await user.click(input);
         await user.click(await screen.findByText("#release-signoff"));
         await user.clear(input);
-        await typeAndSettle({ user, input, text: "#adhoc" });
+        await enterChannel({ user, input, text: "#adhoc" });
         await user.tab();
         await user.click(input);
 
@@ -560,7 +589,7 @@ describe("SlackConfigForm channel picker", () => {
         await user.click(input);
         await user.click(await screen.findByText("#release-signoff"));
         await user.clear(input);
-        await typeAndSettle({ user, input, text: "#adhoc" });
+        await enterChannel({ user, input, text: "#adhoc" });
         await user.tab();
 
         expect(input).toHaveValue("#adhoc");
