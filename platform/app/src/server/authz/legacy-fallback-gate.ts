@@ -35,10 +35,7 @@ export async function legacyTeamFallbackDisabled({
 }): Promise<boolean> {
   if (finalizedOrganizations.has(organizationId)) return true;
   const missedAt = lastMissAt.get(organizationId);
-  if (
-    missedAt !== undefined &&
-    Date.now() - missedAt < NEGATIVE_CACHE_TTL_MS
-  ) {
+  if (missedAt !== undefined && Date.now() - missedAt < NEGATIVE_CACHE_TTL_MS) {
     return false;
   }
   try {

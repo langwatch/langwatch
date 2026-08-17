@@ -65,26 +65,27 @@ describe("legacy fallback per-organization gate", () => {
     });
   });
 
-  describe.each(["pending", "migrated", "parked"] as const)(
-    "when the organization is %s",
-    (state) => {
-      /** @scenario "An organization that is not finalized keeps today's behaviour exactly" */
-      it("keeps the legacy fallback participating exactly as today", async () => {
-        mockPrisma.systemMigrationTenantState.findUnique.mockResolvedValue(
-          state === "pending" ? null : { status: state },
-        );
+  describe.each([
+    "pending",
+    "migrated",
+    "parked",
+  ] as const)("when the organization is %s", (state) => {
+    /** @scenario "An organization that is not finalized keeps today's behaviour exactly" */
+    it("keeps the legacy fallback participating exactly as today", async () => {
+      mockPrisma.systemMigrationTenantState.findUnique.mockResolvedValue(
+        state === "pending" ? null : { status: state },
+      );
 
-        const result = await resolveTeamPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "team-1",
-          "team:manage" as Permission,
-        );
+      const result = await resolveTeamPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "team-1",
+        "team:manage" as Permission,
+      );
 
-        expect(result.permitted).toBe(true);
-        expect(mockPrisma.teamUser.findFirst).toHaveBeenCalled();
-      });
-    },
-  );
+      expect(result.permitted).toBe(true);
+      expect(mockPrisma.teamUser.findFirst).toHaveBeenCalled();
+    });
+  });
 
   describe("when the migration state table is unreadable", () => {
     it("fails safe with the fallback still on", async () => {
