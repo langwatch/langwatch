@@ -23,7 +23,7 @@ import { resolver } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
 import { OpenAI } from "openai";
 import type Stripe from "stripe";
-import { type ZodError, z } from "zod";
+import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { env } from "~/env.mjs";
 import type { Project } from "~/generated/prisma/client";
