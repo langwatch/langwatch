@@ -80,7 +80,6 @@ import {
 import { createStripeClient } from "../../../ee/billing/stripe/stripeClient";
 import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
-import { PrismaAuthzGrantsProjectionRepository } from "../authz/repositories/authz-grants-projection.prisma.repository";
 import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import { PinnedTraceRepository } from "../data-retention/pinning/pinnedTrace.repository";
 import { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
@@ -133,6 +132,7 @@ import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 import { createAnalyticsService } from "./analytics";
 import { LegacyAnalyticsBackendClickHouseRepository } from "./analytics/repositories/legacy-analytics-backend.clickhouse.repository";
 import { App, getApp, globalForApp, initializeApp } from "./app";
+import { PrismaAuthzGrantsProjectionRepository } from "./authz/repositories/authz-grants-projection.prisma.repository";
 import { EmailSuppressionService } from "./automations/emailSuppression.service";
 import { REPORT_SCHEDULER_TARGET_TYPE } from "./automations/report.builder";
 import {

@@ -15,12 +15,12 @@ The design is three layers, app-layer service/repository idiom throughout:
   `AuthzService` (with the epoch cache inside), `GrantsService`,
   `AuthzShadowService` - all written against two repository INTERFACES
   (`AuthzReadRepository`, `AuthzGrantsRepository`). No storage engine.
-- **the app** (`platform/app/src/server/authz/`) - the Prisma repository
+- **the app** (`platform/app/src/server/app-layer/authz/`) - the Prisma repository
   implementations (`repositories/*.prisma.repository.ts`), the redis epoch
   store, the tRPC middleware, and `runtime.ts`: the composition root that
   builds ONE of each service and exports `authz`, `authzCollector` and
   `grantsService()`. The shadow is the exception - `authzShadowFor(prisma)`
-  in `server/authz/shadow.ts` composes one per call, because its caller
+  in `server/app-layer/authz/shadow.ts` composes one per call, because its caller
   `rbac.ts` is imported by client code and must not pull the composition
   root's server-only graph into the browser bundle.
 
@@ -61,7 +61,7 @@ Which door you walk through depends on what you are writing:
 | a share page (anonymous viewer with a link) | `authzCollector.resolveResourceScopeRef` + `authz.check()` |
 
 The composed instances live in the app's composition root,
-`~/server/authz/runtime.ts` - import them from there; nothing else
+`~/server/app-layer/authz/runtime.ts` - import them from there; nothing else
 constructs a service or a repository.
 
 ### Protecting a tRPC procedure
@@ -88,7 +88,7 @@ lineage facts (a project's team and organization) come from storage; a
 hand-built literal is the one way to lie to the engine.
 
 ```ts
-import { authz, authzCollector } from "~/server/authz/runtime";
+import { authz, authzCollector } from "~/server/app-layer/authz/runtime";
 
 const scope = await authzCollector.resolveScopeRef({ projectId });
 if (!scope) throw new NotFoundError(...);          // unknown id: deny, don't leak
@@ -154,7 +154,7 @@ writes an audit event, and bumps the org's epoch so caches die on the next
 request.
 
 ```ts
-import { grantsService } from "~/server/authz/runtime";
+import { grantsService } from "~/server/app-layer/authz/runtime";
 
 const grants = grantsService();
 await grants.attach({ actor, who: { type: "user", id }, role: { builtin: "MEMBER" }, where: teamScope });
@@ -237,13 +237,12 @@ them, and the migration deletes the synonyms.
 | **LEGACY-QUIRK(stage)** | A deliberately reproduced legacy behaviour, tagged with the migration stage that deletes it. Stage-A parity means matching legacy warts and all. |
 | **Witness** | `Authorized<Scope>` - a branded, unforgeable proof that `authz.authorize()` allowed a permission at a scope. Repositories that accept a witness instead of a raw id make "forgot the check" fail to compile. |
 | **Repository port** | The storage interfaces the runtime services are written against: `AuthzReadRepository` (everything COLLECT reads) and `AuthzGrantsRepository` (everything the write surface touches, transactions included). The app implements them as `Prisma*Repository` classes. |
-| **Composition root** | `platform/app/src/server/authz/runtime.ts` - the one place repositories, redis, the audit writer and the KSUID minter meet the services. Everything else imports the composed instances. |
+| **Composition root** | `platform/app/src/server/app-layer/authz/runtime.ts` - the one place repositories, redis, the audit writer and the KSUID minter meet the services. Everything else imports the composed instances. |
 | **Passport** | A signed, short-TTL (≤60s), epoch-bound token carrying per-scope permission bitsets. Lets stateless surfaces (Go gateway, collectors) verify with an HMAC check and an epoch compare - zero database. |
 | **Bitset** | An effective permission set as bits indexed by registry order. The reason the registry is append-only: an index, once shipped inside a passport, must never change meaning. |
 | **Epoch** | A per-organization counter. Every grant write bumps it; caches and passports are valid only for the epoch they were built under, so revocation lands on the next request. |
 | **Shadow mode** | `AUTHZ_V2_SHADOW`: the engine runs beside the legacy resolvers on real traffic and logs mismatches with both verdicts. It never affects the response. |
 | **Divergence family** | A classified, *expected* shadow mismatch: `external-cap` (the legacy API-key path applies no lite-member cap) and `ceiling-legacy-fallback` (the legacy key ceiling consults TeamUser rows un-gated). Dashboards partition on these so real bugs stand out. |
-
 
 ### "Permission" or "scope"? Permission - everywhere (2026-08-17)
 

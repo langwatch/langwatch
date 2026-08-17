@@ -50,8 +50,8 @@ import type {
   RollBackCutoverCommandData,
 } from "~/server/event-sourcing/pipelines/authz-grants/schemas/commands";
 import { AUTHZ_GRANTS_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/authz-grants/schemas/constants";
-import { tryGetApp } from "../app-layer/app";
-import { prisma as appPrisma } from "../db";
+import { prisma as appPrisma } from "../../db";
+import { tryGetApp } from "../app";
 import { bumpAuthzEpoch } from "./epoch";
 import { PrismaAuthzGrantsProjectionRepository } from "./repositories/authz-grants-projection.prisma.repository";
 
@@ -593,10 +593,5 @@ function bindingIdentityKey(binding: LedgerBindingAttach): string {
     binding.customRoleId === null
       ? `builtin:${binding.role}`
       : `custom:${binding.customRoleId}`;
-  return [
-    principal,
-    binding.scopeType,
-    binding.scopeId,
-    roleIdentity,
-  ].join("");
+  return [principal, binding.scopeType, binding.scopeId, roleIdentity].join("");
 }

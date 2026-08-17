@@ -1,7 +1,7 @@
 /**
  * ADR-092 — the write port. Atomicity lives in the implementation (the
  * Prisma repository owns transactions,
- * platform/app/src/server/authz/repositories/authz-grants.prisma.repository.ts)
+ * platform/app/src/server/app-layer/authz/repositories/authz-grants.prisma.repository.ts)
  * while validation, failure naming, and the offboarding proof stay in
  * GrantsService.
  */

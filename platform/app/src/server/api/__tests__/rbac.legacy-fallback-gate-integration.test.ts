@@ -6,7 +6,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
-import { resetLegacyFallbackGateForTesting } from "~/server/authz/legacy-fallback-gate";
+import { resetLegacyFallbackGateForTesting } from "~/server/app-layer/authz/legacy-fallback-gate";
 import { type Permission, resolveTeamPermission } from "../rbac";
 
 const mockPrisma = {

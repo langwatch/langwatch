@@ -13,8 +13,8 @@
  * No storage engine lives here, and no environment read either: every knob
  * arrives as a closure through a service's options. The app implements the
  * repository interfaces with Prisma
- * (platform/app/src/server/authz/repositories/) and composes everything
- * once in its runtime (platform/app/src/server/authz/runtime.ts). The pure
+ * (platform/app/src/server/app-layer/authz/repositories/) and composes everything
+ * once in its runtime (platform/app/src/server/app-layer/authz/runtime.ts). The pure
  * half (registry, roles, decide()) is `@langwatch/authz`.
  */
 export { AuthzCollectorService } from "./authz-collector.service";

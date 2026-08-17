@@ -13,7 +13,7 @@ import {
   type Permission,
   teamRoleHasPermission,
 } from "../api/rbac";
-import { authzShadowFor } from "../authz/shadow";
+import { authzShadowFor } from "../app-layer/authz/shadow";
 // The shadow comparison runs on the APP's own Prisma handle, never the
 // caller's. Both of this module's public functions are called on the API-key
 // mint path with `prisma` bound to an OPEN interactive transaction

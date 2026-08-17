@@ -22,7 +22,7 @@ import {
 } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { prisma } from "../db";
+import { prisma } from "../../db";
 import { bumpAuthzEpoch, getAuthzEpoch } from "./epoch";
 import { grantsLedgerWriter } from "./ledger";
 import { LedgerAuthzGrantsRepository } from "./repositories/authz-grants.ledger.repository";

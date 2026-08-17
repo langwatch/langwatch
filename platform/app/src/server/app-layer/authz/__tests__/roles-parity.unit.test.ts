@@ -23,7 +23,7 @@ import {
   organizationRoleHasPermission,
   type Permission,
   teamRoleHasPermission,
-} from "../../api/rbac";
+} from "../../../api/rbac";
 
 describe("built-in role parity with legacy bags", () => {
   describe.each(

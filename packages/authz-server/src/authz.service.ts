@@ -1,7 +1,7 @@
 /**
  * ADR-092 §11 — the checking API, a service over the collector. The app
  * builds ONE instance in its composition root
- * (platform/app/src/server/authz/runtime.ts) and everything asks it:
+ * (platform/app/src/server/app-layer/authz/runtime.ts) and everything asks it:
  *
  *   authz.can({ principal, permission: "prompts:update", scope })
  *   authz.authorize({ ... })            → Authorized witness, or throws
@@ -46,7 +46,7 @@ import type { AuthzCollectorService } from "./authz-collector.service";
 
 const decisions = createLogger("langwatch:authz:decisions");
 
-/** The app's redis-backed epoch store (src/server/authz/epoch.ts). */
+/** The app's redis-backed epoch store (src/server/app-layer/authz/epoch.ts). */
 export type AuthzEpochReader = (args: {
   organizationId: string;
 }) => Promise<number | null>;

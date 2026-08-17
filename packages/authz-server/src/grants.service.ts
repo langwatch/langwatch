@@ -41,7 +41,7 @@ export type AuthzAuditWriter = (entry: {
   metadata: Record<string, unknown>;
 }) => Promise<unknown>;
 
-/** The app's redis-backed epoch bump (src/server/authz/epoch.ts). */
+/** The app's redis-backed epoch bump (src/server/app-layer/authz/epoch.ts). */
 export type AuthzEpochBumper = (args: {
   organizationId: string;
 }) => Promise<void>;
@@ -59,7 +59,7 @@ type Actor = { userId: string };
 
 /**
  * The app-owned effect seams, composed once in the app's runtime
- * (platform/app/src/server/authz/runtime.ts): the EE audit writer, the
+ * (platform/app/src/server/app-layer/authz/runtime.ts): the EE audit writer, the
  * KSUID minter for binding ids, the redis-backed epoch bump, and the
  * collector factory the offboarding proof re-binds to its transaction
  * (injected rather than constructed so this module keeps no value import of

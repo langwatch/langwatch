@@ -19,13 +19,13 @@
  */
 import type {
   AuthzReadRepository,
+  BindingPrincipalWhere,
   GrantWriteActor,
   OffboardCounts,
   RoleBindingWrite,
 } from "@langwatch/authz-server";
 import { BindingMissingError } from "@langwatch/authz-server";
 import type { PrismaClient } from "~/generated/prisma/client";
-import type { BindingPrincipalWhere } from "@langwatch/authz-server";
 import type { GrantsLedgerWriter } from "../ledger";
 import { PrismaAuthzGrantsRepository } from "./authz-grants.prisma.repository";
 import { PrismaAuthzReadRepository } from "./authz-read.prisma.repository";

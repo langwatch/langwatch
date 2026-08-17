@@ -16,8 +16,8 @@ import {
 } from "@langwatch/authz";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
-import { LiteMemberRestrictedError } from "../app-layer/permissions/errors";
-import type { Session } from "../auth";
+import type { Session } from "../../auth";
+import { LiteMemberRestrictedError } from "../permissions/errors";
 import { authz, authzCollector } from "./runtime";
 
 const logger = createLogger("langwatch:authz");

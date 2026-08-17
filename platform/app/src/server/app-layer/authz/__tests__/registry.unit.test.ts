@@ -8,14 +8,14 @@ import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import {
   getValidActionsForResource,
   orderedResources,
-} from "../../../utils/permissionsConfig";
+} from "../../../../utils/permissionsConfig";
 import {
   EXTERNAL_MEMBER_PERMISSIONS,
   getOrganizationRolePermissions,
   getTeamRolePermissions,
   type Permission,
-} from "../../api/rbac";
-import { PERMISSION_CATEGORIES } from "../../api-key/permission-categories";
+} from "../../../api/rbac";
+import { PERMISSION_CATEGORIES } from "../../../api-key/permission-categories";
 
 describe("authz registry", () => {
   describe("given the legacy vocabulary", () => {

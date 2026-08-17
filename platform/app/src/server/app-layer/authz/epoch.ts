@@ -5,11 +5,11 @@
  * fresh), never staleness.
  *
  * Whether the cache is consulted at all is the composition root's decision
- * (src/server/authz/runtime.ts owns that env read); this module only answers
+ * (src/server/app-layer/authz/runtime.ts owns that env read); this module only answers
  * what the epoch IS.
  */
 import { createLogger } from "@langwatch/observability";
-import { tryGetApp } from "../app-layer/app";
+import { tryGetApp } from "../app";
 
 const logger = createLogger("langwatch:authz:epoch");
 

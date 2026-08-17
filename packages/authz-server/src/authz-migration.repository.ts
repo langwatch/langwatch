@@ -4,7 +4,7 @@
  * a row MEANS - equivalence, parity, when a tenant may finalize - lives in
  * the migration (./team-user-backfill.migration.ts). The app implements
  * this with Prisma
- * (platform/app/src/server/authz/repositories/authz-migration.prisma.repository.ts).
+ * (platform/app/src/server/app-layer/authz/repositories/authz-migration.prisma.repository.ts).
  */
 import type { TeamUserRole } from "@langwatch/authz";
 

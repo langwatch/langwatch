@@ -21,7 +21,7 @@ import type {
   ShareLinkRow,
 } from "@langwatch/authz-server";
 import type { Prisma } from "~/generated/prisma/client";
-import { CUSTOM_ROLE_KIND } from "../../role/role-kind";
+import { CUSTOM_ROLE_KIND } from "../../../role/role-kind";
 import { legacyTeamFallbackDisabled } from "../legacy-fallback-gate";
 
 export class PrismaAuthzReadRepository implements AuthzReadRepository {

@@ -21,7 +21,7 @@ import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors
 const checkDetailed = vi.fn();
 const resolveScopeRef = vi.fn();
 
-vi.mock("~/server/authz/runtime", () => ({
+vi.mock("~/server/app-layer/authz/runtime", () => ({
   authz: {
     checkDetailed: (...args: unknown[]) => checkDetailed(...args),
   },

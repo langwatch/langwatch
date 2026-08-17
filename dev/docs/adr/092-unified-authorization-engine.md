@@ -10,7 +10,7 @@ We will collapse LangWatch authorization into one three-layer module in the
 app-layer service/repository idiom: `@langwatch/authz` (the vocabulary and
 the pure `AuthzEngine`, browser-safe), `@langwatch/authz-server` (the service
 classes - collector, checking, grants, shadow - over two repository
-interfaces, storage-engine-free), and the app's `server/authz/` (the Prisma
+interfaces, storage-engine-free), and the app's `server/app-layer/authz/` (the Prisma
 repository implementations, the redis epoch store, the tRPC adapter, and the
 composition root). Built from three nouns - **permission** (a verb on a
 resource), **role** (a named set of permissions), **role binding** (who holds

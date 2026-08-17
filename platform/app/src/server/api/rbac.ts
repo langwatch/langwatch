@@ -11,8 +11,8 @@ import {
   ProjectPermissionDeniedError,
 } from "~/server/app-layer/permissions/errors";
 import type { Session } from "~/server/auth";
-import { legacyTeamFallbackDisabled } from "~/server/authz/legacy-fallback-gate";
-import { authzShadowFor } from "~/server/authz/shadow";
+import { legacyTeamFallbackDisabled } from "~/server/app-layer/authz/legacy-fallback-gate";
+import { authzShadowFor } from "~/server/app-layer/authz/shadow";
 import { isAdmin } from "../../../ee/admin/isAdmin";
 import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 
