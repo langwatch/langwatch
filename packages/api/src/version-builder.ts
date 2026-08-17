@@ -85,8 +85,9 @@ export class VersionBuilder<TApp> {
   }
 
   /**
-   * Register an RPC-named endpoint (ADR-094). Mounts as a real POST; the
-   * dotted name carries the verb, so the method never does.
+   * Register an RPC-named endpoint: mounts as a real POST, and the dotted name
+   * carries the verb so the method never does. See the RPC section of the
+   * package README for the decision and its scope.
    *
    * Every argument travels in the JSON body — there are no path params and no
    * query string. An RPC with no required arguments declares no `input` and
@@ -308,12 +309,22 @@ function assertStatusInvariant({
   // No schema, or one whose only accepted value is `undefined`: the endpoint
   // has no body and always answers `status ?? 204`.
   if (!config.output || isNoBodySchema(config.output)) return;
+
+  const parsed = config.output.safeParse(undefined);
   // A schema that rejects `undefined`: the body is always present and the
   // endpoint always answers `status ?? 200`.
-  if (!config.output.safeParse(undefined).success) return;
+  if (!parsed.success) return;
+  // A schema that ACCEPTS `undefined` and parses it into a value —
+  // `.default(...)`, `.catch(...)`. The status still cannot move, because
+  // `serializeEndpointResult` branches on what the schema produced, not on what
+  // it accepted, and it never produces `undefined` here. Testing acceptance
+  // instead of the parsed value refused these at registration for a status
+  // ambiguity they do not have.
+  if (parsed.data !== undefined) return;
 
-  // What is left accepts `undefined` AND a value — `.optional()`, `z.any()`,
-  // a union with `undefined` in it — which is the only way the status can move.
+  // What is left accepts `undefined` AND a value, and yields `undefined` for
+  // it — `.optional()`, `z.any()`, a union with `undefined` in it — which is
+  // the only way the status can actually move.
   throw new Error(
     `Endpoint ${method.toUpperCase()} ${path} declares an "output" schema that ` +
       `accepts undefined as well as a value, so its success status would ` +

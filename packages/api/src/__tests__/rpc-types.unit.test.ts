@@ -43,22 +43,44 @@ const ILLEGAL = [
 
 /**
  * `RpcPath<T>` resolves to `unknown` exactly when the name is legal, so this
- * reads as "the compiler accepts it". Both conditionals distribute over the
- * union, so one wrong name turns the result into `boolean` and the assertion
- * below stops compiling — the table is checked entry by entry, not in bulk.
+ * reads as "the compiler accepts it".
  */
 type CompilerAccepts<T extends string> = unknown extends RpcPath<T>
   ? true
   : false;
 
+/**
+ * Applied per element, NOT to the union of them.
+ *
+ * `RpcPath<T>` does not distribute — its checked type is `IsRpcPath<T>`, not a
+ * naked `T` — so `CompilerAccepts<(typeof ILLEGAL)[number]>` collapses twelve
+ * names into one verdict. `IsRpcPath` of a mixed union is `boolean`, `boolean
+ * extends true` is false, and the whole table reports "rejected" whether one
+ * name is accepted or none are. That assertion passed for the wrong reason and
+ * would have gone on passing if the grammar sprang a leak.
+ *
+ * Mapping over the tuple keeps one verdict per name. A single accepted illegal
+ * name makes its element `true`, `T[number]` widens to `boolean`, and the
+ * assertion below stops compiling.
+ */
+type CompilerAcceptsEach<T extends readonly string[]> = {
+  [K in keyof T]: CompilerAccepts<T[K] & string>;
+};
+
+type AllTrue<T extends readonly boolean[]> = T[number] extends true
+  ? true
+  : false;
+type AllFalse<T extends readonly boolean[]> = T[number] extends false
+  ? true
+  : false;
+
 type AssertTrue<T extends true> = T;
-type AssertFalse<T extends false> = T;
 
 export type EveryLegalNameCompiles = AssertTrue<
-  CompilerAccepts<(typeof LEGAL)[number]>
+  AllTrue<CompilerAcceptsEach<typeof LEGAL>>
 >;
-export type EveryIllegalNameIsRejected = AssertFalse<
-  CompilerAccepts<(typeof ILLEGAL)[number]>
+export type EveryIllegalNameIsRejected = AssertTrue<
+  AllFalse<CompilerAcceptsEach<typeof ILLEGAL>>
 >;
 
 const output = z.object({ id: z.string() });

@@ -13,7 +13,13 @@ import { buildRpcCatalogue } from "../rpc-catalogue";
 
 const OPENAPI_URL = "/.well-known/openapi";
 
-const build = (paths: Record<string, unknown>, components?: unknown) =>
+const build = ({
+  paths,
+  components,
+}: {
+  paths: Record<string, unknown>;
+  components?: unknown;
+}) =>
   buildRpcCatalogue({
     document: { paths, ...(components ? { components } : {}) },
     openapiUrl: OPENAPI_URL,
@@ -48,7 +54,9 @@ describe("the RPC catalogue", () => {
       /** @scenario "The catalogue reports the RPC operations the document publishes" */
       it("lists it by dotted name with the path to POST to", () => {
         const catalogue = build({
-          "/api/webhooks/endpoints.rollSecret": rollSecret,
+          paths: {
+            "/api/webhooks/endpoints.rollSecret": rollSecret,
+          },
         });
 
         expect(catalogue.operations).toHaveLength(1);
@@ -62,10 +70,10 @@ describe("the RPC catalogue", () => {
 
       /** @scenario "The catalogue reports the RPC operations the document publishes" */
       it("carries the argument and result schemas from that same document", () => {
-        const catalogue = build(
-          { "/api/webhooks/endpoints.rollSecret": rollSecret },
-          { schemas: { WebhookEndpoint: { type: "object" } } },
-        );
+        const catalogue = build({
+          paths: { "/api/webhooks/endpoints.rollSecret": rollSecret },
+          components: { schemas: { WebhookEndpoint: { type: "object" } } },
+        });
 
         expect(catalogue.operations[0]?.input).toEqual({
           type: "object",
@@ -85,12 +93,14 @@ describe("the RPC catalogue", () => {
     describe("when the catalogue is built", () => {
       it("reports a null input rather than omitting the operation", () => {
         const catalogue = build({
-          "/api/webhooks/endpoints.list": {
-            post: {
-              responses: {
-                "200": {
-                  content: {
-                    "application/json": { schema: { type: "array" } },
+          paths: {
+            "/api/webhooks/endpoints.list": {
+              post: {
+                responses: {
+                  "200": {
+                    content: {
+                      "application/json": { schema: { type: "array" } },
+                    },
                   },
                 },
               },
@@ -113,15 +123,17 @@ describe("the RPC catalogue", () => {
     describe("when the catalogue is built", () => {
       it("reports the status the operation actually answers", () => {
         const catalogue = build({
-          "/api/webhooks/endpoints.create": {
-            post: {
-              responses: {
-                "201": {
-                  content: {
-                    "application/json": { schema: { type: "object" } },
+          paths: {
+            "/api/webhooks/endpoints.create": {
+              post: {
+                responses: {
+                  "201": {
+                    content: {
+                      "application/json": { schema: { type: "object" } },
+                    },
                   },
+                  "400": { description: "Bad Request" },
                 },
-                "400": { description: "Bad Request" },
               },
             },
           },
@@ -132,8 +144,10 @@ describe("the RPC catalogue", () => {
 
       it("reports no body for an operation that sends none", () => {
         const catalogue = build({
-          "/api/webhooks/endpoints.delete": {
-            post: { responses: { "204": { description: "No Content" } } },
+          paths: {
+            "/api/webhooks/endpoints.delete": {
+              post: { responses: { "204": { description: "No Content" } } },
+            },
           },
         });
 
@@ -147,7 +161,7 @@ describe("the RPC catalogue", () => {
     describe("when the catalogue is built", () => {
       /** @scenario "The catalogue reports no operation the document does not carry" */
       it("is empty and still points at the document", () => {
-        const catalogue = build({});
+        const catalogue = build({ paths: {} });
 
         expect(catalogue.operations).toEqual([]);
         expect(catalogue.openapi).toBe(OPENAPI_URL);
@@ -160,9 +174,11 @@ describe("the RPC catalogue", () => {
       /** @scenario "A non-RPC path is not reported as an RPC" */
       it("lists none of them", () => {
         const catalogue = build({
-          "/api/webhooks/endpoints": { post: { responses: {} } },
-          "/api/webhooks/endpoints/{id}": { get: { responses: {} } },
-          "/api/trace/{id}": { get: { responses: {} } },
+          paths: {
+            "/api/webhooks/endpoints": { post: { responses: {} } },
+            "/api/webhooks/endpoints/{id}": { get: { responses: {} } },
+            "/api/trace/{id}": { get: { responses: {} } },
+          },
         });
 
         expect(catalogue.operations).toEqual([]);
@@ -176,9 +192,11 @@ describe("the RPC catalogue", () => {
       /** @scenario "The catalogue recognises names by the same grammar that registers them" */
       it("does not recognise a name v.rpc would have refused", () => {
         const catalogue = build({
-          "/api/webhooks/Endpoints.create": { post: { responses: {} } },
-          "/api/webhooks/endpoints.roll_secret": { post: { responses: {} } },
-          "/api/webhooks/endpoints.": { post: { responses: {} } },
+          paths: {
+            "/api/webhooks/Endpoints.create": { post: { responses: {} } },
+            "/api/webhooks/endpoints.roll_secret": { post: { responses: {} } },
+            "/api/webhooks/endpoints.": { post: { responses: {} } },
+          },
         });
 
         expect(catalogue.operations).toEqual([]);
@@ -191,7 +209,9 @@ describe("the RPC catalogue", () => {
       /** @scenario "A dotted path that is not a POST is not reported as an RPC" */
       it("does not advertise a call that would not work", () => {
         const catalogue = build({
-          "/api/webhooks/endpoints.list": { get: { responses: {} } },
+          paths: {
+            "/api/webhooks/endpoints.list": { get: { responses: {} } },
+          },
         });
 
         expect(catalogue.operations).toEqual([]);
@@ -203,9 +223,11 @@ describe("the RPC catalogue", () => {
     describe("when the catalogue is built", () => {
       it("orders them by path so the response is stable between requests", () => {
         const catalogue = build({
-          "/api/webhooks/endpoints.rollSecret": rollSecret,
-          "/api/webhooks/endpoints.create": { post: { responses: {} } },
-          "/api/things/things.list": { post: { responses: {} } },
+          paths: {
+            "/api/webhooks/endpoints.rollSecret": rollSecret,
+            "/api/webhooks/endpoints.create": { post: { responses: {} } },
+            "/api/things/things.list": { post: { responses: {} } },
+          },
         });
 
         expect(catalogue.operations.map((operation) => operation.path)).toEqual(

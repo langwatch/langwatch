@@ -262,7 +262,9 @@ v.sse(
 
 ## RPC endpoints
 
-`v.rpc()` registers an RPC-named endpoint: a dotted `<resource>.<verb>` path that mounts as a real POST. The name carries the verb, so the HTTP method never does. See [ADR-094](../../dev/docs/adr/094-rpc-endpoint-naming.md) — this is a **pilot on the `webhooks` family**, not the default for new services. The four resource-REST management families stay as they are; use `v.get`/`v.post`/... unless you are extending `webhooks`.
+`v.rpc()` registers an RPC-named endpoint: a dotted `<resource>.<verb>` path that mounts as a real POST. The name carries the verb, so the HTTP method never does. This is a **pilot on the `webhooks` family**, not the default for new services.
+
+> The ADR for this decision is not written yet, and the number it was drafted against (094) belongs to the simulation process-manager work. Until it exists, this section and `specs/api-reference/api-discovery.feature` are the record. Pick the number when writing it — not from `main` alone, since sibling branches claim numbers too. The four resource-REST management families stay as they are; use `v.get`/`v.post`/... unless you are extending `webhooks`.
 
 ```ts
 v.rpc(
@@ -283,7 +285,7 @@ Three rules, all load-bearing:
 - **An RPC with no required arguments declares no `input`**, and its handler ignores the body. The pipeline only installs the json validator when `input` is present, so a bodyless POST and a `{}` POST both succeed. Writing `input: z.object({}).optional()` instead reinstates the parse and rejects the bodyless call.
 - **Reads are POST too.** Uniform method is the point; it also forecloses HTTP caching, which is acceptable for an API-key-only management surface and would not be on a high-volume read surface.
 
-Both rules are checked twice — in the editor by the types on `v.rpc`, and at startup by `assertRpcPath` / `assertRpcConfig`:
+Two of those three are machine-checked, twice each — in the editor by the types on `v.rpc`, and at startup by `assertRpcPath` / `assertRpcConfig`. The name grammar and the no-`params`/`query` rule are the two; "reads are POST too" is a convention review has to hold, because nothing distinguishes a read from a write at registration.
 
 ```text
 ^/[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$   →  /endpoints.rollSecret   ✓

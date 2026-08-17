@@ -30,10 +30,38 @@ export const ROOT_DISCOVERY_PATHS: readonly string[] = [
   LLMS_TXT_PATH,
 ];
 
-/** True for a root-level path that belongs to the API rather than the SPA. */
+/**
+ * True for a root-level path that belongs to the API rather than the SPA.
+ *
+ * A single trailing slash counts. `/llms.txt/` is the same resource to every
+ * client that would send it, and the cost of disagreeing is not a 404 — it is
+ * the SPA fallback answering with the HTML shell and a 200 that the caller
+ * reads as the document.
+ */
 export function isRootDiscoveryPath(pathname: string): boolean {
-  return ROOT_DISCOVERY_PATHS.includes(pathname);
+  const withoutTrailingSlash =
+    pathname.length > 1 && pathname.endsWith("/")
+      ? pathname.slice(0, -1)
+      : pathname;
+  return ROOT_DISCOVERY_PATHS.includes(withoutTrailingSlash);
 }
+
+/** Escapes a literal path for embedding in a regular expression. */
+const escapeForRegExp = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * The dev proxy rule matching exactly these paths, built here so `vite.config.ts`
+ * cannot fall behind the list. A path added above but missed there would reach
+ * Hono in production and the SPA in development — the worst shape of bug,
+ * because it only appears where nobody is testing.
+ *
+ * Vite matches `server.proxy` regex keys against the full request URL, path and
+ * query, so the optional trailing slash and query string are both part of it.
+ */
+export const ROOT_DISCOVERY_PROXY_PATTERN = `^(?:${ROOT_DISCOVERY_PATHS.map(
+  escapeForRegExp,
+).join("|")})/?(?:\\?.*)?$`;
 
 /**
  * Why every discovery location is unauthenticated. A caller reads the

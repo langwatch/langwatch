@@ -66,6 +66,39 @@ describe("endpoint success status", () => {
     });
   });
 
+  /**
+   * `.default(...)` and `.catch(...)` accept `undefined` and then replace it
+   * with a value, so testing acceptance alone refused them for an ambiguity
+   * they do not have: `serializeEndpointResult` branches on what the schema
+   * PRODUCED, and these never produce `undefined`. The status cannot move, so
+   * the registration is legal and the endpoint always answers with a body.
+   */
+  describe("given an output schema that fills undefined in with a value", () => {
+    it("admits a defaulted output and always answers with the default", async () => {
+      const app = buildTestService()
+        .version("2025-03-15", (v) => {
+          v.get("/defaulted", { output: z.string().default("filled") }, () =>
+            // biome-ignore lint/suspicious/noExplicitAny: the handler returning undefined is the case under test; the type correctly forbids it.
+            (undefined as any),
+          );
+        })
+        .build();
+
+      const res = await app.request("/api/test/defaulted");
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toBe("filled");
+    });
+
+    it("admits a caught output at registration", () => {
+      expect(() =>
+        buildTestService().version("2025-03-15", (v) => {
+          v.get("/caught", { output: z.string().catch("fallback") }, () => "x");
+        }),
+      ).not.toThrow();
+    });
+  });
+
   describe("given a schema whose only accepted value is undefined", () => {
     it("admits z.void() and always answers 204", async () => {
       const app = buildTestService()

@@ -125,9 +125,10 @@ Feature: An agent can find the API description without being told where it is
 
   @unit
   Scenario: The catalogue recognises names by the same grammar that registers them
-    Given the grammar v.rpc refuses a bad registration with
-    When the catalogue decides whether a path is an RPC
-    Then it asks that same grammar rather than a second one of its own
+    Given a documented path whose name v.rpc would refuse to register
+    When the catalogue decides whether that path is an RPC
+    Then it is not listed, because the catalogue asks the same grammar rather
+      than a second one of its own
 
   @integration
   Scenario: Discovering the catalogue is itself an RPC
@@ -145,3 +146,21 @@ Feature: An agent can find the API description without being told where it is
     When the server routes it
     Then it is dispatched to the API rather than the single-page-app fallback
     And the response is not the HTML shell
+
+  # A trailing slash is the same resource to any client that would send one, and
+  # disagreeing about it does not cost a 404 — it costs the SPA answering with
+  # the HTML shell and a 200 the caller reads as the document. So the routing
+  # rule and the route table have to agree about it, in both directions.
+
+  @integration
+  Scenario: A trailing slash still reaches the API
+    Given a request for a root-level discovery path with a trailing slash
+    When the server routes it
+    Then it is dispatched to the API
+    And the API answers it with the same document as the bare path
+
+  @integration
+  Scenario: A path that merely starts with a discovery path is left to the app
+    Given a request for a path extending a discovery path with more segments
+    When the server routes it
+    Then it is left to the single-page-app

@@ -7,6 +7,7 @@ import { generate as generateSelfsigned } from "selfsigned";
 import { shikiManualChunk } from "./src/features/traces-v2/components/TraceDrawer/markdownView/shikiChunking";
 import { havenHmrGate } from "./vite/havenHmrGate";
 import { ASSET_URL_GLOBAL } from "./src/server/asset-base";
+import { ROOT_DISCOVERY_PROXY_PATTERN } from "./src/server/openapi/discovery-locations";
 
 // Load `.env` into the Vite config's process environment. Vite normally
 // only exposes `VITE_*` vars to client code — but this config itself
@@ -341,11 +342,16 @@ export default defineConfig(async (): Promise<UserConfig> => {
         secure: false,
       },
       // Root-level API discovery — `/.well-known/openapi` and `/llms.txt`
-      // (src/server/routes/api-discovery.ts). Same split as the OTLP paths
+      // (src/server/routes/root-discovery.ts). Same split as the OTLP paths
       // above: start.ts routes them in production, the frontend owns the root
       // in dev. Left out, they fall to the SPA, which answers an agent's
       // discovery request with the HTML shell and a 200.
-      "^/(?:\\.well-known/openapi|llms\\.txt)(?:\\?.*)?$": {
+      //
+      // The pattern is DERIVED from the same list start.ts dispatches on, not
+      // written out again here: a path added there and missed here would work
+      // in production and return HTML in development, which is the shape of
+      // bug that only shows up where nobody is looking for it.
+      [ROOT_DISCOVERY_PROXY_PATTERN]: {
         target: API_TARGET,
         changeOrigin: true,
         secure: false,

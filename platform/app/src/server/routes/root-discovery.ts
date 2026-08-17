@@ -72,16 +72,27 @@ legacy; new integrations should use \`Authorization\`.
 
 const secured = createServiceApp({ basePath: "/" });
 
-secured
-  .access(publicEndpoint(WHY_DISCOVERY_IS_PUBLIC))
-  .get(WELL_KNOWN_OPENAPI_PATH, (c) => c.json(apiDocument));
+/**
+ * Both spellings of each path. `isRootDiscoveryPath` accepts a trailing slash,
+ * so the server dispatches `/llms.txt/` here; Hono routes strictly, and without
+ * the second registration that dispatch would land on a 404 instead of the SPA
+ * — trading one wrong answer for another. Registering the pair keeps the
+ * routing rule and the route table saying the same thing.
+ */
+const bothSpellings = (path: string) => [path, `${path}/`];
 
-secured
-  .access(publicEndpoint(WHY_DISCOVERY_IS_PUBLIC))
-  .get(LLMS_TXT_PATH, (c) =>
+for (const path of bothSpellings(WELL_KNOWN_OPENAPI_PATH)) {
+  secured
+    .access(publicEndpoint(WHY_DISCOVERY_IS_PUBLIC))
+    .get(path, (c) => c.json(apiDocument));
+}
+
+for (const path of bothSpellings(LLMS_TXT_PATH)) {
+  secured.access(publicEndpoint(WHY_DISCOVERY_IS_PUBLIC)).get(path, (c) =>
     c.text(LLMS_TXT, 200, {
       "Content-Type": "text/plain; charset=utf-8",
     }),
   );
+}
 
 export const app = secured.hono;

@@ -29,10 +29,13 @@ const WELL_KNOWN = "/.well-known/openapi";
 const UNDER_API = "/api/openapi.json";
 const CANONICAL = "/api/gateway/v1/openapi.json";
 
-async function fetchDocument(
-  target: typeof app,
-  path: string,
-): Promise<{ res: Response; document: Record<string, unknown> }> {
+async function fetchDocument({
+  target,
+  path,
+}: {
+  target: typeof app;
+  path: string;
+}): Promise<{ res: Response; document: Record<string, unknown> }> {
   const res = await target.request(path, { method: "GET" });
   return { res, document: (await res.json()) as Record<string, unknown> };
 }
@@ -42,7 +45,10 @@ describe("API discovery", () => {
     describe("when it requests the well-known location", () => {
       /** @scenario "The description is served at the well-known location" */
       it("serves the OpenAPI document as JSON", async () => {
-        const { res, document } = await fetchDocument(rootApp, WELL_KNOWN);
+        const { res, document } = await fetchDocument({
+          target: rootApp,
+          path: WELL_KNOWN,
+        });
 
         expect(res.status).toBe(200);
         expect(res.headers.get("content-type")).toContain("application/json");
@@ -54,7 +60,10 @@ describe("API discovery", () => {
     describe("when it requests the location under the API namespace", () => {
       /** @scenario "The description is served under the API namespace" */
       it("serves the OpenAPI document as JSON", async () => {
-        const { res, document } = await fetchDocument(app, UNDER_API);
+        const { res, document } = await fetchDocument({
+          target: app,
+          path: UNDER_API,
+        });
 
         expect(res.status).toBe(200);
         expect(document.openapi).toMatch(/^3\./);
@@ -68,9 +77,15 @@ describe("API discovery", () => {
     describe("when the document is fetched from every location", () => {
       /** @scenario "Every location serves one document, not three" */
       it("returns the same operations from all three", async () => {
-        const wellKnown = await fetchDocument(rootApp, WELL_KNOWN);
-        const underApi = await fetchDocument(app, UNDER_API);
-        const canonical = await fetchDocument(gatewayApp, CANONICAL);
+        const wellKnown = await fetchDocument({
+          target: rootApp,
+          path: WELL_KNOWN,
+        });
+        const underApi = await fetchDocument({ target: app, path: UNDER_API });
+        const canonical = await fetchDocument({
+          target: gatewayApp,
+          path: CANONICAL,
+        });
 
         const operations = (document: Record<string, unknown>) =>
           Object.keys(document.paths ?? {}).sort();
@@ -85,7 +100,10 @@ describe("API discovery", () => {
 
       /** @scenario "The canonical gateway location keeps answering" */
       it("keeps answering at the location the gateway contract pins", async () => {
-        const { res } = await fetchDocument(gatewayApp, CANONICAL);
+        const { res } = await fetchDocument({
+          target: gatewayApp,
+          path: CANONICAL,
+        });
 
         expect(res.status).toBe(200);
       });
@@ -216,7 +234,7 @@ describe("API discovery", () => {
     });
 
     describe("when the path belongs to the single-page app", () => {
-      /** @scenario "Root-level discovery paths reach the API, not the SPA fallback" */
+      /** @scenario "A path that merely starts with a discovery path is left to the app" */
       it("leaves it alone", () => {
         for (const path of [
           "/",
@@ -227,6 +245,31 @@ describe("API discovery", () => {
         ]) {
           expect(isRootDiscoveryPath(path)).toBe(false);
         }
+      });
+    });
+
+    describe("when the path carries a trailing slash", () => {
+      /** @scenario "A trailing slash still reaches the API" */
+      it("dispatches it to the API", () => {
+        expect(isRootDiscoveryPath("/.well-known/openapi/")).toBe(true);
+        expect(isRootDiscoveryPath("/llms.txt/")).toBe(true);
+      });
+
+      /** @scenario "A trailing slash still reaches the API" */
+      it("answers it with the same document as the bare path", async () => {
+        const withSlash = await rootApp.request("/.well-known/openapi/");
+        const bare = await rootApp.request(WELL_KNOWN);
+
+        expect(withSlash.status).toBe(200);
+        expect(await withSlash.text()).toBe(await bare.text());
+      });
+
+      /** @scenario "A trailing slash still reaches the API" */
+      it("serves the plain-text index at both spellings", async () => {
+        const withSlash = await rootApp.request("/llms.txt/");
+
+        expect(withSlash.status).toBe(200);
+        expect(await withSlash.text()).toContain("# LangWatch");
       });
     });
   });

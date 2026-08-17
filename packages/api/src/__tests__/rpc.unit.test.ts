@@ -5,7 +5,7 @@ import { createService } from "../builder.js";
 import type { MountedRoute } from "../types.js";
 
 // ---------------------------------------------------------------------------
-// v.rpc (ADR-094): a pseudo-method that mounts as a real POST, following the
+// v.rpc: a pseudo-method that mounts as a real POST, following the
 // v.sse precedent. The dotted name carries the verb, every argument travels in
 // the body, and versioning / forward-copying / withdrawal are untouched because
 // endpoint identity is already `${method}:${path}`.
@@ -85,10 +85,10 @@ describe("v.rpc", () => {
     });
 
     /**
-     * The zero-argument rule from ADR-094. An RPC with no required arguments
+     * The zero-argument rule. An RPC with no required arguments
      * declares no `input`, so the pipeline installs no json validator and a
      * bodyless POST is accepted. `input: z.object({}).optional()` would
-     * reinstate the parse and 4xx this call, which is why the ADR forbids it.
+     * reinstate the parse and 4xx this call, which is why the rule forbids it.
      */
     describe("when an argument-free RPC is called with no body at all", () => {
       it("succeeds rather than failing body validation", async () => {
