@@ -11,8 +11,11 @@ no network.
 """
 
 import litellm
+import pytest
 from pydantic import Field
+from tenacity import wait_none
 
+from langevals_core import base_evaluator
 from langevals_core.base_evaluator import (
     BaseEvaluator,
     EvaluationResult,
@@ -20,6 +23,20 @@ from langevals_core.base_evaluator import (
     LLMEvaluatorSettings,
     SingleEvaluationResult,
 )
+
+
+@pytest.fixture(autouse=True)
+def no_backoff(monkeypatch):
+    """Drop the wait between attempts.
+
+    These tests assert on how many attempts happen, never on how long the
+    evaluator waits in between. Keeping the real backoff would make the
+    transient case sleep for seconds, and for a different number of seconds on
+    every run, without proving anything more.
+    """
+    monkeypatch.setattr(
+        base_evaluator, "wait_random_exponential", lambda **kwargs: wait_none()
+    )
 
 
 class CountingEntry(EvaluatorEntry):
