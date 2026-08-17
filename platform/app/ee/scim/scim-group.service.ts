@@ -354,12 +354,12 @@ export class ScimGroupService {
         }
       }
 
-      // Full member replace (path="members" or no path with members in value)
-      const members = this.extractMemberIds(
-        operation.path === "members"
-          ? operation.value
-          : (operation.value as Record<string, unknown> | undefined)?.members,
-      );
+      // Full member replace (path="members" or no path with members in value).
+      // Only when the operation actually carries a member list: an operation
+      // that never mentions members carries no membership instruction at all.
+      const members = this.extractMemberList(operation);
+      if (!members) return;
+
       const current = await this.prisma.groupMembership.findMany({
         where: { groupId: group.id },
       });
@@ -440,6 +440,34 @@ export class ScimGroupService {
           typeof (m as { value: unknown }).value === "string",
       )
       .map((m) => (m as { value: string }).value);
+  }
+
+  /**
+   * The member list a `replace` operation asks us to install, or `null` when it
+   * asks for nothing about membership.
+   *
+   * Absent is not the same as empty. An IdP replacing an unrelated attribute,
+   * or renaming a group with the no-path form Entra ID writes, sends no member
+   * list at all — collapsing that to `[]` reads it as "this group should have
+   * no members" and revokes access for everyone in it. An explicit `members: []`
+   * genuinely does mean clear the group, so the two have to stay distinguishable.
+   */
+  private extractMemberList(operation: ScimPatchOperation): string[] | null {
+    if (operation.path === "members")
+      return this.extractMemberIds(operation.value);
+
+    if (
+      !operation.path &&
+      typeof operation.value === "object" &&
+      operation.value !== null &&
+      "members" in operation.value
+    ) {
+      return this.extractMemberIds(
+        (operation.value as Record<string, unknown>).members,
+      );
+    }
+
+    return null;
   }
 
   private extractMemberIdsFromPath(path: string, value: unknown): string[] {
