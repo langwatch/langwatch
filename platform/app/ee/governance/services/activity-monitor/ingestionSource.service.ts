@@ -44,6 +44,7 @@ import {
   isEncryptedCredentials,
 } from "./ingestionCredentials";
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "./ingestionSource.constants";
+import { mergeIngestionSourceConfig } from "./mergeIngestionSourceConfig";
 import { assertPullDestinationAllowed } from "./pullDestination";
 import { unsupportedValue } from "./unsupportedValue";
 
@@ -52,7 +53,7 @@ export type SourceType =
   | "claude_code"
   | "claude_cowork"
   | "workato"
-  | "copilot_studio"
+  | "microsoft_365_audit"
   | "openai_compliance"
   | "claude_compliance"
   | "anthropic_admin"
@@ -65,7 +66,7 @@ export const SUPPORTED_SOURCE_TYPES: readonly SourceType[] = [
   "claude_code",
   "claude_cowork",
   "workato",
-  "copilot_studio",
+  "microsoft_365_audit",
   "openai_compliance",
   "claude_compliance",
   "anthropic_admin",
@@ -84,7 +85,7 @@ export interface CreateIngestionSourceInput {
   /**
    * Phase 10: opaque adapter config persisted on IngestionSource.pullConfig.
    * Worker resolves `pullConfig.adapter` through the pullerAdapterRegistry
-   * and dispatches `runOnce`. For reference adapters (copilot_studio etc.)
+   * and dispatches `runOnce`. For reference adapters (microsoft_365_audit etc.)
    * the URL/auth/mapping are locked and the admin-supplied portion is just
    * the adapter id + credentials reference.
    */
@@ -359,15 +360,25 @@ export class IngestionSourceService {
     // callers can keep using either field name without a schema
     // change. `parserConfig` wins on key conflicts (it's the
     // canonical input for push-mode sources); `pullConfig` data
-    // fills in for pull-mode adapters.
-    const requestedParserConfig = {
-      ...(input.pullConfig ?? {}),
-      ...(input.parserConfig ?? {}),
-    };
-    assertPullDestinationAllowed(requestedParserConfig);
-    const mergedParserConfig = encryptParserConfigCredentials(
-      requestedParserConfig,
-    )!;
+    // fills in for pull-mode adapters — except for the keys that
+    // decide which puller runs, how it authenticates, and when, which
+    // pullConfig owns outright. See mergeIngestionSourceConfig.
+    const { merged, strippedFromParserConfig } = mergeIngestionSourceConfig({
+      pullConfig: input.pullConfig as Record<string, unknown> | undefined,
+      parserConfig: input.parserConfig as Record<string, unknown> | undefined,
+    });
+    if (strippedFromParserConfig.length > 0) {
+      logger.warn(
+        {
+          organizationId: input.organizationId,
+          sourceType: input.sourceType,
+          strippedFromParserConfig,
+        },
+        "parserConfig carried pullConfig-owned keys; ignored them rather than letting them redirect the puller",
+      );
+    }
+    assertPullDestinationAllowed(merged);
+    const mergedParserConfig = encryptParserConfigCredentials(merged)!;
     const source = await this.prisma.ingestionSource.create({
       data: {
         organizationId: input.organizationId,

@@ -41,9 +41,9 @@ describe("isOttlEnabledSourceType", () => {
   });
 
   describe("when the source type is pull-mode or webhook", () => {
-    it("returns false for workato, copilot_studio, openai_compliance", () => {
+    it("returns false for workato, microsoft_365_audit, openai_compliance", () => {
       expect(isOttlEnabledSourceType("workato")).toBe(false);
-      expect(isOttlEnabledSourceType("copilot_studio")).toBe(false);
+      expect(isOttlEnabledSourceType("microsoft_365_audit")).toBe(false);
       expect(isOttlEnabledSourceType("openai_compliance")).toBe(false);
     });
   });

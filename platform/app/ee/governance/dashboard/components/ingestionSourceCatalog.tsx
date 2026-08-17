@@ -101,11 +101,11 @@ export const SOURCE_TYPE_OPTIONS = [
     icon: <Workato />,
   },
   {
-    value: "copilot_studio",
-    label: "Microsoft Copilot Studio (Purview)",
+    value: "microsoft_365_audit",
+    label: "Microsoft 365 audit (Copilot Studio)",
     mode: "pull",
     blurb:
-      "Polls Microsoft Purview Audit API for Copilot Studio activity. Needs an Azure AD app registration with `AuditLog.Read.All` permission.",
+      "Polls the Office 365 Management Activity API for Copilot Studio interactions. Needs an app registration with the `ActivityFeed.Read` application permission.",
     icon: <Microsoft />,
   },
   {

@@ -3149,7 +3149,7 @@ model IngestionSource {
   teamId String?
   team   Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
-  /// 'otel_generic' | 'claude_cowork' | 'workato' | 'copilot_studio' |
+  /// 'otel_generic' | 'claude_cowork' | 'workato' | 'microsoft_365_audit' |
   /// 'openai_compliance' | 'claude_compliance' | 's3_custom' (extensible).
   /// String not enum so adapters can be added without migrations - the
   /// supported set lives in code (activity-monitor adapter registry).
@@ -3170,7 +3170,8 @@ model IngestionSource {
   ///   - otel_generic: { allowedSourceTypeLabel?: string }
   ///   - claude_cowork: { workspaceId: string }
   ///   - workato: { sharedSecretLastFour: string }
-  ///   - copilot_studio: { tenantId, clientId, clientSecretHash, pollEverySec }
+  ///   - microsoft_365_audit: { credentials: { tenantId, clientId, clientSecret } }
+///     (the secret encrypted, not hashed — the puller must present the real value)
   ///   - openai_compliance: { bucket, prefix, roleArn, pollEverySec }
   ///   - claude_compliance: { workspaceApiKeyHash, pollEverySec }
   ///   - s3_custom: { bucket, prefix, roleArn, parserDsl, pollEverySec }
