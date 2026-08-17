@@ -57,6 +57,8 @@ export interface HealthInput {
   createdAt: Date;
   lastEventAt: Date | null;
   errorCount: number;
+  /** Injectable for tests. Defaults to now. */
+  nowMs?: number;
 }
 
 /**
@@ -64,10 +66,13 @@ export interface HealthInput {
  * derived judgement, and "failing" outranks "silent" because a failing
  * source has a cause worth reading before its silence is interpreted.
  */
-export function classifyIngestionSourceHealth(
-  { status, createdAt, lastEventAt, errorCount }: HealthInput,
-  nowMs: number = Date.now(),
-): IngestionSourceHealth {
+export function classifyIngestionSourceHealth({
+  status,
+  createdAt,
+  lastEventAt,
+  errorCount,
+  nowMs = Date.now(),
+}: HealthInput): IngestionSourceHealth {
   if (status === "disabled") return "disabled";
 
   if (errorCount >= ERRORING_AFTER_CONSECUTIVE_FAILURES) return "erroring";

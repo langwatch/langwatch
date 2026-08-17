@@ -23,35 +23,29 @@ const ago = (ms: number) => new Date(NOW - ms);
 describe("classifyIngestionSourceHealth", () => {
   /** @scenario Prolonged zero-event ingestion is surfaced, not read as a quiet tenant */
   it("separates a long-silent source from a fresh one and from a failing one", () => {
-    const silent = classifyIngestionSourceHealth(
-      {
-        status: "awaiting_first_event",
-        createdAt: ago(NEVER_PRODUCED_AFTER_MS + 1),
-        lastEventAt: null,
-        errorCount: 0,
-      },
-      NOW,
-    );
+    const silent = classifyIngestionSourceHealth({
+      status: "awaiting_first_event",
+      createdAt: ago(NEVER_PRODUCED_AFTER_MS + 1),
+      lastEventAt: null,
+      errorCount: 0,
+      nowMs: NOW,
+    });
 
-    const fresh = classifyIngestionSourceHealth(
-      {
-        status: "awaiting_first_event",
-        createdAt: ago(5 * 60 * 1000),
-        lastEventAt: null,
-        errorCount: 0,
-      },
-      NOW,
-    );
+    const fresh = classifyIngestionSourceHealth({
+      status: "awaiting_first_event",
+      createdAt: ago(5 * 60 * 1000),
+      lastEventAt: null,
+      errorCount: 0,
+      nowMs: NOW,
+    });
 
-    const failing = classifyIngestionSourceHealth(
-      {
-        status: "awaiting_first_event",
-        createdAt: ago(NEVER_PRODUCED_AFTER_MS + 1),
-        lastEventAt: null,
-        errorCount: ERRORING_AFTER_CONSECUTIVE_FAILURES,
-      },
-      NOW,
-    );
+    const failing = classifyIngestionSourceHealth({
+      status: "awaiting_first_event",
+      createdAt: ago(NEVER_PRODUCED_AFTER_MS + 1),
+      lastEventAt: null,
+      errorCount: ERRORING_AFTER_CONSECUTIVE_FAILURES,
+      nowMs: NOW,
+    });
 
     expect(silent).toBe("never_produced");
     expect(fresh).toBe("awaiting_first_event");
@@ -65,15 +59,13 @@ describe("classifyIngestionSourceHealth", () => {
 
   /** @scenario First run after enabling reports that history is not available */
   it("tells an operator that a pull source does not import history", () => {
-    const health = classifyIngestionSourceHealth(
-      {
-        status: "awaiting_first_event",
-        createdAt: ago(60_000),
-        lastEventAt: null,
-        errorCount: 0,
-      },
-      NOW,
-    );
+    const health = classifyIngestionSourceHealth({
+      status: "awaiting_first_event",
+      createdAt: ago(60_000),
+      lastEventAt: null,
+      errorCount: 0,
+      nowMs: NOW,
+    });
 
     expect(health).toBe("awaiting_first_event");
     // An empty first window is not reported as healthy steady state — the
@@ -84,43 +76,37 @@ describe("classifyIngestionSourceHealth", () => {
 
   it("lets an explicit admin action outrank any derived judgement", () => {
     expect(
-      classifyIngestionSourceHealth(
-        {
-          status: "disabled",
-          createdAt: ago(NEVER_PRODUCED_AFTER_MS * 10),
-          lastEventAt: null,
-          errorCount: 99,
-        },
-        NOW,
-      ),
+      classifyIngestionSourceHealth({
+        status: "disabled",
+        createdAt: ago(NEVER_PRODUCED_AFTER_MS * 10),
+        lastEventAt: null,
+        errorCount: 99,
+        nowMs: NOW,
+      }),
     ).toBe("disabled");
   });
 
   it("calls a source active once anything has arrived", () => {
     expect(
-      classifyIngestionSourceHealth(
-        {
-          status: "active",
-          createdAt: ago(NEVER_PRODUCED_AFTER_MS * 3),
-          lastEventAt: ago(60_000),
-          errorCount: 0,
-        },
-        NOW,
-      ),
+      classifyIngestionSourceHealth({
+        status: "active",
+        createdAt: ago(NEVER_PRODUCED_AFTER_MS * 3),
+        lastEventAt: ago(60_000),
+        errorCount: 0,
+        nowMs: NOW,
+      }),
     ).toBe("active");
   });
 
   it("does not fire on a source that is merely quiet overnight", () => {
     expect(
-      classifyIngestionSourceHealth(
-        {
-          status: "awaiting_first_event",
-          createdAt: ago(NEVER_PRODUCED_AFTER_MS - 60_000),
-          lastEventAt: null,
-          errorCount: 0,
-        },
-        NOW,
-      ),
+      classifyIngestionSourceHealth({
+        status: "awaiting_first_event",
+        createdAt: ago(NEVER_PRODUCED_AFTER_MS - 60_000),
+        lastEventAt: null,
+        errorCount: 0,
+        nowMs: NOW,
+      }),
     ).toBe("awaiting_first_event");
   });
 });
