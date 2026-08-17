@@ -75,8 +75,6 @@ async function seedMessage(params: {
   return row.id;
 }
 
-/** A second process name, so the fleet-wide dead read has more than one. */
-const nsB = `${ns}.b`;
 /**
  * The dead-letter block seeds under its own names.
  *
