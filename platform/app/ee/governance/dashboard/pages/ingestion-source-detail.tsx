@@ -29,6 +29,7 @@ import { useState } from "react";
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { NotFoundScene } from "~/components/NotFoundScene";
+import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -110,22 +111,31 @@ const fmtRelative = (iso: string | null): string => {
 function IngestionSourceDetailPage() {
   const router = useRouter();
   const sourceId = router.query.id as string | undefined;
-  const { organization } = useOrganizationTeamProject({
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
+  const canRead = hasAnyPermission("ingestionSources:view");
+  const canManage = hasAnyPermission("ingestionSources:manage");
+  const canReadActivity = hasAnyPermission("activityMonitor:view");
 
   const sourceQuery = api.ingestionSources.get.useQuery(
     { organizationId: orgId, id: sourceId ?? "" },
-    { enabled: !!orgId && !!sourceId, refetchOnWindowFocus: false },
+    { enabled: !!orgId && !!sourceId && canRead, refetchOnWindowFocus: false },
   );
   const healthQuery = api.activityMonitor.sourceHealthMetrics.useQuery(
     { organizationId: orgId, sourceId: sourceId ?? "" },
-    { enabled: !!orgId && !!sourceId, refetchOnWindowFocus: false },
+    {
+      enabled: !!orgId && !!sourceId && canReadActivity,
+      refetchOnWindowFocus: false,
+    },
   );
   const eventsQuery = api.activityMonitor.eventsForSource.useQuery(
     { organizationId: orgId, sourceId: sourceId ?? "", limit: 50 },
-    { enabled: !!orgId && !!sourceId, refetchOnWindowFocus: false },
+    {
+      enabled: !!orgId && !!sourceId && canReadActivity,
+      refetchOnWindowFocus: false,
+    },
   );
   const utils = api.useUtils();
   const [secretReveal, setSecretReveal] = useState<{
@@ -169,6 +179,17 @@ function IngestionSourceDetailPage() {
   const pageTitle = source?.name
     ? `${source.name} · Ingestion Source · LangWatch`
     : "Ingestion Source · LangWatch";
+
+  if (!canRead) {
+    return (
+      <GovernanceLayout pageTitle={pageTitle}>
+        <PermissionRequiredNotice
+          permission="ingestionSources:view"
+          detail="This source's configuration and health stay hidden until then."
+        />
+      </GovernanceLayout>
+    );
+  }
 
   // "This source doesn't exist" is a claim, and only a genuine 404 earns it.
   // Every other failure — a permission denial, a 500, a dropped connection —
@@ -252,44 +273,64 @@ function IngestionSourceDetailPage() {
               )}
             </VStack>
             <Spacer />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() =>
-                rotateMutation.mutate({ organizationId: orgId, id: source.id })
-              }
-              loading={rotateMutation.isPending}
-              title="Mint a new ingestSecret (24h grace on the old one)"
-            >
-              <RotateCw size={14} /> Rotate secret
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              colorPalette="red"
-              onClick={() => {
-                if (
-                  !confirm(
-                    `Archive "${source.name}"? Historical events stay readable.`,
-                  )
-                )
-                  return;
-                archiveMutation.mutate({
-                  organizationId: orgId,
-                  id: source.id,
-                });
-              }}
-              loading={archiveMutation.isPending}
-            >
-              <Trash2 size={14} /> Archive
-            </Button>
+            {/* Rotating a secret and archiving are both
+                `ingestionSources:manage`. */}
+            {canManage && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    rotateMutation.mutate({
+                      organizationId: orgId,
+                      id: source.id,
+                    })
+                  }
+                  loading={rotateMutation.isPending}
+                  title="Mint a new ingestSecret (24h grace on the old one)"
+                >
+                  <RotateCw size={14} /> Rotate secret
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  colorPalette="red"
+                  onClick={() => {
+                    if (
+                      !confirm(
+                        `Archive "${source.name}"? Historical events stay readable.`,
+                      )
+                    )
+                      return;
+                    archiveMutation.mutate({
+                      organizationId: orgId,
+                      id: source.id,
+                    });
+                  }}
+                  loading={archiveMutation.isPending}
+                >
+                  <Trash2 size={14} /> Archive
+                </Button>
+              </>
+            )}
           </HStack>
+
+          {/* Health metrics and the event feed come from the activity
+              monitor, which has a grant of its own. Naming it here keeps the
+              source's own configuration readable to whoever holds only
+              `ingestionSources:view`. */}
+          {!canReadActivity && (
+            <PermissionRequiredNotice
+              permission="activityMonitor:view"
+              detail="Event counts and the recent-event feed stay hidden until then."
+            />
+          )}
 
           {/* The metric cards read `health?.eventsNd ?? 0`, so a failed
               health query renders "0 events" — indistinguishable from a
               silent source, and the first thing an admin does about a silent
               source is go rebuild an integration that was never broken. */}
-          {healthQuery.error ? (
+          {!canReadActivity ? null : healthQuery.error ? (
             <HandledErrorAlert
               error={healthQuery.error}
               fallbackTitle="Couldn't load health metrics for this source"
@@ -319,53 +360,57 @@ function IngestionSourceDetailPage() {
             </SimpleGrid>
           )}
 
-          <StaleTimestampCallout
-            health={health ?? null}
-            eventsCount={events.length}
-          />
-
-          <Box
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="md"
-            padding={5}
-          >
-            <VStack align="start" gap={1} marginBottom={3}>
-              <Heading as="h3" size="sm">
-                Recent events
-              </Heading>
-              {!eventsQuery.error && (
-                <Text fontSize="sm" color="fg.muted">
-                  Last {events.length} OCSF-normalised events from this source.
-                  Raw payload + normalised fields shown side-by-side. Newest
-                  first.
-                </Text>
-              )}
-            </VStack>
-
-            {eventsQuery.isLoading && <Spinner size="sm" />}
-
-            {/* `EmptyEventsHint` walks an admin through setting up an
-                integration. Showing it because the events query failed sends
-                someone debugging a live source off to re-install something
-                that is already working. */}
-            <HandledErrorAlert
-              error={eventsQuery.error}
-              fallbackTitle="Couldn't load recent events"
+          {canReadActivity && (
+            <StaleTimestampCallout
+              health={health ?? null}
+              eventsCount={events.length}
             />
+          )}
 
-            {!eventsQuery.isLoading &&
-              !eventsQuery.error &&
-              events.length === 0 && <EmptyEventsHint source={source} />}
-
-            {events.length > 0 && (
-              <VStack align="stretch" gap={2}>
-                {events.map((ev) => (
-                  <EventRow key={ev.eventId} event={ev} />
-                ))}
+          {canReadActivity && (
+            <Box
+              borderWidth="1px"
+              borderColor="border.muted"
+              borderRadius="md"
+              padding={5}
+            >
+              <VStack align="start" gap={1} marginBottom={3}>
+                <Heading as="h3" size="sm">
+                  Recent events
+                </Heading>
+                {!eventsQuery.error && (
+                  <Text fontSize="sm" color="fg.muted">
+                    Last {events.length} OCSF-normalised events from this
+                    source. Raw payload + normalised fields shown side-by-side.
+                    Newest first.
+                  </Text>
+                )}
               </VStack>
-            )}
-          </Box>
+
+              {eventsQuery.isLoading && <Spinner size="sm" />}
+
+              {/* `EmptyEventsHint` walks an admin through setting up an
+                  integration. Showing it because the events query failed sends
+                  someone debugging a live source off to re-install something
+                  that is already working. */}
+              <HandledErrorAlert
+                error={eventsQuery.error}
+                fallbackTitle="Couldn't load recent events"
+              />
+
+              {!eventsQuery.isLoading &&
+                !eventsQuery.error &&
+                events.length === 0 && <EmptyEventsHint source={source} />}
+
+              {events.length > 0 && (
+                <VStack align="stretch" gap={2}>
+                  {events.map((ev) => (
+                    <EventRow key={ev.eventId} event={ev} />
+                  ))}
+                </VStack>
+              )}
+            </Box>
+          )}
         </VStack>
 
         <SecretRevealModal
@@ -875,7 +920,7 @@ function SecretRevealModal({
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
 })(
-  withPermissionGuard("organization:manage", {
+  withPermissionGuard("governance:view", {
     bypassOnboardingRedirect: true,
   })(IngestionSourceDetailPage),
 );

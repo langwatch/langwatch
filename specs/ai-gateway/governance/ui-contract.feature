@@ -24,7 +24,8 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
 
   Background:
     Given user "admin@acme.com" is signed in to organization "acme"
-    And the user has the "organization:manage" permission
+    And the user has the "governance:view" permission
+    And the user has the "activityMonitor:view" permission
     And the feature flag "release_ui_ai_governance_enabled" is enabled
     And Sergey's data-layer cutover has landed (api.activityMonitor.*
       procedures read from governance_kpis fold + recorded_spans/log_records

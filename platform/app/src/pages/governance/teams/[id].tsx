@@ -9,9 +9,11 @@ import {
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import { Link } from "~/components/ui/link";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { HandledErrorAlert } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -47,10 +49,12 @@ const fmtRelative = (date: Date | string | null): string => {
 function GovernanceTeamDetailPage() {
   const router = useRouter();
   const teamId = typeof router.query.id === "string" ? router.query.id : null;
-  const { organization, organizations } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-  });
+  const { organization, organizations, hasAnyPermission } =
+    useOrganizationTeamProject({
+      redirectToOnboarding: false,
+    });
   const orgId = organization?.id ?? "";
+  const canReadActivity = hasAnyPermission("activityMonitor:view");
   // Resolve the team's first project slug for the bird's-eye drill-in
   // link. Teams typically have a primary project (or a small set);
   // navigating to /[projectSlug]/traces lands the admin on the team's
@@ -64,7 +68,7 @@ function GovernanceTeamDetailPage() {
 
   const teamsQuery = api.activityMonitor.spendByTeam.useQuery(
     { organizationId: orgId, windowDays: 30, limit: 500 },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
   );
 
   const team = (teamsQuery.data ?? []).find((t) => t.teamId === teamId);
@@ -98,7 +102,17 @@ function GovernanceTeamDetailPage() {
           </HStack>
         </VStack>
 
-        {teamsQuery.isLoading ? (
+        {!canReadActivity ? (
+          <PermissionRequiredNotice
+            permission="activityMonitor:view"
+            detail="This team's spend and activity stay hidden until then."
+          />
+        ) : teamsQuery.error ? (
+          <HandledErrorAlert
+            error={teamsQuery.error}
+            fallbackTitle="Couldn't load this team's activity"
+          />
+        ) : teamsQuery.isLoading ? (
           <Spinner />
         ) : !team ? (
           <Box
@@ -212,7 +226,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
 })(
-  withPermissionGuard("organization:manage", {
+  withPermissionGuard("governance:view", {
     bypassOnboardingRedirect: true,
   })(GovernanceTeamDetailPage),
 );

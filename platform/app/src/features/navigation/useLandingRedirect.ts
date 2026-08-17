@@ -132,7 +132,7 @@ function personaHomeDestination({
  * A user with no organization goes to the bootstrap page. Routing them to
  * /me instead is a dead end for a fresh-signup admin: no projects, no
  * discoverable path onward, and /governance renders Access Restricted
- * behind the organization:manage gate. /onboarding/welcome creates the
+ * behind the governance:view gate. /onboarding/welcome creates the
  * organization and the first project (api.onboarding.initializeOrganization),
  * after which the resolver picks the right destination on the next visit.
  */

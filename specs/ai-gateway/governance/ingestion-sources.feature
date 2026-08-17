@@ -14,7 +14,8 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
   Background:
     Given the org admin is signed in as a member of "acme-corp"
     And the governance preview flag is enabled for acme-corp
-    And the admin has organization:manage permission
+    And the admin has governance:view permission
+    And the admin has ingestionSources:manage permission
 
   Scenario: Admin lands on the IngestionSources index
     When the admin navigates to "/governance/ingestion-sources"

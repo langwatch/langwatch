@@ -9,9 +9,11 @@ import {
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import { Link } from "~/components/ui/link";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { HandledErrorAlert } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -42,14 +44,15 @@ function GovernanceUserDetailPage() {
     typeof router.query.id === "string"
       ? decodeURIComponent(router.query.id)
       : null;
-  const { organization } = useOrganizationTeamProject({
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
+  const canReadActivity = hasAnyPermission("activityMonitor:view");
 
   const usersQuery = api.activityMonitor.spendByUser.useQuery(
     { organizationId: orgId, windowDays: 30, limit: 500 },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
   );
   const personalProjectQuery =
     api.governance.resolveActorPersonalProject.useQuery(
@@ -89,7 +92,17 @@ function GovernanceUserDetailPage() {
           </HStack>
         </VStack>
 
-        {usersQuery.isLoading ? (
+        {!canReadActivity ? (
+          <PermissionRequiredNotice
+            permission="activityMonitor:view"
+            detail="This member's spend and activity stay hidden until then."
+          />
+        ) : usersQuery.error ? (
+          <HandledErrorAlert
+            error={usersQuery.error}
+            fallbackTitle="Couldn't load this member's activity"
+          />
+        ) : usersQuery.isLoading ? (
           <Spinner />
         ) : !user ? (
           <Box
@@ -198,7 +211,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
 })(
-  withPermissionGuard("organization:manage", {
+  withPermissionGuard("governance:view", {
     bypassOnboardingRedirect: true,
   })(GovernanceUserDetailPage),
 );

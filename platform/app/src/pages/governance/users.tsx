@@ -1,9 +1,11 @@
 import { Box, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import { Link } from "~/components/ui/link";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { HandledErrorAlert } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -90,10 +92,11 @@ function fmtTrendPct(pct: number): string {
 
 function GovernanceUsersListPage() {
   const router = useRouter();
-  const { organization } = useOrganizationTeamProject({
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
+  const canReadActivity = hasAnyPermission("activityMonitor:view");
 
   const sortBy: SortField = isSortField(router.query.sort)
     ? router.query.sort
@@ -103,19 +106,6 @@ function GovernanceUsersListPage() {
     if (next !== "spend") params.set("sort", next);
     void router.replace(params.toString() ? `?${params.toString()}` : "?");
   };
-
-  const usersQuery = api.activityMonitor.spendByUser.useQuery(
-    {
-      organizationId: orgId,
-      windowDays: 30,
-      limit: 500,
-      sortBy,
-      sortDir: "desc",
-    },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
-  );
-
-  const users = usersQuery.data ?? [];
 
   return (
     <GovernanceLayout pageTitle="Users · AI Governance · LangWatch">
@@ -136,43 +126,94 @@ function GovernanceUsersListPage() {
           </VStack>
         </HStack>
 
-        <HStack gap={2}>
-          <Text fontSize="sm" color="fg.muted" id="sort-by-label">
-            Sort by:
-          </Text>
-          <SortChips
-            value={sortBy}
-            onChange={setSortBy}
-            ariaLabelledBy="sort-by-label"
+        {canReadActivity ? (
+          <UserSpendPanel
+            orgId={orgId}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
           />
-        </HStack>
-
-        <VStack
-          align="stretch"
-          gap={0}
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="md"
-          overflow="hidden"
-        >
-          <Header />
-          {usersQuery.isLoading ? (
-            <Box padding={6}>
-              <Spinner />
-            </Box>
-          ) : users.length === 0 ? (
-            <Box padding={6} color="fg.muted" fontSize="sm">
-              No active users this window.
-            </Box>
-          ) : (
-            users.map((u) => <Row key={u.actor} user={u} />)
-          )}
-        </VStack>
-        <Text fontSize="xs" color="fg.muted">
-          {users.length} user{users.length === 1 ? "" : "s"} shown.
-        </Text>
+        ) : (
+          <PermissionRequiredNotice
+            permission="activityMonitor:view"
+            detail="Member spend and activity stay hidden until then."
+          />
+        )}
       </VStack>
     </GovernanceLayout>
+  );
+}
+
+/**
+ * Mounted only for a viewer holding `activityMonitor:view`, which is the grant
+ * `spendByUser` asks for.
+ */
+function UserSpendPanel({
+  orgId,
+  sortBy,
+  onSortChange,
+}: {
+  orgId: string;
+  sortBy: SortField;
+  onSortChange: (next: SortField) => void;
+}) {
+  const usersQuery = api.activityMonitor.spendByUser.useQuery(
+    {
+      organizationId: orgId,
+      windowDays: 30,
+      limit: 500,
+      sortBy,
+      sortDir: "desc",
+    },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
+
+  const users = usersQuery.data ?? [];
+
+  return (
+    <>
+      <HStack gap={2}>
+        <Text fontSize="sm" color="fg.muted" id="sort-by-label">
+          Sort by:
+        </Text>
+        <SortChips
+          value={sortBy}
+          onChange={onSortChange}
+          ariaLabelledBy="sort-by-label"
+        />
+      </HStack>
+
+      <HandledErrorAlert
+        error={usersQuery.error}
+        fallbackTitle="Couldn't load member activity"
+      />
+
+      <VStack
+        align="stretch"
+        gap={0}
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="md"
+        overflow="hidden"
+      >
+        <Header />
+        {usersQuery.isLoading ? (
+          <Box padding={6}>
+            <Spinner />
+          </Box>
+        ) : users.length === 0 ? (
+          <Box padding={6} color="fg.muted" fontSize="sm">
+            {usersQuery.error
+              ? "Member activity could not be read."
+              : "No active users this window."}
+          </Box>
+        ) : (
+          users.map((u) => <Row key={u.actor} user={u} />)
+        )}
+      </VStack>
+      <Text fontSize="xs" color="fg.muted">
+        {users.length} user{users.length === 1 ? "" : "s"} shown.
+      </Text>
+    </>
   );
 }
 
@@ -288,7 +329,7 @@ function Row({ user }: { user: SpendByUser }) {
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
 })(
-  withPermissionGuard("organization:manage", {
+  withPermissionGuard("governance:view", {
     bypassOnboardingRedirect: true,
   })(GovernanceUsersListPage),
 );

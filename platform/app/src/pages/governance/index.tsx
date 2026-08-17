@@ -27,25 +27,35 @@ import {
   SpendOverTimeChart,
 } from "~/components/governance/SpendOverTimeChart";
 import { InstallCliCard } from "~/components/me/InstallCliCard";
+import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { showErrorToast } from "~/features/errors";
+import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { Permission } from "~/server/api/rbac";
 import { api, type RouterOutputs } from "~/utils/api";
 import { getHexColorForString } from "~/utils/rotatingColors";
 
 /**
- * Org-admin overview of AI governance state - spend, users, anomalies,
- * IngestionSource health. Wires the api.activityMonitor.* procedures
- * (Sergey Option B) for live reads off gateway_activity_events.
+ * Governance overview - spend, users, anomalies, IngestionSource health.
+ * Wires the api.activityMonitor.* procedures for live reads off
+ * gateway_activity_events.
  *
  * When no traffic has been ingested yet, the page shows a setup
  * checklist instead of empty zeroes - a "configure your first source"
  * onboarding rather than an empty wasteland.
  *
- * Spec: specs/ai-gateway/governance/admin-oversight.feature
+ * Every panel here reads a different router, and those routers do not all
+ * ask for the same grant. The page opens for anyone holding
+ * `governance:view` (the grant the Governance product itself is offered on)
+ * and each panel then answers for its own access: readable panels render,
+ * and the rest name the grant they need. A viewer delegated part of the
+ * surface gets the part they hold instead of one refusal for the lot.
+ *
+ * Spec: specs/ai-gateway/governance/admin-oversight.feature,
+ * specs/ai-governance/rbac/delegated-governance-viewer.feature
  */
 
 type SourceHealth =
@@ -78,56 +88,85 @@ const fmtRelative = (date: Date | string | null): string => {
 };
 
 function GovernanceOverviewPage() {
-  const { organization } = useOrganizationTeamProject({
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
 
+  // What this viewer may read, panel by panel. Each flag names the grant the
+  // panel's own router asks for, so a query is never fired against a refusal
+  // we can already predict.
+  const canReadActivity = hasAnyPermission("activityMonitor:view");
+  const canReadSources = hasAnyPermission("ingestionSources:view");
+  const canManageSources = hasAnyPermission("ingestionSources:manage");
+  const canReadPolicies = hasAnyPermission("routingPolicies:view");
+  const canReadAnomalyRules = hasAnyPermission("anomalyRules:view");
+  const canReadCatalog = hasAnyPermission("aiTools:manage");
+  const canReadSessionPolicy = hasAnyPermission("organization:view");
+  const canManageSessionPolicy = hasAnyPermission("organization:manage");
+
   const sourcesQuery = api.ingestionSources.list.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+    { enabled: !!orgId && canReadSources, refetchOnWindowFocus: false },
   );
   const policiesQuery = api.routingPolicy.list.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+    { enabled: !!orgId && canReadPolicies, refetchOnWindowFocus: false },
   );
   const anomalyRulesQuery = api.anomalyRules.list.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+    { enabled: !!orgId && canReadAnomalyRules, refetchOnWindowFocus: false },
   );
   const catalogQuery = api.aiTools.adminList.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+    { enabled: !!orgId && canReadCatalog, refetchOnWindowFocus: false },
   );
   const summaryQuery = api.activityMonitor.summary.useQuery(
     { organizationId: orgId, windowDays: 30 },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
   );
   const usersQuery = api.activityMonitor.spendByUser.useQuery(
     { organizationId: orgId, windowDays: 30, limit: 50 },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
   );
   const teamsQuery = api.activityMonitor.spendByTeam.useQuery(
     { organizationId: orgId, windowDays: 30, limit: 50 },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
   );
   const departmentsQuery = api.activityMonitor.spendByDepartment.useQuery(
     { organizationId: orgId, windowDays: 30 },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
   );
   const healthQuery = api.activityMonitor.ingestionSourcesHealth.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
   );
   const anomaliesQuery = api.activityMonitor.recentAnomalies.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
   );
   const [chartGroupBy, setChartGroupBy] = useState<GroupBy>("team");
   const spendOverTimeQuery = api.activityMonitor.spendOverTime.useQuery(
     { organizationId: orgId, windowDays: 30, groupBy: chartGroupBy },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
   );
+
+  // The activity-monitor panels share one gate and one enterprise plan check,
+  // so they share one alert. Without it a refusal reads as "no spend, no
+  // users, no anomalies" - a claim about the organization we cannot make.
+  const activityError =
+    summaryQuery.error ??
+    usersQuery.error ??
+    teamsQuery.error ??
+    departmentsQuery.error ??
+    healthQuery.error ??
+    anomaliesQuery.error ??
+    spendOverTimeQuery.error;
+  const setupError =
+    sourcesQuery.error ??
+    policiesQuery.error ??
+    anomalyRulesQuery.error ??
+    catalogQuery.error;
 
   const sources = sourcesQuery.data ?? [];
   const policies = policiesQuery.data ?? [];
@@ -171,7 +210,12 @@ function GovernanceOverviewPage() {
 
         {orgId && <QuarantineFillAlert organizationId={orgId} />}
 
-        {!hasTraffic && (
+        <HandledErrorAlert
+          error={setupError}
+          fallbackTitle="Couldn't load the setup state"
+        />
+
+        {canReadActivity && !hasTraffic && (
           <Box
             borderWidth="1px"
             borderColor="border.muted"
@@ -194,6 +238,9 @@ function GovernanceOverviewPage() {
             <VStack align="stretch" gap={2}>
               <SetupItem
                 done={hasCatalogTiles}
+                missingPermission={
+                  canReadCatalog ? undefined : "aiTools:manage"
+                }
                 title="Add tools to the catalog"
                 description="Publish the coding assistants, model providers, and internal tools your team installs from their /me portal."
                 href="/governance/tool-catalog"
@@ -205,6 +252,9 @@ function GovernanceOverviewPage() {
               />
               <SetupItem
                 done={hasPolicies}
+                missingPermission={
+                  canReadPolicies ? undefined : "routingPolicies:view"
+                }
                 title="Define a routing policy"
                 description="Tell virtual keys which providers + models to route through."
                 href="/gateway/routing-policies"
@@ -216,6 +266,9 @@ function GovernanceOverviewPage() {
               />
               <SetupItem
                 done={hasSources}
+                missingPermission={
+                  canReadSources ? undefined : "ingestionSources:view"
+                }
                 title="Connect an ingestion source"
                 description="Map an external AI platform into the activity monitor via OTel push, webhook, or S3 audit drop."
                 href="/governance/ingestion-sources"
@@ -227,6 +280,9 @@ function GovernanceOverviewPage() {
               />
               <SetupItem
                 done={hasAnomalyRules}
+                missingPermission={
+                  canReadAnomalyRules ? undefined : "anomalyRules:view"
+                }
                 title="Define anomaly rules"
                 description="Set thresholds that page on-call when activity drifts."
                 href="/governance/anomaly-rules"
@@ -246,205 +302,277 @@ function GovernanceOverviewPage() {
           </Box>
         )}
 
-        {hasTraffic && summary && (
-          <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
-            <SummaryCard
-              title="Spend (30 d)"
-              value={fmtUsd(summary.spentThisWindowUsd)}
-              subline={
-                summary.spentThisWindowUsd === 0
-                  ? "no traffic this window"
-                  : !summary.hasPriorBaseline || summary.spentThisWindowUsd < 10
-                    ? "insufficient baseline"
-                    : `${summary.windowOverPreviousPct >= 0 ? "↑" : "↓"} ${fmtTrendPct(summary.windowOverPreviousPct)} vs previous`
-              }
-              tone={
-                summary.hasPriorBaseline &&
-                summary.spentThisWindowUsd >= 10 &&
-                summary.windowOverPreviousPct > 25
-                  ? "amber"
-                  : "default"
-              }
-            />
-            <SummaryCard
-              title="Active users (30 d)"
-              value={numeral(summary.activeUsersThisWindow).format("0,0")}
-              subline={
-                summary.activeUsersThisWindow === 0
-                  ? "nobody used AI this window"
-                  : `${summary.newUsersThisWindow} new this window`
-              }
-            />
-            <SummaryCard
-              title="Open anomalies"
-              value={numeral(summary.openAnomalyCount).format("0,0")}
-              subline={
-                summary.openAnomalyCount === 0
-                  ? "nothing to alert on"
-                  : `${summary.anomalyBreakdown.critical} critical · ${summary.anomalyBreakdown.warning} warning`
-              }
-              tone={summary.openAnomalyCount > 0 ? "amber" : "default"}
-            />
-          </SimpleGrid>
-        )}
-
-        {/*
-         * Monitoring sections lead the page when populated - admin's
-         * daily-driver answer to "what happened, where, who" without
-         * scrolling past config knobs. Config (CLI session TTL +
-         * content-logging mode) lives below as occasional-touch
-         * controls. Setup checklist + empty-state ingestion-sources
-         * placeholder render above when there's no traffic yet.
-         */}
-
-        {hasTraffic && (
+        {!canReadActivity && (
           <SectionCard
-            title="Spend over time"
-            subline="Daily UTC buckets, last 30 days. Toggle the breakdown to see which dimension is driving the trend."
-            actions={
-              <GroupByToggle value={chartGroupBy} onChange={setChartGroupBy} />
-            }
+            title="Spend and activity"
+            subline="Spend, active users, anomalies, and ingestion-source health for the organization."
           >
-            <SpendOverTimeChart
-              buckets={spendOverTimeQuery.data?.buckets}
-              groupBy={chartGroupBy}
-              emptyHint="Connect an ingestion source to start collecting governance data."
+            <PermissionRequiredNotice
+              permission="activityMonitor:view"
+              detail="Spend, active users, anomalies, and ingestion-source health stay hidden until then. The rest of this page still works."
             />
           </SectionCard>
         )}
 
-        {teams.length > 0 && (
-          <SectionCard title="Spend share across teams">
-            <SpendByTeamBar teams={teams} />
-          </SectionCard>
+        {canReadActivity && (
+          <>
+            <HandledErrorAlert
+              error={activityError}
+              fallbackTitle="Couldn't load spend and activity"
+            />
+
+            {hasTraffic && summary && (
+              <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
+                <SummaryCard
+                  title="Spend (30 d)"
+                  value={fmtUsd(summary.spentThisWindowUsd)}
+                  subline={
+                    summary.spentThisWindowUsd === 0
+                      ? "no traffic this window"
+                      : !summary.hasPriorBaseline ||
+                          summary.spentThisWindowUsd < 10
+                        ? "insufficient baseline"
+                        : `${summary.windowOverPreviousPct >= 0 ? "↑" : "↓"} ${fmtTrendPct(summary.windowOverPreviousPct)} vs previous`
+                  }
+                  tone={
+                    summary.hasPriorBaseline &&
+                    summary.spentThisWindowUsd >= 10 &&
+                    summary.windowOverPreviousPct > 25
+                      ? "amber"
+                      : "default"
+                  }
+                />
+                <SummaryCard
+                  title="Active users (30 d)"
+                  value={numeral(summary.activeUsersThisWindow).format("0,0")}
+                  subline={
+                    summary.activeUsersThisWindow === 0
+                      ? "nobody used AI this window"
+                      : `${summary.newUsersThisWindow} new this window`
+                  }
+                />
+                <SummaryCard
+                  title="Open anomalies"
+                  value={numeral(summary.openAnomalyCount).format("0,0")}
+                  subline={
+                    summary.openAnomalyCount === 0
+                      ? "nothing to alert on"
+                      : `${summary.anomalyBreakdown.critical} critical · ${summary.anomalyBreakdown.warning} warning`
+                  }
+                  tone={summary.openAnomalyCount > 0 ? "amber" : "default"}
+                />
+              </SimpleGrid>
+            )}
+
+            {/*
+             * Monitoring sections lead the page when populated - admin's
+             * daily-driver answer to "what happened, where, who" without
+             * scrolling past config knobs. Config (CLI session TTL +
+             * content-logging mode) lives below as occasional-touch
+             * controls. Setup checklist + empty-state ingestion-sources
+             * placeholder render above when there's no traffic yet.
+             */}
+
+            {hasTraffic && (
+              <SectionCard
+                title="Spend over time"
+                subline="Daily UTC buckets, last 30 days. Toggle the breakdown to see which dimension is driving the trend."
+                actions={
+                  <GroupByToggle
+                    value={chartGroupBy}
+                    onChange={setChartGroupBy}
+                  />
+                }
+              >
+                <SpendOverTimeChart
+                  buckets={spendOverTimeQuery.data?.buckets}
+                  groupBy={chartGroupBy}
+                  emptyHint="Connect an ingestion source to start collecting governance data."
+                />
+              </SectionCard>
+            )}
+
+            {teams.length > 0 && (
+              <SectionCard title="Spend share across teams">
+                <SpendByTeamBar teams={teams} />
+              </SectionCard>
+            )}
+
+            <SectionCard
+              title="Top teams by spend"
+              subline="Top 5 teams ranked by spend (last 30 days). Sources without a team land under 'Org-wide'."
+              actions={
+                teams.length > 0 ? (
+                  <Link href="/governance/teams" color="blue.600" fontSize="sm">
+                    View all teams →
+                  </Link>
+                ) : null
+              }
+            >
+              {teams.length === 0 ? (
+                <Text color="fg.muted" fontSize="sm">
+                  No team activity this window.
+                </Text>
+              ) : (
+                <VStack align="stretch" gap={0}>
+                  <TeamRowHeader />
+                  {teams.slice(0, 5).map((t) => (
+                    <TeamRow key={t.teamId ?? "org-wide"} team={t} />
+                  ))}
+                </VStack>
+              )}
+            </SectionCard>
+
+            <SectionCard
+              title="Top users by spend"
+              subline="Top 5 LangWatch members ranked by spend (last 30 days)."
+              actions={
+                users.length > 0 ? (
+                  <Link href="/governance/users" color="blue.600" fontSize="sm">
+                    View all users →
+                  </Link>
+                ) : null
+              }
+            >
+              {users.length === 0 ? (
+                <Text color="fg.muted" fontSize="sm">
+                  No active users this window.
+                </Text>
+              ) : (
+                <VStack align="stretch" gap={0}>
+                  <UserRowHeader />
+                  {users.slice(0, 5).map((u) => (
+                    <UserRow key={u.actor} user={u} />
+                  ))}
+                </VStack>
+              )}
+            </SectionCard>
+
+            <SectionCard
+              title="Spend by department"
+              subline="Spend grouped by department across every project in the org, including personal AI use (last 30 days)."
+              actions={
+                <Link
+                  href="/governance/departments"
+                  color="blue.600"
+                  fontSize="sm"
+                >
+                  Manage departments →
+                </Link>
+              }
+            >
+              {departments.length === 0 ? (
+                <Text color="fg.muted" fontSize="sm">
+                  No spend to attribute this window. Assign people, teams, and
+                  projects to departments to compare spend across the org.
+                </Text>
+              ) : (
+                <VStack align="stretch" gap={0}>
+                  <DepartmentRowHeader />
+                  {departments.map((c) => (
+                    <DepartmentRow
+                      key={c.departmentId ?? "unassigned"}
+                      department={c}
+                    />
+                  ))}
+                </VStack>
+              )}
+            </SectionCard>
+
+            <SectionCard
+              title="Recent anomalies"
+              subline="Cross-source rules that fired and haven't been acknowledged."
+              aria-live="polite"
+            >
+              {anomalies.length === 0 ? (
+                <Text color="fg.muted" fontSize="sm">
+                  {hasTraffic
+                    ? "All quiet - no active alerts."
+                    : "Available when the detection backend ships."}
+                </Text>
+              ) : (
+                <VStack align="stretch" gap={2}>
+                  {anomalies.map((a) => (
+                    <AnomalyRow key={a.id} alert={a} />
+                  ))}
+                </VStack>
+              )}
+            </SectionCard>
+
+            <SectionCard
+              title="Ingestion sources"
+              subline="External AI platforms reporting activity to LangWatch."
+            >
+              {sourceHealth.length === 0 ? (
+                <VStack align="start" gap={2}>
+                  <Text color="fg.muted" fontSize="sm">
+                    No ingestion sources configured.
+                  </Text>
+                  {/* An invitation to write, so only for whoever can. */}
+                  {canManageSources && (
+                    <Link href="/governance/ingestion-sources" color="blue.600">
+                      + Add a source
+                    </Link>
+                  )}
+                </VStack>
+              ) : (
+                <HStack gap={3} wrap="wrap">
+                  {sourceHealth.map((src) => (
+                    <SourceChip key={src.id} source={src} />
+                  ))}
+                </HStack>
+              )}
+            </SectionCard>
+          </>
         )}
 
-        <SectionCard
-          title="Top teams by spend"
-          subline="Top 5 teams ranked by spend (last 30 days). Sources without a team land under 'Org-wide'."
-          actions={
-            teams.length > 0 ? (
-              <Link href="/governance/teams" color="blue.600" fontSize="sm">
-                View all teams →
-              </Link>
-            ) : null
-          }
-        >
-          {teams.length === 0 ? (
-            <Text color="fg.muted" fontSize="sm">
-              No team activity this window.
-            </Text>
-          ) : (
-            <VStack align="stretch" gap={0}>
-              <TeamRowHeader />
-              {teams.slice(0, 5).map((t) => (
-                <TeamRow key={t.teamId ?? "org-wide"} team={t} />
-              ))}
-            </VStack>
-          )}
-        </SectionCard>
-
-        <SectionCard
-          title="Top users by spend"
-          subline="Top 5 LangWatch members ranked by spend (last 30 days)."
-          actions={
-            users.length > 0 ? (
-              <Link href="/governance/users" color="blue.600" fontSize="sm">
-                View all users →
-              </Link>
-            ) : null
-          }
-        >
-          {users.length === 0 ? (
-            <Text color="fg.muted" fontSize="sm">
-              No active users this window.
-            </Text>
-          ) : (
-            <VStack align="stretch" gap={0}>
-              <UserRowHeader />
-              {users.slice(0, 5).map((u) => (
-                <UserRow key={u.actor} user={u} />
-              ))}
-            </VStack>
-          )}
-        </SectionCard>
-
-        <SectionCard
-          title="Spend by department"
-          subline="Spend grouped by department across every project in the org, including personal AI use (last 30 days)."
-          actions={
-            <Link href="/governance/departments" color="blue.600" fontSize="sm">
-              Manage departments →
-            </Link>
-          }
-        >
-          {departments.length === 0 ? (
-            <Text color="fg.muted" fontSize="sm">
-              No spend to attribute this window. Assign people, teams, and
-              projects to departments to compare spend across the org.
-            </Text>
-          ) : (
-            <VStack align="stretch" gap={0}>
-              <DepartmentRowHeader />
-              {departments.map((c) => (
-                <DepartmentRow
-                  key={c.departmentId ?? "unassigned"}
-                  department={c}
-                />
-              ))}
-            </VStack>
-          )}
-        </SectionCard>
-
-        <SectionCard
-          title="Recent anomalies"
-          subline="Cross-source rules that fired and haven't been acknowledged."
-          aria-live="polite"
-        >
-          {anomalies.length === 0 ? (
-            <Text color="fg.muted" fontSize="sm">
-              {hasTraffic
-                ? "All quiet - no active alerts."
-                : "Available when the detection backend ships."}
-            </Text>
-          ) : (
-            <VStack align="stretch" gap={2}>
-              {anomalies.map((a) => (
-                <AnomalyRow key={a.id} alert={a} />
-              ))}
-            </VStack>
-          )}
-        </SectionCard>
-
-        <SectionCard
-          title="Ingestion sources"
-          subline="External AI platforms reporting activity to LangWatch."
-        >
-          {sourceHealth.length === 0 ? (
-            <VStack align="start" gap={2}>
-              <Text color="fg.muted" fontSize="sm">
-                No ingestion sources configured.
-              </Text>
-              <Link href="/governance/ingestion-sources" color="blue.600">
-                + Add a source
-              </Link>
-            </VStack>
-          ) : (
-            <HStack gap={3} wrap="wrap">
-              {sourceHealth.map((src) => (
-                <SourceChip key={src.id} source={src} />
-              ))}
-            </HStack>
-          )}
-        </SectionCard>
-
-        <SessionPolicySection organizationId={orgId} />
+        <SessionPolicySection
+          organizationId={orgId}
+          canRead={canReadSessionPolicy}
+          canManage={canManageSessionPolicy}
+        />
       </VStack>
     </GovernanceLayout>
   );
 }
 
-function SessionPolicySection({ organizationId }: { organizationId: string }) {
+function SessionPolicySection({
+  organizationId,
+  canRead,
+  canManage,
+}: {
+  organizationId: string;
+  canRead: boolean;
+  canManage: boolean;
+}) {
+  return (
+    <SectionCard
+      title="CLI session policy"
+      subline="Maximum lifetime of a CLI/device session before re-login is required. Applies to every member's `langwatch login` session."
+    >
+      {canRead ? (
+        <SessionPolicyForm
+          organizationId={organizationId}
+          canManage={canManage}
+        />
+      ) : (
+        <PermissionRequiredNotice permission="organization:view" />
+      )}
+    </SectionCard>
+  );
+}
+
+/**
+ * Mounted only for a viewer who may read the policy, which is what keeps the
+ * read out of a hook that would otherwise run against a refusal.
+ */
+function SessionPolicyForm({
+  organizationId,
+  canManage,
+}: {
+  organizationId: string;
+  canManage: boolean;
+}) {
   const policyQuery = api.sessionPolicy.get.useQuery(
     { organizationId },
     { enabled: !!organizationId, refetchOnWindowFocus: false },
@@ -479,58 +607,71 @@ function SessionPolicySection({ organizationId }: { organizationId: string }) {
   const onReset = () => setValue(String(persisted));
 
   return (
-    <SectionCard
-      title="CLI session policy"
-      subline="Maximum lifetime of a CLI/device session before re-login is required. Applies to every member's `langwatch login` session."
-    >
-      <VStack align="stretch" gap={3}>
-        <HStack gap={3} align="end">
-          <VStack align="start" gap={1}>
-            <Text fontSize="xs" color="fg.muted">
-              Days (0 = unbounded)
-            </Text>
-            <Input
-              type="number"
-              min={0}
-              max={365}
-              step={1}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              width="120px"
-              size="sm"
-              borderColor={isInvalid ? "red.300" : undefined}
-            />
-          </VStack>
-          <Button
-            size="sm"
-            onClick={onSave}
-            loading={setMutation.isPending}
-            disabled={!isDirty || isInvalid}
-          >
-            Save
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onReset}
-            disabled={!isDirty || setMutation.isPending}
-          >
-            Reset
-          </Button>
-        </HStack>
-        <Text fontSize="xs" color="fg.muted">
-          Suggested presets: <code>7</code> (high-security) · <code>30</code>{" "}
-          (standard) · <code>0</code> (open-source / small teams). Values higher
-          than the natural refresh-token life (~30d) cap at the refresh-token
-          expiry.
-        </Text>
-        {isInvalid && (
-          <Text fontSize="xs" color="red.600">
-            Enter an integer between 0 and 365.
+    <VStack align="stretch" gap={3}>
+      <HandledErrorAlert
+        error={policyQuery.error}
+        fallbackTitle="Couldn't load the session policy"
+      />
+      <HStack gap={3} align="end">
+        <VStack align="start" gap={1}>
+          <Text fontSize="xs" color="fg.muted">
+            Days (0 = unbounded)
           </Text>
+          <Input
+            type="number"
+            min={0}
+            max={365}
+            step={1}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            width="120px"
+            size="sm"
+            borderColor={isInvalid ? "red.300" : undefined}
+            readOnly={!canManage}
+            disabled={!canManage}
+          />
+        </VStack>
+        {/* The write is `organization:manage`. Offering Save to a viewer who
+            only reads would hand them a button the server refuses. */}
+        {canManage && (
+          <>
+            <Button
+              size="sm"
+              onClick={onSave}
+              loading={setMutation.isPending}
+              disabled={!isDirty || isInvalid}
+            >
+              Save
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onReset}
+              disabled={!isDirty || setMutation.isPending}
+            >
+              Reset
+            </Button>
+          </>
         )}
-      </VStack>
-    </SectionCard>
+      </HStack>
+      <Text fontSize="xs" color="fg.muted">
+        Suggested presets: <code>7</code> (high-security) · <code>30</code>{" "}
+        (standard) · <code>0</code> (open-source / small teams). Values higher
+        than the natural refresh-token life (~30d) cap at the refresh-token
+        expiry.
+      </Text>
+      {isInvalid && (
+        <Text fontSize="xs" color="red.600">
+          Enter an integer between 0 and 365.
+        </Text>
+      )}
+      {!canManage && (
+        <PermissionRequiredNotice
+          permission="organization:manage"
+          detail="You can read the current policy. Changing it needs this grant."
+        />
+      )}
+    </VStack>
   );
 }
 
@@ -541,6 +682,7 @@ function SetupItem({
   href,
   ctaLabel,
   upcoming,
+  missingPermission,
 }: {
   done: boolean;
   title: string;
@@ -548,19 +690,31 @@ function SetupItem({
   href: string;
   ctaLabel: string;
   upcoming?: boolean;
+  /**
+   * The grant this step's state is read with, when the viewer does not hold
+   * it. A tick or a count is a claim about the organization, and the viewer
+   * who cannot read the resource gets the name of the grant instead of a
+   * claim we did not earn.
+   */
+  missingPermission?: Permission;
 }) {
+  const isDone = done && !missingPermission;
   return (
     <HStack
       borderWidth="1px"
-      borderColor={done ? "green.200" : "border.muted"}
+      borderColor={isDone ? "green.200" : "border.muted"}
       borderRadius="sm"
       padding={3}
       gap={3}
       alignItems="start"
       opacity={upcoming ? 0.7 : 1}
     >
-      <Box color={done ? "green.500" : "fg.muted"} paddingTop="2px">
-        {done ? <CheckCircle2 size={18} /> : <Circle size={18} />}
+      <Box
+        color={isDone ? "green.500" : "fg.muted"}
+        paddingTop="2px"
+        aria-hidden="true"
+      >
+        {isDone ? <CheckCircle2 size={18} /> : <Circle size={18} />}
       </Box>
       <VStack align="start" gap={0} flex={1} minWidth={0}>
         <HStack gap={2}>
@@ -577,9 +731,15 @@ function SetupItem({
           {description}
         </Text>
       </VStack>
-      <Link href={href} color="blue.600">
-        {ctaLabel}
-      </Link>
+      {missingPermission ? (
+        <Text fontSize="xs" color="fg.muted" flexShrink={0}>
+          Needs {missingPermission}
+        </Text>
+      ) : (
+        <Link href={href} color="blue.600">
+          {ctaLabel}
+        </Link>
+      )}
     </HStack>
   );
 }
@@ -1074,7 +1234,7 @@ function UserRow({ user }: { user: SpendByUser }) {
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
 })(
-  withPermissionGuard("organization:manage", {
+  withPermissionGuard("governance:view", {
     bypassOnboardingRedirect: true,
   })(GovernanceOverviewPage),
 );

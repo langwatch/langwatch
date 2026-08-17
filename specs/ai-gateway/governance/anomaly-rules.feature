@@ -36,18 +36,23 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
   Background:
     Given the feature flag "release_ui_ai_governance_enabled" is enabled
       for the organization
-    And the user has the "organization:manage" permission
+    And the user has the "governance:view" permission
+    And the user has the "anomalyRules:manage" permission
 
   # ---------------------------------------------------------------------------
   # Page scaffold + permission gate
   # ---------------------------------------------------------------------------
 
   @bdd @ui @anomaly-rules @permission
-  Scenario: A non-admin user is redirected away from the rules page
-    Given a user without "organization:manage" is signed in
+  Scenario: A user without the governance read grant is refused the rules page
+    # The page gate is `governance:view`. A holder of it who lacks
+    # `anomalyRules:view` reaches the page and is told which grant the rule
+    # list needs, per
+    # specs/ai-governance/rbac/delegated-governance-viewer.feature.
+    Given a user without "governance:view" is signed in
     When they navigate to "/governance/anomaly-rules"
-    Then they are redirected (or shown the existing settings-permission
-      "Not allowed" page)
+    Then they are shown the existing settings-permission "Access Restricted"
+      page
 
   @bdd @ui @anomaly-rules @permission
   Scenario: An org admin reaches the rules page

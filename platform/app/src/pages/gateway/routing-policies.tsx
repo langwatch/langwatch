@@ -12,6 +12,7 @@ import { useMemo, useState } from "react";
 
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
+import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import {
   RoutingPoliciesTable,
   type RoutingPolicyRow,
@@ -22,6 +23,7 @@ import type { ScopeTriadEntry } from "~/components/settings/ScopeChipPicker";
 import { Link } from "~/components/ui/link";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { HandledErrorAlert } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -32,11 +34,12 @@ import { docsUrl } from "~/utils/docsUrl";
  * feature-flag and permission guards around it.
  */
 export function RoutingPoliciesPage() {
-  const { organization } = useOrganizationTeamProject({
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const organizationId = organization?.id ?? "";
   const { openDrawer } = useDrawer();
+  const canManage = hasAnyPermission("routingPolicies:manage");
 
   const policiesQuery = api.routingPolicy.list.useQuery(
     { organizationId },
@@ -64,20 +67,18 @@ export function RoutingPoliciesPage() {
   return (
     <AiGatewayLayout pageTitle="Routing Policies · AI Gateway · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
-        <VStack align="start" gap={0}>
-          <Heading as="h2" size="lg">
-            Routing policies
-          </Heading>
-          <Text color="fg.muted" fontSize="sm">
-            Decide which providers and models your keys reach, and what the
-            model tiers mean here. A project policy wins over a team policy,
-            which wins over the organization policy.
-          </Text>
-        </VStack>
+        <PageHeading />
 
         {policiesQuery.isLoading && <Spinner size="sm" />}
 
-        {!policiesQuery.isLoading && !hasAnyDefault && (
+        <HandledErrorAlert
+          error={policiesQuery.error}
+          fallbackTitle="Couldn't load routing policies"
+        />
+
+        {/* "Publish a default policy" is an instruction, so it is only shown
+            to whoever can carry it out. */}
+        {canManage && !policiesQuery.isLoading && !hasAnyDefault && (
           <NoDefaultNotice
             hasPolicies={policies.length > 0}
             onAddOrganizationPolicy={() => openNew("organization", true)}
@@ -95,23 +96,21 @@ export function RoutingPoliciesPage() {
             setDefault.mutate({ organizationId, id: policy.id })
           }
           onDelete={setPolicyToDelete}
+          canManage={canManage}
         />
+
+        {!canManage && (
+          <PermissionRequiredNotice
+            permission="routingPolicies:manage"
+            detail="You can read the policies and the tiers they publish. Creating, editing, and deleting need this grant."
+          />
+        )}
       </VStack>
 
-      <ConfirmDialog
-        open={!!policyToDelete}
-        onOpenChange={(open) => {
-          if (!open) setPolicyToDelete(null);
-        }}
-        title={`Delete "${policyToDelete?.name ?? ""}"?`}
-        message={
-          policyToDelete?.isDefault
-            ? "Keys that use this policy stop working until you point them at another one, and new keys route through whichever providers they can reach until you publish another default here."
-            : "Keys that use this policy stop working until you point them at another one."
-        }
-        confirmLabel="Delete policy"
-        tone="danger"
-        loading={remove.isPending}
+      <DeletePolicyDialog
+        policy={policyToDelete}
+        isDeleting={remove.isPending}
+        onCancel={() => setPolicyToDelete(null)}
         onConfirm={() => {
           if (!policyToDelete) return;
           remove.mutate(
@@ -121,6 +120,52 @@ export function RoutingPoliciesPage() {
         }}
       />
     </AiGatewayLayout>
+  );
+}
+
+function DeletePolicyDialog({
+  policy,
+  isDeleting,
+  onCancel,
+  onConfirm,
+}: {
+  policy: RoutingPolicyRow | null;
+  isDeleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <ConfirmDialog
+      open={!!policy}
+      onOpenChange={(open) => {
+        if (!open) onCancel();
+      }}
+      title={`Delete "${policy?.name ?? ""}"?`}
+      message={
+        policy?.isDefault
+          ? "Keys that use this policy stop working until you point them at another one, and new keys route through whichever providers they can reach until you publish another default here."
+          : "Keys that use this policy stop working until you point them at another one."
+      }
+      confirmLabel="Delete policy"
+      tone="danger"
+      loading={isDeleting}
+      onConfirm={onConfirm}
+    />
+  );
+}
+
+function PageHeading() {
+  return (
+    <VStack align="start" gap={0}>
+      <Heading as="h2" size="lg">
+        Routing policies
+      </Heading>
+      <Text color="fg.muted" fontSize="sm">
+        Decide which providers and models your keys reach, and what the model
+        tiers mean here. A project policy wins over a team policy, which wins
+        over the organization policy.
+      </Text>
+    </VStack>
   );
 }
 
@@ -227,14 +272,15 @@ function NoDefaultNotice({
 }
 
 /**
- * A routing policy is authored for a whole organization and cascades down to
- * its teams and projects, so this page asks for `organization:manage` rather
- * than one of the narrower gateway permissions the sibling pages use.
+ * Routing policies are read with `routingPolicies:view` and written with
+ * `routingPolicies:manage`, which is what the router asks for and what every
+ * sibling Gateway page gates on. The page opens on the read grant; the
+ * authoring controls appear only for the write one.
  */
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
 })(
-  withPermissionGuard("organization:manage", {
+  withPermissionGuard("routingPolicies:view", {
     layoutComponent: AiGatewayLayout,
   })(RoutingPoliciesPage),
 );

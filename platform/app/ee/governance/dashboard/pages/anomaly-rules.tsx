@@ -17,6 +17,7 @@ import { Info, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
@@ -193,14 +194,16 @@ const blankComposer = (): ComposerState => ({
 });
 
 function AnomalyRulesPage() {
-  const { organization } = useOrganizationTeamProject({
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
+  const canRead = hasAnyPermission("anomalyRules:view");
+  const canManage = hasAnyPermission("anomalyRules:manage");
 
   const rulesQuery = api.anomalyRules.list.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+    { enabled: !!orgId && canRead, refetchOnWindowFocus: false },
   );
   const utils = api.useUtils();
   const refetch = () =>
@@ -341,7 +344,14 @@ function AnomalyRulesPage() {
             <Spacer />
           </HStack>
 
-          {composer && (
+          {!canRead && (
+            <PermissionRequiredNotice
+              permission="anomalyRules:view"
+              detail="The rule list stays hidden until then."
+            />
+          )}
+
+          {canManage && composer && (
             <RuleComposer
               composer={composer}
               setComposer={setComposer}
@@ -379,76 +389,89 @@ function AnomalyRulesPage() {
             </VStack>
           )}
 
-          {(["critical", "warning", "info"] as const).map((sev) => {
-            const meta = SEVERITY_OPTIONS.find((o) => o.value === sev)!;
-            return (
-              <Box
-                key={sev}
-                as="section"
-                borderWidth="1px"
-                borderColor="border.muted"
-                borderRadius="md"
-                padding={4}
-              >
-                <HStack alignItems="start" marginBottom={3}>
-                  <VStack align="start" gap={0}>
-                    <HStack gap={2}>
-                      <Text fontSize="sm" fontWeight="semibold">
-                        {meta.label}
-                      </Text>
-                      {/* A count is a claim about the fleet. We only have
+          {canRead &&
+            (["critical", "warning", "info"] as const).map((sev) => {
+              const meta = SEVERITY_OPTIONS.find((o) => o.value === sev)!;
+              return (
+                <Box
+                  key={sev}
+                  as="section"
+                  borderWidth="1px"
+                  borderColor="border.muted"
+                  borderRadius="md"
+                  padding={4}
+                >
+                  <HStack alignItems="start" marginBottom={3}>
+                    <VStack align="start" gap={0}>
+                      <HStack gap={2}>
+                        <Text fontSize="sm" fontWeight="semibold">
+                          {meta.label}
+                        </Text>
+                        {/* A count is a claim about the fleet. We only have
                             one when the list actually arrived. */}
-                      {!rulesQuery.error && (
-                        <Badge size="sm" variant="surface">
-                          {grouped[sev].length}
-                        </Badge>
-                      )}
-                    </HStack>
-                  </VStack>
-                  <Spacer />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const fresh = blankComposer();
-                      fresh.severity = sev;
-                      setComposer(fresh);
-                    }}
-                    disabled={!!composer}
-                  >
-                    <Plus size={14} /> New rule
-                  </Button>
-                </HStack>
+                        {!rulesQuery.error && (
+                          <Badge size="sm" variant="surface">
+                            {grouped[sev].length}
+                          </Badge>
+                        )}
+                      </HStack>
+                    </VStack>
+                    <Spacer />
+                    {/* The write is `anomalyRules:manage`. A viewer who only
+                      reads is not offered a composer the server refuses. */}
+                    {canManage && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const fresh = blankComposer();
+                          fresh.severity = sev;
+                          setComposer(fresh);
+                        }}
+                        disabled={!!composer}
+                      >
+                        <Plus size={14} /> New rule
+                      </Button>
+                    )}
+                  </HStack>
 
-                <VStack align="stretch" gap={2}>
-                  {/* Same rule as the sibling sources page: "None" is a
+                  <VStack align="stretch" gap={2}>
+                    {/* Same rule as the sibling sources page: "None" is a
                         claim we can only make when we know. */}
-                  {grouped[sev].length === 0 && !rulesQuery.error && (
-                    <Text fontSize="sm" color="fg.muted">
-                      No {meta.label.toLowerCase()} rules.
-                    </Text>
-                  )}
-                  {grouped[sev].map((rule) => (
-                    <RuleRow
-                      key={rule.id}
-                      rule={rule}
-                      onEdit={() => startEdit(rule)}
-                      onArchive={() =>
-                        archiveMutation.mutate({
-                          id: rule.id,
-                          organizationId: orgId,
-                        })
-                      }
-                      isArchiving={
-                        archiveMutation.isPending &&
-                        archiveMutation.variables?.id === rule.id
-                      }
-                    />
-                  ))}
-                </VStack>
-              </Box>
-            );
-          })}
+                    {grouped[sev].length === 0 && !rulesQuery.error && (
+                      <Text fontSize="sm" color="fg.muted">
+                        No {meta.label.toLowerCase()} rules.
+                      </Text>
+                    )}
+                    {grouped[sev].map((rule) => (
+                      <RuleRow
+                        key={rule.id}
+                        rule={rule}
+                        onEdit={() => startEdit(rule)}
+                        onArchive={() =>
+                          archiveMutation.mutate({
+                            id: rule.id,
+                            organizationId: orgId,
+                          })
+                        }
+                        isArchiving={
+                          archiveMutation.isPending &&
+                          archiveMutation.variables?.id === rule.id
+                        }
+                        canManage={canManage}
+                      />
+                    ))}
+                  </VStack>
+                </Box>
+              );
+            })}
+
+          {canRead && !canManage && (
+            <PermissionRequiredNotice
+              permission="anomalyRules:manage"
+              detail="You can read the rules. Creating, editing, and archiving need this grant."
+            />
+          )}
         </VStack>
       </EnterpriseLockedSurface>
     </GovernanceLayout>
@@ -460,11 +483,13 @@ function RuleRow({
   onEdit,
   onArchive,
   isArchiving,
+  canManage,
 }: {
   rule: Rule;
   onEdit: () => void;
   onArchive: () => void;
   isArchiving: boolean;
+  canManage: boolean;
 }) {
   return (
     <HStack
@@ -501,19 +526,23 @@ function RuleRow({
             : ""}
         </Text>
       </VStack>
-      <Button size="sm" variant="ghost" onClick={onEdit}>
-        <Pencil size={14} /> Edit
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        colorPalette="red"
-        onClick={onArchive}
-        loading={isArchiving}
-        title="Archive rule"
-      >
-        <Trash2 size={14} />
-      </Button>
+      {canManage && (
+        <>
+          <Button size="sm" variant="ghost" onClick={onEdit}>
+            <Pencil size={14} /> Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            colorPalette="red"
+            onClick={onArchive}
+            loading={isArchiving}
+            title="Archive rule"
+          >
+            <Trash2 size={14} />
+          </Button>
+        </>
+      )}
     </HStack>
   );
 }
@@ -929,7 +958,7 @@ function ThresholdPreview({
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
 })(
-  withPermissionGuard("organization:manage", {
+  withPermissionGuard("governance:view", {
     bypassOnboardingRedirect: true,
   })(AnomalyRulesPage),
 );

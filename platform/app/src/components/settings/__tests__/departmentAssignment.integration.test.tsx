@@ -60,6 +60,9 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     organization: { id: "org-1" },
     isLoading: false,
+    // The page hides its write controls without `governance:manage`, and this
+    // test is about what an admin sees.
+    hasAnyPermission: () => true,
   }),
 }));
 

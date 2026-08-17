@@ -1,9 +1,11 @@
 import { Box, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import { Link } from "~/components/ui/link";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { HandledErrorAlert } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -96,10 +98,11 @@ function fmtTrendPct(pct: number): string {
 
 function GovernanceTeamsListPage() {
   const router = useRouter();
-  const { organization } = useOrganizationTeamProject({
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
+  const canReadActivity = hasAnyPermission("activityMonitor:view");
 
   // Sort state lives in URL (`?sort=requests`) so the view is deep-linkable
   // and stable across refresh / share-this-view. `spend` is the canonical
@@ -112,19 +115,6 @@ function GovernanceTeamsListPage() {
     if (next !== "spend") params.set("sort", next);
     void router.replace(params.toString() ? `?${params.toString()}` : "?");
   };
-
-  const teamsQuery = api.activityMonitor.spendByTeam.useQuery(
-    {
-      organizationId: orgId,
-      windowDays: 30,
-      limit: 500,
-      sortBy,
-      sortDir: "desc",
-    },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
-  );
-
-  const teams = teamsQuery.data ?? [];
 
   return (
     <GovernanceLayout pageTitle="Teams · AI Governance · LangWatch">
@@ -145,43 +135,94 @@ function GovernanceTeamsListPage() {
           </VStack>
         </HStack>
 
-        <HStack gap={2}>
-          <Text fontSize="sm" color="fg.muted" id="sort-by-label">
-            Sort by:
-          </Text>
-          <SortChips
-            value={sortBy}
-            onChange={setSortBy}
-            ariaLabelledBy="sort-by-label"
+        {canReadActivity ? (
+          <TeamSpendPanel
+            orgId={orgId}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
           />
-        </HStack>
-
-        <VStack
-          align="stretch"
-          gap={0}
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="md"
-          overflow="hidden"
-        >
-          <Header />
-          {teamsQuery.isLoading ? (
-            <Box padding={6}>
-              <Spinner />
-            </Box>
-          ) : teams.length === 0 ? (
-            <Box padding={6} color="fg.muted" fontSize="sm">
-              No team activity this window.
-            </Box>
-          ) : (
-            teams.map((t) => <Row key={t.teamId ?? "org-wide"} team={t} />)
-          )}
-        </VStack>
-        <Text fontSize="xs" color="fg.muted">
-          {teams.length} team{teams.length === 1 ? "" : "s"} shown.
-        </Text>
+        ) : (
+          <PermissionRequiredNotice
+            permission="activityMonitor:view"
+            detail="Team spend and activity stay hidden until then."
+          />
+        )}
       </VStack>
     </GovernanceLayout>
+  );
+}
+
+/**
+ * Mounted only for a viewer holding `activityMonitor:view`, which is the grant
+ * `spendByTeam` asks for.
+ */
+function TeamSpendPanel({
+  orgId,
+  sortBy,
+  onSortChange,
+}: {
+  orgId: string;
+  sortBy: SortField;
+  onSortChange: (next: SortField) => void;
+}) {
+  const teamsQuery = api.activityMonitor.spendByTeam.useQuery(
+    {
+      organizationId: orgId,
+      windowDays: 30,
+      limit: 500,
+      sortBy,
+      sortDir: "desc",
+    },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
+
+  const teams = teamsQuery.data ?? [];
+
+  return (
+    <>
+      <HStack gap={2}>
+        <Text fontSize="sm" color="fg.muted" id="sort-by-label">
+          Sort by:
+        </Text>
+        <SortChips
+          value={sortBy}
+          onChange={onSortChange}
+          ariaLabelledBy="sort-by-label"
+        />
+      </HStack>
+
+      <HandledErrorAlert
+        error={teamsQuery.error}
+        fallbackTitle="Couldn't load team activity"
+      />
+
+      <VStack
+        align="stretch"
+        gap={0}
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="md"
+        overflow="hidden"
+      >
+        <Header />
+        {teamsQuery.isLoading ? (
+          <Box padding={6}>
+            <Spinner />
+          </Box>
+        ) : teams.length === 0 ? (
+          <Box padding={6} color="fg.muted" fontSize="sm">
+            {teamsQuery.error
+              ? "Team activity could not be read."
+              : "No team activity this window."}
+          </Box>
+        ) : (
+          teams.map((t) => <Row key={t.teamId ?? "org-wide"} team={t} />)
+        )}
+      </VStack>
+      <Text fontSize="xs" color="fg.muted">
+        {teams.length} team{teams.length === 1 ? "" : "s"} shown.
+      </Text>
+    </>
   );
 }
 
@@ -308,7 +349,7 @@ function Row({ team }: { team: SpendByTeam }) {
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
 })(
-  withPermissionGuard("organization:manage", {
+  withPermissionGuard("governance:view", {
     bypassOnboardingRedirect: true,
   })(GovernanceTeamsListPage),
 );

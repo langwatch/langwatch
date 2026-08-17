@@ -65,6 +65,9 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", teamId: "team-1", slug: "web-app" },
     organization,
+    // The page hides its authoring controls without
+    // `routingPolicies:manage`, and this test drives them as an admin.
+    hasAnyPermission: () => true,
   }),
 }));
 

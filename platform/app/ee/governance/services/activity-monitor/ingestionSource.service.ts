@@ -8,8 +8,9 @@
  *
  * Org-scoped (no projectId). Optional teamId narrows scope. Auth is
  * enforced at the tRPC / Hono route layer via
- * `checkOrganizationPermission("organization:manage")`. This service
- * does NOT re-check permissions — it trusts the caller resolved them.
+ * `checkOrganizationPermission("ingestionSources:view")` for reads and
+ * `checkOrganizationPermission("ingestionSources:manage")` for writes. This
+ * service does NOT re-check permissions — it trusts the caller resolved them.
  *
  * Secret handling: ingestSecret is auto-generated on create (32 random
  * bytes, base64url) and returned to the caller exactly once. We

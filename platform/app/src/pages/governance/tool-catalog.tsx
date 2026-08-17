@@ -4,6 +4,7 @@ import { useState } from "react";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import type { AiToolEntry } from "~/components/me/tiles/types";
+import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import { AiToolEntryDrawer } from "~/components/settings/governance/AiToolEntryDrawer";
 import { IngestionTemplatesEditor } from "~/components/settings/governance/IngestionTemplatesEditor";
 import { ToolCatalogEditor } from "~/components/settings/governance/ToolCatalogEditor";
@@ -22,12 +23,18 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
  *   - Ingestion Templates: READ-ONLY catalog of platform-published
  *     IngestionTemplate rows. Admin sees what's shipped + 'View OTTL' for
  *     transparency. No edit/disable/fork v1; admin authoring lands v2.
+ *
+ * Both tabs read through `aiTools:manage`, which is the catalog's own grant.
+ * The page opens on `governance:view` like the rest of Governance, so a
+ * delegated viewer arrives here from the section navigation and is told which
+ * grant the catalog needs rather than being refused the whole page.
  */
 function ToolCatalogPage() {
-  const { organization } = useOrganizationTeamProject({
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
+  const canManageCatalog = hasAnyPermission("aiTools:manage");
 
   const [drawerState, setDrawerState] = useState<
     | { mode: "create"; type: AiToolEntry["type"] }
@@ -39,20 +46,24 @@ function ToolCatalogPage() {
     return <LoadingScreen />;
   }
 
+  if (!canManageCatalog) {
+    return (
+      <GovernanceLayout pageTitle="Tool Catalog · Governance · LangWatch">
+        <VStack align="stretch" gap={6} width="full">
+          <ToolCatalogHeading />
+          <PermissionRequiredNotice
+            permission="aiTools:manage"
+            detail="The catalog and the ingestion templates stay hidden until then."
+          />
+        </VStack>
+      </GovernanceLayout>
+    );
+  }
+
   return (
     <GovernanceLayout pageTitle="Tool Catalog · Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full">
-        <HStack alignItems="end">
-          <VStack align="start" gap={0}>
-            <Heading as="h2" size="lg">
-              AI Tool Catalog
-            </Heading>
-            <Text color="fg.muted" fontSize="sm">
-              Catalog rows your members see on their <code>/me</code> portal.
-            </Text>
-          </VStack>
-          <Spacer />
-        </HStack>
+        <ToolCatalogHeading />
 
         <Tabs.Root
           variant="line"
@@ -103,10 +114,26 @@ function ToolCatalogPage() {
   );
 }
 
+function ToolCatalogHeading() {
+  return (
+    <HStack alignItems="end">
+      <VStack align="start" gap={0}>
+        <Heading as="h2" size="lg">
+          AI Tool Catalog
+        </Heading>
+        <Text color="fg.muted" fontSize="sm">
+          Catalog rows your members see on their <code>/me</code> portal.
+        </Text>
+      </VStack>
+      <Spacer />
+    </HStack>
+  );
+}
+
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
 })(
-  withPermissionGuard("organization:manage", {
+  withPermissionGuard("governance:view", {
     bypassOnboardingRedirect: true,
   })(ToolCatalogPage),
 );

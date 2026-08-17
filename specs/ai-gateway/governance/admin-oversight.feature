@@ -23,7 +23,8 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
 
   Background:
     Given user "platform-admin@acme.com" is signed in to organization "acme"
-    And the user has the "organization:manage" permission
+    And the user has the "governance:view" permission
+    And the user has the "activityMonitor:view" permission
     And the feature flag "release_ui_ai_governance_enabled" is enabled
 
   # ---------------------------------------------------------------------------
@@ -31,12 +32,15 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
   # ---------------------------------------------------------------------------
 
   @bdd @ui @admin-oversight @permission
-  Scenario: A non-admin user is redirected away from the dashboard
+  Scenario: A user without the governance read grant is refused the dashboard
+    # The page gate is `governance:view`, the same grant the Governance
+    # product is offered on. Delegation of the panels inside it is covered by
+    # specs/ai-governance/rbac/delegated-governance-viewer.feature.
     Given user "engineer@acme.com" is signed in but does NOT have
-      "organization:manage"
+      "governance:view"
     When she navigates to "/governance"
-    Then she is redirected (or shown the existing settings-permission
-      "Not allowed" page)
+    Then she is shown the existing settings-permission "Access Restricted"
+      page
 
   @bdd @ui @admin-oversight @permission
   Scenario: An org admin reaches the dashboard
@@ -97,7 +101,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
 
   @bdd @ui @admin-oversight @per-user @permissions
   Scenario: Per-user rows respect the admin's RBAC scope
-    Given the admin has "organization:manage" but only on org "acme"
+    Given the admin has "activityMonitor:view" but only on org "acme"
     When the dashboard renders
     Then only users in "acme" appear in the table
     And users from sibling orgs (where the admin has no permission) are

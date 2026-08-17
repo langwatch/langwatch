@@ -12,23 +12,32 @@ import { Archive, ExternalLink, MoreVertical, Pencil } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import { DepartmentEditDrawer } from "~/components/settings/DepartmentEditDrawer";
 import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { showErrorToast } from "~/features/errors";
+import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 
 type Department = RouterOutputs["departments"]["list"][number];
 
+/**
+ * Departments are read with `governance:view` and written with
+ * `governance:manage`. The page opens on the read grant, and the create box
+ * plus the per-row actions appear only for a viewer who holds the write one.
+ *
+ * Spec: specs/ai-governance/rbac/delegated-governance-viewer.feature
+ */
 function DepartmentsPage() {
-  const { organization } = useOrganizationTeamProject({
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
+  const canManage = hasAnyPermission("governance:manage");
 
   const utils = api.useUtils();
   const listQuery = api.departments.list.useQuery(
@@ -39,17 +48,6 @@ function DepartmentsPage() {
   const refresh = async () => {
     await utils.departments.list.invalidate({ organizationId: orgId });
   };
-
-  const [newName, setNewName] = useState("");
-  const createMutation = api.departments.create.useMutation({
-    onSuccess: async () => {
-      setNewName("");
-      toaster.create({ title: "Department created", type: "success" });
-      await refresh();
-    },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't create department" }),
-  });
 
   const departments = listQuery.data ?? [];
   const hasDepartments = departments.length > 0;
@@ -73,58 +71,90 @@ function DepartmentsPage() {
           </Text>
         </VStack>
 
-        <Box
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="md"
-          padding={4}
-        >
-          <Text fontWeight="semibold" fontSize="sm" marginBottom={2}>
-            Create a department
-          </Text>
-          <HStack>
-            <Input
-              size="sm"
-              maxW="sm"
-              placeholder="e.g. Engineering, Marketing"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && newName.trim()) {
-                  createMutation.mutate({
-                    organizationId: orgId,
-                    name: newName.trim(),
-                  });
-                }
-              }}
-            />
-            <Button
-              size="sm"
-              colorPalette="orange"
-              loading={createMutation.isPending}
-              disabled={!newName.trim()}
-              onClick={() =>
-                createMutation.mutate({
-                  organizationId: orgId,
-                  name: newName.trim(),
-                })
-              }
-            >
-              Create
-            </Button>
-          </HStack>
-        </Box>
+        <HandledErrorAlert
+          error={listQuery.error}
+          fallbackTitle="Couldn't load departments"
+        />
+
+        {canManage && <CreateDepartmentBox orgId={orgId} onCreated={refresh} />}
 
         <DepartmentList
           orgId={orgId}
           departments={departments}
           isLoading={listQuery.isLoading}
           onChanged={refresh}
+          canManage={canManage}
         />
+
+        {!canManage && (
+          <PermissionRequiredNotice
+            permission="governance:manage"
+            detail="You can read the department list. Creating, renaming, archiving, and assigning need this grant."
+          />
+        )}
 
         {hasDepartments && <AssignmentGuide />}
       </VStack>
     </GovernanceLayout>
+  );
+}
+
+/** Mounted only for a viewer holding `governance:manage`. */
+function CreateDepartmentBox({
+  orgId,
+  onCreated,
+}: {
+  orgId: string;
+  onCreated: () => Promise<void>;
+}) {
+  const [newName, setNewName] = useState("");
+  const createMutation = api.departments.create.useMutation({
+    onSuccess: async () => {
+      setNewName("");
+      toaster.create({ title: "Department created", type: "success" });
+      await onCreated();
+    },
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't create department" }),
+  });
+
+  const submit = () => {
+    if (!newName.trim()) return;
+    createMutation.mutate({ organizationId: orgId, name: newName.trim() });
+  };
+
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      padding={4}
+    >
+      <Text fontWeight="semibold" fontSize="sm" marginBottom={2}>
+        Create a department
+      </Text>
+      <HStack>
+        <Input
+          size="sm"
+          maxW="sm"
+          placeholder="e.g. Engineering, Marketing"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submit();
+          }}
+        />
+        <Button
+          size="sm"
+          colorPalette="orange"
+          loading={createMutation.isPending}
+          disabled={!newName.trim()}
+          onClick={submit}
+        >
+          Create
+        </Button>
+      </HStack>
+    </Box>
   );
 }
 
@@ -217,11 +247,13 @@ function DepartmentList({
   departments,
   isLoading,
   onChanged,
+  canManage,
 }: {
   orgId: string;
   departments: Department[];
   isLoading: boolean;
   onChanged: () => Promise<void>;
+  canManage: boolean;
 }) {
   const [editing, setEditing] = useState<Department | null>(null);
   const [archiving, setArchiving] = useState<Department | null>(null);
@@ -278,6 +310,7 @@ function DepartmentList({
               department={dept}
               onEdit={() => setEditing(dept)}
               onArchive={() => setArchiving(dept)}
+              canManage={canManage}
             />
           ))
         )}
@@ -318,10 +351,12 @@ function DepartmentRow({
   department,
   onEdit,
   onArchive,
+  canManage,
 }: {
   department: Department;
   onEdit: () => void;
   onArchive: () => void;
+  canManage: boolean;
 }) {
   return (
     <HStack
@@ -333,21 +368,23 @@ function DepartmentRow({
       justifyContent="space-between"
     >
       <Text fontWeight="medium">{department.name}</Text>
-      <Menu.Root>
-        <Menu.Trigger asChild>
-          <Button variant="ghost" size="xs" aria-label="Actions">
-            <MoreVertical size={14} />
-          </Button>
-        </Menu.Trigger>
-        <Menu.Content>
-          <Menu.Item value="edit" onClick={onEdit}>
-            <Pencil size={14} /> Edit
-          </Menu.Item>
-          <Menu.Item value="archive" onClick={onArchive}>
-            <Archive size={14} /> Archive
-          </Menu.Item>
-        </Menu.Content>
-      </Menu.Root>
+      {canManage && (
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button variant="ghost" size="xs" aria-label="Actions">
+              <MoreVertical size={14} />
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content>
+            <Menu.Item value="edit" onClick={onEdit}>
+              <Pencil size={14} /> Edit
+            </Menu.Item>
+            <Menu.Item value="archive" onClick={onArchive}>
+              <Archive size={14} /> Archive
+            </Menu.Item>
+          </Menu.Content>
+        </Menu.Root>
+      )}
     </HStack>
   );
 }
@@ -355,7 +392,7 @@ function DepartmentRow({
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
 })(
-  withPermissionGuard("organization:manage", {
+  withPermissionGuard("governance:view", {
     bypassOnboardingRedirect: true,
   })(DepartmentsPage),
 );

@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -206,6 +207,22 @@ const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
   http_polling: "*/15 * * * *",
 };
 
+/** The three delivery modes the list groups sources under. */
+const MODE_META = {
+  push: {
+    title: "Push (OTLP / webhooks)",
+    blurb: "Upstream pushes events to LangWatch in near-real-time.",
+  },
+  pull: {
+    title: "Pull (admin API polling)",
+    blurb: "LangWatch polls upstream's admin API on a cadence.",
+  },
+  s3: {
+    title: "S3 audit drops",
+    blurb: "LangWatch reads JSONL drops from an S3 bucket.",
+  },
+} as const;
+
 const blankComposer = (): ComposerState => ({
   sourceType: "otel_generic",
   name: "",
@@ -230,15 +247,17 @@ function fmtRelative(date: Date | string | null): string {
 }
 
 function IngestionSourcesPage() {
-  const { organization } = useOrganizationTeamProject({
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
   const { isEnterprise } = useActivePlan();
+  const canRead = hasAnyPermission("ingestionSources:view");
+  const canManage = hasAnyPermission("ingestionSources:manage");
 
   const sourcesQuery = api.ingestionSources.list.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+    { enabled: !!orgId && canRead, refetchOnWindowFocus: false },
   );
   const utils = api.useUtils();
   const refetch = () =>
@@ -384,30 +403,18 @@ function IngestionSourcesPage() {
             </Text>
           </VStack>
           <Spacer />
-          <VStack align="end" gap={1}>
-            <Button
-              size="sm"
-              colorPalette="blue"
-              disabled={
-                !isEnterprise &&
-                (sourcesQuery.data?.length ?? 0) >=
-                  NON_ENTERPRISE_INGESTION_SOURCE_CAP
-              }
-              onClick={() => {
+          {/* The writes are all `ingestionSources:manage`. A viewer who only
+              reads is not offered a composer the server refuses. */}
+          {canManage && (
+            <AddSourceControl
+              isEnterprise={isEnterprise}
+              sourceCount={sourcesQuery.data?.length ?? 0}
+              onAdd={() => {
                 setComposer(blankComposer());
                 setComposing(true);
               }}
-            >
-              <Plus size={14} /> Add source
-            </Button>
-            {!isEnterprise && (
-              <Text fontSize="xs" color="fg.muted">
-                {sourcesQuery.data?.length ?? 0} /{" "}
-                {NON_ENTERPRISE_INGESTION_SOURCE_CAP} sources used. Upgrade to
-                Enterprise for unlimited.
-              </Text>
-            )}
-          </VStack>
+            />
+          )}
         </HStack>
 
         <SourceComposerDrawer
@@ -423,6 +430,13 @@ function IngestionSourcesPage() {
           }}
         />
 
+        {!canRead && (
+          <PermissionRequiredNotice
+            permission="ingestionSources:view"
+            detail="The source list stays hidden until then."
+          />
+        )}
+
         {sourcesQuery.isLoading && <Spinner size="sm" />}
 
         {/* The list is the page. Without this the three mode sections below
@@ -434,72 +448,73 @@ function IngestionSourcesPage() {
           fallbackTitle="Couldn't load ingestion sources"
         />
 
-        {(["push", "pull", "s3"] as const).map((mode) => (
-          <Box
-            key={mode}
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="md"
-            padding={4}
-          >
-            <HStack alignItems="start" marginBottom={3}>
-              <VStack align="start" gap={0}>
-                <Text fontSize="sm" fontWeight="semibold">
-                  {mode === "push"
-                    ? "Push (OTLP / webhooks)"
-                    : mode === "pull"
-                      ? "Pull (admin API polling)"
-                      : "S3 audit drops"}
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  {mode === "push"
-                    ? "Upstream pushes events to LangWatch in near-real-time."
-                    : mode === "pull"
-                      ? "LangWatch polls upstream's admin API on a cadence."
-                      : "LangWatch reads JSONL drops from an S3 bucket."}
-                </Text>
-              </VStack>
-              <Spacer />
-            </HStack>
-            <VStack align="stretch" gap={2}>
-              {/* "None configured" is a claim about the fleet, and we can
+        {canRead &&
+          (["push", "pull", "s3"] as const).map((mode) => (
+            <Box
+              key={mode}
+              borderWidth="1px"
+              borderColor="border.muted"
+              borderRadius="md"
+              padding={4}
+            >
+              <HStack alignItems="start" marginBottom={3}>
+                <VStack align="start" gap={0}>
+                  <Text fontSize="sm" fontWeight="semibold">
+                    {MODE_META[mode].title}
+                  </Text>
+                  <Text fontSize="xs" color="fg.muted">
+                    {MODE_META[mode].blurb}
+                  </Text>
+                </VStack>
+                <Spacer />
+              </HStack>
+              <VStack align="stretch" gap={2}>
+                {/* "None configured" is a claim about the fleet, and we can
                   only make it when we actually know. The alert above says
                   what went wrong instead. */}
-              {grouped[mode].length === 0 && !sourcesQuery.error && (
-                <Text fontSize="sm" color="fg.muted">
-                  No {mode}-mode sources configured.
-                </Text>
-              )}
-              {grouped[mode].map((source) => (
-                <SourceRow
-                  key={source.id}
-                  source={source}
-                  isPendingRotate={
-                    rotateMutation.isPending &&
-                    rotateMutation.variables?.id === source.id
-                  }
-                  isPendingArchive={
-                    archiveMutation.isPending &&
-                    archiveMutation.variables?.id === source.id
-                  }
-                  onEdit={() => setEditingSourceId(source.id)}
-                  onRotate={() =>
-                    rotateMutation.mutate({
-                      organizationId: orgId,
-                      id: source.id,
-                    })
-                  }
-                  onArchive={() =>
-                    archiveMutation.mutate({
-                      organizationId: orgId,
-                      id: source.id,
-                    })
-                  }
-                />
-              ))}
-            </VStack>
-          </Box>
-        ))}
+                {grouped[mode].length === 0 && !sourcesQuery.error && (
+                  <Text fontSize="sm" color="fg.muted">
+                    No {mode}-mode sources configured.
+                  </Text>
+                )}
+                {grouped[mode].map((source) => (
+                  <SourceRow
+                    key={source.id}
+                    source={source}
+                    isPendingRotate={
+                      rotateMutation.isPending &&
+                      rotateMutation.variables?.id === source.id
+                    }
+                    isPendingArchive={
+                      archiveMutation.isPending &&
+                      archiveMutation.variables?.id === source.id
+                    }
+                    onEdit={() => setEditingSourceId(source.id)}
+                    onRotate={() =>
+                      rotateMutation.mutate({
+                        organizationId: orgId,
+                        id: source.id,
+                      })
+                    }
+                    onArchive={() =>
+                      archiveMutation.mutate({
+                        organizationId: orgId,
+                        id: source.id,
+                      })
+                    }
+                    canManage={canManage}
+                  />
+                ))}
+              </VStack>
+            </Box>
+          ))}
+
+        {canRead && !canManage && (
+          <PermissionRequiredNotice
+            permission="ingestionSources:manage"
+            detail="You can read the sources. Adding, editing, rotating a secret, and archiving need this grant."
+          />
+        )}
       </VStack>
 
       <SecretModal details={secretModal} onClose={() => setSecretModal(null)} />
@@ -519,6 +534,38 @@ function IngestionSourcesPage() {
   );
 }
 
+/** Mounted only for a viewer holding `ingestionSources:manage`. */
+function AddSourceControl({
+  isEnterprise,
+  sourceCount,
+  onAdd,
+}: {
+  isEnterprise: boolean;
+  sourceCount: number;
+  onAdd: () => void;
+}) {
+  return (
+    <VStack align="end" gap={1}>
+      <Button
+        size="sm"
+        colorPalette="blue"
+        disabled={
+          !isEnterprise && sourceCount >= NON_ENTERPRISE_INGESTION_SOURCE_CAP
+        }
+        onClick={onAdd}
+      >
+        <Plus size={14} /> Add source
+      </Button>
+      {!isEnterprise && (
+        <Text fontSize="xs" color="fg.muted">
+          {sourceCount} / {NON_ENTERPRISE_INGESTION_SOURCE_CAP} sources used.
+          Upgrade to Enterprise for unlimited.
+        </Text>
+      )}
+    </VStack>
+  );
+}
+
 function SourceRow({
   source,
   isPendingRotate,
@@ -526,6 +573,7 @@ function SourceRow({
   onEdit,
   onRotate,
   onArchive,
+  canManage,
 }: {
   source: Source;
   isPendingRotate: boolean;
@@ -533,6 +581,7 @@ function SourceRow({
   onEdit: () => void;
   onRotate: () => void;
   onArchive: () => void;
+  canManage: boolean;
 }) {
   const status =
     STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
@@ -581,33 +630,37 @@ function SourceRow({
           </Text>
         </HStack>
       </VStack>
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={onEdit}
-        title="Edit source - name, description, OTTL statements"
-      >
-        <Pencil size={14} /> Edit
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={onRotate}
-        loading={isPendingRotate}
-        title="Mint a new ingestSecret (24h grace on the old one)"
-      >
-        <RotateCw size={14} /> Rotate secret
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        colorPalette="red"
-        onClick={onArchive}
-        loading={isPendingArchive}
-        title="Archive (preserves history)"
-      >
-        <Trash2 size={14} />
-      </Button>
+      {canManage && (
+        <>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onEdit}
+            title="Edit source - name, description, OTTL statements"
+          >
+            <Pencil size={14} /> Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onRotate}
+            loading={isPendingRotate}
+            title="Mint a new ingestSecret (24h grace on the old one)"
+          >
+            <RotateCw size={14} /> Rotate secret
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            colorPalette="red"
+            onClick={onArchive}
+            loading={isPendingArchive}
+            title="Archive (preserves history)"
+          >
+            <Trash2 size={14} />
+          </Button>
+        </>
+      )}
     </HStack>
   );
 }
@@ -1689,7 +1742,7 @@ function SecretModal({
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
 })(
-  withPermissionGuard("organization:manage", {
+  withPermissionGuard("governance:view", {
     bypassOnboardingRedirect: true,
   })(IngestionSourcesPage),
 );
