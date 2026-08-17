@@ -34,6 +34,19 @@ vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {
   };
 });
 
+// Grants and role definitions are ledger commands since ADR-092
+// delivery-plan PR 2, so the writer is the seam these cases observe.
+const ledger = vi.hoisted(() => ({
+  attachBindings: vi.fn(),
+  revokeBindings: vi.fn(),
+  revokeBindingsWhere: vi.fn(),
+  defineRole: vi.fn(),
+  deleteRole: vi.fn(),
+}));
+vi.mock("~/server/app-layer/authz/ledger", () => ({
+  grantsLedgerWriter: () => ledger,
+}));
+
 // Mock the logger
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -44,8 +57,14 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
+/**
+ * One flat client. The service used to open a transaction and re-bind its
+ * repositories to it; grants and role definitions are ledger commands now, so
+ * the remaining table writes are plain calls on the client itself. `_mockTx`
+ * stays as an alias so the cases read the same stubs either way.
+ */
 function createMockPrisma() {
-  const mockTx = {
+  const client = {
     apiKey: {
       create: vi.fn().mockResolvedValue({
         id: "ak_1",
@@ -68,49 +87,25 @@ function createMockPrisma() {
       update: vi.fn(),
     },
     roleBinding: {
-      createMany: vi.fn().mockResolvedValue({ count: 1 }),
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findFirst: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+      // Nothing but this key holds the key's private role.
+      count: vi.fn().mockResolvedValue(0),
     },
+    // The personal-workspace guard reads the scopes a binding names.
+    team: { findFirst: vi.fn().mockResolvedValue(null) },
+    project: { findFirst: vi.fn().mockResolvedValue(null) },
+    teamUser: { count: vi.fn().mockResolvedValue(0) },
     customRole: {
-      create: vi.fn().mockResolvedValue({
-        id: "cr_1",
-        name: "API Key: Test",
-        permissions: ["traces:view"],
-      }),
-      update: vi.fn().mockResolvedValue({
-        id: "cr_1",
-        name: "API Key: Test",
-        permissions: ["traces:view"],
-      }),
       findUnique: vi.fn(),
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       findFirst: vi.fn(),
     },
-  };
-
-  return {
-    $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) =>
-      fn(mockTx),
-    ),
     organizationUser: {
       findFirst: vi.fn().mockResolvedValue({ userId: "user_1" }),
     },
-    apiKey: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn().mockResolvedValue([]),
-      update: vi.fn(),
-    },
-    roleBinding: {
-      findFirst: vi.fn(),
-      createMany: vi.fn(),
-      deleteMany: vi.fn(),
-    },
-    customRole: {
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-    },
-    _mockTx: mockTx,
-  } as any;
+  };
+
+  return { ...client, _mockTx: client } as any;
 }
 
 describe("ApiKeyService", () => {
@@ -119,6 +114,11 @@ describe("ApiKeyService", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    ledger.attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
+    ledger.revokeBindings.mockResolvedValue(undefined);
+    ledger.revokeBindingsWhere.mockResolvedValue(0);
+    ledger.defineRole.mockResolvedValue(undefined);
+    ledger.deleteRole.mockResolvedValue(undefined);
     prisma = createMockPrisma();
     service = ApiKeyService.create(prisma);
   });
@@ -221,17 +221,19 @@ describe("ApiKeyService", () => {
           bindings: [],
         });
 
-        expect(prisma._mockTx.roleBinding.createMany).toHaveBeenCalledWith({
-          data: [
-            expect.objectContaining({
-              organizationId: "org_1",
-              apiKeyId: "ak_svc",
-              role: "ADMIN",
-              scopeType: "ORGANIZATION",
-              scopeId: "org_1",
-            }),
-          ],
-        });
+        expect(ledger.attachBindings).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId: "org_1",
+            bindings: [
+              expect.objectContaining({
+                principal: { apiKeyId: "ak_svc" },
+                role: "ADMIN",
+                scopeType: "ORGANIZATION",
+                scopeId: "org_1",
+              }),
+            ],
+          }),
+        );
       });
     });
   });
@@ -263,7 +265,7 @@ describe("ApiKeyService", () => {
           }),
         ).rejects.toThrow("exceeds your own access");
 
-        expect(prisma._mockTx.customRole.create).not.toHaveBeenCalled();
+        expect(ledger.defineRole).not.toHaveBeenCalled();
 
         (
           checkRoleBindingPermission as ReturnType<typeof vi.fn>
@@ -524,13 +526,10 @@ describe("ApiKeyService", () => {
           organizationId: "org_1",
         });
 
-        expect(prisma._mockTx.customRole.deleteMany).toHaveBeenCalledWith({
-          where: {
-            id: { in: ["cr_1"] },
-            roleBindings: { every: { apiKeyId: "ak_1" } },
-            assignedUsers: { none: {} },
-          },
-        });
+        expect(ledger.deleteRole).toHaveBeenCalledTimes(1);
+        expect(ledger.deleteRole).toHaveBeenCalledWith(
+          expect.objectContaining({ organizationId: "org_1", roleId: "cr_1" }),
+        );
       });
     });
 
@@ -569,18 +568,15 @@ describe("ApiKeyService", () => {
           organizationId: "org_1",
         });
 
-        expect(prisma._mockTx.customRole.deleteMany).toHaveBeenCalledWith({
-          where: {
-            id: { in: ["cr_1"] },
-            roleBindings: { every: { apiKeyId: "ak_1" } },
-            assignedUsers: { none: {} },
-          },
-        });
+        expect(ledger.deleteRole).toHaveBeenCalledTimes(1);
+        expect(ledger.deleteRole).toHaveBeenCalledWith(
+          expect.objectContaining({ organizationId: "org_1", roleId: "cr_1" }),
+        );
       });
     });
 
     describe("when revoking a key with no CustomRole (ADMIN bindings)", () => {
-      it("does not call customRole.deleteMany", async () => {
+      it("deletes no role", async () => {
         const keyWithAdminOnly = {
           ...existingKey,
           roleBindings: [
@@ -607,7 +603,7 @@ describe("ApiKeyService", () => {
           organizationId: "org_1",
         });
 
-        expect(prisma._mockTx.customRole.deleteMany).not.toHaveBeenCalled();
+        expect(ledger.deleteRole).not.toHaveBeenCalled();
       });
     });
   });

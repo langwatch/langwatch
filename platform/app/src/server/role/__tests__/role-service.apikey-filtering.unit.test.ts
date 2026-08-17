@@ -2,6 +2,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RoleNotFoundError, RoleReservedNameError } from "../errors";
 import { RoleService } from "../role.service";
 
+// A role definition is a ledger command since ADR-092 delivery-plan PR 2.
+const ledger = vi.hoisted(() => ({
+  attachBindings: vi.fn(),
+  revokeBindings: vi.fn(),
+  revokeBindingsWhere: vi.fn(),
+  defineRole: vi.fn(),
+  deleteRole: vi.fn(),
+}));
+vi.mock("~/server/app-layer/authz/ledger", () => ({
+  grantsLedgerWriter: () => ledger,
+}));
+
 function buildMockPrisma() {
   return {
     customRole: {
@@ -82,7 +94,11 @@ describe("RoleService", () => {
         });
 
         await expect(
-          service.updateRole("cr_1", { name: "hijacked" }),
+          service.updateRole(
+            "cr_1",
+            { name: "hijacked" },
+            { actor: { type: "user" as const, id: "actor_1" } },
+          ),
         ).rejects.toThrow(RoleNotFoundError);
 
         expect(prisma.customRole.update).not.toHaveBeenCalled();
@@ -92,7 +108,11 @@ describe("RoleService", () => {
     describe("when renaming to reserved prefix", () => {
       it("throws RoleReservedNameError", async () => {
         await expect(
-          service.updateRole("cr_1", { name: "apikey:sneaky" }),
+          service.updateRole(
+            "cr_1",
+            { name: "apikey:sneaky" },
+            { actor: { type: "user" as const, id: "actor_1" } },
+          ),
         ).rejects.toThrow(RoleReservedNameError);
       });
     });
@@ -109,9 +129,11 @@ describe("RoleService", () => {
           assignedUsers: [],
         });
 
-        await expect(service.deleteRole("cr_1")).rejects.toThrow(
-          RoleNotFoundError,
-        );
+        await expect(
+          service.deleteRole("cr_1", {
+            actor: { type: "user" as const, id: "actor_1" },
+          }),
+        ).rejects.toThrow(RoleNotFoundError);
 
         expect(prisma.customRole.delete).not.toHaveBeenCalled();
       });
@@ -130,7 +152,9 @@ describe("RoleService", () => {
         });
 
         await expect(
-          service.assignRoleToUser("user_1", "team_1", "cr_1"),
+          service.assignRoleToUser("user_1", "team_1", "cr_1", {
+            actor: { type: "user" as const, id: "actor_1" },
+          }),
         ).rejects.toThrow(RoleNotFoundError);
       });
     });
@@ -140,14 +164,17 @@ describe("RoleService", () => {
     describe("when name uses reserved apikey: prefix", () => {
       it("rejects before any persistence", async () => {
         await expect(
-          service.createRole({
-            organizationId: "org_1",
-            name: "apikey:sneaky",
-            permissions: ["traces:view"],
-          }),
+          service.createRole(
+            {
+              organizationId: "org_1",
+              name: "apikey:sneaky",
+              permissions: ["traces:view"],
+            },
+            { actor: { type: "user", id: "actor_1" } },
+          ),
         ).rejects.toThrow(RoleReservedNameError);
 
-        expect(prisma.customRole.create).not.toHaveBeenCalled();
+        expect(ledger.defineRole).not.toHaveBeenCalled();
       });
     });
   });

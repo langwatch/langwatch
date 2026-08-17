@@ -71,12 +71,15 @@ export const roleRouter = createTRPCRouter({
       });
 
       const roleService = new RoleService(ctx.prisma);
-      return await roleService.createRole({
-        organizationId: input.organizationId,
-        name: input.name,
-        description: input.description,
-        permissions: input.permissions,
-      });
+      return await roleService.createRole(
+        {
+          organizationId: input.organizationId,
+          name: input.name,
+          description: input.description,
+          permissions: input.permissions,
+        },
+        { actor: { type: "user", id: ctx.session.user.id } },
+      );
     }),
 
   update: protectedProcedure
@@ -115,11 +118,15 @@ export const roleRouter = createTRPCRouter({
     })
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
-      return await roleService.updateRole(input.roleId, {
-        name: input.name,
-        description: input.description,
-        permissions: input.permissions,
-      });
+      return await roleService.updateRole(
+        input.roleId,
+        {
+          name: input.name,
+          description: input.description,
+          permissions: input.permissions,
+        },
+        { actor: { type: "user", id: ctx.session.user.id } },
+      );
     }),
 
   delete: protectedProcedure
@@ -145,7 +152,9 @@ export const roleRouter = createTRPCRouter({
     })
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
-      return await roleService.deleteRole(input.roleId);
+      return await roleService.deleteRole(input.roleId, {
+        actor: { type: "user", id: ctx.session.user.id },
+      });
     }),
 
   assignToUser: protectedProcedure
@@ -192,6 +201,7 @@ export const roleRouter = createTRPCRouter({
         input.userId,
         input.teamId,
         input.customRoleId,
+        { actor: { type: "user", id: ctx.session.user.id } },
       );
     }),
 
@@ -206,6 +216,8 @@ export const roleRouter = createTRPCRouter({
     .use(checkTeamPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
-      return await roleService.removeRoleFromUser(input.userId, input.teamId);
+      return await roleService.removeRoleFromUser(input.userId, input.teamId, {
+        actor: { type: "user", id: ctx.session.user.id },
+      });
     }),
 });

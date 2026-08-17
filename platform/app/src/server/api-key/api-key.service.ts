@@ -3,6 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import type { ApiKey, PrismaClient } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
+import type { LedgerActor } from "~/server/app-layer/authz/ledger";
 import {
   MalformedCustomRolePermissionsError,
   parseCustomRolePermissions,
@@ -99,6 +100,16 @@ type CreatorScope =
  * does not have to know that indirection exists.
  */
 export type ApiKeyDetail = ApiKeyWithBindings & { permissions: string[] };
+
+/**
+ * Who a credential change is attributed to in the grants ledger. A key minted
+ * or retired by the product itself acts as nobody, so the service is named as
+ * the system principal rather than inventing a user.
+ */
+const ledgerActorFor = (userId: string | null | undefined): LedgerActor =>
+  userId
+    ? { type: "user", id: userId }
+    : { type: "system", id: "system:api-key-service" };
 
 export class ApiKeyService {
   private readonly repo: ApiKeyRepository;
@@ -253,68 +264,72 @@ export class ApiKeyService {
       ingestSourceType ? { prefix: INGEST_KEY_PREFIX } : undefined,
     );
 
-    const apiKey = await this.prisma.$transaction(async (tx) => {
-      const txRepo = ApiKeyRepository.create(tx);
-      const txRoleRepo = new RoleRepository(tx);
-
-      if (userId) {
-        await this.assertBindingsWithinCeiling({
-          prisma: tx as unknown as PrismaClient,
-          ceilingUserId: userId,
-          organizationId,
-          bindings,
-          rawPermissions: sortedPermissions,
-        });
-      }
-
-      const created = await txRepo.create({
-        name,
-        description,
-        lookupId,
-        hashedSecret,
-        permissionMode,
-        userId,
-        createdByUserId,
+    // Everything the request can be refused over is decided before anything
+    // is written: the key's own row is a plain insert, and its private role
+    // and grants are ledger commands, so there is no transaction left to roll
+    // a late refusal back with.
+    if (userId) {
+      await this.assertBindingsWithinCeiling({
+        prisma: this.prisma,
+        ceilingUserId: userId,
         organizationId,
-        expiresAt,
-        ingestSourceType,
-        ingestionTemplateId,
-        createdByDeviceLabel,
+        bindings,
+        rawPermissions: sortedPermissions,
       });
+    }
+    if (effectiveBindings.length > 0) {
+      // A key may reach a personal workspace only as its owner's own
+      // credential, whose ceiling already caps it. A service key or a key
+      // owned by anyone else binding in would hand the private workspace to
+      // a second principal.
+      await assertPersonalTeamScopesOwnedBy({
+        client: this.prisma,
+        scopes: effectiveBindings,
+        ownerUserId: userId ?? null,
+      });
+    }
 
-      if (sortedPermissions) {
-        const customRole = await txRoleRepo.create({
-          name: `apikey:${created.id}`,
+    const actor = ledgerActorFor(createdByUserId ?? userId);
+    const apiKey = await this.repo.create({
+      name,
+      description,
+      lookupId,
+      hashedSecret,
+      permissionMode,
+      userId,
+      createdByUserId,
+      organizationId,
+      expiresAt,
+      ingestSourceType,
+      ingestionTemplateId,
+      createdByDeviceLabel,
+    });
+
+    if (sortedPermissions) {
+      const customRole = await this.roleRepo.create(
+        {
+          name: `apikey:${apiKey.id}`,
           organizationId,
           permissions: sortedPermissions,
           kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
-        });
-        effectiveBindings = effectiveBindings.map((b) =>
-          b.role === TeamUserRole.CUSTOM
-            ? { ...b, customRoleId: customRole.id }
-            : b,
-        );
-      }
+        },
+        { actor },
+      );
+      effectiveBindings = effectiveBindings.map((b) =>
+        b.role === TeamUserRole.CUSTOM
+          ? { ...b, customRoleId: customRole.id }
+          : b,
+      );
+    }
 
-      if (effectiveBindings.length > 0) {
-        // A key may reach a personal workspace only as its owner's own
-        // credential, whose ceiling already caps it. A service key or a key
-        // owned by anyone else binding in would hand the private workspace to
-        // a second principal.
-        await assertPersonalTeamScopesOwnedBy({
-          client: tx,
-          scopes: effectiveBindings,
-          ownerUserId: userId ?? null,
-        });
-        await txRepo.createRoleBindings({
-          apiKeyId: created.id,
-          organizationId,
-          bindings: effectiveBindings,
-        });
-      }
-
-      return created;
-    });
+    if (effectiveBindings.length > 0) {
+      await this.repo.createRoleBindings({
+        apiKeyId: apiKey.id,
+        organizationId,
+        bindings: effectiveBindings,
+        actor,
+      });
+    }
 
     return { token, apiKey };
   }
@@ -422,99 +437,106 @@ export class ApiKeyService {
       ),
     ];
 
-    return this.prisma.$transaction(async (tx) => {
-      const txRepo = ApiKeyRepository.create(tx);
-      const txRoleRepo = new RoleRepository(tx);
+    const actor = ledgerActorFor(callerUserId);
 
-      if (bindings && existing.userId) {
-        await this.assertBindingsWithinCeiling({
-          prisma: tx as unknown as PrismaClient,
-          ceilingUserId: existing.userId,
-          organizationId,
-          bindings,
-          rawPermissions: sortedPermissions,
-        });
-      }
+    if (bindings && existing.userId) {
+      await this.assertBindingsWithinCeiling({
+        prisma: this.prisma,
+        ceilingUserId: existing.userId,
+        organizationId,
+        bindings,
+        rawPermissions: sortedPermissions,
+      });
+    }
+    if (bindings) {
+      // Same personal-workspace line as create(): replacement bindings may
+      // reach a personal workspace only when this key acts as its owner.
+      await assertPersonalTeamScopesOwnedBy({
+        client: this.prisma,
+        scopes: bindings,
+        ownerUserId: existing.userId,
+      });
+    }
 
-      let effectiveBindings = bindings;
+    let effectiveBindings = bindings;
 
-      if (sortedPermissions && effectiveBindings) {
-        const existingCustomRoleId = existing.roleBindings.find(
-          (rb) => rb.customRoleId !== null,
-        )?.customRoleId;
+    if (sortedPermissions && effectiveBindings) {
+      const existingCustomRoleId = existing.roleBindings.find(
+        (rb) => rb.customRoleId !== null,
+      )?.customRoleId;
 
-        const canReuse = existingCustomRoleId
-          ? await txRoleRepo.isExclusiveToApiKey({
-              roleId: existingCustomRoleId,
-              apiKeyId: id,
-            })
-          : false;
+      const canReuse = existingCustomRoleId
+        ? await this.roleRepo.isExclusiveToApiKey({
+            roleId: existingCustomRoleId,
+            apiKeyId: id,
+          })
+        : false;
 
-        let customRole;
-        if (canReuse && existingCustomRoleId) {
-          customRole = await txRoleRepo.update(existingCustomRoleId, {
-            permissions: sortedPermissions,
-          });
-        } else {
-          customRole = await txRoleRepo.create({
+      let customRole;
+      if (canReuse && existingCustomRoleId) {
+        customRole = await this.roleRepo.update(
+          existingCustomRoleId,
+          { permissions: sortedPermissions },
+          { actor },
+        );
+      } else {
+        customRole = await this.roleRepo.create(
+          {
             name: `apikey:${id}:${generate(KSUID_RESOURCES.API_KEY_ROLE).toString()}`,
             organizationId,
             permissions: sortedPermissions,
             kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
-          });
-        }
-        effectiveBindings = effectiveBindings.map((b) =>
-          b.role === TeamUserRole.CUSTOM
-            ? { ...b, customRoleId: customRole.id }
-            : b,
+          },
+          { actor },
         );
       }
+      effectiveBindings = effectiveBindings.map((b) =>
+        b.role === TeamUserRole.CUSTOM
+          ? { ...b, customRoleId: customRole.id }
+          : b,
+      );
+    }
 
-      await txRepo.update({
-        id,
-        name,
-        description,
-        permissionMode,
+    await this.repo.update({
+      id,
+      name,
+      description,
+      permissionMode,
+    });
+
+    if (effectiveBindings) {
+      await this.repo.replaceRoleBindings({
+        apiKeyId: id,
+        organizationId,
+        bindings: effectiveBindings,
+        actor,
       });
 
-      if (effectiveBindings) {
-        // Same personal-workspace line as create(): replacement bindings may
-        // reach a personal workspace only when this key acts as its owner.
-        await assertPersonalTeamScopesOwnedBy({
-          client: tx,
-          scopes: effectiveBindings,
-          ownerUserId: existing.userId,
-        });
-        await txRepo.replaceRoleBindings({
+      const newCustomRoleIds = new Set(
+        effectiveBindings
+          .filter(
+            (b): b is Extract<RoleBindingInput, { role: "CUSTOM" }> =>
+              b.role === "CUSTOM",
+          )
+          .map((b) => b.customRoleId)
+          .filter((cid): cid is string => !!cid),
+      );
+      const orphanedRoleIds = oldCustomRoleIds.filter(
+        (roleId) => !newCustomRoleIds.has(roleId),
+      );
+      if (orphanedRoleIds.length > 0) {
+        await this.roleRepo.deleteExclusiveToApiKey({
+          roleIds: orphanedRoleIds,
           apiKeyId: id,
           organizationId,
-          bindings: effectiveBindings,
+          actor,
         });
-
-        const newCustomRoleIds = new Set(
-          effectiveBindings
-            .filter(
-              (b): b is Extract<RoleBindingInput, { role: "CUSTOM" }> =>
-                b.role === "CUSTOM",
-            )
-            .map((b) => b.customRoleId)
-            .filter((cid): cid is string => !!cid),
-        );
-        const orphanedRoleIds = oldCustomRoleIds.filter(
-          (roleId) => !newCustomRoleIds.has(roleId),
-        );
-        if (orphanedRoleIds.length > 0) {
-          await txRoleRepo.deleteExclusiveToApiKey({
-            roleIds: orphanedRoleIds,
-            apiKeyId: id,
-          });
-        }
       }
+    }
 
-      const updated = await txRepo.findById({ id });
-      if (!updated) throw new ApiKeyNotFoundError(id);
-      return updated;
-    });
+    const updated = await this.repo.findById({ id });
+    if (!updated) throw new ApiKeyNotFoundError(id);
+    return updated;
   }
 
   /**
@@ -944,30 +966,27 @@ export class ApiKeyService {
     }
     if (apiKey.revokedAt) throw new ApiKeyAlreadyRevokedError(id);
 
-    return this.prisma.$transaction(async (tx) => {
-      const txRepo = ApiKeyRepository.create(tx);
-      const txRoleRepo = new RoleRepository(tx);
+    const fresh = await this.repo.findById({ id });
+    const customRoleIds = [
+      ...new Set(
+        (fresh?.roleBindings ?? [])
+          .map((rb) => rb.customRoleId)
+          .filter((cid): cid is string => cid !== null),
+      ),
+    ];
 
-      const fresh = await txRepo.findById({ id });
-      const customRoleIds = [
-        ...new Set(
-          (fresh?.roleBindings ?? [])
-            .map((rb) => rb.customRoleId)
-            .filter((cid): cid is string => cid !== null),
-        ),
-      ];
+    const result = await this.repo.revoke({ id });
 
-      const result = await txRepo.revoke({ id });
+    if (customRoleIds.length > 0) {
+      await this.roleRepo.deleteExclusiveToApiKey({
+        roleIds: customRoleIds,
+        apiKeyId: id,
+        organizationId,
+        actor: ledgerActorFor(callerUserId),
+      });
+    }
 
-      if (customRoleIds.length > 0) {
-        await txRoleRepo.deleteExclusiveToApiKey({
-          roleIds: customRoleIds,
-          apiKeyId: id,
-        });
-      }
-
-      return result;
-    });
+    return result;
   }
 
   /**

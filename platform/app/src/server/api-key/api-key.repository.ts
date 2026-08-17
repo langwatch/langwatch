@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import type {
   ApiKey,
   Prisma,
@@ -5,7 +6,21 @@ import type {
   RoleBinding,
 } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
+import {
+  type GrantsLedgerWriter,
+  grantsLedgerWriter,
+  type LedgerActor,
+} from "~/server/app-layer/authz/ledger";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
+
+/** The grants an API key carries, as the request states them. */
+export type ApiKeyBindingInput = {
+  role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+  customRoleId?: string | null;
+  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId: string;
+};
 
 export type ApiKeyWithBindings = ApiKey & {
   roleBindings: RoleBinding[];
@@ -20,7 +35,15 @@ export type ApiKeyWithBindings = ApiKey & {
 export type ApiKeyPrismaDelegate = PrismaClient | Prisma.TransactionClient;
 
 export class ApiKeyRepository {
-  constructor(private readonly prisma: ApiKeyPrismaDelegate) {}
+  constructor(
+    private readonly prisma: ApiKeyPrismaDelegate,
+    /**
+     * A key's grants are ledger facts since ADR-092 delivery-plan PR 2. The
+     * writer never rides the caller's transaction, so it is composed over the
+     * app's own client rather than `prisma` above, which may be one.
+     */
+    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
+  ) {}
 
   static create(prisma: ApiKeyPrismaDelegate): ApiKeyRepository {
     return new ApiKeyRepository(prisma);
@@ -319,38 +342,32 @@ export class ApiKeyRepository {
   }
 
   /**
-   * Replaces all role bindings for an API key. Deletes existing ones first,
-   * then creates the new set — all within the caller's transaction.
+   * Replaces all grants on an API key: revoke what it holds, then attach the
+   * set the caller asked for. Revoke first, so a crash between the two leaves
+   * the credential with less access than asked for, never more.
    */
   async replaceRoleBindings({
     apiKeyId,
     organizationId,
     bindings,
+    actor,
   }: {
     apiKeyId: string;
     organizationId: string;
-    bindings: Array<{
-      role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-      customRoleId?: string | null;
-      scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-      scopeId: string;
-    }>;
+    bindings: ApiKeyBindingInput[];
+    actor: LedgerActor;
   }): Promise<{ count: number }> {
-    await this.prisma.roleBinding.deleteMany({
+    await this.writer.revokeBindingsWhere({
+      organizationId,
       where: { apiKeyId },
+      actor,
+      reason: "api key grants replaced",
     });
-
-    if (bindings.length === 0) return { count: 0 };
-
-    return this.prisma.roleBinding.createMany({
-      data: bindings.map((b) => ({
-        organizationId,
-        apiKeyId,
-        role: b.role,
-        customRoleId: b.role === "CUSTOM" ? (b.customRoleId ?? null) : null,
-        scopeType: b.scopeType,
-        scopeId: b.scopeId,
-      })),
+    return this.createRoleBindings({
+      apiKeyId,
+      organizationId,
+      bindings,
+      actor,
     });
   }
 
@@ -513,34 +530,33 @@ export class ApiKeyRepository {
     }));
   }
 
-  /**
-   * Inserts all role bindings for an API key in a single query.
-   */
+  /** Attaches all of an API key's grants as one command. */
   async createRoleBindings({
     apiKeyId,
     organizationId,
     bindings,
+    actor,
   }: {
     apiKeyId: string;
     organizationId: string;
-    bindings: Array<{
-      role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-      customRoleId?: string | null;
-      scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-      scopeId: string;
-    }>;
+    bindings: ApiKeyBindingInput[];
+    actor: LedgerActor;
   }): Promise<{ count: number }> {
     if (bindings.length === 0) return { count: 0 };
 
-    return this.prisma.roleBinding.createMany({
-      data: bindings.map((b) => ({
-        organizationId,
-        apiKeyId,
+    const outcome = await this.writer.attachBindings({
+      organizationId,
+      bindings: bindings.map((b) => ({
+        bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        principal: { apiKeyId },
         role: b.role,
         customRoleId: b.role === "CUSTOM" ? (b.customRoleId ?? null) : null,
         scopeType: b.scopeType,
         scopeId: b.scopeId,
       })),
+      actor,
+      onDuplicate: "skip",
     });
+    return { count: outcome.attached.length };
   }
 }

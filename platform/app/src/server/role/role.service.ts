@@ -1,9 +1,10 @@
 import {
-  Prisma,
+  type Prisma,
   type PrismaClient,
   RoleBindingScopeType,
 } from "~/generated/prisma/client";
 import { isOrgExclusivePermission, type Permission } from "~/server/api/rbac";
+import type { LedgerActor } from "~/server/app-layer/authz/ledger";
 import { OrgExclusivePermissionScopeError } from "~/server/role-bindings/errors";
 import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
 import {
@@ -92,10 +93,12 @@ export class RoleService {
     roleId,
     organizationId,
     params,
+    actor,
   }: {
     roleId: string;
     organizationId: string;
     params: UpdateRoleParams;
+    actor: LedgerActor;
   }) {
     if (params.name?.startsWith("apikey:")) {
       throw new RoleReservedNameError();
@@ -119,36 +122,12 @@ export class RoleService {
       }
     }
 
-    const updated = await this.updateRoleRow(roleId, params);
+    const updated = await this.repository.update(roleId, params, { actor });
 
     return {
       ...updated,
       permissions: updated.permissions as string[],
     };
-  }
-
-  /**
-   * The update itself, with the `(organizationId, name)` unique index as the
-   * backstop the pre-check cannot be: two concurrent renames to one name both
-   * pass the read, and the loser must still get the deterministic refusal
-   * rather than a raw constraint failure.
-   */
-  private async updateRoleRow(roleId: string, params: UpdateRoleParams) {
-    try {
-      return await this.repository.update(roleId, params);
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002" &&
-        // Narrowed to the name index the docstring names, so a future
-        // constraint on CustomRole does not report an unrelated conflict as
-        // "a role with this name already exists".
-        String(error.meta?.target ?? "").includes("name")
-      ) {
-        throw new RoleDuplicateNameError();
-      }
-      throw error;
-    }
   }
 
   /**
@@ -199,13 +178,16 @@ export class RoleService {
   private async deleteRoleRow({
     roleId,
     organizationId,
+    actor,
   }: {
     roleId: string;
     organizationId: string;
+    actor: LedgerActor;
   }) {
     const deleted = await this.repository.deleteIfUnused({
       roleId,
       organizationId,
+      actor,
     });
     if (deleted) return;
 
@@ -227,9 +209,11 @@ export class RoleService {
   async deleteRoleForOrg({
     roleId,
     organizationId,
+    actor,
   }: {
     roleId: string;
     organizationId: string;
+    actor: LedgerActor;
   }) {
     const role = await this.repository.findByIdWithUsersInOrg({
       roleId,
@@ -240,7 +224,7 @@ export class RoleService {
     }
 
     await this.assertRoleNotInUse(role);
-    await this.deleteRoleRow({ roleId, organizationId });
+    await this.deleteRoleRow({ roleId, organizationId, actor });
 
     return { success: true };
   }
@@ -251,7 +235,10 @@ export class RoleService {
     return { ...role, permissions: role.permissions as string[] };
   }
 
-  async createRole(params: CreateRoleParams) {
+  async createRole(
+    params: CreateRoleParams,
+    { actor }: { actor: LedgerActor },
+  ) {
     if (params.name.startsWith("apikey:")) {
       throw new RoleReservedNameError();
     }
@@ -265,7 +252,7 @@ export class RoleService {
       throw new RoleDuplicateNameError();
     }
 
-    const role = await this.repository.create(params);
+    const role = await this.repository.create(params, { actor });
 
     return {
       ...role,
@@ -273,7 +260,11 @@ export class RoleService {
     };
   }
 
-  async updateRole(roleId: string, params: UpdateRoleParams) {
+  async updateRole(
+    roleId: string,
+    params: UpdateRoleParams,
+    { actor }: { actor: LedgerActor },
+  ) {
     if (params.name?.startsWith("apikey:")) {
       throw new RoleReservedNameError();
     }
@@ -283,7 +274,7 @@ export class RoleService {
       throw new RoleNotFoundError(roleId);
     }
 
-    const updated = await this.updateRoleRow(roleId, params);
+    const updated = await this.repository.update(roleId, params, { actor });
 
     return {
       ...updated,
@@ -291,7 +282,7 @@ export class RoleService {
     };
   }
 
-  async deleteRole(roleId: string) {
+  async deleteRole(roleId: string, { actor }: { actor: LedgerActor }) {
     const role = await this.repository.findByIdWithUsers(roleId);
 
     if (!role || role.kind !== CUSTOM_ROLE_KIND.CUSTOM) {
@@ -302,12 +293,18 @@ export class RoleService {
     await this.deleteRoleRow({
       roleId,
       organizationId: role.organizationId,
+      actor,
     });
 
     return { success: true };
   }
 
-  async assignRoleToUser(userId: string, teamId: string, customRoleId: string) {
+  async assignRoleToUser(
+    userId: string,
+    teamId: string,
+    customRoleId: string,
+    { actor }: { actor: LedgerActor },
+  ) {
     const [customRole, team] = await Promise.all([
       this.repository.findById(customRoleId),
       this.repository.findTeamById(teamId),
@@ -339,17 +336,21 @@ export class RoleService {
       client: this.prisma,
       scopes: [{ scopeType: RoleBindingScopeType.TEAM, scopeId: teamId }],
     });
-    await this.repository.assignToUser(userId, teamId, customRoleId);
+    await this.repository.assignToUser(userId, teamId, customRoleId, { actor });
 
     return { success: true };
   }
 
-  async removeRoleFromUser(userId: string, teamId: string) {
+  async removeRoleFromUser(
+    userId: string,
+    teamId: string,
+    { actor }: { actor: LedgerActor },
+  ) {
     await assertNoPersonalTeamScope({
       client: this.prisma,
       scopes: [{ scopeType: RoleBindingScopeType.TEAM, scopeId: teamId }],
     });
-    await this.repository.removeFromUser(userId, teamId);
+    await this.repository.removeFromUser(userId, teamId, { actor });
     return { success: true };
   }
 

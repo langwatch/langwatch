@@ -11,12 +11,17 @@
  * resource with its actions, annotated with whether the resource only takes
  * effect at organization scope (ADR-021): the write-time refusal the role
  * bindings API enforces for those.
+ *
+ * Every write here is a grants-ledger command (ADR-092 delivery-plan PR 2),
+ * so the audit trail is the pipeline's insert-only subscriber (decision 17):
+ * these handlers no longer emit `management.role.*` rows of their own,
+ * because that would record the same mutation twice.
  */
 import type { BaseApp, VersionBuilder } from "@langwatch/api";
 import type { Context } from "hono";
 import { z } from "zod";
+import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 import type { CustomRole, Organization } from "~/generated/prisma/client";
-import { emitManagementAudit } from "~/server/api/management/audit";
 import { createManagementService } from "~/server/api/management/managed-service";
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
 import {
@@ -115,18 +120,15 @@ const createRoleHandler = async (
   }: { input: z.infer<typeof createRoleSchema>; app: RolesFamilyApp },
 ) => {
   const organization = organizationOf(c);
-  const role = await app.roles.createRole({
-    organizationId: organization.id,
-    name: input.name,
-    description: input.description ?? null,
-    permissions: input.permissions,
-  });
-  emitManagementAudit({
-    c,
-    organizationId: organization.id,
-    action: "management.role.create",
-    args: { roleId: role.id, name: role.name },
-  });
+  const role = await app.roles.createRole(
+    {
+      organizationId: organization.id,
+      name: input.name,
+      description: input.description ?? null,
+      permissions: input.permissions,
+    },
+    { actor: orgRequestLedgerActor(c) },
+  );
   return roleWire(role);
 };
 
@@ -184,12 +186,7 @@ const updateRoleHandler = async (
         ? { permissions: input.permissions }
         : {}),
     },
-  });
-  emitManagementAudit({
-    c,
-    organizationId: organization.id,
-    action: "management.role.update",
-    args: { roleId: params.id, fields: Object.keys(input) },
+    actor: orgRequestLedgerActor(c),
   });
   return roleWire(role);
 };
@@ -205,12 +202,7 @@ const deleteRoleHandler = async (
   await app.roles.deleteRoleForOrg({
     roleId: params.id,
     organizationId: organization.id,
-  });
-  emitManagementAudit({
-    c,
-    organizationId: organization.id,
-    action: "management.role.delete",
-    args: { roleId: params.id },
+    actor: orgRequestLedgerActor(c),
   });
   return { success: true as const };
 };

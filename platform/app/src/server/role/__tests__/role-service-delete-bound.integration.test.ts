@@ -90,9 +90,11 @@ describe("RoleService.deleteRole, given a role referenced by role bindings", () 
   it("refuses the delete and keeps the role", async () => {
     const service = new RoleService(prisma);
 
-    await expect(service.deleteRole(boundRoleId)).rejects.toBeInstanceOf(
-      RoleInUseError,
-    );
+    await expect(
+      service.deleteRole(boundRoleId, {
+        actor: { type: "user" as const, id: "actor_1" },
+      }),
+    ).rejects.toBeInstanceOf(RoleInUseError);
 
     const survivor = await prisma.customRole.findUnique({
       where: { id: boundRoleId },
@@ -196,7 +198,11 @@ describe("RoleService.deleteRole, given a role referenced by role bindings", () 
     });
 
     const service = new RoleService(prisma);
-    await expect(service.deleteRole(unboundRole.id)).resolves.toEqual({
+    await expect(
+      service.deleteRole(unboundRole.id, {
+        actor: { type: "user" as const, id: "actor_1" },
+      }),
+    ).resolves.toEqual({
       success: true,
     });
   });
