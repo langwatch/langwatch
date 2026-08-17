@@ -28,7 +28,7 @@
  * file this run did not execute, which is exactly what a developer running one
  * lane locally would do.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Reporter, TestModule } from "vitest/node";
 
@@ -109,17 +109,5 @@ export default class DurationManifestReporter implements Reporter {
     // manifest — see the note at the top of this file.
     const delta = mergeDurations({ existing: {}, measured: this.measured });
     writeFileSync(this.manifestPath, `${JSON.stringify(delta, null, 2)}\n`);
-  }
-}
-
-/**
- * Read a manifest as text, for callers that want to compare two revisions of it
- * rather than use it as weights.
- */
-export function readManifestText(manifestPath: string): string {
-  try {
-    return readFileSync(manifestPath, "utf8");
-  } catch {
-    return "";
   }
 }

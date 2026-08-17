@@ -36,19 +36,24 @@ Feature: A screen fetches a drawer's code before the person opens it
       When it is opened
       Then it renders at once
 
-    # Settling that record means waiting on the promise the drawer throws while
-    # it is still loading. Asking whether that value is a promise by its REALM
-    # rather than by its behaviour is the way to get this wrong: a promise made
-    # in another realm is a perfectly good promise that fails an `instanceof`
-    # check, and the warm-up then reports itself finished without having waited.
-    # A browser has one realm, so the mistake is invisible there and shows up
-    # only where code runs in more than one — which is why this is pinned.
+    # A drawer that is not ready yet says so by handing back something that
+    # finishes later. The warm-up has to wait for that, and it has to wait
+    # whatever shape the drawer's answer arrives in — a warm-up that decides it
+    # is finished while the code is still downloading has warmed nothing, and
+    # the drawer shows its spinner exactly as it did before.
     @unit
-    Scenario: A warm-up waits on a promise made in another realm
-      Given a drawer that is still loading
-      And it reports itself pending with a promise from another realm
+    Scenario: A warm-up finishes only once the drawer's code is ready
+      Given a drawer whose code is still downloading
       When the drawer is warmed
-      Then the warm-up waits for that promise before reporting itself finished
+      Then the warm-up is unfinished while the code is still on its way
+      And it finishes once the code has arrived
+      And it finishes rather than failing if the code never arrives
+
+    @unit
+    Scenario: A warm-up for a drawer with nothing to fetch finishes at once
+      Given a drawer with no separate code to download
+      When the drawer is warmed
+      Then the warm-up finishes without waiting
 
     # The data the person waits for comes first. A warm-up that starts with the
     # screen's own queries competes with them and makes the visible wait longer.

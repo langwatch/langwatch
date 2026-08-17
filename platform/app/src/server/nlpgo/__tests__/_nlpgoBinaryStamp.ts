@@ -22,7 +22,13 @@ import path from "node:path";
 
 /** Files whose bytes the Go build reads. Anything else cannot change output. */
 function isBuildInput(name: string): boolean {
-  return name.endsWith(".go") || name === "go.mod" || name === "go.sum";
+  return (
+    name.endsWith(".go") ||
+    name === "go.mod" ||
+    name === "go.sum" ||
+    name === "go.work" ||
+    name === "go.work.sum"
+  );
 }
 
 /**
@@ -69,15 +75,27 @@ function collectBuildInputs(dir: string, root: string): string[] {
  */
 export function digestGoSources({
   watchDirs,
+  watchFiles = [],
   root,
 }: {
   watchDirs: string[];
+  /**
+   * Individual files outside any watched tree — the module and workspace files
+   * at the repo root. They are build inputs every bit as much as the sources: a
+   * dependency bump, a `replace` retarget or a `go.work` edit changes what
+   * compiles without touching a single .go file under the trees below.
+   */
+  watchFiles?: string[];
   root: string;
 }): string {
-  const files = watchDirs
-    .filter((dir) => fs.existsSync(dir))
-    .flatMap((dir) => collectBuildInputs(dir, root))
-    .sort();
+  const files = [
+    ...watchDirs
+      .filter((dir) => fs.existsSync(dir))
+      .flatMap((dir) => collectBuildInputs(dir, root)),
+    ...watchFiles
+      .filter((file) => fs.existsSync(file))
+      .map((file) => path.relative(root, file)),
+  ].sort();
 
   const digest = createHash("sha256");
   for (const relative of files) {

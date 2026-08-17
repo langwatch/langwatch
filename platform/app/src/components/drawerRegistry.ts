@@ -378,7 +378,7 @@ export function preloadDrawer(type: DrawerType): Promise<void> {
  * fails remembers the failure for the life of the page, which would turn a
  * warm-up that lost the network into a drawer that can never open.
  */
-function primeLazyComponent(component: object): Promise<void> {
+export function primeLazyComponent(component: object): Promise<void> {
   const wrapper = component as {
     _init?: (payload: unknown) => unknown;
     _payload?: unknown;
