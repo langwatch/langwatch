@@ -690,6 +690,19 @@ describe("process ops against a real Postgres", () => {
       });
       expect(audit?.projectId).toBeNull();
       expect(audit?.metadata).toMatchObject({ redriven: 2, scope: nsBulkA });
+
+      // Due times are spread, not stacked on one instant: a fleet redrive
+      // that made every message due simultaneously would hand the dispatcher
+      // one batch the size of the backlog.
+      const redriven = await prisma.processManagerOutbox.findMany({
+        where: { id: { in: [a1, a2] }, projectId: PROJECT },
+        select: { nextAttemptAt: true },
+      });
+      const dueTimes = redriven.map((row) => row.nextAttemptAt.getTime());
+      for (const due of dueTimes) {
+        expect(due).toBeGreaterThanOrEqual(NOW - 1_000);
+        expect(due).toBeLessThanOrEqual(NOW + 61_000);
+      }
     });
 
     /** @scenario Every dead letter shown can be discarded in one act */

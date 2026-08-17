@@ -330,9 +330,10 @@ export class ManagerExplorerService {
   }
 
   /**
-   * Every dead letter back to pending — one process name, or the whole
-   * fleet when omitted. The audit row records a fleet pseudo-ref; the count
-   * is the blast radius.
+   * Dead letters back to pending — one process name, or every process when
+   * omitted. Bounded per call by the repository, so the returned count is
+   * what moved rather than what existed; pressing again takes the next
+   * batch. The count is the blast radius the audit row records.
    */
   async redriveDeadLetters(params: {
     processName?: string;
@@ -357,7 +358,7 @@ export class ManagerExplorerService {
     return { redriven };
   }
 
-  /** Every dead letter marked discarded; same scoping, audited with count. */
+  /** Dead letters marked discarded; same scoping and bound, audited with count. */
   async discardDeadLetters(params: {
     processName?: string;
     actorUserId: string;

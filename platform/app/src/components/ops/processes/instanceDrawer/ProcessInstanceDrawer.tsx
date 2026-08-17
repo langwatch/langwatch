@@ -109,12 +109,12 @@ function InstanceActionConfirms({
           if (actions.discardTarget) {
             actions.discardMessageMutation.mutate({
               ...target,
-              messageId: actions.discardTarget,
+              messageId: actions.discardTarget.id,
             });
           }
         }}
         title="Discard Dead Message"
-        description={`Mark this message of "${label}" as never to be sent. The row is kept as the audit record, and it cannot be redriven afterwards.`}
+        description={`Mark "${actions.discardTarget?.intentType}" on "${label}" as never to be sent. The row is kept as the audit record, and it cannot be redriven afterwards.`}
         isLoading={actions.discardMessageMutation.isPending}
       />
     </>
@@ -184,9 +184,7 @@ export function ProcessInstanceDrawer({
               onRedriveMessage={(messageId) =>
                 actions.redriveMessageMutation.mutate({ ...target, messageId })
               }
-              onDiscardMessage={(messageId) =>
-                actions.setDiscardTarget(messageId)
-              }
+              onDiscardMessage={actions.setDiscardTarget}
               onReleaseLease={(messageId) =>
                 actions.releaseLeaseMutation.mutate({ ...target, messageId })
               }

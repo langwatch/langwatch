@@ -79,7 +79,7 @@ interface OutboxSectionProps {
   grafana?: GrafanaDeepLinkConfig | null;
   canManage: boolean;
   onRedriveMessage?: (messageId: string) => void;
-  onDiscardMessage?: (messageId: string) => void;
+  onDiscardMessage?: (message: { id: string; intentType: string }) => void;
   onReleaseLease?: (messageId: string) => void;
   actionPending?: boolean;
   now: number;
@@ -191,7 +191,7 @@ export function ProcessInstanceContent({
   grafana?: GrafanaDeepLinkConfig | null;
   canManage?: boolean;
   onRedriveMessage?: (messageId: string) => void;
-  onDiscardMessage?: (messageId: string) => void;
+  onDiscardMessage?: (message: { id: string; intentType: string }) => void;
   onReleaseLease?: (messageId: string) => void;
   actionPending?: boolean;
   now?: number;

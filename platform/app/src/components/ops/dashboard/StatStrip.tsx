@@ -76,7 +76,7 @@ export function StatStrip({ data }: { data: DashboardData }) {
       <DeadLetterStat
         queueDead={totalDlq}
         outboxDead={outboxDead}
-        outboxKnown={outboxDeadQuery.data !== undefined}
+        isOutboxCountKnown={outboxDeadQuery.data !== undefined}
       />
       <RedisStatTile data={data} />
     </HStack>
@@ -146,17 +146,17 @@ function LatencyStats({ data }: { data: DashboardData }) {
 function DeadLetterStat({
   queueDead,
   outboxDead,
-  outboxKnown,
+  isOutboxCountKnown,
 }: {
   queueDead: number;
   outboxDead: number;
-  outboxKnown: boolean;
+  isOutboxCountKnown: boolean;
 }) {
   // Half the union is not the union. Until the outbox answer lands, showing
   // the queue figure alone would state a total that is wrong, then jump and
   // turn red when the rest arrives — which on an ops surface reads as a new
   // incident rather than as the tile finishing loading. An unknown says so.
-  if (!outboxKnown) {
+  if (!isOutboxCountKnown) {
     return <LinkedStat label="Dead letters" value="—" sublabel="counting" />;
   }
   const total = queueDead + outboxDead;

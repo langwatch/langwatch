@@ -99,7 +99,7 @@ function MessageMetaRow({
   traceHref: string | null;
   canManage: boolean;
   onRedrive?: (messageId: string) => void;
-  onDiscard?: (messageId: string) => void;
+  onDiscard?: (message: { id: string; intentType: string }) => void;
   onReleaseLease?: (messageId: string) => void;
   actionPending?: boolean;
 }) {
@@ -145,7 +145,9 @@ function MessageMetaRow({
           colorPalette="red"
           loading={actionPending}
           title="A mark, not a delete: the row is kept as the audit record and the message is never sent."
-          onClick={() => onDiscard(message.id)}
+          onClick={() =>
+            onDiscard({ id: message.id, intentType: message.intentType })
+          }
         >
           Discard
         </Button>
@@ -188,7 +190,7 @@ export function OutboxMessageCard({
   grafana?: GrafanaDeepLinkConfig | null;
   canManage: boolean;
   onRedrive?: (messageId: string) => void;
-  onDiscard?: (messageId: string) => void;
+  onDiscard?: (message: { id: string; intentType: string }) => void;
   onReleaseLease?: (messageId: string) => void;
   actionPending?: boolean;
 }) {

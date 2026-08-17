@@ -532,12 +532,18 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
           "leasedUntil" = NULL,
           "leaseToken" = NULL,
           "updatedAt" = ${now}
-      WHERE "id" IN (
-        SELECT "id" FROM "ProcessManagerOutbox"
-        WHERE "status" = 'dead'
-        ${nameFilter}
-        LIMIT ${BULK_RECOVERY_LIMIT}
-      )
+      -- The status guard is repeated on the UPDATE itself, not left to the
+      -- subquery. The subquery picks ids under one snapshot and the UPDATE
+      -- locks them under another, so a concurrent single-row redrive or
+      -- discard that landed in between would otherwise be clobbered. The
+      -- single-row paths guard the same way for the same reason.
+      WHERE "status" = 'dead'
+        AND "id" IN (
+          SELECT "id" FROM "ProcessManagerOutbox"
+          WHERE "status" = 'dead'
+          ${nameFilter}
+          LIMIT ${BULK_RECOVERY_LIMIT}
+        )
     `);
   }
 
@@ -554,12 +560,14 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
       UPDATE "ProcessManagerOutbox"
       SET "status" = 'discarded',
           "updatedAt" = ${now}
-      WHERE "id" IN (
-        SELECT "id" FROM "ProcessManagerOutbox"
-        WHERE "status" = 'dead'
-        ${nameFilter}
-        LIMIT ${BULK_RECOVERY_LIMIT}
-      )
+      -- Guarded on the UPDATE too; see redriveAllDeadMessages.
+      WHERE "status" = 'dead'
+        AND "id" IN (
+          SELECT "id" FROM "ProcessManagerOutbox"
+          WHERE "status" = 'dead'
+          ${nameFilter}
+          LIMIT ${BULK_RECOVERY_LIMIT}
+        )
     `);
   }
 

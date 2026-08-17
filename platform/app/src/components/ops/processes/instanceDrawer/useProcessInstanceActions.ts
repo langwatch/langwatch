@@ -62,7 +62,10 @@ function useMessageActions(onSettled: () => void) {
    * way back — no redrive path selects a discarded row — so it asks first,
    * while redrive and release-lease stay one click (both are recoverable).
    */
-  const [discardTarget, setDiscardTarget] = useState<string | null>(null);
+  const [discardTarget, setDiscardTarget] = useState<{
+    id: string;
+    intentType: string;
+  } | null>(null);
 
   const redriveMessageMutation = api.ops.processRedriveDeadMessage.useMutation(
     mutationOutcomeHandlers({

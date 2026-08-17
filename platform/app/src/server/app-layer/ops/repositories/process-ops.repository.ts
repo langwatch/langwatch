@@ -172,16 +172,27 @@ export interface ProcessOpsRepository {
   }): Promise<{ messageKey: string } | null>;
 
   /**
-   * Every dead message back to pending with a fresh budget, due now —
-   * narrowed to one process name, or the whole fleet when omitted. Returns
-   * how many messages moved, for the audit trail.
+   * Dead messages back to pending with a fresh budget — narrowed to one
+   * process name, or every process when omitted.
+   *
+   * BOUNDED, not exhaustive: an implementation moves at most one batch per
+   * call, because an unbounded UPDATE holds row locks on the highest-volume
+   * table in the system for as long as it runs. The returned count is what
+   * actually moved, so a caller wanting the rest calls again — and an
+   * operator pressing the button again is exactly that.
+   *
+   * Due times are spread rather than set to a single instant: releasing
+   * thousands of intents all due now hands the dispatcher one batch the size
+   * of the backlog.
    */
   redriveAllDeadMessages(params: {
     processName?: string;
     now: number;
   }): Promise<number>;
 
-  /** Every dead message marked discarded; same scoping and count contract. */
+  /**
+   * Dead messages marked discarded; same scoping, and bounded the same way.
+   */
   discardAllDeadMessages(params: {
     processName?: string;
     now: number;

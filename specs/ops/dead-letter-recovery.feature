@@ -92,7 +92,7 @@ Feature: Dead-letter recovery
   Scenario: Discarded messages age out on the dead-letter window
     Given a discarded outbox row older than the dead retention window
     And a discarded outbox row inside the dead retention window
-    When the retention sweep runs
+    When the dead-letter retention batch is reaped
     Then only the row past the window is deleted
 
   # Redrive resets the attempt counter, so the number stops being unique over

@@ -118,14 +118,19 @@ function bulkActionFor(
  * blast radius it will actually apply.
  */
 function DlqToolbar({
-  queueNames,
+  shownQueueNames,
+  allQueueNames,
   shownGroups,
   canaryCount,
   onCanaryCountChange,
   onBulk,
   onCanary,
 }: {
-  queueNames: string[];
+  /** Queues with rows in the current filter — what the bulk acts cover. */
+  shownQueueNames: string[];
+  /** Every queue holding dead letters. The canary samples a QUEUE, not the
+   *  filtered rows, so a filter matching nothing must not take it away. */
+  allQueueNames: string[];
   shownGroups: ShownDlqGroup[];
   canaryCount: number;
   onCanaryCountChange: (count: number) => void;
@@ -134,7 +139,7 @@ function DlqToolbar({
 }) {
   return (
     <HStack gap={1.5} flexWrap="wrap">
-      {queueNames.map((qn) => {
+      {shownQueueNames.map((qn) => {
         const shown = shownGroups.filter((g) => g.queueName === qn);
         const displayName = shown[0]?.queueDisplayName ?? qn;
         return (
@@ -175,7 +180,7 @@ function DlqToolbar({
           }
           width="50px"
         />
-        {queueNames.map((qn) => (
+        {allQueueNames.map((qn) => (
           <Button
             key={`c-${qn}`}
             variant="ghost"
@@ -305,6 +310,7 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
             onFilterChange={setFilterText}
             canManage={hasAccess}
             shownGroups={shownGroups}
+            allGroups={groups}
             canaryCount={canaryCount}
             onCanaryCountChange={setCanaryCount}
             onBulk={(kind, queueName) =>
@@ -349,6 +355,7 @@ function DlqCardHeader({
   onFilterChange,
   canManage,
   shownGroups,
+  allGroups,
   canaryCount,
   onCanaryCountChange,
   onBulk,
@@ -360,13 +367,15 @@ function DlqCardHeader({
   onFilterChange: (value: string) => void;
   canManage: boolean;
   shownGroups: DlqRowGroup[];
+  allGroups: DlqRowGroup[];
   canaryCount: number;
   onCanaryCountChange: (count: number) => void;
   onBulk: (kind: "redrive" | "discard", queueName: string) => void;
   onCanary: (queueName: string) => void;
 }) {
   const filtering = filterText.trim().length > 0;
-  const queueNames = [...new Set(shownGroups.map((g) => g.queueName))];
+  const shownQueueNames = [...new Set(shownGroups.map((g) => g.queueName))];
+  const allQueueNames = [...new Set(allGroups.map((g) => g.queueName))];
   return (
     <HStack
       paddingX={4}
@@ -398,7 +407,8 @@ function DlqCardHeader({
       <Spacer />
       {canManage && (
         <DlqToolbar
-          queueNames={queueNames}
+          shownQueueNames={shownQueueNames}
+          allQueueNames={allQueueNames}
           shownGroups={shownGroups}
           canaryCount={canaryCount}
           onCanaryCountChange={onCanaryCountChange}

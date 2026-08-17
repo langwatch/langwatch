@@ -37,7 +37,12 @@ ALTER TABLE "ProcessManagerOutboxAttempt"
     FOREIGN KEY ("outboxId") REFERENCES "ProcessManagerOutbox"("id")
     ON DELETE CASCADE ON UPDATE CASCADE;
 
--- To roll back, uncomment and run manually. Dropping the table discards the
--- recorded failure history; removing an enum value is not supported in place.
+-- IRREVERSIBLE: the enum change cannot be undone. PostgreSQL has no
+-- `ALTER TYPE ... DROP VALUE`, so reverting `discarded` means recreating the
+-- type and rewriting every column that uses it, on the highest-volume table
+-- in the system. Treat this migration as forward-only.
+--
+-- The table below IS droppable. To roll it back, uncomment and run manually;
+-- doing so discards the recorded failure history.
 -- DROP TABLE "ProcessManagerOutboxAttempt";
 -- DROP TYPE "ProcessManagerOutboxAttemptOutcome";

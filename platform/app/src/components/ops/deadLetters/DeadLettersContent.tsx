@@ -2,6 +2,7 @@ import {
   Button,
   Center,
   HStack,
+  Input,
   Spacer,
   Spinner,
   Text,
@@ -20,6 +21,13 @@ import {
 import { useDeadLetterActions } from "./useDeadLetterActions";
 
 const PAGE_SIZE = 25;
+
+/**
+ * What an operator types to discard every process's dead letters. The API
+ * requires the same phrase, so neither a mis-click nor a script that omits
+ * `processName` can reach that breadth.
+ */
+const FLEET_DISCARD_PHRASE = "DISCARD ALL";
 
 /**
  * Every message the substrate has permanently given up on.
@@ -162,6 +170,13 @@ function BulkConfirms({
   processName: string | undefined;
 }) {
   const plural = shownCount === 1 ? "message" : "messages";
+  // The fleet-wide discard crosses every tenant and cannot be undone, so the
+  // operator types the phrase rather than clicking once. The API asks for the
+  // same phrase, which stops a script reaching this breadth by omitting a
+  // field; this is what makes the ask a human one too.
+  const [typed, setTyped] = useState("");
+  const fleetWide = processName === undefined;
+  const phraseOk = !fleetWide || typed.trim() === FLEET_DISCARD_PHRASE;
   return (
     <>
       {/* Discard asks even for one row, because nothing un-discards it: no
@@ -184,19 +199,32 @@ function BulkConfirms({
       />
       <ConfirmDialog
         open={actions.confirmBulk === "discard"}
-        onClose={() => actions.setConfirmBulk(null)}
+        onClose={() => {
+          setTyped("");
+          actions.setConfirmBulk(null);
+        }}
         onConfirm={() =>
           actions.discardAll.mutate(
-            // The fleet-wide form crosses every tenant, so the API refuses it
-            // without an explicit confirmation rather than treating a missing
-            // process name as "all".
-            processName ? { processName } : { confirm: "DISCARD ALL" },
+            processName ? { processName } : { confirm: FLEET_DISCARD_PHRASE },
           )
         }
         title="Discard dead letters"
         description={`Mark all ${shownCount} dead ${plural} for ${shownScope} as never to be sent. The rows are kept as the audit record, the work will not run, and none of it can be redriven afterwards.`}
         isLoading={actions.discardAll.isPending}
-      />
+        confirmDisabled={!phraseOk}
+      >
+        {fleetWide && (
+          <Input
+            marginTop={3}
+            size="sm"
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            placeholder={FLEET_DISCARD_PHRASE}
+            aria-label={`Type ${FLEET_DISCARD_PHRASE} to confirm`}
+            data-testid="dead-discard-all-phrase"
+          />
+        )}
+      </ConfirmDialog>
     </>
   );
 }
