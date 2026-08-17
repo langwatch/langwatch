@@ -83,7 +83,7 @@ jobs:
       # kept apart only by logical-database juggling, which is exactly what
       # stopped holding. Buy the parallelism where it is free.
       #
-      # Four is affordable again for a different reason: the lane is now ~476
+      # Four is affordable again for a different reason: the lane is now ~477
       # files rather than 1024, because the ones that never needed a datastore
       # moved to `test-component`. Fewer files over fewer shards, with files
       # still strictly serial — the property above is untouched.
@@ -100,9 +100,9 @@ jobs:
       unit-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4]' || '[1]' }}
       unit-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '4' || '1' }}
       # Six became four when the component lane took the files that never
-      # needed a datastore. 546 of the 1024 integration files declare jsdom and
+      # needed a datastore. 540 of the 1017 integration files declare jsdom and
       # name no database, queue or cache; they now run on `test-component`
-      # below, with no service containers at all. What is left here is ~476
+      # below, with no service containers at all. What is left here is ~477
       # files that genuinely talk to something, so the same per-shard file count
       # fits in fewer shards — and two runners come off the critical path,
       # which is its own win while every shard is queueing 5-10 minutes for one.
@@ -428,7 +428,7 @@ jobs:
 
   # The `.integration.test.*` files that need no datastore.
   #
-  # 546 of the app's 1024 integration files declare jsdom and name no database,
+  # 540 of the app's 1017 integration files declare jsdom and name no database,
   # queue or cache — they render a component and mock their boundaries. They
   # were running on `test-integration` below, which means every one of them paid
   # for a Postgres, a ClickHouse and a Redis container, a Prisma migration, a

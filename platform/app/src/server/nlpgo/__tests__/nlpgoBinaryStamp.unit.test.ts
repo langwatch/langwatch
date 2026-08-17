@@ -123,7 +123,10 @@ describe("nlpgo test binary stamp", () => {
     // run whatever binary happens to be sitting there.
     /** @scenario "A failed compile is not recorded as a success" */
     it("rebuilds when the stamp still describes the sources before the change", () => {
-      write("services/nlpgo/main.go", "package main\n// the edit that failed\n");
+      write(
+        "services/nlpgo/main.go",
+        "package main\n// the edit that failed\n",
+      );
 
       expect(
         cachedBinaryIsUsable({
