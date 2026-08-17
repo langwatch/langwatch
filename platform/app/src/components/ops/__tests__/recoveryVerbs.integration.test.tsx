@@ -26,6 +26,33 @@ vi.mock("~/utils/api", () => ({
 
 const NOW = Date.UTC(2026, 7, 17, 12, 0, 0);
 
+function deadLetter() {
+  return {
+    id: "msg_1",
+    processName: "webhookDelivery",
+    projectId: "project_1",
+    processKey: "req_aaaabbbbccccdddd",
+    messageKey: "process:req_01:deliver",
+    intentType: "deliver",
+    attempts: 11,
+    updatedAt: NOW - 60_000,
+    traceId: null,
+    payload: {},
+  };
+}
+
+function dlqGroup(overrides: Record<string, unknown> = {}) {
+  return {
+    queueName: "queue-a",
+    queueDisplayName: "Queue A",
+    groupId: "group-1",
+    pipelineName: "traces",
+    error: "HTTP 500",
+    jobCount: 3,
+    ...overrides,
+  };
+}
+
 function renderWithChakra(ui: React.ReactElement) {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 }
@@ -39,20 +66,7 @@ describe("dead-letter recovery vocabulary", () => {
       it("calls the acts redrive and discard on each, and never replay", () => {
         const { unmount } = renderWithChakra(
           <DeadLettersTable
-            messages={[
-              {
-                id: "msg_1",
-                processName: "webhookDelivery",
-                projectId: "project_1",
-                processKey: "req_aaaabbbbccccdddd",
-                messageKey: "process:req_01:deliver",
-                intentType: "deliver",
-                attempts: 11,
-                updatedAt: NOW - 60_000,
-                traceId: null,
-                payload: {},
-              },
-            ]}
+            messages={[deadLetter()]}
             now={NOW}
             canManage
             expandedId={null}
@@ -75,18 +89,7 @@ describe("dead-letter recovery vocabulary", () => {
         renderWithChakra(
           <Table.Root>
             <Table.Body>
-              <DlqRow
-                group={{
-                  queueName: "queue-a",
-                  queueDisplayName: "Queue A",
-                  groupId: "group-1",
-                  pipelineName: "traces",
-                  error: "HTTP 500",
-                  jobCount: 3,
-                }}
-                canManage
-                onAct={vi.fn()}
-              />
+              <DlqRow group={dlqGroup()} canManage onAct={vi.fn()} />
             </Table.Body>
           </Table.Root>,
         );
@@ -102,18 +105,28 @@ describe("dead-letter recovery vocabulary", () => {
 
     describe("when the operator is view-only", () => {
       it("withholds both verbs on each surface", () => {
+        const outbox = renderWithChakra(
+          <DeadLettersTable
+            messages={[deadLetter()]}
+            now={NOW}
+            canManage={false}
+            expandedId={null}
+            redrivingId={null}
+            discardingId={null}
+            onToggle={vi.fn()}
+            onRedrive={vi.fn()}
+            onDiscard={vi.fn()}
+          />,
+        );
+        expect(screen.queryByText("Redrive")).toBeNull();
+        expect(screen.queryByText("Discard")).toBeNull();
+        outbox.unmount();
+
         renderWithChakra(
           <Table.Root>
             <Table.Body>
               <DlqRow
-                group={{
-                  queueName: "queue-a",
-                  queueDisplayName: "Queue A",
-                  groupId: "group-1",
-                  pipelineName: null,
-                  error: null,
-                  jobCount: 1,
-                }}
+                group={dlqGroup({ pipelineName: null, error: null })}
                 canManage={false}
                 onAct={vi.fn()}
               />

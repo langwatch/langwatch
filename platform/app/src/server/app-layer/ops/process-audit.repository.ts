@@ -80,9 +80,13 @@ export class ProcessAuditRepository implements ProcessAuditSink {
         organizationId: null,
         action: entry.action,
         targetKind: TARGET_KIND,
-        targetId: entry.processName
-          ? `${entry.processName}/${entry.projectId}/${entry.processKey}`
-          : FLEET_TARGET_ID,
+        // The triple only when all three parts are real. A process-scoped
+        // bulk act has a name but no instance, and `foo/null/null` would
+        // read as an instance that does not exist; the scope is in metadata.
+        targetId:
+          entry.processName && entry.projectId && entry.processKey
+            ? `${entry.processName}/${entry.projectId}/${entry.processKey}`
+            : FLEET_TARGET_ID,
         metadata: (entry.metadata ?? {}) as Prisma.InputJsonValue,
       },
     });

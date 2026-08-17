@@ -682,10 +682,14 @@ describe("process ops against a real Postgres", () => {
       const audit = await prisma.auditLog.findFirst({
         where: {
           action: "process_redrive_dead_letters",
-          targetId: { startsWith: nsBulkA },
+          // A bulk act names no instance, so its target is the fleet marker
+          // and the scope it ran under lives in metadata.
+          targetId: "fleet",
+          metadata: { equals: { redriven: 2, scope: nsBulkA } },
         },
       });
-      expect(audit?.metadata).toMatchObject({ redriven: 2 });
+      expect(audit?.projectId).toBeNull();
+      expect(audit?.metadata).toMatchObject({ redriven: 2, scope: nsBulkA });
     });
 
     /** @scenario Every dead letter shown can be discarded in one act */
@@ -721,10 +725,12 @@ describe("process ops against a real Postgres", () => {
       const audit = await prisma.auditLog.findFirst({
         where: {
           action: "process_discard_dead_letters",
-          targetId: { startsWith: nsBulkA },
+          targetId: "fleet",
+          metadata: { equals: { discarded: 1, scope: nsBulkA } },
         },
       });
-      expect(audit?.metadata).toMatchObject({ discarded: 1 });
+      expect(audit?.projectId).toBeNull();
+      expect(audit?.metadata).toMatchObject({ discarded: 1, scope: nsBulkA });
     });
 
     /** @scenario Each failed delivery records why it failed */
