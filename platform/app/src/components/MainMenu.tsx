@@ -452,6 +452,11 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
   // Fleet-wide allowlist (env) OR a per-browser pin from the hidden Feature
   // Flags drawer. The pin is only queried for users who already have ops
   // access — it is a visibility convenience, never a way to widen access.
+  //
+  // Both knobs steer this sidebar only. The navigation-v2 settings menu lists
+  // Ops on ops access alone, so `SHOW_OPS_IN_MAIN_SIDEBAR` and
+  // `ops_ui_ops_menu_pinned` can be deleted with this section when the legacy
+  // chrome retires.
   const envAlwaysShow = publicEnv.data?.SHOW_OPS_IN_MAIN_SIDEBAR ?? false;
   const { enabled: opsMenuPinned } = useFeatureFlag("ops_ui_ops_menu_pinned", {
     enabled: hasAccess,
