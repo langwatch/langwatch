@@ -191,10 +191,26 @@ Feature: Ops dashboard information density
     And each names the mechanism that switched it off
 
   @integration
+  Scenario: A mechanism with nothing to report is not drawn at all
+    Given a tenant is parked at its in-flight cap
+    And no schedule is switched off
+    And no subscriber is paused
+    When the paused panel renders
+    Then only the parked tenants are named
+    And no divider is drawn for the mechanisms that are silent
+
+  @integration
   Scenario: Parking is distinguished from being switched off
     Given a tenant is parked at its in-flight cap
     When the paused panel renders
     Then parking is described as a capacity limit rather than a failure
+
+  @integration
+  Scenario: A switched-off schedule is reported however the fleet is ordered
+    Given the fleet holds more schedules than the panel reads in one page
+    And the schedule that is switched off falls beyond that page
+    When the paused panel renders
+    Then that schedule is still reported
 
   @integration
   Scenario: A bounded list says what it left out

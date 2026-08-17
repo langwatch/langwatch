@@ -137,7 +137,7 @@ describe("PausedCard", () => {
         expect(screen.getByText(/nothing has failed/)).toBeTruthy();
       });
 
-      /** @scenario Everything switched off is reported together */
+      /** @scenario A mechanism with nothing to report is not drawn at all */
       it("names no mechanism that has nothing to report", () => {
         renderCard({
           parkedTenants: [parkedTenant()],
@@ -149,7 +149,7 @@ describe("PausedCard", () => {
         expect(screen.getByText("1 parked tenant")).toBeTruthy();
       });
 
-      /** @scenario Everything switched off is reported together */
+      /** @scenario A mechanism with nothing to report is not drawn at all */
       it("draws no rule under the only section that has content", () => {
         // Stack interleaves its separator by child count, so passing all three
         // sections and letting the empty two return null ends the card in two
@@ -199,8 +199,8 @@ describe("PausedCard", () => {
   });
 
   describe("given the fleet holds more schedules than one page", () => {
-    describe("when every schedule on the first page is active", () => {
-      /** @scenario The paused panel is absent when nothing is switched off */
+    describe("when the switched-off one falls beyond the first page", () => {
+      /** @scenario A switched-off schedule is reported however the fleet is ordered */
       it("still reports the switched-off ones the page would have dropped", () => {
         // The panel asks for paused schedules directly. Filtering a page of
         // `listScheduledJobs` client-side would find none — that read orders
