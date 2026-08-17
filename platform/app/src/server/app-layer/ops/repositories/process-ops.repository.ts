@@ -85,6 +85,12 @@ export interface DeadLetterCount {
  * dead letter died, on the page (specs/ops/dead-letter-recovery.feature).
  */
 export interface OutboxAttemptView {
+  /**
+   * Row identity, not the attempt number. A redrive resets `attempts` to 0,
+   * so a message that failed, was redriven, and failed again holds two
+   * entries numbered 1 — the number is not unique over a message's life.
+   */
+  id: string;
   attempt: number;
   occurredAt: number;
   /** "dead" marks the failure that killed the message. */

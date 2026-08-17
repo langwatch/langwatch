@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { mutationOutcomeHandlers } from "~/components/ops/shared/mutationOutcome";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
@@ -15,6 +16,7 @@ export function useProcessInstanceActions() {
   const [confirmAction, setConfirmAction] = useState<"wake" | "redrive" | null>(
     null,
   );
+  const invalidate = () => void utils.ops.invalidate();
 
   const wakeMutation = api.ops.processWakeNow.useMutation({
     onSuccess: (data) => {
@@ -51,45 +53,32 @@ export function useProcessInstanceActions() {
         }),
     });
 
-  const redriveMessageMutation = api.ops.processRedriveDeadMessage.useMutation({
-    onSuccess: (data) => {
-      toaster.create({
-        title: data.redriven ? "Message redriven" : "Message is no longer dead",
-        type: data.redriven ? "success" : "error",
-      });
-      void utils.ops.invalidate();
-    },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't redrive the message" }),
-  });
+  const redriveMessageMutation = api.ops.processRedriveDeadMessage.useMutation(
+    mutationOutcomeHandlers({
+      onSettled: invalidate,
+      applied: "Message redriven",
+      missed: "Message is no longer dead",
+      failure: "Couldn't redrive the message",
+    }),
+  );
 
-  const discardMessageMutation = api.ops.processDiscardDeadMessage.useMutation({
-    onSuccess: (data) => {
-      toaster.create({
-        title: data.discarded
-          ? "Message discarded"
-          : "Message is no longer dead",
-        type: data.discarded ? "success" : "error",
-      });
-      void utils.ops.invalidate();
-    },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't discard the message" }),
-  });
+  const discardMessageMutation = api.ops.processDiscardDeadMessage.useMutation(
+    mutationOutcomeHandlers({
+      onSettled: invalidate,
+      applied: "Message discarded",
+      missed: "Message is no longer dead",
+      failure: "Couldn't discard the message",
+    }),
+  );
 
-  const releaseLeaseMutation = api.ops.processReleaseLapsedLease.useMutation({
-    onSuccess: (data) => {
-      toaster.create({
-        title: data.released
-          ? "Lease released — message due now"
-          : "Lease is no longer lapsed",
-        type: data.released ? "success" : "error",
-      });
-      void utils.ops.invalidate();
-    },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't release the lease" }),
-  });
+  const releaseLeaseMutation = api.ops.processReleaseLapsedLease.useMutation(
+    mutationOutcomeHandlers({
+      onSettled: invalidate,
+      applied: "Lease released — message due now",
+      missed: "Lease is no longer lapsed",
+      failure: "Couldn't release the lease",
+    }),
+  );
 
   return {
     confirmAction,

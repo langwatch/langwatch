@@ -10,16 +10,14 @@ import {
 import { RotateCcw, XCircle } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
-import { toaster } from "~/components/ui/toaster";
-import { showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";
 import {
-  type DeadLetterMessage,
   DeadLetterSummary,
   DeadLettersEmpty,
   DeadLettersTable,
 } from "./DeadLettersCard";
+import { useDeadLetterActions } from "./useDeadLetterActions";
 
 const PAGE_SIZE = 25;
 
@@ -37,83 +35,12 @@ export function DeadLettersContent() {
   const [processName, setProcessName] = useState<string | undefined>(undefined);
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [redrivingId, setRedrivingId] = useState<string | null>(null);
-  const [discardingId, setDiscardingId] = useState<string | null>(null);
-  const [confirmBulk, setConfirmBulk] = useState<"redrive" | "discard" | null>(
-    null,
-  );
+  const actions = useDeadLetterActions();
 
-  const utils = api.useUtils();
   const query = api.ops.listDeadLetters.useQuery(
     { processName, page, pageSize: PAGE_SIZE },
     { refetchInterval: 30_000 },
   );
-
-  const redrive = api.ops.processRedriveDeadMessage.useMutation({
-    onSuccess: (data) => {
-      toaster.create({
-        title: data.redriven ? "Message redriven" : "Message is no longer dead",
-        type: data.redriven ? "success" : "error",
-      });
-      setRedrivingId(null);
-      void utils.ops.invalidate();
-    },
-    onError: (error) => {
-      setRedrivingId(null);
-      showErrorToast({ error, fallbackTitle: "Couldn't redrive the message" });
-    },
-  });
-  const discard = api.ops.processDiscardDeadMessage.useMutation({
-    onSuccess: (data) => {
-      toaster.create({
-        title: data.discarded
-          ? "Message discarded"
-          : "Message is no longer dead",
-        type: data.discarded ? "success" : "error",
-      });
-      setDiscardingId(null);
-      void utils.ops.invalidate();
-    },
-    onError: (error) => {
-      setDiscardingId(null);
-      showErrorToast({ error, fallbackTitle: "Couldn't discard the message" });
-    },
-  });
-  const redriveAll = api.ops.redriveDeadLetters.useMutation({
-    onSuccess: (data) => {
-      toaster.create({
-        title: `Redrove ${data.redriven} ${
-          data.redriven === 1 ? "message" : "messages"
-        }`,
-        type: "success",
-      });
-      setConfirmBulk(null);
-      void utils.ops.invalidate();
-    },
-    onError: (error) => {
-      setConfirmBulk(null);
-      showErrorToast({ error, fallbackTitle: "Couldn't redrive the messages" });
-    },
-  });
-  const discardAll = api.ops.discardDeadLetters.useMutation({
-    onSuccess: (data) => {
-      toaster.create({
-        title: `Discarded ${data.discarded} ${
-          data.discarded === 1 ? "message" : "messages"
-        }`,
-        type: "success",
-      });
-      setConfirmBulk(null);
-      void utils.ops.invalidate();
-    },
-    onError: (error) => {
-      setConfirmBulk(null);
-      showErrorToast({
-        error,
-        fallbackTitle: "Couldn't discard the messages",
-      });
-    },
-  });
 
   if (query.isPending) {
     return (
@@ -131,32 +58,12 @@ export function DeadLettersContent() {
 
   if (fleetTotal === 0) return <DeadLettersEmpty />;
 
-  const onRedrive = (message: DeadLetterMessage) => {
-    setRedrivingId(message.id);
-    redrive.mutate({
-      processName: message.processName,
-      projectId: message.projectId,
-      processKey: message.processKey,
-      messageId: message.id,
-    });
-  };
-  const onDiscard = (message: DeadLetterMessage) => {
-    setDiscardingId(message.id);
-    discard.mutate({
-      processName: message.processName,
-      projectId: message.projectId,
-      processKey: message.processKey,
-      messageId: message.id,
-    });
-  };
-
   // The bulk actions act on exactly what the filter shows: one process, or
   // the whole fleet when no chip is selected. The count in the button IS the
   // blast radius, restated in the confirmation.
   const shownCount = processName
     ? (byProcess.find((row) => row.processName === processName)?.count ?? 0)
     : fleetTotal;
-  const shownScope = processName ?? "every process";
 
   return (
     <VStack align="stretch" gap={4}>
@@ -170,39 +77,22 @@ export function DeadLettersContent() {
         }}
       />
       {hasAccess && shownCount > 0 && (
-        <HStack gap={2}>
-          <Spacer />
-          <Button
-            size="xs"
-            variant="outline"
-            data-testid="dead-redrive-shown"
-            onClick={() => setConfirmBulk("redrive")}
-          >
-            <RotateCcw size={12} />
-            Redrive shown ({shownCount})
-          </Button>
-          <Button
-            size="xs"
-            variant="outline"
-            colorPalette="red"
-            data-testid="dead-discard-shown"
-            onClick={() => setConfirmBulk("discard")}
-          >
-            <XCircle size={12} />
-            Discard shown ({shownCount})
-          </Button>
-        </HStack>
+        <BulkActionBar
+          shownCount={shownCount}
+          onRedriveAll={() => actions.setConfirmBulk("redrive")}
+          onDiscardAll={() => actions.setConfirmBulk("discard")}
+        />
       )}
       <DeadLettersTable
         messages={messages}
         now={now}
         canManage={hasAccess}
         expandedId={expandedId}
-        redrivingId={redrivingId}
-        discardingId={discardingId}
+        redrivingId={actions.redrivingId}
+        discardingId={actions.discardingId}
         onToggle={(id) => setExpandedId(expandedId === id ? null : id)}
-        onRedrive={onRedrive}
-        onDiscard={onDiscard}
+        onRedrive={actions.onRedrive}
+        onDiscard={actions.onDiscard}
       />
       <Pager
         page={page}
@@ -210,27 +100,87 @@ export function DeadLettersContent() {
         shown={messages.length}
         onPage={setPage}
       />
-      <ConfirmDialog
-        open={confirmBulk === "redrive"}
-        onClose={() => setConfirmBulk(null)}
-        onConfirm={() => redriveAll.mutate({ processName })}
-        title="Redrive dead letters"
-        description={`Return all ${shownCount} dead ${
-          shownCount === 1 ? "message" : "messages"
-        } for ${shownScope} to pending with a fresh attempt budget. Their deliveries will run again.`}
-        isLoading={redriveAll.isPending}
-      />
-      <ConfirmDialog
-        open={confirmBulk === "discard"}
-        onClose={() => setConfirmBulk(null)}
-        onConfirm={() => discardAll.mutate({ processName })}
-        title="Discard dead letters"
-        description={`Mark all ${shownCount} dead ${
-          shownCount === 1 ? "message" : "messages"
-        } for ${shownScope} as never to be sent. The rows are kept as the audit record; the work will not run.`}
-        isLoading={discardAll.isPending}
+      <BulkConfirms
+        actions={actions}
+        shownCount={shownCount}
+        shownScope={processName ?? "every process"}
+        processName={processName}
       />
     </VStack>
+  );
+}
+
+/** Redrive or discard everything the current filter shows. */
+function BulkActionBar({
+  shownCount,
+  onRedriveAll,
+  onDiscardAll,
+}: {
+  shownCount: number;
+  onRedriveAll: () => void;
+  onDiscardAll: () => void;
+}) {
+  return (
+    <HStack gap={2}>
+      <Spacer />
+      <Button
+        size="xs"
+        variant="outline"
+        data-testid="dead-redrive-shown"
+        onClick={onRedriveAll}
+      >
+        <RotateCcw size={12} />
+        Redrive shown ({shownCount})
+      </Button>
+      <Button
+        size="xs"
+        variant="outline"
+        colorPalette="red"
+        data-testid="dead-discard-shown"
+        onClick={onDiscardAll}
+      >
+        <XCircle size={12} />
+        Discard shown ({shownCount})
+      </Button>
+    </HStack>
+  );
+}
+
+/**
+ * Both bulk confirmations, each naming its blast radius in the operator's own
+ * terms (best_practices/ops-dashboard.md).
+ */
+function BulkConfirms({
+  actions,
+  shownCount,
+  shownScope,
+  processName,
+}: {
+  actions: ReturnType<typeof useDeadLetterActions>;
+  shownCount: number;
+  shownScope: string;
+  processName: string | undefined;
+}) {
+  const plural = shownCount === 1 ? "message" : "messages";
+  return (
+    <>
+      <ConfirmDialog
+        open={actions.confirmBulk === "redrive"}
+        onClose={() => actions.setConfirmBulk(null)}
+        onConfirm={() => actions.redriveAll.mutate({ processName })}
+        title="Redrive dead letters"
+        description={`Return all ${shownCount} dead ${plural} for ${shownScope} to pending with a fresh attempt budget. Their deliveries will run again.`}
+        isLoading={actions.redriveAll.isPending}
+      />
+      <ConfirmDialog
+        open={actions.confirmBulk === "discard"}
+        onClose={() => actions.setConfirmBulk(null)}
+        onConfirm={() => actions.discardAll.mutate({ processName })}
+        title="Discard dead letters"
+        description={`Mark all ${shownCount} dead ${plural} for ${shownScope} as never to be sent. The rows are kept as the audit record; the work will not run.`}
+        isLoading={actions.discardAll.isPending}
+      />
+    </>
   );
 }
 

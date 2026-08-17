@@ -85,6 +85,25 @@ Feature: Dead-letter recovery
     When the retention sweep removes the message
     Then its attempt entries are removed with it
 
+  # A discarded row is terminal like a dead one, and no other family's
+  # predicate matches it. Left out of the sweep it would be the one state that
+  # never ages out, on the highest-volume table in the system.
+  @integration
+  Scenario: Discarded messages age out on the dead-letter window
+    Given a discarded outbox row older than the dead retention window
+    And a discarded outbox row inside the dead retention window
+    When the retention sweep runs
+    Then only the row past the window is deleted
+
+  # Redrive resets the attempt counter, so the number stops being unique over
+  # a message's life and only time orders the entries correctly.
+  @integration
+  Scenario: A redriven message keeps the history of both its lives
+    Given a message that failed, was redriven, and failed again
+    When its attempt history is read
+    Then every failure from both lives is present
+    And they read in the order they happened
+
   @unit
   Scenario: A dead letter shows why it died without leaving the page
     Given a dead message with recorded attempts

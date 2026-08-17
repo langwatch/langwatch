@@ -13,10 +13,11 @@ import {
 
 // The expanded row's attempt history reads through the tRPC client; the
 // fixtures here stand in for the ops.listOutboxAttempts read.
-const listOutboxAttemptsQuery = vi.fn(() => ({
+const listOutboxAttemptsQuery = vi.fn((_input: unknown) => ({
   isPending: false,
   data: [
     {
+      id: "att_1",
       attempt: 1,
       occurredAt: 0,
       outcome: "retry_scheduled",
@@ -25,6 +26,7 @@ const listOutboxAttemptsQuery = vi.fn(() => ({
       retryAfterMs: null,
     },
     {
+      id: "att_2",
       attempt: 2,
       occurredAt: 0,
       outcome: "dead",

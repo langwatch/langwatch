@@ -658,11 +658,22 @@ export class PrismaProcessStore implements ProcessStore {
     // that retired them, so it IS the moment the row became a failure record.
     // No new index: `dead` is a rare status, so the existing
     // (status, nextAttemptAt, leasedUntil) index already makes this selective.
+    //
+    // `discarded` is reaped on the same window and by the same sweep. It is
+    // the terminal state an operator writes rather than one the dispatcher
+    // writes, but it means the same thing to retention — a record of work
+    // that will never run, kept for as long as the operator might ask about
+    // it. Leaving it out is what would make it immortal: no other family's
+    // predicate matches it, and this is the highest-volume table in the
+    // system (specs/ops/dead-letter-recovery.feature).
     return await this.prisma.$executeRaw`
       DELETE FROM "ProcessManagerOutbox"
       WHERE "id" IN (
         SELECT "id" FROM "ProcessManagerOutbox"
-        WHERE "status" = 'dead'::"ProcessManagerOutboxStatus"
+        WHERE "status" IN (
+            'dead'::"ProcessManagerOutboxStatus",
+            'discarded'::"ProcessManagerOutboxStatus"
+          )
           AND "updatedAt" < ${asDate(params.before)}
         LIMIT ${params.limit}
       )

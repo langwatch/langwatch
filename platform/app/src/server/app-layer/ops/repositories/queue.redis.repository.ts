@@ -1681,9 +1681,11 @@ export class QueueRedisRepository implements QueueRepository {
     const prefix = `${params.queueName}:gq:`;
     let redrivenCount = 0;
     let jobsRedriven = 0;
-    for (const batch of chunk(params.groupIds, SSCAN_BATCH)) {
-      const pipeline = this.redis.pipeline();
-      const argsByIndex = batch.map((groupId) => [
+    await this.runOverDlqGroups({
+      groupIds: params.groupIds,
+      script: replayFromDlqScript,
+      keyCount: 8,
+      argsFor: (groupId) => [
         `${prefix}dlq:${groupId}:jobs`,
         `${prefix}dlq:${groupId}:data`,
         `${prefix}dlq:${groupId}:error`,
@@ -1694,26 +1696,45 @@ export class QueueRedisRepository implements QueueRepository {
         `${prefix}dlq`,
         groupId,
         String(Date.now()),
-      ]);
+      ],
+      onResult: (result) => {
+        const replayed = Number(result);
+        if (replayed > 0) {
+          redrivenCount++;
+          jobsRedriven += replayed;
+        }
+      },
+    });
+    return { redrivenCount, jobsRedriven };
+  }
+
+  /**
+   * Run one Lua script over an explicit group-id list, batched into pipelines.
+   * Shared by the two explicit-id recovery paths, which differ only in their
+   * script, their key arity and what they count. Errored replies are skipped
+   * — a group that failed its script simply does not count as acted on.
+   */
+  private async runOverDlqGroups(params: {
+    groupIds: string[];
+    script: CachedLuaScript;
+    keyCount: number;
+    argsFor: (groupId: string) => string[];
+    onResult: (result: unknown) => void;
+  }): Promise<void> {
+    for (const batch of chunk(params.groupIds, SSCAN_BATCH)) {
+      const pipeline = this.redis.pipeline();
+      const argsByIndex = batch.map(params.argsFor);
       for (const args of argsByIndex) {
-        replayFromDlqScript.queue(pipeline, 8, ...args);
+        params.script.queue(pipeline, params.keyCount, ...args);
       }
       const results = await execWithNoScriptRecovery(pipeline, (index) =>
-        replayFromDlqScript.run(this.redis, 8, ...argsByIndex[index]!),
+        params.script.run(this.redis, params.keyCount, ...argsByIndex[index]!),
       );
-      if (results) {
-        for (const [err, result] of results) {
-          if (!err) {
-            const replayed = Number(result);
-            if (replayed > 0) {
-              redrivenCount++;
-              jobsRedriven += replayed;
-            }
-          }
-        }
+      for (const [err, result] of results ?? []) {
+        if (err) continue;
+        params.onResult(result);
       }
     }
-    return { redrivenCount, jobsRedriven };
   }
 
   /**
@@ -1734,33 +1755,28 @@ export class QueueRedisRepository implements QueueRepository {
     let discardedCount = 0;
     let jobsDiscarded = 0;
     const lastErrors = new Set<string>();
-    for (const batch of chunk(params.groupIds, SSCAN_BATCH)) {
-      const pipeline = this.redis.pipeline();
-      const argsByIndex = batch.map((groupId) => [
+    await this.runOverDlqGroups({
+      groupIds: params.groupIds,
+      script: discardFromDlqScript,
+      keyCount: 4,
+      argsFor: (groupId) => [
         `${prefix}dlq:${groupId}:jobs`,
         `${prefix}dlq:${groupId}:data`,
         `${prefix}dlq:${groupId}:error`,
         `${prefix}dlq`,
         groupId,
-      ]);
-      for (const args of argsByIndex) {
-        discardFromDlqScript.queue(pipeline, 4, ...args);
-      }
-      const results = await execWithNoScriptRecovery(pipeline, (index) =>
-        discardFromDlqScript.run(this.redis, 4, ...argsByIndex[index]!),
-      );
-      if (results) {
-        for (const [err, result] of results) {
-          if (err) continue;
-          const [count, lastError] = result as [number, string];
-          if (Number(count) > 0) {
-            discardedCount++;
-            jobsDiscarded += Number(count);
-          }
-          if (lastError && lastErrors.size < 5) lastErrors.add(lastError);
+      ],
+      onResult: (result) => {
+        const [count, lastError] = result as [number, string];
+        if (Number(count) > 0) {
+          discardedCount++;
+          jobsDiscarded += Number(count);
         }
-      }
-    }
+        // A sample, not the set: the audit row names why these groups died,
+        // and five distinct messages is enough to recognise the cause.
+        if (lastError && lastErrors.size < 5) lastErrors.add(lastError);
+      },
+    });
     return { discardedCount, jobsDiscarded, lastErrors: [...lastErrors] };
   }
 

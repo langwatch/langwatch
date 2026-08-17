@@ -546,9 +546,13 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
   }): Promise<OutboxAttemptView[]> {
     const rows = await this.prisma.processManagerOutboxAttempt.findMany({
       where: { outboxId: params.outboxId, projectId: params.projectId },
-      orderBy: { attempt: "asc" },
+      // Chronological, not by attempt number: a redrive resets `attempts`, so
+      // ordering by it would interleave a message's second life with its
+      // first. `id` breaks ties within a millisecond.
+      orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
     });
     return rows.map((r) => ({
+      id: r.id,
       attempt: r.attempt,
       occurredAt: r.occurredAt.getTime(),
       outcome: r.outcome,

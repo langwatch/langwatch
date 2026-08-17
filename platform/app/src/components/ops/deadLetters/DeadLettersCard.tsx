@@ -328,6 +328,11 @@ function DeadLetterRow({
  * only exists for messages that failed, and only an opened row needs it.
  * Messages retired before the attempt log existed have no entries; the trace
  * id above remains the join for those.
+ *
+ * Ordered chronologically rather than by attempt number, because a redrive
+ * resets the count: a message that failed, was redriven, and failed again
+ * carries two entries numbered 1, and only time puts them in the order they
+ * happened.
  */
 function AttemptHistory({
   outboxId,
@@ -354,8 +359,10 @@ function AttemptHistory({
       </Text>
       <VStack align="stretch" gap={1}>
         {rows.map((row) => (
+          // Keyed by row id, not attempt number: a redrive resets the count,
+          // so one message can hold two entries numbered 1.
           <HStack
-            key={row.attempt}
+            key={row.id}
             gap={2}
             align="start"
             data-testid={`dead-attempt-${row.attempt}`}

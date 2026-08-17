@@ -368,11 +368,14 @@ export class InMemoryProcessStore implements ProcessStore {
     limit: number;
   }): Promise<number> {
     // Reaped by `updatedAt`, the same column the durable store uses, which
-    // the markFailed that retired the row stamped.
+    // the markFailed that retired the row stamped. `discarded` rides the same
+    // family for the reason given on the durable store: no other predicate
+    // matches it, so leaving it out makes it immortal.
     return this.deleteOutboxBatch(
       params,
       (message) =>
-        message.status === "dead" && message.updatedAt < params.before,
+        (message.status === "dead" || message.status === "discarded") &&
+        message.updatedAt < params.before,
     );
   }
 
@@ -401,6 +404,9 @@ export class InMemoryProcessStore implements ProcessStore {
       if (deleted >= params.limit) break;
       if (!matches(message)) continue;
       this.messages.delete(key);
+      // The durable store cascades attempt rows with their message; a fake
+      // that kept them would model a leak the real store does not have.
+      this.attempts.delete(key);
       deleted++;
     }
     return deleted;

@@ -775,6 +775,107 @@ describe("process ops against a real Postgres", () => {
       expect(attempts[1]?.outcome).toBe("dead");
     });
 
+    /** @scenario Discarded messages age out on the dead-letter window */
+    it("reaps discarded rows on the dead-letter retention window", async () => {
+      const nsSweep = `${ns}.sweep.discarded`;
+      const staleId = await seedDeadMessage({
+        processName: nsSweep,
+        processKey: "dl-sweep",
+        messageKey: "discard-stale",
+        retiredAt: new Date(NOW - 60_000),
+      });
+      const freshId = await seedDeadMessage({
+        processName: nsSweep,
+        processKey: "dl-sweep",
+        messageKey: "discard-fresh",
+        retiredAt: new Date(NOW - 60_000),
+      });
+      for (const [id, key] of [
+        [staleId, "discard-stale"],
+        [freshId, "discard-fresh"],
+      ] as const) {
+        await service.discardDeadMessage({
+          ref: {
+            processName: nsSweep,
+            projectId: PROJECT,
+            processKey: "dl-sweep",
+          },
+          messageId: id,
+          actorUserId: ACTOR,
+        });
+        expect(key).toBeTruthy();
+      }
+      // Discard stamps updatedAt, so age the stale one past the window by
+      // hand — the sweep reaps by that column.
+      await prisma.processManagerOutbox.updateMany({
+        where: { id: staleId, projectId: PROJECT },
+        data: { updatedAt: new Date(NOW - 40 * 24 * 60 * 60 * 1000) },
+      });
+
+      const deleted = await store.deleteDeadOutboxBatch({
+        before: NOW - 30 * 24 * 60 * 60 * 1000,
+        limit: 100,
+      });
+      expect(deleted).toBeGreaterThanOrEqual(1);
+
+      const survivors = await prisma.processManagerOutbox.findMany({
+        where: { id: { in: [staleId, freshId] }, projectId: PROJECT },
+        select: { id: true },
+      });
+      expect(survivors.map((row) => row.id)).toEqual([freshId]);
+    });
+
+    /** @scenario A redriven message keeps the history of both its lives */
+    it("orders a redriven message's attempts by when they happened, not by number", async () => {
+      const nsLives = `${ns}.lives`;
+      const id = await seedDeadMessage({
+        processName: nsLives,
+        processKey: "dl-lives",
+        messageKey: "dead-lives",
+        retiredAt: new Date(NOW - 5_000),
+      });
+      const identity = {
+        processName: nsLives,
+        projectId: PROJECT,
+        messageKey: "dead-lives",
+      };
+
+      // First life, then a redrive resets the counter, then a second life —
+      // so both lives carry an attempt numbered 1.
+      await store.recordFailedAttempt({
+        identity,
+        attempt: {
+          attempt: 1,
+          occurredAt: NOW - 30_000,
+          outcome: "dead",
+          errorType: "DispatchError",
+          errorMessage: "first life",
+        },
+      });
+      await store.recordFailedAttempt({
+        identity,
+        attempt: {
+          attempt: 1,
+          occurredAt: NOW - 10_000,
+          outcome: "dead",
+          errorType: "DispatchError",
+          errorMessage: "second life",
+        },
+      });
+
+      const attempts = await service.getOutboxAttempts({
+        outboxId: id,
+        projectId: PROJECT,
+      });
+      expect(attempts.map((a) => a.errorMessage)).toEqual([
+        "first life",
+        "second life",
+      ]);
+      // Row identity, not the attempt number, is what stays unique.
+      expect(new Set(attempts.map((a) => a.id)).size).toBe(2);
+      expect(new Set(attempts.map((a) => a.attempt)).size).toBe(1);
+    });
+
     /** @scenario Attempt history dies with its message */
     it("cascades attempt rows when the message row is deleted", async () => {
       const nsCascade = `${ns}.cascade`;
