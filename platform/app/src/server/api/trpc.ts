@@ -38,11 +38,14 @@ interface CreateNextContextOptions {
 
 import { auditLog } from "@ee/audit-log/auditLog";
 import type { AuthzPermission } from "@langwatch/authz";
-import { HandledError, ValidationError } from "@langwatch/handled-error";
+import {
+  HandledError,
+  isZodLikeError,
+  ValidationError,
+} from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import superjson from "superjson";
-import { ZodError } from "zod";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
@@ -240,10 +243,12 @@ export function errorFormatter({
   // other failure: `fromZodError` flattens the issues into
   // `meta.fieldErrors` / `meta.formErrors`, which is where the contents of the
   // old sidecar `data.zodError` field now live. Mirrors what the Hono handler
-  // already does (packages/api/src/errors.ts::validationErrorFromZod).
+  // already does (packages/api/src/errors.ts::validationErrorFromZod). Matched
+  // by shape, since the routers behind this one boundary no longer share a
+  // single zod and an `instanceof` sees one major only — see `isZodLikeError`.
   const handled = HandledError.isHandled(error.cause)
     ? error.cause
-    : error.cause instanceof ZodError
+    : isZodLikeError(error.cause)
       ? ValidationError.fromZodError(error.cause)
       : null;
 
