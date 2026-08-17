@@ -68,18 +68,22 @@ describe("resolveExpiresAt", () => {
 });
 
 describe("earliestCustomDate", () => {
-  it("refuses today, so the smallest answer is a whole day away", () => {
-    expect(earliestCustomDate(new Date("2026-08-16T10:30:00.000Z"))).toBe(
-      "2026-08-17",
-    );
+  describe("when the day is already part way through", () => {
+    it("refuses today, so the smallest answer is a whole day away", () => {
+      expect(earliestCustomDate(new Date("2026-08-16T10:30:00.000Z"))).toBe(
+        "2026-08-17",
+      );
+    });
   });
 });
 
 describe("formatExpiry", () => {
-  it("names the day that was picked, not the one a timezone rolls it into", () => {
-    expect(formatExpiry(new Date("2026-08-20T23:59:59.999Z"))).toBe(
-      "Thu, Aug 20, 2026",
-    );
+  describe("when the stored instant sits at the end of its day", () => {
+    it("names the day that was picked, not the one a timezone rolls it into", () => {
+      expect(formatExpiry(new Date("2026-08-20T23:59:59.999Z"))).toBe(
+        "Thu, Aug 20, 2026",
+      );
+    });
   });
 });
 
@@ -111,18 +115,24 @@ describe("expirationStateFromStored", () => {
 describe("isExpired", () => {
   const now = new Date("2026-08-16T10:30:00.000Z");
 
-  it("says no for a key that never expires", () => {
-    expect(isExpired(null, now)).toBe(false);
-    expect(isExpired(undefined, now)).toBe(false);
+  describe("when the key carries no expiration date", () => {
+    it("says no", () => {
+      expect(isExpired(null, now)).toBe(false);
+      expect(isExpired(undefined, now)).toBe(false);
+    });
   });
 
-  it("says no while the date is still ahead", () => {
-    expect(isExpired("2026-08-16T10:30:00.001Z", now)).toBe(false);
+  describe("when the date is still ahead", () => {
+    it("says no", () => {
+      expect(isExpired("2026-08-16T10:30:00.001Z", now)).toBe(false);
+    });
   });
 
-  it("says yes at the moment the date is reached", () => {
-    expect(isExpired("2026-08-16T10:30:00.000Z", now)).toBe(true);
-    expect(isExpired("2026-08-15T10:30:00.000Z", now)).toBe(true);
+  describe("when the date has been reached or has passed", () => {
+    it("says yes, counting the instant itself as expired", () => {
+      expect(isExpired("2026-08-16T10:30:00.000Z", now)).toBe(true);
+      expect(isExpired("2026-08-15T10:30:00.000Z", now)).toBe(true);
+    });
   });
 });
 

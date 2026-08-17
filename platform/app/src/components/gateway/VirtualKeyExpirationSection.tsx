@@ -51,7 +51,11 @@ export function VirtualKeyExpirationSection({
       resolveExpiresAt({ preset: value.preset, customDate: value.customDate }),
     [value.preset, value.customDate],
   );
-  const minDate = useMemo(() => earliestCustomDate(), []);
+  // Recomputed every render rather than memoised: a drawer left open across
+  // the UTC-day boundary would otherwise keep offering yesterday's minimum,
+  // and the server refuses that date with virtual_key_expiry_in_past. Any
+  // interaction with the form re-renders and brings this current.
+  const minDate = earliestCustomDate();
 
   return (
     <VStack align="stretch" gap={2}>

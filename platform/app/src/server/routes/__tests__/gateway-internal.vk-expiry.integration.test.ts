@@ -63,12 +63,18 @@ async function resolveCode(secret: string): Promise<{
 
 describe("virtual key expiry (real PG + internal route)", () => {
   let previousSecret: string | undefined;
+  let previousJwtSecret: string | undefined;
   const service = VirtualKeyService.create(prisma);
 
   beforeAll(async () => {
     await startTestContainers();
     previousSecret = process.env.LW_GATEWAY_INTERNAL_SECRET;
     process.env.LW_GATEWAY_INTERNAL_SECRET = SECRET;
+    // The cases that expect a 200 get a signed JWT back, and signing needs
+    // this secret. Set here rather than taken from the environment, so the
+    // suite passes or fails on its own terms.
+    previousJwtSecret = process.env.LW_GATEWAY_JWT_SECRET;
+    process.env.LW_GATEWAY_JWT_SECRET = SECRET;
 
     await prisma.organization.create({
       data: { id: ORG_ID, name: `VKEX Org ${suffix}`, slug: `vkex-${suffix}` },
@@ -103,6 +109,11 @@ describe("virtual key expiry (real PG + internal route)", () => {
     } else {
       process.env.LW_GATEWAY_INTERNAL_SECRET = previousSecret;
     }
+    if (previousJwtSecret === undefined) {
+      delete process.env.LW_GATEWAY_JWT_SECRET;
+    } else {
+      process.env.LW_GATEWAY_JWT_SECRET = previousJwtSecret;
+    }
     await prisma.virtualKey.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.user.deleteMany({ where: { id: USER_ID } });
     await prisma.project.deleteMany({ where: { id: PROJECT_ID } });
@@ -133,98 +144,108 @@ describe("virtual key expiry (real PG + internal route)", () => {
     await prisma.virtualKey.update({ where: { id }, data: { expiresAt } });
   }
 
-  /** @scenario "An expired key is rejected with its own error code" */
-  it("rejects an expired key with the expiry code, not revoked or disabled", async () => {
-    const { virtualKey, secret } = await mintKey({ name: "ran-out" });
-    await forceExpiry(virtualKey.id, new Date(Date.now() - 60_000));
+  describe("when the date has already passed", () => {
+    /** @scenario "An expired key is rejected with its own error code" */
+    it("rejects an expired key with the expiry code, not revoked or disabled", async () => {
+      const { virtualKey, secret } = await mintKey({ name: "ran-out" });
+      await forceExpiry(virtualKey.id, new Date(Date.now() - 60_000));
 
-    expect(await resolveCode(secret)).toEqual({
-      status: 403,
-      code: "virtual_key_expired",
+      expect(await resolveCode(secret)).toEqual({
+        status: 403,
+        code: "virtual_key_expired",
+      });
     });
   });
 
-  /** @scenario "A key whose expiration date is still ahead serves normally" */
-  it("resolves a key whose date has not arrived yet", async () => {
-    const { secret } = await mintKey({
-      name: "still-good",
-      expiresAt: new Date(Date.now() + DAY_MS),
-    });
+  describe("when the date is still ahead", () => {
+    /** @scenario "A key whose expiration date is still ahead serves normally" */
+    it("resolves a key whose date has not arrived yet", async () => {
+      const { secret } = await mintKey({
+        name: "still-good",
+        expiresAt: new Date(Date.now() + DAY_MS),
+      });
 
-    const res = await app.request(signedResolveKey(secret));
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { jwt: string };
-    expect(body.jwt).toBeTruthy();
+      const res = await app.request(signedResolveKey(secret));
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { jwt: string };
+      expect(body.jwt).toBeTruthy();
+    });
   });
 
-  /** @scenario "Extending the date puts an expired key back in service" */
-  it("serves the same secret again once the date is moved forward", async () => {
-    const { virtualKey, secret } = await mintKey({ name: "extend-me" });
-    await forceExpiry(virtualKey.id, new Date(Date.now() - 60_000));
-    expect((await resolveCode(secret)).code).toBe("virtual_key_expired");
+  describe("when the date on an expired key is moved forward", () => {
+    /** @scenario "Extending the date puts an expired key back in service" */
+    it("serves the same secret again once the date is moved forward", async () => {
+      const { virtualKey, secret } = await mintKey({ name: "extend-me" });
+      await forceExpiry(virtualKey.id, new Date(Date.now() - 60_000));
+      expect((await resolveCode(secret)).code).toBe("virtual_key_expired");
 
-    await service.update({
-      id: virtualKey.id,
-      organizationId: ORG_ID,
-      actorUserId: USER_ID,
-      expiresAt: new Date(Date.now() + DAY_MS),
+      await service.update({
+        id: virtualKey.id,
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+        expiresAt: new Date(Date.now() + DAY_MS),
+      });
+
+      expect((await app.request(signedResolveKey(secret))).status).toBe(200);
     });
-
-    expect((await app.request(signedResolveKey(secret))).status).toBe(200);
   });
 
-  /** @scenario "Clearing the expiration date makes the key permanent again" */
-  it("serves forever once the date is cleared", async () => {
-    const { virtualKey, secret } = await mintKey({
-      name: "clear-me",
-      expiresAt: new Date(Date.now() + DAY_MS),
-    });
-    await forceExpiry(virtualKey.id, new Date(Date.now() - 60_000));
-    expect((await resolveCode(secret)).code).toBe("virtual_key_expired");
+  describe("when the date on an expired key is cleared", () => {
+    /** @scenario "Clearing the expiration date makes the key permanent again" */
+    it("serves forever once the date is cleared", async () => {
+      const { virtualKey, secret } = await mintKey({
+        name: "clear-me",
+        expiresAt: new Date(Date.now() + DAY_MS),
+      });
+      await forceExpiry(virtualKey.id, new Date(Date.now() - 60_000));
+      expect((await resolveCode(secret)).code).toBe("virtual_key_expired");
 
-    await service.update({
-      id: virtualKey.id,
-      organizationId: ORG_ID,
-      actorUserId: USER_ID,
-      expiresAt: null,
-    });
+      await service.update({
+        id: virtualKey.id,
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+        expiresAt: null,
+      });
 
-    const stored = await prisma.virtualKey.findUniqueOrThrow({
-      where: { id: virtualKey.id },
+      const stored = await prisma.virtualKey.findUniqueOrThrow({
+        where: { id: virtualKey.id },
+      });
+      expect(stored.expiresAt).toBeNull();
+      expect((await app.request(signedResolveKey(secret))).status).toBe(200);
     });
-    expect(stored.expiresAt).toBeNull();
-    expect((await app.request(signedResolveKey(secret))).status).toBe(200);
   });
 
-  /** @scenario "Expiry leaves disable and revoke exactly as they were" */
-  it("keeps the stored status, and reports the stored stop first", async () => {
-    const { virtualKey, secret } = await mintKey({ name: "still-active" });
-    await forceExpiry(virtualKey.id, new Date(Date.now() - 60_000));
+  describe("when a stored stop is applied on top of an expired key", () => {
+    /** @scenario "Expiry leaves disable and revoke exactly as they were" */
+    it("keeps the stored status, and reports the stored stop first", async () => {
+      const { virtualKey, secret } = await mintKey({ name: "still-active" });
+      await forceExpiry(virtualKey.id, new Date(Date.now() - 60_000));
 
-    const expired = await prisma.virtualKey.findUniqueOrThrow({
-      where: { id: virtualKey.id },
-    });
-    expect(expired.status).toBe("ACTIVE");
+      const expired = await prisma.virtualKey.findUniqueOrThrow({
+        where: { id: virtualKey.id },
+      });
+      expect(expired.status).toBe("ACTIVE");
 
-    await service.disable({
-      id: virtualKey.id,
-      organizationId: ORG_ID,
-      actorUserId: USER_ID,
-    });
-    expect((await resolveCode(secret)).code).toBe("virtual_key_disabled");
+      await service.disable({
+        id: virtualKey.id,
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+      });
+      expect((await resolveCode(secret)).code).toBe("virtual_key_disabled");
 
-    await service.enable({
-      id: virtualKey.id,
-      organizationId: ORG_ID,
-      actorUserId: USER_ID,
-    });
-    expect((await resolveCode(secret)).code).toBe("virtual_key_expired");
+      await service.enable({
+        id: virtualKey.id,
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+      });
+      expect((await resolveCode(secret)).code).toBe("virtual_key_expired");
 
-    await service.revoke({
-      id: virtualKey.id,
-      organizationId: ORG_ID,
-      actorUserId: USER_ID,
+      await service.revoke({
+        id: virtualKey.id,
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+      });
+      expect((await resolveCode(secret)).code).toBe("virtual_key_revoked");
     });
-    expect((await resolveCode(secret)).code).toBe("virtual_key_revoked");
   });
 });

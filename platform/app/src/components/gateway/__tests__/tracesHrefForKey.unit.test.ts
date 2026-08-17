@@ -83,54 +83,63 @@ describe("tracesHrefForKey over a stated window", () => {
 });
 
 describe("tracesHrefForKey narrowed to one model", () => {
-  const href = tracesHrefForKey({
-    projectSlug: "acme-inc",
-    virtualKeyId: "vk_01HTEST",
-    model: "anthropic/claude-sonnet-4-5",
-  });
-  const parsed = parseFragment(href.slice(href.indexOf("#")));
-
-  it("joins the two clauses with an explicit AND", () => {
-    expect(parsed?.overrides.query).toBe(
-      'trace.attribute.langwatch.virtual_key_id:"vk_01HTEST" AND model:"anthropic/claude-sonnet-4-5"',
-    );
-  });
-
-  it("leaves a model that needs no quoting unquoted", () => {
-    const bare = tracesHrefForKey({
+  describe("when the model name needs quoting", () => {
+    const href = tracesHrefForKey({
       projectSlug: "acme-inc",
       virtualKeyId: "vk_01HTEST",
-      model: "gpt-5-mini",
+      model: "anthropic/claude-sonnet-4-5",
     });
-    expect(parseFragment(bare.slice(bare.indexOf("#")))?.overrides.query).toBe(
-      'trace.attribute.langwatch.virtual_key_id:"vk_01HTEST" AND model:gpt-5-mini',
-    );
+    const parsed = parseFragment(href.slice(href.indexOf("#")));
+
+    it("joins the two clauses with an explicit AND", () => {
+      expect(parsed?.overrides.query).toBe(
+        'trace.attribute.langwatch.virtual_key_id:"vk_01HTEST" AND model:"anthropic/claude-sonnet-4-5"',
+      );
+    });
+
+    describe("when the query language reads the two clauses back", () => {
+      const translated = translateFilterToClickHouse(
+        parsed?.overrides.query ?? "",
+        "project_test",
+        { from: 1714435200000, to: 1715040000000 },
+      );
+
+      it("filters on the key and the model together", () => {
+        expect(translated).not.toBeNull();
+        const params = Object.values(translated!.params);
+        expect(params).toContain("vk_01HTEST");
+        expect(params).toContain("anthropic/claude-sonnet-4-5");
+      });
+    });
   });
 
-  describe("when the query language reads the two clauses back", () => {
-    const translated = translateFilterToClickHouse(
-      parsed?.overrides.query ?? "",
-      "project_test",
-      { from: 1714435200000, to: 1715040000000 },
-    );
-
-    it("filters on the key and the model together", () => {
-      expect(translated).not.toBeNull();
-      const params = Object.values(translated!.params);
-      expect(params).toContain("vk_01HTEST");
-      expect(params).toContain("anthropic/claude-sonnet-4-5");
+  describe("when the model name needs no quoting", () => {
+    it("leaves it unquoted", () => {
+      const bare = tracesHrefForKey({
+        projectSlug: "acme-inc",
+        virtualKeyId: "vk_01HTEST",
+        model: "gpt-5-mini",
+      });
+      expect(
+        parseFragment(bare.slice(bare.indexOf("#")))?.overrides.query,
+      ).toBe(
+        'trace.attribute.langwatch.virtual_key_id:"vk_01HTEST" AND model:gpt-5-mini',
+      );
     });
   });
 
-  it("omits the model clause when no model is picked", () => {
-    const unfiltered = tracesHrefForKey({
-      projectSlug: "acme-inc",
-      virtualKeyId: "vk_01HTEST",
-      model: null,
+  describe("when no model is picked", () => {
+    it("omits the model clause", () => {
+      const unfiltered = tracesHrefForKey({
+        projectSlug: "acme-inc",
+        virtualKeyId: "vk_01HTEST",
+        model: null,
+      });
+      expect(
+        parseFragment(unfiltered.slice(unfiltered.indexOf("#")))?.overrides
+          .query,
+      ).toBe('trace.attribute.langwatch.virtual_key_id:"vk_01HTEST"');
     });
-    expect(
-      parseFragment(unfiltered.slice(unfiltered.indexOf("#")))?.overrides.query,
-    ).toBe('trace.attribute.langwatch.virtual_key_id:"vk_01HTEST"');
   });
 });
 

@@ -573,6 +573,7 @@ Feature: AI Gateway — Virtual Keys
   @integration
   Scenario: A disabled key is listed with the active keys and keeps its actions
     Given virtual key "paused-key" is disabled
+    And it files its traces into a project I can open
     When I open the virtual keys list
     Then it appears in the Active tab, badged "disabled"
     And its actions offer Details, View traces and Revoke

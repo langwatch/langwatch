@@ -32,8 +32,13 @@ type Bundle struct {
 
 // KeyExpired reports whether the virtual key's own expiration date has passed
 // at instant now. A bundle carrying no date never expires.
+//
+// The date itself counts as expired, which is why this asks "not before"
+// rather than "after": the control plane refuses the key when expiresAt is at
+// or below the current time, and a cache that served the exact boundary
+// instant would answer a request the control plane rejects.
 func (b *Bundle) KeyExpired(now time.Time) bool {
-	return !b.VirtualKeyExpiresAt.IsZero() && now.After(b.VirtualKeyExpiresAt)
+	return !b.VirtualKeyExpiresAt.IsZero() && !now.Before(b.VirtualKeyExpiresAt)
 }
 
 // BundleConfig holds the policy knobs configured per virtual key.

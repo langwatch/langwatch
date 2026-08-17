@@ -110,11 +110,22 @@ jobs:
       integration-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '4' || '1' }}
       # The component lane is unit-shaped: forked VM workers and concurrent
       # files, with no service containers to wait on, so a shard gets through
-      # its files far faster than a datastore shard does. Two is enough for
-      # ~546 files. (It does NOT share a module registry the way the unit lane
-      # does — see the `isolate` note in vitest.component.config.ts.)
-      component-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2]' || '[1]' }}
-      component-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '2' || '1' }}
+      # its files far faster than a datastore shard does. (It does NOT share a
+      # module registry the way the unit lane does, see the `isolate` note in
+      # vitest.component.config.ts.)
+      #
+      # Three rather than two, because two put the lane inside a minute of the
+      # hard floor. The floor in src/test-unit-global-setup.ts fires at 4 min
+      # and is calibrated for a lane whose healthy shard takes ~3 min; measured
+      # on 540 files over two shards, shard 1 spent 3m34s in the test step, so
+      # 26 seconds separated a green lane from one the floor cut mid-run. Six
+      # more files crossed it. The floor then reports the shard as red with no
+      # failed test in it, which reads as a wedge rather than as a lane that
+      # outgrew its split, so the cost of being close to it is a confusing
+      # failure rather than a slow pass. Every PR that adds a component test
+      # spends that margin, so the split has to leave some.
+      component-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3]' || '[1]' }}
+      component-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '3' || '1' }}
       # Coverage instrumentation costs ~45% of the run (measured: a unit subset
       # goes 3.7s -> 6.6s with --coverage). Nothing gates on it — there is no
       # codecov.yml, no codecov status check, and both uploads are

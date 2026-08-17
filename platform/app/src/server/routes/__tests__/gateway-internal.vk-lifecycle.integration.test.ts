@@ -198,25 +198,27 @@ describe("virtual key disable and enable (real PG + internal route)", () => {
     expect(body.error.code).toBe("virtual_key_disabled");
   });
 
-  /** @scenario "The token ends when the key does" */
-  it("ends the token at the key's expiration date and carries that date on it", async () => {
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-    const { virtualKey, secret } = await mintKey({
-      name: "short-lived",
-      expiresAt,
-    });
-    const stored = await prisma.virtualKey.findUniqueOrThrow({
-      where: { id: virtualKey.id },
-    });
-    const keyExpiresAt = Math.floor(stored.expiresAt!.getTime() / 1000);
+  describe("when the key expires before the ordinary TTL", () => {
+    /** @scenario "The token ends when the key does" */
+    it("ends the token at the key's expiration date and carries that date on it", async () => {
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+      const { virtualKey, secret } = await mintKey({
+        name: "short-lived",
+        expiresAt,
+      });
+      const stored = await prisma.virtualKey.findUniqueOrThrow({
+        where: { id: virtualKey.id },
+      });
+      const keyExpiresAt = Math.floor(stored.expiresAt!.getTime() / 1000);
 
-    const res = await app.request(signedResolveKey(secret));
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { jwt: string };
+      const res = await app.request(signedResolveKey(secret));
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { jwt: string };
 
-    const decoded = jwt.decode(body.jwt) as { exp: number };
-    expect(decoded.exp).toBe(keyExpiresAt);
-    expect(verifyGatewayJwt(body.jwt).vk_expires_at).toBe(keyExpiresAt);
+      const decoded = jwt.decode(body.jwt) as { exp: number };
+      expect(decoded.exp).toBe(keyExpiresAt);
+      expect(verifyGatewayJwt(body.jwt).vk_expires_at).toBe(keyExpiresAt);
+    });
   });
 
   /** @scenario Revocation is terminal in both directions */
