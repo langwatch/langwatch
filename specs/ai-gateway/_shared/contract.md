@@ -331,7 +331,19 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
       "spent_usd": 12.40, "remaining_usd": 37.60, "resets_at": "2026-05-01T00:00:00Z",
       "on_breach": "block" }
   ],
-  "metadata": { "label": "dev/codex", "tags": ["coding-cli"], "created_by": "user_01HZ..." }
+  "metadata": { "label": "dev/codex", "tags": ["coding-cli"], "created_by": "user_01HZ..." },
+  /* The key's own expiration date in unix seconds, null for a key that never
+     expires. ALWAYS present: the gateway reads an explicit null as "this key
+     has no date" and an absent field as "an older control plane said nothing,
+     keep the date you hold", so the two must stay distinguishable.
+
+     The same date rides the auth token as `vk_expires_at` (§4.1), which is the
+     mint-time floor. Carrying it here as well is what bounds how stale the
+     gateway's copy can get: the ETag moves on every mutation, so a shortened or
+     extended date arrives on the next config revalidation (§9, ConfigTTL, 60s
+     by default) even while the change feed is unavailable. Shortening therefore
+     propagates faster than revocation does under the same failure. */
+  "expires_at": 1734568790
 }
 ```
 
@@ -740,6 +752,8 @@ Documented here so Go code + infra agree:
 Background refresh: single goroutine long-polls `/api/internal/gateway/changes?since=<rev>` with 25s timeout. On diff → re-fetch affected VK configs and invalidate the matching L1 entries.
 
 Config staleness is bounded by a TTL refresh underneath the change feed, and that refresh is conditional: it sends `If-None-Match: <etag>` to §4.2 and takes the 304 as "keep the bundle, restart the staleness clock". A key nobody changed costs the control plane a revision lookup rather than a full config materialization.
+
+The same refresh bounds the staleness of the key's own expiration date, which §4.2 carries as `expires_at`. The token claim `vk_expires_at` is the mint-time floor and the config channel is the update path, so a date an admin shortens or extends reaches the gateway within one ConfigTTL even while the change feed is unavailable. A response with no `expires_at` field comes from a control plane older than it, and the gateway then keeps the date its bundle already holds; reading absent as "no expiry" would lift the cap off a key whose own token says it expires.
 
 No filesystem-persisted secrets. JWTs and configs are in-memory only; on restart we re-fetch.
 

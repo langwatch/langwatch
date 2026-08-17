@@ -327,9 +327,23 @@ func (c *Client) FetchConfig(ctx context.Context, vkID, ifNoneMatch string) (dom
 	if err := json.Unmarshal(body, &wire); err != nil {
 		return domain.ConfigFetchResult{}, err
 	}
+	// An expires_at that is neither a unix timestamp nor null fails the whole
+	// fetch, the same way an unparseable body does: the caller then keeps the
+	// bundle it holds, with the expiry cap it already had, and the refusal is
+	// logged. Taking the rest of the config and dropping the date would move the
+	// key's own end date on a guess.
+	keyExpiry, keyExpiryKnown, err := wire.keyExpiry()
+	if err != nil {
+		return domain.ConfigFetchResult{}, fmt.Errorf("config fetch expires_at: %w", err)
+	}
 	// A response with no ETag header stores none, so the next fetch goes out
 	// unconditional and gets the config outright.
-	return domain.ConfigFetchResult{Config: wire.toDomain(), ETag: resp.Header.Get("ETag")}, nil
+	return domain.ConfigFetchResult{
+		Config:                wire.toDomain(),
+		ETag:                  resp.Header.Get("ETag"),
+		VirtualKeyExpiresAt:   keyExpiry,
+		VirtualKeyExpiryKnown: keyExpiryKnown,
+	}, nil
 }
 
 // BudgetBucketSpend reads the current-period spend for one attributed-user

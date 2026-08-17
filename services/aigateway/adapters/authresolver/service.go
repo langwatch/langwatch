@@ -976,6 +976,14 @@ func (s *Service) bumpEntryAfterTransportFailure(h [64]byte, cause error) {
 // re-downloading. Most of the time it fires, nothing about the key has
 // changed, and the conditional request turns a full config materialization
 // into a 304 the control plane answers from the key's revision.
+//
+// It bounds the staleness of the key's own expiration date by the same TTL. The
+// date arrives on the config response as well as on the token, so an admin who
+// shortens it is followed within one TTL even while the change feed is
+// unavailable, and one who extends it stops a request being refused at a
+// boundary the control plane has already moved. The token claim stays the
+// mint-time floor underneath: a control plane the gateway cannot reach at all
+// leaves the last known date in force and the key still stops at it.
 func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 	defer e.endConfigRefresh()
 
@@ -1003,6 +1011,14 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 	fresh := *stale
 	fresh.Config = res.Config
 	fresh.Credentials = res.Config.Credentials
+	// The key's own end date moves in both directions here, and storeL1 rebuilds
+	// both deadlines from it. A response that says nothing about expiry comes
+	// from a control plane older than the field, so the copied date stands: an
+	// absent field read as "no date" would lift the cap off a key whose token
+	// says it expires.
+	if res.VirtualKeyExpiryKnown {
+		fresh.VirtualKeyExpiresAt = res.VirtualKeyExpiresAt
+	}
 
 	// Guard against resurrecting an entry that another path evicted or
 	// replaced while FetchConfig was in flight: a change-feed eviction

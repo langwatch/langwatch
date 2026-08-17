@@ -13604,14 +13604,14 @@ Disabling a VK stops it without destroying anything: requests on the key are rej
 
 If you find yourself scheduling a revoke "in case the customer comes back", you want disable.
 
-## Expiration: the stop nobody presses
+## Expiration
 
 A VK can carry an expiration date. Requests presented after it are rejected with the distinct `virtual_key_expired` error (`403`). Use it for keys with a known end date: a contractor, a demo, a load test.
 
 - Set it in the create drawer (Never, 1 day, 7 days, 30 days, 6 months, 1 year, or a date you pick) or with `expires_at` on the API. A custom date runs to the end of that day, UTC.
 - The key stays `active` past the date. Expiry is read from `expires_at` on every resolve, so extending the date puts the key straight back in service with the same secret. The edit drawer and `PATCH` both change it, and `null` clears it.
-- Expiry takes effect on the next resolve. A gateway JWT already minted runs out on its own clock, so a key can serve for up to 15 minutes past its date.
-- While the control plane is unreachable the gateway keeps serving from its warm cache, which extends that window to the auth-cache hard grace (`LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`, 6 hours by default). Set it to a negative value to hard-fail at JWT expiry instead, which is the setting for a strict revocation regime. See [Self-Hosting → Config](/ai-gateway/self-hosting/config).
+- The key stops at its date even while the control plane is unreachable. The gateway is told the date on the token it holds and on the key's config, and both of its cache deadlines stop there, so the stale-while-error grace (`LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`, 6 hours by default) never carries a key past its own date.
+- A date you change reaches the gateway within 60 seconds through the change feed. If the change feed is unavailable, the key's config refresh brings the new date on the same 60 second clock, in both directions: a shortened date stops the key, and an extended one keeps it serving. A control plane the gateway cannot reach at all leaves the last date it was told in force.
 - Nothing else changes: budgets, scopes, configuration and rotation grace are untouched, and disable, enable, rotate and revoke behave exactly as they always did.
 
 The virtual keys list badges a key past its date as **expired**. The key detail page states the date, and how long is left while the key is still active.
@@ -13683,7 +13683,7 @@ This means:
 
 - **First request** on a cold cache: 2-4 ms of control-plane overhead.
 - **Warm request** after first: tens of microseconds of overhead.
-- **Control-plane offline**: gateway continues serving a warm key past its JWT TTL (15 min default) up to the auth-cache hard grace (6 hours by default). A key the pod has never resolved still fails, because the cache is per pod and starts empty.
+- **Control-plane offline**: gateway continues serving a warm key past its JWT TTL (15 min default) up to the auth-cache hard grace (6 hours by default), and never past the key's own expiration date. A key the pod has never resolved still fails, because the cache is per pod and starts empty.
 
 See [Self-Hosting → Config](/ai-gateway/self-hosting/config) for tuning the cache.
 

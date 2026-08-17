@@ -432,6 +432,70 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then the cached bundle is served
       And its soft expiry is bumped, transport-failure style
 
+  Rule: A changed expiration date reaches the gateway on the config channel
+
+    The date travels on two channels, because each covers what the other
+    cannot. The token claim is the mint-time floor: it needs no control plane to
+    be true, so a full outage still stops the key at the last date the gateway
+    was told. The config response carries the date as well, and that is the
+    update path: the config version token moves on every mutation, so a date an
+    admin shortens or extends arrives on the next config revalidation, inside
+    the config TTL, even while the change feed is unavailable.
+
+    Both directions matter. Shortening a date has to take effect, or a key keeps
+    calling providers after it ran out. Extending one has to take effect too, or
+    a request at the old boundary is refused for a date the control plane has
+    already moved.
+
+    A response that carries no expiration field comes from a control plane older
+    than the field. The gateway then keeps the date it holds. Reading an absent
+    field as "this key never expires" would lift the cap off a key whose own
+    token says it expires.
+
+    @integration
+    Scenario: the config endpoint carries the key's expiration date
+      Given a key that expires on a date, and a key that never expires
+      When the gateway fetches each key's config
+      Then the first carries its date in unix seconds
+      And the second carries an explicit null, which is not the same answer as no field at all
+
+    @integration
+    Scenario: changing only the date moves the config version token
+      Given a key the gateway holds config for
+      When an administrator changes only its expiration date
+      Then the config version token changes
+      And the next revalidation answers with the config and the new date instead of confirming the old one
+
+    @unit
+    Scenario: a shortened date is followed while the change feed is unavailable
+      Given a cached key the gateway holds no expiration date for
+      And the change feed is not wired
+      When the config refresh answers with a date that has passed
+      Then the next request with that key is rejected with error.type "virtual_key_expired"
+      And the entry is evicted
+
+    @unit
+    Scenario: an extended date is followed the same way
+      Given a cached key whose expiration date is a moment away
+      When the config refresh answers with a later date before that moment
+      Then a request after the old date serves normally
+      And both cache deadlines move past the old date
+
+    @unit
+    Scenario: a config response with no expiration field keeps the date the gateway holds
+      Given a cached key that expires in five minutes
+      When the config refresh comes from a control plane that sends no expiration field
+      Then the entry keeps the expiration date it had
+      And its hard cap stays at that date
+
+    @unit
+    Scenario: the config wire tells a null date apart from a missing one
+      Given a config response
+      When the gateway decodes its expiration field
+      Then a unix timestamp is the date the key stops
+      And an explicit null is a key that never expires
+      And a missing field says nothing about expiry, so the caller keeps what it holds
+
   Rule: Bootstrap-pull enables gateway to serve when control plane is cold
 
     # The flag is named the way contract.md §6 and §9 name it. Nothing reads
