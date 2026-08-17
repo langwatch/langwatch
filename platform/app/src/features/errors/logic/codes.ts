@@ -167,6 +167,8 @@ export const APP_ERROR_CODES = [
   "malformed_request",
   "member_not_found",
   "member_seat_limit_reached",
+  "migration_rollback_requires_finalized",
+  "migration_state_not_found",
   "missing_annotator",
   "missing_credentials",
   // Not declared by a subclass anywhere: `nlpgo/goHandledError.ts` promotes a

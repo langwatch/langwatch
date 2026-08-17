@@ -1354,4 +1354,27 @@ export const opsRouter = createTRPCRouter({
       systemMigrationsService.startPass();
       return { started: true };
     }),
+
+  /**
+   * The operator rollback: pin a finalized organization back onto its
+   * legacy path. Only `finalized` rolls back; the service refuses anything
+   * else with a handled error. Rolled-back tenants are terminal for the
+   * runner — later passes leave them alone.
+   */
+  rollBackSystemMigrationTenant: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        migrationName: z.string().min(1),
+        tenantId: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await systemMigrationsService.rollBack({
+        migrationName: input.migrationName,
+        tenantId: input.tenantId,
+        actorUserId: ctx.session.user.id,
+      });
+      return { rolledBack: true };
+    }),
 });

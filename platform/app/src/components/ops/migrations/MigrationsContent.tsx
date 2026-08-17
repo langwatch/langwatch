@@ -5,19 +5,21 @@ import {
   Center,
   Heading,
   HStack,
+  Input,
   Spacer,
   Spinner,
   Stack,
   Table,
   Text,
 } from "@chakra-ui/react";
-import { Play } from "lucide-react";
+import { Play, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api, type RouterOutputs } from "~/utils/api";
 import { JsonViewer } from "../JsonViewer";
+import { ConfirmDialog } from "../shared/ConfirmDialog";
 
 const STATUS_COLOR: Record<string, string> = {
   finalized: "green",
@@ -100,7 +102,11 @@ export function MigrationsContent() {
       </HStack>
 
       {(query.data ?? []).map((migration) => (
-        <MigrationSection key={migration.name} migration={migration} />
+        <MigrationSection
+          key={migration.name}
+          migration={migration}
+          canManage={canManage}
+        />
       ))}
     </Stack>
   );
@@ -108,7 +114,13 @@ export function MigrationsContent() {
 
 type MigrationListing = RouterOutputs["ops"]["listSystemMigrations"][number];
 
-function MigrationSection({ migration }: { migration: MigrationListing }) {
+function MigrationSection({
+  migration,
+  canManage,
+}: {
+  migration: MigrationListing;
+  canManage: boolean;
+}) {
   return (
     <Box>
       <HStack marginBottom={3}>
@@ -120,6 +132,13 @@ function MigrationSection({ migration }: { migration: MigrationListing }) {
         </Badge>
         <Badge colorPalette="orange">Held {migration.counts.migrated}</Badge>
         <Badge colorPalette="red">Parked {migration.counts.parked}</Badge>
+        {migration.counts.rolled_back > 0 && (
+          <Badge colorPalette="gray">
+            Rolled back {migration.counts.rolled_back}
+          </Badge>
+        )}
+        <Spacer />
+        {canManage && <RollBackAction migrationName={migration.name} />}
       </HStack>
       {migration.attention.length === 0 ? (
         <Text fontSize="sm" color="fg.muted">
@@ -146,6 +165,61 @@ function MigrationSection({ migration }: { migration: MigrationListing }) {
         </Table.Root>
       )}
     </Box>
+  );
+}
+
+/**
+ * The state machine's one human-driven edge: finalized → rolled_back.
+ * Finalized organizations are a count rather than a listing, so the
+ * operator names the organization instead of picking a row — they arrive
+ * here knowing exactly which organization needs to go back.
+ */
+function RollBackAction({ migrationName }: { migrationName: string }) {
+  const [open, setOpen] = useState(false);
+  const [tenantId, setTenantId] = useState("");
+  const utils = api.useUtils();
+  const rollBack = api.ops.rollBackSystemMigrationTenant.useMutation({
+    onSuccess: async () => {
+      toaster.create({
+        title: "Organization rolled back",
+        description:
+          "It is pinned to its legacy path again. Permission checks pick the change up within a minute, and later passes leave it alone.",
+        type: "success",
+      });
+      setOpen(false);
+      setTenantId("");
+      await utils.ops.listSystemMigrations.invalidate();
+    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't roll back" }),
+  });
+
+  return (
+    <>
+      <Button size="xs" variant="outline" onClick={() => setOpen(true)}>
+        <Undo2 size={13} /> Roll back…
+      </Button>
+      <ConfirmDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        onConfirm={() =>
+          rollBack.mutate({ migrationName, tenantId: tenantId.trim() })
+        }
+        title="Roll an organization back to its legacy path"
+        description="The organization returns to the behavior it had before this migration finalized, and stays there until an operator intervenes again. Only finalized organizations can be rolled back. Enter the organization id."
+        isLoading={rollBack.isPending}
+        confirmDisabled={tenantId.trim().length === 0}
+      >
+        <Input
+          marginTop={3}
+          size="sm"
+          fontFamily="mono"
+          placeholder="organization id"
+          value={tenantId}
+          onChange={(event) => setTenantId(event.target.value)}
+        />
+      </ConfirmDialog>
+    </>
   );
 }
 

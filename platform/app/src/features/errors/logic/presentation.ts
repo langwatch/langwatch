@@ -984,6 +984,20 @@ const presentations = {
     describe: () =>
       "Free a seat by disabling a membership, or upgrade the plan to add more.",
   },
+  migration_state_not_found: {
+    title: "No migration state for that organization",
+    describe: () =>
+      "Check the organization id — only organizations a migration has already processed have state to act on.",
+  },
+  migration_rollback_requires_finalized: {
+    title: "Only a finalized organization can be rolled back",
+    describe: (error) => {
+      const status = str(error, "status", "");
+      return status
+        ? `This organization is ${status.replace("_", " ")}, so it is already on — or on its way back to — the legacy path.`
+        : "This organization is not finalized, so it is already on the legacy path.";
+    },
+  },
   duplicate_invite: {
     title: "They already have an invite",
     describe: (error) => {
