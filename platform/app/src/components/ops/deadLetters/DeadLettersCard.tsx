@@ -113,7 +113,10 @@ export function DeadLetterSummary({
               <Badge size="xs" colorPalette="red" marginLeft={1}>
                 {row.count}
               </Badge>
-              <Text textStyle="xs" color="fg.muted" marginLeft={1}>
+              {/* `as="span"`: Chakra's Text renders a <p>, which a <button>
+                  may not contain — the browser closes the button early and
+                  the chip stops being one control. */}
+              <Text as="span" textStyle="xs" color="fg.muted" marginLeft={1}>
                 oldest {formatTimeAgo(row.oldestUpdatedAt, now)}
               </Text>
             </Button>
@@ -195,9 +198,21 @@ function DeadLetterRow({
 }) {
   return (
     <>
+      {/* Reachable by keyboard, not only by mouse. The expanded region holds
+          the trace id, which is the only route from this page to WHY the
+          message died — so a row that opens on click alone puts the
+          diagnosis behind a pointer. */}
       <Table.Row
         cursor="pointer"
         onClick={onToggle}
+        tabIndex={0}
+        role="button"
+        aria-expanded={isExpanded}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          onToggle();
+        }}
         data-testid={`dead-row-${message.messageKey}`}
       >
         <Table.Cell>

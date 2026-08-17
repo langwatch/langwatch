@@ -139,7 +139,15 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
   // not have to know that a GroupQueue job and a process-manager intent retire
   // through different machinery. They still redrive from their own surfaces,
   // because the actions genuinely differ.
-  if (dlqQuery.isLoading || (groups.length === 0 && processDeadTotal === 0)) {
+  // Both sources gate the render. Without the process-dead query in here the
+  // card mounts on the queue answer alone and then flips a red row in a
+  // moment later, which on an ops surface reads as a new incident rather than
+  // as the same page finishing loading.
+  if (
+    dlqQuery.isLoading ||
+    processDeadQuery.isLoading ||
+    (groups.length === 0 && processDeadTotal === 0)
+  ) {
     return null;
   }
 
@@ -155,10 +163,15 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
             gap={2}
             flexWrap="wrap"
           >
-            <Text textStyle="sm" fontWeight="medium" color="orange.500">
-              Dead Letter Queue — {groups.length} group
-              {groups.length !== 1 ? "s" : ""}
-            </Text>
+            {/* The card now renders for either source, so the queue heading
+                stands down when the queue itself is clean rather than
+                printing "0 groups" above a red process-outbox count. */}
+            {groups.length > 0 && (
+              <Text textStyle="sm" fontWeight="medium" color="orange.500">
+                Dead Letter Queue — {groups.length} group
+                {groups.length !== 1 ? "s" : ""}
+              </Text>
+            )}
             <Spacer />
             {hasAccess && (
               <HStack gap={1.5} flexWrap="wrap">
