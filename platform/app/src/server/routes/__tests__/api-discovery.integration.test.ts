@@ -188,7 +188,7 @@ describe("API discovery", () => {
    */
   describe("given the document is served from prepared bytes", () => {
     describe("when it is requested more than once", () => {
-      /** @scenario "The document is served from bytes prepared once" */
+      /** @scenario "Fetching the document twice returns the same document" */
       it("returns byte-identical responses declaring their own length", async () => {
         const first = await rootApp.request(WELL_KNOWN);
         const second = await rootApp.request(WELL_KNOWN);
@@ -251,7 +251,7 @@ describe("API discovery", () => {
     });
 
     describe("when the document is served from each location", () => {
-      /** @scenario "The entity tag identifies the content, not the deployment" */
+      /** @scenario "Every location offers the same entity tag for the same document" */
       it("offers the same tag everywhere", async () => {
         const wellKnown = await rootApp.request(WELL_KNOWN);
         const underApi = await app.request(UNDER_API);

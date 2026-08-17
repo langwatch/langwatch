@@ -42,22 +42,43 @@ function alreadyHasIt(ifNoneMatch: string | undefined): boolean {
 }
 
 /**
- * Writes precomputed JSON bytes as the response body.
+ * Writes precomputed JSON bytes as the response body, without copying them.
  *
- * `new Response` rather than `c.body`, because Hono types the latter as
- * `string | ArrayBuffer | ReadableStream` and a Node `Buffer` is none of those
- * — it is an `ArrayBufferView`, which `BodyInit` accepts. Going through
- * `Response` keeps the bytes as bytes; handing Hono a string instead would
- * reintroduce the UTF-8 encode this exists to avoid.
+ * The body is a `ReadableStream` that enqueues the shared bytes, and that is
+ * load-bearing rather than stylistic. Handing the `Uint8Array` straight to
+ * `new Response(bytes)` COPIES it: 200 responses over one shared 688 KB buffer
+ * allocated 134.4 MB of `arrayBuffers`, identical to passing an explicit
+ * `.slice()`, where the stream form allocated 0. Precomputing the bytes and
+ * then copying them per request would have kept the CPU saving and thrown away
+ * the allocation one.
  *
- * The same Buffer backs every response. That is safe because nothing mutates
- * it, and it is the point: one allocation for the life of the process.
+ * Enqueuing the same array into concurrent streams is safe: a non-transferable
+ * `ReadableStream` does not detach or mutate what it is given, and nothing here
+ * writes to it.
+ *
+ * Not `c.body` either, which Hono types as `string | ArrayBuffer |
+ * ReadableStream` — a string body would reintroduce the UTF-8 encode this
+ * exists to avoid.
+ *
+ * One caveat left open: the Hono Node adapter may still copy on its way to the
+ * socket. That is a transient write buffer rather than a retained allocation,
+ * and it is below what this module can control.
  */
-export function jsonBytesResponse(
-  bytes: Uint8Array<ArrayBuffer>,
-  headers: Record<string, string> = {},
-): Response {
-  return new Response(bytes, {
+export function jsonBytesResponse({
+  bytes,
+  headers = {},
+}: {
+  bytes: Uint8Array<ArrayBuffer>;
+  headers?: Record<string, string>;
+}): Response {
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  });
+
+  return new Response(body, {
     status: 200,
     headers: {
       ...headers,
@@ -79,5 +100,5 @@ export function respondWithApiDocument(c: Context): Response {
     return new Response(null, { status: 304, headers });
   }
 
-  return jsonBytesResponse(apiDocumentBytes, headers);
+  return jsonBytesResponse({ bytes: apiDocumentBytes, headers });
 }

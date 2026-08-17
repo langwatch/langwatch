@@ -78,6 +78,6 @@ const catalogueBytes: Uint8Array<ArrayBuffer> = Buffer.from(
 
 secured
   .access(publicEndpoint(WHY_DISCOVERY_IS_PUBLIC))
-  .post("/rpc.discover", () => jsonBytesResponse(catalogueBytes));
+  .post("/rpc.discover", () => jsonBytesResponse({ bytes: catalogueBytes }));
 
 export const app = secured.hono;

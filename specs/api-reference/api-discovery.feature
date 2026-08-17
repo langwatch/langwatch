@@ -58,9 +58,9 @@ Feature: An agent can find the API description without being told where it is
   # be re-encoded to UTF-8 on every response, which is most of the saving.
 
   @integration
-  Scenario: The document is served from bytes prepared once
+  Scenario: Fetching the document twice returns the same document
     When the document is requested twice
-    Then both responses are byte-identical
+    Then both responses carry identical content
     And each declares the exact length of what it sent
 
   @integration
@@ -70,10 +70,9 @@ Feature: An agent can find the API description without being told where it is
     Then it is answered "not modified" with no body
 
   @integration
-  Scenario: The entity tag identifies the content, not the deployment
+  Scenario: Every location offers the same entity tag for the same document
     When the document is served from any of its locations
     Then they all offer the same entity tag
-    And the tag is derived from the bytes, so replicas of one artifact agree
 
   @integration
   Scenario: A caller holding a stale tag gets the document
