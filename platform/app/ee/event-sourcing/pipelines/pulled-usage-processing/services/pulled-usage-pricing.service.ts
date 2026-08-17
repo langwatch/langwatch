@@ -16,6 +16,7 @@
  * event, copied to the ledger row, and read back unchanged.
  */
 
+import { EMPTY_SPEND_USAGE } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
 import { rateSpendNanoUsd } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
 import { usdToNanoUsd } from "~/server/gateway/wireMoney";
 import {
@@ -116,12 +117,16 @@ export function pricePulledUsage(
 
   const { costNanoUsd, rateVersion } = rateSpendNanoUsd({
     model: input.model,
+    // Spread the canonical zero rather than listing every quantity: a pulled
+    // record carries only these four, and the ones the gateway spine measures
+    // and we cannot (audio, TTS characters, 1h cache writes) must read as zero
+    // — including the ones added after this was written.
     usage: {
+      ...EMPTY_SPEND_USAGE,
       input_tokens: input.quantities.tokensInput,
       output_tokens: input.quantities.tokensOutput,
       cache_read_input_tokens: input.quantities.tokensCacheRead,
       cache_creation_input_tokens: input.quantities.tokensCacheWrite,
-      reasoning_tokens: 0,
     },
   });
 
