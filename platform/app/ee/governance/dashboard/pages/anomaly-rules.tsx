@@ -677,7 +677,10 @@ const SOURCE_TYPE_PICKER_OPTIONS = [
   { value: "otel_generic", label: "Generic OTel (otel_generic)" },
   { value: "claude_cowork", label: "Claude Cowork (claude_cowork)" },
   { value: "workato", label: "Workato (workato)" },
-  { value: "microsoft_365_audit", label: "Microsoft 365 audit (microsoft_365_audit)" },
+  {
+    value: "microsoft_365_audit",
+    label: "Microsoft 365 audit (microsoft_365_audit)",
+  },
   {
     value: "openai_compliance",
     label: "OpenAI Compliance (openai_compliance)",

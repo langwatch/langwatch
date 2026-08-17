@@ -184,7 +184,8 @@ describe("copilot_studio disable migration", () => {
 
     expect(after.status).toBe("active");
     // Nor stamp the reason a second time.
-    const occurrences = (after.description ?? "").split(RETIRED_REASON).length - 1;
+    const occurrences =
+      (after.description ?? "").split(RETIRED_REASON).length - 1;
     expect(occurrences).toBe(1);
   });
 

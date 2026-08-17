@@ -202,14 +202,15 @@ describe("Microsoft365AuditPuller drain", () => {
     const puller = await loadPuller();
     seedBlobs(5);
 
-    // Deadline expires after the second blob is drained.
+    // Deadline expires once two blobs are drained. Keyed on work actually
+    // done, not on a count of Date.now() calls: the number of times the
+    // adapter consults the clock is an implementation detail, and a
+    // call-counting mock silently turns a refactor into a timeout at a
+    // different point in the run.
     const t0 = 1_000_000;
-    let calls = 0;
-    vi.spyOn(Date, "now").mockImplementation(() => {
-      calls += 1;
-      // Let subscribe + listing + two blobs through, then time out.
-      return calls > 8 ? t0 + 10_000 : t0;
-    });
+    vi.spyOn(Date, "now").mockImplementation(() =>
+      fx.blobFetches.length >= 2 ? t0 + 10_000 : t0,
+    );
 
     const run1 = await puller.runOnce(
       { cursor: null, deadlineMs: t0 + 5_000 },

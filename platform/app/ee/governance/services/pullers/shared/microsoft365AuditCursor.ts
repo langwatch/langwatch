@@ -88,24 +88,77 @@ function isStringArray(value: unknown): value is string[] {
  * treats that the same as a first run except that it should start from the
  * salvaged watermark if there is one.
  */
-export function decodeCursor(raw: string | null): DecodeResult {
-  if (raw === null || raw.trim() === "") return { cursor: null };
+/**
+ * The candidate as a usable cursor, or the reason it is not one.
+ *
+ * Split from `decodeCursor` so the rejection ladder stays one flat list of
+ * reasons rather than a branch tree wrapped around the happy path. Returning
+ * the built cursor rather than a bare "ok" keeps the narrowing each check
+ * earned, so the caller needs no casts.
+ */
+function validateCursor(
+  candidate: Record<string, unknown>,
+): { cursor: Microsoft365AuditCursor } | { reason: string } {
+  if (candidate.version !== CURSOR_VERSION) {
+    return { reason: `unknown cursor version ${String(candidate.version)}` };
+  }
+  if (candidate.phase !== "listing" && candidate.phase !== "draining") {
+    return { reason: `unknown cursor phase ${String(candidate.phase)}` };
+  }
+  if (!isIsoDate(candidate.windowStart) || !isIsoDate(candidate.windowEnd)) {
+    return { reason: "cursor window was not a pair of ISO timestamps" };
+  }
+  if (!isStringArray(candidate.blobQueue)) {
+    return { reason: "cursor blobQueue was not a list of strings" };
+  }
+  if (!isIsoDate(candidate.watermark)) {
+    return { reason: "cursor watermark was not an ISO timestamp" };
+  }
+  return {
+    cursor: {
+      version: CURSOR_VERSION,
+      phase: candidate.phase,
+      windowStart: candidate.windowStart,
+      windowEnd: candidate.windowEnd,
+      blobQueue: candidate.blobQueue.slice(0, MAX_QUEUED_BLOBS),
+      ...(typeof candidate.nextPageUri === "string"
+        ? { nextPageUri: candidate.nextPageUri }
+        : {}),
+      watermark: candidate.watermark,
+    },
+  };
+}
 
+/**
+ * The stored cursor as a plain object, or the reason it is not one.
+ *
+ * A JSON document that is merely a string is the legacy bare-cursor shape;
+ * unparseable input is corruption. Neither carries anything to salvage, so
+ * both are a clean restart.
+ */
+function parseCursorObject(
+  raw: string,
+): { candidate: Record<string, unknown> } | { reason: string } {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    // A bare string cursor from some earlier shape, or corruption. Either
-    // way there is nothing to salvage, so this is a clean restart.
-    return { cursor: null, recoveredFrom: "cursor was not JSON" };
+    return { reason: "cursor was not JSON" };
   }
-
-  // A JSON document that is merely a string is the legacy bare-cursor shape.
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    return { cursor: null, recoveredFrom: "cursor was not an object" };
+    return { reason: "cursor was not an object" };
   }
+  return { candidate: parsed as Record<string, unknown> };
+}
 
-  const candidate = parsed as Record<string, unknown>;
+export function decodeCursor(raw: string | null): DecodeResult {
+  if (raw === null || raw.trim() === "") return { cursor: null };
+
+  const parsedResult = parseCursorObject(raw);
+  if ("reason" in parsedResult) {
+    return { cursor: null, recoveredFrom: parsedResult.reason };
+  }
+  const { candidate } = parsedResult;
 
   // Salvage the watermark before rejecting anything else: it is the one
   // field worth keeping from a cursor we otherwise cannot use.
@@ -127,33 +180,7 @@ export function decodeCursor(raw: string | null): DecodeResult {
           recoveredFrom: reason,
         };
 
-  if (candidate.version !== CURSOR_VERSION) {
-    return withWatermark(`unknown cursor version ${String(candidate.version)}`);
-  }
-  if (candidate.phase !== "listing" && candidate.phase !== "draining") {
-    return withWatermark(`unknown cursor phase ${String(candidate.phase)}`);
-  }
-  if (!isIsoDate(candidate.windowStart) || !isIsoDate(candidate.windowEnd)) {
-    return withWatermark("cursor window was not a pair of ISO timestamps");
-  }
-  if (!isStringArray(candidate.blobQueue)) {
-    return withWatermark("cursor blobQueue was not a list of strings");
-  }
-  if (!isIsoDate(candidate.watermark)) {
-    return withWatermark("cursor watermark was not an ISO timestamp");
-  }
-
-  return {
-    cursor: {
-      version: CURSOR_VERSION,
-      phase: candidate.phase,
-      windowStart: candidate.windowStart,
-      windowEnd: candidate.windowEnd,
-      blobQueue: candidate.blobQueue.slice(0, MAX_QUEUED_BLOBS),
-      ...(typeof candidate.nextPageUri === "string"
-        ? { nextPageUri: candidate.nextPageUri }
-        : {}),
-      watermark: candidate.watermark,
-    },
-  };
+  const validated = validateCursor(candidate);
+  if ("reason" in validated) return withWatermark(validated.reason);
+  return { cursor: validated.cursor };
 }

@@ -192,6 +192,36 @@ export function mapAuditRecord(record: AuditRecord): NormalizedPullEvent {
   };
 }
 
+/** Every non-empty `contentUri` in one page of the content listing. */
+function contentUrisFrom(listing: ContentListingEntry[]): string[] {
+  if (!Array.isArray(listing)) return [];
+  return listing
+    .map((entry) => asString(entry.contentUri))
+    .filter((uri) => uri !== "");
+}
+
+/**
+ * Append the Copilot interactions in one blob to `events`, counting the rest.
+ *
+ * Non-Copilot records are counted rather than dropped silently: `Audit.General`
+ * carries every workload's records, so a run that emits nothing needs to say
+ * whether it saw nothing or saw only other people's traffic.
+ */
+function collectCopilotEvents(
+  records: AuditRecord[],
+  events: NormalizedPullEvent[],
+  stats: Microsoft365AuditRunStats,
+): void {
+  if (!Array.isArray(records)) return;
+  for (const record of records) {
+    if (record?.RecordType === COPILOT_INTERACTION_RECORD_TYPE) {
+      events.push(mapAuditRecord(record));
+    } else {
+      stats.filteredOut += 1;
+    }
+  }
+}
+
 export class Microsoft365AuditPuller
   implements PullerAdapter<Microsoft365AuditConfig>
 {
@@ -239,37 +269,14 @@ export class Microsoft365AuditPuller
       const events: NormalizedPullEvent[] = [];
       const working: Microsoft365AuditCursor = { ...cursor };
 
-      // List then drain, repeatedly, because a full blob queue or the page
-      // cap defers part of the listing rather than dropping it.
-      //
-      // A bounded loop, not mutual recursion between the two: `deadlineMs` is
-      // optional on PullRunOptions, so a run without one facing a server that
-      // returns a stable `nextpageuri` would recurse until the stack gave
-      // out. The cap bounds it whether or not a deadline is set, and any
-      // remainder rides the cursor to the next run.
-      for (let round = 0; round < MAX_LIST_DRAIN_ROUNDS_PER_RUN; round += 1) {
-        if (this.outOfTime(options)) break;
-
-        if (working.phase === "listing" || working.nextPageUri !== undefined) {
-          await this.listContent({ config, tokens, options, cursor: working });
-        }
-
-        await this.drainBlobs({
-          config,
-          tokens,
-          options,
-          cursor: working,
-          events,
-          stats,
-        });
-
-        // Nothing deferred and nothing queued: the window is finished.
-        if (working.blobQueue.length === 0 && working.nextPageUri === undefined)
-          break;
-        // Blobs still queued means the deadline stopped the drain, not the
-        // listing — going round again would not help.
-        if (working.blobQueue.length > 0) break;
-      }
+      await this.pumpWindow({
+        config,
+        tokens,
+        options,
+        cursor: working,
+        events,
+        stats,
+      });
 
       const drained =
         working.blobQueue.length === 0 && working.nextPageUri === undefined;
@@ -314,6 +321,50 @@ export class Microsoft365AuditPuller
         return { events: [], cursor: options.cursor, errorCount: 0 };
       }
       throw error;
+    }
+  }
+
+  /**
+   * List then drain, repeatedly, because a full blob queue or the page cap
+   * defers part of the listing rather than dropping it. Mutates the cursor, so
+   * whatever is left when this returns is exactly what the next run resumes.
+   *
+   * A bounded loop, not mutual recursion between the two: `deadlineMs` is
+   * optional on PullRunOptions, so a run without one facing a server that
+   * returns a stable `nextpageuri` would recurse until the stack gave out. The
+   * cap bounds it whether or not a deadline is set, and any remainder rides
+   * the cursor to the next run.
+   */
+  private async pumpWindow({
+    config,
+    tokens,
+    options,
+    cursor,
+    events,
+    stats,
+  }: {
+    config: Microsoft365AuditConfig;
+    tokens: TokenProvider;
+    options: PullRunOptions;
+    cursor: Microsoft365AuditCursor;
+    events: NormalizedPullEvent[];
+    stats: Microsoft365AuditRunStats;
+  }): Promise<void> {
+    for (let round = 0; round < MAX_LIST_DRAIN_ROUNDS_PER_RUN; round += 1) {
+      if (this.outOfTime(options)) return;
+
+      if (cursor.phase === "listing" || cursor.nextPageUri !== undefined) {
+        await this.listContent({ config, tokens, options, cursor });
+      }
+
+      await this.drainBlobs({ config, tokens, options, cursor, events, stats });
+
+      // Nothing deferred and nothing queued: the window is finished. Blobs
+      // still queued means the deadline stopped the drain, not the listing —
+      // either way, going round again would not help.
+      if (cursor.blobQueue.length > 0 || cursor.nextPageUri === undefined) {
+        return;
+      }
     }
   }
 
@@ -424,6 +475,20 @@ export class Microsoft365AuditPuller
    * runs out, the page cap is hit, or the queue is full. Mutates the cursor
    * so a caller that stops early still holds the remainder.
    */
+  /** The first page of a window's content listing. */
+  private firstListingUri(
+    config: Microsoft365AuditConfig,
+    cursor: Microsoft365AuditCursor,
+  ): string {
+    return (
+      `${MANAGEMENT_API_BASE}/${encodeURIComponent(config.tenantId)}` +
+      `/activity/feed/subscriptions/content` +
+      `?contentType=${encodeURIComponent(config.contentType)}` +
+      `&startTime=${encodeURIComponent(cursor.windowStart)}` +
+      `&endTime=${encodeURIComponent(cursor.windowEnd)}`
+    );
+  }
+
   private async listContent({
     config,
     tokens,
@@ -435,13 +500,7 @@ export class Microsoft365AuditPuller
     options: PullRunOptions;
     cursor: Microsoft365AuditCursor;
   }): Promise<void> {
-    let pageUri =
-      cursor.nextPageUri ??
-      `${MANAGEMENT_API_BASE}/${encodeURIComponent(config.tenantId)}` +
-        `/activity/feed/subscriptions/content` +
-        `?contentType=${encodeURIComponent(config.contentType)}` +
-        `&startTime=${encodeURIComponent(cursor.windowStart)}` +
-        `&endTime=${encodeURIComponent(cursor.windowEnd)}`;
+    let pageUri = cursor.nextPageUri ?? this.firstListingUri(config, cursor);
 
     cursor.nextPageUri = undefined;
 
@@ -458,13 +517,9 @@ export class Microsoft365AuditPuller
         deadlineAtMs: options.deadlineMs,
       });
 
-      const listing = (await response.json()) as ContentListingEntry[];
-      if (Array.isArray(listing)) {
-        for (const entry of listing) {
-          const uri = asString(entry.contentUri);
-          if (uri !== "") cursor.blobQueue.push(uri);
-        }
-      }
+      cursor.blobQueue.push(
+        ...contentUrisFrom((await response.json()) as ContentListingEntry[]),
+      );
 
       const nextPage = response.headers.get("nextpageuri");
       if (nextPage === null || nextPage === "") {
@@ -521,16 +576,11 @@ export class Microsoft365AuditPuller
         deadlineAtMs: options.deadlineMs,
       });
 
-      const records = (await response.json()) as AuditRecord[];
-      if (Array.isArray(records)) {
-        for (const record of records) {
-          if (record?.RecordType !== COPILOT_INTERACTION_RECORD_TYPE) {
-            stats.filteredOut += 1;
-            continue;
-          }
-          events.push(mapAuditRecord(record));
-        }
-      }
+      collectCopilotEvents(
+        (await response.json()) as AuditRecord[],
+        events,
+        stats,
+      );
 
       cursor.blobQueue.shift();
       stats.blobsDrained += 1;

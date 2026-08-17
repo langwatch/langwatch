@@ -32,6 +32,14 @@ import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 /** Backoff for 5xx and transport errors. Two retries, then give up. */
 export const RETRY_DELAYS_MS = [250, 500] as const;
 
+/**
+ * One request, plus one more per backoff delay. Stated as its own constant so
+ * the loop bound reads as a request count rather than as an index compared
+ * against an array length — the latter is indistinguishable from an off-by-one
+ * on sight, and was reported as one.
+ */
+const MAX_ATTEMPTS = RETRY_DELAYS_MS.length + 1;
+
 /** Per-request bound, independent of the run's deadline. */
 export const REQUEST_TIMEOUT_MS = 30_000;
 
@@ -122,78 +130,187 @@ function isClientErrorMessage(error: unknown): boolean {
  * retries, on a non-429 4xx, or `RetryDeadlineExceededError` when the
  * required wait would outlive the run.
  */
-export async function fetchWithRetry({
+/**
+ * What one response means for the retry loop: hand it back, or wait and try
+ * again. A status that must not be retried throws from here rather than
+ * returning, so there is no third case for the caller to forget.
+ */
+type AttemptOutcome =
+  | { kind: "done"; response: FetchResponse }
+  | { kind: "retry"; error: Error; waitMs: number | null };
+
+function classifyResponse(
+  response: FetchResponse,
+  url: string,
+  nowMs: number,
+): AttemptOutcome {
+  if (response.status === 429) {
+    const retryAfter = parseRetryAfterMs(
+      response.headers.get("retry-after"),
+      nowMs,
+    );
+    return {
+      kind: "retry",
+      error: new Error(`HTTP 429 ${response.statusText} (${url})`),
+      // Cap a server-supplied wait: an hour-long Retry-After is a "come back
+      // next run" instruction, and the caller's deadline check turns it into
+      // exactly that.
+      waitMs:
+        retryAfter == null ? null : Math.min(retryAfter, MAX_RETRY_AFTER_MS),
+    };
+  }
+  if (response.status >= 500) {
+    return {
+      kind: "retry",
+      error: new Error(`HTTP ${response.status} ${response.statusText}`),
+      waitMs: null,
+    };
+  }
+  if (response.status >= 400) {
+    // Every other 4xx fails fast — retrying a 401 or a 400 just repeats it.
+    throw new Error(`HTTP ${response.status} ${response.statusText} (${url})`);
+  }
+  return { kind: "done", response };
+}
+
+/**
+ * How long to wait before attempt `attempt + 1`, or null when there must not
+ * be one — the run was aborted, or the last delay has been used.
+ *
+ * Throws `RetryDeadlineExceededError` when the wait would outlive the run:
+ * retrying past the deadline just burns time the scheduler has already given
+ * up waiting for. That is not a failure — the caller persists its cursor and
+ * the next run picks up where this one stopped.
+ */
+function delayBeforeRetry({
+  attempt,
+  waitMs,
+  signal,
+  deadlineAtMs,
+  now,
+}: {
+  attempt: number;
+  waitMs: number | null;
+  signal: AbortSignal | undefined;
+  deadlineAtMs: number | undefined;
+  now: () => number;
+}): number | null {
+  if (signal?.aborted === true) return null;
+
+  const backoff = RETRY_DELAYS_MS[attempt];
+  if (backoff === undefined) return null;
+
+  const delay = waitMs ?? backoff;
+  if (deadlineAtMs !== undefined && now() + delay > deadlineAtMs) {
+    throw new RetryDeadlineExceededError(delay);
+  }
+  return delay;
+}
+
+/** One request, classified. Transport failures propagate to the caller. */
+async function attemptOnce({
   url,
-  method = "GET",
+  method,
+  headers,
+  body,
+  signal,
+  nowMs,
+}: {
+  url: string;
+  method: string;
+  headers: Record<string, string> | undefined;
+  body: string | undefined;
+  signal: AbortSignal | undefined;
+  nowMs: number;
+}): Promise<AttemptOutcome> {
+  // Two independent bounds: this request's own timeout, and the run's
+  // deadline. Either one firing must unwind the call.
+  const requestSignal = signal
+    ? AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
+    : AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+
+  const response = await ssrfSafeFetch(url, {
+    method,
+    headers,
+    body,
+    signal: requestSignal,
+  });
+  return classifyResponse(response, url, nowMs);
+}
+
+/**
+ * One attempt, with a transport failure folded into a retry outcome rather
+ * than thrown. A status or message that must not be retried still throws, so
+ * fail-fast stays fail-fast.
+ */
+async function attemptOrRetry(
+  args: Parameters<typeof attemptOnce>[0],
+): Promise<AttemptOutcome> {
+  try {
+    return await attemptOnce(args);
+  } catch (error) {
+    if (isClientErrorMessage(error)) throw error;
+    return {
+      kind: "retry",
+      error: error instanceof Error ? error : new Error(String(error)),
+      waitMs: null,
+    };
+  }
+}
+
+/** Options with every default already applied, so the loop has none to apply. */
+type ResolvedRetryOptions = FetchWithRetryOptions & {
+  method: "GET" | "POST";
+  sleep: (ms: number) => Promise<void>;
+  now: () => number;
+};
+
+async function retryLoop({
+  url,
+  method,
   headers,
   body,
   signal,
   deadlineAtMs,
-  sleep = defaultSleep,
-  now = Date.now,
-}: FetchWithRetryOptions): Promise<FetchResponse> {
+  sleep,
+  now,
+}: ResolvedRetryOptions): Promise<FetchResponse> {
   let lastError: Error | undefined;
 
-  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
-    let waitMs: number | null = null;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    const outcome = await attemptOrRetry({
+      url,
+      method,
+      headers,
+      body,
+      signal,
+      nowMs: now(),
+    });
+    if (outcome.kind === "done") return outcome.response;
+    lastError = outcome.error;
 
-    try {
-      // Two independent bounds: this request's own timeout, and the run's
-      // deadline. Either one firing must unwind the call.
-      const requestSignal = signal
-        ? AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
-        : AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-
-      const response = await ssrfSafeFetch(url, {
-        method,
-        headers,
-        body,
-        signal: requestSignal,
-      });
-
-      if (response.status === 429) {
-        const retryAfter = parseRetryAfterMs(
-          response.headers.get("retry-after"),
-          now(),
-        );
-        // Cap a server-supplied wait: an hour-long Retry-After is a "come
-        // back next run" instruction, and the deadline check below turns it
-        // into exactly that.
-        waitMs =
-          retryAfter == null ? null : Math.min(retryAfter, MAX_RETRY_AFTER_MS);
-        lastError = new Error(`HTTP 429 ${response.statusText} (${url})`);
-      } else if (response.status >= 500) {
-        lastError = new Error(`HTTP ${response.status} ${response.statusText}`);
-      } else if (response.status >= 400) {
-        // Every other 4xx fails fast — retrying a 401 or a 400 just repeats it.
-        throw new Error(
-          `HTTP ${response.status} ${response.statusText} (${url})`,
-        );
-      } else {
-        return response;
-      }
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      if (isClientErrorMessage(error)) throw error;
-    }
-
-    // Retrying past the run's deadline just burns time the scheduler has
-    // already given up waiting for.
-    if (signal?.aborted) break;
-
-    const backoff = RETRY_DELAYS_MS[attempt];
-    if (backoff === undefined || attempt >= RETRY_DELAYS_MS.length) break;
-
-    const delay = waitMs ?? backoff;
-
-    if (deadlineAtMs !== undefined && now() + delay > deadlineAtMs) {
-      // Not a failure. The caller persists its cursor and the next run picks
-      // up where this one stopped.
-      throw new RetryDeadlineExceededError(delay);
-    }
+    const delay = delayBeforeRetry({
+      attempt,
+      waitMs: outcome.waitMs,
+      signal,
+      deadlineAtMs,
+      now,
+    });
+    if (delay === null) break;
 
     await sleep(delay);
   }
 
   throw lastError ?? new Error("fetchWithRetry: unknown error");
+}
+
+export async function fetchWithRetry(
+  options: FetchWithRetryOptions,
+): Promise<FetchResponse> {
+  return retryLoop({
+    ...options,
+    method: options.method ?? "GET",
+    sleep: options.sleep ?? defaultSleep,
+    now: options.now ?? Date.now,
+  });
 }
