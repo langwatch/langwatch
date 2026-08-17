@@ -261,8 +261,11 @@ describe("DeadLettersCard", () => {
       ).toBeTruthy();
     });
 
-    /** @scenario Discarding a dead message marks it and keeps it */
-    /** @scenario Recovery verbs are the same on both substrates */
+    // No @scenario here: what this asserts is that the row offers both verbs
+    // and hands the discard its full ref. That the mark is kept, and that
+    // both substrates use the same verbs, are claims the integration suite
+    // and the DLQ card own — binding them here would report them covered
+    // while asserting neither.
     it("offers Redrive and Discard side by side, and Discard carries the full ref", () => {
       const onDiscard = vi.fn();
       const message = makeMessage();

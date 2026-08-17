@@ -92,12 +92,12 @@ function createMockRepo(
 describe("QueueService", () => {
   describe("dead-letter recovery audit", () => {
     /** @scenario Discarding a DLQ group removes it and remembers the act */
-    it("records the queue, the groups, the job count and the last errors on a discard", async () => {
+    it("records the queue, the groups and the job count on a discard", async () => {
       const repo = createMockRepo({
         discardManyFromDlq: vi.fn().mockResolvedValue({
           discardedCount: 2,
           jobsDiscarded: 5,
-          lastErrors: ["HTTP 500"],
+          lastErrors: ["TimeoutError: upstream did not answer"],
         }),
       });
       const append = vi.fn().mockResolvedValue(undefined);
@@ -117,11 +117,34 @@ describe("QueueService", () => {
         metadata: {
           groupIds: ["g1", "g2"],
           requestedGroups: 2,
-          lastErrors: ["HTTP 500"],
+          // The shape of the failure, not its text.
+          lastErrorTypes: ["TimeoutError"],
           discardedCount: 2,
           jobsDiscarded: 5,
         },
       });
+    });
+
+    it("keeps arbitrary job error text out of the durable audit row", async () => {
+      const repo = createMockRepo({
+        discardManyFromDlq: vi.fn().mockResolvedValue({
+          discardedCount: 1,
+          jobsDiscarded: 1,
+          lastErrors: ["failed for user alice@example.com on card 4111"],
+        }),
+      });
+      const append = vi.fn().mockResolvedValue(undefined);
+      const service = new QueueService(repo, { append });
+
+      await service.discardManyFromDlq({
+        queueName: "queue-a",
+        groupIds: ["g1"],
+        requestedBy: "user_1",
+      });
+
+      const recorded = JSON.stringify(append.mock.calls[0]![0].metadata);
+      expect(recorded).not.toContain("alice@example.com");
+      expect(recorded).not.toContain("4111");
     });
 
     it("audits a redrive with what moved and skips the audit when nothing did", async () => {

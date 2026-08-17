@@ -394,7 +394,6 @@ const SSCAN_BATCH = 500;
 /** Page size for the index reads that enumerate a queue's groups. */
 const PENDING_RECONCILE_PAGE_SIZE = 1000;
 
-/** Split an explicit id list into pipeline-sized batches. */
 function chunk<T>(items: T[], size: number): T[][] {
   const batches: T[][] = [];
   for (let i = 0; i < items.length; i += size) {
@@ -1772,8 +1771,9 @@ export class QueueRedisRepository implements QueueRepository {
           discardedCount++;
           jobsDiscarded += Number(count);
         }
-        // A sample, not the set: the audit row names why these groups died,
-        // and five distinct messages is enough to recognise the cause.
+        // A sample. The service reduces these to error shapes before they
+        // reach the audit row, and five distinct failures is enough to tell
+        // "they all died the same way" from "these are unrelated".
         if (lastError && lastErrors.size < 5) lastErrors.add(lastError);
       },
     });

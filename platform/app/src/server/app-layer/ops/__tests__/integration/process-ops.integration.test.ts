@@ -790,11 +790,8 @@ describe("process ops against a real Postgres", () => {
         messageKey: "discard-fresh",
         retiredAt: new Date(NOW - 60_000),
       });
-      for (const [id, key] of [
-        [staleId, "discard-stale"],
-        [freshId, "discard-fresh"],
-      ] as const) {
-        await service.discardDeadMessage({
+      for (const id of [staleId, freshId]) {
+        const { discarded } = await service.discardDeadMessage({
           ref: {
             processName: nsSweep,
             projectId: PROJECT,
@@ -803,7 +800,7 @@ describe("process ops against a real Postgres", () => {
           messageId: id,
           actorUserId: ACTOR,
         });
-        expect(key).toBeTruthy();
+        expect(discarded).toBe(true);
       }
       // Discard stamps updatedAt, so age the stale one past the window by
       // hand — the sweep reaps by that column.
@@ -812,11 +809,13 @@ describe("process ops against a real Postgres", () => {
         data: { updatedAt: new Date(NOW - 40 * 24 * 60 * 60 * 1000) },
       });
 
-      const deleted = await store.deleteDeadOutboxBatch({
+      // The sweep is fleet-wide, so its returned count includes whatever else
+      // the database holds; what this asserts is which of THESE two rows it
+      // took.
+      await store.deleteDeadOutboxBatch({
         before: NOW - 30 * 24 * 60 * 60 * 1000,
         limit: 100,
       });
-      expect(deleted).toBeGreaterThanOrEqual(1);
 
       const survivors = await prisma.processManagerOutbox.findMany({
         where: { id: { in: [staleId, freshId] }, projectId: PROJECT },

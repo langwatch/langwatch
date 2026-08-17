@@ -8,6 +8,10 @@ import { showErrorToast } from "~/features/errors";
  * moved on under the operator — a message that was redriven by someone else a
  * second earlier is not an error, it is a different outcome — so each one
  * needs three strings: it worked, it no longer applied, it failed.
+ *
+ * `onSettled` runs on BOTH paths. It is what clears the caller's pending
+ * state, and a failure that left the row spinning forever would be worse than
+ * the failure itself.
  */
 export function mutationOutcomeHandlers({
   onSettled,
@@ -27,10 +31,10 @@ export function mutationOutcomeHandlers({
         title: ok ? applied : missed,
         type: ok ? ("success" as const) : ("error" as const),
       });
-      onSettled();
     },
     onError: (error: unknown) =>
       showErrorToast({ error, fallbackTitle: failure }),
+    onSettled,
   };
 }
 
@@ -54,9 +58,9 @@ export function countOutcomeHandlers({
         (value): value is number => typeof value === "number",
       );
       toaster.create({ title: title(count ?? 0), type: "success" as const });
-      onSettled();
     },
     onError: (error: unknown) =>
       showErrorToast({ error, fallbackTitle: failure }),
+    onSettled,
   };
 }

@@ -11,23 +11,25 @@ export type BulkDeadLetterAction = "redrive" | "discard" | null;
 
 const plural = (count: number) => (count === 1 ? "message" : "messages");
 
-/**
- * The Dead Letters page's four mutations and their pending state
- * (specs/ops/dead-letter-recovery.feature). Returns state and callbacks only,
- * never JSX — same shape as `useProcessInstanceActions`, which owns the
- * equivalent set for one process instance.
- */
-export function useDeadLetterActions() {
-  const utils = api.useUtils();
+const refOf = (message: DeadLetterMessage) => ({
+  processName: message.processName,
+  projectId: message.projectId,
+  processKey: message.processKey,
+  messageId: message.id,
+});
+
+/** Redrive or discard one dead letter from its row. */
+function useRowActions(onSettled: () => void) {
   const [redrivingId, setRedrivingId] = useState<string | null>(null);
   const [discardingId, setDiscardingId] = useState<string | null>(null);
-  const [confirmBulk, setConfirmBulk] = useState<BulkDeadLetterAction>(null);
-
+  const [discardTarget, setDiscardTarget] = useState<DeadLetterMessage | null>(
+    null,
+  );
   const settle = () => {
     setRedrivingId(null);
     setDiscardingId(null);
-    setConfirmBulk(null);
-    void utils.ops.invalidate();
+    setDiscardTarget(null);
+    onSettled();
   };
 
   const redrive = api.ops.processRedriveDeadMessage.useMutation(
@@ -46,6 +48,34 @@ export function useDeadLetterActions() {
       failure: "Couldn't discard the message",
     }),
   );
+
+  return {
+    redrivingId,
+    discardingId,
+    discardTarget,
+    setDiscardTarget,
+    onRedrive: (message: DeadLetterMessage) => {
+      setRedrivingId(message.id);
+      redrive.mutate(refOf(message));
+    },
+    /** Asks first: nothing un-discards a message. */
+    onDiscard: (message: DeadLetterMessage) => setDiscardTarget(message),
+    confirmDiscard: () => {
+      if (!discardTarget) return;
+      setDiscardingId(discardTarget.id);
+      discard.mutate(refOf(discardTarget));
+    },
+  };
+}
+
+/** Redrive or discard everything the current filter shows. */
+function useBulkActions(onSettled: () => void) {
+  const [confirmBulk, setConfirmBulk] = useState<BulkDeadLetterAction>(null);
+  const settle = () => {
+    setConfirmBulk(null);
+    onSettled();
+  };
+
   const redriveAll = api.ops.redriveDeadLetters.useMutation(
     countOutcomeHandlers({
       onSettled: settle,
@@ -61,27 +91,20 @@ export function useDeadLetterActions() {
     }),
   );
 
-  const refOf = (message: DeadLetterMessage) => ({
-    processName: message.processName,
-    projectId: message.projectId,
-    processKey: message.processKey,
-    messageId: message.id,
-  });
+  return { confirmBulk, setConfirmBulk, redriveAll, discardAll };
+}
 
+/**
+ * The Dead Letters page's mutations and their pending state
+ * (specs/ops/dead-letter-recovery.feature). Returns state and callbacks only,
+ * never JSX — same shape as `useProcessInstanceActions`, which owns the
+ * equivalent set for one process instance.
+ */
+export function useDeadLetterActions() {
+  const utils = api.useUtils();
+  const invalidate = () => void utils.ops.invalidate();
   return {
-    redrivingId,
-    discardingId,
-    confirmBulk,
-    setConfirmBulk,
-    redriveAll,
-    discardAll,
-    onRedrive: (message: DeadLetterMessage) => {
-      setRedrivingId(message.id);
-      redrive.mutate(refOf(message));
-    },
-    onDiscard: (message: DeadLetterMessage) => {
-      setDiscardingId(message.id);
-      discard.mutate(refOf(message));
-    },
+    ...useRowActions(invalidate),
+    ...useBulkActions(invalidate),
   };
 }

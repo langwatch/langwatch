@@ -707,17 +707,32 @@ export const opsRouter = createTRPCRouter({
       });
     }),
 
-  /** Every dead letter marked discarded; same scoping. */
+  /**
+   * Every dead letter marked discarded; same scoping as the redrive.
+   *
+   * The fleet-wide form — no `processName` — crosses every tenant and cannot
+   * be undone, since no redrive path selects a discarded row. It therefore
+   * takes a typed confirmation, the same shape the blob-store delete uses:
+   * the destructive breadth has to be reached deliberately, not by omitting
+   * a field (best_practices/ops-dashboard.md).
+   */
   discardDeadLetters: protectedProcedure
     .use(opsManagePermission)
     .input(
-      z.object({
-        processName: z.string().min(1).max(200).optional(),
-      }),
+      z
+        .object({
+          processName: z.string().min(1).max(200).optional(),
+          confirm: z.literal("DISCARD ALL").optional(),
+        })
+        .refine((input) => !!input.processName || input.confirm !== undefined, {
+          message:
+            "Discarding every process's dead letters requires an explicit confirmation",
+          path: ["confirm"],
+        }),
     )
     .mutation(async ({ ctx, input }) => {
       return requireOps().managerExplorer.discardDeadLetters({
-        ...input,
+        ...(input.processName ? { processName: input.processName } : {}),
         actorUserId: ctx.session.user.id,
       });
     }),

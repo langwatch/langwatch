@@ -11,6 +11,22 @@ import type {
 } from "./repositories/queue.repository";
 import type { GroupInfo, ParkedGroupInfo, QueueSummaryInfo } from "./types";
 
+/**
+ * Reduce raw job errors to something safe to keep: the leading error class or
+ * first few words, capped, deduped. Enough for an operator to recognise "these
+ * all died the same way" without copying arbitrary thrown text — which can
+ * include customer payload — into a durable audit row.
+ */
+function summarizeErrorShapes(messages: string[]): string[] {
+  const shapes = new Set<string>();
+  for (const message of messages) {
+    const named = /^([A-Za-z][A-Za-z0-9_]*(?:Error|Exception))\b/.exec(message);
+    shapes.add(named?.[1] ?? message.trim().split(/\s+/).slice(0, 3).join(" "));
+    if (shapes.size >= 5) break;
+  }
+  return [...shapes].map((shape) => shape.slice(0, 80));
+}
+
 export class QueueService {
   private readonly audit: QueueAuditSink;
 
@@ -309,7 +325,11 @@ export class QueueService {
         metadata: {
           groupIds: params.groupIds.slice(0, 50),
           requestedGroups: params.groupIds.length,
-          lastErrors,
+          // A job's error message is arbitrary thrown text and can carry
+          // customer payload; the audit log is long-lived and widely read, so
+          // it records the SHAPE of the failure rather than its content. The
+          // full message stays where it already was, on the failing job.
+          lastErrorTypes: summarizeErrorShapes(lastErrors),
           ...result,
         },
       });

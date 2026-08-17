@@ -164,6 +164,16 @@ function BulkConfirms({
   const plural = shownCount === 1 ? "message" : "messages";
   return (
     <>
+      {/* Discard asks even for one row, because nothing un-discards it: no
+          redrive path selects a discarded message. */}
+      <ConfirmDialog
+        open={!!actions.discardTarget}
+        onClose={() => actions.setDiscardTarget(null)}
+        onConfirm={actions.confirmDiscard}
+        title="Discard dead letter"
+        description={`Mark "${actions.discardTarget?.intentType}" on ${actions.discardTarget?.processName} as never to be sent. The row is kept as the audit record, and it cannot be redriven afterwards.`}
+        isLoading={actions.discardingId !== null}
+      />
       <ConfirmDialog
         open={actions.confirmBulk === "redrive"}
         onClose={() => actions.setConfirmBulk(null)}
@@ -175,9 +185,16 @@ function BulkConfirms({
       <ConfirmDialog
         open={actions.confirmBulk === "discard"}
         onClose={() => actions.setConfirmBulk(null)}
-        onConfirm={() => actions.discardAll.mutate({ processName })}
+        onConfirm={() =>
+          actions.discardAll.mutate(
+            // The fleet-wide form crosses every tenant, so the API refuses it
+            // without an explicit confirmation rather than treating a missing
+            // process name as "all".
+            processName ? { processName } : { confirm: "DISCARD ALL" },
+          )
+        }
         title="Discard dead letters"
-        description={`Mark all ${shownCount} dead ${plural} for ${shownScope} as never to be sent. The rows are kept as the audit record; the work will not run.`}
+        description={`Mark all ${shownCount} dead ${plural} for ${shownScope} as never to be sent. The rows are kept as the audit record, the work will not run, and none of it can be redriven afterwards.`}
         isLoading={actions.discardAll.isPending}
       />
     </>

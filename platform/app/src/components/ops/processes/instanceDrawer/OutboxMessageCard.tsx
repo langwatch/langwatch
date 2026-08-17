@@ -18,19 +18,20 @@ import {
 
 const NO_PINNED_KEYS: ReadonlySet<string> = new Set();
 
+/** Exhaustive by type, so the next status has to declare its own colour. */
+const STATUS_PALETTES: Record<ProcessOutboxMessageView["status"], string> = {
+  pending: "blue",
+  dispatched: "green",
+  dead: "red",
+  discarded: "gray",
+};
+
 function StatusBadge({
   status,
 }: {
   status: ProcessOutboxMessageView["status"];
 }) {
-  const palette =
-    status === "dead"
-      ? "red"
-      : status === "discarded"
-        ? "gray"
-        : status === "dispatched"
-          ? "green"
-          : "blue";
+  const palette = STATUS_PALETTES[status];
   return (
     <Badge size="xs" colorPalette={palette} variant="subtle">
       {status}

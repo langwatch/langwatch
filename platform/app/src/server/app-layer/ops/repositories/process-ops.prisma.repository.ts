@@ -21,6 +21,16 @@ function traceIdFromCarrier(carrier: unknown): string | null {
   return TRACEPARENT_RE.exec(traceparent)?.[1] ?? null;
 }
 
+/**
+ * How many dead letters one bulk act moves.
+ *
+ * An unbounded UPDATE over this table holds row locks for as long as it takes,
+ * on the highest-volume write path in the system. The cap makes the act
+ * bounded and repeatable instead: the count comes back, the operator sees what
+ * moved, and pressing again takes the next slice.
+ */
+const BULK_RECOVERY_LIMIT = 5_000;
+
 /** Escape LIKE wildcards so a search term matches literally. */
 function escapeLike(term: string): string {
   return term.replace(/[\\%_]/g, (m) => `\\${m}`);
@@ -513,12 +523,21 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
       UPDATE "ProcessManagerOutbox"
       SET "status" = 'pending',
           "attempts" = 0,
-          "nextAttemptAt" = ${now},
+          -- Spread over a minute rather than making every message due at the
+          -- same instant: a fleet redrive can release thousands of intents,
+          -- and handing the dispatcher one due batch the size of the whole
+          -- backlog is how a recovery becomes the next incident.
+          "nextAttemptAt" =
+            CAST(${now} AS timestamptz) + (random() * interval '60 seconds'),
           "leasedUntil" = NULL,
           "leaseToken" = NULL,
           "updatedAt" = ${now}
-      WHERE "status" = 'dead'
-      ${nameFilter}
+      WHERE "id" IN (
+        SELECT "id" FROM "ProcessManagerOutbox"
+        WHERE "status" = 'dead'
+        ${nameFilter}
+        LIMIT ${BULK_RECOVERY_LIMIT}
+      )
     `);
   }
 
@@ -535,8 +554,12 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
       UPDATE "ProcessManagerOutbox"
       SET "status" = 'discarded',
           "updatedAt" = ${now}
-      WHERE "status" = 'dead'
-      ${nameFilter}
+      WHERE "id" IN (
+        SELECT "id" FROM "ProcessManagerOutbox"
+        WHERE "status" = 'dead'
+        ${nameFilter}
+        LIMIT ${BULK_RECOVERY_LIMIT}
+      )
     `);
   }
 

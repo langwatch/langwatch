@@ -344,10 +344,21 @@ export class InMemoryProcessStore implements ProcessStore {
         message.dispatchedAt >= params.before
       )
         continue;
-      this.messages.delete(key);
+      this.deleteMessage(key);
       deleted++;
     }
     return deleted;
+  }
+
+  /**
+   * Every outbox deletion goes through here, so the attempt rows leave with
+   * their message on all of them — the durable store cascades, and a fake
+   * that shed them on only one path would model a leak the real one does not
+   * have.
+   */
+  private deleteMessage(key: string): void {
+    this.messages.delete(key);
+    this.attempts.delete(key);
   }
 
   async deleteDispatchedOutboxBatch(params: {
@@ -403,10 +414,7 @@ export class InMemoryProcessStore implements ProcessStore {
     for (const [key, message] of this.messages) {
       if (deleted >= params.limit) break;
       if (!matches(message)) continue;
-      this.messages.delete(key);
-      // The durable store cascades attempt rows with their message; a fake
-      // that kept them would model a leak the real store does not have.
-      this.attempts.delete(key);
+      this.deleteMessage(key);
       deleted++;
     }
     return deleted;

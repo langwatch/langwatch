@@ -191,7 +191,7 @@ function DlqToolbar({
 }
 
 /** One dead-lettered group, with its per-row recovery verbs. */
-function DlqRow({
+export function DlqRow({
   group,
   canManage,
   onAct,
