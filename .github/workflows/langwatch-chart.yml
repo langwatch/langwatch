@@ -2,6 +2,10 @@ name: langwatch-chart
 
 on:
   pull_request:
+    # ready_for_review is NOT a default activity type, and the two heaviest
+    # jobs below skip on a draft. Without it, taking a PR out of draft fires
+    # no event at all and they would never get their non-draft run.
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "charts/langwatch/**"
       - "charts/clickhouse-serverless/**"
@@ -189,6 +193,9 @@ jobs:
   # every behavioral guarantee while CI stays green.
   behavioral:
     name: "behavioral (rendered-output assertions)"
+    # Skipped on a draft, like the e2e legs below. This workflow has no
+    # `changes` gate to read `heavy` from, so the draft check is inline.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -221,6 +228,18 @@ jobs:
 
   e2e:
     name: "e2e: ${{ matrix.name }}"
+    # These two legs are the most expensive jobs in the repository — `e2e:
+    # infra` runs to 697s and `e2e: overlays` to 348s, both building images and
+    # standing up a kind cluster — so a draft releases the slots and they come
+    # back on ready_for_review.
+    #
+    # This matters most for the release-please pull requests, which touch
+    # `charts/**` and `package.json` on every merge to main and so fire this
+    # workflow every time. Twelve workflows already skip their heavy jobs on a
+    # draft via detect-changes' `heavy` output; this one has no gate job to
+    # read it from, which left it the last heavy thing running on a version
+    # bump.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     needs: render
     strategy:
