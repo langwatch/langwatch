@@ -15,19 +15,21 @@ Feature: Pods size their ClickHouse connection pools against the whole fleet
   #     reaches the server. ClickHouse holds roughly one connection per statement
   #     in flight and closes idle ones inside `idle_socket_ttl` (1500 ms), so the
   #     cap is never approached in practice.
-  #   - The statement limiter now takes its `maxConcurrent` FROM this number
-  #     (managedClient.ts passes the resolved pool size straight through), with a
-  #     queue of QUEUE_DEPTH_PER_SLOT (8) per slot behind it. So this figure has
-  #     stopped bounding sockets and started bounding in-flight statements, and
-  #     anything past slots + queue sheds as a customer-visible
-  #     ClickHouseOverloadedError.
+  #   - The statement limiter now takes its `maxConcurrent` FROM this number:
+  #     managedClient.ts passes the resolved pool size straight through, and
+  #     withStatementLimit queues max(MIN_QUEUE_DEPTH 64, maxConcurrent x 8)
+  #     behind it. So this figure has stopped bounding sockets and started
+  #     bounding in-flight statements, and anything past slots + queue sheds as
+  #     a customer-visible ClickHouseOverloadedError.
   #   - The derived values moved when DEFAULT_CLIENTS_PER_PROCESS went from 2 to
-  #     1, so the 8 and 5 written here originally are now 17 on a default install
-  #     (50 x 0.7 / 2 pods) and 14 at a production shape (270 x 0.7 / 13 pods).
-  #     Both still sit well under the per-pod concurrency that feeds them -
-  #     GLOBAL_QUEUE_CONCURRENCY defaults to 100 - so the queue, not the slot
-  #     count, is what would absorb steady state, and a burst above 126 per pod
-  #     is what would shed.
+  #     1, so the 8 and 5 written here originally are now 17 on a default
+  #     install (50 x 0.7 / 2 pods) and 10 at a production shape
+  #     (200 x 0.7 / 13 pods). What matters is the capacity each implies once
+  #     the queue floor is applied: 17 + 136 = 153 on a default install, but
+  #     10 + 80 = 90 at the production shape - and GLOBAL_QUEUE_CONCURRENCY
+  #     defaults to 100, with #6399 recording 256 in production. The production
+  #     shape is therefore the one that sheds, and it is the shape that has the
+  #     customers on it.
   #
   # The real bound should be decided from `clickhouse_statements_in_flight` and
   # `clickhouse_statement_wait_seconds`, which #6614 now puts in production.
