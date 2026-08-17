@@ -2,6 +2,7 @@ import {
   extractLastUserMessageText,
   extractMessageContentText,
 } from "~/server/app-layer/traces/canonicalisation/extractors/_messages";
+import { TOKEN_ACCUMULATION_CONTROL_ATTRIBUTE_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import type {
   ErrorCapture,
@@ -137,6 +138,7 @@ export function mapAttributesToMetadata(
     "langwatch.prompt_version_ids",
     // Fold-internal bookkeeping for the metadata.model stamp; not user metadata.
     "langwatch.reserved.model_metadata_stamped",
+    ...TOKEN_ACCUMULATION_CONTROL_ATTRIBUTE_KEYS,
   ]);
   if (modelsParsedAsArray) {
     knownKeys.add("metadata.models");

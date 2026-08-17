@@ -95,14 +95,14 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
         expect(table).toBe("trace_analytics_rollup");
       });
 
-      it("routes alongside rollable sums in the same query", () => {
+      it("routes alongside candidate-sensitive sums through slim", () => {
         const table = pickAnalyticsTable({
           series: [
             series("performance.total_cost", "sum"),
             series("performance.completion_time", "avg"),
           ],
         });
-        expect(table).toBe("trace_analytics_rollup");
+        expect(table).toBe("trace_analytics");
       });
 
       it("does NOT use the rollup when grouped — TraceCount lands in the root span's bucket, so a grouped division has the wrong denominator", () => {
@@ -127,11 +127,11 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
     });
 
     describe("when no group-by is set", () => {
-      it("routes to trace_analytics_rollup", () => {
+      it("routes candidate-sensitive cost sums to trace_analytics", () => {
         const table = pickAnalyticsTable({
           series: [series("performance.total_cost", "sum")],
         });
-        expect(table).toBe("trace_analytics_rollup");
+        expect(table).toBe("trace_analytics");
       });
     });
   });
@@ -156,12 +156,12 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
       expect(table).toBe("evaluation_runs");
     });
 
-    it("still routes to the rollup when negateFilters is false", () => {
+    it("routes to slim when negateFilters is false", () => {
       const table = pickAnalyticsTable({
         series: [series("performance.total_cost", "sum")],
         negateFilters: false,
       });
-      expect(table).toBe("trace_analytics_rollup");
+      expect(table).toBe("trace_analytics");
     });
   });
 
@@ -185,12 +185,12 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
       expect(table).toBe("evaluation_runs");
     });
 
-    it("still routes to the rollup when the trace id list is empty", () => {
+    it("still routes candidate-sensitive metrics through slim when the trace id list is empty", () => {
       const table = pickAnalyticsTable({
         series: [series("performance.total_cost", "sum")],
         traceIds: [],
       });
-      expect(table).toBe("trace_analytics_rollup");
+      expect(table).toBe("trace_analytics");
     });
   });
 
@@ -412,16 +412,14 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
   });
 
   describe("rollup metric set sanity", () => {
-    it("only lists additive, per-span metrics that the rollup carries", () => {
-      // Phase 1 rollup columns: CostSum, NonBilledCostSum, DurationSum (root),
-      // PromptTokensSum, CompletionTokensSum, Cache{Read,Write}TokensSum,
-      // ReasoningTokensSum, SpanCount, ErrorCount.
-      // total_tokens and total_processed_tokens compose from the above sums.
-      const expected = [
+    it("keeps conditional-duplicate metrics off the per-span rollup", () => {
+      expect(
+        ROLLUP_ROLLABLE_METRIC_KEYS.has("performance.completion_time"),
+      ).toBe(true);
+      const candidateSensitive = [
         "performance.total_cost",
         "performance.cost_billed",
         "performance.cost_non_billed",
-        "performance.completion_time",
         "performance.prompt_tokens",
         "performance.completion_tokens",
         "performance.cache_read_tokens",
@@ -430,8 +428,8 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
         "performance.total_tokens",
         "performance.total_processed_tokens",
       ];
-      for (const m of expected) {
-        expect(ROLLUP_ROLLABLE_METRIC_KEYS.has(m)).toBe(true);
+      for (const metric of candidateSensitive) {
+        expect(ROLLUP_ROLLABLE_METRIC_KEYS.has(metric)).toBe(false);
       }
     });
 

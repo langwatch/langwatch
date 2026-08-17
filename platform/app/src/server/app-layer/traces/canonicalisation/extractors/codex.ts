@@ -40,8 +40,9 @@
  * summary fold mirrors them to the top-level columns and the
  * receiver-side pricing lookup computes cost (codex never emits cost
  * on the wire). The known per-response span that reports the same usage
- * natively (`handle_responses`) is flagged so the fold does not
- * double-count it.
+ * natively (`handle_responses`) is either unconditionally skipped on the
+ * established TUI wire or marked as a conditional duplicate on the evolving
+ * exec wire.
  *
  * Canonical attributes produced (only when the corresponding wire
  * field is present):
@@ -69,9 +70,10 @@ const CODEX_EVENT_NAME_PREFIX = "codex.";
 const CODEX_RUST_SCOPE_NAME = "codex_cli_rs";
 /**
  * codex sets its instrumentation scope to the originator: the interactive TUI
- * is `codex_cli_rs`, `codex exec` is `codex_exec`. The exec wire has NO
- * `session_task.turn` rollup, `handle_responses` response spans are its only
- * usage record, so the redundant-usage skip below must never fire for it.
+ * is `codex_cli_rs`, `codex exec` is `codex_exec`. Older exec versions only
+ * emit `handle_responses`; 0.146 also emits `session_task.turn`. Exec response
+ * spans therefore need trace-level duplicate resolution rather than the TUI's
+ * unconditional skip.
  */
 const CODEX_EXEC_SCOPE_NAME = "codex_exec";
 const CODEX_SCOPE_NAMES: ReadonlySet<string> = new Set([
@@ -160,10 +162,13 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
       // call on both wires, and the drawer renders an untyped span as a
       // generic row rather than under the agent turn.
       this.typeUsageSpanAsModelCall(ctx);
-      // The skip marker does not. `codex exec` emits no turn rollup at all,
-      // so its response spans are the trace's ONLY usage record, and skipping
-      // them there would zero the trace totals.
-      if (scopeName !== CODEX_EXEC_SCOPE_NAME) {
+      // The TUI rollup is guaranteed, so its known response copy keeps the
+      // established unconditional skip contract. The exec wire changed shape
+      // across releases: mark its response as a candidate and let the fold
+      // suppress it only if an authoritative turn rollup is also present.
+      if (scopeName === CODEX_EXEC_SCOPE_NAME) {
+        this.markCandidateUsageSpan(ctx);
+      } else {
         this.markRedundantUsageSpan(ctx);
       }
       return;
@@ -211,6 +216,12 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
 
     if (applyCanonicalLifts(ctx, lifts)) {
       ctx.recordRule("codex/session_task.turn");
+    }
+    if (scopeName === CODEX_EXEC_SCOPE_NAME && this.hasTokenUsage(ctx)) {
+      ctx.setAttr(
+        ATTR_KEYS.LANGWATCH_RESERVED_TOKEN_ACCUMULATION_AUTHORITY,
+        "true",
+      );
     }
   }
 
@@ -278,6 +289,21 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     if (!CODEX_REDUNDANT_USAGE_SPAN_NAMES.has(ctx.span.name)) return;
     ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION, "true");
     ctx.recordRule("codex/skip-redundant-usage");
+  }
+
+  /**
+   * Exec response usage is conditionally redundant. It remains countable for
+   * older rollup-less traces and is suppressed by the fold only when a turn
+   * authority is observed on the same trace.
+   */
+  private markCandidateUsageSpan(ctx: ExtractorContext): void {
+    if (!this.hasTokenUsage(ctx)) return;
+    if (!CODEX_REDUNDANT_USAGE_SPAN_NAMES.has(ctx.span.name)) return;
+    ctx.setAttr(
+      ATTR_KEYS.LANGWATCH_RESERVED_TOKEN_ACCUMULATION_CANDIDATE,
+      "true",
+    );
+    ctx.recordRule("codex/candidate-redundant-usage");
   }
 
   private hasTokenUsage(ctx: ExtractorContext): boolean {

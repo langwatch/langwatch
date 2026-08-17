@@ -352,4 +352,61 @@ describe("traceAnalytics fold projection — parity vs trace-summary fold", () =
       assertSharedFieldsParity({ summary, slim });
     });
   });
+
+  describe("given conditional Codex usage duplicates", () => {
+    const usage = {
+      "gen_ai.request.model": "gpt-5-mini",
+      "gen_ai.usage.input_tokens": 13590,
+      "gen_ai.usage.output_tokens": 51,
+      "gen_ai.usage.cache_read.input_tokens": 12000,
+    };
+    const authoritySpan = () =>
+      createTestSpan({
+        name: "session_task.turn",
+        spanId: "turn",
+        spanAttributes: {
+          ...usage,
+          "langwatch.reserved.token_accumulation_authority": "true",
+        },
+      });
+    const candidateSpan = () =>
+      createTestSpan({
+        name: "handle_responses",
+        spanId: "response",
+        spanAttributes: {
+          ...usage,
+          "langwatch.reserved.token_accumulation_candidate": "true",
+        },
+      });
+
+    it.each([
+      ["authority first", () => [authoritySpan(), candidateSpan()]],
+      ["candidate first", () => [candidateSpan(), authoritySpan()]],
+    ])("keeps slim and summary at one usage for %s", (_name, createSpans) => {
+      let summary = createInitState();
+      let slim = createInitSlimState();
+      for (const span of createSpans()) {
+        ({ summary, slim } = applyToBoth(span, summary, slim));
+      }
+
+      assertSharedFieldsParity({ summary, slim });
+      expect(slim.totalPromptTokenCount).toBe(13590);
+      expect(slim.totalCompletionTokenCount).toBe(51);
+      expect(slim.attributes["langwatch.reserved.cache_read_tokens"]).toBe(
+        "12000",
+      );
+    });
+
+    it("keeps a rollup-less candidate in both folds", () => {
+      const { summary, slim } = applyToBoth(
+        candidateSpan(),
+        createInitState(),
+        createInitSlimState(),
+      );
+
+      assertSharedFieldsParity({ summary, slim });
+      expect(slim.totalPromptTokenCount).toBe(13590);
+      expect(slim.totalCompletionTokenCount).toBe(51);
+    });
+  });
 });

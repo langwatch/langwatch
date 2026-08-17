@@ -111,13 +111,14 @@ function slimTableFor(source: AnalyticsMetricSource): AnalyticsTable {
 
 /**
  * Registry metric keys ("<group>.<metric>") that can be served from
- * `trace_analytics_rollup` for additive aggregations. Derived directly from
+ * `trace_analytics_rollup` for additive aggregations. The table is populated
+ * independently per span, so it cannot retract a conditional duplicate when
+ * a sibling authority arrives. Candidate-sensitive cost and token metrics use
+ * the one-row-per-trace slim fold instead. The remaining metric is derived from
  * the rollup column set (migration 00038 — see
  * `traceAnalyticsRollup.mapProjection.ts`):
  *
- *   CostSum, NonBilledCostSum, DurationSum (root), PromptTokensSum,
- *   CompletionTokensSum, CacheReadTokensSum, CacheWriteTokensSum,
- *   ReasoningTokensSum, SpanCount, TraceCount (root), ErrorCount.
+ *   DurationSum (root), TraceCount (root).
  *
  * Distinct trace counts over arbitrary dims (TraceUniq) are NOT in the
  * rollup — that requires `AggregateFunction(uniq, …)` (binary state), and the
@@ -125,7 +126,7 @@ function slimTableFor(source: AnalyticsMetricSource): AnalyticsTable {
  * (cardinality) therefore routes to slim instead. Plain per-bucket trace
  * counts ARE available additively via `sum(TraceCount)` (1 per root span).
  */
-const ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST = [
+const TRACE_ROLLUP_METRIC_KEYS_LIST = [
   "performance.total_cost",
   "performance.cost_billed",
   "performance.cost_non_billed",
@@ -139,7 +140,11 @@ const ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST = [
   "performance.total_processed_tokens",
 ] as const;
 export type TraceRollupMetricKey =
-  (typeof ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST)[number];
+  (typeof TRACE_ROLLUP_METRIC_KEYS_LIST)[number];
+
+const ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST = [
+  "performance.completion_time",
+] as const satisfies readonly TraceRollupMetricKey[];
 
 /**
  * Registry metric keys that can be served from `evaluation_analytics_rollup`

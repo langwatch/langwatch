@@ -321,13 +321,13 @@ const SPAN_MODEL_ALIAS = "smd";
 const SPAN_MODEL_KEY_EXPR = `multiIf(SpanAttributes['gen_ai.response.model'] != '', SpanAttributes['gen_ai.response.model'], SpanAttributes['gen_ai.request.model'] != '', SpanAttributes['gen_ai.request.model'], 'unknown')`;
 
 /**
- * Redundant-usage gate: mirrors SpanCostService.isTokenAccumulationSkipped.
- * A span marked as a duplicate usage copy (e.g. codex's lower-level response
- * span echoing the turn rollup) contributed nothing to the trace totals, so
- * it must contribute nothing to the per-model buckets either, otherwise the
- * bucket sum overshoots the ungrouped total.
+ * Redundant-usage gates mirror SpanCostService. The hard skip keeps its
+ * established meaning. A conditional candidate is suppressed only when the
+ * stored-spans partition for that trace also contains an authority.
  */
 const SPAN_NOT_SKIPPED = `SpanAttributes['langwatch.reserved.skip_token_accumulation'] != 'true'`;
+const SPAN_IS_TOKEN_CANDIDATE = `SpanAttributes['langwatch.reserved.token_accumulation_candidate'] = 'true'`;
+const SPAN_IS_TOKEN_AUTHORITY = `SpanAttributes['langwatch.reserved.token_accumulation_authority'] = 'true'`;
 
 /**
  * Span token read mirroring SpanCostService.extractTokenMetrics:
@@ -380,6 +380,8 @@ function buildSpanModelPartitionJoin(spanTimeFilter: string): string {
   const smd = SPAN_MODEL_ALIAS;
   const contribution = (expr: string) =>
     `max(if(${SPAN_NOT_SKIPPED}, ${expr}, 0))`;
+  const resolvedContribution = (column: string) =>
+    `sum(if((IsTokenCandidate = 0 AND IsTokenAuthority = 0) OR (AuthoritySpanCount > 0 AND IsTokenAuthority = 1) OR (AuthoritySpanCount = 0 AND IsTokenCandidate = 1), ${column}, 0))`;
   // TraceSpanCount = spans of the trace visible to THIS scan, computed as a
   // window over the per-bucket groups BEFORE the zero-suppression filter (a
   // suppressed model-less bucket still holds real spans, e.g. the root).
@@ -393,30 +395,37 @@ function buildSpanModelPartitionJoin(spanTimeFilter: string): string {
             TenantId,
             TraceId,
             SpanModelKey,
-            sum(SpanCost) AS SpanModelCost,
-            sum(SpanNonBilledCost) AS SpanModelNonBilledCost,
-            sum(SpanPromptTokens) AS SpanModelPromptTokens,
-            sum(SpanCompletionTokens) AS SpanModelCompletionTokens,
-            sum(SpanCacheReadTokens) AS SpanModelCacheReadTokens,
-            sum(SpanCacheWriteTokens) AS SpanModelCacheWriteTokens,
-            sum(SpanReasoningTokens) AS SpanModelReasoningTokens,
+            ${resolvedContribution("SpanCost")} AS SpanModelCost,
+            ${resolvedContribution("SpanNonBilledCost")} AS SpanModelNonBilledCost,
+            ${resolvedContribution("SpanPromptTokens")} AS SpanModelPromptTokens,
+            ${resolvedContribution("SpanCompletionTokens")} AS SpanModelCompletionTokens,
+            ${resolvedContribution("SpanCacheReadTokens")} AS SpanModelCacheReadTokens,
+            ${resolvedContribution("SpanCacheWriteTokens")} AS SpanModelCacheWriteTokens,
+            ${resolvedContribution("SpanReasoningTokens")} AS SpanModelReasoningTokens,
             sum(count()) OVER (PARTITION BY TenantId, TraceId) AS TraceSpanCount
           FROM (
             SELECT
-              TenantId,
-              TraceId,
-              SpanId,
-              ${SPAN_MODEL_KEY_EXPR} AS SpanModelKey,
-              ${contribution("coalesce(Cost, 0)")} AS SpanCost,
-              ${contribution("coalesce(NonBilledCost, 0)")} AS SpanNonBilledCost,
-              ${contribution(spanTokenReadExpr("gen_ai.usage.input_tokens"))} AS SpanPromptTokens,
-              ${contribution(spanTokenReadExpr("gen_ai.usage.output_tokens"))} AS SpanCompletionTokens,
-              ${contribution(spanFirstPositiveExpr(["gen_ai.usage.cache_read.input_tokens", "gen_ai.usage.cached_tokens"]))} AS SpanCacheReadTokens,
-              ${contribution(spanFirstPositiveExpr(["gen_ai.usage.cache_creation.input_tokens"]))} AS SpanCacheWriteTokens,
-              ${contribution(spanFirstPositiveExpr(["gen_ai.usage.reasoning_tokens"]))} AS SpanReasoningTokens
-            FROM stored_spans
-            WHERE TenantId = {tenantId:String} ${spanTimeFilter}
-            GROUP BY TenantId, TraceId, SpanId, SpanModelKey
+              *,
+              sum(IsTokenAuthority) OVER (PARTITION BY TenantId, TraceId) AS AuthoritySpanCount
+            FROM (
+              SELECT
+                TenantId,
+                TraceId,
+                SpanId,
+                ${SPAN_MODEL_KEY_EXPR} AS SpanModelKey,
+                max(toUInt8(${SPAN_NOT_SKIPPED} AND ${SPAN_IS_TOKEN_CANDIDATE})) AS IsTokenCandidate,
+                max(toUInt8(${SPAN_NOT_SKIPPED} AND ${SPAN_IS_TOKEN_AUTHORITY})) AS IsTokenAuthority,
+                ${contribution("coalesce(Cost, 0)")} AS SpanCost,
+                ${contribution("coalesce(NonBilledCost, 0)")} AS SpanNonBilledCost,
+                ${contribution(spanTokenReadExpr("gen_ai.usage.input_tokens"))} AS SpanPromptTokens,
+                ${contribution(spanTokenReadExpr("gen_ai.usage.output_tokens"))} AS SpanCompletionTokens,
+                ${contribution(spanFirstPositiveExpr(["gen_ai.usage.cache_read.input_tokens", "gen_ai.usage.cached_tokens"]))} AS SpanCacheReadTokens,
+                ${contribution(spanFirstPositiveExpr(["gen_ai.usage.cache_creation.input_tokens"]))} AS SpanCacheWriteTokens,
+                ${contribution(spanFirstPositiveExpr(["gen_ai.usage.reasoning_tokens"]))} AS SpanReasoningTokens
+              FROM stored_spans
+              WHERE TenantId = {tenantId:String} ${spanTimeFilter}
+              GROUP BY TenantId, TraceId, SpanId, SpanModelKey
+            )
           )
           GROUP BY TenantId, TraceId, SpanModelKey
         )

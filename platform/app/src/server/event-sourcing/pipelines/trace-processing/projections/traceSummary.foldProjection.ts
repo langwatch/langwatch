@@ -215,16 +215,33 @@ export function applySpanToSummary({
     return state;
   }
 
-  const timing = spanTimingService.accumulateTiming({ state, span });
-  const tokens = spanCostService.accumulateTokens({
-    state,
+  const isConditionalUsageSpan =
+    spanCostService.isConditionalTokenAccumulation(span);
+  const conditionalUsage = spanCostService.resolveConditionalTokenAccumulation(
+    { state, span },
+  );
+  const accumulationState = conditionalUsage.state;
+  const accumulationSpan = conditionalUsage.span;
+
+  const timing = spanTimingService.accumulateTiming({
+    state: accumulationState,
     span,
+  });
+  const tokens = spanCostService.accumulateTokens({
+    state: accumulationState,
+    span: accumulationSpan,
     totalDurationMs: timing.totalDurationMs,
   });
-  const status = spanStatusService.accumulateStatus({ state, span });
-  const io = traceIOAccumulationService.accumulateIO({ state, span });
+  const status = spanStatusService.accumulateStatus({
+    state: accumulationState,
+    span,
+  });
+  const io = traceIOAccumulationService.accumulateIO({
+    state: accumulationState,
+    span,
+  });
   const attributes = traceAttributeAccumulationService.accumulateAttributes({
-    state,
+    state: accumulationState,
     span,
     outputSource: io.outputSource,
     inputIsFallback: io.inputIsFallback,
@@ -237,9 +254,11 @@ export function applySpanToSummary({
   // The merged attribute map only carries identity/metadata keys, so the
   // raw gen_ai.usage.cache_* numbers never reach the drawer — fold the sums
   // in under reserved keys the popover reads directly.
-  const cacheTokens = spanCostService.isTokenAccumulationSkipped(span)
+  const cacheTokens = spanCostService.isTokenAccumulationSkipped(
+    accumulationSpan,
+  )
     ? { cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 }
-    : spanCostService.extractCacheTokens(span);
+    : spanCostService.extractCacheTokens(accumulationSpan);
   addReservedTokenSum(
     attributes,
     RESERVED_CACHE_READ_TOKENS,
@@ -255,7 +274,16 @@ export function applySpanToSummary({
     RESERVED_REASONING_TOKENS,
     cacheTokens.reasoningTokens,
   );
-  recordContextSize({ attributes, span, cacheTokens });
+  // Context size is not additive. Preserve the original observation for a
+  // conditional span, while established hard-skipped aggregate spans remain
+  // excluded from context selection.
+  recordContextSize({
+    attributes,
+    span,
+    cacheTokens: isConditionalUsageSpan
+      ? spanCostService.extractCacheTokens(span)
+      : cacheTokens,
+  });
 
   const newModels = spanCostService.extractModelsFromSpan(span);
   const models = mergeModelsMostRecentFirst(state.models, newModels);
@@ -284,7 +312,7 @@ export function applySpanToSummary({
   });
 
   return {
-    ...state,
+    ...accumulationState,
     traceId: state.traceId || span.traceId,
     spanCount: state.spanCount + 1,
     computedIOSchemaVersion: COMPUTED_IO_SCHEMA_VERSION,

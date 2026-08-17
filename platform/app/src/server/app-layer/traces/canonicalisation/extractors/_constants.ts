@@ -274,6 +274,19 @@ export const ATTR_KEYS = {
   LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION:
     "langwatch.reserved.skip_token_accumulation",
 
+  // Cross-span counterpart to the unconditional skip marker above. A
+  // candidate contributes normally unless the same trace also contains an
+  // authority span. The fold resolves the pair, preserving usage for older
+  // emitters that only send the candidate.
+  LANGWATCH_RESERVED_TOKEN_ACCUMULATION_CANDIDATE:
+    "langwatch.reserved.token_accumulation_candidate",
+  LANGWATCH_RESERVED_TOKEN_ACCUMULATION_AUTHORITY:
+    "langwatch.reserved.token_accumulation_authority",
+  LANGWATCH_RESERVED_TOKEN_ACCUMULATION_CANDIDATE_TOTALS:
+    "langwatch.reserved.token_accumulation_candidate_totals",
+  LANGWATCH_RESERVED_TOKEN_ACCUMULATION_AUTHORITY_TOTALS:
+    "langwatch.reserved.token_accumulation_authority_totals",
+
   // Mastra attributes
   MASTRA_INPUT: "input",
   MASTRA_OUTPUT: "mastra.output",
@@ -285,6 +298,24 @@ export const ATTR_KEYS = {
   MASTRA_MODEL_STEP_INPUT: "mastra.model_step.input",
   MASTRA_METADATA_PREFIX: "mastra.metadata.",
 } as const;
+
+export const TOKEN_ACCUMULATION_CONTROL_ATTRIBUTE_KEYS: ReadonlySet<string> =
+  new Set([
+    ATTR_KEYS.LANGWATCH_RESERVED_TOKEN_ACCUMULATION_CANDIDATE,
+    ATTR_KEYS.LANGWATCH_RESERVED_TOKEN_ACCUMULATION_AUTHORITY,
+    ATTR_KEYS.LANGWATCH_RESERVED_TOKEN_ACCUMULATION_CANDIDATE_TOTALS,
+    ATTR_KEYS.LANGWATCH_RESERVED_TOKEN_ACCUMULATION_AUTHORITY_TOTALS,
+  ]);
+
+export function stripTokenAccumulationControlAttributes(
+  attributes: Record<string, string>,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(attributes).filter(
+      ([key]) => !TOKEN_ACCUMULATION_CONTROL_ATTRIBUTE_KEYS.has(key),
+    ),
+  );
+}
 
 export const SPAN_TYPE_TO_GEN_AI_OP: Record<string, string> = {
   llm: "chat",
