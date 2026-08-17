@@ -64,6 +64,11 @@ git config user.email "ci@example.com"
 git config user.name "CI"
 
 echo '{"name":"@langwatch/web"}' > platform/app/package.json
+# Both configs, because the gate refuses to run without the repo-root one: the
+# app config is nested, and a nested config with no root silently falls back to
+# Biome's defaults. The stub biome below reads neither, so the contents only
+# have to exist.
+echo '{}' > biome.jsonc
 echo '{}' > platform/app/biome.jsonc
 echo 'export const value = 1;' > platform/app/src/old-name.tsx
 
