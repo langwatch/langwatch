@@ -171,9 +171,10 @@ function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
               label={item.label}
               href={item.href}
               isActive={
-                item.isExactMatch
+                (item.alsoActiveAt?.includes(router.pathname) ?? false) ||
+                (item.isExactMatch
                   ? router.pathname === item.href
-                  : router.pathname.startsWith(item.includePath ?? item.href)
+                  : router.pathname.startsWith(item.includePath ?? item.href))
               }
               showLabel={showExpanded}
               rightElement={
@@ -265,6 +266,7 @@ function ProductSidebarBody({
     <MainMenuSections
       showExpanded={showExpanded}
       shouldIncludeGovernSection={false}
+      shouldIncludeOpsSection={false}
     />
   );
 }

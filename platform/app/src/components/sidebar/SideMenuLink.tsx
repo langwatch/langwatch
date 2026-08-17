@@ -210,6 +210,9 @@ export const SideMenuLink = ({
       width="full"
       href={href}
       aria-label={label}
+      // The active item is otherwise only a background colour, which a
+      // screen reader cannot report and a test cannot read.
+      aria-current={isActive ? "page" : undefined}
       isExternal={isExternal}
       onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
         trackEvent("side_menu_click", {

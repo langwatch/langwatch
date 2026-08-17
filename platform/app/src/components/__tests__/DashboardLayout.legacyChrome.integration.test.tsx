@@ -134,6 +134,10 @@ vi.mock("~/utils/api", () => ({
     },
     user: {
       getSsoStatus: { useQuery: () => ({ data: undefined }) },
+      isAdmin: { useQuery: () => ({ data: { isAdmin: false } }) },
+    },
+    ops: {
+      getScope: { useQuery: () => ({ data: undefined, isLoading: false }) },
     },
     governance: {
       recordWorkspaceView: {
@@ -304,12 +308,38 @@ describe("navigation mode dispatcher", () => {
     });
   });
 
-  describe("when the flag is on for a route the shells do not cover", () => {
-    /** @scenario Internal ops pages keep the old navigation */
-    it("renders the legacy chrome on an ops page", () => {
+  describe("when the flag is on for an internal ops page", () => {
+    /** @scenario Internal ops pages render in the new settings shell */
+    it("renders the new shell rather than the legacy main menu", () => {
       useNavigationModeStore.setState({ storedMode: "icon-rail" });
       mockNavigationV2FlagEnabled = true;
       mockPathname = "/ops/feature-flags";
+      renderLayout();
+
+      expect(screen.queryByTestId("main-menu")).not.toBeInTheDocument();
+      expect(screen.getByTestId("page-body")).toBeInTheDocument();
+      expect(screen.queryByTestId("loading-screen")).not.toBeInTheDocument();
+    });
+
+    /** @scenario Internal ops pages render in the new settings shell */
+    it("does not treat the ops page as a product page", () => {
+      useNavigationModeStore.setState({ storedMode: "product-switcher" });
+      mockNavigationV2FlagEnabled = true;
+      mockPathname = "/ops/feature-flags";
+      renderLayout();
+
+      expect(
+        screen.queryByRole("button", { name: "Switch product" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the flag is on for a route the shells do not cover", () => {
+    /** @scenario The flag off falls back to legacy and keeps the preference */
+    it("renders the legacy chrome on an auth page", () => {
+      useNavigationModeStore.setState({ storedMode: "icon-rail" });
+      mockNavigationV2FlagEnabled = true;
+      mockPathname = "/auth/signin";
       renderLayout();
 
       expect(screen.getByTestId("main-menu")).toBeInTheDocument();

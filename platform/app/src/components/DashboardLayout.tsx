@@ -402,8 +402,8 @@ const ModeResolvedDashboardLayout = (dashboardProps: DashboardLayoutProps) => {
   if (resolution.mode === "legacy") {
     return <LegacyDashboardLayout {...dashboardProps} />;
   }
-  // Internal ops pages keep the current chrome; the shells cover the
-  // product routes and the settings pages.
+  // The shells cover the product routes, the settings pages and the
+  // internal ops pages. Everything else keeps the current chrome.
   if (!isNavigationV2ShellRoute(router.pathname)) {
     return <LegacyDashboardLayout {...dashboardProps} />;
   }

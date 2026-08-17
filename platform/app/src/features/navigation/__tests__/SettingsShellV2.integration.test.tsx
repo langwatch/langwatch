@@ -7,7 +7,12 @@
  * title, and the unchanged legacy chrome when the device stays on the
  * legacy mode.
  *
- * Spec: specs/navigation/settings-shell-v2.feature
+ * The internal ops pages take the same surface, so their seam is here
+ * too: they render through the real DashboardLayout, which is what an
+ * ops page wraps itself in.
+ *
+ * Specs: specs/navigation/settings-shell-v2.feature,
+ *        specs/navigation/ops-navigation-v2.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -18,6 +23,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 let mockPathname = "/settings";
 let mockIsEnterprise = true;
 let mockIsLiteMember = false;
+let mockHasOpsAccess = false;
+let mockIsAdmin = false;
 const pushMock = vi.fn().mockResolvedValue(true);
 
 const team = {
@@ -135,7 +142,7 @@ vi.mock("~/hooks/useDrawer", () => ({
 }));
 
 vi.mock("~/hooks/useOpsPermission", () => ({
-  useOpsPermission: () => ({ hasAccess: false }),
+  useOpsPermission: () => ({ hasAccess: mockHasOpsAccess }),
 }));
 
 vi.mock("~/features/langy/stores/langyStore", () => ({
@@ -158,7 +165,7 @@ vi.mock("~/utils/api", () => ({
     },
     user: {
       getSsoStatus: { useQuery: () => ({ data: undefined }) },
-      isAdmin: { useQuery: () => ({ data: { isAdmin: false } }) },
+      isAdmin: { useQuery: () => ({ data: { isAdmin: mockIsAdmin } }) },
     },
     governance: {
       recordWorkspaceView: {
@@ -219,6 +226,7 @@ vi.mock("~/components/sidebar/PresenceMenuItem", () => ({
   PresenceMenuItem: () => null,
 }));
 
+import { DashboardLayout } from "~/components/DashboardLayout";
 import SettingsLayout from "~/components/SettingsLayout";
 import { useNavigationModeStore } from "~/features/navigation/navigationModeStore";
 import { captureSettingsReturnPath } from "../logic/resolveSettingsBackTarget";
@@ -233,10 +241,24 @@ function renderSettings() {
   );
 }
 
+/** What an ops page wraps itself in, under the address it is opened at. */
+function renderOpsPage(pathname: string) {
+  mockPathname = pathname;
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <DashboardLayout>
+        <div data-testid="ops-page-content" />
+      </DashboardLayout>
+    </ChakraProvider>,
+  );
+}
+
 beforeEach(() => {
   mockPathname = "/settings";
   mockIsEnterprise = true;
   mockIsLiteMember = false;
+  mockHasOpsAccess = false;
+  mockIsAdmin = false;
   pushMock.mockClear();
   localStorage.clear();
   sessionStorage.clear();
@@ -343,6 +365,80 @@ describe("the settings shell in a new navigation mode", () => {
       expect(
         screen.queryByRole("button", { name: "Quick Search" }),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the reader has ops access and is an admin", () => {
+    /** @scenario The settings menu holds the ops groups at the bottom */
+    it("puts OPS and BACKOFFICE last", () => {
+      mockHasOpsAccess = true;
+      mockIsAdmin = true;
+      renderSettings();
+
+      const groupLabels = screen
+        .getAllByText(
+          /^(Organization|Access|AI Infrastructure|Data Controls|Project|Ops|Backoffice)$/,
+        )
+        .map((node) => node.textContent);
+
+      expect(groupLabels.slice(-2)).toEqual(["Ops", "Backoffice"]);
+    });
+  });
+
+  describe("when the pin flag and the environment variable are both off", () => {
+    /** @scenario The settings menu shows ops without the pin flag or the environment variable */
+    it("still shows the OPS group away from an ops page", () => {
+      // `usePublicEnv` names no SHOW_OPS_IN_MAIN_SIDEBAR and the address
+      // is a settings page, so the two conditions the legacy sidebar
+      // needs are both absent here.
+      mockHasOpsAccess = true;
+      renderSettings();
+
+      expect(screen.getByText("Ops")).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: "The Foundry" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("when the reader has no ops access", () => {
+    /** @scenario A reader without ops access sees no ops groups */
+    it("shows neither the OPS group nor the BACKOFFICE group", () => {
+      renderSettings();
+
+      expect(screen.queryByText("Ops")).not.toBeInTheDocument();
+      expect(screen.queryByText("Backoffice")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when an ops page is opened in a new navigation mode", () => {
+    /** @scenario An ops page renders inside the new settings shell */
+    it("renders the settings shell with the matching entry marked active", () => {
+      mockHasOpsAccess = true;
+      renderOpsPage("/ops/migrations");
+
+      // The settings surface, not the project sidebar: Quick Search and
+      // the settings menu are there, the product dropdown is not.
+      expect(
+        screen.getByRole("button", { name: "Quick Search" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Switch product" }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("ops-page-content")).toBeInTheDocument();
+
+      const migrations = screen.getByRole("link", { name: "Migrations" });
+      expect(migrations).toHaveAttribute("aria-current", "page");
+    });
+
+    /** @scenario An ops page renders inside the new settings shell */
+    it("marks the owning entry active on an address that redirects onto it", () => {
+      mockHasOpsAccess = true;
+      renderOpsPage("/ops/scheduler");
+
+      expect(
+        screen.getByRole("link", { name: "Event Sourcing" }),
+      ).toHaveAttribute("aria-current", "page");
     });
   });
 });

@@ -14,6 +14,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let mockPathname = "/[project]";
+let mockHasOpsAccess = false;
 
 const personalTeam = {
   id: "team_p",
@@ -94,7 +95,7 @@ vi.mock("~/hooks/usePublicEnv", () => ({
 }));
 
 vi.mock("~/hooks/useOpsPermission", () => ({
-  useOpsPermission: () => ({ hasAccess: false }),
+  useOpsPermission: () => ({ hasAccess: mockHasOpsAccess }),
 }));
 
 const toggleSupportChatMock = vi.fn();
@@ -157,6 +158,7 @@ function renderSidebar(surface: "me" | "llm-ops" | "gateway" | "governance") {
 
 beforeEach(() => {
   mockPathname = "/[project]";
+  mockHasOpsAccess = false;
   commandBarOpenMock.mockReset();
   toggleSupportChatMock.mockReset();
   localStorage.clear();
@@ -190,6 +192,20 @@ describe("the product sidebar", () => {
       expect(screen.queryByText("Govern")).not.toBeInTheDocument();
       expect(screen.queryByText("AI Gateway")).not.toBeInTheDocument();
       expect(screen.queryByText("AI Governance")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the reader has ops access and the pin flag is on", () => {
+    /** @scenario The product sidebars carry no ops section */
+    it("renders no Ops section in a product sidebar", () => {
+      // `useFeatureFlag` is mocked on, so the pin that would open the
+      // legacy Ops section is at its most permissive here.
+      mockHasOpsAccess = true;
+      renderSidebar("llm-ops");
+
+      expect(screen.queryByText("Ops")).not.toBeInTheDocument();
+      expect(screen.queryByText("The Foundry")).not.toBeInTheDocument();
+      expect(screen.queryByText("Deja View")).not.toBeInTheDocument();
     });
   });
 

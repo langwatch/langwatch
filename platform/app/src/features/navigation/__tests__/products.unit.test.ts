@@ -52,6 +52,7 @@ describe("productFromPathname", () => {
     expect(productFromPathname("/[project]/messages")).toBe("llm-ops");
   });
 
+  /** @scenario An ops page is never remembered as the last product */
   it("treats settings, ops and app plumbing as no product", () => {
     for (const pathname of [
       "/",

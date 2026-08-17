@@ -10,6 +10,7 @@ import {
   Coins,
   CreditCard,
   Database,
+  DatabaseZap,
   EyeOff,
   Fingerprint,
   Flag,
@@ -24,6 +25,7 @@ import {
   MailX,
   Network,
   RefreshCw,
+  Repeat,
   ScrollText,
   Settings2,
   ShieldCheck,
@@ -48,6 +50,13 @@ export interface SettingsMenuItem {
   includePath?: string;
   /** Only the exact address marks the item active (group index pages). */
   isExactMatch?: boolean;
+  /**
+   * Further addresses this entry answers for, matched exactly. Ops keeps
+   * a set of old addresses that redirect onto a page another entry owns,
+   * and naming them here marks the right entry while the redirect runs
+   * and tells the reachability test the address has an owner.
+   */
+  alsoActiveAt?: string[];
   icon: LucideIcon;
   /** Enterprise-plan entry; renders the violet pill. */
   isEnterprise?: boolean;
@@ -237,29 +246,60 @@ function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
   };
 }
 
-function opsGroup(): SettingsMenuGroup {
+/**
+ * Every internal ops page, in one list. This is the only place the ops
+ * pages are offered in the new navigation modes, so a page missing here
+ * cannot be reached from the menu at all. `opsMenuReachability` pins it
+ * against the route table.
+ *
+ * Spec: specs/navigation/ops-navigation-v2.feature
+ */
+export function opsGroup(): SettingsMenuGroup {
   return {
     label: "Ops",
     items: [
-      { label: "Dashboard", href: "/ops", isExactMatch: true, icon: Activity },
+      {
+        label: "Dashboard",
+        href: "/ops",
+        isExactMatch: true,
+        // The queues address redirects onto the dashboard, which reads
+        // the same queues.
+        alsoActiveAt: ["/ops/queues"],
+        icon: Activity,
+      },
+      {
+        label: "Event Sourcing",
+        href: "/ops/event-sourcing",
+        // The scheduler address redirects onto the schedules section of
+        // the event-sourcing workspace.
+        alsoActiveAt: ["/ops/scheduler"],
+        icon: Workflow,
+      },
       {
         label: "Projection Replay",
         href: "/ops/projections",
-        icon: Workflow,
+        icon: Repeat,
       },
       { label: "The Foundry", href: "/ops/foundry", icon: Anvil },
       { label: "Payload store", href: "/ops/blobs", icon: Database },
       { label: "Deja View", href: "/ops/dejaview", icon: History },
       { label: "Feature Flags", href: "/ops/feature-flags", icon: Flag },
+      { label: "Migrations", href: "/ops/migrations", icon: DatabaseZap },
     ],
   };
 }
 
-function backofficeGroup(): SettingsMenuGroup {
+export function backofficeGroup(): SettingsMenuGroup {
   return {
     label: "Backoffice",
     items: [
-      { label: "Users", href: "/ops/backoffice/users", icon: UserCog },
+      {
+        label: "Users",
+        href: "/ops/backoffice/users",
+        // The backoffice root redirects onto the users page.
+        alsoActiveAt: ["/ops/backoffice"],
+        icon: UserCog,
+      },
       {
         label: "Organizations",
         href: "/ops/backoffice/organizations",

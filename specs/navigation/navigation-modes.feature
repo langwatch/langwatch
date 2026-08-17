@@ -87,11 +87,12 @@ Feature: Navigation modes behind one flag
     Then the personal sidebar renders instead of the project menu
 
   @integration
-  Scenario: Internal ops pages keep the old navigation
+  Scenario: Internal ops pages render in the new settings shell
     Given the navigation flag is on for me
     And my device is in a new navigation mode
     When I open an internal ops page
-    Then the old chrome renders instead of a new shell
+    Then the new settings shell renders around it
+    And the ops page is not treated as a product page
 
   @integration
   Scenario: Legacy mode runs no navigation-v2 queries

@@ -1,16 +1,18 @@
 import { useRouter } from "~/utils/compat/next-router";
-import { productFromPathname } from "./products";
+import { isSettingsShellRoute, productFromPathname } from "./products";
 import { useNavigationMode } from "./useNavigationMode";
 
 /**
- * Which routes the navigation-v2 shells cover: the product routes and
- * the settings pages. Internal ops pages keep the legacy chrome.
+ * Which routes the navigation-v2 shells cover: the product routes, the
+ * settings pages, and the internal ops pages. The ops pages are offered
+ * from the settings menu in the new modes, so they render in the same
+ * shell rather than dropping the reader back into the legacy chrome.
+ *
+ * Spec: specs/navigation/ops-navigation-v2.feature
  */
 export function isNavigationV2ShellRoute(pathname: string): boolean {
   return (
-    productFromPathname(pathname) !== null ||
-    pathname === "/settings" ||
-    pathname.startsWith("/settings/")
+    productFromPathname(pathname) !== null || isSettingsShellRoute(pathname)
   );
 }
 

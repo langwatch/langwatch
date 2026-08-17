@@ -145,3 +145,19 @@ export function productFromPathname(pathname: string): ProductId | null {
   // "/[project]/*" pattern spelling).
   return "llm-ops";
 }
+
+/**
+ * The settings detour: the settings pages and the internal ops pages.
+ * Neither is a product. Both render the settings sidebar surface, which
+ * is where the ops pages are offered in the new navigation modes, both
+ * carry the static Settings title, and both belong to the organization
+ * rather than to a project, so the chrome never waits for a project.
+ *
+ * Spec: specs/navigation/ops-navigation-v2.feature
+ */
+export function isSettingsShellRoute(pathname: string): boolean {
+  return (
+    isPathUnder({ pathname, base: "/settings" }) ||
+    isPathUnder({ pathname, base: "/ops" })
+  );
+}

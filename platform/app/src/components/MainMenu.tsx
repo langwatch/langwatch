@@ -49,16 +49,20 @@ export type MainMenuProps = {
  * The project navigation sections (Home, Observe, Test, Build, Govern,
  * Ops), extracted so the navigation-v2 LLM Ops sidebar renders the same
  * sections as the legacy chrome and the two cannot drift. The v2 sidebar
- * drops the Govern group because the product switcher replaces it.
+ * drops the Govern group because the product switcher replaces it, and
+ * the Ops group because the settings menu holds the ops pages there.
  *
- * Spec: specs/navigation/product-sidebars.feature
+ * Specs: specs/navigation/product-sidebars.feature,
+ *        specs/navigation/ops-navigation-v2.feature
  */
 export const MainMenuSections = function MainMenuSections({
   showExpanded,
   shouldIncludeGovernSection = true,
+  shouldIncludeOpsSection = true,
 }: {
   showExpanded: boolean;
   shouldIncludeGovernSection?: boolean;
+  shouldIncludeOpsSection?: boolean;
 }) {
   const router = useRouter();
   const { project, hasPermission } = useOrganizationTeamProject();
@@ -102,7 +106,7 @@ export const MainMenuSections = function MainMenuSections({
         <GovernSection showExpanded={showExpanded} />
       )}
 
-      <OpsSection showExpanded={showExpanded} />
+      {shouldIncludeOpsSection && <OpsSection showExpanded={showExpanded} />}
     </>
   );
 };
