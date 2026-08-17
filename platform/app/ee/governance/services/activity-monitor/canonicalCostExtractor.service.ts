@@ -147,16 +147,7 @@ function numberOr(v: unknown, fallback: number): number {
   return fallback;
 }
 
-function numberOrNull(v: unknown): number | null {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "string") {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
-
-/** Like `numberOrNull`, but returns the value as a decimal string so USD
+/** Like `numberOr`, but returns the value as a decimal string so USD
  *  amounts are never narrowed to a lossy float. A numeric OTLP value is
  *  stringified; a string that parses as a finite number is kept verbatim. */
 function costUsdStringOrNull(v: unknown): string | null {
