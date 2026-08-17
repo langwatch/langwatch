@@ -112,32 +112,32 @@ export default defineConfig({
     // and Redis; handing vitest the whole box starved the datastores and
     // suites failed on vi.waitFor timeouts rather than on their assertions.
     maxWorkers: isCI ? 2 : 1,
-    // Reuse the module registry across the files in the worker instead of
-    // rebuilding it per file.
+    // ISOLATION STAYS ON, and the reason is measured rather than assumed.
     //
-    // This is NOT the concurrency knob above, and the distinction is the whole
-    // argument. `fileParallelism` decides whether two files run AT ONCE, which
-    // is the property the ClickHouse schema and the Redis keyspace depend on;
-    // that stays off. `isolate` decides only whether the second file re-imports
-    // the module graph the first already loaded. Files still run strictly one
-    // at a time either way, so the earlier VITEST_INTEGRATION_PARALLEL attempt
-    // — reverted because concurrent workers lost each other's Redis state — is
-    // not what this re-enables.
+    // Import is the largest single line item in this suite: across the six CI
+    // shards it was 1,664s against 1,408s of actual test execution — 43% of
+    // integration runner time, roughly 1.8s per file spent rebuilding the same
+    // Prisma client and the same server graph. `isolate: false` reclaims most
+    // of that, and the unit lane runs 1,688 files that way, so it looks like
+    // free money.
     //
-    // The cost it removes is the largest single line item in the suite.
-    // Measured across the six CI shards: 1,664s of `import` against 1,408s of
-    // actual test execution, or ~1.8s per file spent rebuilding the same Prisma
-    // client, the same zod schemas and the same server graph 171 times a shard.
-    // Import was 43% of integration runner time and the tests themselves 37%.
+    // It is not, for this suite. Turned on, three of four CI shards went red
+    // and shard 2 alone failed 30 of its 120 files, with errors that name the
+    // cause: "Cannot resolve ClickHouse client", "App not initialized",
+    // ECONNREFUSED. These files build and tear down an application container
+    // per file, and that container is module-level state. Share the registry
+    // and the first file's teardown takes the next file's client with it.
     //
-    // The unit lane has run this way at larger scale for some time (1,688 files,
-    // vitest.config.ts), so the failure mode is known and narrow: module-level
-    // state that outlives a file — a memoised client, a module-scope queue
-    // handle, a cached config read at import. That shows up as an
-    // order-dependent failure, not as a wrong assertion. If a shard starts
-    // flaking that way, drop this line first and read the ordering before
-    // reaching for anything else.
-    isolate: false,
+    // That is not the same hazard as `fileParallelism` above — nothing here
+    // runs at once — but it has the same root: this suite keeps real,
+    // per-file lifecycle state in module scope. The unit and component lanes
+    // do not build containers, which is why one of them can share a registry
+    // and this one cannot.
+    //
+    // Reclaiming that 1,664s means giving the app container an explicit reset
+    // between files instead of relying on a fresh module graph to provide one.
+    // That is a real change to the test harness and belongs in its own PR,
+    // where the failures it causes are the subject rather than collateral.
     // Same weight-balanced split as the unit config: equal file counts are not
     // equal work, and a matrix is only as fast as its slowest leg.
     sequence: { sequencer: WeightBalancedSequencer },
