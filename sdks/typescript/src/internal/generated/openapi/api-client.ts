@@ -766,8 +766,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Run LangWatchQL analytics SQL
-         * @description Executes one read-only ClickHouse SELECT over the LangWatchQL analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project. Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
+         * Run governed analytics SQL
+         * @description Executes one read-only ClickHouse SELECT over the governed analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project. Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
          */
         post: operations["postApiV1ProjectsByProjectIdAnalyticsQueryClickhouse"];
         delete?: never;
@@ -784,8 +784,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Discover the LangWatchQL analytics schema
-         * @description Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.
+         * Discover the governed analytics schema
+         * @description Lists the governed analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.
          */
         get: operations["getApiV1ProjectsByProjectIdAnalyticsSchema"];
         put?: never;
@@ -805,13 +805,13 @@ export interface paths {
         };
         /**
          * List saved workbench charts
-         * @description Lists every saved LangWatchQL chart in this project, each with the statement it runs, the parameter values it was saved with and the Vega-Lite specification that draws it. Charts built with the chart builder are a different kind and are not listed here.
+         * @description Lists every saved governed SQL chart in this project, each with the statement it runs, the parameter values it was saved with and the Vega-Lite specification that draws it. Charts built with the chart builder are a different kind and are not listed here.
          */
         get: operations["getApiV1ProjectsByProjectIdAnalyticsCharts"];
         put?: never;
         /**
          * Save a workbench chart
-         * @description Saves a LangWatchQL statement, its bound parameter values and an optional Vega-Lite specification as one chart. The statement is validated by the LangWatchQL analytics SQL validator against this key's own permissions, and the specification by the visualization policy, before anything is written — a chart that could not be run or drawn is refused rather than stored.
+         * @description Saves a governed SQL statement, its bound parameter values and an optional Vega-Lite specification as one chart. The statement is validated by the governed analytics SQL validator against this key's own permissions, and the specification by the visualization policy, before anything is written — a chart that could not be run or drawn is refused rather than stored.
          */
         post: operations["postApiV1ProjectsByProjectIdAnalyticsCharts"];
         delete?: never;
@@ -829,14 +829,14 @@ export interface paths {
         };
         /**
          * Get a saved workbench chart
-         * @description Returns one saved LangWatchQL chart with its statement, parameter values and specification. A chart saved in another project is reported as not found.
+         * @description Returns one saved governed SQL chart with its statement, parameter values and specification. A chart saved in another project is reported as not found.
          */
         get: operations["getApiV1ProjectsByProjectIdAnalyticsChartsByChartId"];
         put?: never;
         post?: never;
         /**
          * Delete a saved workbench chart
-         * @description Deletes one saved LangWatchQL chart. Answers 204 with no body; deleting a chart that is not in this project is reported as not found.
+         * @description Deletes one saved governed SQL chart. Answers 204 with no body; deleting a chart that is not in this project is reported as not found.
          */
         delete: operations["deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId"];
         options?: never;
@@ -5230,7 +5230,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The LangWatchQL schema, scoped to the caller's permissions */
+            /** @description The governed schema, scoped to the caller's permissions */
             200: {
                 headers: {
                     [name: string]: unknown;
