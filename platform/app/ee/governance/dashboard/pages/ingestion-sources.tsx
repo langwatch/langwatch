@@ -1252,7 +1252,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       key: "startingAt",
       label: "Backfill start (optional)",
       placeholder: "2026-08-01",
-      hint: "The date the first run reads from: `2026-08-01`, or an instant carrying a timezone (`2026-08-01T00:00:00Z`). A time without a timezone is rejected rather than read as yours. Empty = 24 hours back.",
+      hint: "The date the first run reads from: `2026-08-01`, or an instant carrying a timezone (`2026-08-01T00:00:00Z`). A time without a timezone is rejected rather than read as yours. Empty = 3 calendar days back at midnight UTC for cost, 1 calendar day back at midnight UTC for usage.",
     },
   ],
   databricks_genie: [
