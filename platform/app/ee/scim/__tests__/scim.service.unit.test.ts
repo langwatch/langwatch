@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { User } from "~/generated/prisma/client";
+import type { PrismaClient, User } from "~/generated/prisma/client";
 import { ScimService } from "../scim.service";
 
 // An App carrying no Redis, so the revoke helper reachable from the SCIM
@@ -26,9 +26,22 @@ vi.mock("~/server/app-layer/authz/ledger", () => ({
 }));
 
 function createMockPrisma() {
-  // The reconciler reads the grants this push is authoritative over.
+  // The reconciler reads the grants this push is authoritative over. The
+  // write path must never reach the three write methods: since PR 2 the
+  // tables are projection-fed and the ledger is the only writer. Each throws
+  // so a regression reads as this named failure rather than as a mock
+  // missing a method.
+  const forbiddenWrite = (method: string) =>
+    vi.fn().mockImplementation(() => {
+      throw new Error(
+        `roleBinding.${method} reached from ScimService — the grants ledger is the only writer`,
+      );
+    });
   const roleBinding = {
     findMany: vi.fn().mockResolvedValue([]),
+    create: forbiddenWrite("create"),
+    update: forbiddenWrite("update"),
+    deleteMany: forbiddenWrite("deleteMany"),
   };
   const organizationUser = {
     findUnique: vi.fn(),
@@ -55,7 +68,7 @@ function createMockPrisma() {
       .fn()
       .mockImplementation((ops: unknown[]) => Promise.all(ops)),
   };
-  return mock as unknown as Parameters<typeof ScimService.create>[0];
+  return mock as unknown as PrismaClient;
 }
 
 function buildMockUser(overrides: Partial<User> = {}): User {
@@ -85,7 +98,7 @@ describe("ScimService", () => {
     ledger.attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
     ledger.revokeBindings.mockResolvedValue(undefined);
     prisma = createMockPrisma();
-    service = ScimService.create(prisma);
+    service = ScimService.create({ prisma });
   });
 
   describe("toScimUser()", () => {

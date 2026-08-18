@@ -197,12 +197,12 @@ export const roleRouter = createTRPCRouter({
     })
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
-      return await roleService.assignRoleToUser(
-        input.userId,
-        input.teamId,
-        input.customRoleId,
-        { actor: { type: "user", id: ctx.session.user.id } },
-      );
+      return await roleService.assignRoleToUser({
+        userId: input.userId,
+        teamId: input.teamId,
+        customRoleId: input.customRoleId,
+        actor: { type: "user", id: ctx.session.user.id },
+      });
     }),
 
   removeFromUser: protectedProcedure

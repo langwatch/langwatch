@@ -109,7 +109,7 @@ describe("given a revocation with the queue severed and Redis disconnected", () 
     });
     if (!connection) {
       throw new Error(
-        "This suite needs Redis. Set LANGWATCH_TEST_REDIS_URL in platform/app/.env.",
+        "This suite needs Redis. Set REDIS_URL (or REDIS_CLUSTER_ENDPOINTS) in platform/app/.env.",
       );
     }
     connection.disconnect();

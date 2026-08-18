@@ -634,9 +634,13 @@ export class PipelineRegistry {
       eventSourcing: this.deps.eventSourcing,
     });
     const billingPipeline = this.registerBillingReportingPipeline();
-    // The grants ledger (ADR-092 §13). Ships dark: registered so the
-    // machinery is live, but no production writer calls its commands until
-    // the backfill refactor and PR 2 move the write paths.
+    // The grants ledger (ADR-092 §13). The write paths emit through the
+    // app-layer ledger module, gated PER ORGANIZATION (decision 4): only an
+    // organization whose genesis import has landed (its
+    // SystemMigrationTenantState row, read by the ledger-write-gate) sends
+    // these commands; every other organization still takes the imperative
+    // Prisma path, and an operator's `rolled_back` flip returns one there
+    // with no deploy.
     this.deps.eventSourcing.register(
       createAuthzGrantsPipeline({
         authzGrantsProjectionStore:

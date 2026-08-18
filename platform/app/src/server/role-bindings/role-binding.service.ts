@@ -87,15 +87,30 @@ function foldScopeRows({ orgs, teams, projects }: ScopeRows): {
 }
 
 export class RoleBindingService {
-  constructor(
-    // TODO: complex queries (listForUser, listForOrg, etc.) should be moved to the repository
-    private readonly prisma: PrismaClient,
-    private readonly repo: RoleBindingRepository,
-    private readonly roleService: RoleService,
-    // Every binding write on this service is a grants-ledger command; the
-    // RoleBinding table is a projection fed by the fold, never written here.
-    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-  ) {}
+  // TODO: complex queries (listForUser, listForOrg, etc.) should be moved to the repository
+  private readonly prisma: PrismaClient;
+  private readonly repo: RoleBindingRepository;
+  private readonly roleService: RoleService;
+  // Every binding write on this service is a grants-ledger command; the
+  // RoleBinding table is a projection fed by the fold, never written here.
+  private readonly writer: GrantsLedgerWriter;
+
+  constructor({
+    prisma,
+    repo,
+    roleService,
+    writer = grantsLedgerWriter(),
+  }: {
+    prisma: PrismaClient;
+    repo: RoleBindingRepository;
+    roleService: RoleService;
+    writer?: GrantsLedgerWriter;
+  }) {
+    this.prisma = prisma;
+    this.repo = repo;
+    this.roleService = roleService;
+    this.writer = writer;
+  }
 
   /**
    * Whether this user's access so far derives ONLY from legacy shared-team

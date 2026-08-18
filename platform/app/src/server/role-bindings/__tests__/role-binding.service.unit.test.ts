@@ -95,7 +95,12 @@ beforeEach(() => {
   vi.spyOn(roleService, "filterAssignableRoleIds").mockImplementation(
     filterAssignableRoleIds as unknown as RoleService["filterAssignableRoleIds"],
   );
-  service = new RoleBindingService(prisma, repository, roleService, writer);
+  service = new RoleBindingService({
+    prisma,
+    repo: repository,
+    roleService,
+    writer,
+  });
 });
 
 const actor = { type: "user" as const, id: "user_admin" };

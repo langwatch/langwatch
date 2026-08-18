@@ -1,3 +1,4 @@
+import { DuplicateBindingError } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
 import type {
   Group,
@@ -9,6 +10,7 @@ import type { LedgerActor } from "~/server/app-layer/authz/ledger";
 import { PersonalWorkspaceNotManagedHereError } from "~/server/app-layer/teams/team.service";
 import type { RoleService } from "~/server/role";
 import { RoleNotAssignableError } from "~/server/role/errors";
+import { RoleBindingAlreadyExistsError } from "~/server/role-bindings/errors";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import {
@@ -385,19 +387,31 @@ export class GroupRestService {
     });
     await this.assertNoPersonalTeamScope([{ scopeType, scopeId }]);
 
-    return this.repo.createBinding(
-      {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId,
-        groupId,
-        role,
-        customRoleId:
-          role === ("CUSTOM" as TeamUserRole) ? (customRoleId ?? null) : null,
-        scopeType,
-        scopeId,
-      },
-      { actor },
-    );
+    try {
+      return await this.repo.createBinding(
+        {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId,
+          groupId,
+          role,
+          customRoleId:
+            role === ("CUSTOM" as TeamUserRole) ? (customRoleId ?? null) : null,
+          scopeType,
+          scopeId,
+        },
+        { actor },
+      );
+    } catch (error) {
+      // The repository rejects duplicate identities rather than skipping
+      // them: a skipped duplicate would return a binding id for a row that
+      // was never created.
+      if (error instanceof DuplicateBindingError) {
+        throw new RoleBindingAlreadyExistsError({
+          meta: { scopeType, scopeId },
+        });
+      }
+      throw error;
+    }
   }
 
   async removeBinding({

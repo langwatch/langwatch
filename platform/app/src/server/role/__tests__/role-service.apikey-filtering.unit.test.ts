@@ -160,7 +160,10 @@ describe("RoleService", () => {
         });
 
         await expect(
-          service.assignRoleToUser("user_1", "team_1", "cr_1", {
+          service.assignRoleToUser({
+            userId: "user_1",
+            teamId: "team_1",
+            customRoleId: "cr_1",
             actor: { type: "user" as const, id: "actor_1" },
           }),
         ).rejects.toThrow(RoleNotFoundError);

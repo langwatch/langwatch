@@ -1026,27 +1026,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
     }
 
-    // Same guard as disabling or demoting the last admin, and the only
-    // irreversible one of the three: an organization with no admin who can
-    // sign in cannot be recovered from inside the product. Read ahead of the
-    // revocation as well as inside the transaction below, so a refusal never
-    // strips the last admin's grants on its way to saying no; the locked read
-    // inside the transaction is still the authority.
-    if (
-      member.role === OrganizationUserRole.ADMIN &&
-      member.disabledAt === null
-    ) {
-      const activeAdmins = await this.prisma.organizationUser.count({
-        where: {
-          organizationId,
-          role: OrganizationUserRole.ADMIN,
-          disabledAt: null,
-        },
-      });
-      if (activeAdmins <= 1) {
-        throw new CannotRemoveLastAdminError();
-      }
-    }
+    await this.assertRemovalKeepsAnActiveAdmin({ organizationId, member });
 
     // Grants go before the membership, not after. A ledger append cannot join
     // the Prisma transaction, so one of the two writes is always exposed to a
@@ -1056,66 +1036,130 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     await revokeTheirGrants();
 
     await this.prisma.$transaction(async (tx) => {
-      const stillAMember = await tx.organizationUser.findUnique({
-        where: { userId_organizationId: { userId, organizationId } },
-        select: { role: true, disabledAt: true },
-      });
+      await this.deleteMembershipRow({ tx, organizationId, userId });
+      await this.archivePersonalWorkspaces({ tx, organizationId, userId });
+    });
+  }
 
-      if (!stillAMember) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+  /**
+   * Same guard as disabling or demoting the last admin, and the only
+   * irreversible one of the three: an organization with no admin who can
+   * sign in cannot be recovered from inside the product. Read ahead of the
+   * revocation as well as inside the removal transaction, so a refusal never
+   * strips the last admin's grants on its way to saying no; the locked read
+   * inside the transaction is still the authority.
+   */
+  private async assertRemovalKeepsAnActiveAdmin({
+    organizationId,
+    member,
+  }: {
+    organizationId: string;
+    member: { role: OrganizationUserRole; disabledAt: Date | null };
+  }): Promise<void> {
+    if (
+      member.role !== OrganizationUserRole.ADMIN ||
+      member.disabledAt !== null
+    ) {
+      return;
+    }
+    const activeAdmins = await this.prisma.organizationUser.count({
+      where: {
+        organizationId,
+        role: OrganizationUserRole.ADMIN,
+        disabledAt: null,
+      },
+    });
+    if (activeAdmins <= 1) {
+      throw new CannotRemoveLastAdminError();
+    }
+  }
+
+  /**
+   * The membership delete itself, re-guarded under the transaction: the
+   * pre-transaction reads are advisory, this locked read is the authority.
+   */
+  private async deleteMembershipRow({
+    tx,
+    organizationId,
+    userId,
+  }: {
+    tx: Prisma.TransactionClient;
+    organizationId: string;
+    userId: string;
+  }): Promise<void> {
+    const stillAMember = await tx.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { role: true, disabledAt: true },
+    });
+
+    if (!stillAMember) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+    }
+
+    if (
+      stillAMember.role === OrganizationUserRole.ADMIN &&
+      stillAMember.disabledAt === null
+    ) {
+      const activeAdmins = await lockActiveAdmins({ tx, organizationId });
+
+      if (activeAdmins.length <= 1) {
+        throw new CannotRemoveLastAdminError();
       }
+    }
 
-      if (
-        stillAMember.role === OrganizationUserRole.ADMIN &&
-        stillAMember.disabledAt === null
-      ) {
-        const activeAdmins = await lockActiveAdmins({ tx, organizationId });
-
-        if (activeAdmins.length <= 1) {
-          throw new CannotRemoveLastAdminError();
-        }
-      }
-
-      await tx.organizationUser.delete({
-        where: {
-          userId_organizationId: {
-            userId,
-            organizationId,
-          },
-        },
-      });
-
-      const archivedAt = new Date();
-      const personalTeams = await tx.team.findMany({
-        where: {
+    await tx.organizationUser.delete({
+      where: {
+        userId_organizationId: {
+          userId,
           organizationId,
-          ownerUserId: userId,
-          isPersonal: true,
-          archivedAt: null,
         },
-        select: { id: true },
-      });
-      if (personalTeams.length === 0) return;
+      },
+    });
+  }
 
-      const personalTeamIds = personalTeams.map((team) => team.id);
-      // `isPersonal` on the same terms the reactivation reads it, so the two
-      // sides move the same rows. A personal team holds nothing else today
-      // (creating a project in one, or moving one into it, is refused), and the
-      // flag mirrors the team's, so this narrows nothing away; it keeps the pair
-      // symmetric if that ever slips, since archiving what the revival would
-      // not return is the failure with no way back.
-      await tx.project.updateMany({
-        where: {
-          teamId: { in: personalTeamIds },
-          isPersonal: true,
-          archivedAt: null,
-        },
-        data: { archivedAt },
-      });
-      await tx.team.updateMany({
-        where: { id: { in: personalTeamIds } },
-        data: { archivedAt },
-      });
+  /**
+   * Archives the removed member's personal team and project, on the same
+   * terms `PersonalWorkspaceService.ensure()` reactivates them.
+   */
+  private async archivePersonalWorkspaces({
+    tx,
+    organizationId,
+    userId,
+  }: {
+    tx: Prisma.TransactionClient;
+    organizationId: string;
+    userId: string;
+  }): Promise<void> {
+    const archivedAt = new Date();
+    const personalTeams = await tx.team.findMany({
+      where: {
+        organizationId,
+        ownerUserId: userId,
+        isPersonal: true,
+        archivedAt: null,
+      },
+      select: { id: true },
+    });
+    if (personalTeams.length === 0) return;
+
+    const personalTeamIds = personalTeams.map((team) => team.id);
+    // `isPersonal` on the same terms the reactivation reads it, so the two
+    // sides move the same rows. A personal team holds nothing else today
+    // (creating a project in one, or moving one into it, is refused), and the
+    // flag mirrors the team's, so this narrows nothing away; it keeps the pair
+    // symmetric if that ever slips, since archiving what the revival would
+    // not return is the failure with no way back.
+    await tx.project.updateMany({
+      where: {
+        teamId: { in: personalTeamIds },
+        isPersonal: true,
+        archivedAt: null,
+      },
+      data: { archivedAt },
+    });
+    await tx.team.updateMany({
+      where: { id: { in: personalTeamIds } },
+      data: { archivedAt },
     });
   }
 

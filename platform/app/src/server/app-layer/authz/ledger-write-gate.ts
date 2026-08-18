@@ -62,7 +62,7 @@ const POSITIVE_CACHE_TTL_MS = 60_000;
  * directions from disagreeing and lets an expired entry be dropped on the
  * way past instead of accumulating for the life of the pod.
  */
-const cached = new Map<string, { onLedger: boolean; expiresAt: number }>();
+const cached = new Map<string, { isOnLedger: boolean; expiresAt: number }>();
 
 export async function isOrgOnLedgerWrites({
   organizationId,
@@ -73,11 +73,11 @@ export async function isOrgOnLedgerWrites({
 }): Promise<boolean> {
   const entry = cached.get(organizationId);
   if (entry !== undefined) {
-    if (Date.now() < entry.expiresAt) return entry.onLedger;
+    if (Date.now() < entry.expiresAt) return entry.isOnLedger;
     cached.delete(organizationId);
   }
 
-  let onLedger = false;
+  let isOnLedger = false;
   try {
     const record = await prisma.systemMigrationTenantState.findUnique({
       where: {
@@ -92,7 +92,7 @@ export async function isOrgOnLedgerWrites({
     // union the array is pinned to on purpose (see the type above) - the
     // cast is on this comparison, not on the declaration a rename must
     // still catch.
-    onLedger =
+    isOnLedger =
       record !== null &&
       (LEDGER_WRITE_STATUSES as readonly string[]).includes(record.status);
   } catch (error) {
@@ -110,15 +110,15 @@ export async function isOrgOnLedgerWrites({
       { organizationId, error, ttlMs: NEGATIVE_CACHE_TTL_MS },
       "could not read the genesis-import state; this organization's grant writes stay on the legacy path until the cache expires",
     );
-    onLedger = false;
+    isOnLedger = false;
   }
 
   cached.set(organizationId, {
-    onLedger,
+    isOnLedger,
     expiresAt:
-      Date.now() + (onLedger ? POSITIVE_CACHE_TTL_MS : NEGATIVE_CACHE_TTL_MS),
+      Date.now() + (isOnLedger ? POSITIVE_CACHE_TTL_MS : NEGATIVE_CACHE_TTL_MS),
   });
-  return onLedger;
+  return isOnLedger;
 }
 
 /** The cache, dropped — for tests that migrate an organization mid-suite. */

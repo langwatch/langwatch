@@ -154,11 +154,15 @@ export class RoleService {
   }
 
   /**
-   * The delete itself, with the in-use condition carried on the statement as
-   * the backstop the pre-check cannot be: a grant written between the check
-   * and the delete would otherwise be unhooked from the role behind it, and a
-   * dangling reference falls back to the built-in permission bag rather than
-   * failing, so nobody would see it happen.
+   * The delete itself. `deleteIfUnused` re-reads every reference immediately
+   * before appending `role_deleted` — a read followed by an append, not a
+   * condition carried on a statement, because the role is a ledger fact
+   * (ADR-092 §13) and its deletion is a command. A grant written inside that
+   * window is silently unhooked from the role behind it, and the dangling
+   * reference falls back to the built-in permission bag rather than failing;
+   * what survives is the guarantee callers rely on — a role somebody holds at
+   * the moment of the re-read is left standing. The window and its cost are
+   * spelled out on `RoleRepository.deleteIfUnused`.
    *
    * Nothing deleted has two causes, and they get different answers, settled by
    * re-reading the role rather than by the counts. Something took a reference
@@ -168,12 +172,12 @@ export class RoleService {
    * answer is that the role is gone, which is also the stable outcome a
    * repeated delete needs.
    *
-   * The counts cannot decide this on their own: the delete's condition spans
-   * every organization, while `countRoleBindings` is organization-scoped as
-   * the tenancy middleware requires, so a holder elsewhere reads as zero here.
-   * Under-reporting how many bindings hold a role is a worse refusal message;
-   * reporting "not found" for a role that is still there would be a wrong
-   * answer.
+   * The counts cannot decide this on their own: `deleteIfUnused`'s reference
+   * check spans every organization, while `countRoleBindings` is
+   * organization-scoped as the tenancy middleware requires, so a holder
+   * elsewhere reads as zero here. Under-reporting how many bindings hold a
+   * role is a worse refusal message; reporting "not found" for a role that is
+   * still there would be a wrong answer.
    */
   private async deleteRoleRow({
     roleId,
@@ -299,12 +303,17 @@ export class RoleService {
     return { success: true };
   }
 
-  async assignRoleToUser(
-    userId: string,
-    teamId: string,
-    customRoleId: string,
-    { actor }: { actor: LedgerActor },
-  ) {
+  async assignRoleToUser({
+    userId,
+    teamId,
+    customRoleId,
+    actor,
+  }: {
+    userId: string;
+    teamId: string;
+    customRoleId: string;
+    actor: LedgerActor;
+  }) {
     const [customRole, team] = await Promise.all([
       this.repository.findById(customRoleId),
       this.repository.findTeamById(teamId),
@@ -336,7 +345,7 @@ export class RoleService {
       client: this.prisma,
       scopes: [{ scopeType: RoleBindingScopeType.TEAM, scopeId: teamId }],
     });
-    await this.repository.assignToUser(userId, teamId, customRoleId, { actor });
+    await this.repository.assignToUser({ userId, teamId, customRoleId, actor });
 
     return { success: true };
   }

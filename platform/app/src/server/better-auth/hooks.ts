@@ -90,6 +90,157 @@ export const beforeUserCreate = async ({
 };
 
 /**
+ * The organization-scoped grant that comes with a default membership.
+ * Idempotent by construction: an identical row already present is skipped,
+ * so calling this twice grants nothing twice, and calling it after a
+ * membership row turned up on its own is the repair.
+ */
+const grantDefaultOrgMembership = ({
+  writer,
+  organizationId,
+  userId,
+}: {
+  writer: GrantsLedgerWriter;
+  organizationId: string;
+  userId: string;
+}) =>
+  writer.attachBindings({
+    organizationId,
+    bindings: [
+      {
+        bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        principal: { userId },
+        role: TeamUserRole.MEMBER,
+        customRoleId: null,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organizationId,
+      },
+    ],
+    // The signup is the product acting on a domain rule, not an
+    // administrator granting access.
+    actor: { type: "system", id: SYSTEM_ACTORS.ssoAutoJoin },
+    onDuplicate: "skip",
+  });
+
+/**
+ * Success-side announcements once the membership landed: the log line, the
+ * Slack signup event (fire-and-forget), and the nurturing calls.
+ */
+const announceSsoAutoJoin = ({
+  user,
+  org,
+  inviteId,
+}: {
+  user: { id: string; email: string; name: string };
+  org: { id: string; name: string };
+  inviteId: string | null;
+}): void => {
+  logger.info(
+    { userId: user.id, organizationId: org.id, inviteId },
+    inviteId
+      ? "Applied pending invite on SSO signup"
+      : "Auto-added new user to SSO organization (default MEMBER)",
+  );
+
+  void getApp()
+    .notifications.sendSlackSignupEvent({
+      userName: user.name,
+      userEmail: user.email,
+      organizationName: org.name,
+    })
+    .catch(captureException);
+
+  fireSsoAutoAddNurturingCalls({
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    organizationId: org.id,
+    organizationName: org.name,
+  });
+};
+
+/**
+ * Membership + grant for one domain-matched organization. A pending invite
+ * wins when one exists (its role and team assignments carry their own
+ * grants); otherwise the default MEMBER membership plus the organization-
+ * scoped grant beside it. P2002 on the membership means a concurrent OAuth
+ * callback or a retry created the row first — treated as success, with the
+ * grant re-asserted rather than assumed, because the concurrent callback
+ * may have died between the two writes.
+ */
+const joinSsoOrganization = async ({
+  prisma,
+  writer,
+  user,
+  org,
+}: {
+  prisma: PrismaClient;
+  writer: GrantsLedgerWriter;
+  user: { id: string; email: string; name: string };
+  org: { id: string; name: string };
+}): Promise<void> => {
+  const pendingInvite = await InviteService.create(
+    prisma,
+  ).findPendingByOrgAndEmail({
+    organizationId: org.id,
+    email: user.email,
+  });
+
+  try {
+    if (pendingInvite) {
+      await InviteService.create(prisma).applyInvite({
+        userId: user.id,
+        invite: pendingInvite,
+      });
+    } else {
+      // The membership row is not a grant fact and keeps its imperative
+      // write; the organization-scoped grant that comes with it is a ledger
+      // command, emitted once the membership exists (ADR-092).
+      await prisma.organizationUser.create({
+        data: {
+          userId: user.id,
+          organizationId: org.id,
+          role: "MEMBER",
+        },
+      });
+      await grantDefaultOrgMembership({
+        writer,
+        organizationId: org.id,
+        userId: user.id,
+      });
+    }
+  } catch (err) {
+    // P2002 (unique constraint) means another concurrent OAuth callback
+    // or a retry already created this membership. Idempotent success.
+    if (
+      !(err instanceof Prisma.PrismaClientKnownRequestError) ||
+      err.code !== "P2002"
+    ) {
+      throw err;
+    }
+    logger.info(
+      { userId: user.id, organizationId: org.id },
+      "Auto-add SSO membership was already present (P2002) — treating as success",
+    );
+    // The membership row existing says nothing about the grant beside it:
+    // the concurrent callback that created it may have died in between,
+    // and the two writes no longer share a transaction. Re-assert, which
+    // is a no-op when the other attempt finished. An invite carries its
+    // own grants at its own roles, so this only covers the default path.
+    if (!pendingInvite) {
+      await grantDefaultOrgMembership({
+        writer,
+        organizationId: org.id,
+        userId: user.id,
+      });
+    }
+    return;
+  }
+
+  announceSsoAutoJoin({ user, org, inviteId: pendingInvite?.id ?? null });
+};
+
+/**
  * Called after a new user is created. Fires the `signed_up` analytics event
  * for every new user (fire-and-forget, no-op without POSTHOG_KEY), then, if
  * the user's email domain matches an organization with ssoDomain,
@@ -106,10 +257,11 @@ export const beforeUserCreate = async ({
  * The OrganizationUser row and the grant that comes with it can no longer
  * share a transaction: the membership is a table write and the grant is a
  * ledger command (ADR-092 delivery-plan PR 2). What replaces the transaction
- * is a re-assert — the grant write is idempotent, and the P2002 path below,
- * which is a concurrent callback or a retry, runs it again rather than
- * assuming the other attempt got that far. Otherwise the user is left "in the
- * org" with no grant: org membership to legacy code, zero access under RBAC.
+ * is a re-assert — the grant write is idempotent, and the P2002 path in
+ * `joinSsoOrganization`, which is a concurrent callback or a retry, runs it
+ * again rather than assuming the other attempt got that far. Otherwise the
+ * user is left "in the org" with no grant: org membership to legacy code,
+ * zero access under RBAC.
  *
  * Outer catch: the whole auto-add is best-effort. If the write fails
  * outright (transient DB issue, concurrent signup we didn't catch via P2002),
@@ -169,105 +321,7 @@ export const afterUserCreate = async ({
     });
     if (!org) return;
 
-    const pendingInvite = await InviteService.create(
-      prisma,
-    ).findPendingByOrgAndEmail({
-      organizationId: org.id,
-      email: user.email,
-    });
-
-    // The organization-scoped grant that comes with a default membership.
-    // Idempotent by construction: an identical row already present is skipped,
-    // so calling this twice grants nothing twice, and calling it after a
-    // membership row turned up on its own is the repair.
-    const grantDefaultMembership = () =>
-      writer.attachBindings({
-        organizationId: org.id,
-        bindings: [
-          {
-            bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            principal: { userId: user.id },
-            role: TeamUserRole.MEMBER,
-            customRoleId: null,
-            scopeType: RoleBindingScopeType.ORGANIZATION,
-            scopeId: org.id,
-          },
-        ],
-        // The signup is the product acting on a domain rule, not an
-        // administrator granting access.
-        actor: { type: "system", id: SYSTEM_ACTORS.ssoAutoJoin },
-        onDuplicate: "skip",
-      });
-
-    try {
-      if (pendingInvite) {
-        await InviteService.create(prisma).applyInvite({
-          userId: user.id,
-          invite: pendingInvite,
-        });
-      } else {
-        // The membership row is not a grant fact and keeps its imperative
-        // write; the organization-scoped grant that comes with it is a ledger
-        // command, emitted once the membership exists (ADR-092).
-        await prisma.organizationUser.create({
-          data: {
-            userId: user.id,
-            organizationId: org.id,
-            role: "MEMBER",
-          },
-        });
-        await grantDefaultMembership();
-      }
-
-      logger.info(
-        {
-          userId: user.id,
-          organizationId: org.id,
-          inviteId: pendingInvite?.id ?? null,
-        },
-        pendingInvite
-          ? "Applied pending invite on SSO signup"
-          : "Auto-added new user to SSO organization (default MEMBER)",
-      );
-
-      void getApp()
-        .notifications.sendSlackSignupEvent({
-          userName: user.name,
-          userEmail: user.email,
-          organizationName: org.name,
-        })
-        .catch(captureException);
-
-      fireSsoAutoAddNurturingCalls({
-        userId: user.id,
-        email: user.email,
-        name: user.name,
-        organizationId: org.id,
-        organizationName: org.name,
-      });
-    } catch (err) {
-      // P2002 (unique constraint) means another concurrent OAuth callback
-      // or a retry already created this membership. Idempotent success.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === "P2002"
-      ) {
-        logger.info(
-          { userId: user.id, organizationId: org.id },
-          "Auto-add SSO membership was already present (P2002) — treating as success",
-        );
-        // The membership row existing says nothing about the grant beside it:
-        // the concurrent callback that created it may have died in between,
-        // and the two writes no longer share a transaction. Re-assert, which
-        // is a no-op when the other attempt finished. An invite carries its
-        // own grants at its own roles, so this only covers the default path.
-        if (!pendingInvite) {
-          await grantDefaultMembership();
-        }
-        return;
-      }
-      throw err;
-    }
+    await joinSsoOrganization({ prisma, writer, user, org });
   } catch (err) {
     logger.error(
       { err, userId: user.id, domain },

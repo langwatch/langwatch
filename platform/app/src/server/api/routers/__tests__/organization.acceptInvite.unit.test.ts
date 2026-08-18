@@ -119,6 +119,7 @@ function makeInvite(overrides: Record<string, unknown> = {}) {
 describe("organization.acceptInvite", () => {
   let findUniqueMock: ReturnType<typeof vi.fn>;
   let inviteUpdateMock: ReturnType<typeof vi.fn>;
+  let createManyMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -128,6 +129,7 @@ describe("organization.acceptInvite", () => {
     inviteUpdateMock = vi
       .fn()
       .mockResolvedValue(makeInvite({ status: "ACCEPTED" }));
+    createManyMock = vi.fn().mockResolvedValue({ count: 1 });
   });
 
   function createCaller(email = "user@example.com") {
@@ -148,7 +150,7 @@ describe("organization.acceptInvite", () => {
         update: inviteUpdateMock,
         findFirst: vi.fn().mockResolvedValue(null),
       },
-      organizationUser: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      organizationUser: { createMany: createManyMock },
       project: { findFirst: vi.fn().mockResolvedValue(null) },
     };
     return organizationRouter.createCaller(ctx);
@@ -165,8 +167,14 @@ describe("organization.acceptInvite", () => {
       // The membership row and the acceptance land in one transaction, and
       // the grants the invite carries follow it: they are ledger commands and
       // cannot join, and this order is what keeps a PENDING invite from ever
-      // carrying access somebody could revoke out from under.
+      // carrying access somebody could revoke out from under. The ordering
+      // assertion is the point: a grant emitted before the membership row
+      // lands would attach access to someone who is not yet a member.
+      expect(createManyMock).toHaveBeenCalledTimes(1);
       expect(ledger.attachBindings).toHaveBeenCalled();
+      expect(createManyMock.mock.invocationCallOrder[0]!).toBeLessThan(
+        ledger.attachBindings.mock.invocationCallOrder[0]!,
+      );
       expect(inviteUpdateMock).toHaveBeenCalledWith(
         expect.objectContaining({ data: { status: "ACCEPTED" } }),
       );

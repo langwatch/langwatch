@@ -53,6 +53,26 @@ async function readTeamAdminPrincipals({
   return { userIds, groupIds };
 }
 
+/**
+ * Every user the given admin-holding groups expand to — the one membership
+ * fan-out all the group-derived admin answers share, so the expansion cannot
+ * drift between them.
+ */
+async function groupMemberUserIds({
+  tx,
+  groupIds,
+}: {
+  tx: TxClient;
+  groupIds: string[];
+}): Promise<string[]> {
+  if (groupIds.length === 0) return [];
+  const memberships = await tx.groupMembership.findMany({
+    where: { groupId: { in: groupIds } },
+    select: { userId: true },
+  });
+  return memberships.map((m) => m.userId);
+}
+
 export async function computeEffectiveAdminUserIds({
   tx,
   organizationId,
@@ -69,15 +89,9 @@ export async function computeEffectiveAdminUserIds({
   });
 
   const userIds = new Set<string>(directUserIds);
-
-  if (groupIds.length > 0) {
-    const memberships = await tx.groupMembership.findMany({
-      where: { groupId: { in: groupIds } },
-      select: { userId: true },
-    });
-    for (const m of memberships) userIds.add(m.userId);
+  for (const id of await groupMemberUserIds({ tx, groupIds })) {
+    userIds.add(id);
   }
-
   return userIds;
 }
 
@@ -109,14 +123,9 @@ export async function projectAdminUserIdsAfterDirectEdit({
     organizationId,
     teamId,
   });
-  if (groupIds.length === 0) return userIds;
-
-  const memberships = await tx.groupMembership.findMany({
-    where: { groupId: { in: groupIds } },
-    select: { userId: true },
-  });
-  for (const m of memberships) userIds.add(m.userId);
-
+  for (const id of await groupMemberUserIds({ tx, groupIds })) {
+    userIds.add(id);
+  }
   return userIds;
 }
 

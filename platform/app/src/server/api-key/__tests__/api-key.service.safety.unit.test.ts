@@ -155,16 +155,12 @@ function buildPrisma() {
 
 describe("ApiKeyService — safety invariants (mocked)", () => {
   let prisma: ReturnType<typeof buildPrisma>["prisma"];
-  let mockTx: ReturnType<typeof buildPrisma>["mockTx"];
-  let txState: ReturnType<typeof buildPrisma>["txState"];
   let service: ApiKeyService;
 
   beforeEach(() => {
     vi.clearAllMocks();
     const built = buildPrisma();
     prisma = built.prisma;
-    mockTx = built.mockTx;
-    txState = built.txState;
     service = ApiKeyService.create(prisma);
     ledger.attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
     ledger.revokeBindings.mockResolvedValue(undefined);

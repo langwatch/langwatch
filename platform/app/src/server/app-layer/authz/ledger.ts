@@ -47,6 +47,7 @@ import {
   bindingIdentityKey,
   DuplicateBindingError,
   type GrantRevocationSelector,
+  type GrantWriteActor,
   type LedgerScopeType,
   type RoleBindingWrite,
 } from "@langwatch/authz-server";
@@ -78,7 +79,9 @@ import { PrismaAuthzGrantsProjectionRepository } from "./repositories/authz-gran
 
 const logger = createLogger("langwatch:authz:ledger");
 
-export type LedgerActor = { type: "user" | "system"; id: string | null };
+/** The actor on every ledger write — the package's `GrantWriteActor`, aliased
+ *  at the one declaration site so the two shapes cannot drift apart. */
+export type LedgerActor = GrantWriteActor;
 
 /**
  * Which writer authored a runtime fact — the event's `source` field.
@@ -242,7 +245,15 @@ export type AttachOutcome = {
  * alongside, not instead).
  */
 export class GrantsLedgerWriter {
-  private readonly enforcement: PrismaAuthzGrantsProjectionRepository;
+  /**
+   * Only the one sanctioned direct projection write (decision 7) — typed to
+   * exactly that member so the writer cannot quietly grow a dependency on
+   * the projection store's fold-side surface.
+   */
+  private readonly enforcement: Pick<
+    PrismaAuthzGrantsProjectionRepository,
+    "enforceGrantRevocation"
+  >;
 
   constructor(
     private readonly prisma: PrismaClient,

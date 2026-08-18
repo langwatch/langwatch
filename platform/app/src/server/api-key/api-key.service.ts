@@ -584,8 +584,15 @@ export class ApiKeyService {
 
   /**
    * Validates every requested binding against the ceiling user's permissions.
-   * Must be called inside a transaction to prevent TOCTOU races where
-   * the user's bindings change between validation and write.
+   *
+   * A read taken immediately before the grants are appended, not a check
+   * riding a transaction: the writes it guards are ledger commands now
+   * (ADR-092 §13), so neither caller opens one — see the comment above the
+   * create-path call. The accepted race is the ceiling shrinking between this
+   * read and the append: the key can end up with grants its owner held at the
+   * moment of the check rather than at the moment of the write. What a key
+   * can never do is exceed a ceiling its owner never had, which is the
+   * guarantee callers rely on.
    */
   private async assertBindingsWithinCeiling({
     prisma,
@@ -995,10 +1002,9 @@ export class ApiKeyService {
     }
     if (apiKey.revokedAt) throw new ApiKeyAlreadyRevokedError(id);
 
-    const fresh = await this.repo.findById({ id });
     const customRoleIds = [
       ...new Set(
-        (fresh?.roleBindings ?? [])
+        apiKey.roleBindings
           .map((rb) => rb.customRoleId)
           .filter((cid): cid is string => cid !== null),
       ),

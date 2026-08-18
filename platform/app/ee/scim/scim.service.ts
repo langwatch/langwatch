@@ -30,13 +30,20 @@ import { reconcileScimGrants } from "./scim-grants.reconciler";
  * All operations are scoped to an organization for multi-tenancy.
  */
 export class ScimService {
+  private readonly prisma: PrismaClient;
+  private readonly writer: GrantsLedgerWriter;
   private readonly userService: UserService;
   private readonly departmentService: DepartmentService;
 
-  constructor(
-    private readonly prisma: PrismaClient,
-    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-  ) {
+  constructor({
+    prisma,
+    writer = grantsLedgerWriter(),
+  }: {
+    prisma: PrismaClient;
+    writer?: GrantsLedgerWriter;
+  }) {
+    this.prisma = prisma;
+    this.writer = writer;
     this.userService = UserService.create(prisma);
     this.departmentService = DepartmentService.create(prisma);
   }
@@ -85,8 +92,11 @@ export class ScimService {
     });
   }
 
-  static create(prisma: PrismaClient): ScimService {
-    return new ScimService(prisma);
+  static create(options: {
+    prisma: PrismaClient;
+    writer?: GrantsLedgerWriter;
+  }): ScimService {
+    return new ScimService(options);
   }
 
   /**

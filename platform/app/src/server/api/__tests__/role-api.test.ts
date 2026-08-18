@@ -48,6 +48,9 @@ const mockPrisma = {
   organizationUser: {
     findFirst: vi.fn(),
   },
+  // deleteIfUnused reads the cross-organization RoleBinding count in raw SQL
+  // (the tenancy guard refuses the model client for that question).
+  $queryRaw: vi.fn().mockResolvedValue([{ count: 0n }]),
   $transaction: vi
     .fn()
     .mockImplementation((fn: (tx: any) => Promise<any>) => fn(mockPrisma)),
@@ -167,16 +170,6 @@ describe("RoleService Tests", () => {
 
   describe("createRole", () => {
     it("creates new custom role", async () => {
-      const mockRole = {
-        id: "role-1",
-        name: "Data Analyst",
-        description: "Can view analytics and datasets",
-        permissions: ["analytics:view", "datasets:view"],
-        organizationId: "org-123",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
       mockPrisma.customRole.findUnique.mockResolvedValue(null);
 
       const result = await roleService.createRole(
@@ -339,14 +332,15 @@ describe("RoleService Tests", () => {
         organizationId: "org-123",
         kind: "custom",
       });
-      // Counted three times: the service's own check, the repository's read
-      // immediately before the append, and the re-read that names what holds
-      // the role now. Per-call values, not defaults: `clearAllMocks` between
-      // tests clears calls but keeps implementations.
+      // The service's own check sees nothing; the repository's cross-org raw
+      // read immediately before the append and the re-read that names what
+      // holds the role now both find the grant. Per-call values, not
+      // defaults: `clearAllMocks` between tests clears calls but keeps
+      // implementations.
       mockPrisma.roleBinding.count
         .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(1)
         .mockResolvedValueOnce(1);
+      mockPrisma.$queryRaw.mockResolvedValueOnce([{ count: 1n }]);
 
       await expect(
         roleService.deleteRole("role-1", { actor }),
@@ -410,12 +404,12 @@ describe("RoleService Tests", () => {
       mockPrisma.roleBinding.findFirst.mockResolvedValue(mockBinding);
       mockPrisma.teamUser.update.mockResolvedValue({});
 
-      const result = await roleService.assignRoleToUser(
-        "user-123",
-        "team-123",
-        "role-123",
-        { actor },
-      );
+      const result = await roleService.assignRoleToUser({
+        userId: "user-123",
+        teamId: "team-123",
+        customRoleId: "role-123",
+        actor,
+      });
 
       expect(result).toEqual({ success: true });
       expect(mockPrisma.roleBinding.findFirst).toHaveBeenCalledWith({
@@ -458,24 +452,20 @@ describe("RoleService Tests", () => {
       mockPrisma.customRole.findUnique.mockResolvedValue(null);
 
       await expect(
-        roleService.assignRoleToUser(
-          "user-123",
-          "team-123",
-          "nonexistent-role",
-          {
-            actor,
-          },
-        ),
+        roleService.assignRoleToUser({
+          userId: "user-123",
+          teamId: "team-123",
+          customRoleId: "nonexistent-role",
+          actor,
+        }),
       ).rejects.toThrow(RoleNotFoundError);
       await expect(
-        roleService.assignRoleToUser(
-          "user-123",
-          "team-123",
-          "nonexistent-role",
-          {
-            actor,
-          },
-        ),
+        roleService.assignRoleToUser({
+          userId: "user-123",
+          teamId: "team-123",
+          customRoleId: "nonexistent-role",
+          actor,
+        }),
       ).rejects.toThrow("Custom role not found");
     });
 
@@ -490,12 +480,18 @@ describe("RoleService Tests", () => {
       mockPrisma.team.findUnique.mockResolvedValue(null);
 
       await expect(
-        roleService.assignRoleToUser("user-123", "team-123", "role-123", {
+        roleService.assignRoleToUser({
+          userId: "user-123",
+          teamId: "team-123",
+          customRoleId: "role-123",
           actor,
         }),
       ).rejects.toThrow(TeamNotFoundError);
       await expect(
-        roleService.assignRoleToUser("user-123", "team-123", "role-123", {
+        roleService.assignRoleToUser({
+          userId: "user-123",
+          teamId: "team-123",
+          customRoleId: "role-123",
           actor,
         }),
       ).rejects.toThrow("Team not found");
@@ -518,7 +514,10 @@ describe("RoleService Tests", () => {
       mockPrisma.roleBinding.findFirst.mockResolvedValue(null);
 
       await expect(
-        roleService.assignRoleToUser("user-123", "team-123", "role-123", {
+        roleService.assignRoleToUser({
+          userId: "user-123",
+          teamId: "team-123",
+          customRoleId: "role-123",
           actor,
         }),
       ).rejects.toThrow(UserNotTeamMemberError);

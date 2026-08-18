@@ -551,7 +551,11 @@ export const groupRouter = createTRPCRouter({
 
       const repo = new PrismaRoleBindingRepository(ctx.prisma);
       const roleService = new RoleService(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo, roleService);
+      const service = new RoleBindingService({
+        prisma: ctx.prisma,
+        repo,
+        roleService,
+      });
       return service.applyGroupEdits({
         organizationId: input.organizationId,
         actor: { type: "user", id: ctx.session.user.id },

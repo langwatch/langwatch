@@ -54,7 +54,12 @@ beforeEach(() => {
   attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
   bindingFindMany.mockResolvedValue([]);
   groupMembershipFindMany.mockResolvedValue([]);
-  service = new RoleBindingService(prisma, repository, roleService, writer);
+  service = new RoleBindingService({
+    prisma,
+    repo: repository,
+    roleService,
+    writer,
+  });
 });
 
 const actor = { type: "user" as const, id: "user_admin" };

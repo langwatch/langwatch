@@ -23,7 +23,11 @@ export const roleBindingRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const repo = new PrismaRoleBindingRepository(ctx.prisma);
       const roleService = new RoleService(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo, roleService);
+      const service = new RoleBindingService({
+        prisma: ctx.prisma,
+        repo,
+        roleService,
+      });
       return service.listForOrg({ organizationId: input.organizationId });
     }),
 
@@ -37,7 +41,11 @@ export const roleBindingRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const repo = new PrismaRoleBindingRepository(ctx.prisma);
       const roleService = new RoleService(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo, roleService);
+      const service = new RoleBindingService({
+        prisma: ctx.prisma,
+        repo,
+        roleService,
+      });
       return service.listForUser({
         organizationId: input.organizationId,
         userId: input.userId,
@@ -54,7 +62,11 @@ export const roleBindingRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const repo = new PrismaRoleBindingRepository(ctx.prisma);
       const roleService = new RoleService(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo, roleService);
+      const service = new RoleBindingService({
+        prisma: ctx.prisma,
+        repo,
+        roleService,
+      });
       return service.getMyAccessBreakdown({
         organizationId: input.organizationId,
         userId: ctx.session.user.id,
@@ -85,7 +97,11 @@ export const roleBindingRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const repo = new PrismaRoleBindingRepository(ctx.prisma);
       const roleService = new RoleService(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo, roleService);
+      const service = new RoleBindingService({
+        prisma: ctx.prisma,
+        repo,
+        roleService,
+      });
       return service.create({
         organizationId: input.organizationId,
         actor: { type: "user", id: ctx.session.user.id },
@@ -114,7 +130,11 @@ export const roleBindingRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const repo = new PrismaRoleBindingRepository(ctx.prisma);
       const roleService = new RoleService(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo, roleService);
+      const service = new RoleBindingService({
+        prisma: ctx.prisma,
+        repo,
+        roleService,
+      });
       return service.update({
         organizationId: input.organizationId,
         actor: { type: "user", id: ctx.session.user.id },
@@ -138,7 +158,11 @@ export const roleBindingRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const repo = new PrismaRoleBindingRepository(ctx.prisma);
       const roleService = new RoleService(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo, roleService);
+      const service = new RoleBindingService({
+        prisma: ctx.prisma,
+        repo,
+        roleService,
+      });
       return service.delete({
         organizationId: input.organizationId,
         actor: { type: "user", id: ctx.session.user.id },
@@ -171,7 +195,11 @@ export const roleBindingRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const repo = new PrismaRoleBindingRepository(ctx.prisma);
       const roleService = new RoleService(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo, roleService);
+      const service = new RoleBindingService({
+        prisma: ctx.prisma,
+        repo,
+        roleService,
+      });
       return service.applyMemberBindings({
         organizationId: input.organizationId,
         actor: { type: "user", id: ctx.session.user.id },

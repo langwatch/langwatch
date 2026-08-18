@@ -373,11 +373,11 @@ const registerItemEndpoints = (v: RoleBindingsVersion): void => {
 export const app = service
   .provide({
     roleBindings: () =>
-      new RoleBindingService(
+      new RoleBindingService({
         prisma,
-        new PrismaRoleBindingRepository(prisma),
-        new RoleService(prisma),
-      ),
+        repo: new PrismaRoleBindingRepository(prisma),
+        roleService: new RoleService(prisma),
+      }),
   })
   .version(MANAGEMENT_API_VERSION, (v) => {
     registerCollectionEndpoints(v);

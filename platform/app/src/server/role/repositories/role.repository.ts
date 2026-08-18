@@ -202,14 +202,22 @@ export class RoleRepository {
     organizationId: string;
     actor: LedgerActor;
   }): Promise<boolean> {
-    const [role, holders, assignedUsers] = await Promise.all([
+    // Raw SQL on purpose: the reference check spans every organization (a
+    // binding in another org can point at this role, see the doc block), and
+    // the tenancy guard rightly refuses a cross-org `roleBinding.count` on
+    // the model client.
+    const [role, holderRows, assignedUsers] = await Promise.all([
       this.prisma.customRole.findFirst({
         where: { id: roleId, organizationId },
         select: { id: true },
       }),
-      this.prisma.roleBinding.count({ where: { customRoleId: roleId } }),
+      this.prisma.$queryRaw<
+        { count: bigint }[]
+      >`-- @tenancy: the delete refuses while ANY organization's binding still references the role (relationMode = "prisma" has no FK to refuse for us)
+        SELECT COUNT(*) AS count FROM "RoleBinding" WHERE "customRoleId" = ${roleId}`,
       this.prisma.teamUser.count({ where: { assignedRoleId: roleId } }),
     ]);
+    const holders = Number(holderRows[0]?.count ?? 0n);
     if (!role || holders > 0 || assignedUsers > 0) return false;
 
     await this.writer.deleteRole({ organizationId, roleId, actor });
@@ -487,12 +495,17 @@ export class RoleRepository {
     return this.prisma;
   }
 
-  async assignToUser(
-    userId: string,
-    teamId: string,
-    customRoleId: string,
-    { actor }: { actor: LedgerActor },
-  ) {
+  async assignToUser({
+    userId,
+    teamId,
+    customRoleId,
+    actor,
+  }: {
+    userId: string;
+    teamId: string;
+    customRoleId: string;
+    actor: LedgerActor;
+  }) {
     await this.replaceTeamGrant({
       userId,
       teamId,

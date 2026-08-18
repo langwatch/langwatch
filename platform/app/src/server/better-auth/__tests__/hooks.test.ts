@@ -215,6 +215,22 @@ describe("afterUserCreate", () => {
       expect(prisma.organizationUser.create).toHaveBeenCalledWith({
         data: { userId: "user_1", organizationId: "org_1", role: "MEMBER" },
       });
+
+      // The organization-scoped grant lands beside the membership row.
+      expect(ledger.attachBindings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "org_1",
+          onDuplicate: "skip",
+          bindings: [
+            expect.objectContaining({
+              principal: { userId: "user_1" },
+              role: "MEMBER",
+              scopeType: "ORGANIZATION",
+              scopeId: "org_1",
+            }),
+          ],
+        }),
+      );
     });
   });
 
@@ -298,10 +314,40 @@ describe("afterUserCreate", () => {
         skipDuplicates: true,
       });
 
-      // Two commands: the ORG-scoped grant (ADMIN), and the invite's teams in
-      // one batch, so the invitee cannot land in the first team and not the
-      // second.
-      expect(ledger.attachBindings).toHaveBeenCalledTimes(2);
+      // The grants are the behaviour, the batching shape is not: assert the
+      // emitted bindings — the invite's ORG-scoped ADMIN plus both team
+      // assignments — wherever the writer put them.
+      const emitted = ledger.attachBindings.mock.calls.flatMap(
+        (call: any[]) => call[0].bindings,
+      );
+      expect(emitted).toHaveLength(3);
+      expect(emitted).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            principal: { userId: "user_1" },
+            role: "ADMIN",
+            customRoleId: null,
+            scopeType: "ORGANIZATION",
+            scopeId: "org_1",
+          }),
+          expect.objectContaining({
+            principal: { userId: "user_1" },
+            role: "ADMIN",
+            customRoleId: null,
+            scopeType: "TEAM",
+            scopeId: "team_1",
+          }),
+          expect.objectContaining({
+            principal: { userId: "user_1" },
+            role: "MEMBER",
+            customRoleId: "cr_1",
+            scopeType: "TEAM",
+            scopeId: "team_2",
+          }),
+        ]),
+      );
+      // The invite's teams still land as one command, so the invitee cannot
+      // land in the first team and not the second.
       const teamCommand = ledger.attachBindings.mock.calls
         .map((call: any[]) => call[0])
         .find((envelope: any) => envelope.bindings[0]?.scopeType === "TEAM");
@@ -402,6 +448,14 @@ describe("afterUserCreate", () => {
         expect.objectContaining({
           organizationId: "org_1",
           onDuplicate: "skip",
+          bindings: [
+            expect.objectContaining({
+              principal: { userId: "user_1" },
+              role: "MEMBER",
+              scopeType: "ORGANIZATION",
+              scopeId: "org_1",
+            }),
+          ],
         }),
       );
     });

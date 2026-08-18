@@ -74,6 +74,161 @@ function compareNullsLast(a: string | null, b: string | null): number {
   return a.localeCompare(b);
 }
 
+/** A submitted membership row, as the settings form sends it. */
+type MemberInput = { userId: string; role: string; customRoleId?: string };
+
+/** A TEAM-scoped user binding as the membership planner reads it. */
+type TeamUserBinding = {
+  id: string;
+  userId: string | null;
+  role: TeamUserRole;
+  customRoleId: string | null;
+};
+
+/**
+ * The membership edit `updateWithMembers` decided against one transactional
+ * snapshot, to be emitted to the grants ledger after the rename commits.
+ */
+type MembershipPlan = {
+  idsToRemove: string[];
+  toUpdate: { id: string; role: TeamUserRole; customRoleId: string | null }[];
+  toCreate: MemberInput[];
+};
+
+const targetRole = (member: { role: string }): TeamUserRole =>
+  isCustomRole(member.role)
+    ? TeamUserRole.CUSTOM
+    : (member.role as TeamUserRole);
+
+const targetCustomRoleId = (member: MemberInput): string | null =>
+  isCustomRole(member.role) ? (member.customRoleId ?? null) : null;
+
+// The displayed binding = highest-privilege one, matching the read path.
+const displayedBinding = (bindings: TeamUserBinding[]) =>
+  [...bindings].sort(
+    (a, b) => TEAM_ROLE_PRIORITY[a.role] - TEAM_ROLE_PRIORITY[b.role],
+  )[0]!;
+
+function groupBindingsByUser(
+  currentBindings: TeamUserBinding[],
+): Map<string, TeamUserBinding[]> {
+  const byUser = new Map<string, TeamUserBinding[]>();
+  for (const binding of currentBindings) {
+    if (!binding.userId) continue;
+    const list = byUser.get(binding.userId) ?? [];
+    list.push(binding);
+    byUser.set(binding.userId, list);
+  }
+  return byUser;
+}
+
+/**
+ * What the save does to one submitted user's displayed binding: nothing, a
+ * first binding, a role change — or, when the target grant already exists on
+ * another of their bindings (updating into it would collide with the partial
+ * unique index), dropping the displayed binding instead (the grant is
+ * already present).
+ */
+function planDisplayedBindingEdit({
+  existing,
+  member,
+}: {
+  existing: TeamUserBinding[];
+  member: MemberInput;
+}):
+  | { kind: "create" }
+  | { kind: "keep" }
+  | { kind: "remove"; bindingId: string }
+  | { kind: "update"; update: MembershipPlan["toUpdate"][number] } {
+  if (existing.length === 0) return { kind: "create" };
+
+  const role = targetRole(member);
+  const customRoleId = targetCustomRoleId(member);
+  const displayed = displayedBinding(existing);
+  if (displayed.role === role && displayed.customRoleId === customRoleId) {
+    return { kind: "keep" }; // displayed binding already matches — nothing to do
+  }
+
+  const targetAlreadyHeld = existing.some(
+    (b) =>
+      b.id !== displayed.id &&
+      b.role === role &&
+      b.customRoleId === customRoleId,
+  );
+  if (targetAlreadyHeld) return { kind: "remove", bindingId: displayed.id };
+  return { kind: "update", update: { id: displayed.id, role, customRoleId } };
+}
+
+/**
+ * Diff the submitted membership against the current bindings: drop every
+ * binding belonging to a user no longer on the team; for each submitted
+ * user edit only the displayed binding and leave the rest (additive grants)
+ * untouched.
+ */
+function diffMembership({
+  currentBindings,
+  members,
+}: {
+  currentBindings: TeamUserBinding[];
+  members: MemberInput[];
+}): MembershipPlan {
+  const byUser = groupBindingsByUser(currentBindings);
+  const newMembersMap = new Map(members.map((m) => [m.userId, m]));
+  const plan: MembershipPlan = { idsToRemove: [], toUpdate: [], toCreate: [] };
+
+  for (const [userId, bindings] of byUser) {
+    if (!newMembersMap.has(userId)) {
+      plan.idsToRemove.push(...bindings.map((b) => b.id));
+    }
+  }
+
+  for (const member of members) {
+    const edit = planDisplayedBindingEdit({
+      existing: byUser.get(member.userId) ?? [],
+      member,
+    });
+    switch (edit.kind) {
+      case "create":
+        plan.toCreate.push(member);
+        break;
+      case "remove":
+        plan.idsToRemove.push(edit.bindingId);
+        break;
+      case "update":
+        plan.toUpdate.push(edit.update);
+        break;
+      case "keep":
+        break;
+    }
+  }
+
+  return plan;
+}
+
+/**
+ * The direct-admin users the plan leaves behind, read off the plan rather
+ * than out of a half-written table.
+ */
+function directAdminUserIdsAfterPlan({
+  currentBindings,
+  plan,
+}: {
+  currentBindings: TeamUserBinding[];
+  plan: MembershipPlan;
+}): Set<string> {
+  const removedIds = new Set(plan.idsToRemove);
+  const updatedById = new Map(plan.toUpdate.map((u) => [u.id, u]));
+
+  const survivingAdmins = currentBindings
+    .filter((b) => b.userId && !removedIds.has(b.id))
+    .filter((b) => (updatedById.get(b.id) ?? b).role === TeamUserRole.ADMIN)
+    .map((b) => b.userId!);
+  const createdAdmins = plan.toCreate
+    .filter((member) => targetRole(member) === TeamUserRole.ADMIN)
+    .map((member) => member.userId);
+  return new Set([...survivingAdmins, ...createdAdmins]);
+}
+
 export class TeamService {
   constructor(
     private readonly prisma: PrismaClient,
@@ -580,11 +735,7 @@ export class TeamService {
   }: {
     teamId: string;
     name: string;
-    members: Array<{
-      userId: string;
-      role: string;
-      customRoleId?: string;
-    }>;
+    members: MemberInput[];
     currentUserId: string;
   }): Promise<{ success: true }> {
     const teamRecord = await this.prisma.team.findUnique({
@@ -596,25 +747,7 @@ export class TeamService {
     }
     const { organizationId } = teamRecord;
 
-    // A personal team is single-member by definition: its owner holds the one
-    // ADMIN binding PersonalWorkspaceService provisions, and plan-limit
-    // counting exempts the team on that basis. Members and roles are
-    // therefore not editable here. Only submissions that keep the provisioned
-    // membership (or touch none at all, e.g. a rename) go through; everything
-    // else needs a shared team.
-    if (teamRecord.isPersonal) {
-      const keepsProvisionedMembership =
-        members.length === 0 ||
-        (members.length === 1 &&
-          members[0]!.userId === teamRecord.ownerUserId &&
-          members[0]!.role === TeamUserRole.ADMIN);
-      if (!keepsProvisionedMembership) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
-        });
-      }
-    }
+    this.assertPersonalTeamMembershipKept({ teamRecord, members });
 
     await assertUsersInOrganization(
       this.prisma,
@@ -631,22 +764,68 @@ export class TeamService {
       return { success: true };
     }
 
-    const targetRole = (member: { role: string }) =>
-      isCustomRole(member.role)
-        ? TeamUserRole.CUSTOM
-        : (member.role as TeamUserRole);
-    const targetCustomRoleId = (member: {
-      role: string;
-      customRoleId?: string;
-    }) => (isCustomRole(member.role) ? (member.customRoleId ?? null) : null);
+    const plan = await this.decidePlanAndRename({
+      teamId,
+      organizationId,
+      name,
+      members,
+    });
+    await this.emitMembershipPlan({
+      organizationId,
+      teamId,
+      plan,
+      currentUserId,
+    });
+    return { success: true };
+  }
 
-    // The rename and every read the plan rests on share one transaction, so
-    // the plan is decided against a single snapshot and the team row is
-    // renamed with it. The grants cannot join: they are ledger facts, so they
-    // are emitted after this commits, in the order below.
-    const plan = await this.prisma.$transaction(async (tx) => {
-      const newMembersMap = new Map(members.map((m) => [m.userId, m]));
+  /**
+   * A personal team is single-member by definition: its owner holds the one
+   * ADMIN binding PersonalWorkspaceService provisions, and plan-limit
+   * counting exempts the team on that basis. Members and roles are
+   * therefore not editable here. Only submissions that keep the provisioned
+   * membership (or touch none at all, e.g. a rename) go through; everything
+   * else needs a shared team.
+   */
+  private assertPersonalTeamMembershipKept({
+    teamRecord,
+    members,
+  }: {
+    teamRecord: { isPersonal: boolean; ownerUserId: string | null };
+    members: MemberInput[];
+  }): void {
+    if (!teamRecord.isPersonal) return;
+    const keepsProvisionedMembership =
+      members.length === 0 ||
+      (members.length === 1 &&
+        members[0]!.userId === teamRecord.ownerUserId &&
+        members[0]!.role === TeamUserRole.ADMIN);
+    if (!keepsProvisionedMembership) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
+      });
+    }
+  }
 
+  /**
+   * The rename and every read the plan rests on share one transaction, so
+   * the plan is decided against a single snapshot and the team row is
+   * renamed with it. The grants cannot join: they are ledger facts, so they
+   * are emitted after this commits, by `emitMembershipPlan`.
+   */
+  private async decidePlanAndRename({
+    teamId,
+    organizationId,
+    name,
+    members,
+  }: {
+    teamId: string;
+    organizationId: string;
+    name: string;
+    members: MemberInput[];
+  }): Promise<MembershipPlan> {
+    return await this.prisma.$transaction(async (tx) => {
       const currentBindings = await tx.roleBinding.findMany({
         where: {
           organizationId,
@@ -656,129 +835,93 @@ export class TeamService {
         },
         select: { id: true, userId: true, role: true, customRoleId: true },
       });
-      const currentBindingsByUser = new Map<string, typeof currentBindings>();
-      for (const binding of currentBindings) {
-        if (!binding.userId) continue;
-        const list = currentBindingsByUser.get(binding.userId) ?? [];
-        list.push(binding);
-        currentBindingsByUser.set(binding.userId, list);
-      }
 
-      // The displayed binding = highest-privilege one, matching the read path.
-      const displayedBinding = (bindings: typeof currentBindings) =>
-        [...bindings].sort(
-          (a, b) => TEAM_ROLE_PRIORITY[a.role] - TEAM_ROLE_PRIORITY[b.role],
-        )[0]!;
+      const plan = diffMembership({ currentBindings, members });
 
-      const idsToRemove: string[] = [];
-      const toUpdate: {
-        id: string;
-        role: TeamUserRole;
-        customRoleId: string | null;
-      }[] = [];
-      const toCreate: (typeof members)[number][] = [];
-
-      // Drop every binding belonging to a user no longer on the team.
-      for (const [userId, bindings] of currentBindingsByUser) {
-        if (!newMembersMap.has(userId)) {
-          idsToRemove.push(...bindings.map((b) => b.id));
-        }
-      }
-
-      // For each submitted user: edit only the displayed binding; leave the
-      // rest (additive grants) untouched.
-      for (const member of members) {
-        const existing = currentBindingsByUser.get(member.userId) ?? [];
-        const role = targetRole(member);
-        const customRoleId = targetCustomRoleId(member);
-        if (existing.length === 0) {
-          toCreate.push(member);
-          continue;
-        }
-        const displayed = displayedBinding(existing);
-        if (
-          displayed.role === role &&
-          displayed.customRoleId === customRoleId
-        ) {
-          continue; // displayed binding already matches — nothing to do
-        }
-        // If the target grant already exists on another binding, updating into
-        // it would collide with the partial unique index, so drop the
-        // displayed binding instead (the grant is already present).
-        const targetAlreadyHeld = existing.some(
-          (b) =>
-            b.id !== displayed.id &&
-            b.role === role &&
-            b.customRoleId === customRoleId,
-        );
-        if (targetAlreadyHeld) {
-          idsToRemove.push(displayed.id);
-        } else {
-          toUpdate.push({ id: displayed.id, role, customRoleId });
-        }
-      }
-
-      // The direct-admin users the plan leaves behind, read off the plan
-      // rather than out of a half-written table.
-      const removedIds = new Set(idsToRemove);
-      const updatedById = new Map(toUpdate.map((u) => [u.id, u]));
-      const directAdminUserIdsAfter = new Set<string>();
-      for (const binding of currentBindings) {
-        if (removedIds.has(binding.id)) continue;
-        const role = updatedById.get(binding.id)?.role ?? binding.role;
-        if (role === TeamUserRole.ADMIN && binding.userId) {
-          directAdminUserIdsAfter.add(binding.userId);
-        }
-      }
-      for (const member of toCreate) {
-        if (targetRole(member) === TeamUserRole.ADMIN) {
-          directAdminUserIdsAfter.add(member.userId);
-        }
-      }
-
-      // The same rule the per-member path enforces: a team-local save cannot
-      // take the team's last admin away, whether it demotes them or drops them
-      // from the list. "Has an admin" counts group-expanded admins too; this
-      // form cannot edit group bindings, so a team a group administers never
-      // trips it.
-      //
-      // What it does NOT do is refuse a save on a team that already has no
-      // admin. That is the repair — somebody being promoted back to Admin —
-      // and gating it on "did this team have a direct admin to lose" let a
-      // half-applied save skip the guard entirely on retry. The question is
-      // whether this edit LOSES the last admin, so it is asked against the
-      // before-state rather than against the shape of the edit.
-      const adminsAfter = await projectAdminUserIdsAfterDirectEdit({
+      await this.assertEditKeepsAnAdmin({
         tx,
         organizationId,
         teamId,
-        directAdminUserIdsAfter,
+        teamName: name,
+        directAdminUserIdsAfter: directAdminUserIdsAfterPlan({
+          currentBindings,
+          plan,
+        }),
       });
-      if (adminsAfter.size === 0) {
-        const adminsBefore = await computeEffectiveAdminUserIds({
-          tx,
-          organizationId,
-          teamId,
-        });
-        if (adminsBefore.size > 0) {
-          throw new TeamLastAdminRequiredError(name);
-        }
-      }
 
       await tx.team.update({ where: { id: teamId }, data: { name } });
 
-      return { idsToRemove, toUpdate, toCreate };
+      return plan;
     });
+  }
 
-    const writer = this.writer;
+  /**
+   * The same rule the per-member path enforces: a team-local save cannot
+   * take the team's last admin away, whether it demotes them or drops them
+   * from the list. "Has an admin" counts group-expanded admins too; this
+   * form cannot edit group bindings, so a team a group administers never
+   * trips it.
+   *
+   * What it does NOT do is refuse a save on a team that already has no
+   * admin. That is the repair — somebody being promoted back to Admin —
+   * and gating it on "did this team have a direct admin to lose" let a
+   * half-applied save skip the guard entirely on retry. The question is
+   * whether this edit LOSES the last admin, so it is asked against the
+   * before-state rather than against the shape of the edit.
+   */
+  private async assertEditKeepsAnAdmin({
+    tx,
+    organizationId,
+    teamId,
+    teamName,
+    directAdminUserIdsAfter,
+  }: {
+    tx: Prisma.TransactionClient;
+    organizationId: string;
+    teamId: string;
+    teamName: string;
+    directAdminUserIdsAfter: Set<string>;
+  }): Promise<void> {
+    const adminsAfter = await projectAdminUserIdsAfterDirectEdit({
+      tx,
+      organizationId,
+      teamId,
+      directAdminUserIdsAfter,
+    });
+    if (adminsAfter.size > 0) return;
+
+    const adminsBefore = await computeEffectiveAdminUserIds({
+      tx,
+      organizationId,
+      teamId,
+    });
+    if (adminsBefore.size > 0) {
+      throw new TeamLastAdminRequiredError(teamName);
+    }
+  }
+
+  /**
+   * Emit the decided plan to the grants ledger. Grants before revocations,
+   * the opposite of the batch corrections elsewhere. A save that dies
+   * half-way here leaves the OLD access standing — somebody still on the
+   * team who was going to be removed — rather than a team stripped of the
+   * admin whose replacement had not been promoted yet. The retry converges,
+   * and the last-admin guard lets it.
+   */
+  private async emitMembershipPlan({
+    organizationId,
+    teamId,
+    plan,
+    currentUserId,
+  }: {
+    organizationId: string;
+    teamId: string;
+    plan: MembershipPlan;
+    currentUserId: string;
+  }): Promise<void> {
     const actor = { type: "user" as const, id: currentUserId };
-    // Grants before revocations, the opposite of the batch corrections
-    // elsewhere. A save that dies half-way here leaves the OLD access
-    // standing — somebody still on the team who was going to be removed —
-    // rather than a team stripped of the admin whose replacement had not been
-    // promoted yet. The retry converges, and the guard above lets it.
     if (plan.toCreate.length > 0) {
-      await writer.attachBindings({
+      await this.writer.attachBindings({
         organizationId,
         bindings: plan.toCreate.map((member) => ({
           bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
@@ -793,7 +936,7 @@ export class TeamService {
       });
     }
     for (const { id, role, customRoleId } of plan.toUpdate) {
-      await writer.changeBindingRole({
+      await this.writer.changeBindingRole({
         organizationId,
         bindingId: id,
         role,
@@ -802,14 +945,12 @@ export class TeamService {
       });
     }
     if (plan.idsToRemove.length > 0) {
-      await writer.revokeBindings({
+      await this.writer.revokeBindings({
         organizationId,
         bindingIds: plan.idsToRemove,
         actor,
       });
     }
-
-    return { success: true };
   }
 
   /**
@@ -855,12 +996,8 @@ export class TeamService {
     const memberBindings = members.map((member) => ({
       bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
       principal: { userId: member.userId },
-      role: isCustomRole(member.role)
-        ? TeamUserRole.CUSTOM
-        : (member.role as TeamUserRole),
-      customRoleId: isCustomRole(member.role)
-        ? (member.customRoleId ?? null)
-        : null,
+      role: targetRole(member),
+      customRoleId: targetCustomRoleId(member),
       scopeType: RoleBindingScopeType.TEAM,
       scopeId: teamId,
     }));

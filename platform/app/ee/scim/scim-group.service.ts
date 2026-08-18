@@ -37,13 +37,25 @@ type MemberInstruction =
  * via the Groups settings page.
  */
 export class ScimGroupService {
-  constructor(
-    private readonly prisma: PrismaClient,
-    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-  ) {}
+  private readonly prisma: PrismaClient;
+  private readonly writer: GrantsLedgerWriter;
 
-  static create(prisma: PrismaClient): ScimGroupService {
-    return new ScimGroupService(prisma);
+  constructor({
+    prisma,
+    writer = grantsLedgerWriter(),
+  }: {
+    prisma: PrismaClient;
+    writer?: GrantsLedgerWriter;
+  }) {
+    this.prisma = prisma;
+    this.writer = writer;
+  }
+
+  static create(options: {
+    prisma: PrismaClient;
+    writer?: GrantsLedgerWriter;
+  }): ScimGroupService {
+    return new ScimGroupService(options);
   }
 
   async listGroups({

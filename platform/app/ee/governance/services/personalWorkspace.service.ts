@@ -105,6 +105,15 @@ export class PersonalWorkspaceService {
       ) {
         const winner = await this.findExisting({ userId, organizationId });
         if (winner) {
+          // The race loser cannot know how far the winner got: the team
+          // commit and the grant append are separate writes, so this return
+          // path repairs the owner's grant exactly as the in-transaction
+          // found-existing path does.
+          await this.repairOwnerGrantIfMissing({
+            userId,
+            organizationId,
+            teamId: winner.team.id,
+          });
           return { ...winner, created: false };
         }
       }
@@ -138,16 +147,12 @@ export class PersonalWorkspaceService {
         // append, leaving an owner with a workspace they cannot administer
         // and no path back except this repair. Re-assert only when it is
         // actually missing, since this runs on the session path.
-        const ownerGrant = await tx.roleBinding.findFirst({
-          where: {
-            organizationId,
-            userId,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: existing.team.id,
-          },
-          select: { id: true },
+        const grantHeld = await this.ownerGrantExists(tx, {
+          userId,
+          organizationId,
+          teamId: existing.team.id,
         });
-        if (!ownerGrant) {
+        if (!grantHeld) {
           grantOnTeamId = existing.team.id;
         }
         return { ...existing, created: false };
@@ -164,98 +169,183 @@ export class PersonalWorkspaceService {
         return { ...reactivated, created: false };
       }
 
-      // Use the user's display name if available, otherwise their local
-      // email part (jane@acme.com → "jane"), otherwise a fallback. Slug
-      // gets a nanoid suffix to avoid global slug collisions across orgs.
-      const displayLabel =
-        displayName?.trim() || displayEmail?.split("@")[0] || "user";
-      const teamName = `${displayLabel}'s Workspace`;
-      const teamSlug = `personal-${userId.toLowerCase().slice(0, 12)}-${nanoid(6).toLowerCase()}`;
-      const projectSlug = `personal-${userId.toLowerCase().slice(0, 12)}-${nanoid(6).toLowerCase()}`;
-
-      const team = await tx.team.create({
-        data: {
-          id: generate(KSUID_RESOURCES.TEAM).toString(),
-          name: teamName,
-          slug: teamSlug,
-          organizationId,
-          isPersonal: true,
-          ownerUserId: userId,
-        },
+      const created = await this.createInTx(tx, {
+        userId,
+        organizationId,
+        displayName,
+        displayEmail,
       });
-
-      const project = await tx.project.create({
-        data: {
-          id: generate(KSUID_RESOURCES.PROJECT).toString(),
-          name: "Personal Workspace",
-          slug: projectSlug,
-          // API key kept distinct from VK secret format. Personal projects
-          // get a key like every other project for trace ingestion paths
-          // that still authenticate via project apiKey.
-          apiKey: `pkey_${nanoid(40)}`,
-          teamId: team.id,
-          language: "other",
-          framework: "other",
-          isPersonal: true,
-          ownerUserId: userId,
-        },
-      });
-
       // ADMIN grant so the user can manage their own personal team. Nobody
       // else is ever granted this scope — personal teams are single-member by
       // definition — and it is emitted after this transaction commits.
-      grantOnTeamId = team.id;
-
-      // Legacy TeamUser row too — many existing read paths still join via
-      // TeamUser. Keeps the personal team visible to any code that pre-
-      // dates the RoleBinding refactor.
-      await tx.teamUser.create({
-        data: {
-          userId,
-          teamId: team.id,
-          role: TeamUserRole.ADMIN,
-        },
-      });
-
-      return {
-        team: {
-          id: team.id,
-          name: team.name,
-          slug: team.slug,
-          createdAt: team.createdAt,
-        },
-        project: {
-          id: project.id,
-          name: project.name,
-          slug: project.slug,
-          apiKey: project.apiKey,
-          createdAt: project.createdAt,
-        },
-        created: true,
-      };
+      grantOnTeamId = created.team.id;
+      return created;
     });
 
     if (grantOnTeamId) {
-      await this.writer.attachBindings({
+      await this.attachOwnerAdminGrant({
+        userId,
         organizationId,
-        bindings: [
-          {
-            bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            principal: { userId },
-            role: TeamUserRole.ADMIN,
-            customRoleId: null,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: grantOnTeamId,
-          },
-        ],
-        // Nobody decided this: the workspace is the product's own, and its
-        // owner administers it by construction.
-        actor: { type: "system", id: "system:personal-workspace" },
-        onDuplicate: "skip",
+        teamId: grantOnTeamId,
       });
     }
 
     return workspace;
+  }
+
+  /** The team + project + legacy TeamUser writes of a brand-new workspace. */
+  private async createInTx(
+    tx: TxClient,
+    {
+      userId,
+      organizationId,
+      displayName,
+      displayEmail,
+    }: {
+      userId: string;
+      organizationId: string;
+      displayName?: string | null;
+      displayEmail?: string | null;
+    },
+  ): Promise<PersonalWorkspace> {
+    // Use the user's display name if available, otherwise their local
+    // email part (jane@acme.com → "jane"), otherwise a fallback. Slug
+    // gets a nanoid suffix to avoid global slug collisions across orgs.
+    const displayLabel =
+      displayName?.trim() || displayEmail?.split("@")[0] || "user";
+
+    const team = await tx.team.create({
+      data: {
+        id: generate(KSUID_RESOURCES.TEAM).toString(),
+        name: `${displayLabel}'s Workspace`,
+        slug: `personal-${userId.toLowerCase().slice(0, 12)}-${nanoid(6).toLowerCase()}`,
+        organizationId,
+        isPersonal: true,
+        ownerUserId: userId,
+      },
+    });
+
+    const project = await tx.project.create({
+      data: {
+        id: generate(KSUID_RESOURCES.PROJECT).toString(),
+        name: "Personal Workspace",
+        slug: `personal-${userId.toLowerCase().slice(0, 12)}-${nanoid(6).toLowerCase()}`,
+        // API key kept distinct from VK secret format. Personal projects
+        // get a key like every other project for trace ingestion paths
+        // that still authenticate via project apiKey.
+        apiKey: `pkey_${nanoid(40)}`,
+        teamId: team.id,
+        language: "other",
+        framework: "other",
+        isPersonal: true,
+        ownerUserId: userId,
+      },
+    });
+
+    // Legacy TeamUser row too — many existing read paths still join via
+    // TeamUser. Keeps the personal team visible to any code that pre-
+    // dates the RoleBinding refactor.
+    await tx.teamUser.create({
+      data: {
+        userId,
+        teamId: team.id,
+        role: TeamUserRole.ADMIN,
+      },
+    });
+
+    return {
+      team: {
+        id: team.id,
+        name: team.name,
+        slug: team.slug,
+        createdAt: team.createdAt,
+      },
+      project: {
+        id: project.id,
+        name: project.name,
+        slug: project.slug,
+        apiKey: project.apiKey,
+        createdAt: project.createdAt,
+      },
+      created: true,
+    };
+  }
+
+  /** Whether the owner already holds a binding on their personal team. */
+  private async ownerGrantExists(
+    client: TxClient | PrismaClient,
+    {
+      userId,
+      organizationId,
+      teamId,
+    }: { userId: string; organizationId: string; teamId: string },
+  ): Promise<boolean> {
+    const grant = await client.roleBinding.findFirst({
+      where: {
+        organizationId,
+        userId,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: teamId,
+      },
+      select: { id: true },
+    });
+    return grant !== null;
+  }
+
+  /**
+   * The owner's ADMIN grant on their personal team — a ledger command
+   * (ADR-092 §13), duplicate-safe: re-asserting a grant the owner already
+   * holds emits nothing.
+   */
+  private async attachOwnerAdminGrant({
+    userId,
+    organizationId,
+    teamId,
+  }: {
+    userId: string;
+    organizationId: string;
+    teamId: string;
+  }): Promise<void> {
+    await this.writer.attachBindings({
+      organizationId,
+      bindings: [
+        {
+          bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          principal: { userId },
+          role: TeamUserRole.ADMIN,
+          customRoleId: null,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: teamId,
+        },
+      ],
+      // Nobody decided this: the workspace is the product's own, and its
+      // owner administers it by construction.
+      actor: { type: "system", id: "system:personal-workspace" },
+      onDuplicate: "skip",
+    });
+  }
+
+  /**
+   * Re-asserts the owner's ADMIN grant when the projection shows none — the
+   * repair for a workspace whose earlier ensure() died between the team
+   * commit and the grant append. Duplicate-safe, so racing repairs converge.
+   */
+  private async repairOwnerGrantIfMissing({
+    userId,
+    organizationId,
+    teamId,
+  }: {
+    userId: string;
+    organizationId: string;
+    teamId: string;
+  }): Promise<void> {
+    const grantHeld = await this.ownerGrantExists(this.prisma, {
+      userId,
+      organizationId,
+      teamId,
+    });
+    if (grantHeld) return;
+    await this.attachOwnerAdminGrant({ userId, organizationId, teamId });
   }
 
   /**

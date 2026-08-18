@@ -66,19 +66,22 @@ describe("RoleService.assignRoleToUser", () => {
 
     it("allows role assignment via RoleBinding membership check", async () => {
       await expect(
-        service.assignRoleToUser("user-rolebinding-only", "team-1", "role-1", {
+        service.assignRoleToUser({
+          userId: "user-rolebinding-only",
+          teamId: "team-1",
+          customRoleId: "role-1",
           actor: { type: "user" as const, id: "actor_1" },
         }),
       ).resolves.toEqual({ success: true });
     });
 
     it("queries roleBinding with team scope for membership", async () => {
-      await service.assignRoleToUser(
-        "user-rolebinding-only",
-        "team-1",
-        "role-1",
-        { actor: { type: "user" as const, id: "actor_1" } },
-      );
+      await service.assignRoleToUser({
+        userId: "user-rolebinding-only",
+        teamId: "team-1",
+        customRoleId: "role-1",
+        actor: { type: "user" as const, id: "actor_1" },
+      });
 
       expect(mockPrisma.roleBinding.findFirst).toHaveBeenCalledWith({
         where: {
@@ -106,7 +109,10 @@ describe("RoleService.assignRoleToUser", () => {
 
     it("throws UserNotTeamMemberError", async () => {
       await expect(
-        service.assignRoleToUser("user-nobody", "team-1", "role-1", {
+        service.assignRoleToUser({
+          userId: "user-nobody",
+          teamId: "team-1",
+          customRoleId: "role-1",
           actor: { type: "user" as const, id: "actor_1" },
         }),
       ).rejects.toThrow(UserNotTeamMemberError);

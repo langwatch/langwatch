@@ -26,6 +26,9 @@ vi.mock("~/server/app-layer/authz/ledger", () => ({
 
 function buildMockPrisma() {
   return {
+    // deleteIfUnused reads the cross-organization RoleBinding count in raw
+    // SQL (the tenancy guard refuses the model client for that question).
+    $queryRaw: vi.fn().mockResolvedValue([{ count: 0n }]),
     customRole: {
       findMany: vi.fn(),
       findFirst: vi.fn(),
@@ -205,12 +208,12 @@ describe("RoleService org-scoped variants", () => {
     describe("when a binding is written between the check and the delete", () => {
       it("leaves the role standing and refuses with the fresh counts", async () => {
         prisma.customRole.findFirst.mockResolvedValue(storedRole);
-        // The pre-check sees nothing; the re-read after the delete finds the
-        // binding that arrived in between.
+        // The pre-check sees nothing; the cross-org read inside the delete
+        // and the re-read after it find the binding that arrived in between.
         prisma.roleBinding.count
           .mockResolvedValueOnce(0)
-          .mockResolvedValueOnce(1)
           .mockResolvedValue(1);
+        prisma.$queryRaw.mockResolvedValue([{ count: 1n }]);
         prisma.teamUser.count.mockResolvedValue(0);
 
         await expect(
