@@ -62,7 +62,6 @@ let statementBodies: Record<string, unknown>[];
 let costPlan: CostPlan | null;
 /** Message creation time, moved by tests that care about the read window. */
 let messageCreatedMs: number;
-/** Whether Genie ran a query to answer the question. */
 let messageRanSql: boolean;
 
 beforeEach(async () => {
