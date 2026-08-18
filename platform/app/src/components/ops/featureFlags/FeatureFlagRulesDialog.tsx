@@ -301,12 +301,13 @@ function RuleRow({
           size="sm"
           fontFamily="mono"
           fontSize="xs"
+          // Bare nanoids, matching what the matcher compares against — ids
+          // carry no "organization_"/"project_" prefix, and matching is exact
+          // string equality, so a prefixed id silently never matches.
           placeholder={
-            rule.scopeKind === "ORGANIZATION"
-              ? "organization_xxxx"
-              : rule.scopeKind === "PROJECT"
-                ? "project_xxxx"
-                : ""
+            rule.scopeKind === "ORGANIZATION" || rule.scopeKind === "PROJECT"
+              ? "bare id, e.g. V1StGXR8_Z5jdHi6B-myT"
+              : ""
           }
           value={rule.scopeId}
           disabled={rule.scopeKind === "EVERYONE"}
