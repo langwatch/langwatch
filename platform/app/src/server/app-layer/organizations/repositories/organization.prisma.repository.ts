@@ -1006,23 +1006,73 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
    */
   async deleteMember(input: DeleteMemberInput): Promise<void> {
     const { organizationId, userId, actingUserId } = input;
+    const actor = ledgerActorFor(actingUserId);
+    const revokeTheirGrants = () =>
+      this.writer.revokeBindingsWhere({
+        organizationId,
+        where: { userId },
+        actor,
+        reason: "organization membership removed",
+      });
+
+    const member = await this.prisma.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { role: true, disabledAt: true },
+    });
+
+    if (!member) {
+      // The membership is already gone, which is also what a retry of a
+      // removal that died between the two writes below sees. Revoking again
+      // is a no-op when the first attempt finished and the repair when it did
+      // not, so the retry can still reach grants the seat no longer names —
+      // refusing outright left them orphaned, and a re-invite reactivated
+      // them.
+      await revokeTheirGrants();
+      throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+    }
+
+    // Same guard as disabling or demoting the last admin, and the only
+    // irreversible one of the three: an organization with no admin who can
+    // sign in cannot be recovered from inside the product. Read ahead of the
+    // revocation as well as inside the transaction below, so a refusal never
+    // strips the last admin's grants on its way to saying no; the locked read
+    // inside the transaction is still the authority.
+    if (
+      member.role === OrganizationUserRole.ADMIN &&
+      member.disabledAt === null
+    ) {
+      const activeAdmins = await this.prisma.organizationUser.count({
+        where: {
+          organizationId,
+          role: OrganizationUserRole.ADMIN,
+          disabledAt: null,
+        },
+      });
+      if (activeAdmins <= 1) {
+        throw new CannotRemoveLastAdminError();
+      }
+    }
+
+    // Grants go before the membership, not after. A ledger append cannot join
+    // the Prisma transaction, so one of the two writes is always exposed to a
+    // crash: this order leaves a member who still holds their seat and none of
+    // their grants (less access, and the retry converges), where the other
+    // order left grants nobody could reach any more.
+    await revokeTheirGrants();
 
     await this.prisma.$transaction(async (tx) => {
-      const member = await tx.organizationUser.findUnique({
+      const stillAMember = await tx.organizationUser.findUnique({
         where: { userId_organizationId: { userId, organizationId } },
         select: { role: true, disabledAt: true },
       });
 
-      if (!member) {
+      if (!stillAMember) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
       }
 
-      // Same guard as disabling or demoting the last admin, and the only
-      // irreversible one of the three: an organization with no admin who can
-      // sign in cannot be recovered from inside the product.
       if (
-        member.role === OrganizationUserRole.ADMIN &&
-        member.disabledAt === null
+        stillAMember.role === OrganizationUserRole.ADMIN &&
+        stillAMember.disabledAt === null
       ) {
         const activeAdmins = await lockActiveAdmins({ tx, organizationId });
 
@@ -1071,17 +1121,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         where: { id: { in: personalTeamIds } },
         data: { archivedAt },
       });
-    });
-
-    // The membership and the personal workspace are not grant facts; the
-    // access this person held is, so it is revoked as a command once the
-    // membership transaction has committed. Revocation carries instant
-    // enforcement, so the deny holds before this call returns.
-    await this.writer.revokeBindingsWhere({
-      organizationId,
-      where: { userId },
-      actor: ledgerActorFor(actingUserId),
-      reason: "organization membership removed",
     });
   }
 
@@ -1141,7 +1180,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     // membership transaction has committed.
     const plans: ScopeBindingPlan[] = [];
 
-    await this.prisma.$transaction(async (tx) => {
+    // The transaction answers the seat the member held before it, kept so a
+    // failed correction can put it back (see the compensation below).
+    const previousRole = await this.prisma.$transaction(async (tx) => {
       const currentMember = await tx.organizationUser.findUnique({
         where: {
           userId_organizationId: {
@@ -1416,14 +1457,31 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           message: "Operation would result in no admins for this organization",
         });
       }
+
+      return currentMember.role;
     });
 
-    await emitScopeBindingPlans({
-      writer: this.writer,
-      organizationId,
-      plans,
-      actor: ledgerActorFor(input.currentUserId),
-    });
+    // The seat has committed and the grants it caps have not. A ledger append
+    // cannot join the transaction above, so the correction is compensated
+    // instead of shared with it: if it fails the seat goes back to the role it
+    // held, and the caller sees the whole change refused with the member's old
+    // access standing rather than an ADMIN binding under a MEMBER seat.
+    try {
+      await emitScopeBindingPlans({
+        writer: this.writer,
+        organizationId,
+        plans,
+        actor: ledgerActorFor(input.currentUserId),
+      });
+    } catch (error) {
+      if (previousRole !== role) {
+        await this.prisma.organizationUser.updateMany({
+          where: { organizationId, userId, role },
+          data: { role: previousRole },
+        });
+      }
+      throw error;
+    }
 
     return { teamsLeftWithoutAdmin };
   }

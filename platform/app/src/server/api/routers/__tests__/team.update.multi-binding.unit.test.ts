@@ -84,7 +84,12 @@ describe("team.update", () => {
       },
     ];
 
-    const prisma = {
+    const prisma: PrismaClient = {
+      // The save decides its plan and renames the team under one transaction,
+      // so the reads it rests on cannot shift beneath it. The stub runs the
+      // callback against itself.
+      $transaction: (run: (tx: PrismaClient) => Promise<unknown>) =>
+        run(prisma),
       team: {
         findUnique: vi.fn().mockResolvedValue({ organizationId: ORG_ID }),
         update: teamUpdate,
@@ -103,8 +108,15 @@ describe("team.update", () => {
           async ({ where }: { where?: Record<string, unknown> }) => {
             // The team's group-admin bindings (the last-admin projection).
             if (where?.groupId) return [];
-            // The edited team's direct bindings.
-            if (where?.scopeId === TEAM_ID) return teamBindings;
+            // The edited team's direct bindings. The role filter is honoured:
+            // the last-admin projection asks this table who administers the
+            // team, and a stub that answers "everybody" reads a team with no
+            // admin as one that has two.
+            if (where?.scopeId === TEAM_ID) {
+              return where.role
+                ? teamBindings.filter((b) => b.role === where.role)
+                : teamBindings;
+            }
             return callerBindings;
           },
         ),
@@ -156,6 +168,45 @@ describe("team.update", () => {
       expect(ledger.revokeBindings).toHaveBeenCalledWith(
         expect.objectContaining({
           bindingIds: [MEMBER_BINDING_ID, CUSTOM_BINDING_ID],
+        }),
+      );
+    });
+  });
+
+  describe("when the ledger dies part-way through a save", () => {
+    it("has not revoked anything yet, so the old access is what stands", async () => {
+      ledger.attachBindings.mockRejectedValue(new Error("ledger unavailable"));
+
+      await expect(
+        caller.update({
+          teamId: TEAM_ID,
+          name: "Team",
+          // A swap: somebody new comes in as admin, the current member goes.
+          members: [{ userId: "someone_else", role: TeamUserRole.ADMIN }],
+        }),
+      ).rejects.toThrow("ledger unavailable");
+
+      // Grants land before revocations precisely so this window leaves a team
+      // with too many members rather than one with none.
+      expect(ledger.revokeBindings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the team has no admin left to lose", () => {
+    it("lets the save through, because that save is the repair", async () => {
+      // Nobody on the team holds ADMIN — the state a seat correction or a
+      // half-applied save leaves behind. Promoting somebody back has to be
+      // possible from here.
+      await caller.update({
+        teamId: TEAM_ID,
+        name: "Team",
+        members: [{ userId: USER_ID, role: TeamUserRole.ADMIN }],
+      });
+
+      expect(ledger.changeBindingRole).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bindingId: MEMBER_BINDING_ID,
+          role: TeamUserRole.ADMIN,
         }),
       );
     });

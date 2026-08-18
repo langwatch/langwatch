@@ -14,7 +14,7 @@ import {
 } from "~/server/app-layer/authz/ledger";
 import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { RoleDuplicateNameError } from "../errors";
+import { RoleDuplicateNameError, RoleNotFoundError } from "../errors";
 import { CUSTOM_ROLE_KIND } from "../role-kind";
 
 export type RolePrismaDelegate = PrismaClient | Prisma.TransactionClient;
@@ -176,13 +176,17 @@ export class RoleRepository {
    * Deletes the role only if nothing references it, and reports whether it
    * went.
    *
-   * The condition rides on the delete rather than sitting in a separate read
-   * before it: a binding written in between would otherwise be silently
-   * unhooked from the role that grants it, because the relation is emulated in
-   * the client (`relationMode = "prisma"`), so deleting the parent nulls the
-   * reference instead of refusing. One statement leaves nothing to interleave
-   * with, and a delete that finds a holder leaves the role standing for the
-   * caller to refuse over.
+   * The reference check is a read taken immediately before the delete is
+   * emitted, not a condition riding on the delete itself. It used to be one
+   * conditional statement, which left nothing to interleave with; the role is
+   * a ledger fact now (ADR-092 delivery-plan PR 2) and its deletion is a
+   * command, so the check cannot be part of the write. What that costs is one
+   * race: a binding created between the read and the append is silently
+   * unhooked from the role that grants it, because the relation is emulated
+   * in the client (`relationMode = "prisma"`), so deleting the parent nulls
+   * the reference instead of refusing. What survives is the guarantee callers
+   * actually rely on — a role somebody holds at the moment of the check is
+   * left standing, and the caller is told so rather than finding it gone.
    *
    * The role row is scoped to the organization; the reference checks are not.
    * There are no database foreign keys here, so a binding in another
@@ -249,7 +253,11 @@ export class RoleRepository {
       organizationId: params.organizationId,
       roleId,
       name: params.name,
-      ...(params.description ? { description: params.description } : {}),
+      // Present-or-absent, not truthy-or-absent: an empty description is a
+      // description the caller wrote, and the column stores it.
+      ...(params.description != null
+        ? { description: params.description }
+        : {}),
       permissions: params.permissions as string[],
       kind: kind as "custom" | "system_api_key",
       actor,
@@ -280,7 +288,10 @@ export class RoleRepository {
       where: { id: roleId },
     });
     if (!existing) {
-      throw new Error(`custom role ${roleId} no longer exists`);
+      // Knowable and actionable: the role was deleted between the caller
+      // opening the editor and saving it, and there is nothing to redefine.
+      // A plain Error degraded this to an "unknown error" with a trace id.
+      throw new RoleNotFoundError(roleId);
     }
     const name = params.name ?? existing.name;
     const description =
@@ -302,7 +313,10 @@ export class RoleRepository {
       organizationId: existing.organizationId,
       roleId,
       name,
-      ...(description ? { description } : {}),
+      // `!== null` rather than a truthy test: an empty description is the
+      // caller clearing it, and a falsy check dropped that from the fact, so
+      // the fold re-stated the description the role already had.
+      ...(description !== null ? { description } : {}),
       permissions,
       kind: existing.kind as "custom" | "system_api_key",
       actor,

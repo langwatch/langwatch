@@ -126,6 +126,25 @@ export class PersonalWorkspaceService {
     const workspace = await this.prisma.$transaction(async (tx) => {
       const existing = await this.findInTx(tx, { userId, organizationId });
       if (existing) {
+        // The workspace row is here, which says nothing about the grant that
+        // makes it usable: the two no longer share a transaction, so an
+        // earlier ensure() may have committed the team and died before the
+        // append. Every later call then took this short-circuit and the
+        // owner had a workspace they could not administer, with no path back.
+        // Re-assert only when it is actually missing, since this runs on the
+        // session path.
+        const ownerGrant = await tx.roleBinding.findFirst({
+          where: {
+            organizationId,
+            userId,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: existing.team.id,
+          },
+          select: { id: true },
+        });
+        if (!ownerGrant) {
+          grantOnTeamId = existing.team.id;
+        }
         return { ...existing, created: false };
       }
 

@@ -138,6 +138,11 @@ describe("organization.acceptInvite", () => {
       },
     });
     (ctx as any).prisma = {
+      // Acceptance and the membership row land in one transaction, and the
+      // service refuses to run on somebody else's: `$connect` is what marks
+      // this stub as the root client it stands in for.
+      $connect: vi.fn(),
+      $transaction: (writes: Promise<unknown>[]) => Promise.all(writes),
       organizationInvite: {
         findUnique: findUniqueMock,
         update: inviteUpdateMock,
@@ -157,10 +162,10 @@ describe("organization.acceptInvite", () => {
       const result = await caller.acceptInvite({ inviteCode: "test-code" });
 
       expect(result.success).toBe(true);
-      // The membership row is written and the invite is only marked ACCEPTED
-      // once the grant it carries has been emitted. There is no transaction
-      // around any of it any more: the grant is a ledger command, so the
-      // membership must be committed before it goes.
+      // The membership row and the acceptance land in one transaction, and
+      // the grants the invite carries follow it: they are ledger commands and
+      // cannot join, and this order is what keeps a PENDING invite from ever
+      // carrying access somebody could revoke out from under.
       expect(ledger.attachBindings).toHaveBeenCalled();
       expect(inviteUpdateMock).toHaveBeenCalledWith(
         expect.objectContaining({ data: { status: "ACCEPTED" } }),

@@ -1022,6 +1022,11 @@ export class InviteService {
   /**
    * Deletes a pending invite. Organization-scoped: an invite id from another
    * organization reads as not found, never as someone else's invite.
+   *
+   * No grants to take back, and that is a property of `applyInvite` rather
+   * than an omission here: it marks the invite ACCEPTED in the same
+   * transaction that creates the membership, before it emits a single grant.
+   * A revocable invite is therefore always one that has granted nothing.
    */
   async revokeInvite({
     organizationId,
@@ -1238,18 +1243,23 @@ export class InviteService {
   }
 
   /**
-   * Applies a PENDING invite to a user: writes OrganizationUser, the
+   * Applies a PENDING invite to a user: writes OrganizationUser, marks the
+   * invite ACCEPTED, and grants the access the invite describes — the
    * ORGANIZATION-scoped grant (skipped for EXTERNAL — they get access via
-   * team/project grants), each team's grant, and marks the invite ACCEPTED.
-   * Every step is idempotent — OrganizationUser uses createMany+skipDuplicates
-   * and the grants revoke-then-attach — so a caller can safely retry.
+   * team/project grants) and each team's grant.
    *
-   * No longer a transaction, and no longer callable inside one: the grants are
-   * ledger commands (ADR-092 delivery-plan PR 2, source `invite`), so the
-   * membership row must be committed before they are emitted. The invite is
-   * only marked ACCEPTED once everything before it has landed, so the stuck
-   * state the transaction guarded against is now a retry instead: an invite
-   * still PENDING is an invite still to apply.
+   * The membership row and the acceptance share one transaction; the grants
+   * cannot join it, because they are ledger commands (ADR-092 delivery-plan
+   * PR 2, source `invite`). So the order is membership-and-acceptance first,
+   * grants after, and that order is what makes the invite lifecycle
+   * consistent: **a PENDING invite never carries grants**. `revokeInvite` can
+   * therefore delete one without hunting for access to take back — there is
+   * none — and the window a crash opens leaves a member who holds a seat and
+   * no grants, which is less access than the invite asked for rather than
+   * more.
+   *
+   * The grants are idempotent (revoke-then-attach, duplicates skipped), so
+   * re-running the tail of this is safe.
    */
   async applyInvite({
     userId,
@@ -1262,19 +1272,36 @@ export class InviteService {
       throw new InviteNotReadyError(invite.id, invite.status);
     }
 
-    await this.prisma.organizationUser.createMany({
-      data: [
-        {
-          userId,
-          organizationId: invite.organizationId,
-          role: invite.role,
-        },
-      ],
-      skipDuplicates: true,
-    });
+    // Root client only, and it always was: the grants below are ledger
+    // commands that cannot ride a caller's transaction, and the acceptance
+    // now opens one of its own.
+    const prisma = this.requireRootClient();
+    await prisma.$transaction([
+      this.prisma.organizationUser.createMany({
+        data: [
+          {
+            userId,
+            organizationId: invite.organizationId,
+            role: invite.role,
+          },
+        ],
+        skipDuplicates: true,
+      }),
+      this.prisma.organizationInvite.update({
+        where: { id: invite.id, organizationId: invite.organizationId },
+        data: { status: "ACCEPTED" },
+      }),
+    ]);
 
     const writer = grantsLedgerWriter();
-    const actor: LedgerActor = { type: "user", id: userId };
+    // Who decided this access: the person who sent the invitation, not the
+    // person receiving it. The invitee never granted themselves anything, and
+    // an audit trail that says they did answers the wrong question. An invite
+    // with no recorded sender (the older rows, and the ones a subscription
+    // approval creates) is attributed to the service.
+    const actor: LedgerActor = invite.requestedBy
+      ? { type: "user", id: invite.requestedBy }
+      : { type: "system", id: "system:invite-service" };
 
     if (invite.role !== OrganizationUserRole.EXTERNAL) {
       await writer.revokeBindingsWhere({
@@ -1293,7 +1320,10 @@ export class InviteService {
           {
             bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
             principal: { userId },
-            role: invite.role as unknown as TeamUserRole,
+            // The declared mapping, not a cast through `unknown`: the two
+            // enums share three names by coincidence and EXTERNAL is not one
+            // of them, so a cast would be right until somebody adds a seat.
+            role: ORGANIZATION_TO_TEAM_ROLE_MAP[invite.role],
             customRoleId: null,
             scopeType: RoleBindingScopeType.ORGANIZATION,
             scopeId: invite.organizationId,
@@ -1336,6 +1366,11 @@ export class InviteService {
       }
     }
 
+    // Each team's stale grants go first, one team at a time — the revoke is
+    // scoped to a single team and cannot be widened without widening what it
+    // takes away. The grants that replace them are one command for the whole
+    // invite: the invitee gets every team the invitation named, or none of
+    // them, instead of arriving in the first three teams of five.
     for (const member of teamMembershipData) {
       await writer.revokeBindingsWhere({
         organizationId: invite.organizationId,
@@ -1347,28 +1382,23 @@ export class InviteService {
         actor,
         reason: "replaced by the invite's team role",
       });
+    }
+    if (teamMembershipData.length > 0) {
       await writer.attachBindings({
         organizationId: invite.organizationId,
-        bindings: [
-          {
-            bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            principal: { userId },
-            role: member.role,
-            customRoleId: member.customRoleId ?? null,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: member.teamId,
-          },
-        ],
+        bindings: teamMembershipData.map((member) => ({
+          bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          principal: { userId },
+          role: member.role,
+          customRoleId: member.customRoleId ?? null,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: member.teamId,
+        })),
         actor,
         source: "invite",
         onDuplicate: "skip",
       });
     }
-
-    await this.prisma.organizationInvite.update({
-      where: { id: invite.id, organizationId: invite.organizationId },
-      data: { status: "ACCEPTED" },
-    });
   }
 
   /**

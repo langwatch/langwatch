@@ -1,4 +1,3 @@
-import { generate } from "@langwatch/ksuid";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
@@ -6,17 +5,35 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { grantsLedgerWriter } from "~/server/app-layer/authz/ledger";
+import type { LedgerActor } from "~/server/app-layer/authz/ledger";
+import { GroupRestService } from "~/server/app-layer/groups/group.service";
+import { PrismaGroupRepository } from "~/server/app-layer/groups/repositories/group.prisma.repository";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
-import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
 import { RoleService } from "~/server/role/role.service";
-import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
 import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+
+/**
+ * The group domain's service, composed the same way the REST surface composes
+ * it (`app/api/middleware/group-service.ts`). Every grant a group carries is a
+ * ledger fact and the service owns the write: the router validated scopes and
+ * custom roles itself and then drove the ledger writer directly, so the two
+ * surfaces had two copies of one rule and only one of them was tested.
+ */
+function groupService(prisma: PrismaClient): GroupRestService {
+  return new GroupRestService({
+    repo: new PrismaGroupRepository(prisma),
+    roleService: new RoleService(prisma),
+  });
+}
+
+const ledgerActor = (userId: string): LedgerActor => ({
+  type: "user",
+  id: userId,
+});
 
 async function findUniqueGroupSlug(
   prisma: Pick<PrismaClient, "group">,
@@ -250,93 +267,13 @@ export const groupRouter = createTRPCRouter({
         errorMessage: ENTERPRISE_FEATURE_ERRORS.SCIM,
       });
 
-      const baseSlug = slugify(input.name, { lower: true, strict: true });
-
-      await assertUsersInOrganization(
-        ctx.prisma,
-        input.organizationId,
-        input.memberIds ?? [],
-      );
-
-      // Validate all binding scopes belong to this org before starting the transaction
-      if (input.bindings?.length) {
-        const repo = new PrismaRoleBindingRepository(ctx.prisma);
-        for (const b of input.bindings) {
-          await repo.validateScopeInOrg({
-            organizationId: input.organizationId,
-            scopeType: b.scopeType,
-            scopeId: b.scopeId,
-          });
-        }
-
-        const customRoleIds = input.bindings
-          .filter((b) => b.role === TeamUserRole.CUSTOM && b.customRoleId)
-          .map((b) => b.customRoleId!);
-        if (customRoleIds.length > 0) {
-          const roleService = new RoleService(ctx.prisma);
-          await roleService.validateRolesAssignable({
-            roleIds: customRoleIds,
-            organizationId: input.organizationId,
-          });
-        }
-      }
-
-      if (input.bindings?.length) {
-        await assertNoPersonalTeamScope({
-          client: ctx.prisma,
-          scopes: input.bindings,
-        });
-      }
-
-      // The group and its memberships are not grant facts, so they keep the
-      // transaction; the grants the group carries are emitted as one command
-      // after it commits.
-      const group = await ctx.prisma.$transaction(async (tx) => {
-        const slug = await findUniqueGroupSlug(
-          tx,
-          input.organizationId,
-          baseSlug,
-        );
-
-        const created = await tx.group.create({
-          data: {
-            id: generate(KSUID_RESOURCES.GROUP).toString(),
-            organizationId: input.organizationId,
-            name: input.name,
-            slug,
-          },
-        });
-
-        if (input.memberIds?.length) {
-          await tx.groupMembership.createMany({
-            data: input.memberIds.map((userId) => ({
-              groupId: created.id,
-              userId,
-            })),
-          });
-        }
-
-        return created;
+      return groupService(ctx.prisma).create({
+        organizationId: input.organizationId,
+        name: input.name,
+        ...(input.bindings ? { bindings: input.bindings } : {}),
+        ...(input.memberIds ? { memberIds: input.memberIds } : {}),
+        actor: ledgerActor(ctx.session.user.id),
       });
-
-      if (input.bindings?.length) {
-        await grantsLedgerWriter().attachBindings({
-          organizationId: input.organizationId,
-          bindings: input.bindings.map((b) => ({
-            bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            principal: { groupId: group.id },
-            role: b.role,
-            customRoleId:
-              b.role === TeamUserRole.CUSTOM ? (b.customRoleId ?? null) : null,
-            scopeType: b.scopeType,
-            scopeId: b.scopeId,
-          })),
-          actor: { type: "user", id: ctx.session.user.id },
-          onDuplicate: "skip",
-        });
-      }
-
-      return group;
     }),
 
   /**
@@ -355,51 +292,16 @@ export const groupRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
-      const group = await ctx.prisma.group.findFirst({
-        where: { id: input.groupId, organizationId: input.organizationId },
-      });
-      if (!group) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
-      }
-
-      await new PrismaRoleBindingRepository(ctx.prisma).validateScopeInOrg({
+      const binding = await groupService(ctx.prisma).addBinding({
+        groupId: input.groupId,
         organizationId: input.organizationId,
+        role: input.role,
+        ...(input.customRoleId ? { customRoleId: input.customRoleId } : {}),
         scopeType: input.scopeType,
         scopeId: input.scopeId,
+        actor: ledgerActor(ctx.session.user.id),
       });
-      await assertNoPersonalTeamScope({
-        client: ctx.prisma,
-        scopes: [{ scopeType: input.scopeType, scopeId: input.scopeId }],
-      });
-
-      if (input.role === TeamUserRole.CUSTOM && input.customRoleId) {
-        const roleService = new RoleService(ctx.prisma);
-        await roleService.validateRolesAssignable({
-          roleIds: [input.customRoleId],
-          organizationId: input.organizationId,
-        });
-      }
-
-      const bindingId = generate(KSUID_RESOURCES.ROLE_BINDING).toString();
-      await grantsLedgerWriter().attachBindings({
-        organizationId: input.organizationId,
-        bindings: [
-          {
-            bindingId,
-            principal: { groupId: input.groupId },
-            role: input.role,
-            customRoleId:
-              input.role === TeamUserRole.CUSTOM
-                ? (input.customRoleId ?? null)
-                : null,
-            scopeType: input.scopeType,
-            scopeId: input.scopeId,
-          },
-        ],
-        actor: { type: "user", id: ctx.session.user.id },
-        onDuplicate: "skip",
-      });
-      return { id: bindingId };
+      return { id: binding.id };
     }),
 
   /**
@@ -414,23 +316,10 @@ export const groupRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
-      const binding = await ctx.prisma.roleBinding.findFirst({
-        where: { id: input.bindingId, organizationId: input.organizationId },
-      });
-      if (!binding) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Binding not found",
-        });
-      }
-      await assertNoPersonalTeamScope({
-        client: ctx.prisma,
-        scopes: [binding],
-      });
-      await grantsLedgerWriter().revokeBindings({
+      await groupService(ctx.prisma).removeBinding({
+        bindingId: input.bindingId,
         organizationId: input.organizationId,
-        bindingIds: [input.bindingId],
-        actor: { type: "user", id: ctx.session.user.id },
+        actor: ledgerActor(ctx.session.user.id),
       });
       return { success: true };
     }),
@@ -485,26 +374,15 @@ export const groupRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), groupId: z.string() }))
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
-      const group = await ctx.prisma.group.findFirst({
-        where: { id: input.groupId, organizationId: input.organizationId },
-      });
-      if (!group) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
-      }
-
-      // The grants the group carries go first, so the deny is enforced before
-      // the group row disappears; the memberships and the group itself are
-      // not grant facts and stay imperative.
-      await grantsLedgerWriter().revokeBindingsWhere({
+      await groupService(ctx.prisma).delete({
+        id: input.groupId,
         organizationId: input.organizationId,
-        where: { groupId: input.groupId },
-        actor: { type: "user", id: ctx.session.user.id },
-        reason: "group deleted",
+        actor: ledgerActor(ctx.session.user.id),
+        // The settings page asks before it gets here ("re-created by your IdP
+        // on next sync. Delete anyway?"), which is the answer the API surface
+        // has nobody to ask for.
+        evenIfDirectoryManaged: true,
       });
-      await ctx.prisma.groupMembership.deleteMany({
-        where: { groupId: input.groupId },
-      });
-      await ctx.prisma.group.delete({ where: { id: input.groupId } });
 
       return { success: true };
     }),

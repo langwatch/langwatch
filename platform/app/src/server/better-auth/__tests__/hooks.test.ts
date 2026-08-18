@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "~/generated/prisma/client";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 
 vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
@@ -59,6 +59,12 @@ type PrismaMockOverrides = Record<string, PrismaMockTable | unknown>;
 
 const makePrismaMock = (overrides: PrismaMockOverrides = {}): PrismaClient => {
   const base: PrismaMockOverrides = {
+    // Applying an invite opens a transaction of its own — the membership row
+    // and the acceptance land together — and refuses to run on somebody
+    // else's transaction client. `$connect` is what marks this stub as the
+    // root client it stands in for.
+    $connect: vi.fn(),
+    $transaction: (writes: Promise<unknown>[]) => Promise.all(writes),
     organization: { findUnique: vi.fn().mockResolvedValue(null) },
     organizationInvite: { findFirst: vi.fn().mockResolvedValue(null) },
     organizationUser: {
@@ -292,8 +298,17 @@ describe("afterUserCreate", () => {
         skipDuplicates: true,
       });
 
-      // 3 grants attached: 1 ORG-scope (ADMIN) + 2 TEAM-scope.
-      expect(ledger.attachBindings).toHaveBeenCalledTimes(3);
+      // Two commands: the ORG-scoped grant (ADMIN), and the invite's teams in
+      // one batch, so the invitee cannot land in the first team and not the
+      // second.
+      expect(ledger.attachBindings).toHaveBeenCalledTimes(2);
+      const teamCommand = ledger.attachBindings.mock.calls
+        .map((call: any[]) => call[0])
+        .find((envelope: any) => envelope.bindings[0]?.scopeType === "TEAM");
+      expect(teamCommand.bindings.map((b: any) => b.scopeId)).toEqual([
+        "team_1",
+        "team_2",
+      ]);
 
       // Invite flipped to ACCEPTED so the link stops looking outstanding.
       expect(inviteUpdate).toHaveBeenCalledWith({
@@ -353,6 +368,42 @@ describe("afterUserCreate", () => {
           user: { id: "user_1", email: "u@acme.com", name: "User" },
         }),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("when a concurrent callback already created the membership row", () => {
+    it("re-asserts the organization grant instead of assuming it landed", async () => {
+      // The membership row and the grant beside it no longer share a
+      // transaction, so the other callback may have died between them. P2002
+      // says the row is there; it says nothing about the grant.
+      const alreadyExists = new Prisma.PrismaClientKnownRequestError(
+        "Unique constraint failed",
+        { code: "P2002", clientVersion: "7.0.0" },
+      );
+      const prisma = makePrismaMock({
+        organization: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "org_1",
+            ssoDomain: "acme.com",
+          }),
+        },
+        organizationUser: {
+          create: vi.fn().mockRejectedValue(alreadyExists),
+          count: vi.fn().mockResolvedValue(0),
+        },
+      });
+
+      await afterUserCreate({
+        prisma,
+        user: { id: "user_1", email: "u@acme.com", name: "User" },
+      });
+
+      expect(ledger.attachBindings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "org_1",
+          onDuplicate: "skip",
+        }),
+      );
     });
   });
 });

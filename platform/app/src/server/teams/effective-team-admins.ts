@@ -18,7 +18,16 @@ import {
 
 type TxClient = Prisma.TransactionClient;
 
-export async function computeEffectiveAdminUserIds({
+/**
+ * The principals holding a team's ADMIN bindings, split by kind.
+ *
+ * The one read every admin question in this module asks. It used to be
+ * written out at each of them, three times, each with its own `select` and its
+ * own non-null assertion on `groupId` — three chances for the definition of
+ * "administers this team" to drift apart while the last-admin invariant rests
+ * on all three agreeing.
+ */
+async function readTeamAdminPrincipals({
   tx,
   organizationId,
   teamId,
@@ -26,7 +35,7 @@ export async function computeEffectiveAdminUserIds({
   tx: TxClient;
   organizationId: string;
   teamId: string;
-}): Promise<Set<string>> {
+}): Promise<{ userIds: string[]; groupIds: string[] }> {
   const adminBindings = await tx.roleBinding.findMany({
     where: {
       organizationId,
@@ -37,12 +46,31 @@ export async function computeEffectiveAdminUserIds({
     select: { userId: true, groupId: true },
   });
 
-  const userIds = new Set<string>();
+  const userIds: string[] = [];
   const groupIds: string[] = [];
-  for (const b of adminBindings) {
-    if (b.userId) userIds.add(b.userId);
-    if (b.groupId) groupIds.push(b.groupId);
+  for (const binding of adminBindings) {
+    if (binding.userId) userIds.push(binding.userId);
+    if (binding.groupId) groupIds.push(binding.groupId);
   }
+  return { userIds, groupIds };
+}
+
+export async function computeEffectiveAdminUserIds({
+  tx,
+  organizationId,
+  teamId,
+}: {
+  tx: TxClient;
+  organizationId: string;
+  teamId: string;
+}): Promise<Set<string>> {
+  const { userIds: directUserIds, groupIds } = await readTeamAdminPrincipals({
+    tx,
+    organizationId,
+    teamId,
+  });
+
+  const userIds = new Set<string>(directUserIds);
 
   if (groupIds.length > 0) {
     const memberships = await tx.groupMembership.findMany({
@@ -78,20 +106,15 @@ export async function projectAdminUserIdsAfterDirectEdit({
 }): Promise<Set<string>> {
   const userIds = new Set<string>(directAdminUserIdsAfter);
 
-  const adminGroupBindings = await tx.roleBinding.findMany({
-    where: {
-      organizationId,
-      scopeType: RoleBindingScopeType.TEAM,
-      scopeId: teamId,
-      role: TeamUserRole.ADMIN,
-      groupId: { not: null },
-    },
-    select: { groupId: true },
+  const { groupIds } = await readTeamAdminPrincipals({
+    tx,
+    organizationId,
+    teamId,
   });
-  if (adminGroupBindings.length === 0) return userIds;
+  if (groupIds.length === 0) return userIds;
 
   const memberships = await tx.groupMembership.findMany({
-    where: { groupId: { in: adminGroupBindings.map((b) => b.groupId!) } },
+    where: { groupId: { in: groupIds } },
     select: { userId: true },
   });
   for (const m of memberships) userIds.add(m.userId);
@@ -110,23 +133,15 @@ export async function isUserAdminViaGroup({
   teamId: string;
   userId: string;
 }): Promise<boolean> {
-  const adminGroupBindings = await tx.roleBinding.findMany({
-    where: {
-      organizationId,
-      scopeType: RoleBindingScopeType.TEAM,
-      scopeId: teamId,
-      role: TeamUserRole.ADMIN,
-      groupId: { not: null },
-    },
-    select: { groupId: true },
+  const { groupIds } = await readTeamAdminPrincipals({
+    tx,
+    organizationId,
+    teamId,
   });
-  if (adminGroupBindings.length === 0) return false;
+  if (groupIds.length === 0) return false;
 
   const count = await tx.groupMembership.count({
-    where: {
-      userId,
-      groupId: { in: adminGroupBindings.map((b) => b.groupId!) },
-    },
+    where: { userId, groupId: { in: groupIds } },
   });
   return count > 0;
 }

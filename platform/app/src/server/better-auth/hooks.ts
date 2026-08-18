@@ -99,12 +99,15 @@ export const beforeUserCreate = async ({
  *     looking unused.
  *   - Otherwise, fall back to the default behavior and add them as MEMBER.
  *
- * OrganizationUser + RoleBinding writes are wrapped in a single transaction
- * so a partial failure can't leave the user "in the org" with no RoleBinding
- * (which would look like org membership to legacy code but give zero access
- * under RBAC).
+ * The OrganizationUser row and the grant that comes with it can no longer
+ * share a transaction: the membership is a table write and the grant is a
+ * ledger command (ADR-092 delivery-plan PR 2). What replaces the transaction
+ * is a re-assert — the grant write is idempotent, and the P2002 path below,
+ * which is a concurrent callback or a retry, runs it again rather than
+ * assuming the other attempt got that far. Otherwise the user is left "in the
+ * org" with no grant: org membership to legacy code, zero access under RBAC.
  *
- * Outer catch: the whole auto-add is best-effort. If the transaction fails
+ * Outer catch: the whole auto-add is best-effort. If the write fails
  * outright (transient DB issue, concurrent signup we didn't catch via P2002),
  * we LOG and SWALLOW so the signup itself still succeeds — failing would
  * orphan the user (the User row was just committed by the preceding Prisma
@@ -166,6 +169,29 @@ export const afterUserCreate = async ({
       email: user.email,
     });
 
+    // The organization-scoped grant that comes with a default membership.
+    // Idempotent by construction: an identical row already present is skipped,
+    // so calling this twice grants nothing twice, and calling it after a
+    // membership row turned up on its own is the repair.
+    const grantDefaultMembership = () =>
+      grantsLedgerWriter().attachBindings({
+        organizationId: org.id,
+        bindings: [
+          {
+            bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+            principal: { userId: user.id },
+            role: TeamUserRole.MEMBER,
+            customRoleId: null,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: org.id,
+          },
+        ],
+        // The signup is the product acting on a domain rule, not an
+        // administrator granting access.
+        actor: { type: "system", id: "system:sso-auto-join" },
+        onDuplicate: "skip",
+      });
+
     try {
       if (pendingInvite) {
         await InviteService.create(prisma).applyInvite({
@@ -183,23 +209,7 @@ export const afterUserCreate = async ({
             role: "MEMBER",
           },
         });
-        await grantsLedgerWriter().attachBindings({
-          organizationId: org.id,
-          bindings: [
-            {
-              bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-              principal: { userId: user.id },
-              role: TeamUserRole.MEMBER,
-              customRoleId: null,
-              scopeType: RoleBindingScopeType.ORGANIZATION,
-              scopeId: org.id,
-            },
-          ],
-          // The signup is the product acting on a domain rule, not an
-          // administrator granting access.
-          actor: { type: "system", id: "system:sso-auto-join" },
-          onDuplicate: "skip",
-        });
+        await grantDefaultMembership();
       }
 
       logger.info(
@@ -239,6 +249,14 @@ export const afterUserCreate = async ({
           { userId: user.id, organizationId: org.id },
           "Auto-add SSO membership was already present (P2002) — treating as success",
         );
+        // The membership row existing says nothing about the grant beside it:
+        // the concurrent callback that created it may have died in between,
+        // and the two writes no longer share a transaction. Re-assert, which
+        // is a no-op when the other attempt finished. An invite carries its
+        // own grants at its own roles, so this only covers the default path.
+        if (!pendingInvite) {
+          await grantDefaultMembership();
+        }
         return;
       }
       throw err;

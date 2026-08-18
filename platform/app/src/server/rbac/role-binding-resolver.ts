@@ -15,11 +15,13 @@ import {
 } from "../api/rbac";
 import { authzShadowFor } from "../app-layer/authz/shadow";
 // The shadow comparison runs on the APP's own Prisma handle, never the
-// caller's. Both of this module's public functions are called on the API-key
-// mint path with `prisma` bound to an OPEN interactive transaction
-// (ApiKeyService.create), and a detached fire-and-forget query on that handle
-// either lengthens the transaction it was never part of or lands after the
-// commit and fails with "Transaction already closed". This module is
+// caller's. The caller's handle is whatever it happened to pass — a
+// transaction client on any path that opens one — and a detached
+// fire-and-forget query on such a handle either lengthens a transaction it
+// was never part of or lands after the commit and fails with "Transaction
+// already closed". (The API-key mint path used to hold exactly that open
+// interactive transaction; it no longer does, and the rule outlives it,
+// because nothing here can tell what it was handed.) This module is
 // server-only — its importers are org-auth.ts, auth-middleware.ts and
 // api-key.service.ts — so the singleton is safe to hold here, unlike in
 // ./shadow.ts, which rbac.ts (client-reachable) imports.

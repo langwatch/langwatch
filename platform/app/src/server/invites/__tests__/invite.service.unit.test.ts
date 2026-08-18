@@ -150,6 +150,12 @@ describe("InviteService", () => {
     mockSendInviteEmail.mockClear();
 
     mockPrisma = {
+      // The membership row and the invite's acceptance are one transaction:
+      // a PENDING invite must never be one that has already granted access.
+      // The stub runs the batch it is handed, and `$connect` is what marks it
+      // as a root client rather than somebody else's transaction.
+      $connect: vi.fn(),
+      $transaction: (writes: Promise<unknown>[]) => Promise.all(writes),
       organizationInvite: {
         findFirst: vi.fn(),
         findMany: vi.fn(),
@@ -895,6 +901,14 @@ describe("InviteService", () => {
         expect(orgBinding).toBeDefined();
         expect(orgBinding!.principal).toEqual({ userId: "user-flow-1" });
 
+        // ...into THIS organization. The binding rows no longer carry the
+        // tenant themselves — the command envelope does — so the envelope is
+        // where the tenant has to be asserted, or a grant landing in the
+        // wrong organization reads as a pass.
+        for (const envelope of ledger.attachBindings.mock.calls) {
+          expect(envelope[0]).toMatchObject({ organizationId: "org-1" });
+        }
+
         // Verify: team-scoped grant was attached
         const teamBinding = roleBindingsCreated.find(
           (rb) => rb.scopeType === "TEAM",
@@ -914,6 +928,93 @@ describe("InviteService", () => {
   });
 
   describe("applyInvite", () => {
+    describe("given a pending invite into two teams", () => {
+      const invite = {
+        id: "inv-lifecycle-1",
+        status: "PENDING",
+        organizationId: "org-1",
+        teamIds: "team-1,team-2",
+        teamAssignments: null,
+        role: "MEMBER",
+        requestedBy: "user-inviter",
+      } as any;
+
+      beforeEach(() => {
+        (mockPrisma as any).organizationUser = { createMany: vi.fn() };
+        mockPrisma.organizationInvite.update.mockResolvedValue({});
+        // The writer is module-level and shared, so what the previous test
+        // sent it would otherwise be counted as this one's.
+        ledger.attachBindings.mockClear();
+        ledger.revokeBindingsWhere.mockClear();
+        ledger.revokeBindingsWhere.mockResolvedValue(0);
+        ledger.attachBindings.mockResolvedValue({
+          attached: [],
+          duplicates: [],
+        });
+      });
+
+      describe("when it is applied", () => {
+        it("accepts the invite before granting anything, so a pending invite never carries access", async () => {
+          const order: string[] = [];
+          mockPrisma.organizationInvite.update.mockImplementation(() => {
+            order.push("accepted");
+            return Promise.resolve({});
+          });
+          ledger.attachBindings.mockImplementation(() => {
+            order.push("granted");
+            return Promise.resolve({ attached: [], duplicates: [] });
+          });
+
+          await service.applyInvite({ userId: "user-flow-2", invite });
+
+          expect(order[0]).toBe("accepted");
+          expect(order).toContain("granted");
+        });
+
+        it("names the inviter as the actor, not the person receiving the access", async () => {
+          await service.applyInvite({ userId: "user-flow-2", invite });
+
+          for (const [envelope] of ledger.attachBindings.mock.calls) {
+            expect(envelope.actor).toEqual({
+              type: "user",
+              id: "user-inviter",
+            });
+          }
+        });
+
+        it("grants both teams in one command, so the invitee never lands in half of them", async () => {
+          await service.applyInvite({ userId: "user-flow-2", invite });
+
+          const teamCommands = ledger.attachBindings.mock.calls
+            .map((call: any[]) => call[0])
+            .filter(
+              (envelope: any) => envelope.bindings[0]?.scopeType === "TEAM",
+            );
+          expect(teamCommands).toHaveLength(1);
+          expect(teamCommands[0]!.bindings.map((b: any) => b.scopeId)).toEqual([
+            "team-1",
+            "team-2",
+          ]);
+        });
+      });
+
+      describe("when the invite records no sender", () => {
+        it("attributes the grants to the service rather than to the invitee", async () => {
+          await service.applyInvite({
+            userId: "user-flow-2",
+            invite: { ...invite, requestedBy: null },
+          });
+
+          for (const [envelope] of ledger.attachBindings.mock.calls) {
+            expect(envelope.actor).toEqual({
+              type: "system",
+              id: "system:invite-service",
+            });
+          }
+        });
+      });
+    });
+
     describe("when invite status is not PENDING", () => {
       it("throws for PAYMENT_PENDING invites", async () => {
         await expect(

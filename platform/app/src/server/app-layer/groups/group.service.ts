@@ -244,17 +244,26 @@ export class GroupRestService {
     id,
     organizationId,
     actor,
+    evenIfDirectoryManaged = false,
   }: {
     id: string;
     organizationId: string;
     actor: LedgerActor;
+    /**
+     * Whether a directory-owned group may be deleted anyway. The API surface
+     * says no: a caller automating against it cannot be asked. The settings
+     * page says yes, because it asks first — its confirmation reads "This
+     * SCIM group will be re-created by your IdP on next sync. Delete anyway?"
+     * and the admin answers it.
+     */
+    evenIfDirectoryManaged?: boolean;
   }): Promise<void> {
     const group = await this.repo.findGroupOnly({ id, organizationId });
     if (!group) throw new GroupNotFoundError();
     // Deleting is the most destructive thing that can happen to a group the
     // directory owns: every grant it carries goes with it, and the next sync
     // pushes the group back without them.
-    if (group.scimSource) {
+    if (group.scimSource && !evenIfDirectoryManaged) {
       throw new ScimManagedGroupError(id);
     }
 

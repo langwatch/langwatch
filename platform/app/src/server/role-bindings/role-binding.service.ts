@@ -823,7 +823,9 @@ export class RoleBindingService {
     actor: LedgerActor;
   }) {
     // Validate scopes and role assignability up front so a bad input fails
-    // the whole batch before we open the transaction.
+    // the whole batch before anything is emitted. There is no transaction to
+    // open any more — the bindings are ledger commands — so this pre-flight
+    // is the only thing standing between a bad row and a half-applied batch.
     const { organizationRole } = await this.validatePrincipalInOrganization({
       organizationId,
       userId,
