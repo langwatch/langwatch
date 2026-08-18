@@ -95,7 +95,12 @@ end-to-end coverage at all, because it has no browser step to cap:
   install` mutate real user files (`settings.json`, `config.toml`, shell rc).
   `langwatch logout` must remove only langwatch-authored blocks. This is
   file-system round-trip behaviour that unit tests stub out.
-- **Annotations.** UI, API, CLI and three MCP tools, and zero `.feature` specs.
+- **Annotations.** The two UI specs are bound and healthy — 41 `@integration`
+  scenarios in `annotation-queue-workflow.feature` and 51 in
+  `annotations-list-selection.feature`. The gap is everything reached without a
+  browser: `annotation-cli.feature` carries 8 scenarios and no binding tag, so
+  it enforces nothing, and the public REST API and the three MCP tools have no
+  `.feature` spec at all.
 
 These are not "verify a form renders" tests. They cross real process boundaries
 and assert real side effects, and they are cheap, fast and deterministic.
