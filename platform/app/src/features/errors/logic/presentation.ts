@@ -60,14 +60,6 @@ const str = (
   return typeof value === "string" && value.length > 0 ? value : fallback;
 };
 
-/** Reads a list of strings out of `meta` without trusting it. */
-const list = (error: HandledErrorShape, key: string): string[] => {
-  const value = error.meta[key];
-  return Array.isArray(value)
-    ? value.filter((entry): entry is string => typeof entry === "string")
-    : [];
-};
-
 /**
  * Reads a list of short identifiers out of `meta` without trusting it.
  *
@@ -1634,8 +1626,8 @@ const presentations = {
     // channel has. Naming them is the whole remediation — a misspelt field is
     // invisible otherwise.
     describe: (error) => {
-      const fields = list(error, "fields");
-      const accepted = list(error, "accepted");
+      const fields = strList(error, "fields");
+      const accepted = strList(error, "accepted");
       const named = fields.length > 0 ? `${fields.join(", ")}. ` : "";
       return accepted.length > 0
         ? `${named}This channel reads: ${accepted.join(", ")}.`

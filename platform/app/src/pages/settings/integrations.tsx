@@ -292,6 +292,21 @@ function SlackIntegrationCard() {
   const [scopes, setScopes] = useState<
     Array<{ scopeType: "PROJECT"; scopeId: string }>
   >(project ? [{ scopeType: "PROJECT", scopeId: project.id }] : []);
+
+  // This page carries no project in its route, so the session's project
+  // resolves after the first render — and a `useState` initializer only ever
+  // runs on that first render. Without this the card would sit on "Pick a
+  // project" for an admin who has one. It seeds an empty selection only, so a
+  // deliberate pick (or a deliberate clear, once the id is stable) stands.
+  useEffect(() => {
+    const projectId = project?.id;
+    if (!projectId) return;
+    setScopes((current) =>
+      current.length > 0
+        ? current
+        : [{ scopeType: "PROJECT", scopeId: projectId }],
+    );
+  }, [project?.id]);
   const selectedProjectId = scopes[0]?.scopeId ?? "";
   const selectedProjectName = useMemo(
     () =>
@@ -326,7 +341,12 @@ function SlackIntegrationCard() {
             label="Project"
           />
           {selectedProjectId ? (
+            // Keyed on the project so switching the picker remounts the form.
+            // The token field holds unsubmitted input in local state; reusing
+            // the instance would carry a token pasted for one project into a
+            // Connect pressed against another.
             <SlackProjectConnection
+              key={selectedProjectId}
               projectId={selectedProjectId}
               projectName={selectedProjectName}
             />
