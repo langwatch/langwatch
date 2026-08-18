@@ -72,15 +72,26 @@ CHANGELOG_CONTENT=$(echo "$CHANGELOG_CONTENT" | sed \
   | sed -E 's/ \(\[[0-9a-f]+\]\([^)]+\)\)//g')
 
 # Slack caps a section's text at 3000 characters and rejects the whole
-# payload as invalid_blocks past it, so split the changelog into chunks at
-# line boundaries and give each chunk its own section block.
-CHUNKS_JSON=$(printf '%s' "$CHANGELOG_CONTENT" | awk -v max=2900 '
-  {
-    if (buf != "" && length(buf) + length($0) + 1 > max) { print buf; print "__LW_CHUNK_BREAK__"; buf = "" }
-    buf = (buf == "" ? $0 : buf "\n" $0)
-  }
-  END { if (buf != "") print buf }
-' | jq -Rs 'split("\n__LW_CHUNK_BREAK__\n") | map(select(length > 0)) | map(sub("\n$"; ""))')
+# payload as invalid_blocks past it, so split the changelog into chunks and
+# give each chunk its own section block. Chunks break at line boundaries,
+# and a single line longer than the cap is cut into pieces so it cannot
+# escape the limit on its own. The 2900 target leaves 100 characters of
+# margin, which absorbs the few emoji that count as more than one character.
+# jq measures and slices strings in characters, not bytes, which is what
+# Slack counts.
+CHUNKS_JSON=$(printf '%s' "$CHANGELOG_CONTENT" | jq -Rs --argjson max 2900 '
+  def split_long($max):
+    if length <= $max then [.] else [.[0:$max]] + (.[$max:] | split_long($max)) end;
+
+  sub("\n+$"; "")
+  | split("\n")
+  | map(split_long($max))
+  | (add // [])
+  | reduce .[] as $line ([];
+      if length == 0 then [$line]
+      elif ((.[-1] | length) + 1 + ($line | length)) > $max then . + [$line]
+      else .[0:-1] + [.[-1] + "\n" + $line] end)
+  | map(select(length > 0))')
 
 RELEASES_URL="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-langwatch/langwatch}/releases"
 
@@ -100,8 +111,12 @@ MESSAGE=$(jq -n \
     + [{type: "divider"}])}')
 
 # Send to Slack. The webhook answers 200 "ok" on success and an error string
-# such as invalid_blocks otherwise, so the body is the success signal.
+# such as invalid_blocks otherwise, so the body is the success signal. The
+# timeouts keep a stalled webhook from holding the release job open until the
+# runner limit.
 RESPONSE=$(curl -sS -X POST \
+  --connect-timeout 10 \
+  --max-time 30 \
   -H 'Content-type: application/json' \
   --data "$MESSAGE" \
   "$SLACK_WEBHOOK_URL")
