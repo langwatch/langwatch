@@ -162,10 +162,29 @@ export class HttpResponseError extends Error {
  * exhausts the pool.
  */
 async function readErrorBody(response: FetchResponse): Promise<string> {
+  const body = response.body;
+  if (!body) return "";
+
+  const reader = body.getReader();
+  const decoder = new TextDecoder("utf-8", { fatal: false });
+  let text = "";
+
   try {
-    return (await response.text()).slice(0, MAX_ERROR_BODY_CHARS);
+    // Stop pulling once we have the ceiling. Slicing after response.text()
+    // would mean a hostile or broken endpoint could make us allocate its
+    // whole body first, which is the allocation this ceiling exists to stop.
+    while (text.length < MAX_ERROR_BODY_CHARS) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+    }
+    return text.slice(0, MAX_ERROR_BODY_CHARS);
   } catch {
-    return "";
+    return text.slice(0, MAX_ERROR_BODY_CHARS);
+  } finally {
+    // We stopped early on purpose; tell the socket so it can go back to the
+    // pool instead of waiting on a body nobody is reading.
+    await reader.cancel().catch(() => undefined);
   }
 }
 

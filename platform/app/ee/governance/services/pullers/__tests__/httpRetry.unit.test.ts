@@ -16,6 +16,8 @@ interface QueuedResponse {
   status: number;
   headers?: Record<string, string>;
   body?: unknown;
+  /** Supplied instead of `body` when a test needs to watch the read itself. */
+  stream?: ReadableStream<Uint8Array>;
 }
 
 let capturedUrls: string[] = [];
@@ -33,6 +35,12 @@ beforeEach(() => {
       if (transportError) throw transportError;
       const next = responseQueue.shift();
       if (!next) throw new Error("test bug: no queued response");
+      if (next.stream) {
+        return new Response(next.stream, {
+          status: next.status,
+          headers: { "content-type": "text/plain", ...(next.headers ?? {}) },
+        });
+      }
       return new Response(JSON.stringify(next.body ?? {}), {
         status: next.status,
         headers: {
@@ -247,5 +255,44 @@ describe("existing adapters after the 429 change", () => {
     expect(exhausted.events).toEqual([]);
     // Cursor is left untouched so the next run retries the same page.
     expect(exhausted.cursor).toBeNull();
+  });
+});
+
+describe("given an error response with an oversized body", () => {
+  describe("when the failure is read for diagnosis", () => {
+    /** @scenario "An oversized error body is bounded before it is allocated" */
+    it("stops pulling at the ceiling instead of buffering the whole body", async () => {
+      const CHUNK = "x".repeat(1_000);
+      const TOTAL_CHUNKS = 5_000; // 5 MB if anything reads it all
+      let chunksPulled = 0;
+
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (chunksPulled >= TOTAL_CHUNKS) {
+            controller.close();
+            return;
+          }
+          chunksPulled += 1;
+          controller.enqueue(new TextEncoder().encode(CHUNK));
+        },
+      });
+
+      responseQueue = [{ status: 400, stream }];
+      const { fetchWithRetry, HttpResponseError } = await loadHelper();
+
+      const failure = await fetchWithRetry({
+        url: URL_UNDER_TEST,
+        deadlineAtMs: Date.now() + 10_000,
+      }).catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(HttpResponseError);
+      expect(
+        (failure as InstanceType<typeof HttpResponseError>).bodyText,
+      ).toHaveLength(2_000);
+
+      // The ceiling has to bound the READ, not just the string we keep: a
+      // slice after response.text() would still have pulled all 5000 chunks.
+      expect(chunksPulled).toBeLessThan(10);
+    });
   });
 });

@@ -151,6 +151,14 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
     Then neither the log output nor the error message contains the token
     And neither contains the client secret
 
+  @unit
+  Scenario: A token-endpoint refusal is raised as TokenAcquisitionError
+    Given the token endpoint refuses the client credentials
+    When the adapter tries to obtain a token
+    Then the failure is raised as a token acquisition error carrying only the status
+    And the refusal body is not carried on the error
+    And a failure that is not a refusal keeps the type it already had
+
   # ---------------------------------------------------------------------------
   # Prerequisite 4 — 429 / Retry-After
   # Lifted from httpPollingPullerAdapter.ts:163-230 into
@@ -513,3 +521,10 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
     When the run returns
     Then it emits no events
     And the window it was given is left in place for the next run
+
+  @unit
+  Scenario: An oversized error body is bounded before it is allocated
+    Given an error response whose body is far larger than the diagnostic ceiling
+    When the failure is read so it can be reported
+    Then only up to the ceiling is read from the response
+    And the remainder is never pulled from the connection
