@@ -10,23 +10,28 @@
  * are plain `sum(SpendUsd)` with no `FINAL` and no `argMax`, so nothing
  * compensated.
  *
- * These tests run the real migration file against the real table, staged into
- * its pre-upgrade state, because the two things that can actually break are
- * properties of the swap procedure and not of ClickHouse:
+ * These tests run the real migration file against a real `governance_kpis`,
+ * staged into its pre-upgrade state, because the two things that can actually
+ * break are properties of the swap procedure and not of ClickHouse:
  *   - the copy reads a snapshot, so a write arriving mid-migration must still
  *     survive (the reconciliation pass),
  *   - the runner may re-apply a partially executed file, so a second run must
  *     converge rather than wedge.
  *
+ * On its OWN endpoint, not the shared migrated one. Staging the pre-upgrade
+ * state means dropping and recreating `governance_kpis`, and the shared
+ * database is read by other suites — `spendSpikeAnomalyEvaluator` seeds and
+ * queries that exact table. `withReplayLock` orders replays against each
+ * other but not against plain readers, so on the shared endpoint a neighbour
+ * could read the table during the window where it does not exist. An isolated
+ * database removes the question rather than narrowing it.
+ *
  * @see https://github.com/langwatch/langwatch-saas/issues/1089
  */
-import type { ClickHouseClient } from "@clickhouse/client";
+import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { generate } from "@langwatch/ksuid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import {
-  startTestContainers,
-  stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { startTestClickHouseEndpoints } from "~/test-utils/clickhouseTestEndpoints";
 import { replayGooseMigrationUp } from "./migrationReplay";
 
 const CREATE_MIGRATION = "00031_create_governance_kpis.sql";
@@ -88,9 +93,10 @@ async function versionColumnOf(table: string): Promise<string> {
 }
 
 /**
- * Puts `governance_kpis` back in the shape 00031 left it: the pre-upgrade
- * engine, empty. The suite has to start from there because 00083 is what is
- * under test, and the migrated container already has it applied.
+ * Puts `governance_kpis` in the shape 00031 leaves it: the pre-upgrade engine,
+ * empty. 00083 is what is under test, so every case has to start from before
+ * it ran — and each one starts from a clean table so the cases cannot read each
+ * other's rows.
  */
 async function stageThePreUpgradeTable(): Promise<void> {
   await ch.command({ query: "DROP TABLE IF EXISTS governance_kpis" });
@@ -98,22 +104,18 @@ async function stageThePreUpgradeTable(): Promise<void> {
 }
 
 beforeAll(async () => {
-  const containers = await startTestContainers();
-  ch = containers.clickHouseClient;
+  const [endpoint] = await startTestClickHouseEndpoints({
+    suite: "governance-kpis-version-column",
+    names: ["migration"],
+  });
+  ch = createClient({ url: endpoint!.url });
 }, 120_000);
 
 afterAll(async () => {
-  if (ch) {
-    // Later suites must see the head schema, not whichever intermediate state
-    // the last test left behind.
-    await stageThePreUpgradeTable();
-    await replayGooseMigrationUp({
-      client: ch,
-      fileName: VERSION_COLUMN_MIGRATION,
-    });
-  }
-  await stopTestContainers();
-}, 120_000);
+  // Nothing to restore: the endpoint is this suite's own database, so the
+  // schema it is left in is nobody else's problem.
+  await ch?.close();
+});
 
 describe("governance_kpis version column migration", () => {
   describe("given the pre-upgrade table holds rows and a write lands mid-migration", () => {
