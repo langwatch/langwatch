@@ -53,16 +53,33 @@ export async function replayRollupRebuild(
   }
 }
 
+/**
+ * Called after each Up statement, with its zero-based index and text.
+ *
+ * A migration that swaps a live table has to survive writes that arrive
+ * mid-run, and that is not something a test can provoke from outside: by the
+ * time `replayGooseMigrationUp` returns, the window has closed. This hook is
+ * the seam — a test writes into the table between the copy and the swap and
+ * then asserts the row survived, which is the only way to cover a
+ * reconciliation step rather than trust its comment.
+ */
+export type ReplayStatementHook = (step: {
+  index: number;
+  statement: string;
+}) => Promise<void>;
+
 export async function replayGooseMigrationUp({
   client,
   fileName,
+  afterStatement,
 }: {
   client: ClickHouseClient;
   fileName: string;
+  afterStatement?: ReplayStatementHook;
 }): Promise<void> {
   const release = await acquireClickHouseSchemaLock();
   try {
-    await runMigrationStatements({ client, fileName });
+    await runMigrationStatements({ client, fileName, afterStatement });
   } finally {
     release();
   }
@@ -71,9 +88,11 @@ export async function replayGooseMigrationUp({
 async function runMigrationStatements({
   client,
   fileName,
+  afterStatement,
 }: {
   client: ClickHouseClient;
   fileName: string;
+  afterStatement?: ReplayStatementHook;
 }): Promise<void> {
   const raw = await readFile(join(MIGRATIONS_DIR, fileName), "utf-8");
 
@@ -156,8 +175,9 @@ async function runMigrationStatements({
   await withReplayLock({
     database,
     run: async () => {
-      for (const query of queries) {
+      for (const [index, query] of queries.entries()) {
         await client.command({ query });
+        await afterStatement?.({ index, statement: query });
       }
     },
   });
