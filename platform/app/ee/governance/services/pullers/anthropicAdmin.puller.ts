@@ -108,7 +108,7 @@ function parseCursor(
     }
   }
   return {
-    startingAt: config.startingAt ?? defaultStartingAt(),
+    startingAt: config.startingAt ?? defaultStartingAt(config.report),
     page: null,
   };
 }
@@ -117,9 +117,22 @@ function encodeCursor(startingAt: string, page: string | null): string {
   return JSON.stringify({ startingAt, page });
 }
 
-/** A first run with no configured watermark reads the last full day. */
-function defaultStartingAt(): string {
-  return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+/**
+ * A first run with no configured watermark.
+ *
+ * Cost reports use daily buckets with a ~1-day processing lag, so the most
+ * recent *completed* bucket is ≥2 days ago.  Going back 3 days guarantees at
+ * least one full bucket and avoids the 400 Anthropic returns when there is no
+ * valid ending date after `starting_at`.
+ *
+ * Usage reports can have sub-day granularity, so 24 h is fine.
+ */
+function defaultStartingAt(report: "usage" | "cost"): string {
+  const daysBack = report === "cost" ? 3 : 1;
+  const d = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+  // Snap to midnight UTC so the timestamp aligns with daily bucket boundaries.
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString();
 }
 
 /** One group-by row inside a usage bucket. Unknown fields are tolerated. */
@@ -370,8 +383,16 @@ export class AnthropicAdminPuller
       signal,
     });
     if (!response.ok) {
+      // Read the body so the actual API error message reaches the logs —
+      // HTTP/2 has no statusText, and without this the 400 is opaque.
+      let detail = "";
+      try {
+        detail = await response.text();
+      } catch {
+        // Best-effort; some responses have no body.
+      }
       throw new Error(
-        `HTTP ${response.status} ${response.statusText} (anthropic ${config.report}_report)`,
+        `HTTP ${response.status} (anthropic ${config.report}_report)${detail ? `: ${detail}` : ""}`,
       );
     }
     return await response.json();
