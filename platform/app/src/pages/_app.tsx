@@ -68,22 +68,6 @@ const appConfig = defineConfig({
       background:
         "color-mix(in srgb, var(--chakra-colors-orange-emphasized) 20%, transparent) !important",
     },
-    // GraphicsQualityProvider sets this attribute when a background FPS
-    // probe finds the device can't sustain a smooth frame rate. Recipes
-    // below reference `var(--lw-backdrop-blur, blur(Npx))` instead of a
-    // literal blur value, so this one variable turns off decorative blur
-    // everywhere at once — including static recipes, which can't read
-    // React state directly.
-    //
-    // --lw-panel-alpha goes with it: these surfaces are semi-transparent
-    // specifically because the blur diffuses whatever shows through. Turn
-    // off the blur alone and the same transparency reads as a plain
-    // see-through tint instead of frosted glass — so reduced-graphics mode
-    // also pushes every paired background to fully opaque.
-    'html[data-reduced-graphics="true"]': {
-      "--lw-backdrop-blur": "none",
-      "--lw-panel-alpha": "100%",
-    },
   },
   theme: {
     tokens: {
@@ -703,8 +687,8 @@ const appConfig = defineConfig({
         slots: ["content", "arrow", "arrowTip"],
         base: {
           content: {
-            bg: "color-mix(in srgb, var(--chakra-colors-bg-panel) var(--lw-panel-alpha, 85%), transparent)",
-            backdropFilter: "var(--lw-backdrop-blur, blur(8px))",
+            bg: "color-mix(in srgb, var(--chakra-colors-bg-panel) 85%, transparent)",
+            backdropFilter: "blur(8px)",
             color: "fg",
             border: "1px solid",
             borderColor: "border",
@@ -1067,8 +1051,8 @@ const appConfig = defineConfig({
           },
           content: {
             background:
-              "color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 60%), transparent)",
-            backdropFilter: "var(--lw-backdrop-blur, blur(12px))",
+              "color-mix(in srgb, var(--chakra-colors-bg-surface) 60%, transparent)",
+            backdropFilter: "blur(12px)",
             border: "1px solid",
             borderColor: "border",
             borderRadius: "lg",
@@ -1102,8 +1086,8 @@ const appConfig = defineConfig({
           },
           content: {
             background:
-              "color-mix(in srgb, var(--chakra-colors-bg-panel) var(--lw-panel-alpha, 75%), transparent)",
-            backdropFilter: "var(--lw-backdrop-blur, blur(8px))",
+              "color-mix(in srgb, var(--chakra-colors-bg-panel) 75%, transparent)",
+            backdropFilter: "blur(8px)",
             border: "1px solid",
             borderColor: "border",
             borderRadius: "lg",
@@ -1181,8 +1165,8 @@ const appConfig = defineConfig({
           content: {
             maxWidth: "70%",
             background:
-              "color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 80%), transparent)",
-            backdropFilter: "var(--lw-backdrop-blur, blur(25px))",
+              "color-mix(in srgb, var(--chakra-colors-bg-surface) 80%, transparent)",
+            backdropFilter: "blur(25px)",
             border: "1px solid",
             borderColor: "border",
             borderRadius: "lg",
@@ -1226,7 +1210,7 @@ const appConfig = defineConfig({
         base: {
           root: {
             borderRadius: "xl",
-            backdropFilter: "var(--lw-backdrop-blur, blur(12px))",
+            backdropFilter: "blur(12px)",
             border: "1px solid",
             borderColor: "border.muted",
             boxShadow: "lg",
