@@ -32,17 +32,6 @@ import { HandledError } from "@langwatch/handled-error";
 import { remediation } from "~/server/app-layer/error-remediation";
 
 /**
- * The LangWatchQL execution path is not provisioned on this deployment.
- *
- * Fail-closed, and the reason this is an error rather than a fallback: without
- * the restricted identity there is no identity to run a customer's SQL as
- * except the application's own, which is exactly the substitution the whole
- * isolation model exists to prevent. Refusing is the only correct answer.
- *
- * `platform` fault, because nothing the caller does fixes it and a 5xx that
- * defaults to `customer` logs a real outage as routine noise.
- */
-/**
  * The LangWatchQL surface is switched off for this project.
  *
  * Distinct from {@link LangWatchQLUnavailableError} on purpose: unavailable is
@@ -67,6 +56,24 @@ export class LangWatchQLNotEnabledError extends HandledError {
   }
 }
 
+/**
+ * The LangWatchQL execution path is not provisioned on this deployment.
+ *
+ * Two ways to arrive here, one condition: the deployment configured no
+ * restricted identity at all (no executor is built), or it configured one but
+ * the database objects the catalog promises — the views, the grants — are not
+ * there for it (the server answers UNKNOWN_TABLE / UNKNOWN_DATABASE /
+ * ACCESS_DENIED for a name the validator already approved, so it cannot be
+ * the caller's SQL; see `executor.ts`).
+ *
+ * Fail-closed, and the reason this is an error rather than a fallback: without
+ * the restricted identity there is no identity to run a customer's SQL as
+ * except the application's own, which is exactly the substitution the whole
+ * isolation model exists to prevent. Refusing is the only correct answer.
+ *
+ * `platform` fault, because nothing the caller does fixes it and a 5xx that
+ * defaults to `customer` logs a real outage as routine noise.
+ */
 export class LangWatchQLUnavailableError extends HandledError {
   declare readonly code: "lwql_unavailable";
 

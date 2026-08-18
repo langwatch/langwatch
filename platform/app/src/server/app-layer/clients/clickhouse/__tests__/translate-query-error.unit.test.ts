@@ -5,7 +5,10 @@ import {
   QueryScanLimitExceededError,
   QueryTimeoutError,
 } from "~/server/app-layer/traces/errors";
-import { translateClickHouseQueryError } from "../translate-query-error";
+import {
+  isClickHouseObjectUnavailableError,
+  translateClickHouseQueryError,
+} from "../translate-query-error";
 
 describe("translateClickHouseQueryError", () => {
   describe("given a MEMORY_LIMIT_EXCEEDED driver error", () => {
@@ -191,5 +194,46 @@ describe("translateClickHouseQueryError", () => {
         QueryScanLimitExceededError,
       );
     });
+  });
+});
+
+describe("isClickHouseObjectUnavailableError", () => {
+  it.each([
+    ["UNKNOWN_TABLE by driver properties", { code: "60", type: "UNKNOWN_TABLE" }, "boom"],
+    ["UNKNOWN_DATABASE by driver properties", { code: "81", type: "UNKNOWN_DATABASE" }, "boom"],
+    ["ACCESS_DENIED by driver properties", { code: "497", type: "ACCESS_DENIED" }, "boom"],
+    [
+      "UNKNOWN_TABLE from raw HTTP text",
+      {},
+      "Code: 60. DB::Exception: Table lwql.traces does not exist. (UNKNOWN_TABLE)",
+    ],
+    [
+      "ACCESS_DENIED from raw HTTP text",
+      {},
+      "Code: 497. DB::Exception: lwql_reader: Not enough privileges. (ACCESS_DENIED)",
+    ],
+  ])("recognises %s", (_case, props, message) => {
+    const raw = Object.assign(new Error(message), props);
+
+    expect(isClickHouseObjectUnavailableError(raw)).toBe(true);
+  });
+
+  it("does not classify by a variant name echoed from the query", () => {
+    // The engine echoes the submitted query in the message; only the anchored
+    // `Code: <n>.` prefix the engine writes itself gets a vote.
+    const raw = new Error(
+      "Code: 62. DB::Exception: Syntax error near UNKNOWN_TABLE",
+    );
+
+    expect(isClickHouseObjectUnavailableError(raw)).toBe(false);
+  });
+
+  it("is false for unrelated errors and non-Error values", () => {
+    expect(
+      isClickHouseObjectUnavailableError(
+        Object.assign(new Error("boom"), { code: "241" }),
+      ),
+    ).toBe(false);
+    expect(isClickHouseObjectUnavailableError("nope")).toBe(false);
   });
 });
