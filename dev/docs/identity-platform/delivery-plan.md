@@ -114,11 +114,38 @@ Parallel tracks; staff in any order capacity allows.
 | D12 | `JOIN_REQUESTS` | request → approve → member round-trip; domain auto-join round-trip (org opt-in, never public email domains); reminder/expiry wakes verified; matching/privacy specs green; orphaned-org creation rate visibly down | `JOIN_REQUESTS` off | Low |
 | D13 | `IDENTITY_ROUTER_V2` (with D03) | Every unauthenticated journey round-trips in the new UI: sign-in per method, sign-up per method, reset, verification, deny/guidance states; zero Auth0-hosted pages or assets; sign-up completion ≥ baseline | Flag off — legacy screens intact until bake end | Medium (rides the D03 flip) |
 
+# Wave 1 — PR breakdown
+
+The program starts here. Same shape as the authz program's plan (`dev/docs/plans/adr-092-authz-delivery-plan.md`): few PRs, gates and flags protect the rollout, not PR boundaries. D01 is two PRs rather than one because the seam is load-bearing: ADR-101's amendment rule says a pipeline with row-truth columns must not enter replay discovery until per-pipeline column scoping exists — the PR boundary *is* that ordering, enforced.
+
+```text
+ PR 1  D01a — the live path                PR 2  D01b — history + replay
+ pipeline skeleton + no-op round-trip      backfill rider on system-migrations
+ additive Account migration                per-pipeline column scoping in replay
+ identity adapter + routing table          022/015 amendment text appended
+ lifecycle apply on the calling path  ──►  identity enters replay discovery
+ lint rule on lifecycle columns            replay-parity test (the D01 exit gate)
+ (identity NOT in replay discovery)
+                                                        │  needs ledger PR 1 (#7143)
+                                                        ▼  merged (breaker primitive)
+                                           PR 3  D02 — auth-path breaker
+                                           identity joins ADR-007's Redis-loss
+                                           amendment (volume analysis in ADR-2)
+                                           sessions PG-only · inline commands
+                                           flag AUTH_REDIS_BREAKER · Redis-kill test
+```
+
+- **PR 1 gate:** no-op command round-trip green; adapter routing-table coverage green (every better-auth model+operation explicitly routed, an unrouted write fails at startup); every new identity write demonstrably produces its event. Rollback: revert — columns additive, nothing reads them yet.
+- **PR 2 gate:** the D01 exit gate — replay rebuilds lifecycle columns from CH and matches the live table per tenant (self-proving finalization; disagreement holds the tenant at `migrated` with a diff on the ops migrations page). Rollback: park the migration, stop emitting; columns additive.
+- **PR 3 gate:** the D02 exit gate — dev-compose Redis-kill: sign-in + attach + detach + session refresh pass; breaker metrics emitted. Rollback: `AUTH_REDIS_BREAKER` off = today's behavior. Blocked until the grants ledger's PR 1 (#7143) merges; PRs 1–2 wait on nothing.
+
+D11 (invitations) forks off after PR 2 for a second engineer; D03/D13 start only when the Wave 1 gates are green.
+
 # ADRs to write (before or with the gated deliverable)
 
 Plain design docs, written before the code they cover:
 
-1. **Identity platform + identifiers** (D01) — the identity adapter (R10), the column-truth rule; **explicitly amends ADR-022 (`022-event-log-source-of-truth.md`) and ADR-015 (`015-projection-replay-coordination.md`)** — cite by filename, the numbers are collided in the corpus (handler-written value columns are row-truth, excluded from replay; replay tooling gains per-pipeline column scoping). Carries the payload rule (the email rides in the event where the fact is about one; HMAC-keyed hashes; secrets never) and erasure-as-event-plus-log-wipe (R11).
+1. **Identity platform + identifiers** (D01) — **written: [ADR-101](../adr/101-identity-pipeline-and-identifiers.md)**. The identity adapter (R10), the column-truth rule; **explicitly amends ADR-022 (`022-event-log-source-of-truth.md`) and ADR-015 (`015-projection-replay-coordination.md`)** — cite by filename, the numbers are collided in the corpus (handler-written value columns are row-truth, excluded from replay; replay tooling gains per-pipeline column scoping). Carries the payload rule (the email rides in the event where the fact is about one; HMAC-keyed hashes; secrets never) and erasure-as-event-plus-log-wipe (R11). The amendment text lands in the two doctrine files with PR 2 above.
 2. **Auth-path resilience** (D02) — adds the `identity` pipeline to **ADR-007's shared Redis-loss amendment** (which names `authz_grants` and expects identity to join), with the identity-specific volume and failure-semantics analysis.
 3. **Sign-in router, screens + SSO self-service** (D03/D13–D05) — identifier-first routing, auto-link rules, the first-party screen set; **explicitly amends ADR-027 (`027-license-gated-sso.md`; the number is collided)** (hook → per-method router policy; carries over the constants table and the route-table canary; answers the license-timing question, Open Q11).
 4. **MFA + session shape** (D06) — `amr` semantics incl. the passkey/`phw` decision (Open Q4); the forced re-login.
@@ -164,7 +191,7 @@ House discipline: dashboards before flags flip. Metrics pack per deliverable: ro
 | Cutover breaks sign-in fleet-wide | D03 | Shadow bake with zero-mismatch gate; flag off = instant revert; D02 already landed |
 | New front door tanks sign-up conversion | D13 | Sign-up funnel dashboard live before the flip; completion ≥ baseline in the exit gate; flag off restores legacy screens |
 | Domain auto-join admits the wrong person | D12 | Org opt-in only; verified email required; public email domains excluded outright; every auto-join is an audited event admins are notified of |
-| Replay touches row-truth value columns | D01 | ADR-1 pins the column-truth rule + per-pipeline column scoping in replay tooling; replay-parity test in exit gate; lint rule on identity-column writes |
+| Replay touches row-truth value columns | D01 | ADR-101 pins the column-truth rule + per-pipeline column scoping in replay tooling; replay-parity test in exit gate; lint rule on identity-column writes |
 | Inline processing overloads web role during Redis outage | D02 | Identity volume is hundreds/day; breaker metrics; half-open probes; ADR-2 records the analysis |
 | Session revoke-all strands users mid-work | D06 | Comms + precedent (better-auth cutover); schedule low-traffic window |
 | Customer IdP apps pin legacy Auth0 callback URI | D09 | Resolved (R9): temporary shim with per-org usage metric through grace; removed at D10 |
