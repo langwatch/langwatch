@@ -145,9 +145,8 @@ describe("authz shadow mode", () => {
       check();
       await new Promise((resolve) => setImmediate(resolve));
 
-      const messages = info.mock.calls
-        .map(([, message]) => message)
-        .filter((message) => message !== "authz shadow match");
+      // Match lines are debug, so info carries the announcements alone.
+      const messages = info.mock.calls.map(([, message]) => message);
       expect(messages).toEqual([
         "authz shadow enabled",
         "authz shadow disabled",
@@ -185,7 +184,7 @@ describe("authz shadow mode", () => {
 
   describe("when legacy and engine agree", () => {
     /** @scenario "Every shadow comparison is visible in the logs" */
-    it("logs an info match line — the proof both resolvers ran", async () => {
+    it("logs a debug match line — the proof both resolvers ran", async () => {
       const signal = readCompletionSignal();
       const shadow = makeShadow(
         makeShadowReader({
@@ -206,13 +205,19 @@ describe("authz shadow mode", () => {
       await signal.settle();
 
       expect(warn).not.toHaveBeenCalled();
-      expect(info).toHaveBeenCalledWith(
+      // Agreement is the hot path's expected outcome, so it stays at debug -
+      // one line per sampled check at info is production traffic in the log.
+      expect(debug).toHaveBeenCalledWith(
         expect.objectContaining({
           caller: "trpc.project",
           legacyAllowed: false,
           engineAllowed: false,
           permission: "traces:view",
         }),
+        "authz shadow match",
+      );
+      expect(info).not.toHaveBeenCalledWith(
+        expect.anything(),
         "authz shadow match",
       );
     });

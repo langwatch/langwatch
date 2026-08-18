@@ -1,9 +1,10 @@
 /**
  * ADR-092 stage A4 — shadow mode. Behind the app's shadow flag, every legacy
  * resolver fires an async engine comparison after answering. Every comparison
- * logs its outcome — info when the verdicts agree, warn when they disagree —
- * and the service announces the sample rate whenever it changes, so the logs
- * themselves prove shadow mode is on and running rather than silently off.
+ * logs its outcome — debug when the verdicts agree, warn when they disagree —
+ * and the service announces the sample rate at info whenever it changes, so
+ * the logs themselves prove shadow mode is on and running rather than
+ * silently off.
  * Nothing here affects the response; gate A is seven days of matches with no
  * unexplained mismatches.
  *
@@ -86,8 +87,15 @@ export class AuthzShadowService {
   }
 
   /**
-   * Every comparison logs — the info line is the proof that both resolvers
+   * Every comparison logs — the match line is the proof that both resolvers
    * ran and agreed, so silence means "not comparing", never "no news".
+   *
+   * Agreement is DEBUG and disagreement is WARN, because agreement is the
+   * expected outcome on a request-rate hot path: at info it is a line per
+   * sampled permission check, which is the whole of production traffic
+   * multiplied by the sample rate. The proof that shadow mode is running
+   * lives in the info-level rate announcement instead, which costs one line
+   * per change rather than one per check.
    */
   private logOutcome({
     caller,
@@ -120,7 +128,7 @@ export class AuthzShadowService {
       knownDivergence,
     };
     if (legacyAllowed === engineAllowed) {
-      logger.info(detail, "authz shadow match");
+      logger.debug(detail, "authz shadow match");
       return;
     }
     logger.warn(detail, "authz shadow mismatch");
