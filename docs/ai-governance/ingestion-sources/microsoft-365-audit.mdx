@@ -1,12 +1,12 @@
 ---
-title: Microsoft 365 audit (Copilot Studio)
-description: Pulls Copilot Studio interactions from the Office 365 Management Activity API.
+title: Microsoft 365 audit (Microsoft Copilot)
+description: Pulls Microsoft Copilot interactions from the Office 365 Management Activity API.
 sidebarTitle: Microsoft 365 audit
 ---
 
 <Info>**Pairs with:** [Ingestion Sources index](/ai-governance/ingestion-sources/index). Replaces the earlier `copilot_studio` source.</Info>
 
-`microsoft_365_audit` pulls Copilot Studio interaction records from the Office 365 Management Activity API on a schedule. It subscribes to the `Audit.General` content type, lists the content blobs published for each window, and drains them.
+`microsoft_365_audit` pulls Microsoft Copilot interaction records from the Office 365 Management Activity API on a schedule. `RecordType: 261` is `CopilotInteraction`, which covers Microsoft Copilot surfaces generally rather than Copilot Studio alone. It subscribes to the `Audit.General` content type, lists the content blobs published for each window, and drains them.
 
 <Warning>
 **If you configured the earlier `copilot_studio` source, it has been disabled and you need to re-create it here.**
@@ -58,6 +58,6 @@ Progress is carried in the source's cursor, so a run cut short by its deadline r
 
 ## Why not Microsoft Graph
 
-Graph exposes an audit-query API that would allow server-side filtering, which would be preferable. It is not usable yet: it was demoted from `v1.0` back to `beta`, and the same completed query paginated twice within ten minutes has been observed returning materially different record counts. Duplicate records are harmless here — they collapse on ingest — but missing records are not, and a short feed would look identical to a quiet one.
+Graph exposes an audit-query API that would allow server-side filtering, which would be preferable. Microsoft documents `auditLogQuery` and its records endpoint under `v1.0`, but two things stop us relying on it. Tenants continue to report that the documented `v1.0` route does not resolve for them, answering `Resource not found for the segment 'auditLog'` while the same tenant and permissions work against `beta`. And the same completed query paginated twice within ten minutes has been observed returning materially different record counts, with large non-overlapping subsets in each. Duplicate records are harmless here — they collapse on ingest — but missing records are not, and a short feed would look identical to a quiet one.
 
-Graph is the migration target for this source, not a rejected option. When it responds on `v1.0` with stable pagination, the adapter can swap its transport without changing what this page describes.
+Graph is the migration target for this source, not a rejected option. When the `v1.0` route resolves reliably and pagination is stable, the adapter can swap its transport without changing what this page describes.
