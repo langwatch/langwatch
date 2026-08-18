@@ -6,7 +6,7 @@
  * Only the pair proves anything. A test that checked the refusal alone would
  * pass against a validator that refused everything.
  *
- * The specifications are generated from `GOVERNED_VEGA_LIMITS` so the pair
+ * The specifications are generated from `LWQL_VEGA_LIMITS` so the pair
  * stays a pair when a ceiling moves; the absolute numbers are pinned separately
  * in the first test, so a ceiling cannot be moved without saying so.
  *
@@ -15,25 +15,25 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  GOVERNED_FIXTURE_COLUMNS,
-  GOVERNED_FIXTURE_ROW_COUNTS,
-} from "../../__tests__/fixtures/governedDatasetRegistry";
+  LWQL_FIXTURE_COLUMNS,
+  LWQL_FIXTURE_ROW_COUNTS,
+} from "../../__tests__/fixtures/lwqlDatasetRegistry";
 import { validateVegaLiteSpec } from "../validateVegaLiteSpec";
 import {
-  GOVERNED_VEGA_RULES,
-  type GovernedVegaLimitName,
-  GOVERNED_VEGA_LIMITS as L,
+  LWQL_VEGA_RULES,
+  type LangWatchQLVegaLimitName,
+  LWQL_VEGA_LIMITS as L,
 } from "../vegaLitePolicy";
 import { VEGA_LITE_SCHEMA_URL as S } from "../vegaLiteSchema";
 import type { DatasetRowCounts } from "../visualization.types";
 
 const validate = (
   spec: unknown,
-  rows: DatasetRowCounts = GOVERNED_FIXTURE_ROW_COUNTS,
+  rows: DatasetRowCounts = LWQL_FIXTURE_ROW_COUNTS,
 ) =>
   validateVegaLiteSpec({
     spec,
-    columnsByDataset: GOVERNED_FIXTURE_COLUMNS,
+    columnsByDataset: LWQL_FIXTURE_COLUMNS,
     rowCountsByDataset: rows,
   });
 
@@ -97,7 +97,7 @@ const refusedBy = (spec: unknown, rows?: DatasetRowCounts) => {
 
 /** What one ceiling's pair of specifications turned out to do. */
 interface CeilingObservation {
-  readonly limit: GovernedVegaLimitName;
+  readonly limit: LangWatchQLVegaLimitName;
   readonly admittedAtCeiling: boolean;
   readonly refusedPastCeiling: boolean;
   readonly namedTheLimit: boolean;
@@ -116,7 +116,7 @@ const observeCeiling = ({
   rowsAt,
   rowsPast,
 }: {
-  limit: GovernedVegaLimitName;
+  limit: LangWatchQLVegaLimitName;
   atCeiling: unknown;
   pastCeiling: unknown;
   rowsAt?: DatasetRowCounts;
@@ -143,12 +143,12 @@ const limitsFailing = (
   holds: (observation: CeilingObservation) => boolean,
 ): string[] => observations.filter((o) => !holds(o)).map((o) => o.limit);
 
-describe("the governed complexity ceilings", () => {
+describe("the LangWatchQL complexity ceilings", () => {
   describe("given the centralized complexity limits", () => {
     describe("when a spec sits at a ceiling and another sits just past it", () => {
       it("covers exactly the ceiling rules the policy declares", () => {
         expect(
-          GOVERNED_VEGA_RULES.map((rule) => rule.id).filter((id) =>
+          LWQL_VEGA_RULES.map((rule) => rule.id).filter((id) =>
             id.startsWith("limit."),
           ),
         ).toEqual([

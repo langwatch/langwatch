@@ -9,7 +9,7 @@
  *
  * Returns state and callbacks, never JSX.
  *
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import {
@@ -22,12 +22,12 @@ import {
 
 import { api } from "~/utils/api";
 
-import type { GovernedSqlParameterValue } from "../logic/governedSqlRequestState";
+import type { LangWatchQLParameterValue } from "../logic/lwqlRequestState";
 
 /** The definition a save writes, assembled from what is on screen. */
 export interface WorkbenchChartDraft {
   readonly sql: string;
-  readonly parameters: Readonly<Record<string, GovernedSqlParameterValue>>;
+  readonly parameters: Readonly<Record<string, LangWatchQLParameterValue>>;
   /**
    * The specification the member is looking at, when they have opened the
    * chart at all. Absent saves the query alone — which is a whole record, not
@@ -77,7 +77,7 @@ export function useSavedWorkbenchCharts({
     id: string;
     name: string;
     sql: string;
-    parameters: Readonly<Record<string, GovernedSqlParameterValue>>;
+    parameters: Readonly<Record<string, LangWatchQLParameterValue>>;
     vegaLiteSpec: Record<string, unknown> | undefined;
   }) => void;
   /** Where a refusal goes. The caller renders registry copy from its `code`. */

@@ -13,7 +13,7 @@
  * it will leave them with one chart or two.
  *
  * @see dev/docs/best_practices/row-actions-overflow-menu.md
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { Button, Input, Stack, Text } from "@chakra-ui/react";

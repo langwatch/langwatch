@@ -1,5 +1,5 @@
 /**
- * The governed Vega-Lite policy: the ceilings, the allowlists, the rule
+ * The LangWatchQL Vega-Lite policy: the ceilings, the allowlists, the rule
  * catalogue, and the fail-closed walk that applies them.
  *
  * Every ceiling is named here and nowhere else, so a refusal can say which one
@@ -26,8 +26,8 @@ import {
 import { TRANSFORM_ANALYZERS } from "./vegaLiteTransforms";
 import {
   type DatasetRowCounts,
-  GOVERNED_VEGA_RULE_IDS,
-  type GovernedVegaRuleId,
+  LWQL_VEGA_RULE_IDS,
+  type LangWatchQLVegaRuleId,
   type VegaValidationError,
   type VegaValidationErrorCode,
   type VegaValidationWarning,
@@ -37,7 +37,7 @@ import {
  * Every named ceiling, in one object. A chart that sits on a ceiling renders;
  * one past it is refused naming the ceiling it crossed.
  */
-export const GOVERNED_VEGA_LIMITS = {
+export const LWQL_VEGA_LIMITS = {
   /** Serialized specification size, in UTF-8 bytes. */
   maxSpecBytes: 262144,
   /** Depth of the JSON object/array tree. */
@@ -60,7 +60,7 @@ export const GOVERNED_VEGA_LIMITS = {
   maxRowsAllDatasets: 20000,
 } as const;
 
-export type GovernedVegaLimitName = keyof typeof GOVERNED_VEGA_LIMITS;
+export type LangWatchQLVegaLimitName = keyof typeof LWQL_VEGA_LIMITS;
 
 /**
  * Transforms whose behaviour and produced columns have been reviewed.
@@ -74,18 +74,18 @@ export const ALLOWED_VEGA_LITE_TRANSFORMS: readonly string[] =
 
 const ALLOWED_TRANSFORM_SET = new Set(ALLOWED_VEGA_LITE_TRANSFORMS);
 
-export interface GovernedVegaRule {
-  readonly id: GovernedVegaRuleId;
+export interface LangWatchQLVegaRule {
+  readonly id: LangWatchQLVegaRuleId;
   readonly code: VegaValidationErrorCode;
   readonly summary: string;
 }
 
 /**
  * Keyed by the rule-id union, so a rule cannot be added to
- * `GOVERNED_VEGA_RULE_IDS` without the compiler demanding its entry here.
+ * `LWQL_VEGA_RULE_IDS` without the compiler demanding its entry here.
  */
 const RULE_CATALOGUE: Record<
-  GovernedVegaRuleId,
+  LangWatchQLVegaRuleId,
   { code: VegaValidationErrorCode; summary: string }
 > = {
   "spec.not-json": {
@@ -215,17 +215,17 @@ const RULE_CATALOGUE: Record<
 };
 
 /** The full rule list, for review and for the tests that must cover each one. */
-export const GOVERNED_VEGA_RULES: readonly GovernedVegaRule[] =
-  GOVERNED_VEGA_RULE_IDS.map((id) => ({ id, ...RULE_CATALOGUE[id] }));
+export const LWQL_VEGA_RULES: readonly LangWatchQLVegaRule[] =
+  LWQL_VEGA_RULE_IDS.map((id) => ({ id, ...RULE_CATALOGUE[id] }));
 
 /** Builds a refusal, taking its presentation code from the rule catalogue. */
-export function governedVegaError({
+export function lwqlVegaError({
   rule,
   path,
   message,
   meta,
 }: {
-  rule: GovernedVegaRuleId;
+  rule: LangWatchQLVegaRuleId;
   path: string;
   message: string;
   meta?: Readonly<Record<string, unknown>>;
@@ -246,14 +246,14 @@ function limitError({
   actual,
   noun,
 }: {
-  limit: GovernedVegaLimitName;
+  limit: LangWatchQLVegaLimitName;
   path: string;
   actual: number;
   noun: string;
 }): VegaValidationError {
-  const allowed = GOVERNED_VEGA_LIMITS[limit];
-  return governedVegaError({
-    rule: `limit.${limit}` as GovernedVegaRuleId,
+  const allowed = LWQL_VEGA_LIMITS[limit];
+  return lwqlVegaError({
+    rule: `limit.${limit}` as LangWatchQLVegaRuleId,
     path,
     message: `This chart uses ${actual} ${noun}, past the ${limit} limit of ${allowed}. Simplify the specification or narrow the query.`,
     meta: { limit, allowed, actual },
@@ -268,7 +268,7 @@ export function checkSpecEnvelopeLimits(spec: unknown): VegaValidationError[] {
   const errors: VegaValidationError[] = [];
 
   const bytes = measureSpecBytes(spec);
-  if (bytes === null || bytes > GOVERNED_VEGA_LIMITS.maxSpecBytes) {
+  if (bytes === null || bytes > LWQL_VEGA_LIMITS.maxSpecBytes) {
     errors.push(
       limitError({
         limit: "maxSpecBytes",
@@ -280,8 +280,8 @@ export function checkSpecEnvelopeLimits(spec: unknown): VegaValidationError[] {
     return errors;
   }
 
-  const depth = measureJsonDepth(spec, GOVERNED_VEGA_LIMITS.maxNestingDepth);
-  if (depth > GOVERNED_VEGA_LIMITS.maxNestingDepth) {
+  const depth = measureJsonDepth(spec, LWQL_VEGA_LIMITS.maxNestingDepth);
+  if (depth > LWQL_VEGA_LIMITS.maxNestingDepth) {
     errors.push(
       limitError({
         limit: "maxNestingDepth",
@@ -304,7 +304,7 @@ export function checkDatasetRowLimits(
 
   for (const [name, rows] of Object.entries(rowCountsByDataset)) {
     total += rows;
-    if (rows > GOVERNED_VEGA_LIMITS.maxRowsPerDataset) {
+    if (rows > LWQL_VEGA_LIMITS.maxRowsPerDataset) {
       errors.push(
         limitError({
           limit: "maxRowsPerDataset",
@@ -316,7 +316,7 @@ export function checkDatasetRowLimits(
     }
   }
 
-  if (total > GOVERNED_VEGA_LIMITS.maxRowsAllDatasets) {
+  if (total > LWQL_VEGA_LIMITS.maxRowsAllDatasets) {
     errors.push(
       limitError({
         limit: "maxRowsAllDatasets",
@@ -330,7 +330,7 @@ export function checkDatasetRowLimits(
   return errors;
 }
 
-export interface GovernedVegaPolicyOutcome {
+export interface LangWatchQLVegaPolicyOutcome {
   readonly errors: readonly VegaValidationError[];
   readonly warnings: readonly VegaValidationWarning[];
 }
@@ -340,13 +340,13 @@ export interface GovernedVegaPolicyOutcome {
  * rather than stopping at the first, so one pass tells the member everything
  * they have to change; the envelope limits already bound how much work that is.
  */
-export function applyGovernedVegaPolicy({
+export function applyLangWatchQLVegaPolicy({
   spec,
   registeredDatasets,
 }: {
   spec: unknown;
   registeredDatasets: readonly string[];
-}): GovernedVegaPolicyOutcome {
+}): LangWatchQLVegaPolicyOutcome {
   const objects = visitJsonObjects(spec);
   const errors: VegaValidationError[] = [
     ...refuseCallerDatasets(spec),
@@ -368,7 +368,7 @@ export function applyGovernedVegaPolicy({
 function refuseCallerDatasets(spec: unknown): VegaValidationError[] {
   if (!isPlainObject(spec) || !("datasets" in spec)) return [];
   return [
-    governedVegaError({
+    lwqlVegaError({
       rule: "data.caller-datasets",
       path: joinPointer(JSON_POINTER_ROOT, "datasets"),
       message:
@@ -381,7 +381,7 @@ function refuseCallerDatasets(spec: unknown): VegaValidationError[] {
  * Any property named `url`, anywhere. The Vega-Lite v6 schema puts one on
  * `UrlData`, on the `url` encoding channel, on `MarkDef`, and on six different
  * mark config definitions, so position-by-position rules would leak; the blanket
- * rule cannot, and no governed chart has a legitimate URL in it.
+ * rule cannot, and no LangWatchQL chart has a legitimate URL in it.
  */
 function refuseUrlProperties(
   objects: readonly JsonObjectNode[],
@@ -390,7 +390,7 @@ function refuseUrlProperties(
     .filter(({ node }) => "url" in node)
     .map(({ path }) => {
       const urlPath = joinPointer(path, "url");
-      return governedVegaError({
+      return lwqlVegaError({
         rule: urlRuleFor(path),
         path: urlPath,
         message: `Loading a resource from a URL is not permitted (at ${urlPath}). Charts read only the datasets registered for this result.`,
@@ -398,7 +398,7 @@ function refuseUrlProperties(
     });
 }
 
-function urlRuleFor(parentPath: string): GovernedVegaRuleId {
+function urlRuleFor(parentPath: string): LangWatchQLVegaRuleId {
   if (parentPath.endsWith("/from/data")) return "lookup.url-data";
   if (parentPath.endsWith("/data")) return "data.url";
   if (parentPath.endsWith("/encoding")) return "encoding.url";
@@ -414,7 +414,7 @@ function refuseEmbedOptions(
         parentKey === "usermeta" && "embedOptions" in node,
     )
     .map(({ path }) =>
-      governedVegaError({
+      lwqlVegaError({
         rule: "runtime.embed-options",
         path: joinPointer(path, "embedOptions"),
         message:
@@ -425,7 +425,7 @@ function refuseEmbedOptions(
 
 /**
  * `config` and `patch` given as strings are how vega-embed is told to fetch a
- * remote configuration or JSON patch. Neither is ever a string in a governed spec.
+ * remote configuration or JSON patch. Neither is ever a string in a LangWatchQL spec.
  */
 function refuseStringResourceProperties(
   objects: readonly JsonObjectNode[],
@@ -435,7 +435,7 @@ function refuseStringResourceProperties(
     for (const key of ["config", "patch"]) {
       if (typeof node[key] !== "string") continue;
       errors.push(
-        governedVegaError({
+        lwqlVegaError({
           rule: "resource.url-property",
           path: joinPointer(path, key),
           message: `"${key}" must not be a string: a string is read as a URL to fetch. Inline the value or remove it.`,
@@ -452,7 +452,7 @@ function refuseImageMarks(
   return objects
     .filter(({ node }) => isImageMark(node.mark))
     .map(({ path }) =>
-      governedVegaError({
+      lwqlVegaError({
         rule: "mark.image",
         path: joinPointer(path, "mark"),
         message:
@@ -505,7 +505,7 @@ function inlineValuesError({
   path: string;
   isLookup: boolean;
 }): VegaValidationError {
-  return governedVegaError({
+  return lwqlVegaError({
     rule: isLookup ? "lookup.inline-data" : "data.inline-values",
     path: joinPointer(path, "values"),
     message:
@@ -528,7 +528,7 @@ function checkDatasetName({
   const known = registeredDatasets.join(", ") || "none";
   const named = typeof name === "string" ? `"${name}"` : "no dataset name";
   return [
-    governedVegaError({
+    lwqlVegaError({
       rule: "data.unknown-name",
       path,
       message: `This data source resolves to ${named}, which is not a registered dataset. Registered datasets: ${known}.`,
@@ -544,7 +544,7 @@ function refuseUnresolvedViews(spec: unknown): VegaValidationError[] {
   return collectViewNodes(spec)
     .filter((view) => view.isUnit && view.dataPath === null)
     .map((view) =>
-      governedVegaError({
+      lwqlVegaError({
         rule: "data.unresolved",
         path: view.path,
         message:
@@ -563,7 +563,7 @@ function checkCompositionLimits({
   const errors: VegaValidationError[] = [];
 
   const unitViews = countUnitViews(spec);
-  if (unitViews > GOVERNED_VEGA_LIMITS.maxUnitViews) {
+  if (unitViews > LWQL_VEGA_LIMITS.maxUnitViews) {
     errors.push(
       limitError({
         limit: "maxUnitViews",
@@ -578,7 +578,7 @@ function checkCompositionLimits({
     const layers = node.layer;
     if (
       !Array.isArray(layers) ||
-      layers.length <= GOVERNED_VEGA_LIMITS.maxLayersPerView
+      layers.length <= LWQL_VEGA_LIMITS.maxLayersPerView
     ) {
       continue;
     }
@@ -618,7 +618,7 @@ function checkTransforms(
   const steps = transformStepsOf(objects);
   const errors: VegaValidationError[] = [];
 
-  if (steps.length > GOVERNED_VEGA_LIMITS.maxTransforms) {
+  if (steps.length > LWQL_VEGA_LIMITS.maxTransforms) {
     errors.push(
       limitError({
         limit: "maxTransforms",
@@ -632,7 +632,7 @@ function checkTransforms(
   for (const { path, step } of steps) {
     if (identifyTransform(step) !== null) continue;
     errors.push(
-      governedVegaError({
+      lwqlVegaError({
         rule: "transform.unknown",
         path,
         message: `This transform is outside the reviewed set. Permitted transforms: ${ALLOWED_VEGA_LITE_TRANSFORMS.join(", ")}.`,
@@ -688,7 +688,7 @@ function checkExpressions(
   for (const { path, expression } of expressionStringsOf(objects)) {
     const bytes = measureUtf8Bytes(expression);
     totalBytes += bytes;
-    if (bytes > GOVERNED_VEGA_LIMITS.maxExpressionBytes) {
+    if (bytes > LWQL_VEGA_LIMITS.maxExpressionBytes) {
       errors.push(
         limitError({
           limit: "maxExpressionBytes",
@@ -702,7 +702,7 @@ function checkExpressions(
     errors.push(...screenOneExpression({ path, expression }));
   }
 
-  if (totalBytes > GOVERNED_VEGA_LIMITS.maxTotalExpressionBytes) {
+  if (totalBytes > LWQL_VEGA_LIMITS.maxTotalExpressionBytes) {
     errors.push(
       limitError({
         limit: "maxTotalExpressionBytes",
@@ -729,7 +729,7 @@ function screenOneExpression({
   if (refused.length === 0) return [];
 
   return [
-    governedVegaError({
+    lwqlVegaError({
       rule: "expression.forbidden",
       path,
       message: `This expression uses ${refused.join(", ")}, which is outside the reviewed set. Rewrite it using the permitted functions, or ask for the list to be extended.`,
@@ -746,7 +746,7 @@ function checkInteractiveParams(
     return Array.isArray(params) ? sum + params.length : sum;
   }, 0);
 
-  if (total <= GOVERNED_VEGA_LIMITS.maxInteractiveParams) return [];
+  if (total <= LWQL_VEGA_LIMITS.maxInteractiveParams) return [];
   return [
     limitError({
       limit: "maxInteractiveParams",

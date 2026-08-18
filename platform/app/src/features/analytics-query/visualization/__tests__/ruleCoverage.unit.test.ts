@@ -1,5 +1,5 @@
 /**
- * The guard that makes a new governed rule impossible to add without a test.
+ * The guard that makes a new LangWatchQL rule impossible to add without a test.
  *
  * A rule is covered either by an adversarial or invalid fixture that declares
  * it — and `adversarialCorpus.unit.test.ts` proves each fixture really is
@@ -17,10 +17,10 @@ import { describe, expect, it } from "vitest";
 
 import { ADVERSARIAL_VEGA_FIXTURES } from "../../__tests__/fixtures/adversarial";
 import { INVALID_VEGA_FIXTURES } from "../../__tests__/fixtures/invalid";
-import { GOVERNED_VEGA_RULES } from "../vegaLitePolicy";
+import { LWQL_VEGA_RULES } from "../vegaLitePolicy";
 import {
-  GOVERNED_VEGA_RULE_IDS,
-  type GovernedVegaRuleId,
+  LWQL_VEGA_RULE_IDS,
+  type LangWatchQLVegaRuleId,
   VEGA_VALIDATION_ERROR_CODES,
 } from "../visualization.types";
 
@@ -33,7 +33,7 @@ const TEST_DIR = fileURLToPath(new URL("./", import.meta.url));
  * runtime load. Each names the test that exercises it.
  */
 const RULES_COVERED_BY_NAMED_TESTS: Partial<
-  Record<GovernedVegaRuleId, string>
+  Record<LangWatchQLVegaRuleId, string>
 > = {
   "spec.not-json": "validateVegaLiteSpec.unit.test.ts",
   "spec.not-object": "validateVegaLiteSpec.unit.test.ts",
@@ -43,11 +43,11 @@ const RULES_COVERED_BY_NAMED_TESTS: Partial<
   "loader.blocked": "noNetworkVegaLoader.unit.test.ts",
   // Raised by the chart layer rather than by validation: there is no
   // specification that "is" a Vega runtime failure or an all-empty result.
-  "render.failure": "governedChartFailures.unit.test.ts",
-  "encoding.empty": "governedChartFailures.unit.test.ts",
+  "render.failure": "lwqlChartFailures.unit.test.ts",
+  "encoding.empty": "lwqlChartFailures.unit.test.ts",
 };
 
-describe("governed rule coverage", () => {
+describe("LangWatchQL rule coverage", () => {
   describe("given the exported policy rule list", () => {
     describe("when it is compared with the tests and fixtures", () => {
       it("covers every rule by a fixture that declares it or a test that names it", () => {
@@ -68,22 +68,22 @@ describe("governed rule coverage", () => {
           byNamedTest.add(rule);
         }
 
-        const uncovered = GOVERNED_VEGA_RULES.map((rule) => rule.id).filter(
+        const uncovered = LWQL_VEGA_RULES.map((rule) => rule.id).filter(
           (id) => !byFixture.has(id) && !byNamedTest.has(id),
         );
 
         expect(
           uncovered,
-          "every governed rule needs a fixture or a named test",
+          "every LangWatchQL rule needs a fixture or a named test",
         ).toEqual([]);
       });
 
       it("keeps the rule list, the identifier list, and the catalogue in step", () => {
-        expect(GOVERNED_VEGA_RULES.map((rule) => rule.id)).toEqual([
-          ...GOVERNED_VEGA_RULE_IDS,
+        expect(LWQL_VEGA_RULES.map((rule) => rule.id)).toEqual([
+          ...LWQL_VEGA_RULE_IDS,
         ]);
 
-        for (const rule of GOVERNED_VEGA_RULES) {
+        for (const rule of LWQL_VEGA_RULES) {
           expect(
             VEGA_VALIDATION_ERROR_CODES,
             `${rule.id} must map to a known code`,
@@ -97,15 +97,15 @@ describe("governed rule coverage", () => {
 
       it("claims coverage only for rules that exist", () => {
         for (const rule of Object.keys(RULES_COVERED_BY_NAMED_TESTS)) {
-          expect(GOVERNED_VEGA_RULE_IDS as readonly string[]).toContain(rule);
+          expect(LWQL_VEGA_RULE_IDS as readonly string[]).toContain(rule);
         }
         for (const fixture of ADVERSARIAL_VEGA_FIXTURES) {
-          expect(GOVERNED_VEGA_RULE_IDS as readonly string[]).toContain(
+          expect(LWQL_VEGA_RULE_IDS as readonly string[]).toContain(
             fixture.attacks,
           );
         }
         for (const fixture of INVALID_VEGA_FIXTURES) {
-          expect(GOVERNED_VEGA_RULE_IDS as readonly string[]).toContain(
+          expect(LWQL_VEGA_RULE_IDS as readonly string[]).toContain(
             fixture.refusedBy,
           );
         }

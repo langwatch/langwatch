@@ -5,7 +5,7 @@
  * permission guard, and the deployment's provisioning. Neither can be turned on
  * from the browser, which is the point of the first scenario below.
  *
- * Spec: specs/analytics/governed-sql-workbench.feature
+ * Spec: specs/analytics/lwql-workbench.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -17,11 +17,11 @@ import { explainHandledError, readHandledError } from "~/features/errors";
 
 import { CustomQueryMenuLink } from "../components/CustomQueryMenuLink";
 import {
-  governedSqlNotEnabledPayload,
-  governedSqlUnavailablePayload,
-} from "../logic/governedSqlFailure";
+  lwqlNotEnabledPayload,
+  lwqlUnavailablePayload,
+} from "../logic/lwqlFailure";
 
-import { SCHEMA_RESPONSE } from "./governedSqlFixtures";
+import { SCHEMA_RESPONSE } from "./lwqlFixtures";
 
 const harness = vi.hoisted(() => ({
   available: true,
@@ -33,7 +33,7 @@ vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({ client: {} }),
     analytics: {
-      governedSql: {
+      lwql: {
         availability: {
           useQuery: () => ({
             data: { available: harness.available, reason: harness.reason },
@@ -114,7 +114,7 @@ vi.mock("~/utils/compat/next-dynamic", () => {
     return (
       <textarea
         data-testid="stub-monaco"
-        aria-label="Governed ClickHouse SQL"
+        aria-label="LangWatchQL ClickHouse SQL"
         value={props.value ?? ""}
         onChange={(event) => props.onChange?.(event.target.value)}
       />
@@ -160,9 +160,9 @@ function copyFor(payload: unknown) {
 }
 
 describe("the Custom query page", () => {
-  describe("given a deployment with no governed SQL provisioning", () => {
+  describe("given a deployment with no LangWatchQL provisioning", () => {
     describe("when the member looks for the surface", () => {
-      /** @scenario "The workbench is unreachable while governed SQL is not provisioned" */
+      /** @scenario "The workbench is unreachable while LangWatchQL is not provisioned" */
       it("offers no navigation entry", () => {
         harness.available = false;
         harness.reason = "unprovisioned";
@@ -173,16 +173,16 @@ describe("the Custom query page", () => {
         ).not.toBeInTheDocument();
       });
 
-      /** @scenario "The workbench is unreachable while governed SQL is not provisioned" */
+      /** @scenario "The workbench is unreachable while LangWatchQL is not provisioned" */
       it("renders the backend's unavailable state instead of the workbench", async () => {
         harness.available = false;
         harness.reason = "unprovisioned";
         renderPage();
 
-        const copy = copyFor(governedSqlUnavailablePayload());
+        const copy = copyFor(lwqlUnavailablePayload());
         expect(await screen.findByText(copy.title)).toBeInTheDocument();
         expect(
-          screen.queryByTestId("governed-sql-workbench"),
+          screen.queryByTestId("lwql-workbench"),
         ).not.toBeInTheDocument();
       });
     });
@@ -196,14 +196,14 @@ describe("the Custom query page", () => {
         harness.reason = "disabled";
         renderPage();
 
-        const switchedOff = copyFor(governedSqlNotEnabledPayload());
-        const unprovisioned = copyFor(governedSqlUnavailablePayload());
+        const switchedOff = copyFor(lwqlNotEnabledPayload());
+        const unprovisioned = copyFor(lwqlUnavailablePayload());
         expect(switchedOff.title).not.toBe(unprovisioned.title);
 
         expect(await screen.findByText(switchedOff.title)).toBeInTheDocument();
         expect(screen.queryByText(unprovisioned.title)).not.toBeInTheDocument();
         expect(
-          screen.queryByTestId("governed-sql-workbench"),
+          screen.queryByTestId("lwql-workbench"),
         ).not.toBeInTheDocument();
       });
     });
@@ -218,7 +218,7 @@ describe("the Custom query page", () => {
 
         expect(screen.getByText("Access Restricted")).toBeInTheDocument();
         expect(
-          screen.queryByTestId("governed-sql-workbench"),
+          screen.queryByTestId("lwql-workbench"),
         ).not.toBeInTheDocument();
         expect(screen.queryByText("Custom query")).not.toBeInTheDocument();
       });
@@ -227,20 +227,20 @@ describe("the Custom query page", () => {
 
   describe("given an authorized member on a provisioned deployment", () => {
     describe("when they open the page", () => {
-      /** @scenario "An authorized member opens Custom query and sees only their live governed schema" */
-      it("names the page and identifies the editor as governed ClickHouse SQL", async () => {
+      /** @scenario "An authorized member opens Custom query and sees only their live LangWatchQL schema" */
+      it("names the page and identifies the editor as LangWatchQL ClickHouse SQL", async () => {
         renderPage();
 
         expect(screen.getByText("Custom query")).toBeInTheDocument();
         expect(
-          await screen.findByText("Governed · project-scoped"),
+          await screen.findByText("LangWatchQL · project-scoped"),
         ).toBeInTheDocument();
         expect(
-          screen.getByTestId("governed-sql-workbench"),
+          screen.getByTestId("lwql-workbench"),
         ).toBeInTheDocument();
       });
 
-      /** @scenario "The workbench is unreachable while governed SQL is not provisioned" */
+      /** @scenario "The workbench is unreachable while LangWatchQL is not provisioned" */
       it("offers the navigation entry only once the backend says it is available", () => {
         renderMenuLink();
 

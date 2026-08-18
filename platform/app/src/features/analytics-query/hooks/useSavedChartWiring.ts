@@ -9,16 +9,16 @@
  *
  * Returns state and callbacks, never JSX.
  *
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { useCallback, useRef, useState } from "react";
 
 import { showErrorToast } from "~/features/errors";
 
-import type { GovernedSqlParameterValue } from "../logic/governedSqlRequestState";
+import type { LangWatchQLParameterValue } from "../logic/lwqlRequestState";
 
-import type { UseGovernedSqlQuery } from "./useGovernedSqlQuery";
+import type { UseLangWatchQLQuery } from "./useLangWatchQLQuery";
 import { useSavedWorkbenchCharts } from "./useSavedWorkbenchCharts";
 
 /** Reads the specification the chart is showing, once the chart has mounted. */
@@ -31,7 +31,7 @@ export type SpecReader = () => Record<string, unknown> | undefined;
  * generated Vega-Lite validator, which is megabytes the workbench only loads
  * when Chart mode does (`vegaLazyBoundary.unit.test.ts` is what notices). This
  * text was written by a save that already passed the governors, and the save
- * about to carry it will be governed again on the way in.
+ * about to carry it will be LangWatchQL again on the way in.
  */
 function parseSpecText(text: string): Record<string, unknown> | undefined {
   try {
@@ -87,14 +87,14 @@ export function useSavedChartWiring({
   query,
 }: {
   projectId: string;
-  query: UseGovernedSqlQuery;
+  query: UseLangWatchQLQuery;
 }) {
   const [openedRevision, setOpenedRevision] = useState(0);
   const [openedSpecText, setOpenedSpecText] = useState<string | undefined>(
     undefined,
   );
   const [openedParameters, setOpenedParameters] = useState<
-    Readonly<Record<string, GovernedSqlParameterValue>> | undefined
+    Readonly<Record<string, LangWatchQLParameterValue>> | undefined
   >(undefined);
 
   const specReaderRef = useRef<SpecReader | null>(null);
