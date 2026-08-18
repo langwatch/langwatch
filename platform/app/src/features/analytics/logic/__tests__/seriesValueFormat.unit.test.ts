@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import { resolveSeriesValueFormat } from "../seriesValueFormat";
 
 describe("resolveSeriesValueFormat", () => {
-  const formatOf = (
-    format: ReturnType<typeof resolveSeriesValueFormat>,
-    value: number,
-  ) => {
+  const formatOf = ({
+    format,
+    value,
+  }: {
+    format: ReturnType<typeof resolveSeriesValueFormat>;
+    value: number;
+  }) => {
     if (typeof format !== "function") throw new Error("expected a formatter");
     return format(value);
   };
@@ -21,8 +24,8 @@ describe("resolveSeriesValueFormat", () => {
 
       // The builder already emits `filtered / all * 100`; a numeral `%`
       // token would multiply again and render 50 as "5000%".
-      expect(formatOf(format, 50)).toBe("50%");
-      expect(formatOf(format, 0)).toBe("0%");
+      expect(formatOf({ format, value: 50 })).toBe("50%");
+      expect(formatOf({ format, value: 0 })).toBe("0%");
     });
 
     it("wins over a cardinality aggregation", () => {
@@ -32,7 +35,7 @@ describe("resolveSeriesValueFormat", () => {
         metricFormat: "0.00a",
       });
 
-      expect(formatOf(format, 33.4)).toBe("33%");
+      expect(formatOf({ format, value: 33.4 })).toBe("33%");
     });
 
     it("formats as a percentage even with no known metric", () => {
@@ -41,7 +44,7 @@ describe("resolveSeriesValueFormat", () => {
         aggregation: "avg",
       });
 
-      expect(formatOf(format, 100)).toBe("100%");
+      expect(formatOf({ format, value: 100 })).toBe("100%");
     });
   });
 

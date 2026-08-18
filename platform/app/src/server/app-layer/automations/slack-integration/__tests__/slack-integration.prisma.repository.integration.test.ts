@@ -157,7 +157,7 @@ describe("Feature: the project's Slack integration", () => {
         triggerId: row.id,
       });
 
-      expect(cleared).toBe(true);
+      expect(cleared).toBe("cleared");
       const after = await prisma.trigger.findUniqueOrThrow({
         where: { id: row.id, projectId: projectId() },
       });
@@ -168,7 +168,7 @@ describe("Feature: the project's Slack integration", () => {
     });
 
     /** @scenario "Bulk-switching clears each automation independently" */
-    it("reports an automation with nothing to clear as not cleared", async () => {
+    it("reports an automation with nothing to clear as already clear", async () => {
       const row = await storeSlackAutomation({});
 
       expect(
@@ -176,7 +176,7 @@ describe("Feature: the project's Slack integration", () => {
           projectId: projectId(),
           triggerId: row.id,
         }),
-      ).toBe(false);
+      ).toBe("already_clear");
     });
   });
 

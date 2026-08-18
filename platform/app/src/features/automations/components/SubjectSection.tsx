@@ -34,12 +34,6 @@ import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { queryIsStructurable } from "../logic/conditionQuery";
 import { type DailyCapAdvice, dailyCapAdvice } from "../logic/dailyCapAdvice";
 import {
-  DAILY_CAP_OPTIONS,
-  PREVIEW_LIST_OPTIONS,
-  PREVIEW_SORT,
-  PREVIEW_WINDOW_MS,
-} from "../logic/useDailyCapAdvice";
-import {
   type AutomationDraft,
   filterQueryIsSet,
   filtersAreSet,
@@ -49,6 +43,12 @@ import {
 } from "../logic/draftReducer";
 import { estimateFiringRate, estimateRatePerDay } from "../logic/firingRate";
 import { deriveSeriesOptionsFromGraph } from "../logic/seriesOptions";
+import {
+  DAILY_CAP_OPTIONS,
+  PREVIEW_LIST_OPTIONS,
+  PREVIEW_SORT,
+  PREVIEW_WINDOW_MS,
+} from "../logic/useDailyCapAdvice";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
 import { ConditionBuilder } from "./ConditionBuilder";

@@ -9,5 +9,5 @@
 -- run inside a transaction, which the Prisma migration setup requires.
 CREATE INDEX "TriggerSent_projectId_triggerId_createdAt_id_idx" ON "TriggerSent"("projectId", "triggerId", "createdAt", "id");
 
--- Down (manual rollback):
+-- To roll back, uncomment and run manually:
 -- DROP INDEX "TriggerSent_projectId_triggerId_createdAt_id_idx";

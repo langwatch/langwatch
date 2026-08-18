@@ -9,7 +9,6 @@ import {
 import { DEFAULT_WEBHOOK_CONTENT_TYPE } from "@langwatch/automations/providers/webhook";
 import { generate as ksuid } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import type { AlertType, Prisma, Trigger } from "~/generated/prisma/client";
 import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
@@ -18,6 +17,7 @@ import {
   type TriggerFilterValue,
 } from "~/server/filters/types";
 import { rateLimit } from "~/server/rateLimit";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { translateFilterToClickHouse } from "../traces/filter-to-clickhouse";
 import type { AutomationCustomGraphService } from "./custom-graph.service";
 import { NOTIFY_TRIGGER_ACTIONS } from "./dispatch/triggerActionDispatch";
