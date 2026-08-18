@@ -1,6 +1,18 @@
 import { createHash } from "node:crypto";
-import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
+import { Instance, Ksuid } from "@langwatch/ksuid";
 import type { LedgerPrincipal, LedgerScope } from "./grants-ledger.reducer";
+
+/**
+ * Pinned, never read from the ambient environment. A KSUID's environment is a
+ * display prefix (`dev_`, `staging_`, …), not content — but it lands in the
+ * STRING this function returns, so deriving it from `getEnvironment()` would
+ * make the id a function of the deriving process's configuration rather than
+ * of the fact. Two processes disagreeing about `ENVIRONMENT` — a worker and a
+ * web pod, a backfill and the fold that replays it — would then derive two
+ * ids for one legacy row, and the projection's upserts would stop converging.
+ * `"prod"` is the library's own default, i.e. no prefix at all.
+ */
+const GRANT_ID_ENVIRONMENT = "prod";
 
 /**
  * Deterministic grant identity (ADR-092 §13 doctrine: ids are functions of
@@ -22,6 +34,8 @@ import type { LedgerPrincipal, LedgerScope } from "./grants-ledger.reducer";
  * - Resource-tier grants key on the token: one resource can carry several
  *   links (ADR-057 dropped one-share-per-resource), and the token is the
  *   credential's own identity.
+ * - The AMBIENT ENVIRONMENT is not part of it either (see
+ *   `GRANT_ID_ENVIRONMENT`): every byte comes from the arguments below.
  */
 export function deriveGrantId({
   organizationId,
@@ -58,7 +72,7 @@ export function deriveGrantId({
   const sequenceId = digest.readUInt32BE(8);
   const timestampSeconds = Math.floor(occurredAtMs / 1000);
   return new Ksuid(
-    getEnvironment(),
+    GRANT_ID_ENVIRONMENT,
     "grant",
     timestampSeconds,
     instance,

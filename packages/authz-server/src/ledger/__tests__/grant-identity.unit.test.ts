@@ -1,3 +1,4 @@
+import { getEnvironment, setEnvironment } from "@langwatch/ksuid";
 import { describe, expect, it } from "vitest";
 import { deriveGrantId } from "../grant-identity";
 
@@ -18,6 +19,27 @@ describe("grant identity", () => {
       const b = deriveGrantId({ ...base });
       expect(a).toBe(b);
       expect(a).toContain("grant_");
+    });
+  });
+
+  describe("when the deriving process's ksuid environment differs", () => {
+    it("derives the same id, so two processes cannot disagree about one row", () => {
+      // The environment is a display prefix, but it lands in the string this
+      // returns. Reading it from ambient configuration would make a worker
+      // and a web pod derive two ids for one legacy row, and the
+      // projection's upserts would stop converging.
+      const original = getEnvironment();
+      try {
+        setEnvironment("dev");
+        const fromDev = deriveGrantId(base);
+        setEnvironment("staging");
+        const fromStaging = deriveGrantId(base);
+
+        expect(fromDev).toBe(fromStaging);
+        expect(fromDev.startsWith("grant_")).toBe(true);
+      } finally {
+        setEnvironment(original);
+      }
     });
   });
 
