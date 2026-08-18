@@ -1,7 +1,7 @@
-Feature: Governed analytics SQL API — read-only native ClickHouse SQL over analytics.* with tenant isolation
+Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over analytics.* with tenant isolation
 
   As an authenticated LangWatch API client
-  I want to discover a governed analytics schema and execute native ClickHouse SQL against it
+  I want to discover a LangWatchQL analytics schema and execute native ClickHouse SQL against it
   So that I can answer analytical questions beyond the built-in endpoints without ever
   reading another tenant's data or writing anything
 
@@ -26,7 +26,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   No tenant-isolation or read-only scenario may be satisfied by a validator-only test.
 
   Background:
-    Given a ClickHouse test server on the deployed 25.10 image with the governed analytics setup applied
+    Given a ClickHouse test server on the deployed 25.10 image with the LangWatchQL analytics setup applied
     And tenants "tenant-a" and "tenant-b" each have seeded analytical rows
 
   # ---------------------------------------------------------------------------
@@ -37,26 +37,26 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   @integration
   Scenario: Restricted identity with a valid key context reads only its own tenant's rows
     Given the restricted identity carries tenant-a's valid key-hash context
-    When it selects from a governed table
+    When it selects from a LangWatchQL table
     Then every returned row belongs to tenant-a
     And no row of tenant-b is returned
 
   @integration
   Scenario: Empty key context yields zero rows, never all rows
     Given the restricted identity carries an empty key-hash context
-    When it selects from a governed table
+    When it selects from a LangWatchQL table
     Then zero rows are returned
 
   @integration
   Scenario: Garbage key context yields zero rows, never all rows
     Given the restricted identity carries a key-hash context matching no key-map entry
-    When it selects from a governed table
+    When it selects from a LangWatchQL table
     Then zero rows are returned
 
   @integration
   Scenario: A caller that sends no tenant context at all reads nothing
     Given the restricted identity sends no tenant setting with its query
-    When it selects from a governed table
+    When it selects from a LangWatchQL table
     Then the tenant setting resolves to the profile's empty default
     And zero rows are returned
     And no error is raised
@@ -64,7 +64,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   @integration
   Scenario: Detaching the row policy makes the other tenant's rows visible
     Given the restricted identity carries tenant-a's valid key-hash context
-    And a governed object holds rows for both tenants
+    And a LangWatchQL object holds rows for both tenants
     When the row policy is detached from that object
     Then tenant-b rows become visible to the restricted identity
     And reattaching the policy hides them again
@@ -77,7 +77,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 
   # No LangWatch error code applies here: the restricted identity executes below
   # the API boundary, so the stable code is ClickHouse's own. The same attempt
-  # made through the gateway is refused earlier, as governed_sql_not_permitted
+  # made through the gateway is refused earlier, as lwql_not_permitted
   # with a SETTINGS_CLAUSE violation.
   @integration
   Scenario: Overriding a pinned setting in query text is rejected by profile constraints
@@ -88,25 +88,25 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   @integration
   Scenario: Row policy holds inside a CTE
     Given the restricted identity carries tenant-a's valid key-hash context
-    When it selects from a governed table through a WITH clause
+    When it selects from a LangWatchQL table through a WITH clause
     Then no tenant-b row is reachable through the CTE
 
   @integration
   Scenario: Row policy holds across UNION ALL branches
     Given the restricted identity carries tenant-a's valid key-hash context
-    When it executes a UNION ALL whose branches select from governed tables
+    When it executes a UNION ALL whose branches select from LangWatchQL tables
     Then no branch returns a tenant-b row
 
   @integration
   Scenario: Row policy holds on both sides of a JOIN
     Given the restricted identity carries tenant-a's valid key-hash context
-    When it joins two governed tables
+    When it joins two LangWatchQL tables
     Then neither join side contributes a tenant-b row
 
   @integration
   Scenario: Row policy holds inside subqueries
     Given the restricted identity carries tenant-a's valid key-hash context
-    When it executes queries using IN, EXISTS, and scalar subqueries over governed tables
+    When it executes queries using IN, EXISTS, and scalar subqueries over LangWatchQL tables
     Then no subquery position leaks a tenant-b row
 
   @integration
@@ -118,7 +118,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   @integration
   Scenario: The merge table function is contained by the row policies
     Given the restricted identity carries tenant-a's valid key-hash context
-    When it reads governed tables through the merge table function
+    When it reads LangWatchQL tables through the merge table function
     Then only tenant-a rows are returned
 
   @integration
@@ -134,22 +134,22 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     Then it sees exactly the objects it holds a grant on
 
   @integration
-  Scenario: Every governed object has an effective row policy
+  Scenario: Every LangWatchQL object has an effective row policy
     Given the set of objects the restricted identity can read, taken from the server
     When each is checked for a row policy bound to that identity
     Then every object has one
 
   @integration
   Scenario: A definer-rights view bypasses the row policy and is reported by the audit
-    Given a view over a governed table created with definer rights
+    Given a view over a LangWatchQL table created with definer rights
     When the restricted identity selects from it
     Then rows from both tenants are returned
-    And the governed-schema audit reports that view
+    And the lwql-schema audit reports that view
     And the audit reports the database clean once the view is removed
 
   @integration
-  Scenario: No dictionary in the governed schema could serve the same data unpoliced
-    Given the governed schema's dictionaries
+  Scenario: No dictionary in the LangWatchQL schema could serve the same data unpoliced
+    Given the LangWatchQL schema's dictionaries
     When they are enumerated
     Then none is present, because dictionaries are not subject to row policies
 
@@ -164,7 +164,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   Scenario: Revoking a key hash from the key map takes effect within the stated revocation bound
     Given the restricted identity carries tenant-a's valid key-hash context
     And tenant-a's key hash is removed from the key map
-    When it selects from a governed table
+    When it selects from a LangWatchQL table
     Then zero rows are returned
 
   @integration
@@ -198,14 +198,14 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     Then every attempt is rejected by the database
 
   # ---------------------------------------------------------------------------
-  # The governed analytics.* schema: the catalog and the views over the real
+  # The LangWatchQL analytics.* schema: the catalog and the views over the real
   # fact tables (bound in this PR — Testcontainers, the shipped ClickHouse
   # migrations applied, executing as the restricted user)
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: Every governed view declares its grain, join keys, and time column
-    Given the governed analytics schema catalog
+  Scenario: Every LangWatchQL view declares its grain, join keys, and time column
+    Given the LangWatchQL analytics schema catalog
     When each dataset is inspected
     Then it declares a grain, join keys, a freshness, and the column that prunes its partitions
     And every column it advertises is one the dataset exposes
@@ -213,14 +213,14 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   @unit
   Scenario: The gated column set is derived from the data privacy policy, not hand-listed
     Given the data privacy policy's content categories and their attribute keys
-    When the governed schema's gated columns are derived for a caller's permissions
+    When the LangWatchQL schema's gated columns are derived for a caller's permissions
     Then a column built over a content-carrying attribute key is gated exactly as that policy classifies it
     And no ungated column is built over a content-carrying key
     And a caller whose permissions are unresolved has every gated column withheld
 
   @unit
   Scenario: A pre-aggregated dataset declares that its rows merge rather than supersede
-    Given the governed analytics schema catalog
+    Given the LangWatchQL analytics schema catalog
     When a dataset whose source aggregates is inspected
     Then it declares every key its rows merge on
     And it declares no version column, because no version supersedes another
@@ -228,21 +228,21 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 
   @unit
   Scenario: The analytics-optimised datasets expose no captured content
-    Given the governed analytics schema catalog
+    Given the LangWatchQL analytics schema catalog
     When the datasets built over the analytics projections are inspected
     Then none of them exposes a content-gated column
     And every attribute map any dataset exposes has the content keys filtered out
 
   @unit
   Scenario: A pre-aggregated dataset advertises its whole bucket key as its join keys
-    Given the governed analytics schema catalog
+    Given the LangWatchQL analytics schema catalog
     When a dataset whose rows are pre-aggregated buckets is inspected
     Then every column of its bucket key is advertised as a join key
     And a dataset whose rows are records may still advertise a key it is not unique on
 
   @unit
   Scenario: A summed measure reads the column it is named after
-    Given the governed analytics schema catalog
+    Given the LangWatchQL analytics schema catalog
     When a pre-aggregated measure is inspected
     Then it reads the column it is named after
     And it is read back as the numeric type the schema publishes for it
@@ -250,7 +250,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 
   @unit
   Scenario: A dataset whose sort key moves declares the strategy that deduplicates it
-    Given the governed analytics schema catalog
+    Given the LangWatchQL analytics schema catalog
     When a dataset whose source sorts by a column its write path moves is inspected
     Then it declares that one row is one record rather than one sort key
     And a dataset that declares a grain narrower than its engine's key declares a strategy that can deliver it
@@ -260,7 +260,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   Scenario: A pre-aggregated dataset returns one merged row per bucket
     Given a rollup table holding two partial rows for the same bucket
     And the restricted identity carries tenant-a's valid key-hash context
-    When it reads that bucket through the governed view
+    When it reads that bucket through the LangWatchQL view
     Then one row is returned
     And every measure is the sum of its own column's partial rows
 
@@ -268,47 +268,47 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   Scenario: A dataset whose sort key moves is deduplicated by its own identity
     Given a fact table holding two versions of one record under two different sort keys
     And the restricted identity carries tenant-a's valid key-hash context
-    When it reads that record through the governed view
+    When it reads that record through the LangWatchQL view
     Then one row is returned
     And it carries the newer version's values
 
   @integration
-  Scenario: Every governed view's dedup declaration matches the table it reads
+  Scenario: Every LangWatchQL view's dedup declaration matches the table it reads
     Given the shipped ClickHouse migrations applied to the test server
-    When each governed view's declared keys are compared with its source table
+    When each LangWatchQL view's declared keys are compared with its source table
     Then the declared keys are the columns that table sorts by
     And the declared merge behaviour is the engine that table uses
 
   @integration
   Scenario: The catalog's declared columns match the tables the views read
     Given the shipped ClickHouse migrations applied to the test server
-    When the governed schema catalog is compared with the created tables and views
+    When the LangWatchQL schema catalog is compared with the created tables and views
     Then every column the catalog declares exists with the type it declares
 
   @integration
-  Scenario: Every governed view names the column that prunes its partitions
+  Scenario: Every LangWatchQL view names the column that prunes its partitions
     Given the shipped ClickHouse migrations applied to the test server
-    When each governed view's advertised time column is compared with its source table's partitioning
+    When each LangWatchQL view's advertised time column is compared with its source table's partitioning
     Then the advertised column is the one the table partitions by
 
   @integration
-  Scenario: A governed view returns only the calling tenant's rows
+  Scenario: A LangWatchQL view returns only the calling tenant's rows
     Given the restricted identity carries tenant-a's valid key-hash context
-    When it selects from each governed view
+    When it selects from each LangWatchQL view
     Then every returned row belongs to tenant-a
     And no row of tenant-b is returned
 
   @integration
-  Scenario: A governed view returns one row per logical record, the latest version
+  Scenario: A LangWatchQL view returns one row per logical record, the latest version
     Given a fact table holding two versions of the same record
-    When the restricted identity selects that record through the governed view
+    When the restricted identity selects that record through the LangWatchQL view
     Then one row is returned
     And it carries the newer version's values
 
   @integration
-  Scenario: A column no governed view exposes is unreachable, not merely unselected
+  Scenario: A column no LangWatchQL view exposes is unreachable, not merely unselected
     Given the restricted identity carries tenant-a's valid key-hash context
-    When it references a column outside the governed schema catalog
+    When it references a column outside the LangWatchQL schema catalog
     Then the query is rejected by the database
     And a column the catalog does expose reads normally
 
@@ -316,27 +316,27 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   Scenario: Captured content is reachable only through the gated columns
     Given seeded traces and spans whose attributes carry captured content
     And the restricted identity carries tenant-a's valid key-hash context
-    When it reads the attribute maps a governed view exposes
+    When it reads the attribute maps a LangWatchQL view exposes
     Then no captured content is present in them
     And the same content is returned by the view's content-gated columns
 
   @integration
   Scenario: Reading the physical fact table directly is policed the same way
     Given the restricted identity carries tenant-a's valid key-hash context
-    When it selects from the physical table a governed view reads
+    When it selects from the physical table a LangWatchQL view reads
     Then every returned row belongs to tenant-a
 
   @integration
   Scenario: Row policies leave the application's own reads untouched
-    Given the governed row policies applied to the fact tables
+    Given the LangWatchQL row policies applied to the fact tables
     When an administrative identity reads those tables
     Then rows of both tenants are returned
 
   @integration
-  Scenario: A time predicate on a governed view prunes partitions
+  Scenario: A time predicate on a LangWatchQL view prunes partitions
     Given seeded fact rows spread across several weekly partitions
     And the restricted identity carries tenant-a's valid key-hash context
-    When it selects from a governed view with and without a predicate on the view's time column
+    When it selects from a LangWatchQL view with and without a predicate on the view's time column
     Then the filtered query reads substantially fewer rows than the unfiltered one
 
   # ---------------------------------------------------------------------------
@@ -398,29 +398,29 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 
   @integration
   Scenario: Every PostgreSQL-resident dataset in the catalog is tenant-scoped
-    Given the PostgreSQL-resident half of the governed catalog is mapped into ClickHouse
+    Given the PostgreSQL-resident half of the LangWatchQL catalog is mapped into ClickHouse
     And the restricted identity carries tenant-a's valid key-hash context
     When it reads each mapped dataset in turn
     Then every dataset returns the caller's tenant rows and no other tenant's
 
   @integration
-  Scenario: The governed view sends a tenant predicate PostgreSQL can use
+  Scenario: The LangWatchQL view sends a tenant predicate PostgreSQL can use
     Given a PG-resident table is mapped into ClickHouse through the server-side named collection
     And the restricted identity carries tenant-a's valid key-hash context
-    When it reads the governed view over the mapped table
+    When it reads the LangWatchQL view over the mapped table
     Then the statement PostgreSQL received carries a predicate naming the caller's tenant
     And it names no other tenant and carries no API key
 
   @integration
-  Scenario: The governed view bounds what PostgreSQL reads to the caller's tenant
+  Scenario: The LangWatchQL view bounds what PostgreSQL reads to the caller's tenant
     Given a PG-resident table is mapped into ClickHouse through the server-side named collection
-    When the same question is asked of the mapped table and of the governed view over it
-    Then PostgreSQL reads fewer rows for the governed view than for the mapped table
+    When the same question is asked of the mapped table and of the LangWatchQL view over it
+    Then PostgreSQL reads fewer rows for the LangWatchQL view than for the mapped table
     And a key-hash context matching no key-map entry makes PostgreSQL read nothing
 
   @integration
   Scenario: A wrong tenant predicate costs a wrong read and never a wrong answer
-    Given a governed view whose tenant predicate names a tenant other than the caller's
+    Given a LangWatchQL view whose tenant predicate names a tenant other than the caller's
     And the restricted identity carries tenant-a's valid key-hash context
     When it reads that view
     Then the statement PostgreSQL received carries the foreign tenant's predicate
@@ -431,7 +431,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   Scenario: A duplicate key-map row does not break a PostgreSQL-resident read
     Given the key map holds two rows carrying the caller's key hash
     And the restricted identity carries tenant-a's valid key-hash context
-    When it reads a PostgreSQL-resident governed view
+    When it reads a PostgreSQL-resident LangWatchQL view
     Then it receives its own tenant's rows
     And the read is not rejected for returning more than one tenant
 
@@ -466,10 +466,10 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: Authenticated client discovers its governed schema scoped to its own permissions
+  Scenario: Authenticated client discovers its LangWatchQL schema scoped to its own permissions
     Given an authenticated API client
     When it calls the schema discovery endpoint
-    Then it receives the governed analytics datasets with descriptions, types, units, grain, freshness, allowed joins, content restrictions, and example SQL
+    Then it receives the LangWatchQL analytics datasets with descriptions, types, units, grain, freshness, allowed joins, content restrictions, and example SQL
     And datasets outside its permissions are absent
 
   @integration
@@ -489,7 +489,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   @integration
   Scenario: Results carry typed columns, rows, execution statistics, truncation state, and diagnostics
     Given an authenticated API client
-    When it executes a governed query
+    When it executes a LangWatchQL query
     Then the response contains typed columns, rows, execution statistics, truncation state, and structured diagnostics
 
   @integration
@@ -502,7 +502,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   Scenario: A parameterized query missing a bound value is refused before execution
     Given an authenticated API client
     When it submits a parameterized query without a value for one of its parameters
-    Then the query is refused with error code governed_sql_parameter_missing at HTTP 400
+    Then the query is refused with error code lwql_parameter_missing at HTTP 400
     And the response names every parameter the SQL declares that the request left unset
     And the fault is the caller's, and the remediation tells them to send a value for each declared parameter
     And the query never reaches the database
@@ -613,7 +613,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   Scenario: Content-gated fields are refused in every expression position
     Given an authenticated API client without content permissions
     When it references a content-gated field in projection, filter, group, order, having, join, window, or subquery position
-    Then the query is rejected with error code governed_sql_not_permitted at HTTP 400
+    Then the query is rejected with error code lwql_not_permitted at HTTP 400
     And every refusal names the GATED_COLUMN rule, so the caller learns which field to drop
     And the fault is the caller's, and the remediation points them at the fields the schema endpoint lists for their key
     And the gated-field set matches the canonical visibility policy
@@ -635,30 +635,30 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   Scenario: External and table-function access is blocked by AST policy before reaching the database
     Given an authenticated API client
     When it submits SQL using postgresql, url, s3, remote, or any table function
-    Then the gateway rejects the query by AST policy with error code governed_sql_not_permitted at HTTP 400
+    Then the gateway rejects the query by AST policy with error code lwql_not_permitted at HTTP 400
     And every refusal names the TABLE_FUNCTION rule, which a rejection by the database could not produce
     And the fault is the caller's, and the remediation tells them to read only the datasets the schema endpoint lists
 
   @unit
-  Scenario: Only the functions a governed question needs can be called
-    Given the governed analytics SQL policy
-    When a query calls a function outside the set the governed questions need
+  Scenario: Only the functions a LangWatchQL question needs can be called
+    Given the LangWatchQL analytics SQL policy
+    When a query calls a function outside the set the LangWatchQL questions need
     Then the query is refused before it reaches the database
     And the refusal names the FUNCTION_NOT_ALLOWED rule and the function it refused, so the caller knows what to change
-    And the boundary carries it as error code governed_sql_not_permitted, a caller fault
+    And the boundary carries it as error code lwql_not_permitted, a caller fault
     And the functions those questions are written in are accepted
 
   @integration
   Scenario: Query database credentials never reach the caller
     Given an authenticated API client
-    When any governed query succeeds or fails
+    When any LangWatchQL query succeeds or fails
     Then no response or error ever contains database credentials, server settings, physical internal table names, or another tenant's existence
 
   # @unimplemented: fail-closed wiring lands with the query endpoint PR of #6480.
   @integration @unimplemented
   Scenario: Missing parser, restricted identity, or row policy fails closed
     Given the parser, the restricted identity, or the row-policy setup is unavailable
-    When a client submits a governed query
+    When a client submits a LangWatchQL query
     Then the query is rejected rather than executed with weaker guarantees
 
   # ---------------------------------------------------------------------------
@@ -668,7 +668,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   # @unimplemented: resource governance lands with the executor PR of #6480.
   @integration @unimplemented
   Scenario: Database-enforced ceilings bound every resource dimension
-    Given the governed execution profile
+    Given the LangWatchQL execution profile
     When queries approach time, memory, scan, join, aggregation, sort, temp-disk, AST-complexity, result-size, and per-tenant concurrency limits
     Then each ceiling is enforced by the database or gateway configuration
 
@@ -729,7 +729,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 
   # @unimplemented: no mapped table has failed the measured bar, so there is no
   # projection fallback to exercise. The measurement itself is bound — see
-  # "The governed view bounds what PostgreSQL reads to the caller's tenant" —
+  # "The LangWatchQL view bounds what PostgreSQL reads to the caller's tenant" —
   # and this stays unbound until a table's numbers actually trigger a fallback.
   @integration @unimplemented
   Scenario: A PG-resident table that fails the measured bar is served via projection instead
@@ -738,15 +738,15 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     Then that table is served from a ClickHouse projection
     And the fallback is documented per table
 
-  # @unimplemented: annotations ship PG-direct, and the governed schema now has
+  # @unimplemented: annotations ship PG-direct, and the LangWatchQL schema now has
   # exactly one annotation source. The second half is not done: the
   # `trace_summaries.AnnotationIds` column still backs the product's own
   # has-annotation filter, so it is neither removed nor widened. Removing it is
-  # a product change beyond the governed schema and lands with its own slice.
+  # a product change beyond the LangWatchQL schema and lands with its own slice.
   @integration @unimplemented
   Scenario: Annotation data has exactly one source at ship time
     Given the shipped annotations mechanism
-    When annotation data is queried through the governed schema
+    When annotation data is queried through the LangWatchQL schema
     Then it comes from exactly one source
     And the partial AnnotationIds projection is either removed or widened, not left half-done
 
@@ -769,7 +769,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   @integration
   Scenario: Submitted SQL is never automatically rewritten
     Given an authenticated API client
-    When it submits a governed query
+    When it submits a LangWatchQL query
     Then the SQL the database executes is the submitted statement, not a rewritten one
     And no UI or natural-language translation layer is involved
 
@@ -803,12 +803,12 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 #   → Scenario: The restricted identity cannot enumerate the key map beyond its own key
 #   → Scenario: Multiple statements in one request are rejected
 #
-# Governed schema (the analytics.* catalog and the views over the fact tables):
+# LangWatchQL schema (the analytics.* catalog and the views over the fact tables):
 # AC "Expose a stable analytics.* namespace; every exposed dataset declares grain,
 #     join keys, sensitivity, freshness"
-#   → Scenario: Every governed view declares its grain, join keys, and time column
+#   → Scenario: Every LangWatchQL view declares its grain, join keys, and time column
 #   → Scenario: The catalog's declared columns match the tables the views read
-#   → Scenario: Every governed view names the column that prunes its partitions
+#   → Scenario: Every LangWatchQL view names the column that prunes its partitions
 #   → Scenario: A pre-aggregated dataset declares that its rows merge rather than supersede
 #     (issue #6856: the analytics projections and their per-minute rollups join
 #      the catalog, and a rollup's source is an AggregatingMergeTree — its rows
@@ -831,7 +831,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 #     (evaluation_analytics folds a moving watermark into OccurredAt, which is
 #      part of its sort key, so FINAL keeps every lifecycle version and every
 #      aggregate counts the evaluation once per version)
-#   → Scenario: Every governed view's dedup declaration matches the table it reads
+#   → Scenario: Every LangWatchQL view's dedup declaration matches the table it reads
 #     (the rule the catalog states and nothing enforced: the declared keys are
 #      the source's sort key, and the declared merge behaviour is its engine)
 # AC "Derive content-gated fields from the existing visibility stack — never a second
@@ -846,16 +846,16 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 # (supporting invariants of the same proof: the views are bounded by the same row
 #  policies as the tables under them, the grant is the exposed surface, and the
 #  views are usable at scale)
-#   → Scenario: A governed view returns only the calling tenant's rows
-#   → Scenario: A governed view returns one row per logical record, the latest version
-#   → Scenario: A column no governed view exposes is unreachable, not merely unselected
+#   → Scenario: A LangWatchQL view returns only the calling tenant's rows
+#   → Scenario: A LangWatchQL view returns one row per logical record, the latest version
+#   → Scenario: A column no LangWatchQL view exposes is unreachable, not merely unselected
 #   → Scenario: Reading the physical fact table directly is policed the same way
 #   → Scenario: Row policies leave the application's own reads untouched
-#   → Scenario: A time predicate on a governed view prunes partitions
+#   → Scenario: A time predicate on a LangWatchQL view prunes partitions
 #
 # Product:
 # AC "schema discovery scoped to own permissions"
-#   → Scenario: Authenticated client discovers its governed schema scoped to its own permissions
+#   → Scenario: Authenticated client discovers its LangWatchQL schema scoped to its own permissions
 #     (the catalog carries a per-column unit and a dataset-level gate; a dataset
 #      the caller can read nothing in is absent rather than listed-and-refused)
 #   → Scenario: The schema endpoint names which permission unlocks each gated column
@@ -920,8 +920,8 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 #    PG-mapping PR (process AC); the load half is measured on every run by:
 #   → Scenario: The row-policy predicate is not pushed down to PostgreSQL
 #     (the finding: a policy predicate never reaches the primary, in any form)
-#   → Scenario: The governed view sends a tenant predicate PostgreSQL can use
-#   → Scenario: The governed view bounds what PostgreSQL reads to the caller's tenant
+#   → Scenario: The LangWatchQL view sends a tenant predicate PostgreSQL can use
+#   → Scenario: The LangWatchQL view bounds what PostgreSQL reads to the caller's tenant
 #     (rows off the primary, from PostgreSQL's own accounting — the number the
 #      projection-fallback decision turns on)
 #   → Scenario: A wrong tenant predicate costs a wrong read and never a wrong answer
@@ -933,7 +933,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 #     (still @unimplemented: no mapped table has failed the bar, so no fallback
 #      exists to exercise — see the note above the scenario)
 # AC "AnnotationIds partial projection resolved one way" → Scenario: Annotation data has exactly one source at ship time
-#   (still @unimplemented: the governed schema now has a single annotation
+#   (still @unimplemented: the LangWatchQL schema now has a single annotation
 #    source, but `trace_summaries.AnnotationIds` still backs the product's own
 #    has-annotation filter, so the projection itself is neither removed nor
 #    widened — see the note above the scenario)
@@ -947,9 +947,9 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 # AC "table functions blocked by AST policy and grants"
 #   → Scenario: Table functions are rejected for the restricted identity by grants
 #   → Scenario: External and table-function access is blocked by AST policy before reaching the database
-#   → Scenario: Only the functions a governed question needs can be called
+#   → Scenario: Only the functions a LangWatchQL question needs can be called
 #     (the name allowlist beside the positional table-function rule: a function
-#      is listed because a governed question needs it, never because it looks harmless)
+#      is listed because a LangWatchQL question needs it, never because it looks harmless)
 # AC "credentials never reach the caller"
 #   → Scenario: PG connection credentials are not exposed to the restricted identity
 #   → Scenario: Query database credentials never reach the caller
@@ -974,7 +974,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 #   → Scenario: Missing time buckets diagnostic fires (MISSING_TIME_BUCKETS)
 # AC "clean = no known issue detected" → Scenario: Clean diagnostic status is documented as no known issue detected
 # (a fifth rule beyond the four the issue scopes, because the partition-pruning
-#  measurement recorded in src/server/analytics/governed-sql/views.ts puts an
+#  measurement recorded in src/server/analytics/lwql/views.ts puts an
 #  eight-fold read cost on the shape it reports)
 #   → Scenario: An unbounded read is reported as covering the whole history (UNBOUNDED_TIME_RANGE)
 #

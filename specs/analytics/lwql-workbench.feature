@@ -1,30 +1,30 @@
-Feature: Governed SQL query workbench — native tables and governed Vega-Lite charts
+Feature: LangWatchQL query workbench — native tables and LangWatchQL Vega-Lite charts
 
   As an authorized LangWatch project member
-  I want to discover the governed analytics schema, write native ClickHouse SQL,
+  I want to discover the LangWatchQL analytics schema, write native ClickHouse SQL,
   inspect results in a native virtualized table, and optionally chart them with
-  a governed Vega-Lite specification
+  a LangWatchQL Vega-Lite specification
   So that I can answer analytical questions beyond the built-in charts without
   weakening tenant isolation, content gating, or the application's security policy
 
-  Issue: #6577. Builds on the governed analytics SQL API (#6480, PR #6486).
+  Issue: #6577. Builds on the LangWatchQL analytics SQL API (#6480, PR #6486).
   The backend owns SQL parsing, validation, tenant isolation, content gating,
   resource limits, result truncation, and analytical diagnostics. The frontend
   owns editing, request state, table presentation, Vega-Lite policy,
   named-dataset injection, theming, accessibility, and chart runtime
   containment. Query execution and visualization stay separate: no
-  visualization syntax in SQL, no weakening of the governed SQL service.
+  visualization syntax in SQL, no weakening of the LangWatchQL service.
 
   Background:
-    Given a project whose governed analytics SQL API is available to the signed-in member
+    Given a project whose LangWatchQL analytics SQL API is available to the signed-in member
 
   # ---------------------------------------------------------------------------
   # Availability gating and scope guards
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: The workbench is unreachable while governed SQL is not provisioned
-    Given a deployment where governed SQL provisioning and configuration are absent
+  Scenario: The workbench is unreachable while LangWatchQL is not provisioned
+    Given a deployment where LangWatchQL provisioning and configuration are absent
     When the member looks for the Custom query surface
     Then the navigation entry is not offered
     And opening the route directly renders the backend's unavailable state
@@ -32,7 +32,7 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
 
   @integration
   Scenario: The whole surface stays dark until the experimental feature switch is on
-    Given the governed SQL feature switch is off for the project
+    Given the LangWatchQL feature switch is off for the project
     When the member looks for the Custom query surface
     Then availability answers unavailable, so neither the navigation entry nor the page offers the workbench
     And the schema and query endpoints refuse the request with a named, customer-safe refusal
@@ -46,9 +46,9 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
     Then it is evaluated with the project's organization, so the rule matches and the surface is on
 
   @integration
-  Scenario: An authorized member opens Custom query and sees only their live governed schema
+  Scenario: An authorized member opens Custom query and sees only their live LangWatchQL schema
     When the member opens the Custom query page
-    Then the page identifies the surface as governed and project-scoped
+    Then the page identifies the surface as LangWatchQL and project-scoped
     And the schema browser lists exactly the datasets the schema endpoint returned for them
     And nothing implies access to arbitrary ClickHouse databases or tables
 
@@ -60,7 +60,7 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
     And opening the route directly renders the permission-denied guard, not the workbench
 
   # Amended by #6582 slice 2, which added saving a chart to the member's own
-  # project. That is server-side, explicitly invoked, and governed by the same
+  # project. That is server-side, explicitly invoked, and LangWatchQL by the same
   # validators a run passes — so it is not the thing this scenario forbids. What
   # it forbids is unchanged: work the member did not ask for, state the browser
   # keeps behind their back, and a surface an agent can reach.
@@ -112,7 +112,7 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
 
   @integration
   Scenario: Monaco assistance derives from the same schema response
-    When the member invokes completion or hovers a governed identifier in the editor
+    When the member invokes completion or hovers a LangWatchQL identifier in the editor
     Then the suggestions and hover details come from the live schema response
 
   @unit
@@ -161,7 +161,7 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
 
   @unit
   Scenario: Duplicate submissions are prevented while a request is in flight
-    Given a governed query in flight
+    Given a LangWatchQL query in flight
     When the member tries to run or reload again
     Then no second request is issued until the first settles
 
@@ -181,7 +181,7 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
 
   @unit
   Scenario: An aborted request never updates the result pane
-    Given a governed query in flight
+    Given a LangWatchQL query in flight
     When the member leaves the workbench or the request is cancelled
     Then the request is aborted using the existing cancellation pattern
     And a response arriving after the abort does not change the visible result
@@ -214,7 +214,7 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
 
   @integration
   Scenario: An unprovisioned deployment renders the unavailable state on query
-    Given governed SQL is not provisioned so the query endpoint refuses as unavailable
+    Given LangWatchQL is not provisioned so the query endpoint refuses as unavailable
     When the member runs a query
     Then the workbench renders the backend's unavailable presentation
     And it does not retry automatically
@@ -305,8 +305,8 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
     And a truncation diagnostic is visually prominent in both
 
   @e2e
-  Scenario: A governed query flows from editor to native table in a real browser
-    When the member writes governed SQL, runs it, and waits for the response
+  Scenario: A LangWatchQL query flows from editor to native table in a real browser
+    When the member writes LangWatchQL, runs it, and waits for the response
     Then the returned rows appear in the native result table with statistics
 
   # ---------------------------------------------------------------------------
@@ -509,14 +509,14 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
   # ---------------------------------------------------------------------------
 
   @e2e
-  Scenario: A categorical governed result renders as a chart in a real browser
-    Given a successful categorical governed SQL result
+  Scenario: A categorical LangWatchQL result renders as a chart in a real browser
+    Given a successful categorical LangWatchQL result
     When the member provides a valid bar specification over the query result dataset
     Then the chart renders from the registered dataset
 
   @integration
   Scenario: A time-bucketed multi-series result renders responsively with tooltips
-    Given a successful time-bucketed, multi-series governed SQL result shape
+    Given a successful time-bucketed, multi-series LangWatchQL result shape
     When a valid line specification renders
     Then the chart fits its container, responds to resize, and shows tooltips
 
@@ -601,14 +601,14 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
   Scenario: A caller that supplies a reserved period parameter itself is refused
     Given SQL declaring the reserved period parameters
     When the request carries a value for period_start of its own
-    Then it is refused with error code governed_sql_reserved_parameter_supplied
+    Then it is refused with error code lwql_reserved_parameter_supplied
     And nothing reaches the database
 
   @unit
   Scenario: A reserved period parameter declared as anything but a date-time is refused
     Given SQL declaring period_start as a string
     When the statement is validated
-    Then it is refused with error code governed_sql_reserved_parameter_type
+    Then it is refused with error code lwql_reserved_parameter_type
     And the refusal comes from the validation step both running and saving pass through
 
   @unit
@@ -622,7 +622,7 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
   Scenario: A period-aware statement run with no window names what is unset
     Given SQL declaring the reserved period parameters
     When it is run with no time window at all
-    Then it is refused with error code governed_sql_parameter_missing naming them
+    Then it is refused with error code lwql_parameter_missing naming them
     And validating that same statement is not refused, because the window is the surface's to supply
 
   @unit
@@ -669,16 +669,16 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
 #
 # Base and scope:
 # AC "based on current #6486 head with exact base SHA recorded" → process AC,
-#    recorded in the PR body (base branch issue6480/governed-analytics-sql-api-read-only,
+#    recorded in the PR body (base branch issue6480/lwql-analytics-sql-api-read-only,
 #    base SHA recorded at PR-open time).
 # AC "production navigation gated until provisioning available"
-#   → Scenario: The workbench is unreachable while governed SQL is not provisioned
+#   → Scenario: The workbench is unreachable while LangWatchQL is not provisioned
 # AC "old LWQL parser, IR, branches, API types not used" → process AC, verified
 #    in the PR diff (no LWQL import exists to reference); the behavioral shadow is
 #   → Scenario: The frontend does not implement a second SQL validator
 # AC "SQL grammar, parser, validator, tenant policy, row policies, catalog,
 #    resource ceilings unchanged" → process AC, verified by the PR diff touching
-#    no governed SQL backend module; the frontend half is
+#    no LangWatchQL backend module; the frontend half is
 #   → Scenario: The frontend does not implement a second SQL validator
 # AC "existing Recharts charts are not migrated" → process AC, verified by the
 #    PR diff leaving Recharts components untouched.
@@ -690,13 +690,13 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
 #   → Scenario: Reload is manual only
 #
 # Workbench:
-# AC "authorized user opens Custom query and discovers only their live governed schema"
-#   → Scenario: An authorized member opens Custom query and sees only their live governed schema
+# AC "authorized user opens Custom query and discovers only their live LangWatchQL schema"
+#   → Scenario: An authorized member opens Custom query and sees only their live LangWatchQL schema
 #   → Scenario: The live schema response drives the browser and completion model
 # AC "Monaco provides SQL editing and schema-derived assistance without claiming
 #    arbitrary ClickHouse access"
 #   → Scenario: Monaco assistance derives from the same schema response
-#   → Scenario: An authorized member opens Custom query and sees only their live governed schema
+#   → Scenario: An authorized member opens Custom query and sees only their live LangWatchQL schema
 # AC "named scalar parameters without rewriting SQL in the browser"
 #   → Scenario: Named scalar parameters accompany the SQL without rewriting it
 # AC "Run query, Reload, in-flight, error, stale-result, submitted-snapshot behavior"
@@ -780,8 +780,8 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
 #   → Scenario: The renderer contract accepts multiple registered named datasets
 #
 # Rendering and UX:
-# AC "categorical governed SQL result renders from query_result"
-#   → Scenario: A categorical governed result renders as a chart in a real browser
+# AC "categorical LangWatchQL result renders from query_result"
+#   → Scenario: A categorical LangWatchQL result renders as a chart in a real browser
 # AC "time-bucketed multi-series renders responsively with tooltips"
 #   → Scenario: A time-bucketed multi-series result renders responsively with tooltips
 # AC "data-only Reload updates named data through the View API without leaking the old view"
@@ -814,8 +814,8 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
 #    data/spec updates, cleanup, empty/error states, stale results,
 #    diagnostics, truncation" → the @integration table and chart scenarios above.
 # AC "browser tests cover request-to-table and request-to-chart"
-#   → Scenario: A governed query flows from editor to native table in a real browser
-#   → Scenario: A categorical governed result renders as a chart in a real browser
+#   → Scenario: A LangWatchQL query flows from editor to native table in a real browser
+#   → Scenario: A categorical LangWatchQL result renders as a chart in a real browser
 # AC "browser egress test proves rejected specs cause no network request"
 #   → Scenario: Rejected and adversarial specs cause no network request
 # AC "real-CSP browser test proves the chart works without unsafe-eval"
@@ -823,7 +823,7 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
 # AC "existing #6486 suites and application gates remain green" → process AC,
 #    proven by the CI run on the PR.
 #
-# Issue #6631 ("wire the dashboard/workbench time window into governed SQL as
+# Issue #6631 ("wire the dashboard/workbench time window into LangWatchQL as
 # standard start/end parameters"). Its ACs, in the order the issue's plan states
 # them:
 #

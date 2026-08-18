@@ -4,13 +4,13 @@
 
 **Status:** Accepted
 
-**Relates to:** [ADR-081](./081-governed-sql-table-function-and-ssrf-policy.md) (why the caller can never write `postgresql()` themselves), [ADR-082](./082-governed-analytics-views-invoker-column-grants-final-dedup.md) (the invoker-view and column-grant model this extends across a second residence).
+**Relates to:** [ADR-081](./081-lwql-table-function-and-ssrf-policy.md) (why the caller can never write `postgresql()` themselves), [ADR-082](./082-lwql-analytics-views-invoker-column-grants-final-dedup.md) (the invoker-view and column-grant model this extends across a second residence).
 
-Behavioural contract: [specs/analytics/governed-sql-api.feature](../../../specs/analytics/governed-sql-api.feature).
+Behavioural contract: [specs/analytics/lwql-api.feature](../../../specs/analytics/lwql-api.feature).
 
 ## Context
 
-The governed analytics SQL API ([#6480](https://github.com/langwatch/langwatch/issues/6480))
+The LangWatchQL analytics SQL API ([#6480](https://github.com/langwatch/langwatch/issues/6480))
 answers questions over ClickHouse. Three of the question classes it exists to
 answer cannot be answered there at all, because the data lives in the
 application's PostgreSQL: human annotations, experiments and their runs, and the
@@ -55,7 +55,7 @@ Two mechanisms were measured and rejected before the one below:
 ## Decision
 
 A PostgreSQL-resident dataset is one catalog entry carrying a
-`GovernedPostgresMapping`, and that entry generates the whole chain. Four
+`LangWatchQLPostgresMapping`, and that entry generates the whole chain. Four
 objects, each with one job:
 
 1. **An approved PostgreSQL view** over the application's table, exposing
@@ -63,15 +63,15 @@ objects, each with one job:
    `projectId` (and, on `Project`, `id`) to `TenantId`. The dedicated reader role
    holds `SELECT` on these views and on nothing else, so a column the catalog
    does not expose is unreachable rather than merely unselected.
-2. **A PostgreSQL-engine table** in the governed database, mapping that view
+2. **A PostgreSQL-engine table** in the LangWatchQL database, mapping that view
    through the named collection. The **row policy sits here**, and it is what
    makes the mapping safe.
-3. **A governed invoker-rights view** over the engine table — the object a
+3. **A LangWatchQL invoker-rights view** over the engine table — the object a
    caller names, and the object carrying the tenant predicate below.
 4. **The dedicated role**, non-owner, `default_transaction_read_only = on`, with
    a `statement_timeout` and a `CONNECTION LIMIT`.
 
-**We will carry the tenant predicate in the governed view's own body**, as a
+**We will carry the tenant predicate in the LangWatchQL view's own body**, as a
 scalar subquery over the self-policed key map:
 
 ```sql
@@ -88,7 +88,7 @@ tenant, and an unknown or empty key yields no row, which folds to `NULL` and
 matches nothing in PostgreSQL.
 
 Nothing about the caller's statement changes. The predicate lives in a
-server-side view definition, which is where every other governed view's body
+server-side view definition, which is where every other LangWatchQL view's body
 already lives, so the `never rewritten` guard is untouched.
 
 ## Rationale / Trade-offs
@@ -109,9 +109,9 @@ from PostgreSQL's own `pg_stat_user_tables` accounting:
 | read                                    | rows returned | rows PostgreSQL read | statement PostgreSQL received |
 | --------------------------------------- | ------------- | -------------------- | ----------------------------- |
 | engine table, policy only               | 2             | 10,016               | no `WHERE` |
-| governed view, valid key                | 2             | 2                    | `WHERE "TenantId" = 'tenant-a'` |
-| governed view, unknown key              | 0             | 0                    | `WHERE "TenantId" = NULL` |
-| governed view, foreign-tenant predicate | 0             | >0 (the foreign rows)| `WHERE "TenantId" = 'tenant-b'` |
+| LangWatchQL view, valid key                | 2             | 2                    | `WHERE "TenantId" = 'tenant-a'` |
+| LangWatchQL view, unknown key              | 0             | 0                    | `WHERE "TenantId" = NULL` |
+| LangWatchQL view, foreign-tenant predicate | 0             | >0 (the foreign rows)| `WHERE "TenantId" = 'tenant-b'` |
 
 Five thousand fold on this fixture, and the ratio is the tenant's share of the
 table — which is the point: the cost stops scaling with how many *other*
@@ -122,11 +122,11 @@ shape that returns nothing used to cost a full scan of the primary.
 self-policy, which was previously load-bearing only for the key map itself. If
 that policy were missing, the subquery would see every row and fail as a
 multi-row scalar — a broken query rather than a leak, which is the right failure
-direction, but it is a new coupling and `governedPolicyCoverageQuery` auditing
+direction, but it is a new coupling and `lwqlPolicyCoverageQuery` auditing
 that policy now matters here too.
 
 **Why the approved views are generated, not migrated.** Their column lists are
-the governed catalog's, they change when the catalog changes, and nothing the
+the LangWatchQL catalog's, they change when the catalog changes, and nothing the
 application itself reads touches them. Binding them to Prisma's migration history
 would tie a catalog edit to a schema migration and leave the two able to
 disagree. They are emitted as DDL from the catalog, like every other object in
@@ -142,7 +142,7 @@ this module.
   endpoint, validator, diagnostics — reads that list unchanged; only the
   provisioning generators ask which residence an entry has, and they ask the
   entry rather than being told.
-- `GovernedViewDedup.versionColumn` becomes optional, meaning "the source keeps
+- `LangWatchQLViewDedup.versionColumn` becomes optional, meaning "the source keeps
   one row per key and there is nothing to collapse". `keyColumns` is the grain
   either way, which is what the fanout diagnostic reads — so an
   annotations-to-traces join earns a correct fanout warning with nothing written
@@ -182,7 +182,7 @@ proving it cannot be probed.
 ## References
 
 - Issue: [#6480](https://github.com/langwatch/langwatch/issues/6480)
-- `platform/app/src/server/analytics/governed-sql/catalog/postgresViews.ts` — the six entries
-- `platform/app/src/server/analytics/governed-sql/views.ts` — `postgresTenantPredicate`
-- `platform/app/src/server/analytics/governed-sql/provisioning.ts` — approved views, engine tables, reader role
-- `platform/app/src/server/analytics/governed-sql/__tests__/postgresEngineIsolation.integration.test.ts` — the proof and the measurements
+- `platform/app/src/server/analytics/lwql/catalog/postgresViews.ts` — the six entries
+- `platform/app/src/server/analytics/lwql/views.ts` — `postgresTenantPredicate`
+- `platform/app/src/server/analytics/lwql/provisioning.ts` — approved views, engine tables, reader role
+- `platform/app/src/server/analytics/lwql/__tests__/postgresEngineIsolation.integration.test.ts` — the proof and the measurements

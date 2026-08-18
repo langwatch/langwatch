@@ -1,13 +1,13 @@
-Feature: Saved governed SQL workbench charts — the persistence model and its write choke point
+Feature: Saved LangWatchQL workbench charts — the persistence model and its write choke point
 
   As an authorized LangWatch project member
-  I want the governed SQL and the Vega-Lite specification I built in the workbench
+  I want the LangWatchQL and the Vega-Lite specification I built in the workbench
   to be saved together as one project-scoped record
   So that a metric I authored once keeps its query, its parameter values and its
   chart, and neither can be edited into something the workbench itself would refuse
 
   Issue: #6582, slice 1 of the delivery stack (persistence model, repository,
-  service). Builds on the governed SQL workbench (#6577) and the governed
+  service). Builds on the LangWatchQL workbench (#6577) and the LangWatchQL
   analytics SQL API (#6480).
 
   Scope of this slice — deliberately server-side only. No tRPC router, no REST
@@ -26,12 +26,12 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
     Vega-Lite specification that renders the result. Execution and visualization
     stay separate — no visualization syntax inside the SQL.
   - The service is the only write path. Both governors run on the way in: the
-    governed SQL validator (#6480) and the Vega-Lite policy (#6577). Neither is
+    LangWatchQL validator (#6480) and the Vega-Lite policy (#6577). Neither is
     re-implemented here; both are called.
   - Every read and every write is scoped by project id.
 
   Background:
-    Given a project whose member is authorized for governed analytics SQL
+    Given a project whose member is authorized for LangWatchQL analytics SQL
 
   # ---------------------------------------------------------------------------
   # The saved definition
@@ -39,14 +39,14 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
 
   @unit
   Scenario: A saved definition carries the query, its parameter values and its specification
-    Given a definition holding governed SQL, named scalar parameter values and a Vega-Lite specification
+    Given a definition holding LangWatchQL, named scalar parameter values and a Vega-Lite specification
     When it is read as a saved workbench chart definition
     Then all three are preserved together
     And the definition declares the version it was written in
 
   @unit
   Scenario: A chart saved without a hand-authored specification is the same record
-    Given a definition holding only governed SQL and its parameter values
+    Given a definition holding only LangWatchQL and its parameter values
     When it is read as a saved workbench chart definition
     Then it is accepted with no specification
     And nothing invents one on its behalf
@@ -70,7 +70,7 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
     Given a definition whose SQL, parameter count or parameter value exceeds what is stored
     When it is read as a saved workbench chart definition
     Then it is refused for being too big
-    And the SQL ceiling is the same one the governed query endpoints enforce, so a
+    And the SQL ceiling is the same one the LangWatchQL query endpoints enforce, so a
       statement the workbench will run is always one it can save
 
   # ---------------------------------------------------------------------------
@@ -86,17 +86,17 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
     And no record is written
 
   @unit
-  Scenario: SQL the governed validator refuses never reaches the database
-    Given SQL the governed analytics validator refuses
+  Scenario: SQL the LangWatchQL validator refuses never reaches the database
+    Given SQL the LangWatchQL analytics validator refuses
     When the member saves a chart carrying it
-    Then the save is refused with the governed validator's own refusal code
+    Then the save is refused with the LangWatchQL validator's own refusal code
     And no record is written
 
   @unit
   Scenario: A query whose declared parameters have no saved values is refused at save
     Given SQL declaring a bound parameter the definition supplies no value for
     When the member saves the chart
-    Then the save is refused with error code governed_sql_parameter_missing
+    Then the save is refused with error code lwql_parameter_missing
     And the missing parameter is named
 
   @unit
@@ -110,7 +110,7 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
   Scenario: What the author may read decides what their saved SQL may name
     Given a member whose protections withhold a content-gated column
     When they save a chart whose SQL names that column
-    Then the save is refused by the governed validator
+    Then the save is refused by the LangWatchQL validator
     And the refusal is the same one the query endpoint would have given them
 
   # ---------------------------------------------------------------------------
@@ -183,9 +183,9 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
 
   @integration
   Scenario: Saved charts stay unreachable while the workbench switch is off
-    Given the governed SQL feature switch is off for the project
+    Given the LangWatchQL feature switch is off for the project
     When the member lists, opens, saves, edits or deletes a saved chart
-    Then every one of them refuses with error code governed_sql_not_enabled
+    Then every one of them refuses with error code lwql_not_enabled
     And nothing in the browser can force the surface on
 
   @integration
@@ -224,7 +224,7 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
 
   @integration
   Scenario: Save stores what is on screen, and saves again into the same chart
-    Given a member who has written governed SQL, its parameters and a specification
+    Given a member who has written LangWatchQL, its parameters and a specification
     When they save it and then save a second time after an edit
     Then the first save creates one chart
     And the second updates that same chart rather than creating another
@@ -256,7 +256,7 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
   # Slice 4 — the REST surface: saved charts under a project API key
   #
   # The same charts, reached by an integration rather than by a signed-in member,
-  # under the governed analytics SQL family at
+  # under the LangWatchQL analytics SQL family at
   # /api/v1/projects/{projectId}/analytics/charts. The credential is a project
   # API key, so the project id in the path is a cross-check and never the scope,
   # exactly as it is for the query and schema endpoints. Every route goes through
@@ -281,11 +281,11 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
     And the project's chart listing is unchanged
 
   @integration
-  Scenario: SQL the governed validator refuses earns the same code over the API as the query endpoint
+  Scenario: SQL the LangWatchQL validator refuses earns the same code over the API as the query endpoint
     Given SQL naming a content-gated column the calling key's protections withhold
     When the integration posts a chart carrying it
-    Then the request is refused with the governed validator's own refusal code
-    And it is the identical code the governed query endpoint gives that key for that SQL
+    Then the request is refused with the LangWatchQL validator's own refusal code
+    And it is the identical code the LangWatchQL query endpoint gives that key for that SQL
     And the project's chart listing is unchanged
 
   @integration
@@ -298,9 +298,9 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
 
   @integration
   Scenario: Every chart endpoint stays dark while the workbench switch is off
-    Given the governed SQL feature switch is off for the project
+    Given the LangWatchQL feature switch is off for the project
     When the integration lists, reads, creates, updates or deletes a chart
-    Then every one of them refuses with error code governed_sql_not_enabled
+    Then every one of them refuses with error code lwql_not_enabled
 
   @integration
   Scenario: The API's switch is decided for the project's organization
@@ -379,7 +379,7 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
 #   → Scenario: A definition larger than the stored ceilings is refused
 # AC "service is the validation and governance choke point — the only write path"
 #   → Scenario: A specification the chart policy refuses never reaches the database
-#   → Scenario: SQL the governed validator refuses never reaches the database
+#   → Scenario: SQL the LangWatchQL validator refuses never reaches the database
 #   → Scenario: A query whose declared parameters have no saved values is refused at save
 #   → Scenario: Editing a saved chart runs exactly the governors that creating it ran
 # AC "both the SQL and the Vega-Lite spec are re-validated on the way in"
@@ -433,7 +433,7 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
 #   reads as coverage and is worse than one not yet written.
 #
 # Issue #6582, slice 4 ("REST surface — the same charts under a project API
-# key, in the governed analytics SQL family").
+# key, in the LangWatchQL analytics SQL family").
 #
 # AC1 "the five routes exist and round-trip"
 #   → Scenario: A chart created over the API reads back exactly as it was submitted
@@ -447,8 +447,8 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
 #   route bounds its size — the versioned schema puts no ceiling on the
 #   statement it holds — so the request-shape ceiling is the route's own, and
 #   the listing half is again what makes "nothing is written" mean anything)
-# AC3 "the governed validator's own codes survive the wire"
-#   → Scenario: SQL the governed validator refuses earns the same code over the API as the query endpoint
+# AC3 "the LangWatchQL validator's own codes survive the wire"
+#   → Scenario: SQL the LangWatchQL validator refuses earns the same code over the API as the query endpoint
 # AC4 "the feature switch closes every route"
 #   → Scenario: Every chart endpoint stays dark while the workbench switch is off
 #   → Scenario: The API's switch is decided for the project's organization
@@ -466,7 +466,7 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
 #   → Scenario: Every chart endpoint is published in the API document
 #   (plus `pnpm check:openapi-route-coverage`, which fails on a handler with no
 #   `describeRoute` — the scenario is what fails when the *document* loses them)
-# AC9 "no regression" → the existing governed SQL REST suite, unedited, which
+# AC9 "no regression" → the existing LangWatchQL REST suite, unedited, which
 #   runs the extracted guards through the query and schema endpoints.
 # AC10 "every slice-4 scenario is actually bound" → `pnpm check:feature-parity`.
 #

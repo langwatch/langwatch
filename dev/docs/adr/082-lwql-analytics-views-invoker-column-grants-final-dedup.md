@@ -1,4 +1,4 @@
-# ADR-082: The governed `analytics.*` schema is invoker-rights views, column grants, and `FINAL`
+# ADR-082: The LangWatchQL `analytics.*` schema is invoker-rights views, column grants, and `FINAL`
 
 **Date:** 2026-08-03
 
@@ -6,7 +6,7 @@
 
 ## Context
 
-The governed analytics SQL API ([#6480](https://github.com/langwatch/langwatch/issues/6480))
+The LangWatchQL analytics SQL API ([#6480](https://github.com/langwatch/langwatch/issues/6480))
 lets an authenticated API client submit native ClickHouse SQL. It must run over
 a **stable, curated namespace** rather than over the physical event-sourcing
 projections, because those projections carry columns the API does not promise to
@@ -142,7 +142,7 @@ over an `AggregatingMergeTree` returns one row per sort key with each
 what the catalog has to *say*, and — for one dataset — which strategy it uses.
 
 **A catalog entry declares an aggregating source explicitly**
-(`GovernedViewDedup.aggregating`), and such an entry declares no version column.
+(`LangWatchQLViewDedup.aggregating`), and such an entry declares no version column.
 Absence of a version column previously meant one thing — a PostgreSQL-resident
 view with nothing to collapse — and the unit guard read it that way, so an
 aggregating entry would otherwise be indistinguishable from a `ReplacingMergeTree`
@@ -159,7 +159,7 @@ not fan out (or stays silent on ones that do). The rule is true by construction
 now rather than by review.
 
 **The grain is a separate declaration from the sort key**
-(`GovernedViewDefinition.grainColumns`) — but only where the strategy can
+(`LangWatchQLViewDefinition.grainColumns`) — but only where the strategy can
 deliver the narrower grain. `evaluation_metrics` declares
 `(TenantId, EvaluationId)` against a sort key of
 `(TenantId, OccurredAt, EvaluationId)`: its `in-tuple` dedup groups by the
@@ -191,7 +191,7 @@ the sort key and a caller's predicates on anything else stop pruning. Here the
 group keys are the published grain of a rollup — `TenantId` and the partition
 column `BucketStart` — which is exactly where a caller's predicates already go.
 
-**`evaluation_metrics` pins the `in-tuple` strategy** (`GovernedViewDedup
+**`evaluation_metrics` pins the `in-tuple` strategy** (`LangWatchQLViewDedup
 .strategy`), the one entry in the catalog that does not take the measured
 default. `evaluation_analytics` folds its progress watermark —
 `max(previous, event time)` — straight into `OccurredAt`, which is second in its
@@ -250,10 +250,10 @@ doubles aggregates, which is the failure mode nobody notices.
 
 ## References
 
-- `platform/app/src/server/analytics/governed-sql/catalog/` — the catalog and the
+- `platform/app/src/server/analytics/lwql/catalog/` — the catalog and the
   content-gating derivation
-- `platform/app/src/server/analytics/governed-sql/views.ts` — the generators, and
-  the measurement on `SHIPPED_GOVERNED_DEDUP`
-- `platform/app/src/server/analytics/governed-sql/__tests__/governedViews.integration.test.ts`
-- `specs/analytics/governed-sql-api.feature`
+- `platform/app/src/server/analytics/lwql/views.ts` — the generators, and
+  the measurement on `SHIPPED_LWQL_DEDUP`
+- `platform/app/src/server/analytics/lwql/__tests__/lwqlViews.integration.test.ts`
+- `specs/analytics/lwql-api.feature`
 - ADR-081 — the table-function and SSRF policy over the same identity

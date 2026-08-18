@@ -1,13 +1,13 @@
-# Governed SQL workbench + governed chart surface
+# LangWatchQL workbench + LangWatchQL chart surface
 
 Patterns to follow when extending `platform/app/src/features/analytics-query/`.
-See [ADR-085](../adr/085-governed-chart-runtime-without-eval.md) for why the
+See [ADR-085](../adr/085-lwql-chart-runtime-without-eval.md) for why the
 chart runtime avoids `eval`, and
-`specs/analytics/governed-sql-workbench.feature` for the behavioral contract.
+`specs/analytics/lwql-workbench.feature` for the behavioral contract.
 
 ## Request state: draft / submitted / outcome
 
-`logic/governedSqlRequestState.ts` is the one reducer for the workbench's
+`logic/lwqlRequestState.ts` is the one reducer for the workbench's
 request lifecycle. It keeps three things apart:
 
 - `draft` — what the member is typing.
@@ -15,10 +15,10 @@ request lifecycle. It keeps three things apart:
 - `outcome` — the answer, carrying **its own copy** of the snapshot that
   produced it.
 
-All transitions go through `governedSqlRequestReducer`. Do not mutate this
+All transitions go through `lwqlRequestReducer`. Do not mutate this
 state, add a fourth field, or read `submitted` from a component — every reader
-outside the reducer goes through `isGovernedSqlResultStale` or
-`governedSqlActionLabel`.
+outside the reducer goes through `isLangWatchQLResultStale` or
+`lwqlActionLabel`.
 
 - **Staleness and the action label (`Run query` vs `Reload`) compare the draft
   against `outcome.snapshot`, never `submitted`.** They differ the moment a
@@ -36,14 +36,14 @@ outside the reducer goes through `isGovernedSqlResultStale` or
 ## Backend answers only
 
 There is no frontend SQL validator and no invented schema. The schema shown in
-`GovernedSchemaBrowser` and fed to Monaco completion comes from the same live
+`LangWatchQLSchemaBrowser` and fed to Monaco completion comes from the same live
 schema response the backend serves — do not hardcode table/column lists or
 duplicate backend validation logic in a component.
 
 Every failure renders through the code-keyed error registry, never a wire
 message:
 
-- `readGovernedSqlFailure` (`logic/governedSqlFailure.ts`) lifts the
+- `readLangWatchQLFailure` (`logic/lwqlFailure.ts`) lifts the
   *structure* a registry entry cannot carry — violation positions, clause
   names, missing parameter names — off `meta`. It never carries the words a
   member reads; those come from the presentation registry keyed by `code`
@@ -52,31 +52,31 @@ message:
   every field) because it crossed a wire — a malformed payload degrades to "no
   extra detail," never a crash in the pane that was about to explain the
   failure.
-- `governedSqlUnavailablePayload()` mints a client-side payload carrying the
-  `governed_sql_unavailable` code so the *availability* answer (a boolean, not
+- `lwqlUnavailablePayload()` mints a client-side payload carrying the
+  `lwql_unavailable` code so the *availability* answer (a boolean, not
   a failure) renders through the same registry copy as a real refusal, rather
   than a second hand-written copy of the words.
 
 ## Value fidelity
 
-`logic/governedSqlValueFormat.ts` decides what a result cell *says*; never
-reach for `Number()` on a value from a governed result.
+`logic/lwqlValueFormat.ts` decides what a result cell *says*; never
+reach for `Number()` on a value from a LangWatchQL result.
 
 - **64-bit integers and high-precision decimals arrive as digit strings** when
   the ClickHouse profile has 64-bit quoting on. `Number("9007199254740993")` is
   `9007199254740992` — coercion silently drops precision that survived the
   wire. A value typed `string` is rendered and copied as that exact string.
 - **`missing`, `null`, `emptyString`, `nan`, and `infinity` are distinct
-  `GovernedSqlCell` variants** (beside `scalar` and `structured`), not
+  `LangWatchQLCell` variants** (beside `scalar` and `structured`), not
   collapsible into each other, into a blank, or into an ordinary `0` — which is
-  just a `scalar`. `describeGovernedSqlValue` and
-  `readGovernedSqlCell` are the only places that classify a raw value —
+  just a `scalar`. `describeLangWatchQLValue` and
+  `readLangWatchQLCell` are the only places that classify a raw value —
   `Object.hasOwn` (not an `undefined` check) is what tells a row that doesn't
   carry the column apart from one carrying `NULL`.
-- `governedSqlCellText` / `governedSqlCellCopyText` are the only places the
+- `lwqlCellText` / `lwqlCellCopyText` are the only places the
   visible/copied token per kind is decided. A structured value's `copy` is
   compact JSON; a scalar's `copy` is its exact text. `missing` copies as
-  nothing (`null` from `governedSqlCellCopyText`), never as the literal word
+  nothing (`null` from `lwqlCellCopyText`), never as the literal word
   `"missing"`.
 
 ## The chart governance chain
@@ -84,7 +84,7 @@ reach for `Number()` on a value from a governed result.
 Order matters — each stage bounds what the next has to cope with
 (`validateVegaLiteSpec`'s own doc comment names the seven stages in order):
 row ceilings → parsed-object check → `$schema` version → size/depth →
-bundled v6 schema → governed policy → field references.
+bundled v6 schema → LangWatchQL policy → field references.
 
 1. **Validate** — the schema check
    (`visualization/vegaLiteSchema.ts`) uses a **generated Ajv standalone
@@ -98,24 +98,24 @@ bundled v6 schema → governed policy → field references.
    the CSP it exists to survive (ADR-085).
 2. **Policy** (`visualization/vegaLitePolicy.ts`) — the ceilings, allowlists,
    and rule catalogue, applied as one fail-closed walk
-   (`applyGovernedVegaPolicy`). A spec may only reference **named, registered
+   (`applyLangWatchQLVegaPolicy`). A spec may only reference **named, registered
    datasets** — no inline `values`, no caller-supplied top-level `datasets`
    key, no `url` property anywhere in the document (blanket rule, because the
    v6 schema puts `url` on `UrlData`, the `url` encoding channel, `MarkDef`,
    and six mark configs — a position-by-position rule would leak). Adding a
-   new rule means adding its id to `GOVERNED_VEGA_RULE_IDS` and its entry to
+   new rule means adding its id to `LWQL_VEGA_RULE_IDS` and its entry to
    `RULE_CATALOGUE` — the compiler enforces both exist together.
-3. **Build** (`visualization/buildGovernedVegaSpec.ts`) — data is injected,
+3. **Build** (`visualization/buildLangWatchQLVegaSpec.ts`) — data is injected,
    never accepted: the caller's `datasets` key is deleted, then rebuilt from
    the registry the renderer was given (the second lock; the policy step is
    the first, and this is the one that holds if that one is ever loosened).
    The pinned config is merged **last**, over whatever `config` the member
    wrote — a member may restyle an axis, not the background or font the chart
    renders in.
-4. **Render** (`hooks/useGovernedVegaView.ts`) — `vega-embed` is called with
+4. **Render** (`hooks/useLangWatchQLVegaView.ts`) — `vega-embed` is called with
    `ast: true`, which makes it parse expressions into a syntax tree and
    evaluate them with `vega-interpreter` instead of compiling with `new
-   Function`. Do not add `expr` to `governedVegaEmbedOptions` — `vega@6`
+   Function`. Do not add `expr` to `lwqlVegaEmbedOptions` — `vega@6`
    exports no `expressionInterpreter`, so `ast: true` alone already reaches
    the interpreter; passing one explicitly only duplicates it in the bundle.
    The loader is `createNoNetworkVegaLoader()` — every method rejects, so a
@@ -127,15 +127,15 @@ bundled v6 schema → governed policy → field references.
 
 ## The lazy boundary
 
-Mount `LazyGovernedSqlChartMode`, never `GovernedSqlChartMode` directly.
+Mount `LazyLangWatchQLChartMode`, never `LangWatchQLChartMode` directly.
 Vega, Vega-Lite, vega-embed, and the generated schema validator are several
 megabytes that only a member who opens Chart mode needs — one ordinary-looking
-static import from `GovernedSqlChartMode` puts all of it in the entry chunk,
+static import from `LangWatchQLChartMode` puts all of it in the entry chunk,
 and nothing about that import looks wrong at review time.
 
 `vegaLazyBoundary.unit.test.ts` is the tripwire: it walks the static import
-graph from `LazyGovernedSqlChartMode.tsx` and from every other source file in
-the feature, and fails if anything outside `GovernedSqlChartMode`'s own graph
+graph from `LazyLangWatchQLChartMode.tsx` and from every other source file in
+the feature, and fails if anything outside `LangWatchQLChartMode`'s own graph
 reaches a Vega package or the generated validator. A new module that imports
 Vega (directly or transitively) and isn't reached through the chart-mode
 boundary fails this test, not silently ships a bigger bundle.
@@ -145,7 +145,7 @@ boundary fails this test, not silently ships a bigger bundle.
 - **jsdom integration suites mock `~/utils/compat/next-dynamic`.** Monaco and
   the chart boundary are both lazy-loaded through it, and the shim's lazy
   import never resolves under jsdom — mock it to a stub component (see
-  `CustomQueryPage.integration.test.tsx`, `GovernedSqlChartMode.integration.test.tsx`)
+  `CustomQueryPage.integration.test.tsx`, `LangWatchQLChartMode.integration.test.tsx`)
   so the page under test is the mounted one, not one permanently stuck on a
   loading fallback.
 - **Chakra tabs (Table/Chart mode) select on focus, not on a bare click
@@ -153,7 +153,7 @@ boundary fails this test, not silently ships a bigger bundle.
   leaves the tab's mode unchanged, and every "still visible in the other mode"
   assertion downstream then passes vacuously because nothing moved. Assert
   `aria-selected="true"` after switching to catch this (pattern in
-  `GovernedSqlResultPane.integration.test.tsx`'s `selectResultMode`).
+  `LangWatchQLResultPane.integration.test.tsx`'s `selectResultMode`).
 - **A node-environment test must never contain the jsdom environment pragma
   string, even in prose.** Vitest reads that pragma out of a file's first
   docblock — writing it inside a comment to say "this file declines jsdom"
@@ -163,8 +163,8 @@ boundary fails this test, not silently ships a bigger bundle.
 
 ## References
 
-- [ADR-085](../adr/085-governed-chart-runtime-without-eval.md) — why the chart
+- [ADR-085](../adr/085-lwql-chart-runtime-without-eval.md) — why the chart
   runtime runs without `eval`
-- `specs/analytics/governed-sql-workbench.feature` — full behavioral contract
+- `specs/analytics/lwql-workbench.feature` — full behavioral contract
 - `error-handling.md` — the code-keyed error registry this surface builds on
 - `platform/app/src/features/analytics-query/` — the feature directory

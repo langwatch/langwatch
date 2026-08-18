@@ -1,4 +1,4 @@
-# ADR-085: The governed chart runtime runs without `eval`
+# ADR-085: The LangWatchQL chart runtime runs without `eval`
 
 **Date:** 2026-08-05
 
@@ -6,7 +6,7 @@
 
 ## Context
 
-The governed SQL workbench lets a member write a Vega-Lite specification and
+The LangWatchQL workbench lets a member write a Vega-Lite specification and
 draw the result of their own query with it. That is a member-authored program
 running in the browser, so two things have to be true at once: the chart runtime
 must be contained, and the containment must survive a Content-Security-Policy
@@ -28,7 +28,7 @@ validator that fails open is worse than no validator.
 
 ## Decision
 
-We will run the whole governed chart path without `eval`, and prove it.
+We will run the whole LangWatchQL chart path without `eval`, and prove it.
 
 1. **The schema validator is generated ahead of time.**
    `scripts/generate-vega-lite-validator.ts` compiles the bundled official
@@ -48,15 +48,15 @@ We will run the whole governed chart path without `eval`, and prove it.
    copy of it in the bundle to change nothing.
 
 3. **Data is injected, never accepted.** A specification names datasets; it
-   never carries them. `buildGovernedVegaSpec` deletes whatever the caller wrote
+   never carries them. `buildLangWatchQLVegaSpec` deletes whatever the caller wrote
    under `datasets` and builds that block from the registry the renderer was
    given. The policy already refuses a caller-supplied `datasets`; this is the
    second lock, and it is the one that holds if the first is ever loosened.
 
 4. **Everything Vega is behind one lazy import.**
-   `LazyGovernedSqlChartMode` is the only way in. A source-graph test asserts
+   `LazyLangWatchQLChartMode` is the only way in. A source-graph test asserts
    that no module in the feature reaches a Vega package except through
-   `GovernedSqlChartMode`.
+   `LangWatchQLChartMode`.
 
 Two guards keep the generated validator honest: regenerating must reproduce the
 committed bytes (Ajv's standalone output is deterministic across processes), and
@@ -91,7 +91,7 @@ remains available if the checked-in size becomes the binding constraint.
 - The generated file is excluded from Biome (past 1 MB it trips `maxSize` into a
   pathless "ignored file" notice) and carries `@ts-nocheck`, so `checkJs` parses
   it without checking 7.7 MB of machine-written code.
-- A future contributor who imports `GovernedSqlChartMode` directly instead of
+- A future contributor who imports `LangWatchQLChartMode` directly instead of
   the lazy boundary puts the whole Vega runtime in the entry chunk. The
   source-graph test is what catches that, because nothing about it would look
   wrong.
@@ -112,8 +112,8 @@ before the specification is stored.
 
 ## References
 
-- Related ADRs: [081](./081-governed-sql-table-function-and-ssrf-policy.md),
-  [082](./082-governed-analytics-views-invoker-column-grants-final-dedup.md),
-  [083](./083-governed-sql-diagnostics-read-the-single-parse.md)
-- `specs/analytics/governed-sql-workbench.feature`
+- Related ADRs: [081](./081-lwql-table-function-and-ssrf-policy.md),
+  [082](./082-lwql-analytics-views-invoker-column-grants-final-dedup.md),
+  [083](./083-lwql-diagnostics-read-the-single-parse.md)
+- `specs/analytics/lwql-workbench.feature`
 - Issue #6577

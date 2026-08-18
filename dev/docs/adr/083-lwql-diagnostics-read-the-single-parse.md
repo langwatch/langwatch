@@ -1,4 +1,4 @@
-# ADR-083: Governed SQL diagnostics read the validator's single parse, never a second one
+# ADR-083: LangWatchQL diagnostics read the validator's single parse, never a second one
 
 **Date:** 2026-08-04
 
@@ -6,7 +6,7 @@
 
 ## Context
 
-The governed analytics SQL API ([#6480](https://github.com/langwatch/langwatch/issues/6480))
+The LangWatchQL analytics SQL API ([#6480](https://github.com/langwatch/langwatch/issues/6480))
 returns **diagnostics** alongside every result: advisory notes about an answer
 that is correct but easy to misread — a measure counted once per joined row, a
 chart with a hole in it, a period that has not finished filling. They never
@@ -31,15 +31,15 @@ That is the decision this record refuses.
 **The validator's walk is the only pass that ever reads the SQL tree, and it
 records the facts a diagnostic needs on its way through.** The diagnostics
 module (`diagnostics.ts`) is a pure function of the validator's accept shape
-(`AcceptedGovernedSql`), the executor's typed result, and an injected clock. It
+(`AcceptedLangWatchQL`), the executor's typed result, and an injected clock. It
 imports no parser.
 
-`GovernedSqlQueryBlock` therefore carries, per `SELECT` block, the facts no
+`LangWatchQLQueryBlock` therefore carries, per `SELECT` block, the facts no
 consumer could recover afterwards:
 
 | field | what it answers |
 | --- | --- |
-| `tables` | which governed datasets this block reads, and under which alias |
+| `tables` | which LangWatchQL datasets this block reads, and under which alias |
 | `joins` | which column equalities the join was written on |
 | `filteredColumns` | which columns appear in `WHERE` / `PREWHERE` / `QUALIFY` |
 | `groupByColumns` | which *names* the block groups by |
@@ -64,7 +64,7 @@ Three consequences are deliberate:
    the ordinary spacing between two unrelated traces gets reported as missing
    buckets.
 3. **The clock is a dependency.** "Has this period finished yet" is asked
-   against an injected instant (`GovernedSqlServiceDependencies.now`), so the
+   against an injected instant (`LangWatchQLServiceDependencies.now`), so the
    diagnostics a result earns are a function of the result and the instant
    rather than of when the suite happened to run.
 
@@ -80,7 +80,7 @@ That is the trade taken, and the alternative is worse — see below.
 Every diagnostic is data in the response with a stable machine-readable `code`,
 enumerated in the published OpenAPI spec. An empty list is documented, in one
 place reused by the endpoint's own description
-(`GOVERNED_SQL_CLEAN_DIAGNOSTICS_MEANING`), as *no known issue was detected* and
+(`LWQL_CLEAN_DIAGNOSTICS_MEANING`), as *no known issue was detected* and
 explicitly not as proof the answer is the one the caller meant.
 
 ## Alternatives considered
@@ -104,12 +104,12 @@ growth. Revisit if a consumer needs the intersection.
 
 ## References
 
-- `platform/app/src/server/analytics/governed-sql/diagnostics.ts` — the rules
-- `platform/app/src/server/analytics/governed-sql/validation/validate.ts` — the
+- `platform/app/src/server/analytics/lwql/diagnostics.ts` — the rules
+- `platform/app/src/server/analytics/lwql/validation/validate.ts` — the
   walk and the accept shape it records
-- `platform/app/src/server/analytics/governed-sql/__tests__/governedSqlDiagnostics.unit.test.ts`
-- `platform/app/src/app/api/analytics-sql/__tests__/governedSqlAnswerableQuestions.integration.test.ts`
+- `platform/app/src/server/analytics/lwql/__tests__/lwqlDiagnostics.unit.test.ts`
+- `platform/app/src/app/api/analytics-sql/__tests__/lwqlAnswerableQuestions.integration.test.ts`
   — every rule triggered through the public endpoint against a seeded fixture
-- `specs/analytics/governed-sql-api.feature`
-- ADR-082 — the governed views whose `dedup.keyColumns` the fanout rule reads as
+- `specs/analytics/lwql-api.feature`
+- ADR-082 — the LangWatchQL views whose `dedup.keyColumns` the fanout rule reads as
   grain

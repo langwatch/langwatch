@@ -1,4 +1,4 @@
-# ADR-081: Governed analytics SQL blocks user-supplied table functions, by AST policy and by grants
+# ADR-081: LangWatchQL analytics SQL blocks user-supplied table functions, by AST policy and by grants
 
 **Date:** 2026-08-03
 
@@ -6,12 +6,12 @@
 
 ## Context
 
-The governed analytics SQL API ([#6480](https://github.com/langwatch/langwatch/issues/6480))
+The LangWatchQL analytics SQL API ([#6480](https://github.com/langwatch/langwatch/issues/6480))
 accepts native ClickHouse SQL from an authenticated API client and runs it
 against `analytics.*` as a single shared restricted database identity. Tenant
 isolation is carried by row policies keyed on a per-query capability, and
 read-only enforcement by `readonly = 1` in a settings profile — both provisioned
-by `platform/app/src/server/analytics/governed-sql/provisioning.ts` and proven
+by `platform/app/src/server/analytics/lwql/provisioning.ts` and proven
 against the deployed ClickHouse image by the isolation suite.
 
 ClickHouse **table functions** sit awkwardly inside that model. They are read
@@ -55,7 +55,7 @@ The validator keeps **no list of table-function names**. The check is on the
 grammatical position, so a list would always be a subset of "all of them", and a
 second list is a second thing to keep in sync with ClickHouse's releases.
 `TABLE_FUNCTION_RE` stays where it is, serving the ops endpoint it was written
-for; the governed API does not import it and does not copy it.
+for; the LangWatchQL API does not import it and does not copy it.
 
 ## Rationale / Trade-offs
 
@@ -85,7 +85,7 @@ one-line fix rather than a mystery.
 
 ## Consequences
 
-- Every governed query is refused at the gateway before it reaches the database
+- Every LangWatchQL query is refused at the gateway before it reaches the database
   if it names any table function. The database refusal (grants) still stands
   behind it, and the isolation suite still proves the grant half independently —
   a validator-only test may not stand in for it.
@@ -94,7 +94,7 @@ one-line fix rather than a mystery.
   is not a question anyone has to hold.
 - Widening this is a deliberate act with an obvious shape: add a rule to
   `NODE_RULES`/`TableExpression` in
-  `platform/app/src/server/analytics/governed-sql/validation/validate.ts`, and
+  `platform/app/src/server/analytics/lwql/validation/validate.ts`, and
   amend this ADR. It cannot happen by accident, and it cannot happen by a
   dependency upgrade.
 - The two guards say different things on purpose and must not be merged: the
@@ -105,9 +105,9 @@ one-line fix rather than a mystery.
 
 ## References
 
-- Issue [#6480](https://github.com/langwatch/langwatch/issues/6480) — governed analytics SQL API
-- `specs/analytics/governed-sql-api.feature` — the behavioural contract
-- `platform/app/src/server/analytics/governed-sql/provisioning.ts` — the grants, row policies and settings profile
-- `platform/app/src/server/analytics/governed-sql/validation/validate.ts` — the default-deny AST walk
+- Issue [#6480](https://github.com/langwatch/langwatch/issues/6480) — LangWatchQL analytics SQL API
+- `specs/analytics/lwql-api.feature` — the behavioural contract
+- `platform/app/src/server/analytics/lwql/provisioning.ts` — the grants, row policies and settings profile
+- `platform/app/src/server/analytics/lwql/validation/validate.ts` — the default-deny AST walk
 - `platform/app/src/server/ops/explain-core.ts` — `TABLE_FUNCTION_RE`, the ops endpoint's separate name-list pre-check
 - [ADR-045](./045-domain-errors-handled-boundary.md) — how the refusal reaches the caller
