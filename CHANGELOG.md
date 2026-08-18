@@ -1,5 +1,104 @@
 # Changelog
 
+## [3.14.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.13.0...langwatch@v3.14.0) (2026-08-18)
+
+
+### Features
+
+* **ai-gateway:** virtual keys can auto-expire, and every usage view links to its traces ([#7067](https://github.com/langwatch/langwatch/issues/7067)) ([2e21dc3](https://github.com/langwatch/langwatch/commit/2e21dc3b0529cd627cd7b245c0bec754a2b023c1))
+* **api:** add v.rpc(), and fix an endpoint's success status at registration ([#7077](https://github.com/langwatch/langwatch/issues/7077)) ([b9245e8](https://github.com/langwatch/langwatch/commit/b9245e8325b3e459202e60d5467e2d99df4fcc1a))
+* **authz:** stage B in place — the system backfills itself ([#7079](https://github.com/langwatch/langwatch/issues/7079)) ([4be01a9](https://github.com/langwatch/langwatch/commit/4be01a9f0cfeb77bb6e557491f8d0f16adf3c162))
+* **authz:** unified authorization engine (ADR-092) - one registry, one resolver, every principal ([#6894](https://github.com/langwatch/langwatch/issues/6894)) ([13fdd91](https://github.com/langwatch/langwatch/commit/13fdd910fa7b4aceeb8ab9c7b06710ce4a33fe44))
+* **coding-agent:** a Sessions screen, full-session terminal replay, and conversations back to their name ([#6815](https://github.com/langwatch/langwatch/issues/6815)) ([5ba2147](https://github.com/langwatch/langwatch/commit/5ba2147a79e3957c0ade19d64927c795f0567e42))
+* **coding-agent:** capture codex conversations and repository identity by default ([#7069](https://github.com/langwatch/langwatch/issues/7069)) ([625ddb6](https://github.com/langwatch/langwatch/commit/625ddb69d626383659f5c6357351ceb1515f3b28))
+* **gateway:** audio and realtime quantities reach billing, closing the zero-billed audio path ([#7021](https://github.com/langwatch/langwatch/issues/7021)) ([071ae32](https://github.com/langwatch/langwatch/commit/071ae32368a43ca44ab203221800e5f4e1c5f290))
+* **gateway:** model tiers, routing policy editor, and the allowlist that aliases skipped ([#6923](https://github.com/langwatch/langwatch/issues/6923)) ([c4a988d](https://github.com/langwatch/langwatch/commit/c4a988d3ebf7c1f16d09c4257e547f668232c61e))
+* **gateway:** stop minting a durable process row per LLM call ([#7083](https://github.com/langwatch/langwatch/issues/7083)) ([d3f8503](https://github.com/langwatch/langwatch/commit/d3f85034defc4b05566880857a0008bff1a5b834))
+* **github:** keep pull request history, add a GitHub Enterprise Server host, document restricted networks ([#7047](https://github.com/langwatch/langwatch/issues/7047)) ([e7e3346](https://github.com/langwatch/langwatch/commit/e7e33469f1b5158d62f35d8f7cced8d0fc4c7647))
+* **governance:** pulled provider usage as priced, attributed cost in the shared ledger (ADR-088) ([#6649](https://github.com/langwatch/langwatch/issues/6649)) ([cae9c39](https://github.com/langwatch/langwatch/commit/cae9c39cf764f0623e0ae4c1e9eb0221c6f46ce0))
+* **governed-sql:** governed SQL workbench — full stack (supersedes [#6486](https://github.com/langwatch/langwatch/issues/6486)/[#6861](https://github.com/langwatch/langwatch/issues/6861)/[#6579](https://github.com/langwatch/langwatch/issues/6579)/[#6678](https://github.com/langwatch/langwatch/issues/6678)/[#6690](https://github.com/langwatch/langwatch/issues/6690)/[#6705](https://github.com/langwatch/langwatch/issues/6705)/[#6709](https://github.com/langwatch/langwatch/issues/6709)) ([#7014](https://github.com/langwatch/langwatch/issues/7014)) ([7007d9b](https://github.com/langwatch/langwatch/commit/7007d9bd55b426be89c96ea798447918b5b6484a))
+* **haven:** machine-wide resource governance for parallel agents ([#6623](https://github.com/langwatch/langwatch/issues/6623)) ([2cf718b](https://github.com/langwatch/langwatch/commit/2cf718b2b5d5cdf936b825e82403906a3e37f37f))
+* **haven:** reap leaked testcontainers and tighten shared-resource defaults ([#6944](https://github.com/langwatch/langwatch/issues/6944)) ([269a56e](https://github.com/langwatch/langwatch/commit/269a56ec79295beabd3f7dcfc9d8a76df4bdfc82))
+* **haven:** revamp the hub — whole-machine RAM, worktrees, cleanup, reaping monitor ([#6989](https://github.com/langwatch/langwatch/issues/6989)) ([d8cac76](https://github.com/langwatch/langwatch/commit/d8cac76167c002c0fcdb377d8fadda4dff436a49))
+* **langy:** key-authed Langy turn surface, behind its own rollback switch ([#6821](https://github.com/langwatch/langwatch/issues/6821)) ([#6844](https://github.com/langwatch/langwatch/issues/6844)) ([2ae67f8](https://github.com/langwatch/langwatch/commit/2ae67f8c5c7e59d04f2321685ef62f1f883937bc))
+* **observability:** continuous profiling with Pyroscope ([#7000](https://github.com/langwatch/langwatch/issues/7000)) ([ad3ff83](https://github.com/langwatch/langwatch/commit/ad3ff83109eb02fcba00f99d90f29e82fabd9982))
+* **ops:** discard dead letters, redrive in bulk, and record why each one died ([#7127](https://github.com/langwatch/langwatch/issues/7127)) ([e393096](https://github.com/langwatch/langwatch/commit/e393096c51b5200cb71f7db56c2f00958b95ec06))
+* **ops:** give the event-sourcing page a sidebar and dead letters a home ([#7085](https://github.com/langwatch/langwatch/issues/7085)) ([3fb479d](https://github.com/langwatch/langwatch/commit/3fb479d60ba47e37b6b355dacae7a4db13dcb9a4))
+* **ops:** one writer publishes the ops snapshot every pod serves, and the scheduler gets controls (ADR-090, ADR-091) ([#6859](https://github.com/langwatch/langwatch/issues/6859)) ([37edf25](https://github.com/langwatch/langwatch/commit/37edf25a79de8fba9489488cc4c2c3c18244a71d))
+* project-scoped coding-agent instrumentation, lazy virtual keys, CLI help cleanup ([#7057](https://github.com/langwatch/langwatch/issues/7057)) ([0f2c353](https://github.com/langwatch/langwatch/commit/0f2c353fa1ac59ac963f8b95fce7a1e43ba6edbe))
+* **scenarios:** add maxTurns/minTurns to scenario editor ([#6932](https://github.com/langwatch/langwatch/issues/6932)) ([986ed11](https://github.com/langwatch/langwatch/commit/986ed110de6169c8db36b1386463255f4e120878))
+* **scenarios:** judge on remote traces with per-turn propagation and a local dev tunnel ([#7070](https://github.com/langwatch/langwatch/issues/7070)) ([56689a3](https://github.com/langwatch/langwatch/commit/56689a327857169ce0d458a08f9e105ef28e182b))
+* **scenarios:** open the parameters editor with a row ready to fill ([#7045](https://github.com/langwatch/langwatch/issues/7045)) ([5105bbf](https://github.com/langwatch/langwatch/commit/5105bbf2ebc1933d99bf1fe8a8d6885adb98642a))
+* **scenarios:** scenario run parameters and http secret references ([#6906](https://github.com/langwatch/langwatch/issues/6906)) ([a21b7a1](https://github.com/langwatch/langwatch/commit/a21b7a15f0a98e6a5a4754eea0b8a33729561d24))
+* **simulations:** run simulation execution on the process-manager substrate (ADR-094) ([#6946](https://github.com/langwatch/langwatch/issues/6946)) ([122b1d7](https://github.com/langwatch/langwatch/commit/122b1d7790be4eab8b38335172c63cf85cad5182))
+* sync wait mode for langy turns + gateway provider routing fixes ([#7006](https://github.com/langwatch/langwatch/issues/7006)) ([d826d5a](https://github.com/langwatch/langwatch/commit/d826d5af905817f51bc61229c9caef88c91c0152))
+* **traces:** extract AWS Bedrock Converse payloads into trace I/O ([#6984](https://github.com/langwatch/langwatch/issues/6984)) ([a63e703](https://github.com/langwatch/langwatch/commit/a63e7034b389b07f767efd339bf055decb1b349b))
+* **traces:** remove the legacy trace UI ([#6902](https://github.com/langwatch/langwatch/issues/6902)) ([c2ee570](https://github.com/langwatch/langwatch/commit/c2ee5708c78ea9733bb67b321201d98685dec24d))
+* **webhooks:** deliver to SQS as a per-endpoint destination ([#6925](https://github.com/langwatch/langwatch/issues/6925)) ([4c30bf3](https://github.com/langwatch/langwatch/commit/4c30bf3595b40d0d9cd5b04a936639f3ed8d9597))
+
+
+### Bug Fixes
+
+* **agents:** test an HTTP agent through the engine that runs it ([#6942](https://github.com/langwatch/langwatch/issues/6942)) ([251bf0c](https://github.com/langwatch/langwatch/commit/251bf0c23edbf89120372715dc663cb17e5ad428))
+* **ai-gateway:** a provider-native route decides its own vendor ([#7049](https://github.com/langwatch/langwatch/issues/7049)) ([5945b0c](https://github.com/langwatch/langwatch/commit/5945b0c413a667a4076b0d5a3c5f286ca4eae2ab))
+* **ai-gateway:** provider access allows scope-reachable providers and the gateway says why a request was blocked ([#7063](https://github.com/langwatch/langwatch/issues/7063)) ([edfba78](https://github.com/langwatch/langwatch/commit/edfba7850fe0ff25485ce214a54f09f3df5709df))
+* **aigateway:** make graceful shutdown actually happen, and give a stream the budget it is promised ([#7003](https://github.com/langwatch/langwatch/issues/7003)) ([f4258df](https://github.com/langwatch/langwatch/commit/f4258dfd62f7e667329c005121d32f9c28b9b6ac))
+* **app:** stop the nested-update storm that wedges navigation after a prompt chat (React [#185](https://github.com/langwatch/langwatch/issues/185)) ([#6931](https://github.com/langwatch/langwatch/issues/6931)) ([5ad9b57](https://github.com/langwatch/langwatch/commit/5ad9b57f897b16e4948cd8e585e2f2541e3070d5))
+* **ci:** re-arm a dead ast-grep rule and repoint stale post-restructure paths ([#6892](https://github.com/langwatch/langwatch/issues/6892)) ([4a88619](https://github.com/langwatch/langwatch/commit/4a88619d46f30f14212d8e366c83855030249db4))
+* **ci:** treat an allow-list checkout as already lean ([#7102](https://github.com/langwatch/langwatch/issues/7102)) ([576ebfe](https://github.com/langwatch/langwatch/commit/576ebfe8f6d9abbff01c6315efb0a9c6c841cdbb))
+* **cli:** make scenario run --wait count only its own batch ([#7144](https://github.com/langwatch/langwatch/issues/7144)) ([1a0fd66](https://github.com/langwatch/langwatch/commit/1a0fd66208c63656c2762659e3b02b98382a8449))
+* **coding-agent:** link a pull request the moment GitHub announces it ([#6849](https://github.com/langwatch/langwatch/issues/6849)) ([411ccc4](https://github.com/langwatch/langwatch/commit/411ccc4199d3b0fa1d0d885b9ccbaaf994ccd215))
+* **costs:** let the hand-written overlay override a wrong generated price ([#7046](https://github.com/langwatch/langwatch/issues/7046)) ([17d7e9a](https://github.com/langwatch/langwatch/commit/17d7e9ae7226421e9793bef9f3797d70a19e4014))
+* **costs:** unbreak the price guard, and correct the gpt-realtime-2 text output rate ([#7058](https://github.com/langwatch/langwatch/issues/7058)) ([8168415](https://github.com/langwatch/langwatch/commit/8168415ceeb1ee7c5187d075601220f6a1bd90c3))
+* **data-privacy:** keep identifier-shaped attribute values out of phone redaction ([#7017](https://github.com/langwatch/langwatch/issues/7017)) ([53471ed](https://github.com/langwatch/langwatch/commit/53471ed639bbc1dcb3f7977edff4625978c23cb1))
+* **errors:** recognise a validation failure whichever zod threw it ([#7106](https://github.com/langwatch/langwatch/issues/7106)) ([689d1aa](https://github.com/langwatch/langwatch/commit/689d1aacfee9e409700d3fb7d75c6f3000beea7d))
+* **event-sourcing:** confirm worker deaths before parking a group ([#6922](https://github.com/langwatch/langwatch/issues/6922)) ([a6cd99a](https://github.com/langwatch/langwatch/commit/a6cd99a0df08798eeafc81bfb942ae41c37242c8))
+* **experiments:** let a row the judge could not settle explain itself ([#6928](https://github.com/langwatch/langwatch/issues/6928)) ([853b1a1](https://github.com/langwatch/langwatch/commit/853b1a1343adce6edcf84c8a3d7e418f3594701a))
+* **governance:** replace hardcoded white backgrounds with theme tokens in ingestion sources drawers ([#7161](https://github.com/langwatch/langwatch/issues/7161)) ([c32644c](https://github.com/langwatch/langwatch/commit/c32644c26dc9a228ea3fa3ce4aa8ae007b2f612f))
+* **lint:** let Biome run from the repo root ([#7108](https://github.com/langwatch/langwatch/issues/7108)) ([16d5c4f](https://github.com/langwatch/langwatch/commit/16d5c4f82b4b3187490dbfba957cef24bb3c5faf))
+* **model-providers:** classify credential fields fail-closed ([#7050](https://github.com/langwatch/langwatch/issues/7050)) ([481a7b5](https://github.com/langwatch/langwatch/commit/481a7b5667741b03aef5ce700f72b786ffa8889c))
+* **model-providers:** one default-models config per scope, wide-to-narrow inherit, no 500 on save ([#7002](https://github.com/langwatch/langwatch/issues/7002)) ([66612ec](https://github.com/langwatch/langwatch/commit/66612ec6b848445852cfa9db0b8689f7a1fdb9b8))
+* **observability:** bound the reads and level the logs that hid a six-day fleet crash ([#7125](https://github.com/langwatch/langwatch/issues/7125)) ([54cdbfc](https://github.com/langwatch/langwatch/commit/54cdbfc066707d8cd7fb9df361a3623a7dcbf99b))
+* **observability:** keep request bytes out of the logs, and name an uncaused 5xx ([#6992](https://github.com/langwatch/langwatch/issues/6992)) ([98ac6a5](https://github.com/langwatch/langwatch/commit/98ac6a5224c00bc9a82d43efc93fe1f34a40f7a4))
+* **ops:** close the type-argument list that made the dead-letter read a comparison ([#7095](https://github.com/langwatch/langwatch/issues/7095)) ([60fa445](https://github.com/langwatch/langwatch/commit/60fa445a3e320bc7d281d3f650ee3fc4a7d3cea6))
+* **ops:** drop the namespace the dead-letter block stopped using ([#7104](https://github.com/langwatch/langwatch/issues/7104)) ([b22a34b](https://github.com/langwatch/langwatch/commit/b22a34b0035093dee9daadaf6cd1394d8d07f89f))
+* **ops:** register the /ops/migrations route so the sidebar link opens ([#7113](https://github.com/langwatch/langwatch/issues/7113)) ([cb31fec](https://github.com/langwatch/langwatch/commit/cb31fecf0a64d5e3401ce0c4f75f0b9f75a1a9e1))
+* **process-manager:** outbox lease hardening: attempts at lease, loud fencing, batch-tail shedding, stuck-drain watchdog ([#7037](https://github.com/langwatch/langwatch/issues/7037)) ([8a240e0](https://github.com/langwatch/langwatch/commit/8a240e08ee8fa5098156028e821aa24b2a7b4494))
+* **readme:** repair nine dead links and check them in CI ([#6878](https://github.com/langwatch/langwatch/issues/6878)) ([3d7448b](https://github.com/langwatch/langwatch/commit/3d7448b21a33568b41d61fcdd9fc92bf9bf48414))
+* **redis:** close the ownership guard's blind spots and stop silent auth writes ([#6957](https://github.com/langwatch/langwatch/issues/6957)) ([a195fa6](https://github.com/langwatch/langwatch/commit/a195fa66a803b9a788869ae292f54988ee3d80ec))
+* **scim:** read PATCH operation names without regard to case, so Entra can offboard ([#7121](https://github.com/langwatch/langwatch/issues/7121)) ([5fa3602](https://github.com/langwatch/langwatch/commit/5fa36026c517f105d987de4a51074c1b72433e63))
+* **sso:** count Auth0 SAML logins as verified emails so account linking works ([#7008](https://github.com/langwatch/langwatch/issues/7008)) ([2803659](https://github.com/langwatch/langwatch/commit/28036594a0357ed9dbaa4421271fcf42e256681d))
+
+
+### Miscellaneous
+
+* **deps:** bump the aws-sdk group across 1 directory with 6 updates ([#7087](https://github.com/langwatch/langwatch/issues/7087)) ([4d34fae](https://github.com/langwatch/langwatch/commit/4d34faefcdb4f690178472249dda053ea04bc1a6))
+* **deps:** bump the react group across 1 directory with 2 updates ([#7088](https://github.com/langwatch/langwatch/issues/7088)) ([124b087](https://github.com/langwatch/langwatch/commit/124b08708c270d6d039497a55764cfc802529a25))
+* **deps:** upgrade Prisma to 7.9.1 and tRPC to 11 (TanStack Query 5) ([#6697](https://github.com/langwatch/langwatch/issues/6697)) ([5f3122a](https://github.com/langwatch/langwatch/commit/5f3122a525a404c4ff136337dfeec81bbd4fdc9e))
+* **scenarios:** re-vendor @langwatch/scenario 1.2.0 ([#7135](https://github.com/langwatch/langwatch/issues/7135)) ([13beae9](https://github.com/langwatch/langwatch/commit/13beae9c7437d91f8a22973dfdcd23eef9c23350))
+* sync model registry ([c854b70](https://github.com/langwatch/langwatch/commit/c854b70a971dcb3520760319a0965552b7a69083))
+* sync model registry ([5e0a8ad](https://github.com/langwatch/langwatch/commit/5e0a8ad44c017fe81ff75abea6eb6874e8e08a9e))
+* sync model registry (436 models) ([#7059](https://github.com/langwatch/langwatch/issues/7059)) ([5e0a8ad](https://github.com/langwatch/langwatch/commit/5e0a8ad44c017fe81ff75abea6eb6874e8e08a9e))
+* sync model registry (441 models) ([#7082](https://github.com/langwatch/langwatch/issues/7082)) ([c854b70](https://github.com/langwatch/langwatch/commit/c854b70a971dcb3520760319a0965552b7a69083))
+
+
+### Documentation
+
+* **adr:** one automation flow with a subject choice, and Slack as a project integration (ADR-093) ([#6901](https://github.com/langwatch/langwatch/issues/6901)) ([4f68a37](https://github.com/langwatch/langwatch/commit/4f68a37660ef271c36d9930d77094ff90a12b4fc))
+* **adr:** record the realtime voice session broker decision (ADR-097) ([#7019](https://github.com/langwatch/langwatch/issues/7019)) ([900e657](https://github.com/langwatch/langwatch/commit/900e65785335dd09a4607735a9082af98c1bdf31))
+* **logging:** identifiers are logged raw, and the linters now agree ([#7093](https://github.com/langwatch/langwatch/issues/7093)) ([523e07e](https://github.com/langwatch/langwatch/commit/523e07e8c59cc0fa172d9ea0ab65617542be096b))
+* rewrite marketing language in simple technical English ([#7020](https://github.com/langwatch/langwatch/issues/7020)) ([68faaf5](https://github.com/langwatch/langwatch/commit/68faaf577bf9623c7ffbf8e1a8a500deabf3e036))
+* **scim:** say plainly that an unrecognized PATCH operation name is rejected ([#7130](https://github.com/langwatch/langwatch/issues/7130)) ([d72b184](https://github.com/langwatch/langwatch/commit/d72b1840987e34fa6c7529644afb079f2c37022f))
+
+
+### Code Refactoring
+
+* **clickhouse:** a client class, and a cluster name on every failure ([#6947](https://github.com/langwatch/langwatch/issues/6947)) ([3377d12](https://github.com/langwatch/langwatch/commit/3377d1267122085f3d73fbd3f9a27af0e55aab38))
+* **event-sourcing:** retire the reactor vocabulary — post-event work is subscribers and process managers (ADR-098) ([#6956](https://github.com/langwatch/langwatch/issues/6956)) ([8609798](https://github.com/langwatch/langwatch/commit/8609798ba36387596a62f8c513fd76660bd500dc))
+* **ops:** answer each operator question on one surface ([#7099](https://github.com/langwatch/langwatch/issues/7099)) ([8f8ee6b](https://github.com/langwatch/langwatch/commit/8f8ee6b7cd50514c2639d672d7bf8f501d709c04))
+* **redis:** make Redis an owned client, not a module singleton ([#6829](https://github.com/langwatch/langwatch/issues/6829)) ([2f9e913](https://github.com/langwatch/langwatch/commit/2f9e913b7923972760f443712accc13f81975499))
+* **typescript:** move the workspace to TypeScript 7, and stop a typecheck filling a 9 GiB ceiling ([#7081](https://github.com/langwatch/langwatch/issues/7081)) ([f79b748](https://github.com/langwatch/langwatch/commit/f79b74898b6a921823ebd32c57ac2295d79e6113))
+
 ## [3.13.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.12.0...langwatch@v3.13.0) (2026-08-13)
 
 
