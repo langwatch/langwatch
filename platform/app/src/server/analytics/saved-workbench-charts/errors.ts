@@ -2,14 +2,14 @@
  * The refusals a saved workbench chart can earn.
  *
  * Only the failures with no existing home are named here. A statement the
- * governed validator refuses keeps *its* refusal — `governed_sql_unparseable`,
- * `governed_sql_not_permitted`, `governed_sql_parameter_missing` — because the
+ * LangWatchQL validator refuses keeps *its* refusal — `lwql_unparseable`,
+ * `lwql_not_permitted`, `lwql_parameter_missing` — because the
  * cause is identical whether the member pressed Run or Save, and a parallel
  * code would fork copy, remediation and client rendering that already exist for
  * the same mistake.
  *
  * @see dev/docs/best_practices/error-handling.md
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { HandledError } from "@langwatch/handled-error";

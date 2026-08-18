@@ -2,7 +2,7 @@
  * The `CustomGraph.kind` values, and the one place they are spelled.
  *
  * Two features share the `CustomGraph` table: the chart builder, which has been
- * writing rows since before the column existed, and the governed SQL workbench,
+ * writing rows since before the column existed, and the LangWatchQL workbench,
  * whose `graph` column holds a versioned `{ sql, parameters, vegaLiteSpec }`
  * definition instead of a builder payload. `kind` is what keeps them apart.
  *
@@ -14,7 +14,7 @@
  * directions rather than only in the newer one.
  *
  * @see prisma/schema.prisma — the `CustomGraph.kind` column
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 /**
@@ -26,5 +26,5 @@
  */
 export const BUILDER_CHART_KIND = "builder";
 
-/** The kind a saved governed SQL workbench chart carries. */
+/** The kind a saved LangWatchQL workbench chart carries. */
 export const WORKBENCH_SQL_CHART_KIND = "workbench_sql";
