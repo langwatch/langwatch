@@ -728,6 +728,44 @@ describe("TerminalView", () => {
         expect(screen.getByText("$0.06")).toBeInTheDocument();
       });
     });
+
+    describe("when an earlier turn carries no totals of its own", () => {
+      /** @scenario "The footer states no total it cannot count in full" */
+      it("reports no total rather than one short by that turn", () => {
+        renderView({
+          earlierTotals: { tokens: null, costUsd: null },
+          sessionStartAtMs: 500,
+          scrollback: {
+            status: "available",
+            earlierCount: 5,
+            onLoadEarlier: vi.fn(),
+          },
+        });
+
+        // The loaded window alone holds 175 tokens and $0.06. Printed as the
+        // session total they read as the whole session, which they are not.
+        expect(screen.queryByText(/tokens/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/^\$/)).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the reader may not see cost", () => {
+      /** @scenario "A reader without cost:view still reads the session's tokens" */
+      it("counts the session's tokens and states no cost", () => {
+        renderView({
+          earlierTotals: { tokens: 1_000, costUsd: null },
+          sessionStartAtMs: 500,
+          scrollback: {
+            status: "available",
+            earlierCount: 5,
+            onLoadEarlier: vi.fn(),
+          },
+        });
+
+        expect(screen.getByText("1.2K tokens")).toBeInTheDocument();
+        expect(screen.queryByText(/^\$/)).not.toBeInTheDocument();
+      });
+    });
   });
 
   describe("given the loaded transcript starts mid-session with its context already grown", () => {

@@ -340,7 +340,8 @@ describe("useSessionScrollback", () => {
     });
 
     describe("when one of the turns carries no totals", () => {
-      it("counts a turn without totals as zero rather than dropping the rest", () => {
+      /** @scenario "The footer states no total it cannot count in full" */
+      it("reports no total rather than a sum short by that turn", () => {
         conversation.turns = [
           { traceId: "turn-1", timestamp: 1_000 },
           {
@@ -354,8 +355,40 @@ describe("useSessionScrollback", () => {
         const { result } = setup();
 
         expect(result.current.earlierTotals).toEqual({
-          tokens: 50,
-          costUsd: 1,
+          tokens: null,
+          costUsd: null,
+        });
+      });
+    });
+
+    describe("when the reader may not see cost", () => {
+      /** @scenario "A reader without cost:view still reads the session's tokens" */
+      it("keeps the token total and reports no cost", () => {
+        conversation.turns = [
+          {
+            traceId: "turn-1",
+            timestamp: 1_000,
+            totalTokens: 40,
+            totalCost: null,
+          },
+          {
+            traceId: "turn-2",
+            timestamp: 2_000,
+            totalTokens: 60,
+            totalCost: null,
+          },
+          {
+            traceId: "turn-3",
+            timestamp: 3_000,
+            totalTokens: 10,
+            totalCost: null,
+          },
+        ];
+        const { result } = setup();
+
+        expect(result.current.earlierTotals).toEqual({
+          tokens: 100,
+          costUsd: null,
         });
       });
     });

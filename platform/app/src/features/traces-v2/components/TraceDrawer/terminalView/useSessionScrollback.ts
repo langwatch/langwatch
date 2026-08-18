@@ -61,9 +61,10 @@ export interface SessionScrollback {
    * Totals of those unloaded earlier turns, from the session's turn list, so
    * the bottom bar can count the whole session up to the reader's position.
    * Loading a turn moves its share from here into the loaded entries, so the
-   * sum the bar shows stays put. Null when the trace has no walkable session.
+   * sum the bar shows stays put. Null when the trace has no walkable session,
+   * and a field is null when one of those turns does not carry it.
    */
-  earlierTotals: { tokens: number; costUsd: number } | null;
+  earlierTotals: EarlierTotals | null;
   /** When the session's first turn started; null without a walkable session. */
   sessionStartAtMs: number | null;
   loadEarlier: () => void;
@@ -347,6 +348,33 @@ function useOpenedTurn({
 }
 
 /**
+ * What the bottom bar counts from the turns above the loaded window. A field is
+ * null when one of those turns does not carry it, which is not the same as
+ * zero: the session total for that field cannot be stated at all, and the bar
+ * leaves it out rather than reporting a sum that is short by the turns it could
+ * not read. Cost is null for a reader without `cost:view`, since the turn list
+ * carries no spend for them.
+ */
+export type EarlierTotals = {
+  tokens: number | null;
+  costUsd: number | null;
+};
+
+/**
+ * The sum, or null when one of the values is absent. A turn that carries no
+ * total is not a turn that counted for nothing, so a sum that skips it is not a
+ * total at all.
+ */
+function sumOrNull(values: (number | null | undefined)[]): number | null {
+  let sum = 0;
+  for (const value of values) {
+    if (value == null) return null;
+    sum += value;
+  }
+  return sum;
+}
+
+/**
  * Where the bottom bar counts from: the totals of the turns above the loaded
  * window, and the session's own start.
  *
@@ -363,18 +391,16 @@ function useSessionBaseline({
   turns: ConversationTurn[];
   oldestLoadedIndex: number;
 }): {
-  earlierTotals: { tokens: number; costUsd: number } | null;
+  earlierTotals: EarlierTotals | null;
   sessionStartAtMs: number | null;
 } {
   const earlierTotals = useMemo(() => {
     if (!hasSession) return null;
-    let tokens = 0;
-    let costUsd = 0;
-    for (let i = 0; i < oldestLoadedIndex; i++) {
-      tokens += turns[i]?.totalTokens ?? 0;
-      costUsd += turns[i]?.totalCost ?? 0;
-    }
-    return { tokens, costUsd };
+    const earlier = turns.slice(0, oldestLoadedIndex);
+    return {
+      tokens: sumOrNull(earlier.map((turn) => turn.totalTokens)),
+      costUsd: sumOrNull(earlier.map((turn) => turn.totalCost)),
+    };
   }, [hasSession, turns, oldestLoadedIndex]);
 
   return {

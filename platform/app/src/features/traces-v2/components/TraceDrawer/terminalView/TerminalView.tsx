@@ -42,6 +42,7 @@ import {
 import { parsePatchHunks, type TerminalToolSpan } from "./toolSpans";
 import {
   CONVERSATION_TURN_CAP,
+  type EarlierTotals,
   type ScrollbackStatus,
 } from "./useSessionScrollback";
 
@@ -318,9 +319,10 @@ interface TerminalViewProps {
    * Totals of the session's turns above the loaded window, so the bottom bar
    * reports the whole session up to the reader's position rather than only
    * what happens to be loaded. Loading a turn moves its share from here into
-   * the entries, so the sum never moves.
+   * the entries, so the sum never moves. A null field means one of those turns
+   * does not carry it, so the bar leaves that stat out.
    */
-  earlierTotals?: { tokens: number; costUsd: number } | null;
+  earlierTotals?: EarlierTotals | null;
   /** When the session's first turn started — anchors the bar's elapsed time. */
   sessionStartAtMs?: number | null;
 }
@@ -646,10 +648,14 @@ export const TerminalView = memo(function TerminalView({
       <StatusLine
         stepCount={visibleIndices.length}
         currentStep={trackedStep}
-        tokens={(earlierTotals?.tokens ?? 0) + (point?.cumulativeTokens ?? 0)}
-        costUsd={
-          (earlierTotals?.costUsd ?? 0) + (point?.cumulativeCostUsd ?? 0)
-        }
+        tokens={sessionTotal(
+          earlierTotals?.tokens,
+          point?.cumulativeTokens ?? 0,
+        )}
+        costUsd={sessionTotal(
+          earlierTotals?.costUsd,
+          point?.cumulativeCostUsd ?? 0,
+        )}
         elapsedMs={point?.elapsedMs ?? 0}
         model={modelAtScroll}
         sessionName={sessionName}
@@ -657,6 +663,24 @@ export const TerminalView = memo(function TerminalView({
     </VStack>
   );
 });
+
+/**
+ * The session's running total at the reader's position: what the turns above
+ * the loaded window carry, plus what the loaded window has counted so far.
+ *
+ * `undefined` for the earlier part means there is no session above the loaded
+ * window, so the loaded total IS the session total. `null` means the turns are
+ * there but one of them does not carry this field, so the session total cannot
+ * be stated and the bar drops the stat rather than reporting a sum that is
+ * short by the turns it could not read.
+ */
+function sessionTotal(
+  earlier: number | null | undefined,
+  loaded: number,
+): number | null {
+  if (earlier === null) return null;
+  return (earlier ?? 0) + loaded;
+}
 
 /** The nearest model in effect at or before `fullIndex` — sessions mostly use one. */
 function modelAt(entries: TranscriptEntry[], fullIndex: number): string | null {
@@ -1630,8 +1654,9 @@ function StatusLine({
 }: {
   stepCount: number;
   currentStep: number;
-  tokens: number;
-  costUsd: number;
+  /** Null when the session total cannot be stated, which is not zero. */
+  tokens: number | null;
+  costUsd: number | null;
   elapsedMs: number;
   model?: string | null;
   sessionName?: string | null;
@@ -1691,8 +1716,12 @@ function StatusLine({
           {elapsedMs > 0 && (
             <Stat label={formatDurationSeconds(elapsedMs / 1000)} />
           )}
-          {tokens > 0 && <Stat label={`${formatTokens(tokens)} tokens`} />}
-          {costUsd > 0 && <Stat label={formatCost(costUsd)} accent />}
+          {tokens !== null && tokens > 0 && (
+            <Stat label={`${formatTokens(tokens)} tokens`} />
+          )}
+          {costUsd !== null && costUsd > 0 && (
+            <Stat label={formatCost(costUsd)} accent />
+          )}
         </HStack>
       </HStack>
     </VStack>

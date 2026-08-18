@@ -186,6 +186,26 @@ Rule: The terminal reads back the whole session
     When an earlier turn is loaded above the reader
     Then the cost, tokens, and elapsed time at that position stay the same
 
+  # A turn that carries no total is not a turn that cost nothing. Counting it as
+  # zero makes the bar report a session total that is short by that turn, and
+  # the reader has no way to see that it is short. The bar states a total it can
+  # stand behind, or it states none. Spend is the everyday case: a reader
+  # without cost:view gets no per-turn cost at all, so the session cost is not
+  # theirs to read, while the token count still is.
+
+  @integration
+  Scenario: The footer states no total it cannot count in full
+    Given an earlier turn of the session carries no token total
+    When the reader reads the bottom bar
+    Then the bar reports no token total
+
+  @integration
+  Scenario: A reader without cost:view still reads the session's tokens
+    Given the session's earlier turns carry tokens but no cost
+    When the reader reads the bottom bar
+    Then the bar reports the token total
+    And the bar reports no cost
+
   @unit
   Scenario: The turn list carries each turn's cost and tokens
     Given a session whose turns are listed by the conversation read
