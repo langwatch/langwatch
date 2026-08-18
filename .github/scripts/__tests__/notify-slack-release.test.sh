@@ -121,7 +121,9 @@ fi
 # so the chunker has to cut the line itself.
 # ---------------------------------------------------------------------------
 LONG_LINE_CHANGELOG="$WORK_DIR/long-line-changelog.md"
-LONG_SUBJECT=$(head -c 7000 < /dev/zero | tr '\0' 'x')
+# Only this line carries the letter Z, so a count over the sent blocks tells
+# a split apart from a truncation.
+LONG_SUBJECT=$(head -c 7000 < /dev/zero | tr '\0' 'Z')
 {
   echo "## [1.2.3](https://github.com/langwatch/langwatch/compare/v1.2.2...v1.2.3) (2026-08-18)"
   echo ""
@@ -135,6 +137,17 @@ assert_eq "$RUN_EXIT" "0" "single oversized line exits 0"
 
 OVER_CAP=$(section_texts | jq '[.[] | select(length > 3000)] | length')
 assert_eq "$OVER_CAP" "0" "a single line past the cap is cut into blocks under the cap"
+
+# The blocks joined back together must still hold the whole line. Without
+# this, an implementation that drops the remainder passes the cap check.
+SENT_JOINED=$(section_texts | jq -r 'join("")' | tr -d '\n')
+SENT_Z_COUNT=$(printf '%s' "$SENT_JOINED" | tr -cd 'Z' | wc -c | tr -d ' ')
+assert_eq "$SENT_Z_COUNT" "7000" "the oversized line is split, not truncated"
+
+case "$SENT_JOINED" in
+  *"$LONG_SUBJECT"*) pass "the oversized line survives the split unbroken" ;;
+  *) fail "the oversized line should survive the split unbroken" ;;
+esac
 
 # ---------------------------------------------------------------------------
 # A small changelog stays in one section block.
