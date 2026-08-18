@@ -403,8 +403,8 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Routing policies](https://langwatch.ai/docs/ai-gateway/governance/routing-policies.md): An admin decides once which providers and models a key can reach. Virtual keys point at that decision instead of carrying their own copy.
 - [Retention](https://langwatch.ai/docs/ai-gateway/governance/retention.md): How long governance and gateway data lives, tenant retention policies, what is deliberately exempt, and what that means for compliance evidence.
 - [OCSF / SIEM export](https://langwatch.ai/docs/ai-gateway/governance/ocsf-export.md): Pull LangWatch governance events into Splunk, Datadog Security, AWS Security Hub, Microsoft Sentinel, Elastic Security, or Sumo Logic CSE. Cursor-paginated OCSF v1.1 read API. Auth-scoped to org admin or auditor. Cron-pull pattern.
-- [LangWatch governance — architecture](https://langwatch.ai/docs/ai-gateway/governance/architecture.md): How the personal-keys flow, AI Gateway, Activity Monitor, RoutingPolicy admin, and IngestionSource pipeline fit into one control plane.
-- [Activity Monitor — event-sourcing architecture](https://langwatch.ai/docs/ai-gateway/governance/activity-monitor-event-sourcing.md): Why the receiver → event_log → projection reactor → anomaly reactor pipeline replaces the original direct-CH-write design, and how to extend it.
+- [LangWatch governance architecture](https://langwatch.ai/docs/ai-gateway/governance/architecture.md): How the personal-keys flow, AI Gateway, Activity Monitor, RoutingPolicy admin, and IngestionSource pipeline fit into one control plane.
+- [Activity Monitor event-sourcing architecture](https://langwatch.ai/docs/ai-gateway/governance/activity-monitor-event-sourcing.md): Why the receiver → event_log → projection subscriber → anomaly subscriber pipeline replaces the original direct-CH-write design, and how to extend it.
 
 ## Providers
 
