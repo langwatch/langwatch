@@ -455,6 +455,14 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then PostgreSQL rejects the write
     And the role can select only from the explicitly approved views
 
+  @unit
+  Scenario: Every approved view is named under the prefix the reader's grants match
+    Given the reader role's SELECT grants are provisioned by matching approved view names against the lwql_ prefix
+    When the approved views the catalog declares are read
+    Then every one of them is named under that prefix
+    And every view statement the provisioner emits creates a view under that prefix
+    And a view named outside it would be created without a grant, and so read as empty rather than fail
+
   @integration
   Scenario: PG connection credentials are not exposed to the restricted identity
     Given a PG-resident table is mapped into ClickHouse through the server-side named collection
@@ -988,3 +996,4 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 # PG-role containment invariants from the design (named-collection role limits):
 #   → Scenario: The dedicated PG role is read-only at the PostgreSQL layer
 #   → Scenario: The restricted identity cannot write through a PG-engine mapped table
+#   → Scenario: Every approved view is named under the prefix the reader's grants match
