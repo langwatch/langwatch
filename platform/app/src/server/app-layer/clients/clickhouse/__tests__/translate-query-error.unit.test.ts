@@ -199,9 +199,21 @@ describe("translateClickHouseQueryError", () => {
 
 describe("isClickHouseObjectUnavailableError", () => {
   it.each([
-    ["UNKNOWN_TABLE by driver properties", { code: "60", type: "UNKNOWN_TABLE" }, "boom"],
-    ["UNKNOWN_DATABASE by driver properties", { code: "81", type: "UNKNOWN_DATABASE" }, "boom"],
-    ["ACCESS_DENIED by driver properties", { code: "497", type: "ACCESS_DENIED" }, "boom"],
+    [
+      "UNKNOWN_TABLE by driver properties",
+      { code: "60", type: "UNKNOWN_TABLE" },
+      "boom",
+    ],
+    [
+      "UNKNOWN_DATABASE by driver properties",
+      { code: "81", type: "UNKNOWN_DATABASE" },
+      "boom",
+    ],
+    [
+      "ACCESS_DENIED by driver properties",
+      { code: "497", type: "ACCESS_DENIED" },
+      "boom",
+    ],
     [
       "UNKNOWN_TABLE from raw HTTP text",
       {},
