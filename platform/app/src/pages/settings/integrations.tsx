@@ -505,29 +505,21 @@ function SlackLegacyTokenCensus({
   );
 }
 
-/** Paste a bot token to connect, or paste a new one to rotate — the same form
- *  and the same write, because Slack revalidates either way and the ciphertext
- *  is replaced either way. */
-function SlackTokenForm({
-  projectId,
+/** Connect and disconnect as one pair, so the form below stays about the form.
+ *  Both report through the toaster because neither has a field to fail into —
+ *  the token is the whole input, and Slack decides it is bad after the write. */
+function useSlackConnection({
   projectName,
-  connected,
-  canManage,
+  onConnected,
   onChanged,
 }: {
-  projectId: string;
   projectName: string | null;
-  connected: boolean;
-  canManage: boolean;
+  onConnected: () => void;
   onChanged: () => void;
 }) {
-  const [token, setToken] = useState("");
-  const [showForm, setShowForm] = useState(false);
-
   const connect = api.slackIntegration.connect.useMutation({
     onSuccess: (integration) => {
-      setToken("");
-      setShowForm(false);
+      onConnected();
       onChanged();
       toaster.create({
         type: "success",
@@ -559,6 +551,37 @@ function SlackTokenForm({
           fallbackTitle: "Couldn't disconnect Slack",
         }),
       }),
+  });
+
+  return { connect, disconnect };
+}
+
+/** Paste a bot token to connect, or paste a new one to rotate — the same form
+ *  and the same write, because Slack revalidates either way and the ciphertext
+ *  is replaced either way. */
+function SlackTokenForm({
+  projectId,
+  projectName,
+  connected,
+  canManage,
+  onChanged,
+}: {
+  projectId: string;
+  projectName: string | null;
+  connected: boolean;
+  canManage: boolean;
+  onChanged: () => void;
+}) {
+  const [token, setToken] = useState("");
+  const [showForm, setShowForm] = useState(false);
+
+  const { connect, disconnect } = useSlackConnection({
+    projectName,
+    onConnected: () => {
+      setToken("");
+      setShowForm(false);
+    },
+    onChanged,
   });
 
   if (!canManage) {
