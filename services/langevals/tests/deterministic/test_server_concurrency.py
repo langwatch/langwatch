@@ -301,6 +301,86 @@ def test_capacity_freed_after_the_deadline_does_not_admit():
         assert gate.active_evaluations == 1
 
 
+def test_a_repeating_environment_cannot_hold_the_queue_front():
+    """A request joins a queued generation of its own env, but not a running one.
+
+    Requests that arrive while their own env is still queued join that
+    queued generation, because batching same-env work is what the gate is
+    for. That costs the env behind them one generation, never more: the
+    moment the generation starts, its waiters leave the queue and the front
+    belongs to the next env, so every later request of the running env
+    queues behind it. A repeating env therefore cannot hold the front.
+    """
+    gate = server.EvaluationGate(max_concurrent=3, timeout_seconds=30)
+    env_a = (("OPENAI_API_KEY", "a"),)
+    env_b = (("OPENAI_API_KEY", "b"),)
+    env_c = (("OPENAI_API_KEY", "c"),)
+    entered: list[str] = []
+    entered_lock = threading.Lock()
+    releases = {name: threading.Event() for name in ("a", "b1", "b2", "c", "b3")}
+    threads: dict[str, threading.Thread] = {}
+
+    def entered_so_far() -> list[str]:
+        with entered_lock:
+            return list(entered)
+
+    def start(name: str, key: tuple) -> None:
+        def run():
+            with gate.admit(key):
+                with entered_lock:
+                    entered.append(name)
+                releases[name].wait(5)
+
+        threads[name] = threading.Thread(target=run)
+        threads[name].start()
+
+    start("a", env_a)
+    wait_until(lambda: gate.active_evaluations == 1, "A was not admitted")
+
+    start("b1", env_b)
+    wait_until(lambda: gate.waiting_environments == [env_b], "B never queued")
+    start("c", env_c)
+    wait_until(
+        lambda: gate.waiting_environments == [env_b, env_c],
+        "C never queued behind B",
+    )
+    # Arrives while B is still queued and C waits behind it, so it joins B's
+    # queued generation instead of forming a third one after C.
+    start("b2", env_b)
+    wait_until(lambda: gate.waiting_evaluations == 3, "The second B never queued")
+
+    releases["a"].set()
+    wait_until(
+        lambda: gate.active_evaluations == 2, "Both B requests did not run together"
+    )
+
+    # B is running now, so it no longer holds the queue front. This request
+    # queues behind C even though its env matches the running generation and
+    # the gate still has spare capacity.
+    start("b3", env_b)
+    wait_until(
+        lambda: gate.waiting_environments == [env_c, env_b],
+        "The late B never queued behind C",
+    )
+
+    releases["b1"].set()
+    releases["b2"].set()
+    wait_until(lambda: "c" in entered_so_far(), "C did not run after B drained")
+    releases["c"].set()
+    wait_until(lambda: "b3" in entered_so_far(), "The late B did not run after C")
+    releases["b3"].set()
+
+    for name, thread in threads.items():
+        thread.join(timeout=5)
+        assert not thread.is_alive(), f"{name} never finished"
+
+    assert entered[0] == "a"
+    assert set(entered[1:3]) == {"b1", "b2"}
+    assert entered[3:] == ["c", "b3"]
+    assert gate.active_evaluations == 0
+    assert gate.waiting_evaluations == 0
+
+
 def test_model_env_key_ignores_non_model_vars():
     assert server.model_env_key(None) == ()
     assert server.model_env_key({"NOT_A_MODEL_VAR": "x"}) == ()

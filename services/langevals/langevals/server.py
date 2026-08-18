@@ -135,6 +135,10 @@ class EvaluationGate:
     def waiting_environments(self) -> list[tuple]:
         return list(self._waiting)
 
+    @property
+    def waiting_evaluations(self) -> int:
+        return sum(self._waiting.values())
+
     def _may_admit(self, key: tuple) -> bool:
         if self._active >= self._max_concurrent:
             return False
@@ -159,23 +163,23 @@ class EvaluationGate:
     def admit(self, key: tuple):
         deadline = self._clock() + self._timeout_seconds
         with self._condition:
-            queued = False
+            is_queued = False
             try:
                 while True:
                     # A queued request past its deadline is rejected even if
                     # capacity happens to free at that same moment: its
                     # caller already gave up, so running it would only delay
                     # the live requests behind it.
-                    if queued and self._clock() >= deadline:
+                    if is_queued and self._clock() >= deadline:
                         raise EvaluationQueueTimeout()
                     if self._may_admit(key):
                         break
-                    if not queued:
+                    if not is_queued:
                         self._waiting[key] = self._waiting.get(key, 0) + 1
-                        queued = True
+                        is_queued = True
                     self._condition.wait(deadline - self._clock())
             finally:
-                if queued:
+                if is_queued:
                     self._leave_queue(key)
             self._key = key
             self._active += 1
