@@ -312,11 +312,21 @@ const warehouseCostResponseSchema = z.object({
           columns: z.array(z.object({ name: z.string() })).optional(),
         })
         .optional(),
+      /** How many rows the query produced, which is not how many arrived. */
+      total_row_count: z.number().optional(),
     })
     .optional(),
   result: z
     .object({
       data_array: z.array(z.array(z.string().nullable())).optional(),
+      /**
+       * Present when the answer did not fit in one chunk.
+       *
+       * An `INLINE` answer is capped by size as well as by row count, so a
+       * reply can be short of the `LIMIT` and still be missing rows. This is
+       * the only field that says so.
+       */
+      next_chunk_index: z.number().optional(),
     })
     .optional(),
 });
@@ -387,13 +397,29 @@ function readWarehouseCost({
 
   const data = statement.result?.data_array ?? [];
 
-  // A full page is an answer that was cut off. Which statements are missing is
-  // exactly what we cannot know, so pricing the ones that did arrive would put
-  // a confident zero on the ones that did not.
-  if (data.length >= WAREHOUSE_COST_ROW_LIMIT) {
+  // An answer can be cut short three ways, and only the first is obvious. A
+  // full page means the LIMIT bit. A `next_chunk_index` means the reply was too
+  // large to send at once and the rest is elsewhere — that one arrives *under*
+  // the LIMIT, so a row count alone would call it complete. And a manifest that
+  // counts more rows than arrived says so outright.
+  //
+  // Which statements are missing is exactly what none of them can tell us, so
+  // pricing the ones that did arrive would put a confident zero on the rest.
+  const total = statement.manifest?.total_row_count;
+  const cutShort =
+    data.length >= WAREHOUSE_COST_ROW_LIMIT ||
+    statement.result?.next_chunk_index !== undefined ||
+    (total !== undefined && total > data.length);
+  if (cutShort) {
     logger.error(
-      { ...log, rows: data.length, limit: WAREHOUSE_COST_ROW_LIMIT },
-      "databricks warehouse cost query hit its row limit; refusing a partial answer",
+      {
+        ...log,
+        rows: data.length,
+        limit: WAREHOUSE_COST_ROW_LIMIT,
+        totalRowCount: total,
+        nextChunkIndex: statement.result?.next_chunk_index,
+      },
+      "databricks warehouse cost answer was cut short; refusing a partial answer",
     );
     return null;
   }

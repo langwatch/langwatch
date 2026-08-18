@@ -49,6 +49,10 @@ type CostPlan = {
   state?: string;
   rows?: (string | null)[][];
   columns?: string[];
+  /** Set when the reply is one chunk of a larger answer. */
+  nextChunkIndex?: number;
+  /** What the manifest claims the query produced, which may exceed `rows`. */
+  totalRowCount?: number;
 };
 
 let server: http.Server;
@@ -145,8 +149,16 @@ beforeEach(async () => {
                 ]
               ).map((name) => ({ name })),
             },
+            ...(costPlan?.totalRowCount === undefined
+              ? {}
+              : { total_row_count: costPlan.totalRowCount }),
           },
-          result: { data_array: costPlan?.rows ?? [] },
+          result: {
+            data_array: costPlan?.rows ?? [],
+            ...(costPlan?.nextChunkIndex === undefined
+              ? {}
+              : { next_chunk_index: costPlan.nextChunkIndex }),
+          },
         });
       });
       return;
@@ -438,6 +450,52 @@ describe("a source that names a warehouse", () => {
         ],
         ...filler,
       ],
+    };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+
+    expect(hintOf(result).costUsd).toBe("0");
+  });
+
+  /** @scenario "A cost answer that was cut short prices nothing" */
+  it("prices nothing from one chunk of a larger answer", async () => {
+    // The reply is well under the row limit and this question's own row is in
+    // it, fully priced. What says it is incomplete is the pointer to the rest —
+    // an INLINE answer is capped by size as well as by row count, so this is
+    // the form of truncation a row count would call complete.
+    costPlan = {
+      rows: [
+        [
+          STATEMENT_ID,
+          "3600000",
+          "3600000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+      ],
+      nextChunkIndex: 1,
+    };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+
+    expect(hintOf(result).costUsd).toBe("0");
+  });
+
+  /** @scenario "A cost answer that was cut short prices nothing" */
+  it("prices nothing when the manifest counts more rows than arrived", async () => {
+    costPlan = {
+      rows: [
+        [
+          STATEMENT_ID,
+          "3600000",
+          "3600000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+      ],
+      totalRowCount: 2,
     };
 
     const result = await pull({ warehouseId: WAREHOUSE_ID });
