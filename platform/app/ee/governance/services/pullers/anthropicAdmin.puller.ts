@@ -142,7 +142,9 @@ const MAX_ERROR_BODY_BYTES = 4_096;
  * Best-effort read of a non-OK response body, bounded so an unexpectedly
  * large payload doesn't blow up logs or memory.
  */
-async function safeResponseText(response: Response): Promise<string> {
+async function safeResponseText(response: {
+  text(): Promise<string>;
+}): Promise<string> {
   try {
     const raw = await response.text();
     if (raw.length <= MAX_ERROR_BODY_BYTES) return raw;
@@ -153,12 +155,14 @@ async function safeResponseText(response: Response): Promise<string> {
 }
 
 async function fetchPageError(
-  response: Response,
+  response: { status: number; text(): Promise<string> },
   report: string,
 ): Promise<Error> {
   const detail = await safeResponseText(response);
   const suffix = detail ? `: ${detail}` : "";
-  return new Error(`HTTP ${response.status} (anthropic ${report}_report)${suffix}`);
+  return new Error(
+    `HTTP ${response.status} (anthropic ${report}_report)${suffix}`,
+  );
 }
 
 /** One group-by row inside a usage bucket. Unknown fields are tolerated. */
