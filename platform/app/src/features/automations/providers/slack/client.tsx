@@ -132,20 +132,20 @@ export type SlackTokenState =
 
 export function slackTokenState({
   slice,
-  projectIntegrationConnected,
+  hasProjectIntegration,
 }: {
   slice: SlackSlice;
-  projectIntegrationConnected: boolean;
+  hasProjectIntegration: boolean;
 }): SlackTokenState {
   if (slice.botTokenAlreadySet || slice.botToken.trim().length > 0) {
     return "own_token";
   }
-  return projectIntegrationConnected ? "project_integration" : "not_connected";
+  return hasProjectIntegration ? "project_integration" : "not_connected";
 }
 
 function slackTokenAvailable(params: {
   slice: SlackSlice;
-  projectIntegrationConnected: boolean;
+  hasProjectIntegration: boolean;
 }): boolean {
   return slackTokenState(params) !== "not_connected";
 }
@@ -609,7 +609,7 @@ function previewOptions({
       slice.deliveryMethod === "bot" &&
       slackTokenAvailable({
         slice,
-        projectIntegrationConnected: context.hasProjectSlackIntegration,
+        hasProjectIntegration: context.hasProjectSlackIntegration,
       }),
   };
 }
@@ -971,7 +971,7 @@ function SlackBotFields({
     : null;
   const state = slackTokenState({
     slice,
-    projectIntegrationConnected: !!workspaceName,
+    hasProjectIntegration: !!workspaceName,
   });
 
   // Until the answer lands, "no integration" is a guess, and the guess reads as

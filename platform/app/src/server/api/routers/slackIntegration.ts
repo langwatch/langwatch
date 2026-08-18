@@ -27,7 +27,7 @@ import {
   checkProjectPermission,
   resolveProjectPermission,
 } from "~/server/api/rbac";
-import { SlackIntegrationService } from "~/server/app-layer/automations/slack-integration/slack-integration.service";
+import { createSlackIntegrationService } from "~/server/app-layer/automations/slack-integration/slack-integration.wiring";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -36,9 +36,9 @@ export const slackIntegrationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("triggers:view"))
     .query(async ({ ctx, input }) => {
-      const status = await SlackIntegrationService.create(ctx.prisma).getStatus(
-        { projectId: input.projectId },
-      );
+      const status = await createSlackIntegrationService({
+        prisma: ctx.prisma,
+      }).getStatus({ projectId: input.projectId });
       // Whether THIS caller may change the connection of THIS project — the
       // settings picker can reach projects the session is not on, and the
       // session project's permission says nothing about those.
@@ -54,9 +54,9 @@ export const slackIntegrationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("triggers:view"))
     .query(async ({ ctx, input }) => {
-      const automations = await SlackIntegrationService.create(
-        ctx.prisma,
-      ).getLegacyTokenAutomations({ projectId: input.projectId });
+      const automations = await createSlackIntegrationService({
+        prisma: ctx.prisma,
+      }).getLegacyTokenAutomations({ projectId: input.projectId });
       return { count: automations.length, automations };
     }),
 
@@ -78,7 +78,7 @@ export const slackIntegrationRouter = createTRPCRouter({
           `project ${input.projectId} resolves to no organization`,
         );
       }
-      return SlackIntegrationService.create(ctx.prisma).setup({
+      return createSlackIntegrationService({ prisma: ctx.prisma }).setup({
         projectId: input.projectId,
         organizationId,
         botToken: input.botToken,
@@ -90,7 +90,7 @@ export const slackIntegrationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("project:update"))
     .mutation(async ({ ctx, input }) => {
-      await SlackIntegrationService.create(ctx.prisma).remove({
+      await createSlackIntegrationService({ prisma: ctx.prisma }).remove({
         projectId: input.projectId,
       });
     }),
@@ -107,7 +107,9 @@ export const slackIntegrationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("project:update"))
     .mutation(async ({ ctx, input }) => {
-      return SlackIntegrationService.create(ctx.prisma).clearLegacyTokens({
+      return createSlackIntegrationService({
+        prisma: ctx.prisma,
+      }).clearLegacyTokens({
         projectId: input.projectId,
         triggerIds: input.automationIds,
       });

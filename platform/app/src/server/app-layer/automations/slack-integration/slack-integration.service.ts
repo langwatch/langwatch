@@ -1,5 +1,4 @@
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "~/generated/prisma/client";
 import { decrypt, encrypt } from "~/utils/encryption";
 import {
   fetchSlackWorkspaceIdentity,
@@ -10,7 +9,6 @@ import {
   SlackIntegrationInvalidTokenError,
   SlackIntegrationMissingError,
 } from "../errors";
-import { PrismaSlackIntegrationRepository } from "./repositories/slack-integration.prisma.repository";
 import type {
   LegacySlackTokenAutomation,
   SlackIntegrationRepository,
@@ -68,12 +66,6 @@ export class SlackIntegrationService {
       | { ok: false; error: string }
     > = fetchSlackWorkspaceIdentity,
   ) {}
-
-  static create(prisma: PrismaClient): SlackIntegrationService {
-    return new SlackIntegrationService(
-      new PrismaSlackIntegrationRepository(prisma),
-    );
-  }
 
   async getStatus({
     projectId,

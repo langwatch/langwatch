@@ -339,7 +339,7 @@ describe("evaluateGraphTrigger", () => {
       return new SeriesPercentageUnsupportedError();
     }
 
-    // @scenario "An alert on a series the query refuses is skipped, not retried forever"
+    /** @scenario "An alert on a series the query refuses is skipped, not retried forever" */
     it("skips that trigger instead of failing the evaluation", async () => {
       harness.getTimeseries.mockRejectedValue(percentageUnsupported());
 

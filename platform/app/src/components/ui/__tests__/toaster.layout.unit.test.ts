@@ -43,6 +43,13 @@ describe("given the toast card's material", () => {
   describe("when the toast renders in light mode", () => {
     it("uses a stronger elevation than the recipe's own light-mode 'lg' shadow", () => {
       const recipeLightShadow = semanticTokens.shadows.lg.value._light;
+      // Read off a live Chakra token: if the theme stops carrying a light
+      // value, say so by name here rather than letting `matchAll` throw a
+      // bare TypeError three lines down.
+      expect(
+        typeof recipeLightShadow,
+        "Chakra's shadows.lg semantic token no longer carries a _light value",
+      ).toBe("string");
       // Pull the gray-900 alpha percentage out of each shadow layer, in
       // order (blur first, 1px ring second — both values have exactly two
       // layers). The real, currently-shipped token spells it

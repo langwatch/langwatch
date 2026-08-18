@@ -24,7 +24,7 @@ const { mockGraphsRefetch } = vi.hoisted(() => ({
 
 /** What the subject's mocked queries — the trace preview, the plan-cap
  *  status, and the graph list — return for the test at hand.
- *  `graphs` and `graphsError` are independent — react-query's `isError`
+ *  `graphs` and `isGraphsError` are independent — react-query's `isError`
  *  does NOT imply `data` is empty: a background refetch failure leaves the
  *  last good `data` in place, and a test needs to represent that state
  *  without the mock coupling the two together for it. */
@@ -38,9 +38,9 @@ const server = vi.hoisted(() => ({
   graphs: [{ id: "graph-1", name: "Latency", trigger: null as unknown }] as
     | Array<{ id: string; name: string; trigger: unknown }>
     | undefined,
-  graphsLoading: false,
-  graphsError: false,
-  /** What react-query would carry in `error` when `graphsError` is set. */
+  isGraphsLoading: false,
+  isGraphsError: false,
+  /** What react-query would carry in `error` when `isGraphsError` is set. */
   graphsErrorValue: null as unknown,
 }));
 
@@ -50,8 +50,8 @@ vi.mock("~/utils/api", () => ({
       getAll: {
         useQuery: () => ({
           data: server.graphs,
-          isLoading: server.graphsLoading,
-          isError: server.graphsError,
+          isLoading: server.isGraphsLoading,
+          isError: server.isGraphsError,
           error: server.graphsErrorValue,
           refetch: mockGraphsRefetch,
         }),
@@ -148,7 +148,7 @@ const previewReturns = (totalHits: number) => {
 
 /** The graph list request itself failed, with nothing ever cached. */
 const graphListFails = () => {
-  server.graphsError = true;
+  server.isGraphsError = true;
   server.graphs = undefined;
   seedFreshAlertDraft();
 };
@@ -159,8 +159,8 @@ describe("SubjectSection", () => {
     previewReturns(0);
     server.cap = { data: { cap: PLAN_CAP } };
     server.graphs = [{ id: "graph-1", name: "Latency", trigger: null }];
-    server.graphsLoading = false;
-    server.graphsError = false;
+    server.isGraphsLoading = false;
+    server.isGraphsError = false;
     server.graphsErrorValue = null;
     mockGraphsRefetch.mockClear();
   });
@@ -323,7 +323,7 @@ describe("SubjectSection", () => {
       // fix does this after a graph create/update), can land here with a
       // populated, already-selected picker still on screen.
       it("keeps showing the working picker with the selection intact, not the failure screen", () => {
-        server.graphsError = true; // data stays server.graphs's beforeEach default (non-empty)
+        server.isGraphsError = true; // data stays server.graphs's beforeEach default (non-empty)
         seedGraphDraft(); // customGraphId: "graph-1" — already selected
         render(<SubjectSection />, { wrapper: Wrapper });
 
@@ -338,7 +338,7 @@ describe("SubjectSection", () => {
 
     describe("given the graph list is still loading", () => {
       it("shows neither the empty state nor the picker's missing-graph error", () => {
-        server.graphsLoading = true;
+        server.isGraphsLoading = true;
         seedFreshAlertDraft();
         render(<SubjectSection />, { wrapper: Wrapper });
 

@@ -76,7 +76,7 @@ export const SYMMETRIC_PADDING_END = "4";
  * near-white page instead of blending into it.
  */
 export const LIGHT_MODE_ELEVATION =
-  "0 16px 32px -12px color-mix(in srgb, var(--chakra-colors-gray-900) 32%, transparent), 0 0 0 1px color-mix(in srgb, var(--chakra-colors-gray-900) 45%, transparent)";
+  "0 16px 32px -12px {colors.gray.900/32}, 0 0 0 1px {colors.gray.900/45}";
 
 /**
  * The colour a toast's action reads in. Exported because it is the whole of the

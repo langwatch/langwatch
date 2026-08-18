@@ -89,8 +89,8 @@ const def: SharedDef = {
   action: TriggerAction.SEND_SLACK_MESSAGE,
   category: "notify",
   label: "Slack",
-  description: "Post a message to a Slack webhook when a trace matches.",
-  alertDescription: "Post a message to a Slack webhook when it fires.",
+  description: "Post a message to Slack when a trace matches.",
+  alertDescription: "Post a message to Slack when it fires.",
   actionParamsSchema: slackActionParamsSchema,
 };
 

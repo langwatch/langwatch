@@ -73,52 +73,64 @@ describe("OwnSlackTokenNudge", () => {
   });
 
   describe("given a caller who can switch it", () => {
-    /** @scenario "An automation using its own token is flagged where it appears" */
-    it("says the automation uses its own token and offers the switch", () => {
-      renderNudge();
+    describe("when the nudge renders", () => {
+      /** @scenario "An automation using its own token is flagged where it appears" */
+      it("says the automation uses its own token and offers the switch", () => {
+        renderNudge();
 
-      expect(screen.getByText(/uses its own slack token/i)).toBeInTheDocument();
-      expect(switchButton()).toBeInTheDocument();
+        expect(
+          screen.getByText(/uses its own slack token/i),
+        ).toBeInTheDocument();
+        expect(switchButton()).toBeInTheDocument();
+      });
     });
 
-    it("asks before doing anything, naming the workspace and the loss", async () => {
-      renderNudge();
+    describe("when the switch is pressed", () => {
+      it("asks before doing anything, naming the workspace and the loss", async () => {
+        renderNudge();
 
-      fireEvent.click(switchButton());
+        fireEvent.click(switchButton());
 
-      expect(
-        await screen.findByText(
-          /use the project integration for "error spike"/i,
-        ),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(/deleted and cannot be recovered/i),
-      ).toHaveTextContent(/acme hq/i);
-      // Nothing has happened yet — the click opened a question, not a write.
-      expect(switchCalls).toEqual([]);
+        expect(
+          await screen.findByText(
+            /use the project integration for "error spike"/i,
+          ),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText(/deleted and cannot be recovered/i),
+        ).toHaveTextContent(/acme hq/i);
+        // Nothing has happened yet — the click opened a question, not a write.
+        expect(switchCalls).toEqual([]);
+      });
     });
 
-    /** @scenario "Switching a legacy automation to the project integration" */
-    it("clears that automation's stored token once the switch is confirmed", async () => {
-      renderNudge();
+    describe("when the question is confirmed", () => {
+      /** @scenario "Switching a legacy automation to the project integration" */
+      it("clears that automation's stored token once the switch is confirmed", async () => {
+        renderNudge();
 
-      fireEvent.click(switchButton());
-      fireEvent.click(
-        await screen.findByRole("button", { name: /switch this automation/i }),
-      );
+        fireEvent.click(switchButton());
+        fireEvent.click(
+          await screen.findByRole("button", {
+            name: /switch this automation/i,
+          }),
+        );
 
-      expect(switchCalls).toEqual([
-        { projectId: "project-1", automationIds: ["automation-1"] },
-      ]);
+        expect(switchCalls).toEqual([
+          { projectId: "project-1", automationIds: ["automation-1"] },
+        ]);
+      });
     });
 
-    it("leaves the token alone when the question is dismissed", async () => {
-      renderNudge();
+    describe("when the question is dismissed", () => {
+      it("leaves the token alone when the question is dismissed", async () => {
+        renderNudge();
 
-      fireEvent.click(switchButton());
-      fireEvent.click(await screen.findByRole("button", { name: /cancel/i }));
+        fireEvent.click(switchButton());
+        fireEvent.click(await screen.findByRole("button", { name: /cancel/i }));
 
-      expect(switchCalls).toEqual([]);
+        expect(switchCalls).toEqual([]);
+      });
     });
   });
 

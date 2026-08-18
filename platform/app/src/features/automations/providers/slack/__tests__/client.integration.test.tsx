@@ -1023,9 +1023,9 @@ describe("Slack client slice contract", () => {
       /** @scenario "The composer can tell the three token states apart" */
       it("reads as needing Slack connected, and the preview drops gated blocks", () => {
         const slice = botSlice({ botTokenAlreadySet: false });
-        expect(
-          slackTokenState({ slice, projectIntegrationConnected: false }),
-        ).toBe("not_connected");
+        expect(slackTokenState({ slice, hasProjectIntegration: false })).toBe(
+          "not_connected",
+        );
         expect(
           slackClient.previewOptions?.({
             slice: slice,
@@ -1039,9 +1039,9 @@ describe("Slack client slice contract", () => {
       /** @scenario "The composer can tell the three token states apart" */
       it("reads as using the project integration, and gated blocks render", () => {
         const slice = botSlice({ botTokenAlreadySet: false });
-        expect(
-          slackTokenState({ slice, projectIntegrationConnected: true }),
-        ).toBe("project_integration");
+        expect(slackTokenState({ slice, hasProjectIntegration: true })).toBe(
+          "project_integration",
+        );
         expect(
           slackClient.previewOptions?.({
             slice: slice,

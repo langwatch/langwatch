@@ -3,7 +3,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { SlackIntegrationMissingError } from "../errors";
 import { decryptSlackBotToken } from "../providers/slack/server";
-import { SlackIntegrationService } from "./slack-integration.service";
+import { createSlackIntegrationService } from "./slack-integration.wiring";
 
 /** Where a resolved Slack bot token came from. */
 export type SlackTokenSource = "automation" | "project_integration";
@@ -102,5 +102,5 @@ export function slackTokenMissingDispatchError({
 export function slackProjectTokenReader(
   prisma: PrismaClient,
 ): SlackProjectTokenReader {
-  return SlackIntegrationService.create(prisma);
+  return createSlackIntegrationService({ prisma });
 }

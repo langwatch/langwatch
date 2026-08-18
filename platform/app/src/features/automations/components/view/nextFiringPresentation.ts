@@ -75,8 +75,7 @@ export function describeNextFiring(
         summary: "Sends the next batch at",
         at: new Date(next.windowClosesAt),
         caveat: `Matches are collected and sent together. ${
-          CADENCE_LABELS[next.cadence as keyof typeof CADENCE_LABELS] ??
-          "On a schedule"
+          CADENCE_LABELS[next.cadence]
         }, and a batch with nothing in it sends nothing.`,
       };
     case "immediate":
