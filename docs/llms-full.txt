@@ -32838,46 +32838,263 @@ description: Register your agent's HTTP endpoint as a simulation target, so your
 
 # Connect Your Agent
 
-Paste this prompt into your coding agent (Claude Code, Cursor, or any agent with shell access) and it performs the whole setup, from finding the endpoint to running the first suite:
+The fastest path is the connect-agent skill. Install it in your coding agent (Claude Code, Cursor, or any agent with shell access), or copy the full prompt, and the agent performs the whole setup, from finding the endpoint to running the first suite:
 
-```text
-Connect this codebase's AI agent to LangWatch agent simulations, so scenario suites run against it over HTTP.
+{/* lw-generated:connect-agent:start */}
 
-Setup: the `langwatch` CLI reads LANGWATCH_API_KEY (and LANGWATCH_ENDPOINT for self-hosted installs) from the environment or a .env file. Install it with `npm install -g langwatch` if it is missing. If there is no API key, ask me for one; I can copy it from my LangWatch project settings.
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">Connect my agent to LangWatch simulations</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/connect-agent"} data-track="docs_copy_skill_install" data-track-title={"Connect my agent to LangWatch simulations"} data-track-skill={"langwatch/skills/connect-agent"}>
+          <code>npx skills add langwatch/skills/connect-agent</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/connect-agent"} data-track="docs_copy_slash_command" data-track-title={"Connect my agent to LangWatch simulations"} data-track-command={"/connect-agent"}>
+          <code><span className="lw-slash-command">/connect-agent</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Connect my agent to LangWatch simulations"} data-track-skill={"langwatch/skills/connect-agent"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
 
-1. Inspect the codebase and identify the HTTP endpoint that takes a user message and returns the agent's reply. If none exists, add one: accept a JSON body carrying the conversation messages, run the agent, return the reply text in a JSON field. Ask me for the URL where this service is deployed; prefer staging. If it only runs locally, plan to use `langwatch agent dev --port <port>` at the end instead of a public URL.
+````text
+Connect my agent to LangWatch simulations
 
-2. Wire authentication for scenario traffic. If the endpoint accepts a fixed token in a header, use that. If its normal authentication is built for human users (sessions, OAuth redirects), add a dedicated API key check for scenario traffic: read the expected value from an environment variable such as SCENARIO_API_KEY and check it against an Authorization: Bearer header.
+You are using LangWatch for your AI agent project. Follow these instructions.
 
-3. Make the endpoint adopt the W3C traceparent header that LangWatch sends on every call, so the judge can read the agent's own traces:
-   - If the service uses OpenTelemetry HTTP auto-instrumentation, this already happens; change nothing.
-   - Python otherwise: ctx = propagate.extract(dict(request.headers)), then open the handler's root span with context=ctx.
-   - TypeScript otherwise: context.with(propagation.extract(context.active(), req.headers), () => handler()).
-   Confirm the agent reports its traces to the same LangWatch project that runs the scenarios (same LANGWATCH_API_KEY project).
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
-4. Register the endpoint as an HTTP agent. Adjust bodyTemplate to the request shape the endpoint expects ({{ messages }} is the conversation as a JSON array, {{ input }} the last user message, {{ threadId }} a stable conversation id) and outputPath to the JSONPath of the reply text:
+# Connect Your Agent to LangWatch Simulations
 
-   langwatch agent create 'My Agent' --type http --config '{
-     "url": "https://staging.example.com/chat",
-     "bodyTemplate": "{\"thread_id\": \"{{ threadId }}\", \"messages\": {{ messages }}}",
-     "outputPath": "$.reply",
-     "auth": {"type": "bearer", "token": "{{ secrets.SCENARIO_API_KEY }}"}
-   }'
+Register the user's agent as an HTTP simulation target. Scenario runs call the agent's endpoint from the LangWatch backend, one HTTP request per conversation turn, and the judge verifies behavior against the traces the agent itself reports: tool calls, database writes, retrievals. Work through the steps in order, then report what changed and the first run's result.
 
-   For the secret reference to resolve, the credential must exist as a project secret. Ask me to create SCENARIO_API_KEY under Settings > Secrets in LangWatch, or run `langwatch secret create SCENARIO_API_KEY --value "<key>"` if I hand you a test-only value.
+Do NOT skip the trace adoption step (Step 4). Without it the judge can only grade the reply text, and criteria about tool calls or lookups come back inconclusive.
 
-5. Create one scenario about something this agent really handles, and a suite pairing it with the agent, then run it:
+## Step 1: Set up the LangWatch CLI
 
-   langwatch scenario create 'Order status question' --situation "A customer asks about the status of a recent order" --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate"
-   langwatch suite create 'Smoke' --scenarios <scenario-id> --targets http:<agent-id>
-   langwatch suite run <suite-id> --wait
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
-   Write the situation and criteria from the agent's real behavior in this codebase, and include at least one criterion about a tool call or a lookup, which the judge verifies against the traces from step 3.
-
-6. Report: the simulations page URL of my LangWatch project, what you changed in the codebase, and the result of the first run.
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
 ```
 
-The steps below are the same setup by hand, and what to check when the prompt's run needs a correction.
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+
+**Projects and API keys: target a real project, not a personal one.**
+
+LangWatch has two kinds of project:
+
+- **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
+- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only, and you can mistake it for a real project.
+
+And two ways to authenticate:
+
+- **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
+- **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
+
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+
+## Step 2: Locate the agent's HTTP endpoint
+
+Find the HTTP endpoint that takes a user message and returns the agent's reply. Read the codebase first: identify the framework (FastAPI, Flask, Express, Hono, ...) and the file where the handler lives before changing anything.
+
+If no such endpoint exists, add one:
+
+- Accept a JSON body carrying the conversation messages.
+- Run the agent.
+- Return the reply text in a JSON field, for example `{"reply": "..."}`.
+
+The endpoint does not need to know anything about LangWatch. The request body shape and the response parsing are configured on the LangWatch side in Step 6.
+
+## Step 3: Wire authentication for scenario traffic
+
+Understand the endpoint's authentication before touching it.
+
+- If the endpoint accepts a fixed token in a header, use that credential as-is in the registration (Step 6). Change nothing on the server.
+- If the normal authentication is built for human users (sessions, cookies, OAuth redirects), add a dedicated authentication path for scenario traffic: the server reads the expected key from an environment variable such as `SCENARIO_API_KEY` and checks it against the `Authorization: Bearer` header on each request. A request carrying the valid key is accepted; every other request goes through the existing authentication unchanged. If `SCENARIO_API_KEY` is unset, the path is off.
+
+NEVER weaken, bypass, or remove the existing authentication for normal traffic. The scenario path is additive, and the dedicated key is what the user revokes to close it.
+
+## Step 4: Adopt the trace context
+
+The platform sends a W3C `traceparent` header on every call, one trace per conversation turn. When the server adopts it, the spans the agent produces land in that same trace, and the judge reads them before its verdict. A criterion like "the agent looked up the order before answering" then passes on evidence instead of on the reply's wording.
+
+- If the service uses OpenTelemetry HTTP auto-instrumentation, adoption already happens. Verify it in the code and change nothing.
+- Otherwise, attach the extracted context in a middleware that runs before any tracing starts. Do not extract inside the handler body: a handler decorated with `@langwatch.trace()` opens its root span before the body runs, so an extraction there is too late and the agent's spans land in a separate trace. The middleware placement covers every tracing style: decorators, `with langwatch.trace()`, autotrack, community instrumentations, and plain OpenTelemetry spans.
+
+**Python (ASGI middleware, e.g. FastAPI):**
+
+```python
+from opentelemetry import propagate
+from opentelemetry.context import attach, detach
+
+@app.middleware("http")
+async def adopt_remote_trace(request, call_next):
+    token = attach(propagate.extract(dict(request.headers)))
+    try:
+        return await call_next(request)
+    finally:
+        detach(token)
+```
+
+For Flask, attach in `before_request` (keep the token on `g`) and detach in `teardown_request`.
+
+**TypeScript (middleware, registered before the routes):**
+
+```typescript
+import { context, propagation } from "@opentelemetry/api";
+
+app.use((req, res, next) => {
+  const ctx = propagation.extract(context.active(), req.headers);
+  context.with(ctx, () => next());
+});
+```
+
+The TypeScript middleware needs an initialized OpenTelemetry runtime: a registered context manager and propagator. The LangWatch SDK's `setupObservability()` and the OpenTelemetry `NodeSDK` both register them at startup; without one of them, `context.with` and `propagation.extract` are no-ops.
+
+Confirm the agent reports its traces to the same LangWatch project that runs the scenarios (the same `LANGWATCH_API_KEY` project). Traces sent to another project, or to another observability backend only, are invisible to the judge. If the service has no LangWatch tracing yet, set it up with the `tracing` skill; its prompt is "Instrument my code with LangWatch".
+
+## Step 5: ASK where the agent runs
+
+Ask the user for the URL where this service is deployed, and wait for the answer. A staging deployment is the recommended target: it exercises the real system without touching production data. Any URL the LangWatch backend can reach works; an internal hostname or a firewalled service does not.
+
+If the agent only runs on the user's machine, plan to use `langwatch agent dev --port <port>` at the end instead of a public URL: it opens a tunnel to the local port and points the registered agent at it for the session (Ctrl-C restores the previous URL). Register the agent in Step 6 as normal, then run `langwatch agent dev --port <port> --agent <agent-id>` and keep it running while suites execute.
+
+## Step 6: Register the agent and run the first scenario
+
+First store the scenario key as a project secret, so the registration can reference it as `{{ secrets.SCENARIO_API_KEY }}` and the value stays encrypted at rest instead of readable in the agent's configuration. Ask the user to create it under Settings > Secrets in LangWatch, or run the command when they hand you a test-only value:
+
+```bash
+langwatch secret create SCENARIO_API_KEY --value "<key>"
+```
+
+Register the endpoint as an HTTP agent. Adjust `bodyTemplate` to the request shape the endpoint expects and `outputPath` to the JSONPath of the reply text in the endpoint's real response:
+
+```bash
+langwatch agent create 'My Agent' --type http --config '{
+  "url": "https://staging.example.com/chat",
+  "bodyTemplate": "{\"thread_id\": \"{{ threadId }}\", \"messages\": {{ messages }}}",
+  "outputPath": "$.reply",
+  "auth": {"type": "bearer", "token": "{{ secrets.SCENARIO_API_KEY }}"}
+}'
+```
+
+The body template renders as a Liquid template on every turn. The URL and header values render the same variables:
+
+| Variable | Value |
+|---|---|
+| `{{ messages }}` | The whole conversation as a raw JSON array of `{role, content}` messages |
+| `{{ input }}` | The text of the last user message |
+| `{{ threadId }}` | A conversation id, the same on every turn of a run |
+| `{{ params.NAME }}` | A run parameter the scenario declares |
+| `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, for systems that read them from the body or a custom header instead of the `traceparent` header |
+
+Then create one scenario about something this agent really handles, pair it with the agent in a suite, and run it:
+
+```bash
+langwatch scenario create 'Order status question' \
+  --situation "A customer asks about the status of a recent order" \
+  --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate"
+
+langwatch suite create 'Smoke' --scenarios <scenario-id> --targets http:<agent-id>
+
+langwatch suite run <suite-id> --wait
+```
+
+- Write the situation and criteria from the agent's real behavior in this codebase, not from the example above. Include at least one criterion about a tool call or a lookup, which the judge verifies against the traces from Step 4.
+- `--criteria` takes one comma-separated string, so a criterion cannot contain a comma; rephrase instead.
+- `--targets` takes `http:<agent-id>` where `<agent-id>` is the id `langwatch agent create` returned (also in `langwatch agent list --format json`). It is never a URL; the URL lives in the agent's config.
+- `--wait` blocks until the run finishes and exits non-zero when it fails. Use it here: the report in Step 7 needs the result.
+
+## Step 7: Report the result
+
+Report to the user:
+
+- The simulations page URL of their LangWatch project (`https://app.langwatch.ai/<project-slug>/simulations`, or the `LANGWATCH_ENDPOINT` host when self-hosted).
+- What changed in the codebase: the endpoint, the authentication path, the trace adoption.
+- The result of the first run.
+
+Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and the error, and stop there. Do NOT claim a scenario or a suite ran when it did not.
+
+A connected setup shows, on the run page: the conversation transcript with the reply text `outputPath` extracted, a trace link on each turn opening the agent's own spans, and judge reasoning that cites spans. A trace-dependent criterion that comes back inconclusive means the traces did not arrive.
+
+## Plan Limits
+
+LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments, and datasets. When you hit a limit, the API returns `"Free plan limit of N reached..."` with an upgrade link.
+
+How to handle:
+
+- Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
+- Make every creation count: each one should demonstrate clear value.
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings if `LANGWATCH_ENDPOINT` is set (self-hosted).
+- Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
+
+## Common Failures
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| The run fails with a connection error | The URL is not reachable from the LangWatch backend: an internal hostname, a firewall, or a stopped service. | Deploy the endpoint to a reachable URL, or use `langwatch agent dev --port <port>` for a local process. |
+| Every turn fails with 401 or 403 | The credential is missing or wrong: no `auth` block or header row, or the `{{ secrets.NAME }}` reference names a secret the project does not have. | Add the `auth` block, and check the secret's name with `langwatch secret list`. |
+| The transcript shows empty replies or raw JSON | `outputPath` does not match the response shape, so no reply text is found. | Set `outputPath` to the JSONPath of the reply text in the endpoint's real response. |
+| Trace-dependent criteria come back inconclusive, and turns have no trace link | The server does not adopt the incoming `traceparent`, or it reports traces to a different LangWatch project. | Adopt the context as in Step 4, and point the agent's tracing at the same project's API key. |
+
+## Common Mistakes
+
+- Do NOT weaken or remove the endpoint's existing authentication. The dedicated scenario key is an additional path, checked only when the request carries it.
+- Do NOT put the raw key in the agent config. Store it with `langwatch secret create` and reference `{{ secrets.SCENARIO_API_KEY }}`.
+- Do NOT skip trace adoption because the endpoint "already returns the answer". The reply text cannot prove a tool call happened; the trace can.
+- Do NOT append a list of tools used to the response text so the judge can "see" them. That grades a self-report instead of evidence; adopt `traceparent` and the trace carries the real calls.
+- Do NOT point the agent's tracing at a different LangWatch project than the one running the scenarios. The judge finds nothing there.
+- Do NOT invent an agent id or pass a URL as the suite target. `http:` is followed by the Agent id from `langwatch agent create` or `langwatch agent list --format json`.
+- Do NOT comma-separate `--targets` on `suite create`. It is space-separated and variadic; `--scenarios` is the comma-separated one.
+- Do NOT guess the deployment URL or quietly default to localhost. Step 5 is a question for the user; ask and wait.
+- Do NOT report success when a command failed. An unreachable platform or a failed run is part of the report, named per step.
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/connect-agent/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Connect my agent to LangWatch simulations"} data-track-skill={"langwatch/skills/connect-agent"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{/* lw-generated:connect-agent:end */}
+
+The steps below are the same setup by hand, and what to check when the skill's run needs a correction.
 
 ## 1. Expose an endpoint LangWatch can reach
 
@@ -32924,32 +33141,38 @@ For the response, set `outputPath` to where the reply text lives. If the endpoin
 
 The platform sends a W3C `traceparent` header on every call, one trace per conversation turn. When your server adopts it, the spans your agent produces land in that same trace, and the judge reads them before its verdict: tool calls, database writes, retrievals. A criterion like "the agent looked up the order before answering" then passes on evidence instead of on the reply's wording.
 
-With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens and you change nothing. Without it, extract the context from the request headers and open your handler's root span inside it:
+With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens and you change nothing. Without it, attach the extracted context in a middleware that runs before any tracing starts. Do not extract inside the handler body: a handler decorated with `@langwatch.trace()` opens its root span before the body runs, so an extraction there comes too late and the agent's spans land in a separate trace. The middleware placement covers every tracing style: decorators, `with langwatch.trace()`, autotrack, community instrumentations, and plain OpenTelemetry spans.
 
 
   ### Python
 
     ```python
-    from opentelemetry import propagate, trace
+    from opentelemetry import propagate
+    from opentelemetry.context import attach, detach
 
-    tracer = trace.get_tracer("my-agent")
-
-    def handle_chat(request):
-        ctx = propagate.extract(dict(request.headers))
-        with tracer.start_as_current_span("chat", context=ctx):
-            return run_agent(request)
+    @app.middleware("http")
+    async def adopt_remote_trace(request, call_next):
+        token = attach(propagate.extract(dict(request.headers)))
+        try:
+            return await call_next(request)
+        finally:
+            detach(token)
     ```
+
+    For Flask, attach in `before_request` (keep the token on `g`) and detach in `teardown_request`.
 
   ### TypeScript
 
     ```typescript
     import { context, propagation } from "@opentelemetry/api";
 
-    app.post("/chat", (req, res) => {
+    app.use((req, res, next) => {
       const ctx = propagation.extract(context.active(), req.headers);
-      context.with(ctx, () => handleChat(req, res));
+      context.with(ctx, () => next());
     });
     ```
+
+    The middleware needs an initialized OpenTelemetry runtime: a registered context manager and propagator. The LangWatch SDK's `setupObservability()` and the OpenTelemetry `NodeSDK` both register them at startup; without one of them, `context.with` and `propagation.extract` are no-ops.
 
 
 
@@ -48868,31 +49091,37 @@ NEVER weaken, bypass, or remove the existing authentication for normal traffic. 
 The platform sends a W3C `traceparent` header on every call, one trace per conversation turn. When the server adopts it, the spans the agent produces land in that same trace, and the judge reads them before its verdict. A criterion like "the agent looked up the order before answering" then passes on evidence instead of on the reply's wording.
 
 - If the service uses OpenTelemetry HTTP auto-instrumentation, adoption already happens. Verify it in the code and change nothing.
-- Otherwise, extract the context from the request headers and open the handler's root span inside it.
+- Otherwise, attach the extracted context in a middleware that runs before any tracing starts. Do not extract inside the handler body: a handler decorated with `@langwatch.trace()` opens its root span before the body runs, so an extraction there is too late and the agent's spans land in a separate trace. The middleware placement covers every tracing style: decorators, `with langwatch.trace()`, autotrack, community instrumentations, and plain OpenTelemetry spans.
 
-**Python:**
+**Python (ASGI middleware, e.g. FastAPI):**
 
 ```python
-from opentelemetry import propagate, trace
+from opentelemetry import propagate
+from opentelemetry.context import attach, detach
 
-tracer = trace.get_tracer("my-agent")
-
-def handle_chat(request):
-    ctx = propagate.extract(dict(request.headers))
-    with tracer.start_as_current_span("chat", context=ctx):
-        return run_agent(request)
+@app.middleware("http")
+async def adopt_remote_trace(request, call_next):
+    token = attach(propagate.extract(dict(request.headers)))
+    try:
+        return await call_next(request)
+    finally:
+        detach(token)
 ```
 
-**TypeScript:**
+For Flask, attach in `before_request` (keep the token on `g`) and detach in `teardown_request`.
+
+**TypeScript (middleware, registered before the routes):**
 
 ```typescript
 import { context, propagation } from "@opentelemetry/api";
 
-app.post("/chat", (req, res) => {
+app.use((req, res, next) => {
   const ctx = propagation.extract(context.active(), req.headers);
-  context.with(ctx, () => handleChat(req, res));
+  context.with(ctx, () => next());
 });
 ```
+
+The TypeScript middleware needs an initialized OpenTelemetry runtime: a registered context manager and propagator. The LangWatch SDK's `setupObservability()` and the OpenTelemetry `NodeSDK` both register them at startup; without one of them, `context.with` and `propagation.extract` are no-ops.
 
 Confirm the agent reports its traces to the same LangWatch project that runs the scenarios (the same `LANGWATCH_API_KEY` project). Traces sent to another project, or to another observability backend only, are invisible to the judge. If the service has no LangWatch tracing yet, set it up with the `tracing` skill; its prompt is "Instrument my code with LangWatch".
 
