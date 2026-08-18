@@ -46,6 +46,13 @@ export function resolveLocalUrl(options: {
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       fail("--url must be an http or https URL");
     }
+    // The URL is stored in the agent's platform config and printed by the
+    // session, so credentials embedded in it would leak both ways.
+    if (parsed.username || parsed.password) {
+      fail(
+        "--url must not carry a username or password. Pass the URL without credentials.",
+      );
+    }
     return options.url;
   }
   fail(
@@ -178,7 +185,7 @@ async function createHttpAgentInteractively({
     type: "text",
     name: "name",
     message: `This project has no HTTP agents. Name a new one (will point at ${localUrl}):`,
-    initial: path.basename(process.cwd()),
+    initial: path.basename(process.cwd()) || "my-agent",
   });
   const name = typeof answer.name === "string" ? answer.name.trim() : "";
   if (!name) {

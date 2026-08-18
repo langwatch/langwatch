@@ -1,6 +1,7 @@
+import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
-import { resolveTargetAgent } from "../dev/resolve";
+import { resolveLocalUrl, resolveTargetAgent } from "../dev/resolve";
 
 /**
  * Agent selection for `langwatch agent dev` when `--agent` is omitted.
@@ -64,6 +65,15 @@ function makeService({
 	return { service, create };
 }
 
+// Vitest recycles worker processes across files, so forcing a value into
+// process.stdin.isTTY would leak into whatever file runs next in the same
+// worker. Capture the original descriptors once and restore them after each
+// test.
+const originalTTY = {
+	stdin: Object.getOwnPropertyDescriptor(process.stdin, "isTTY"),
+	stdout: Object.getOwnPropertyDescriptor(process.stdout, "isTTY"),
+};
+
 function setTTY(isTTY: boolean) {
 	Object.defineProperty(process.stdin, "isTTY", {
 		value: isTTY,
@@ -73,6 +83,19 @@ function setTTY(isTTY: boolean) {
 		value: isTTY,
 		configurable: true,
 	});
+}
+
+function restoreTTY() {
+	for (const [stream, descriptor] of [
+		[process.stdin, originalTTY.stdin],
+		[process.stdout, originalTTY.stdout],
+	] as const) {
+		if (descriptor) {
+			Object.defineProperty(stream, "isTTY", descriptor);
+		} else {
+			delete (stream as { isTTY?: boolean }).isTTY;
+		}
+	}
 }
 
 describe("agent dev target resolution", () => {
@@ -88,7 +111,7 @@ describe("agent dev target resolution", () => {
 	});
 
 	afterEach(() => {
-		setTTY(false);
+		restoreTTY();
 		vi.restoreAllMocks();
 	});
 
@@ -112,6 +135,11 @@ describe("agent dev target resolution", () => {
 				});
 				expect(agent.id).toBe("agent_new");
 				expect(agent.name).toBe("My Local Agent");
+				expect(mockPrompts).toHaveBeenCalledWith(
+					expect.objectContaining({
+						initial: path.basename(process.cwd()),
+					}),
+				);
 			});
 
 			/** @scenario "Declining the offered agent name ends the session with instructions" */
@@ -181,6 +209,21 @@ describe("agent dev target resolution", () => {
 					"--agent <id|name>",
 				);
 			});
+		});
+	});
+
+	describe("given a --url value carrying embedded credentials", () => {
+		/** @scenario "A local URL carrying credentials is refused" */
+		it("fails and says to pass the URL without credentials", () => {
+			// The URL lands in the agent's platform config and in terminal
+			// output, so userinfo in it would leak both ways.
+			expect(() =>
+				resolveLocalUrl({ url: "http://user:secret@localhost:3000" }),
+			).toThrow(ProcessExitError);
+
+			expect(String(consoleError.mock.calls.flat())).toContain(
+				"without credentials",
+			);
 		});
 	});
 

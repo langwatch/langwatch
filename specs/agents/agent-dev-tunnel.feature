@@ -81,7 +81,13 @@ Feature: Agent dev tunnel
     And the session runs in a terminal
     When the developer confirms the offered agent name
     Then the session registers a new HTTP agent pointing at the local server
+    And the offered name defaults to the current directory's name
     And the new agent is the session's target
+
+  Scenario: A local URL carrying credentials is refused
+    Given a --url value with a username and password embedded in it
+    When the session resolves the local server to expose
+    Then the session fails and says to pass the URL without credentials
 
   Scenario: Declining the offered agent name ends the session with instructions
     Given the project has no HTTP agents
