@@ -33,6 +33,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   DATABRICKS_GENIE_ADAPTER_ID,
   DatabricksGeniePuller,
+  WAREHOUSE_COST_ROW_LIMIT,
 } from "../databricksGenie.puller";
 import { WAREHOUSE_COST_SETTLING_LAG_MS } from "../databricksWarehouseCost";
 import { PULLED_USAGE_HINT_KEY } from "../pulledUsageRecord";
@@ -386,8 +387,8 @@ describe("a source that names a warehouse", () => {
     expect(hintOf(result).costUsd).toBe("0");
   });
 
-  /** @scenario "The cost is the published rate, not the customer's negotiated one" */
-  it("never presents the figure as the customer's invoice", async () => {
+  /** @scenario "A priced question calls its figure an estimate" */
+  it("marks a priced figure an estimate", async () => {
     costPlan = {
       rows: [
         [
@@ -407,6 +408,41 @@ describe("a source that names a warehouse", () => {
     // The account's discount is on no table this token reads, so the figure is
     // the published rate and has to say so.
     expect(hintOf(result).costStatus).toBe("estimate");
+  });
+
+  /** @scenario "A cost answer that was cut short prices nothing" */
+  it("prices nothing from an answer that filled the row limit", async () => {
+    // This question's own row is first and fully priced, so an adapter that
+    // used the answer would charge it $6. A full page means the rows we cannot
+    // see are missing, and there is no way to tell which questions they were.
+    const filler = Array.from(
+      { length: WAREHOUSE_COST_ROW_LIMIT - 1 },
+      (_, i): (string | null)[] => [
+        `other-statement-${i}`,
+        "1",
+        "3600000",
+        "6.00",
+        "USD",
+        "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+      ],
+    );
+    costPlan = {
+      rows: [
+        [
+          STATEMENT_ID,
+          "3600000",
+          "3600000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+        ...filler,
+      ],
+    };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+
+    expect(hintOf(result).costUsd).toBe("0");
   });
 
   /** @scenario "Cost that arrives late corrects the record rather than adding one" */

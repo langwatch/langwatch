@@ -110,8 +110,7 @@ Feature: Databricks AI/BI Genie puller
     Scenario: A source that prices its questions keeps looking back far enough
       Given a Genie source that names a warehouse
       When a run finishes
-      Then the next run still reads the questions asked since the compute
-      behind them could have been billed
+      Then the next run still reads the questions whose compute could have been billed since
       # Databricks publishes a query's compute well after the query. A source
       # that stops looking at a question five minutes after it was asked can
       # never learn what it cost, and every question would sit at zero forever.
@@ -131,15 +130,29 @@ Feature: Databricks AI/BI Genie puller
       Then the recorded cost is zero
 
     @integration
-    Scenario: The cost is the published rate, not the customer's negotiated one
-      Given a workspace whose account has a discount off the published rate
+    Scenario: A priced question calls its figure an estimate
+      Given a workspace whose account may have a discount off the published rate
       When the puller prices a question
-      Then the cost is worked out from the published rate
-      And it is marked an estimate
-      And it is not presented as the customer's final invoice
-      # The discount is not on any table this token can read. Naming the number
-      # an estimate is the whole difference between a useful figure and one
-      # somebody reconciles against a bill and finds wrong.
+      Then the figure is marked an estimate
+      # The account's negotiated discount is on no table this token can read, so
+      # the figure can only ever come from the published rate. Saying so is the
+      # whole difference between a useful number and one somebody reconciles
+      # against a bill and finds wrong.
+      #
+      # That the arithmetic reaches for the published rate rather than any other
+      # price lives in the SQL, and no test executes the SQL — replacing the
+      # whole statement with nonsense leaves every test green. This scenario
+      # therefore claims only what is observed: the label. See langwatch-saas#1116.
+
+    @integration
+    Scenario: A cost answer that was cut short prices nothing
+      Given a warehouse busy enough to fill the cost query's row limit
+      When the puller reads the cost
+      Then no question is priced from that answer
+      # Which statements the answer left out is exactly what it cannot tell us.
+      # Pricing the ones that arrived would put a confident zero on the rest,
+      # and on a first sweep that zero is permanent: the cursor moves past the
+      # question and later runs only re-read the settling window.
 
     @integration
     Scenario: Compute the workspace prices in another currency is not converted

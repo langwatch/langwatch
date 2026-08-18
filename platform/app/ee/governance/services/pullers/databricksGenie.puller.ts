@@ -216,6 +216,18 @@ const WAREHOUSE_COST_TIMEOUT_MS = 60_000;
  * charged wholly to the hour it began — an approximation, and the same one the
  * live validation used.
  */
+/**
+ * The most rows one cost read will accept.
+ *
+ * The cap is a guard against holding a whole busy warehouse's hour-by-hour
+ * detail in memory, not a sampling decision. Hitting it means the answer is
+ * missing statements we cannot identify, so the read is refused whole rather
+ * than used: a partial answer prices some questions and silently leaves the
+ * rest at nothing, and on a first sweep those zeroes are permanent, because
+ * the cursor moves past them and later runs only re-read the settling window.
+ */
+export const WAREHOUSE_COST_ROW_LIMIT = 50_000;
+
 const WAREHOUSE_COST_STATEMENT = `
 WITH windowed AS (
   SELECT
@@ -278,7 +290,7 @@ FROM windowed w
 JOIN hour_total t ON t.usage_hour = w.usage_hour
 JOIN priced pr ON pr.usage_hour = w.usage_hour
 WHERE w.client_application = :genie_app
-LIMIT 50000
+LIMIT ${WAREHOUSE_COST_ROW_LIMIT}
 `;
 
 /**
@@ -326,6 +338,108 @@ const WAREHOUSE_COST_COLUMNS = [
   "currency_code",
   "sku_name",
 ] as const;
+
+/**
+ * Turn one cost reply into per-statement cost, or refuse the whole reply.
+ *
+ * Every refusal here returns `null`, which the caller reads as "no cost this
+ * run" — the questions are still recorded, and a re-read leaves any cost an
+ * earlier run worked out alone. Refusing whole is deliberate: a partial answer
+ * prices some questions and leaves the rest at nothing, and nothing is
+ * indistinguishable from a question that genuinely cost nothing.
+ */
+function readWarehouseCost({
+  payload,
+  adapter,
+  warehouseId,
+}: {
+  payload: unknown;
+  adapter: string;
+  warehouseId: string;
+}): Map<string, string> | null {
+  const statement = warehouseCostResponseSchema.parse(payload);
+  const log = { adapter, warehouseId };
+
+  if (statement.status.state !== "SUCCEEDED") {
+    logger.warn(
+      {
+        ...log,
+        state: statement.status.state,
+        error: statement.status.error?.message,
+      },
+      "databricks warehouse cost query did not succeed; recording the questions without cost",
+    );
+    return null;
+  }
+
+  // No manifest is a refusal, not a pass. The rows are positional and every
+  // value in them is a string, so without the names there is nothing that could
+  // tell a correct answer from a reordered one — which is the whole case this
+  // check exists for. An answer we cannot check is one we cannot price from.
+  const served = statement.manifest?.schema?.columns?.map((c) => c.name);
+  if (!served || !WAREHOUSE_COST_COLUMNS.every((n, i) => served[i] === n)) {
+    logger.error(
+      { ...log, expected: WAREHOUSE_COST_COLUMNS, served },
+      "databricks warehouse cost query answered with unexpected columns; refusing to price from it",
+    );
+    return null;
+  }
+
+  const data = statement.result?.data_array ?? [];
+
+  // A full page is an answer that was cut off. Which statements are missing is
+  // exactly what we cannot know, so pricing the ones that did arrive would put
+  // a confident zero on the ones that did not.
+  if (data.length >= WAREHOUSE_COST_ROW_LIMIT) {
+    logger.error(
+      { ...log, rows: data.length, limit: WAREHOUSE_COST_ROW_LIMIT },
+      "databricks warehouse cost query hit its row limit; refusing a partial answer",
+    );
+    return null;
+  }
+
+  let unreadable = 0;
+  const rows = data.flatMap((columns) => {
+    const parsed = warehouseCostRowSchema.safeParse({
+      statementId: columns[0],
+      executionDurationMs: columns[1],
+      hourTotalMs: columns[2],
+      hourBillableUsd: columns[3] ?? null,
+      currencyCode: columns[4] ?? null,
+      skuName: columns[5] ?? "",
+    });
+    if (!parsed.success) {
+      unreadable += 1;
+      return [];
+    }
+    return [parsed.data];
+  });
+
+  // Every other refusal reaches the log through `skipped`. A row that would not
+  // parse is the one case that would otherwise under-price in silence.
+  if (unreadable > 0) {
+    logger.warn(
+      { ...log, unreadable, rows: data.length },
+      "some databricks warehouse cost rows could not be read; those questions carry no cost",
+    );
+  }
+
+  const { costByStatementId, skipped } = allocateWarehouseCost({ rows });
+  if (skipped.length > 0) {
+    logger.warn(
+      {
+        ...log,
+        skipped: skipped.length,
+        // The reasons, not the rows: a workspace priced in one currency
+        // produces one reason repeated a thousand times.
+        reasons: [...new Set(skipped.map((entry) => entry.reason))],
+        skus: [...new Set(skipped.map((entry) => entry.skuName))],
+      },
+      "some databricks warehouse compute could not be priced; those questions carry no cost",
+    );
+  }
+  return costByStatementId;
+}
 
 /**
  * Anything below this is epoch SECONDS; anything above it is epoch
@@ -1997,67 +2111,11 @@ export class DatabricksGeniePuller
         },
       });
 
-      const statement = warehouseCostResponseSchema.parse(payload);
-      if (statement.status.state !== "SUCCEEDED") {
-        logger.warn(
-          {
-            adapter: this.id,
-            warehouseId,
-            state: statement.status.state,
-            error: statement.status.error?.message,
-          },
-          "databricks warehouse cost query did not succeed; recording the questions without cost",
-        );
-        return null;
-      }
-
-      // No manifest is a refusal, not a pass. The rows are positional and every
-      // value in them is a string, so without the names there is nothing that
-      // could tell a correct answer from a reordered one — which is the whole
-      // case this check exists for. An answer we cannot check is one we cannot
-      // price from.
-      const served = statement.manifest?.schema?.columns?.map((c) => c.name);
-      if (!served || !WAREHOUSE_COST_COLUMNS.every((n, i) => served[i] === n)) {
-        logger.error(
-          {
-            adapter: this.id,
-            warehouseId,
-            expected: WAREHOUSE_COST_COLUMNS,
-            served,
-          },
-          "databricks warehouse cost query answered with unexpected columns; refusing to price from it",
-        );
-        return null;
-      }
-
-      const rows = (statement.result?.data_array ?? []).flatMap((columns) => {
-        const parsed = warehouseCostRowSchema.safeParse({
-          statementId: columns[0],
-          executionDurationMs: columns[1],
-          hourTotalMs: columns[2],
-          hourBillableUsd: columns[3] ?? null,
-          currencyCode: columns[4] ?? null,
-          skuName: columns[5] ?? "",
-        });
-        return parsed.success ? [parsed.data] : [];
+      return readWarehouseCost({
+        payload,
+        adapter: this.id,
+        warehouseId,
       });
-
-      const { costByStatementId, skipped } = allocateWarehouseCost({ rows });
-      if (skipped.length > 0) {
-        logger.warn(
-          {
-            adapter: this.id,
-            warehouseId,
-            skipped: skipped.length,
-            // The reasons, not the rows: a workspace priced in one currency
-            // produces one reason repeated a thousand times.
-            reasons: [...new Set(skipped.map((entry) => entry.reason))],
-            skus: [...new Set(skipped.map((entry) => entry.skuName))],
-          },
-          "some databricks warehouse compute could not be priced; those questions carry no cost",
-        );
-      }
-      return costByStatementId;
     } catch (error) {
       logger.warn(
         {
@@ -2200,40 +2258,50 @@ function withWarehouseCost({
 }): NormalizedPullEvent[] {
   if (!costEnabled) return events;
 
-  return events.map((event) => {
-    const extra = event.extra;
-    if (!extra) return event;
+  return events.map((event) =>
+    withCost({ event, costByStatementId, watermarkMs }),
+  );
+}
 
-    const hint = extra[PULLED_USAGE_HINT_KEY];
-    if (typeof hint !== "object" || hint === null) return event;
+/** One event's share of the warehouse bill, or its hint removed, or it unchanged. */
+function withCost({
+  event,
+  costByStatementId,
+  watermarkMs,
+}: {
+  event: NormalizedPullEvent;
+  costByStatementId: Map<string, string> | null;
+  watermarkMs: number;
+}): NormalizedPullEvent {
+  const extra = event.extra;
+  if (!extra) return event;
 
-    const statementId = extra.statementId;
-    const costUsd =
-      typeof statementId === "string" && statementId !== ""
-        ? costByStatementId?.get(statementId)
-        : undefined;
+  const hint = extra[PULLED_USAGE_HINT_KEY];
+  if (typeof hint !== "object" || hint === null) return event;
 
-    if (costUsd !== undefined) {
-      return {
-        ...event,
-        // The audit row's own float field, which ADR-088 keeps for continuity
-        // and does not price from. The ledger reads `costUsd` below, as a
-        // string, so the number a customer reconciles never sees a float.
-        cost_usd: Number(costUsd),
-        extra: {
-          ...extra,
-          [PULLED_USAGE_HINT_KEY]: { ...hint, costUsd },
-        },
-      };
-    }
+  const statementId = extra.statementId;
+  const costUsd =
+    typeof statementId === "string" && statementId !== ""
+      ? costByStatementId?.get(statementId)
+      : undefined;
 
-    const askedAtMs = Date.parse(event.event_timestamp);
-    const isReread = Number.isFinite(askedAtMs) && askedAtMs <= watermarkMs;
-    if (!isReread) return event;
+  if (costUsd !== undefined) {
+    return {
+      ...event,
+      // The audit row's own float field, which ADR-088 keeps for continuity and
+      // does not price from. The ledger reads `costUsd` below, as a string, so
+      // the number a customer reconciles never sees a float.
+      cost_usd: Number(costUsd),
+      extra: { ...extra, [PULLED_USAGE_HINT_KEY]: { ...hint, costUsd } },
+    };
+  }
 
-    const { [PULLED_USAGE_HINT_KEY]: _dropped, ...auditOnly } = extra;
-    return { ...event, extra: auditOnly };
-  });
+  const askedAtMs = Date.parse(event.event_timestamp);
+  const isReread = Number.isFinite(askedAtMs) && askedAtMs <= watermarkMs;
+  if (!isReread) return event;
+
+  const { [PULLED_USAGE_HINT_KEY]: _dropped, ...auditOnly } = extra;
+  return { ...event, extra: auditOnly };
 }
 
 function encode(cursor: GenieCursor): string {
