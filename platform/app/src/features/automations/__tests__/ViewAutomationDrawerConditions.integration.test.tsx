@@ -11,6 +11,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ViewAutomationDrawer } from "../ViewAutomationDrawer";
+import { fakeQuery } from "./viewDrawerTestKit";
 
 let mockTriggerRow: Record<string, unknown> | null = null;
 
@@ -43,27 +44,49 @@ vi.mock("~/utils/api", () => ({
   api: {
     automation: {
       getTriggerById: {
-        useQuery: () => ({
-          data: mockTriggerRow,
-          isLoading: false,
-          error: null,
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockTriggerRow, options),
+      },
+      getFireHistory: {
+        useInfiniteQuery: (
+          _input: unknown,
+          options?: { enabled?: boolean },
+        ) => ({
+          ...fakeQuery({ pages: [{ fires: [], nextCursor: null }] }, options),
+          hasNextPage: false,
+          isFetchingNextPage: false,
+          fetchNextPage: vi.fn(),
         }),
       },
-      getRecentFires: {
-        useQuery: () => ({ data: [], isLoading: false, error: null }),
+      getLatestEvaluation: {
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(null, options),
+      },
+      getNextFiring: {
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery({ kind: "immediate", traceDebounceMs: 30000 }, options),
       },
       getWebhookDeliveries: {
-        useQuery: () => ({ data: [], isLoading: false, error: null }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery([], options),
       },
     },
     graphs: {
       getById: {
-        useQuery: () => ({ data: null, isLoading: false, error: null }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(null, options),
       },
     },
     dataset: {
       getAll: {
-        useQuery: () => ({ data: [], isLoading: false, error: null }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery([], options),
+      },
+    },
+    tracesV2: {
+      list: {
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(undefined, options),
       },
     },
   },

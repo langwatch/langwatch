@@ -47,6 +47,7 @@ describe("sendWebhook", () => {
     // local addresses regardless of the BLOCK_LOCAL_HTTP_CALLS toggle, and
     // the block is observed on the real code path — no string assertions on
     // generated config.
+    /** @scenario "Requests to private or internal addresses are blocked" */
     it.each([
       "https://127.0.0.1/hook",
       "https://10.0.0.5/hook",
@@ -94,6 +95,7 @@ describe("assertWebhookDelivered", () => {
   });
 
   describe("when the endpoint answers a retryable status", () => {
+    /** @scenario "Server errors are retried" */
     it.each([
       500, 502, 503, 429, 408,
     ])("classifies %s as retryable", (status) => {
@@ -108,6 +110,7 @@ describe("assertWebhookDelivered", () => {
   });
 
   describe("when the endpoint answers a terminal status", () => {
+    /** @scenario "Client errors fail terminally without retry" */
     it.each([
       301, 400, 401, 403, 404, 422,
     ])("classifies %s as terminal", (status) => {

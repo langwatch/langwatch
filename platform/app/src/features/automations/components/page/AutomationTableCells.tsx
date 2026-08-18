@@ -14,6 +14,7 @@ import {
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
 import { HelpCircle, Plus } from "react-feather";
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
   OPERATOR_LABELS,
@@ -21,12 +22,99 @@ import {
 } from "~/features/automations/logic/draftReducer";
 import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
+import { useSwitchToProjectIntegration } from "~/features/automations/logic/useSwitchToProjectIntegration";
+import { describeError } from "~/features/errors";
 import type { RouterOutputs } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 type TriggerStats = RouterOutputs["automation"]["getTriggerStats"][number];
 type ReportSchedule = RouterOutputs["automation"]["getReportSchedules"][number];
+
+/**
+ * Row nudge for an automation that still stores its own Slack token
+ * (ADR-093 §5). Delivery never retargets such a row on its own, so the only
+ * thing that moves it onto the project integration is someone choosing to —
+ * which means every unmigrated token has to stay visible where the automation
+ * appears.
+ *
+ * The switch is confirmed, not one click: it deletes the only copy of a
+ * credential the customer can no longer read or retype, and points the
+ * automation at a workspace that may not be the one it posts to today. Same
+ * ConfirmDialog the row's Delete uses, for the same reason.
+ *
+ * `workspaceName` is null when the project has no integration, and `canSwitch`
+ * is false without `project:update` at this project — in either case the
+ * automation is still flagged, but no affordance is offered that would break it
+ * or be refused at the server.
+ */
+export function OwnSlackTokenNudge({
+  projectId,
+  automationId,
+  automationName,
+  workspaceName,
+  canSwitch,
+}: {
+  projectId: string;
+  automationId: string;
+  automationName: string;
+  workspaceName: string | null;
+  canSwitch: boolean;
+}) {
+  const switchOver = useSwitchToProjectIntegration({
+    projectId,
+    automationId,
+    automationName,
+    workspaceName,
+  });
+
+  return (
+    <VStack align="start" gap={0} paddingTop={1}>
+      <Text textStyle="xs" color="fg.muted">
+        Uses its own Slack token
+      </Text>
+      {/* Both gates hold here, not only in the caller's composition: without
+          a workspace to fall through to, the switch would leave the
+          automation unable to deliver, and the server refuses it. */}
+      {canSwitch && workspaceName ? (
+        <Button
+          variant="plain"
+          size="xs"
+          height="auto"
+          paddingX={0}
+          color="fg.muted"
+          _hover={{ color: "fg" }}
+          loading={switchOver.isPending}
+          onClick={(event) => {
+            // The whole row opens the automation; this action is its own.
+            event.stopPropagation();
+            switchOver.setIsConfirming(true);
+          }}
+        >
+          Use the project integration
+        </Button>
+      ) : null}
+      {switchOver.isError ? (
+        <Text textStyle="xs" color="fg.error">
+          {describeError({
+            error: switchOver.error,
+            fallbackTitle: "Couldn't switch this automation",
+          })}
+        </Text>
+      ) : null}
+      <ConfirmDialog
+        open={switchOver.isConfirming}
+        onOpenChange={switchOver.setIsConfirming}
+        title={switchOver.confirmation.title}
+        message={switchOver.confirmation.message}
+        confirmLabel={switchOver.confirmation.confirmLabel}
+        tone="danger"
+        loading={switchOver.isPending}
+        onConfirm={switchOver.confirmSwitch}
+      />
+    </VStack>
+  );
+}
 
 /** Column header with a help tooltip explaining the metric. */
 export function MetricHeader({ label, help }: { label: string; help: string }) {
@@ -315,7 +403,12 @@ export function EmptyHint({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function AlertSubjectCell({
+/**
+ * The "Watches" cell for a graph-watching automation. Names the graph the way
+ * the wizard's rail and review overview do — "Graph · <name>" — so the list and
+ * the composer say one thing about the same row (ADR-093 §1).
+ */
+export function GraphWatchCell({
   graphName,
   graph,
   seriesName,
@@ -331,7 +424,7 @@ export function AlertSubjectCell({
     <VStack align="start" gap={0}>
       {graphName ? (
         <Text textStyle="sm" fontWeight="medium" lineClamp={1}>
-          {graphName}
+          {`Graph · ${graphName}`}
         </Text>
       ) : (
         <Text textStyle="sm" color="fg.muted">
@@ -347,9 +440,9 @@ export function AlertSubjectCell({
   );
 }
 
-/** Alert "Fires when" cell — the threshold rule (the cadence facet). Mirrors
- *  the dashboard "Configure Alert" copy (`greater than`, `over 5 minutes`) so
- *  both creation paths read the same. */
+/** The firing rule under a graph-watching row's "Watches" cell. Mirrors the
+ *  dashboard "Configure Alert" copy (`greater than`, `over 5 minutes`) so both
+ *  creation paths read the same. */
 export function AlertRuleCell({
   actionParams,
 }: {

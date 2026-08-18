@@ -66404,6 +66404,33 @@ openapi: "PATCH /api/traces/{traceId}/metadata"
 
 ---
 
+# FILE: ./api-reference/triggers/action-disable.mdx
+
+---
+title: "Pause an automation"
+openapi: "POST /api/triggers/{id}/disable"
+---
+
+---
+
+# FILE: ./api-reference/triggers/action-enable.mdx
+
+---
+title: "Resume an automation"
+openapi: "POST /api/triggers/{id}/enable"
+---
+
+---
+
+# FILE: ./api-reference/triggers/action-test-fire.mdx
+
+---
+title: "Send a test fire"
+openapi: "POST /api/triggers/{id}/test-fire"
+---
+
+---
+
 # FILE: ./api-reference/triggers/create-a-slack-alert-trigger.mdx
 
 ---
@@ -66427,6 +66454,15 @@ openapi: "POST /api/triggers"
 ---
 title: "Delete a trigger"
 openapi: "DELETE /api/triggers/{id}"
+---
+
+---
+
+# FILE: ./api-reference/triggers/get-fires.mdx
+
+---
+title: "List an automation's fires"
+openapi: "GET /api/triggers/{id}/fires"
 ---
 
 ---

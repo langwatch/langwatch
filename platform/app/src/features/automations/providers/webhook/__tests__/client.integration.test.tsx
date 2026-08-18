@@ -27,6 +27,7 @@ import {
   screen,
   within,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigFormCtx } from "~/features/automations/providers/types";
@@ -139,6 +140,7 @@ describe("WebhookConfigForm URL validation", () => {
   });
 
   describe("when the author types a non-https URL", () => {
+    /** @scenario "Only https URLs are accepted" */
     it("shows the https-only error", () => {
       renderForm();
 
@@ -154,6 +156,7 @@ describe("WebhookConfigForm URL validation", () => {
   });
 
   describe("when the author types a non-default port", () => {
+    /** @scenario "Non-standard ports are rejected" */
     it("shows the default-port-only error", () => {
       renderForm();
 
@@ -189,8 +192,138 @@ describe("WebhookConfigForm URL validation", () => {
   });
 });
 
+describe("WebhookConfigForm setup fields", () => {
+  afterEach(() => cleanup());
+
+  describe("given a fresh webhook draft", () => {
+    /** @scenario "A webhook automation configures a URL, method, headers, and a body" */
+    it("offers the destination, method, headers and body a delivery needs", async () => {
+      const user = userEvent.setup();
+      const onChangeSpy = vi.fn();
+      renderForm({ onChangeSpy });
+
+      fireEvent.change(
+        screen.getByPlaceholderText("https://example.com/hooks/langwatch"),
+        { target: { value: "https://example.com/hooks/langwatch" } },
+      );
+      await user.click(screen.getByText("PUT"));
+      fireEvent.click(screen.getByRole("button", { name: /add header/i }));
+      fireEvent.change(screen.getByPlaceholderText("Authorization"), {
+        target: { value: "Authorization" },
+      });
+      fireEvent.change(screen.getByPlaceholderText("Bearer …"), {
+        target: { value: "Bearer token" },
+      });
+
+      const params = webhookClient.toActionParams(
+        onChangeSpy.mock.calls.at(-1)![0],
+      ) as WebhookActionParams;
+      expect(params).toMatchObject({
+        url: "https://example.com/hooks/langwatch",
+        method: "PUT",
+        headers: { Authorization: "Bearer token" },
+      });
+      // The body is authored as a Liquid template, seeded with the framework
+      // default; leaving it untouched stores null, which is what makes each
+      // fire render that default rather than a frozen copy of it.
+      expect(bodyTextbox()).toHaveValue(DEFAULT_WEBHOOK_BODY_TEMPLATE);
+      expect(params.bodyTemplate).toBeNull();
+    });
+  });
+});
+
+describe("WebhookConfigForm test-fire outcome", () => {
+  afterEach(() => cleanup());
+
+  describe("when the last test fire succeeded", () => {
+    /** @scenario "A successful test shows the real status code inline" */
+    it("shows the endpoint's status next to the test button", () => {
+      renderForm({
+        ctx: makeCtx({
+          lastTestAttempt: {
+            at: Date.now(),
+            channel: "webhook",
+            status: "success",
+            httpStatus: 202,
+          },
+        }),
+      });
+
+      expect(screen.getByTestId("webhook-test-result")).toHaveTextContent(
+        "Delivered — HTTP 202",
+      );
+    });
+  });
+
+  describe("when the last test fire failed", () => {
+    /** @scenario "A failing test shows the error inline next to the test button" */
+    it("names what went wrong and the status or transport failure", () => {
+      renderForm({
+        ctx: makeCtx({
+          lastTestAttempt: {
+            at: Date.now(),
+            channel: "webhook",
+            status: "failure",
+            errorTitle: "Test request failed",
+            errorDetail: 'received HTTP 500: {"error":"boom"}',
+          },
+        }),
+      });
+
+      const result = screen.getByTestId("webhook-test-result");
+      expect(result).toHaveTextContent("Test request failed");
+      expect(result).toHaveTextContent("received HTTP 500");
+    });
+  });
+
+  describe("when the last test fire was on another channel", () => {
+    it("shows nothing, so a Slack outcome never reads as this endpoint's", () => {
+      renderForm({
+        ctx: makeCtx({
+          lastTestAttempt: {
+            at: Date.now(),
+            channel: "slack",
+            status: "success",
+          },
+        }),
+      });
+
+      expect(
+        screen.queryByTestId("webhook-test-result"),
+      ).not.toBeInTheDocument();
+    });
+  });
+});
+
 describe("webhookClient kept-header sentinel round-trip", () => {
   describe("given a saved trigger row with a kept header value", () => {
+    /** @scenario "Saved header values never return to the browser" */
+    it("shows the header name behind a masked value and re-sends the sentinel untouched", () => {
+      const slice = webhookClient.fromTriggerRow(
+        savedRowWith({
+          url: "https://example.com/hooks",
+          method: "POST",
+          headers: { Authorization: WEBHOOK_HEADER_VALUE_KEPT },
+          bodyTemplate: null,
+        }),
+      );
+      renderForm({ initial: slice });
+
+      // The name is on screen; the saved value is nowhere on it.
+      expect(screen.getByPlaceholderText("Authorization")).toHaveValue(
+        "Authorization",
+      );
+      expect(screen.getByPlaceholderText("•••••• (saved)")).toHaveValue("");
+      expect(
+        screen.queryByDisplayValue(WEBHOOK_HEADER_VALUE_KEPT),
+      ).not.toBeInTheDocument();
+
+      // Saving with the value left untouched sends the sentinel, which is what
+      // makes the server keep the stored secret instead of clearing it.
+      const params = webhookClient.toActionParams(slice) as WebhookActionParams;
+      expect(params.headers.Authorization).toBe(WEBHOOK_HEADER_VALUE_KEPT);
+    });
+
     it("marks the header row as kept, dropping the sentinel from its value", () => {
       const slice = webhookClient.fromTriggerRow(
         savedRowWith({
@@ -381,6 +514,114 @@ describe("webhookClient signing secret", () => {
 function bodyTextbox() {
   return within(screen.getByTestId("webhook-body-editor")).getByRole("textbox");
 }
+
+describe("webhookClient Content-Type", () => {
+  afterEach(() => cleanup());
+
+  const contentTypeInput = () => screen.getByTestId("webhook-content-type");
+
+  describe("given a fresh webhook draft", () => {
+    /** @scenario "Content-Type is a fixed header row that defaults to JSON" */
+    it("leads the headers with a fixed Content-Type row set to JSON", () => {
+      renderForm();
+
+      expect(contentTypeInput()).toHaveValue("application/json");
+      // The name cell is fixed — the row is always there and cannot be
+      // removed, so the delivery always announces something.
+      expect(screen.getByDisplayValue("Content-Type")).toBeDisabled();
+
+      const params = webhookClient.toActionParams(
+        webhookClient.initialSlice(),
+      ) as WebhookActionParams;
+      expect(params.contentType).toBe("application/json");
+    });
+
+    it("rejects a value that is not a media type, where it is typed", () => {
+      const onChangeSpy = vi.fn();
+      renderForm({ onChangeSpy });
+
+      fireEvent.change(contentTypeInput(), { target: { value: "banana" } });
+
+      expect(screen.getByText(/media type/i)).toBeInTheDocument();
+      // Refused, not just flagged: the config reads incomplete, which is
+      // what holds Save and the test fire.
+      expect(
+        webhookClient.isComplete(onChangeSpy.mock.calls.at(-1)![0] as never),
+      ).toBe(false);
+    });
+  });
+
+  describe("when the author declares a non-JSON Content-Type", () => {
+    /** @scenario "The editor and preview follow the declared Content-Type" */
+    it("sends it on toActionParams and stops treating the body as JSON", () => {
+      const onChangeSpy = vi.fn();
+      renderForm({ onChangeSpy });
+
+      // JSON first: the editor is seeded with the framework envelope.
+      expect(bodyTextbox()).toHaveValue(DEFAULT_WEBHOOK_BODY_TEMPLATE);
+
+      fireEvent.change(contentTypeInput(), {
+        target: { value: "text/plain" },
+      });
+
+      const params = webhookClient.toActionParams(
+        onChangeSpy.mock.calls.at(-1)![0],
+      ) as WebhookActionParams;
+      expect(params.contentType).toBe("text/plain");
+      // A non-JSON body has no framework envelope to seed or reset to.
+      expect(bodyTextbox()).toHaveValue("");
+      expect(screen.queryByText("Using default")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /reset to default/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the Content-Type changes under an authored body", () => {
+    it("keeps the author's text instead of clearing it", () => {
+      renderForm({
+        initial: {
+          ...webhookClient.initialSlice(),
+          url: "https://example.com/hooks",
+          template: {
+            value: "custom body {{ trigger.name }}",
+            usingDefault: false,
+          },
+        },
+      });
+
+      fireEvent.change(contentTypeInput(), {
+        target: { value: "text/plain" },
+      });
+
+      // Only the framework default vanishes on a non-JSON type — an authored
+      // body is the author's and survives the switch.
+      expect(bodyTextbox()).toHaveValue("custom body {{ trigger.name }}");
+    });
+  });
+
+  describe("given a saved trigger row", () => {
+    it("reads the stored Content-Type back", () => {
+      const slice = webhookClient.fromTriggerRow(
+        savedRowWith({
+          url: "https://example.com/hooks",
+          contentType: "text/plain; charset=utf-8",
+          bodyTemplate: "hello",
+        }),
+      );
+
+      expect(slice.contentType).toBe("text/plain; charset=utf-8");
+    });
+
+    it("reads a row saved before the field existed as JSON", () => {
+      const slice = webhookClient.fromTriggerRow(
+        savedRowWith({ url: "https://example.com/hooks", bodyTemplate: null }),
+      );
+
+      expect(slice.contentType).toBe("application/json");
+    });
+  });
+});
 
 describe("webhookClient JSON-body default resolution", () => {
   afterEach(() => cleanup());

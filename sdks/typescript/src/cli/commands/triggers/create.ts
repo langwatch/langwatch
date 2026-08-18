@@ -6,10 +6,11 @@ import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import { parseJsonObject } from "./parseJsonObject";
+import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
-import { redactTriggerSecrets } from "./redact";
 
 /**
  * Returns the created trigger rather than printing it: the output port renders
@@ -20,14 +21,16 @@ export const createTriggerCommand = async (
   options: {
     action: string;
     filters?: string;
+    filterQuery?: string;
     message?: string;
     alertType?: string;
     slackWebhook?: string;
+    actionParams?: string;
   },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const validActions = ["SEND_EMAIL", "ADD_TO_DATASET", "ADD_TO_ANNOTATION_QUEUE", "SEND_SLACK_MESSAGE"];
+  const validActions = ["SEND_EMAIL", "ADD_TO_DATASET", "ADD_TO_ANNOTATION_QUEUE", "SEND_SLACK_MESSAGE", "SEND_WEBHOOK"];
   if (!validActions.includes(options.action)) {
     reportCommandError({
       error: commandValidationError(
@@ -42,16 +45,36 @@ export const createTriggerCommand = async (
 
   const spinner = createSpinner(`Creating trigger "${name}"...`).start();
 
+  // Parsed BEFORE the request, in their own narrow guard — the outer catch
+  // must not misread a non-JSON API response as a flag the user never passed.
+  let filters: Record<string, unknown> | undefined;
+  let actionParams: Record<string, unknown> = {};
   try {
-    let filters: Record<string, unknown> = {};
     if (options.filters) {
-      filters = JSON.parse(options.filters) as Record<string, unknown>;
+      filters = parseJsonObject(options.filters);
     }
+    if (options.actionParams) {
+      actionParams = parseJsonObject(options.actionParams);
+    }
+  } catch {
+    failSpinner({
+      spinner,
+      error: commandValidationError(
+        "--filters and --action-params must each be a JSON object",
+      ),
+      action: "create trigger",
+    });
+    process.exit(1);
+  }
+  // The delivery configuration the chosen channel reads. `--slack-webhook`
+  // is the shorthand for the one field a Slack automation most often needs;
+  // everything else is stated with `--action-params`.
+  if (options.slackWebhook) actionParams.slackWebhook = options.slackWebhook;
 
-    const actionParams: Record<string, unknown> = {};
-    if (options.slackWebhook) actionParams.slackWebhook = options.slackWebhook;
+  try {
 
     const response = await fetch(`${endpoint}/api/triggers`, {
+      signal: AbortSignal.timeout(TRIGGER_REQUEST_TIMEOUT_MS),
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -61,6 +84,7 @@ export const createTriggerCommand = async (
         name,
         action: options.action,
         filters,
+        filterQuery: options.filterQuery,
         actionParams,
         message: options.message,
         alertType: options.alertType,
@@ -77,8 +101,9 @@ export const createTriggerCommand = async (
     spinner.succeed(`Trigger "${trigger.name}" created (${trigger.id})`);
 
     return {
-      // See ./redact.ts — actionParams is plaintext and never shown to humans.
-      data: redactTriggerSecrets(trigger),
+      // The API redacts delivery credentials before it answers, so machine
+      // output is the response exactly as it arrived.
+      data: trigger,
       table: () => {
         console.log();
         console.log(`  ${chalk.gray("ID:")}     ${chalk.green(trigger.id)}`);
@@ -94,10 +119,7 @@ export const createTriggerCommand = async (
     // prints nothing in --json/--jq/agent mode (spinners are silent there).
     failSpinner({
       spinner,
-      error:
-        error instanceof SyntaxError
-          ? commandValidationError("--filters must be valid JSON")
-          : error,
+      error,
       action: "create trigger",
     });
     process.exit(1);

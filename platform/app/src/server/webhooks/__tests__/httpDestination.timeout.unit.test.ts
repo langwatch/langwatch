@@ -44,6 +44,7 @@ afterAll(async () => {
 
 describe("sendHttpDestination against a real endpoint", () => {
   describe("when the endpoint accepts the connection but never responds", () => {
+    /** @scenario "An endpoint that never answers is retried, not waited on" */
     it("rejects within the requested timeout instead of riding undici's 300s default", async () => {
       const timeoutMs = 500;
       const startedAt = Date.now();

@@ -5,6 +5,8 @@ import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import { parseJsonObject } from "./parseJsonObject";
+import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
@@ -20,6 +22,9 @@ export const updateTriggerCommand = async (
     active?: string;
     message?: string;
     alertType?: string;
+    filters?: string;
+    filterQuery?: string;
+    actionParams?: string;
   },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
@@ -29,18 +34,48 @@ export const updateTriggerCommand = async (
 
   const spinner = createSpinner(`Updating trigger "${id}"...`).start();
 
+  // Parsed BEFORE the request, in their own narrow guard — the outer catch
+  // must not misread a non-JSON API response as a flag the user never passed.
+  let parsedFilters: Record<string, unknown> | undefined;
+  let parsedActionParams: Record<string, unknown> | undefined;
+  try {
+    if (options.filters) {
+      parsedFilters = parseJsonObject(options.filters);
+    }
+    if (options.actionParams) {
+      parsedActionParams = parseJsonObject(options.actionParams);
+    }
+  } catch {
+    failSpinner({
+      spinner,
+      error: commandValidationError(
+        "--filters and --action-params must be valid JSON objects",
+      ),
+      action: "update trigger",
+    });
+    process.exit(1);
+  }
+
   try {
     const body: Record<string, unknown> = {};
     if (options.name) body.name = options.name;
     if (options.active !== undefined) body.active = options.active === "true";
     if (options.message !== undefined) body.message = options.message || null;
     if (options.alertType) body.alertType = options.alertType;
+    if (parsedFilters) body.filters = parsedFilters;
+    if (options.filterQuery !== undefined) {
+      body.filterQuery = options.filterQuery || null;
+    }
+    // The delivery configuration this automation should have from now on: it
+    // replaces the stored one rather than merging into it. A credential the
+    // read hid comes back as `[redacted]`; send that to keep the stored value.
+    if (parsedActionParams) body.actionParams = parsedActionParams;
 
     if (Object.keys(body).length === 0) {
       failSpinner({
         spinner,
         error: commandValidationError(
-          "No fields to update. Use --name, --active, --message, or --alert-type.",
+          "No fields to update. Use --name, --active, --message, --alert-type, --filters, --filter-query or --action-params.",
         ),
         action: "update trigger",
       });
@@ -48,6 +83,7 @@ export const updateTriggerCommand = async (
     }
 
     const response = await fetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
+      signal: AbortSignal.timeout(TRIGGER_REQUEST_TIMEOUT_MS),
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -73,7 +109,11 @@ export const updateTriggerCommand = async (
       },
     };
   } catch (error) {
-    failSpinner({ spinner, error, action: "update trigger" });
+    failSpinner({
+      spinner,
+      error,
+      action: "update trigger",
+    });
     process.exit(1);
   }
 };

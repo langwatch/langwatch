@@ -168,36 +168,84 @@ export const DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE = `[
  */
 export const DEFAULT_WEBHOOK_BODY_TEMPLATE = `{
   "event": "trigger.matched",
-  "trigger": { "id": {{ trigger.id | json }}, "name": {{ trigger.name | json }}{% if trigger.alertType %}, "alertType": {{ trigger.alertType | json }}{% endif %} },
-  "project": { "name": {{ project.name | json }}, "slug": {{ project.slug | json }} },
+  "trigger": {
+    "id": {{ trigger.id | json }},
+    "name": {{ trigger.name | json }}{% if trigger.alertType %},
+    "alertType": {{ trigger.alertType | json }}{% endif %}
+  },
+  "project": {
+    "name": {{ project.name | json }},
+    "slug": {{ project.slug | json }}
+  },
   "digest": { "count": {{ digest.count | json }} },
-  "matches": [{% for m in matches %}
-    { "traceId": {{ m.trace.id | json }}, "url": {{ m.trace.url | json }},
-      "input": {{ m.trace.input | json }}, "output": {{ m.trace.output | json }} }{% unless forloop.last %},{% endunless %}{% endfor %}
+  "matches": [
+    {% for m in matches %}
+      {
+        "traceId": {{ m.trace.id | json }},
+        "url": {{ m.trace.url | json }},
+        "input": {{ m.trace.input | json }},
+        "output": {{ m.trace.output | json }}
+      }{% unless forloop.last %},{% endunless %}
+    {% endfor %}
   ]
 }`;
 
 export const DEFAULT_ALERT_WEBHOOK_BODY_TEMPLATE = `{
   "event": "alert.fired",
-  "trigger": { "id": {{ trigger.id | json }}, "name": {{ trigger.name | json }}{% if trigger.alertType %}, "alertType": {{ trigger.alertType | json }}{% endif %} },
-  "project": { "name": {{ project.name | json }}, "slug": {{ project.slug | json }} },
-  "graph": { "name": {{ graph.name | json }}, "url": {{ graph.url | json }} },
+  "trigger": {
+    "id": {{ trigger.id | json }},
+    "name": {{ trigger.name | json }}{% if trigger.alertType %},
+    "alertType": {{ trigger.alertType | json }}{% endif %}
+  },
+  "project": {
+    "name": {{ project.name | json }},
+    "slug": {{ project.slug | json }}
+  },
+  "graph": {
+    "name": {{ graph.name | json }},
+    "url": {{ graph.url | json }}
+  },
   "metric": { "label": {{ metric.label | json }} },
-  "condition": { "operator": {{ condition.operatorLabel | json }}, "threshold": {{ condition.threshold | json }}, "window": {{ condition.timePeriodLabel | json }} },
+  "condition": {
+    "operator": {{ condition.operatorLabel | json }},
+    "threshold": {{ condition.threshold | json }},
+    "window": {{ condition.timePeriodLabel | json }}
+  },
   "currentValue": {{ currentValue | json }}{% if previousValue != nil %},
   "previousValue": {{ previousValue | json }}{% endif %}
 }`;
 
 export const DEFAULT_REPORT_WEBHOOK_BODY_TEMPLATE = `{
   "event": "report.scheduled",
-  "trigger": { "id": {{ trigger.id | json }}, "name": {{ trigger.name | json }} },
-  "project": { "name": {{ project.name | json }}, "slug": {{ project.slug | json }} },
-  "report": { "source": {{ report.sourceLabel | json }}, "schedule": {{ report.scheduleLabel | json }}, "isEmpty": {{ report.isEmpty | json }} },
-  "traces": [{% for t in traces %}
-    { "traceId": {{ t.traceId | json }}, "url": {{ t.url | json }}, "input": {{ t.input | json }} }{% unless forloop.last %},{% endunless %}{% endfor %}
+  "trigger": {
+    "id": {{ trigger.id | json }},
+    "name": {{ trigger.name | json }}
+  },
+  "project": {
+    "name": {{ project.name | json }},
+    "slug": {{ project.slug | json }}
+  },
+  "report": {
+    "source": {{ report.sourceLabel | json }},
+    "schedule": {{ report.scheduleLabel | json }},
+    "isEmpty": {{ report.isEmpty | json }}
+  },
+  "traces": [
+    {% for t in traces %}
+      {
+        "traceId": {{ t.traceId | json }},
+        "url": {{ t.url | json }},
+        "input": {{ t.input | json }}
+      }{% unless forloop.last %},{% endunless %}
+    {% endfor %}
   ],
-  "charts": [{% for chart in charts %}
-    { "title": {{ chart.title | json }}{% unless chart.isEmpty %}, "total": {{ chart.total | json }}{% endunless %} }{% unless forloop.last %},{% endunless %}{% endfor %}
+  "charts": [
+    {% for chart in charts %}
+      {
+        "title": {{ chart.title | json }}{% unless chart.isEmpty %},
+        "total": {{ chart.total | json }}{% endunless %}
+      }{% unless forloop.last %},{% endunless %}
+    {% endfor %}
   ],
   "viewUrl": {{ viewUrl | json }}
 }`;

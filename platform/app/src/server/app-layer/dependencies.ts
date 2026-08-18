@@ -313,7 +313,7 @@ export interface AppDependencies {
   };
   experiments: ExperimentService;
   triggers: TriggerService;
-  /** Wraps `testFireTrigger(deps, input)` with the composition-time
+  /** Wraps `testFireTrigger({ deps, input })` with the composition-time
    *  `{baseHost, notifier}` bag already bound — the router only needs
    *  to pass the per-call input. */
   triggerTemplates: {

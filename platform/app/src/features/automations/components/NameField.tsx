@@ -10,7 +10,7 @@ import {
 /** Per-preset placeholder — a concrete example beats an empty field. */
 const NAME_PLACEHOLDER = {
   trace: "Flag failing traces",
-  customGraph: "High latency alert",
+  customGraph: "High latency",
   report: "Weekly quality digest",
 } as const;
 

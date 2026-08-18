@@ -915,10 +915,52 @@ model Trigger {
   traceDebounceMs      Int                       @default(30000)
   TriggerSent          TriggerSent[]
   webhookDeliveries    WebhookEndpointDelivery[]
+  latestEvaluation     TriggerLatestEvaluation?
   customGraphId        String?                   @unique
   customGraph          CustomGraph?              @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+}
+
+/// The scopes a Slack integration can be set up at. PROJECT is the only value
+/// today (ADR-093 §5); TEAM and ORGANIZATION are a future enum add, which is
+/// why the row carries (scopeType, scopeId) rather than a bare projectId.
+enum SlackIntegrationScopeType {
+  PROJECT
+}
+
+/// A Slack workspace connection owned by one scope (ADR-093 §5). The bot token
+/// is AES-256-GCM encrypted at rest (shared encrypt/decrypt, CREDENTIALS_SECRET)
+/// and is never returned to any client: reads answer with presence plus the
+/// workspace identity pinned by `auth.test` at save time. Single-scope-per-row
+/// per ADR-021 — inline (scopeType, scopeId) plus the organizationId tenancy
+/// anchor — and the one-per-project decision is the unique constraint.
+///
+/// No relation to Project, and no cascade: `scopeId` is polymorphic by design
+/// (a TEAM or ORGANIZATION row is a future enum value, not a schema change), so
+/// there is no column a foreign key could point at. RetentionPolicy,
+/// DataPrivacyPolicy and CustomLLMModelCost carry the same shape for the same
+/// reason. Projects are archived rather than deleted in the product — no code
+/// path hard-deletes one — so a row cannot be orphaned by ordinary use; a
+/// hard delete outside the product must clear this row's scope pair too, or the
+/// ciphertext outlives what it belonged to.
+model SlackIntegration {
+  id                String                    @id @default(nanoid())
+  /// No default: the writer names the scope it is writing at. PROJECT being
+  /// the only value today is a fact about now, not an assumption to bake in.
+  scopeType         SlackIntegrationScopeType
+  scopeId           String
+  organizationId    String
+  botTokenEncrypted String
+  slackTeamId       String
+  slackTeamName     String
+  createdById       String
+  updatedById       String
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @default(now()) @updatedAt
+
+  @@unique([scopeType, scopeId])
+  @@index([organizationId])
 }
 
 enum WebhookDeliveryOutcome {
@@ -1601,6 +1643,49 @@ model TriggerSent {
   @@index([projectId])
   @@index([customGraphId])
   @@index([resolvedAt])
+  // Backs the fire-history keyset walk: filter on (projectId, triggerId),
+  // order by (createdAt, id) descending — served by a backward scan.
+  @@index([projectId, triggerId, createdAt, id])
+}
+
+// The most recent evaluation of one alert — what the evaluator observed, what
+// it compared that against, and what it decided. Exactly ONE row per trigger
+// (`triggerId` is the primary key, the write is an upsert), so this is a
+// bounded snapshot and never a log: storage is one row per alert and there is
+// nothing to retain or prune.
+//
+// Deliberately its own table rather than rows on `TriggerSent`: that ledger is
+// the FIRE history, arbitrated by the `openIncidentKey` claim, and every
+// "last fired" / "fires in the last 30 days" / "currently firing" read counts
+// its rows. A non-fire evaluation written there would change all of those
+// answers and sit next to the claim that guards at-most-once notification.
+// This table is read-only to every existing path and cannot affect it.
+model TriggerLatestEvaluation {
+  triggerId String  @id
+  trigger   Trigger @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+  projectId String
+
+  evaluatedAt DateTime @db.Timestamptz(3)
+  // What the evaluator decided: fired | already_firing | resolved |
+  // not_breached | not_delivered | skipped. A plain string, not an enum: the
+  // set follows the evaluator's own result status, and a value this table has
+  // never seen must degrade to "checked" in the UI rather than fail a read.
+  verdict     String
+  // The metric value the evaluation observed, and the condition it was
+  // compared against. Null when the check was skipped before reading the
+  // metric — which is exactly the case the reader needs explained.
+  observedValue     Float?
+  threshold         Float?
+  operator          String?
+  timePeriodMinutes Int?
+  // Why a skipped check was skipped, as a stable code (never prose): the UI
+  // maps it to customer copy, and an unrecognised code degrades to a generic
+  // explanation.
+  skipCode String?
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([projectId])
 }
 
 // ADR-031: recipient unsubscribe / suppression list for trigger emails. A row

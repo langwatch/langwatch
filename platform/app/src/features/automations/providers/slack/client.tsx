@@ -1,14 +1,13 @@
 import {
   Box,
   Button,
-  Code,
   Combobox,
   createListCollection,
   Field,
   HStack,
   Input,
-  List,
   Portal,
+  Skeleton,
   Spinner,
   Text,
   useFilter,
@@ -29,9 +28,11 @@ import { filterVariablesForCadence } from "@langwatch/automations/templating/exa
 import { ExternalLink } from "lucide-react";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { FaSlack } from "react-icons/fa";
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { Link } from "~/components/ui/link";
 import { SegmentedControl } from "~/components/ui/segmented-control";
 import { Select } from "~/components/ui/select";
+import { ReceiveCadenceField } from "~/features/automations/components/ReceiveCadenceField";
 import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
 import { LIQUID_JSON_LANGUAGE_ID } from "~/features/automations/editors/liquidMonaco";
 import { SLACK_BLOCK_KIT_JSON_SCHEMA } from "~/features/automations/editors/monacoSchemas";
@@ -39,14 +40,16 @@ import {
   CompactSlackPreview,
   FieldHeader,
   LiquidEditor,
-  TemplateDisclosure,
 } from "~/features/automations/editors/templateAuthoring";
+import { useSwitchToProjectIntegration } from "~/features/automations/logic/useSwitchToProjectIntegration";
 import { describeError } from "~/features/errors";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { TestFireButton } from "../TestFireButton";
 import type {
   ConfigFormProps,
   NotifyClientDef,
+  PreviewDeliveryContext,
   SummaryIdentity,
 } from "../types";
 import {
@@ -116,12 +119,47 @@ function initialSlice(): SlackSlice {
   };
 }
 
+/**
+ * Which of the three token states a Slack delivery is in (ADR-093 §5). The
+ * composer reads as exactly one of them, and they are ordered the way delivery
+ * resolves: an automation's own token outranks the project integration, so an
+ * automation that has one reads as using its own however the project is set up.
+ */
+export type SlackTokenState =
+  | "own_token"
+  | "project_integration"
+  | "not_connected";
+
+export function slackTokenState({
+  slice,
+  hasProjectIntegration,
+}: {
+  slice: SlackSlice;
+  hasProjectIntegration: boolean;
+}): SlackTokenState {
+  if (slice.botTokenAlreadySet || slice.botToken.trim().length > 0) {
+    return "own_token";
+  }
+  return hasProjectIntegration ? "project_integration" : "not_connected";
+}
+
+function slackTokenAvailable(params: {
+  slice: SlackSlice;
+  hasProjectIntegration: boolean;
+}): boolean {
+  return slackTokenState(params) !== "not_connected";
+}
+
+/**
+ * Completeness is what the AUTHOR still has to fill in, and the token is no
+ * longer one of those things: it belongs to the project, not to this
+ * automation. A project with no Slack integration is a real problem, but it is
+ * the project's to fix and delivery names it (`slack_integration_missing`)
+ * rather than the composer blocking a save over it.
+ */
 function isComplete(slice: SlackSlice): boolean {
   if (slice.deliveryMethod === "bot") {
-    return (
-      slice.channelId.trim().length > 0 &&
-      (slice.botToken.trim().length > 0 || slice.botTokenAlreadySet)
-    );
+    return slice.channelId.trim().length > 0;
   }
   return slice.webhook.trim().length > 0;
 }
@@ -200,32 +238,6 @@ const DELIVERY_ITEMS: { value: SlackDeliveryMethod; label: string }[] = [
   { value: "bot", label: "Slack app (bot)" },
 ];
 
-/**
- * Slack app manifest an author pastes into "Create app → From a manifest" to
- * skip manual scope setup. One app serves the whole workspace (not per
- * automation), so the name is generic. It grants:
- *   - `chat:write` — post messages to channels the bot is a member of
- *   - `chat:write.public` — post to ANY public channel without being invited
- *     first; without it Slack rejects the post with `not_in_channel` until the
- *     bot is manually `/invite`d, which is the #1 setup snag
- *   - `channels:read` / `groups:read` — populate the channel picker
- * `features.bot_user` is required alongside `oauth_config.scopes.bot` —
- * Slack rejects the manifest with "OAuth requires bot_user" without it.
- */
-export const SLACK_APP_MANIFEST = `display_information:
-  name: LangWatch
-features:
-  bot_user:
-    display_name: LangWatch
-    always_online: false
-oauth_config:
-  scopes:
-    bot:
-      - chat:write
-      - chat:write.public
-      - channels:read
-      - groups:read`;
-
 /** Shown on a legacy webhook automation: nudges the author to move to a Slack
  *  app, which unlocks the richer templates a webhook can't render. */
 function UpgradeToBotBanner({ onUpgrade }: { onUpgrade: () => void }) {
@@ -240,7 +252,7 @@ function UpgradeToBotBanner({ onUpgrade }: { onUpgrade: () => void }) {
       <HStack justify="space-between" gap={3} align="center">
         <VStack align="start" gap={0}>
           <Text textStyle="xs" fontWeight="medium" color="fg">
-            Get charts, tables, and alert banners
+            Get charts, tables, and status banners
           </Text>
           <Text textStyle="xs" color="fg.muted">
             Move this automation to a Slack app to unlock the richer templates.
@@ -311,22 +323,25 @@ function SlackChannelField({
       { projectId, botToken: typedToken || null, automationId },
       {
         onError: (error) =>
+          // The hint below already reads `list.isError` / `list.error`, so
+          // this is a dev-diagnostic echo, not the only place the failure
+          // surfaces to the author.
           // eslint-disable-next-line no-console
           console.error("[slack] listSlackChannels failed", error),
       },
     );
   };
 
-  // Fetch as soon as a usable token exists — a freshly typed one (debounced so
-  // we don't fire mid-type) or the stored token of a saved automation (loaded
-  // server-side by id). No button to click; the list just appears.
+  // Fetch straight away and let the server resolve which token to list with
+  // (ADR-093 §5): the automation's own stored one, else the project's Slack
+  // integration. A freshly typed token is still honoured — the public API can
+  // still write one — and is debounced so we don't fire mid-type. Nothing to
+  // resolve comes back as `no_token`, which the hint below names.
   const fetchKey = typedToken
     ? /^xoxb-/.test(typedToken)
       ? `typed:${typedToken}`
       : null
-    : slice.botTokenAlreadySet || automationId
-      ? "stored"
-      : null;
+    : "resolved";
   const lastFetched = useRef<string | null>(null);
   useEffect(() => {
     if (!fetchKey || lastFetched.current === fetchKey) return;
@@ -406,8 +421,6 @@ function SlackChannelField({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelData, slice.channelId]);
 
-  const canLoad =
-    typedToken.length > 0 || slice.botTokenAlreadySet || !!automationId;
   const returnedError =
     list.data?.error && list.data.error !== "no_token" ? list.data.error : null;
   // A listing can succeed and still be short of the workspace. Saying nothing
@@ -420,7 +433,7 @@ function SlackChannelField({
   const gaps = list.data?.gaps ?? [];
   const gapHints = [
     gaps.includes("private_channels_hidden")
-      ? "Private channels aren't listed — your Slack app needs the groups:read permission. Reinstall it with the manifest above."
+      ? "Private channels aren't listed — your Slack app needs the groups:read permission. Reinstall it with the manifest in this project's integration settings."
       : null,
     gaps.includes("page_cap")
       ? "This workspace has more channels than we can list here, so some are missing."
@@ -429,6 +442,10 @@ function SlackChannelField({
   const gapHint = gapHints.length
     ? `${gapHints.join(" ")} Type the channel name or paste its ID above to use one that isn't shown.`
     : null;
+  // `no_token` means a load ran with nothing to load against — the "manual
+  // reload with no usable token yet" case a mid-typed token can hit even
+  // though the field isn't empty. Saying nothing here reads as a load that
+  // silently did nothing; name the cause instead.
   const hint = list.isError
     ? `${endWithStop(
         describeError({
@@ -436,30 +453,41 @@ function SlackChannelField({
           fallbackTitle: "Couldn't load channels",
         }),
       )} You can still type the channel above.`
-    : returnedError === "missing_scope"
-      ? "Add the channels:read permission to your Slack app and reinstall it to pick from a list — you can still type the channel above."
-      : returnedError
-        ? "Couldn't load channels from Slack. Check the token, or type the channel above."
-        : gapHint;
+    : list.data?.error === "no_token"
+      ? "Connect Slack for this project to see its channels."
+      : returnedError === "missing_scope"
+        ? "Add the channels:read permission to your Slack app and reinstall it to pick from a list — you can still type the channel above."
+        : returnedError
+          ? "Couldn't load channels from Slack. Check the token, or type the channel above."
+          : gapHint;
+
+  // A token that failed to list once (app not yet installed, scopes not yet
+  // granted) can become valid without the field changing — the author fixes
+  // it in Slack and comes back to the same draft. The automatic effect above
+  // won't retry on its own once a key has been attempted (by design — it
+  // isn't a poll), so Reload resets the latch before firing: the same key is
+  // fetched again instead of being treated as already tried.
+  const handleReload = () => {
+    lastFetched.current = null;
+    fetchChannels(fetchKey ?? `manual:${Date.now()}`);
+  };
 
   return (
     <Field.Root>
       <HStack justify="space-between" align="center" width="full">
         <Field.Label>Channel</Field.Label>
-        {canLoad ? (
-          <Button
-            variant="plain"
-            size="xs"
-            height="auto"
-            paddingX={0}
-            color="fg.muted"
-            _hover={{ color: "fg" }}
-            disabled={list.isPending}
-            onClick={() => fetchChannels(fetchKey ?? `manual:${Date.now()}`)}
-          >
-            {list.isPending ? "Loading…" : "Reload"}
-          </Button>
-        ) : null}
+        <Button
+          variant="plain"
+          size="xs"
+          height="auto"
+          paddingX={0}
+          color="fg.muted"
+          _hover={{ color: "fg" }}
+          disabled={list.isPending}
+          onClick={handleReload}
+        >
+          {list.isPending ? "Loading…" : "Reload"}
+        </Button>
       </HStack>
       <Combobox.Root
         collection={collection}
@@ -564,9 +592,26 @@ function templatesFromSlice(slice: SlackSlice) {
  * its fallback; a bot connection renders them. Previewing a chart the webhook
  * is about to strip — or hiding one the bot will happily send — is the fastest
  * way to make the editor feel like it is lying.
+ *
+ * A bot connection with no token anywhere sends nothing at all (ADR-093 §5), so
+ * the gate keys off token availability, not off the delivery method alone: the
+ * automation's own token, or the project's Slack integration behind it.
  */
-function previewOptions(slice: SlackSlice) {
-  return { allowGatedBlocks: slice.deliveryMethod === "bot" };
+function previewOptions({
+  slice,
+  context,
+}: {
+  slice: SlackSlice;
+  context: PreviewDeliveryContext;
+}): { allowGatedBlocks: boolean } {
+  return {
+    allowGatedBlocks:
+      slice.deliveryMethod === "bot" &&
+      slackTokenAvailable({
+        slice,
+        hasProjectIntegration: context.hasProjectSlackIntegration,
+      }),
+  };
 }
 
 function SlackConfigForm({
@@ -693,8 +738,8 @@ function SlackConfigForm({
           />
           <Field.HelperText>
             {slice.deliveryMethod === "webhook"
-              ? "This automation uses a webhook. Move it to a Slack app for charts, tables, and alert banners."
-              : "Renders charts, tables, and alert banners."}
+              ? "This automation uses a webhook. Move it to a Slack app for charts, tables, and status banners."
+              : "Renders charts, tables, and status banners."}
           </Field.HelperText>
         </Field.Root>
       ) : null}
@@ -725,19 +770,16 @@ function SlackConfigForm({
           </Field.Root>
         </VStack>
       )}
-      {/* Try the real message straight from the destination section. */}
-      <TestFireButton
-        onTestFire={ctx.onTestFire}
-        loading={ctx.testFireLoading}
-        disabled={!isComplete(slice)}
-        hint={
-          isComplete(slice)
-            ? undefined
-            : slice.deliveryMethod === "bot"
-              ? "Add a token and channel first"
-              : "Add a webhook URL first"
-        }
-      />
+      {/* The receive choice lives here, beside the layouts it filters — one
+          decision drives both the cadence and which templates are offered
+          (`hasOwnReceiveChooser`). Only a trace automation has the choice: the
+          server pins alerts and reports to their own timing. */}
+      {ctx.sourceKind === "trace" ? (
+        <ReceiveCadenceField
+          value={ctx.notificationCadence}
+          onChange={ctx.setNotificationCadence}
+        />
+      ) : null}
       <FieldHeader
         label="Message"
         usingDefault={slice.template.usingDefault}
@@ -783,22 +825,6 @@ function SlackConfigForm({
                     template: { value: option.source, usingDefault: false },
                   })
                 }
-                onSelectOtherCadence={(option) => {
-                  // Cross-cadence pick: switch the cadence alongside the template
-                  // so the author doesn't have to round-trip via the Cadence
-                  // section. Both land in the same batch, so the cadence-mismatch
-                  // reset effect above sees a consistent pair and leaves it
-                  // alone.
-                  ctx.setNotificationCadence(
-                    option.cadenceFit === "digest"
-                      ? "5min_digest"
-                      : "immediate",
-                  );
-                  onChange({
-                    ...slice,
-                    template: { value: option.source, usingDefault: false },
-                  });
-                }}
               />
             )
           ) : (
@@ -809,7 +835,7 @@ function SlackConfigForm({
             <VStack align="stretch" gap={2}>
               <Text textStyle="xs" color="fg.muted">
                 Write the layout yourself in Block Kit. Values in braces fill in
-                from your trace or alert when the message sends.
+                from your trace or metric when the message sends.
               </Text>
               <Box data-testid="slack-code-editor">
                 <LiquidEditor
@@ -881,16 +907,47 @@ function SlackConfigForm({
           </Button>
         </VStack>
       )}
+      {/* Sits after the layout choice — a test fire renders whatever is
+          configured above, so it belongs after there is something to try. */}
+      <TestFireButton
+        onTestFire={ctx.onTestFire}
+        loading={ctx.testFireLoading}
+        disabled={!isComplete(slice)}
+        hint={
+          isComplete(slice)
+            ? undefined
+            : slice.deliveryMethod === "bot"
+              ? "Pick a channel first"
+              : "Add a webhook URL first"
+        }
+      />
+    </VStack>
+  );
+}
+
+/** Shown while the project's Slack connection is still being read. Deliberately
+ *  not the not-connected state: that would be a guess presented as an answer. */
+function SlackStatusLoading() {
+  return (
+    <VStack align="stretch" gap={3}>
+      <Skeleton height="16px" width="70%" data-testid="slack-state-loading" />
+      <Field.Root>
+        <Field.Label>Channel</Field.Label>
+        <Input placeholder="Loading…" disabled />
+      </Field.Root>
     </VStack>
   );
 }
 
 /**
- * Bot-connection destination: the channel to post in plus the app's bot token.
- * The token is write-only from the browser's side — once stored, the server
- * echoes a "set" flag (`botTokenAlreadySet`) instead of the secret, so the
- * field stays blank and the author keeps the stored token unless they type a
- * new one. A short setup callout points at where to create the Slack app.
+ * Bot-connection destination. Since ADR-093 §5 the composer never asks for a
+ * token — Slack is connected once per project and the channel is the only
+ * decision left here. What the author sees is one of exactly three states:
+ *
+ *   own_token           this automation carries its own token, kept until it is
+ *                       explicitly switched over, with the switch offered here
+ *   project_integration the project's Slack workspace serves it — channel only
+ *   not_connected       nothing to deliver with, so the way forward is settings
  */
 function SlackBotFields({
   slice,
@@ -903,123 +960,194 @@ function SlackBotFields({
   projectId: string;
   automationId?: string;
 }) {
-  const tokenRef = useRef<HTMLInputElement>(null);
-  const [stepsOpen, setStepsOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const tokenKept = slice.botTokenAlreadySet && slice.botToken.length === 0;
+  const integration = api.slackIntegration.getStatus.useQuery(
+    { projectId },
+    { enabled: !!projectId, refetchOnWindowFocus: false },
+  );
+  // Null unless a workspace is actually connected — every surface below reads
+  // "which workspace?" and "is there one?" off this single value.
+  const workspaceName = integration.data?.connected
+    ? integration.data.slackTeamName
+    : null;
+  const state = slackTokenState({
+    slice,
+    hasProjectIntegration: !!workspaceName,
+  });
 
-  const copyManifest = () => {
-    void navigator.clipboard?.writeText(SLACK_APP_MANIFEST);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
+  // Until the answer lands, "no integration" is a guess, and the guess reads as
+  // a statement: it would tell an author with Slack connected that it is not,
+  // and take the channel picker away while it did. An automation carrying its
+  // own token is the exception — that state is decided by the draft alone, so
+  // it is already known.
+  //
+  // Guarded on `projectId` because the query is disabled without one, and a
+  // disabled query reports as loading forever — which would leave the skeleton
+  // on screen permanently rather than for a moment.
+  const statusLoading = !!projectId && integration.isLoading;
+  if (statusLoading && state !== "own_token") return <SlackStatusLoading />;
 
   return (
     <VStack align="stretch" gap={3}>
-      <Box
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        bg="bg.subtle"
-        padding={3}
-      >
-        <VStack align="stretch" gap={2}>
-          <Text textStyle="xs" color="fg">
-            Post to your Slack workspace with a bot token. Create a Slack app,
-            then paste its token below.
-          </Text>
-          <HStack gap={3}>
-            <Link
-              href="https://api.slack.com/apps"
-              isExternal
-              textStyle="xs"
-              fontWeight="medium"
-              display="inline-flex"
-              alignItems="center"
-              gap={1}
-            >
-              Create a Slack app <ExternalLink size={12} />
-            </Link>
-            <Button
-              variant="plain"
-              size="xs"
-              height="auto"
-              paddingX={0}
-              color="fg.muted"
-              _hover={{ color: "fg" }}
-              onClick={copyManifest}
-            >
-              {copied ? "Manifest copied" : "Copy app manifest"}
-            </Button>
-          </HStack>
-          <TemplateDisclosure
-            triggerLabel="Setup steps"
-            open={stepsOpen}
-            onToggle={() => setStepsOpen((prev) => !prev)}
-          >
-            <List.Root as="ol" gap={1} paddingLeft={4}>
-              <List.Item>
-                <Text textStyle="xs" color="fg.muted">
-                  Create the app with &ldquo;From a manifest&rdquo; and paste
-                  the copied manifest — it sets the permissions for you.
-                </Text>
-              </List.Item>
-              <List.Item>
-                <Text textStyle="xs" color="fg.muted">
-                  Install it to your workspace and copy the Bot User OAuth Token
-                  (<Code size="sm">xoxb-</Code>).
-                </Text>
-              </List.Item>
-              <List.Item>
-                <Text textStyle="xs" color="fg.muted">
-                  Public channels work straight away. To post to a private
-                  channel, add the app to that channel first.
-                </Text>
-              </List.Item>
-            </List.Root>
-          </TemplateDisclosure>
-        </VStack>
-      </Box>
-      <Field.Root>
-        <Field.Label>Bot User OAuth Token</Field.Label>
-        <Input
-          ref={tokenRef}
-          type="password"
-          autoComplete="off"
-          value={slice.botToken}
-          onChange={(e) => onChange({ ...slice, botToken: e.target.value })}
-          placeholder={
-            slice.botTokenAlreadySet
-              ? "•••••••• (unchanged, leave blank to keep)"
-              : "xoxb-…"
+      {state === "own_token" ? (
+        <OwnTokenNotice
+          projectId={projectId}
+          automationId={automationId}
+          workspaceName={workspaceName}
+          onSwitched={() =>
+            onChange({ ...slice, botToken: "", botTokenAlreadySet: false })
           }
         />
-        {tokenKept ? (
-          <HStack gap={1} pt={1}>
-            <Text textStyle="xs" color="fg.muted">
-              A token is already saved.
-            </Text>
-            <Button
-              variant="plain"
-              size="xs"
-              height="auto"
-              paddingX={0}
-              color="fg.muted"
-              _hover={{ color: "fg" }}
-              onClick={() => tokenRef.current?.focus()}
-            >
-              Replace token
-            </Button>
-          </HStack>
-        ) : null}
-      </Field.Root>
-      <SlackChannelField
-        projectId={projectId}
-        automationId={automationId}
-        slice={slice}
-        onChange={onChange}
-      />
+      ) : state === "project_integration" ? (
+        <ConnectedWorkspaceNotice workspaceName={workspaceName} />
+      ) : (
+        <ConnectSlackNotice />
+      )}
+      {state === "not_connected" ? null : (
+        <SlackChannelField
+          projectId={projectId}
+          automationId={automationId}
+          slice={slice}
+          onChange={onChange}
+        />
+      )}
     </VStack>
+  );
+}
+
+/**
+ * State one: this automation stores its own token. It keeps delivering with it
+ * — the switch is a decision, never something the project makes for it, and a
+ * decision that deletes the only copy of a credential gets confirmed rather
+ * than taken on one click.
+ *
+ * The switch is offered only to a caller holding `project:update`; the server
+ * requires it, so showing the button to anyone else is an invitation to a 403.
+ */
+function OwnTokenNotice({
+  projectId,
+  automationId,
+  workspaceName,
+  onSwitched,
+}: {
+  projectId: string;
+  automationId?: string;
+  /** Null when the project has no integration to fall through to. */
+  workspaceName: string | null;
+  onSwitched: () => void;
+}) {
+  const { hasPermission } = useOrganizationTeamProject();
+  const switchOver = useSwitchToProjectIntegration({
+    projectId,
+    automationId,
+    workspaceName,
+    onSwitched,
+  });
+  const canSwitch =
+    !!workspaceName && !!automationId && hasPermission("project:update");
+
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      bg="bg.subtle"
+      padding={3}
+    >
+      <VStack align="stretch" gap={2}>
+        <Text textStyle="xs" fontWeight="medium" color="fg">
+          Uses its own Slack token
+        </Text>
+        <Text textStyle="xs" color="fg.muted">
+          {workspaceName
+            ? `This automation posts with a token saved on it, not the ${workspaceName} workspace connected for this project. Switching deletes the saved token so it posts with the project's Slack connection instead.`
+            : "This automation posts with a token saved on it. Connect Slack for this project to manage it in one place."}
+        </Text>
+        {switchOver.isError ? (
+          <Text textStyle="xs" color="fg.error">
+            {describeError({
+              error: switchOver.error,
+              fallbackTitle: "Couldn't switch this automation",
+            })}
+          </Text>
+        ) : null}
+        <HStack gap={3}>
+          {canSwitch ? (
+            <Button
+              size="xs"
+              variant="outline"
+              alignSelf="flex-start"
+              loading={switchOver.isPending}
+              onClick={() => switchOver.setIsConfirming(true)}
+            >
+              Use the project integration
+            </Button>
+          ) : null}
+          <Link href="/settings/integrations" textStyle="xs">
+            Slack integration settings
+          </Link>
+        </HStack>
+      </VStack>
+      <ConfirmDialog
+        open={switchOver.isConfirming}
+        onOpenChange={switchOver.setIsConfirming}
+        title={switchOver.confirmation.title}
+        message={switchOver.confirmation.message}
+        confirmLabel={switchOver.confirmation.confirmLabel}
+        tone="danger"
+        loading={switchOver.isPending}
+        onConfirm={switchOver.confirmSwitch}
+      />
+    </Box>
+  );
+}
+
+/** State two: the project's workspace serves this automation. Naming the
+ *  workspace is the point — the author is picking a channel inside it. */
+function ConnectedWorkspaceNotice({
+  workspaceName,
+}: {
+  workspaceName: string | null;
+}) {
+  return (
+    <Text textStyle="xs" color="fg.muted">
+      {workspaceName
+        ? `Posts to the ${workspaceName} Slack workspace connected for this project.`
+        : "Posts to the Slack workspace connected for this project."}
+    </Text>
+  );
+}
+
+/** State three: nothing to deliver with. The way forward is the settings card,
+ *  which is also where creating the Slack app is explained. */
+function ConnectSlackNotice() {
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      bg="bg.subtle"
+      padding={3}
+    >
+      <VStack align="stretch" gap={2}>
+        <Text textStyle="xs" fontWeight="medium" color="fg">
+          Slack isn&rsquo;t connected for this project
+        </Text>
+        <Text textStyle="xs" color="fg.muted">
+          Connect a Slack workspace once for the project, and every automation
+          in it can post to a channel without its own token.
+        </Text>
+        <Link
+          href="/settings/integrations"
+          textStyle="xs"
+          fontWeight="medium"
+          display="inline-flex"
+          alignItems="center"
+          gap={1}
+        >
+          Connect Slack for this project <ExternalLink size={12} />
+        </Link>
+      </VStack>
+    </Box>
   );
 }
 
@@ -1102,6 +1230,9 @@ function ReuseSlackWebhook({
 const client: NotifyClientDef<SlackSlice, SlackPreview> = {
   Icon: FaSlack,
   channel: "slack",
+  // The layout gallery depends on the receive choice, so the chooser renders
+  // beside it (in SlackConfigForm) and the cadence facet stands down.
+  hasOwnReceiveChooser: true,
   initialSlice,
   isComplete,
   summary,

@@ -63,6 +63,22 @@ const RESPONSE_HEADER_MAX_COUNT = 32;
 
 type SsrfResponseHeaders = Awaited<ReturnType<typeof ssrfSafeFetch>>["headers"];
 
+/** Response headers that can carry the RECEIVER's credentials (session
+ *  cookies, auth challenges with embedded material). The delivery log shows
+ *  its stored headers to every reader of the drawer, so these are redacted
+ *  at capture — the name still appears, which is the debugging signal. */
+const SENSITIVE_RESPONSE_HEADERS = new Set([
+  "set-cookie",
+  // RFC 2965. Obsolete, but a receiver is free to still send it, and it
+  // carries exactly what `set-cookie` carries.
+  "set-cookie2",
+  "cookie",
+  "authorization",
+  "proxy-authorization",
+  "proxy-authenticate",
+  "www-authenticate",
+]);
+
 function captureResponseHeaders(
   headers: SsrfResponseHeaders | undefined,
 ): Record<string, string> {
@@ -71,7 +87,9 @@ function captureResponseHeaders(
   let count = 0;
   for (const [name, value] of headers.entries()) {
     if (count >= RESPONSE_HEADER_MAX_COUNT) break;
-    out[name] = value.slice(0, RESPONSE_HEADER_VALUE_CHARS);
+    out[name] = SENSITIVE_RESPONSE_HEADERS.has(name.toLowerCase())
+      ? "[redacted]"
+      : value.slice(0, RESPONSE_HEADER_VALUE_CHARS);
     count++;
   }
   return out;

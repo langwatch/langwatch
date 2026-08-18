@@ -1,5 +1,4 @@
 import {
-  Alert,
   Badge,
   Box,
   Button,
@@ -14,11 +13,14 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { NotificationCadence } from "@langwatch/automations/cadences";
-import { keepPreviousData } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
+import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
 import { describeError } from "~/features/errors";
+import { explainAnyError } from "~/features/errors/logic/presentation";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
@@ -27,6 +29,7 @@ import {
   type TriggerFilterValue,
 } from "~/server/filters/types";
 import { api } from "~/utils/api";
+import { formatMilliseconds } from "~/utils/formatMilliseconds";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { queryIsStructurable } from "../logic/conditionQuery";
 import { type DailyCapAdvice, dailyCapAdvice } from "../logic/dailyCapAdvice";
@@ -40,9 +43,16 @@ import {
 } from "../logic/draftReducer";
 import { estimateFiringRate, estimateRatePerDay } from "../logic/firingRate";
 import { deriveSeriesOptionsFromGraph } from "../logic/seriesOptions";
+import {
+  DAILY_CAP_OPTIONS,
+  PREVIEW_LIST_OPTIONS,
+  PREVIEW_SORT,
+  PREVIEW_WINDOW_MS,
+} from "../logic/useDailyCapAdvice";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
 import { ConditionBuilder } from "./ConditionBuilder";
+import { DailyCapAdviceAlert } from "./DailyCapAdviceAlert";
 import { type FacetAccordionProps, FacetSection } from "./FacetSection";
 import { QueryFilterInput } from "./QueryFilterInput";
 
@@ -54,47 +64,56 @@ function subjectSummary(draft: AutomationDraft): string {
       : "Pick a graph and series";
   }
   if (draft.source === "report") {
-    return draft.report.sourceKind === "traceQuery"
-      ? "Top matching traces"
-      : draft.report.sourceKind === "customGraph"
-        ? "A custom graph"
-        : "A dashboard";
+    return reportSummary(draft.report.sourceKind);
   }
   if (filterQueryIsSet(draft.filterQuery)) return draft.filterQuery!.trim();
   if (filtersAreSet(draft.filters)) return "Structured filters";
   return "No conditions yet";
 }
 
+function reportSummary(
+  sourceKind: AutomationDraft["report"]["sourceKind"],
+): string {
+  if (sourceKind === "traceQuery") return "Top matching traces";
+  if (sourceKind === "customGraph") return "A custom graph";
+  return "A dashboard";
+}
+
 const SUBJECT_HELP = {
   trace:
     "Which incoming traces this automation acts on. It fires when a trace matches every condition you set.",
   customGraph:
-    "The metric this alert watches — one series on one of your analytics graphs.",
+    "The metric this automation watches — one series on one of your analytics graphs.",
   report:
-    "What this schedule sends: a table of matching traces, a single graph, or a whole dashboard.",
+    "What this report sends: a table of matching traces, a single graph, or a whole dashboard.",
 } as const;
 
 /**
  * The Subject facet (ADR-043 facet 3) — "what is it about?". Switches on
- * the preset: trace filters for an automation, a graph + series for an
- * alert, a content source for a report. Reads and writes the draft through
- * the store, so the awkward required-`report` prop the old secondary drawer
- * needed is gone.
+ * what the draft watches: trace filters, a graph plus the series to watch, or
+ * a schedule's content source. Reads and writes the draft through the store,
+ * so the awkward required-`report` prop the old secondary drawer needed is
+ * gone.
  */
 export function SubjectSection({
   prefilledGraphId,
   accordion,
+  title = "Subject",
 }: {
   /** The graph select is locked to this value when the drawer was opened
    *  from a specific chart card (Phase 5.2). */
   prefilledGraphId?: string;
   accordion?: FacetAccordionProps;
+  /** The wizard's Watch step names this panel after what it is choosing
+   *  ("Which traces" / "The graph and series") — "Subject" is facet
+   *  vocabulary, and no customer-facing label says it (ADR-093 §1). */
+  title?: string;
 }) {
   const draft = useDraft();
 
   return (
     <FacetSection
-      title="Subject"
+      title={title}
       help={SUBJECT_HELP[draft.source]}
       accordion={accordion}
       complete={subjectIsSet(draft)}
@@ -111,12 +130,48 @@ export function SubjectSection({
   );
 }
 
-/** Alert subject: the custom graph + the series to watch. */
+/**
+ * Which face the graph subject shows. A fetch failure and a project with no
+ * graphs both replace the picker, and telling them apart matters: "go create
+ * a graph" is wrong advice for a project that already has one and merely
+ * failed to load the list.
+ *
+ * The failure face is gated on `data == null` because react-query's `error`
+ * state leaves the last good `data` in place on a background refetch failure
+ * — a stale list is still a working picker, so only a failure with nothing
+ * to show replaces it. Loading is not emptiness either: deciding on an
+ * in-flight first fetch would flash a false rejection before the data that
+ * clears it has arrived. And a draft that already carries a graph —
+ * prefilled from a dashboard chart card, or an existing alert opened for
+ * editing — keeps the picker too: "go create a graph" would hide the
+ * selection the author came to inspect, even when the graph itself has
+ * since been removed.
+ */
+function graphSubjectView({
+  isPrefilled,
+  hasSelection,
+  isLoading,
+  isError,
+  data,
+}: {
+  isPrefilled: boolean;
+  hasSelection: boolean;
+  isLoading: boolean;
+  isError: boolean;
+  /** `undefined`/`null` when no list has ever loaded. */
+  data: unknown[] | undefined | null;
+}): "failed" | "empty" | "picker" {
+  if (isPrefilled) return "picker";
+  if (isError && data == null) return "failed";
+  if (hasSelection || isLoading || isError) return "picker";
+  return (data ?? []).length === 0 ? "empty" : "picker";
+}
+
+/** Graph-watching subject: the custom graph + the series to watch. */
 function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const draft = useDraft();
-  const dispatch = useAutomationStore((s) => s.dispatch);
   const isPrefilled = !!prefilledGraphId;
 
   const graphs = api.graphs.getAll.useQuery(
@@ -132,77 +187,226 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
     [selectedGraphQuery.data?.graph],
   );
 
-  const customGraphMissing = draft.customGraphId === null;
-  const seriesMissing =
+  // Loading is not "no graph picked yet" — showing the error while the first
+  // fetch is still in flight would flash a false rejection before the data
+  // that would clear it has even arrived.
+  const isCustomGraphMissing =
+    draft.customGraphId === null && !graphs.isLoading;
+  const isSeriesMissing =
     !!draft.customGraphId && draft.graphAlert.seriesName.length === 0;
+  const view = graphSubjectView({
+    isPrefilled,
+    hasSelection: !!draft.customGraphId,
+    // An unresolved project disables the query, which react-query reports as
+    // "not loading" — but it is not "no graphs" either. Treat it as loading
+    // so the terminal empty state only shows for a real, answered project.
+    isLoading: graphs.isLoading || !projectId,
+    isError: graphs.isError,
+    data: graphs.data,
+  });
+
+  if (view === "failed") {
+    return (
+      <GraphsLoadFailed
+        error={graphs.error}
+        onRetry={() => void graphs.refetch()}
+      />
+    );
+  }
+
+  if (view === "empty") {
+    return <NoGraphsYet projectSlug={project?.slug} />;
+  }
 
   return (
     <VStack align="stretch" gap={4}>
-      {/* `disabled` on Field.Root stamps the native attribute through the
-          field context, so the control is genuinely inert (keyboard + AT). */}
-      <Field.Root invalid={customGraphMissing} disabled={isPrefilled}>
-        <Field.Label>Custom graph</Field.Label>
-        <NativeSelect.Root disabled={isPrefilled}>
-          <NativeSelect.Field
-            value={draft.customGraphId ?? ""}
-            onChange={(e) => {
-              const id = e.target.value || null;
-              dispatch({ type: "SET_CUSTOM_GRAPH_ID", value: id });
-              // Reset the series — the previous key won't exist on the new graph.
-              dispatch({
-                type: "SET_GRAPH_ALERT",
-                value: { ...draft.graphAlert, seriesName: "" },
-              });
-            }}
-          >
-            <option value="">Select a graph…</option>
-            {(graphs.data ?? []).map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name ?? g.id}
-                {g.trigger && g.id !== draft.customGraphId
-                  ? " — already automated"
-                  : ""}
-              </option>
-            ))}
-          </NativeSelect.Field>
-          <NativeSelect.Indicator />
-        </NativeSelect.Root>
-        <Field.ErrorText>Pick a custom graph to continue.</Field.ErrorText>
-        {isPrefilled ? (
-          <Field.HelperText>
-            Set from the dashboard graph that opened this drawer.
-          </Field.HelperText>
-        ) : null}
-      </Field.Root>
+      <GraphPickerField
+        isInvalid={isCustomGraphMissing}
+        isLocked={isPrefilled}
+        options={graphs.data ?? []}
+      />
+      <SeriesPickerField
+        isInvalid={isSeriesMissing}
+        seriesOptions={seriesOptions}
+      />
+    </VStack>
+  );
+}
 
-      <Field.Root
-        invalid={seriesMissing}
-        disabled={!draft.customGraphId || seriesOptions.length === 0}
-      >
-        <Field.Label>Series</Field.Label>
-        <NativeSelect.Root
-          disabled={!draft.customGraphId || seriesOptions.length === 0}
+/** The graph half of the subject. Reads and writes the draft directly, the
+ *  same way the parent does. */
+function GraphPickerField({
+  isInvalid,
+  isLocked,
+  options,
+}: {
+  isInvalid: boolean;
+  /** True when the drawer was opened from a specific chart card. */
+  isLocked: boolean;
+  options: { id: string; name: string | null; trigger?: unknown }[];
+}) {
+  const draft = useDraft();
+  const dispatch = useAutomationStore((s) => s.dispatch);
+  return (
+    /* `disabled` on Field.Root stamps the native attribute through the
+       field context, so the control is genuinely inert (keyboard + AT). */
+    <Field.Root invalid={isInvalid} disabled={isLocked}>
+      <Field.Label>Custom graph</Field.Label>
+      <NativeSelect.Root disabled={isLocked}>
+        <NativeSelect.Field
+          value={draft.customGraphId ?? ""}
+          onChange={(e) => {
+            const id = e.target.value || null;
+            dispatch({ type: "SET_CUSTOM_GRAPH_ID", value: id });
+            // Reset the series — the previous key won't exist on the new graph.
+            dispatch({
+              type: "SET_GRAPH_ALERT",
+              value: { ...draft.graphAlert, seriesName: "" },
+            });
+          }}
         >
-          <NativeSelect.Field
-            value={draft.graphAlert.seriesName}
-            onChange={(e) =>
-              dispatch({
-                type: "SET_GRAPH_ALERT",
-                value: { ...draft.graphAlert, seriesName: e.target.value },
-              })
-            }
-          >
-            <option value="">Select a series…</option>
-            {seriesOptions.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </NativeSelect.Field>
-          <NativeSelect.Indicator />
-        </NativeSelect.Root>
-        <Field.ErrorText>Pick a series to monitor.</Field.ErrorText>
-      </Field.Root>
+          <option value="">Select a graph…</option>
+          {options.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name ?? g.id}
+              {g.trigger && g.id !== draft.customGraphId
+                ? " — already automated"
+                : ""}
+            </option>
+          ))}
+        </NativeSelect.Field>
+        <NativeSelect.Indicator />
+      </NativeSelect.Root>
+      <Field.ErrorText>Pick a custom graph to continue.</Field.ErrorText>
+      {isLocked ? (
+        <Field.HelperText>
+          Set from the dashboard graph that opened this drawer.
+        </Field.HelperText>
+      ) : null}
+    </Field.Root>
+  );
+}
+
+/** The series half: which line on the picked graph. */
+function SeriesPickerField({
+  isInvalid,
+  seriesOptions,
+}: {
+  isInvalid: boolean;
+  seriesOptions: ReturnType<typeof deriveSeriesOptionsFromGraph>;
+}) {
+  const draft = useDraft();
+  const dispatch = useAutomationStore((s) => s.dispatch);
+  const isDisabled = !draft.customGraphId || seriesOptions.length === 0;
+  return (
+    <Field.Root invalid={isInvalid} disabled={isDisabled}>
+      <Field.Label>Series</Field.Label>
+      <NativeSelect.Root disabled={isDisabled}>
+        <NativeSelect.Field
+          value={draft.graphAlert.seriesName}
+          onChange={(e) =>
+            dispatch({
+              type: "SET_GRAPH_ALERT",
+              value: { ...draft.graphAlert, seriesName: e.target.value },
+            })
+          }
+        >
+          <option value="">Select a series…</option>
+          {seriesOptions.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.label}
+            </option>
+          ))}
+        </NativeSelect.Field>
+        <NativeSelect.Indicator />
+      </NativeSelect.Root>
+      <Field.ErrorText>Pick a series to monitor.</Field.ErrorText>
+    </Field.Root>
+  );
+}
+
+/**
+ * Shown instead of an empty, error-flagged graph picker when the project has
+ * no custom graphs yet — there is nothing to watch until one exists, so the
+ * fix is a way to create one, not a picker that can only ever be wrong. Also
+ * covers the #6716 case where a template opens this same drawer with no
+ * graph attached: either way, the author lands here with the same way out.
+ * The link opens in a new tab so this draft is still exactly as left
+ * when the author comes back to finish it.
+ */
+function NoGraphsYet({ projectSlug }: { projectSlug?: string }) {
+  return (
+    <VStack
+      align="start"
+      gap={2}
+      padding={3}
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="md"
+      bg="bg.subtle"
+    >
+      <Text textStyle="sm">
+        This project doesn{"'"}t have a custom graph yet. An automation watches
+        a metric on one, so create a graph first, then come back here to pick
+        it.
+      </Text>
+      {projectSlug ? (
+        <>
+          <Button asChild size="xs" variant="outline">
+            <Link href={`/${projectSlug}/analytics/custom`} isExternal>
+              <Plus size={13} /> Create a custom graph
+            </Link>
+          </Button>
+          <Text textStyle="2xs" color="fg.muted">
+            Opens in a new tab, so this automation stays exactly as you left it.
+          </Text>
+        </>
+      ) : null}
+    </VStack>
+  );
+}
+
+/**
+ * Shown when the graph list request itself failed — distinct from
+ * `NoGraphsYet`, which means the project genuinely has none. Conflating the
+ * two would tell an author to go create a graph their project may already
+ * have, over a failure that has nothing to do with them. No raw error
+ * detail in the copy (customer-safe per error-handling.md); retry just
+ * re-runs the same query.
+ */
+function GraphsLoadFailed({
+  error,
+  onRetry,
+}: {
+  error: unknown;
+  onRetry: () => void;
+}) {
+  // A handled failure carries registry copy keyed by its code — show that,
+  // so a nameable cause (say, a permission gate) explains itself. Anything
+  // unregistered keeps the generic line: still customer-safe, never raw
+  // error detail.
+  const explanation = explainAnyError(error);
+  return (
+    <VStack
+      // The failure can replace the picker mid-session on a refetch, so
+      // announce the swap to assistive technology.
+      role="alert"
+      align="start"
+      gap={2}
+      padding={3}
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="md"
+      bg="bg.subtle"
+    >
+      <Text textStyle="sm">
+        {explanation.isRegistered
+          ? explanation.description
+          : `Your custom graphs couldn't be loaded right now.`}
+      </Text>
+      <Button size="xs" variant="outline" onClick={onRetry}>
+        Try again
+      </Button>
     </VStack>
   );
 }
@@ -383,6 +587,7 @@ interface PreviewTrace {
   traceId: string;
   name: string;
   timestamp: number;
+  durationMs: number;
   status: "ok" | "error" | "warning";
 }
 
@@ -392,8 +597,6 @@ const STATUS_DOT_COLOR: Record<PreviewTrace["status"], string> = {
   warning: "orange.solid",
 };
 
-const PREVIEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const PREVIEW_SORT = { columnId: "time", direction: "desc" as const };
 const QUERY_DEBOUNCE_MS = 400;
 
 /**
@@ -446,29 +649,14 @@ function TraceQuerySubject({
       pageSize: 5,
       query: trimmed,
     },
-    {
-      enabled: !!projectId && trimmed.length > 0,
-      retry: false,
-      // A long stale window plus keepPreviousData keeps the last result on
-      // screen while a new query resolves, so the preview refreshes in place
-      // instead of blanking to a spinner. Focus changes never refetch — the
-      // matched set doesn't move fast enough to justify the flicker.
-      staleTime: 5 * 60_000,
-      placeholderData: keepPreviousData,
-      refetchOnWindowFocus: false,
-    },
+    { enabled: !!projectId && trimmed.length > 0, ...PREVIEW_LIST_OPTIONS },
   );
 
   // The plan's daily ceiling on persist actions, read once and held: it moves
   // only when the plan does, and a failed read simply means no advice below.
   const capStatus = api.automation.getDailyCap.useQuery(
     { projectId },
-    {
-      enabled: !!projectId,
-      staleTime: 10 * 60 * 1000,
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
+    { enabled: !!projectId, ...DAILY_CAP_OPTIONS },
   );
 
   // Advice, never a gate: this warns that the drafted condition would outrun
@@ -504,7 +692,7 @@ function TraceQuerySubject({
       <HStack justify="space-between" align="start" gap={3}>
         <Text textStyle="xs" color="fg.muted" flex={1}>
           {purpose === "report"
-            ? "The schedule sends the traces that match these conditions, the same filters you use in the traces view. Leave it empty to send the most recent traces."
+            ? "The report sends the traces that match these conditions, the same filters you use in the traces view. Leave it empty to send the most recent traces."
             : "The automation fires on every incoming trace that matches these conditions, the same filters you use in the traces view."}
         </Text>
         <SubjectModeToggle
@@ -747,74 +935,57 @@ function TracePreview({
 }
 
 /**
- * Advice, sitting right under the firing-rate line so it reads as a comment on
- * that rate: the drafted condition would match more traces a day than the
- * plan's daily action ceiling allows. It never blocks saving, and it is absent
- * whenever the estimate, the ceiling, or the relevance of either is in doubt.
+ * A single matched trace. Two compact lines: the name, duration and how long
+ * ago on top; the trace id and the exact date underneath, so a row is enough
+ * to recognise a trace and to find it again in the traces view.
  */
-function DailyCapAdviceAlert({
-  advice,
-  hasDividerBelow,
-}: {
-  advice: DailyCapAdvice | null;
-  hasDividerBelow: boolean;
-}) {
-  if (!advice) return null;
-  return (
-    <Box
-      paddingX={3}
-      paddingY={2}
-      borderBottomWidth={hasDividerBelow ? "1px" : "0"}
-      borderColor="border"
-    >
-      <Alert.Root
-        status="warning"
-        size="sm"
-        variant="subtle"
-        width="full"
-        data-testid="daily-cap-advice"
-      >
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Description textStyle="xs">
-            About {advice.perDay.toLocaleString()} matches a day is over your
-            plan&apos;s daily automation limit of {advice.cap.toLocaleString()}.
-            Matches past the limit are skipped for the rest of the day. Narrow
-            the condition so it selects fewer traces.
-          </Alert.Description>
-        </Alert.Content>
-        <Button
-          asChild
-          size="xs"
-          variant="outline"
-          bg="bg"
-          flexShrink={0}
-          alignSelf="center"
-          data-testid="daily-cap-advice-upgrade"
-        >
-          <a href="/settings/plans">Upgrade Plan</a>
-        </Button>
-      </Alert.Root>
-    </Box>
-  );
-}
-
-/** A single matched trace, kept to the essentials: status dot, name, time ago. */
 function PreviewTraceRow({ trace }: { trace: PreviewTrace }) {
+  const hasName = trace.name.length > 0;
   return (
-    <HStack gap={2.5} paddingX={3} paddingY={1.5} _hover={{ bg: "bg.muted" }}>
+    <HStack
+      gap={2.5}
+      paddingX={3}
+      paddingY={1.5}
+      align="start"
+      _hover={{ bg: "bg.muted" }}
+    >
       <Box
         boxSize={2}
         borderRadius="full"
         bg={STATUS_DOT_COLOR[trace.status]}
         flexShrink={0}
+        marginTop="5px"
       />
-      <Text textStyle="xs" color="fg" truncate flex={1} minWidth={0}>
-        {trace.name || trace.traceId}
-      </Text>
-      <Text textStyle="2xs" color="fg.subtle" flexShrink={0}>
-        {formatTimeAgoCompact(trace.timestamp)}
-      </Text>
+      <VStack align="start" gap={0} flex={1} minWidth={0}>
+        <Text
+          textStyle="xs"
+          color={hasName ? "fg" : "fg.muted"}
+          truncate
+          maxWidth="full"
+        >
+          {hasName ? trace.name : "Unnamed trace"}
+        </Text>
+        <Text
+          textStyle="2xs"
+          color="fg.subtle"
+          fontFamily="mono"
+          truncate
+          maxWidth="full"
+        >
+          {trace.traceId}
+        </Text>
+      </VStack>
+      <VStack align="end" gap={0} flexShrink={0}>
+        <Text textStyle="2xs" color="fg.muted" whiteSpace="nowrap">
+          {trace.durationMs > 0
+            ? `${formatMilliseconds(trace.durationMs)} · `
+            : ""}
+          {formatTimeAgoCompact(trace.timestamp)}
+        </Text>
+        <Text textStyle="2xs" color="fg.subtle" whiteSpace="nowrap">
+          {format(new Date(trace.timestamp), "d MMM, HH:mm")}
+        </Text>
+      </VStack>
     </HStack>
   );
 }

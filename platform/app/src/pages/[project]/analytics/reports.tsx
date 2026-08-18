@@ -59,6 +59,7 @@ function ReportsContent() {
     { enabled: !!projectId && !!activeDashboardId },
   );
 
+  const queryClient = api.useUtils();
   const deleteGraph = api.graphs.delete.useMutation();
   const updateLayout = api.graphs.updateLayout.useMutation();
   const batchUpdateLayouts = api.graphs.batchUpdateLayouts.useMutation();
@@ -90,7 +91,11 @@ function ReportsContent() {
       { projectId, id: graphId },
       {
         onSuccess: () => {
-          void graphsQuery.refetch();
+          // Invalidate EVERY graphs.getAll key, not just this dashboard's.
+          // The alert composer reads the list keyed by {projectId} alone, so
+          // refetching only the {projectId, dashboardId} query left a deleted
+          // graph on offer there until a full page reload.
+          void queryClient.graphs.getAll.invalidate();
         },
         onError: () => {
           toaster.create({

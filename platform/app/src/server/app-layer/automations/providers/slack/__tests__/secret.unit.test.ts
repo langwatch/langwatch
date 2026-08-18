@@ -12,53 +12,44 @@ import {
   decryptSlackBotToken,
   persistSlackActionParams,
   redactSlackActionParams,
-  slackBotTokenMissing,
 } from "../server";
 
-describe("slackBotTokenMissing", () => {
-  it("is false for webhook mode", () => {
-    expect(
-      slackBotTokenMissing({
-        incoming: { slackDelivery: "webhook", slackWebhook: "https://x" },
-      }),
-    ).toBe(false);
-  });
-
-  it("is true for a bot connection with neither a new nor a stored token", () => {
-    expect(
-      slackBotTokenMissing({
-        incoming: { slackDelivery: "bot", slackChannelId: "C1" },
-      }),
-    ).toBe(true);
-  });
-
-  it("is false when a new token is supplied", () => {
-    expect(
-      slackBotTokenMissing({
-        incoming: {
-          slackDelivery: "bot",
-          slackChannelId: "C1",
-          slackBotToken: "xoxb-new",
-        },
-      }),
-    ).toBe(false);
-  });
-
-  it("is false when the token is kept and one is already stored", () => {
-    expect(
-      slackBotTokenMissing({
-        incoming: {
-          slackDelivery: "bot",
-          slackChannelId: "C1",
-          slackBotToken: SLACK_BOT_TOKEN_KEPT,
-        },
-        existing: { slackDelivery: "bot", slackBotToken: "enc(xoxb-old)" },
-      }),
-    ).toBe(false);
-  });
-});
-
 describe("persistSlackActionParams", () => {
+  // Since ADR-093 §5 the composer stops asking for a token: the project's Slack
+  // integration serves the delivery, so persist must accept a bot connection
+  // with nothing in the token field rather than refusing it.
+  describe("when a bot connection carries no token at all", () => {
+    /** @scenario "New automations rely on the project integration, not a token of their own" */
+    it("stores no token rather than refusing the save", () => {
+      const stored = persistSlackActionParams({
+        incoming: { slackDelivery: "bot", slackChannelId: "C1" },
+      });
+      expect(stored).toEqual({
+        slackDelivery: "bot",
+        slackChannelId: "C1",
+      });
+      // `toEqual` treats an absent key and an explicit `undefined` alike, so
+      // the absence needs its own assertion to mean anything.
+      expect(stored).not.toHaveProperty("slackBotToken");
+    });
+  });
+
+  describe("when the kept sentinel arrives on a row that already has one", () => {
+    /** @scenario "A legacy automation keeps delivering with its own token" */
+    it("keeps the stored ciphertext", () => {
+      expect(
+        persistSlackActionParams({
+          incoming: {
+            slackDelivery: "bot",
+            slackChannelId: "C1",
+            slackBotToken: SLACK_BOT_TOKEN_KEPT,
+          },
+          existing: { slackDelivery: "bot", slackBotToken: "enc(xoxb-old)" },
+        }).slackBotToken,
+      ).toBe("enc(xoxb-old)");
+    });
+  });
+
   it("keeps only the webhook in webhook mode (no stale bot fields)", () => {
     expect(
       persistSlackActionParams({
@@ -91,6 +82,7 @@ describe("persistSlackActionParams", () => {
     });
   });
 
+  /** @scenario "Editing a bot automation without re-entering the token" */
   it("keeps the stored ciphertext when the token is left blank on edit", () => {
     expect(
       persistSlackActionParams({

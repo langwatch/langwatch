@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CustomGraph, Project, Trigger } from "~/generated/prisma/client";
 import { TriggerAction } from "~/generated/prisma/client";
+import { SeriesPercentageUnsupportedError } from "~/server/analytics/errors";
 import type { TimeseriesResult } from "~/server/analytics/types";
 import type { GraphAlertDispatchResult } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
@@ -231,6 +232,9 @@ function makeHarness({
     triggerSent,
     updateLastRunAt,
     notifier: { dispatch },
+    // The harness project has no Slack integration and its triggers store no
+    // token, so resolution answers "nothing to deliver with".
+    resolveSlackToken: async () => null,
     baseHost: "https://app.langwatch.test",
     now: () => NOW,
   };
@@ -314,6 +318,56 @@ describe("evaluateGraphTrigger", () => {
 
     it("never fires an alert on a result it could not read", async () => {
       harness.getTimeseries.mockRejectedValue(tooLarge());
+
+      await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(harness.dispatch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a series the query builder refuses to express as a percentage", () => {
+    // #6718 added a handled refusal for "percentage of a per-entity
+    // measurement", which the composer still lets an author save. The builder
+    // raises it on EVERY evaluation of such a trigger, and a rethrow here is a
+    // redelivery — the same poison-pill shape the row ceiling above documents.
+    function percentageUnsupported() {
+      return new SeriesPercentageUnsupportedError();
+    }
+
+    /** @scenario "An alert on a series the query refuses is skipped, not retried forever" */
+    it("skips that trigger instead of failing the evaluation", async () => {
+      harness.getTimeseries.mockRejectedValue(percentageUnsupported());
+
+      const result = await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(result.status).toBe("skipped");
+    });
+
+    it("does not throw, so one bad series cannot quarantine the tenant's lane", async () => {
+      harness.getTimeseries.mockRejectedValue(percentageUnsupported());
+
+      await expect(
+        evaluateGraphTrigger({
+          deps: harness.deps,
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          reason: "real-time",
+        }),
+      ).resolves.toMatchObject({ status: "skipped" });
+    });
+
+    it("never fires an alert on a result it could not read", async () => {
+      harness.getTimeseries.mockRejectedValue(percentageUnsupported());
 
       await evaluateGraphTrigger({
         deps: harness.deps,
@@ -832,6 +886,7 @@ describe("evaluateGraphTrigger", () => {
   });
 
   describe("given a breach whose dispatch throws a typed DispatchError", () => {
+    /** @scenario "A terminally failing endpoint is not re-posted every evaluation" */
     it("keeps the claim when the failure is terminal (retryable: false), so a dead endpoint is not re-posted every evaluation", async () => {
       harness.dispatch.mockRejectedValue(
         new DispatchError({ message: "webhook revoked", retryable: false }),
@@ -904,6 +959,7 @@ describe("evaluateGraphTrigger", () => {
   // branch. Bot params carry no `slackWebhook`, so the dispatcher logged "no
   // Slack webhook configured" and returned didSend false — a silent hole.
   describe("given a bot-delivery Slack alert whose connection cannot be resolved", () => {
+    /** @scenario "Slack delivery without any token fails with a named cause" */
     it("throws rather than falling through to the webhook branch", async () => {
       harness = makeHarness({
         trigger: makeTrigger({
@@ -927,7 +983,7 @@ describe("evaluateGraphTrigger", () => {
           projectId: PROJECT_ID,
           reason: "real-time",
         }),
-      ).rejects.toThrow(/missing its token or channel/);
+      ).rejects.toThrow(/has no bot token/);
 
       expect(harness.dispatch).not.toHaveBeenCalled();
       // The throw happens during bot-destination resolution, which runs BEFORE

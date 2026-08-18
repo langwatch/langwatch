@@ -5,7 +5,6 @@ import {
 } from "@langwatch/automations/providers/slack";
 import { TriggerAction } from "~/generated/prisma/client";
 import { decrypt, encrypt } from "~/utils/encryption";
-import { MissingSlackBotTokenError } from "../../errors";
 import type { PersistActionParamsArgs, ServerDef } from "../types";
 
 /**
@@ -17,21 +16,6 @@ import type { PersistActionParamsArgs, ServerDef } from "../types";
  *  - read: strip the ciphertext, echo only a `slackBotTokenSet` flag.
  *  - deliver: decrypt just before the Web API call.
  */
-
-/** True when a bot connection is being saved without any token — neither a new
- *  one nor a previously-stored one. Persist rejects this. */
-export function slackBotTokenMissing({
-  incoming,
-  existing,
-}: {
-  incoming: SlackActionParams;
-  existing?: SlackActionParams | null;
-}): boolean {
-  if (slackDeliveryMethodOf(incoming) !== "bot") return false;
-  const raw = incoming.slackBotToken?.trim();
-  const providingNew = !!raw && raw !== SLACK_BOT_TOKEN_KEPT;
-  return !providingNew && !existing?.slackBotToken;
-}
 
 /**
  * Prepare Slack actionParams for persistence: encrypt a new bot token, keep the
@@ -62,7 +46,9 @@ export function persistSlackActionParams({
   return {
     slackDelivery: "bot",
     slackChannelId: incoming.slackChannelId?.trim(),
-    slackBotToken,
+    // Omitted, not `undefined`: the stored JSON must carry no token KEY when
+    // there is no token, so a read never mistakes the field for present.
+    ...(slackBotToken === undefined ? {} : { slackBotToken }),
   };
 }
 
@@ -95,9 +81,11 @@ const def: ServerDef = {
       slackDeliveryMethodOf(params) === "bot"
         ? ((await loadExisting()) as SlackActionParams | undefined)
         : undefined;
-    if (slackBotTokenMissing({ incoming: params, existing })) {
-      throw new MissingSlackBotTokenError();
-    }
+    // No token check here any more (ADR-093 §5). A bot connection is allowed to
+    // store no token at all: the project's Slack integration serves it, and
+    // persist cannot see that column. The "nothing to deliver with" refusal
+    // moved to the one place that can read both storage locations — the
+    // dispatch-time resolver, which raises `slack_integration_missing`.
     return persistSlackActionParams({ incoming: params, existing });
   },
   redactActionParams: (params) =>

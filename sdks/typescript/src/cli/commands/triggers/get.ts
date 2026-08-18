@@ -5,10 +5,10 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
-import { redactTriggerSecrets } from "./redact";
 
 /**
  * Returns the trigger rather than printing it: the output port renders it in
@@ -28,6 +28,7 @@ export const getTriggerCommand = async (
 
   try {
     const response = await fetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
+      signal: AbortSignal.timeout(TRIGGER_REQUEST_TIMEOUT_MS),
       headers: buildAuthHeaders({ apiKey }),
     });
 
@@ -54,9 +55,9 @@ export const getTriggerCommand = async (
     spinner.succeed(`Found trigger "${trigger.name}"`);
 
     return {
-      // actionParams holds plaintext webhook URLs and delivery secrets that
-      // the human block never prints — see ./redact.ts.
-      data: redactTriggerSecrets(trigger),
+      // `actionParams` arrives with its delivery credentials already redacted,
+      // so machine output is the response exactly as the API answered it.
+      data: trigger,
       table: () => {
         console.log();
         console.log(chalk.bold("  Trigger Details:"));

@@ -56,7 +56,6 @@ import {
   TriggerKind,
 } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -68,6 +67,7 @@ import {
 import { api } from "~/utils/api";
 import { MainSectionList } from "./components/MainSectionList";
 import { ConfigurationSecondaryDrawer } from "./components/secondaries/ConfigurationSecondaryDrawer";
+import { AutomationWizard } from "./components/wizard/AutomationWizard";
 import { ALERT_TEMPLATE_VARIABLES } from "./editors/alertVariables";
 import { REPORT_TEMPLATE_VARIABLES } from "./editors/reportVariables";
 import {
@@ -86,12 +86,15 @@ import {
   templatesFromDraft,
 } from "./logic/draftReducer";
 import { useGraphAlertLabels } from "./logic/useGraphAlertLabels";
+import { nextStep, previousStep } from "./logic/wizardSteps";
 import { useAutomationStore } from "./state/automationStore";
 import {
   useConditionsSet,
   useConfigComplete,
   useDraft,
+  useHasInvalidConditionRows,
   useSection,
+  useWizardStep,
 } from "./state/selectors";
 
 /**
@@ -135,25 +138,21 @@ function templateValidationTitle(error: unknown): string | undefined {
   return TEMPLATE_FIELD_TITLES[String(handled.meta.field ?? "")];
 }
 
-/** Facet-ordered "why can't I save yet" copy: Name → Type → Subject →
- *  Cadence → Severity → Delivery. Type is always chosen (the source defaults
- *  to an automation), so it never contributes a message. */
+/** Facet-ordered "why can't I save yet" copy: Name → Subject → Cadence →
+ *  Severity → Delivery. Each unanswered facet contributes its own todo,
+ *  subject and cadence mutually exclusively — an unset subject makes any
+ *  cadence advice premature. */
 function saveDisabledReason({
   draft,
   nameSet,
   configComplete,
   actionPicked,
-  webhookReadOnly = false,
 }: {
   draft: AutomationDraft;
   nameSet: boolean;
   configComplete: boolean;
   actionPicked: boolean;
-  webhookReadOnly?: boolean;
 }): string {
-  if (webhookReadOnly) {
-    return "Webhook delivery is unavailable for this project. Choose another delivery channel to save changes.";
-  }
   const missing: string[] = [];
   if (!nameSet) missing.push("give it a name");
   if (!subjectIsSet(draft)) missing.push(subjectTodo(draft));
@@ -180,7 +179,7 @@ function subjectTodo(draft: AutomationDraft): string {
 function cadenceTodo(draft: AutomationDraft): string {
   switch (draft.source) {
     case "customGraph":
-      return "set the alert threshold";
+      return "set the firing threshold";
     case "report":
       return "set a schedule";
     case "trace":
@@ -195,9 +194,9 @@ function cadenceTodo(draft: AutomationDraft): string {
  * - Owns the data-loading lifecycle: scaffold (synchronous client),
  *   trigger row prefill on edit, traces-view filter prefill on create.
  * - Owns the live preview / test-fire / upsert mutations.
- * - Renders three pieces: the main drawer with `<MainSectionList/>`, the
- *   Filters secondary, and the Configuration secondary (which itself
- *   delegates the inner config to the active provider's ConfigForm).
+ * - Renders the drawer body — the three-step wizard for an automation, the
+ *   single-pane composer for a schedule (ADR-093 §4) — and the Configuration
+ *   secondary, which delegates the inner config to the provider's ConfigForm.
  *
  * Everything else lives in `components/`, `state/`, `providers/`, or
  * `logic/`. Adding a new action type doesn't change this file.
@@ -219,7 +218,7 @@ export function AutomationDrawer({
    *  undefined) renders the drawer normally. */
   source?: string;
   /** When set, the drawer opens in graph-alert mode with the graph
-   *  pre-filled and locked. Used by the dashboard "Add alert" entry
+   *  pre-filled and locked. Used by the dashboard "Add automation" entry
    *  point (Phase 5.2). */
   prefilledGraphId?: string;
   prefilledSeriesName?: string;
@@ -239,37 +238,37 @@ export function AutomationDrawer({
   initialFilterQuery?: string;
 }) {
   const { project, organization, team } = useOrganizationTeamProject();
-  const { closeDrawer } = useDrawer();
+  const { closeDrawer, openDrawer } = useDrawer();
   const queryClient = api.useUtils();
   const { filterParams } = useFilterParams();
   const projectId = project?.id ?? "";
-  const { enabled: webhookEnabled, isLoading: webhookFlagLoading } =
-    useFeatureFlag("release_webhook_automations", {
-      projectId: project?.id,
-      enabled: !!project,
-    });
-
   const draft = useDraft();
   const section = useSection();
+  const step = useWizardStep();
   const conditionsSet = useConditionsSet();
+  const hasInvalidConditionRows = useHasInvalidConditionRows();
   const configComplete = useConfigComplete();
   const isGraphAlert = draft.source === "customGraph";
-  const isReport = draft.source === "report";
-  // Single source of truth for every heading / button / toast noun. Treat a
-  // graph-prefilled create as an alert from the first paint so the title
-  // doesn't flash "Add automation" before the prefill effect lands.
-  const labels = presetLabels(
-    prefilledGraphId ? "customGraph" : draft.source,
-    !!automationId,
-  );
-  // A saved graph alert or report can't become a trace automation mid-edit
-  // (the kind decides the row's whole shape — schedule, source, dispatcher),
-  // and a drawer opened from a specific chart is pinned to that alert — lock
-  // the Type cards visibly in all three cases.
-  const sourceLocked =
-    (!!automationId && (isGraphAlert || isReport)) || !!prefilledGraphId;
+  // A schedule keeps the single-pane composer — the wizard authors the two
+  // things an automation can watch, and the clock is neither (ADR-093 §1).
+  // Read from the prefill too, so a fresh schedule never paints one frame of
+  // the wizard before the prefill effect lands.
+  const isReport = draft.source === "report" || initialSource === "report";
+  // Single source of truth for every heading / button / toast noun. A schedule
+  // is read off the prefill too, so a fresh one never flashes the automation
+  // heading before the prefill effect lands.
+  const labels = presetLabels({
+    source: isReport ? "report" : draft.source,
+    isEdit: !!automationId,
+  });
+  // What a saved automation watches never changes — the graph slot is one
+  // automation per graph, so the conversion is a create plus a delete, which is
+  // exactly what the public API already refuses (ADR-093 §1). A drawer opened
+  // from a specific chart is pinned to that graph for the same reason.
+  const subjectLocked = !!automationId || !!prefilledGraphId;
   const dispatch = useAutomationStore((s) => s.dispatch);
   const setSection = useAutomationStore((s) => s.setSection);
+  const setStep = useAutomationStore((s) => s.setStep);
   const hydrate = useAutomationStore((s) => s.hydrate);
   const reset = useAutomationStore((s) => s.reset);
   const pushAttempt = useAutomationStore((s) => s.pushTestAttempt);
@@ -277,6 +276,15 @@ export function AutomationDrawer({
 
   // Wipe the singleton store on unmount — next open is a fresh slate.
   useEffect(() => () => reset(), [reset]);
+
+  // Editing opens on the review overview, always, and never on the Watch step:
+  // losing the overview while editing was the annoying part of the previous
+  // restructuring attempt (ADR-093 §4). Every step is reachable from the rail
+  // straight away, because they were all answered when the row was saved.
+  useEffect(() => {
+    if (automationId) setStep("review");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Baseline the close-guard diffs against: the hydrated row on edit, the
   // traces-prefilled (or empty) draft on create. Set once the relevant
@@ -286,8 +294,86 @@ export function AutomationDrawer({
   const baselineRef = useRef<string | null>(null);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
 
-  // Pre-fill conditions from the traces view on a fresh create.
+  // Gate hydration to the FIRST successful read per automationId. tRPC's
+  // background refetch (window-focus, query invalidation) would otherwise
+  // re-fire this effect mid-session and overwrite unsaved edits with the
+  // last-saved row.
+  const hydratedFromServerFor = useRef<string | null>(null);
+  /** Latched once the name has been seeded from the watched graph's own name;
+   *  declared here so the identity-reset effect below can unlatch it. */
+  const seededNameFromGraph = useRef(false);
+  // Latches for the one-shot prefill effects below. The identity-reset
+  // effect re-arms them, and runs FIRST (declaration order), so a new drawer
+  // opening prefills again instead of skipping on a stale latch.
   const prefilledFromTraces = useRef(false);
+  const prefilledFromGraph = useRef(false);
+  const prefilledFromParams = useRef(false);
+
+  /**
+   * Reopening this drawer for a DIFFERENT automation — or a different create
+   * prefill — does not remount it.
+   *
+   * `openDrawer` replaces the URL params in place when the drawer type is
+   * already open (`useDrawer`), and the drawer host renders the component
+   * without a key — so the instance, the singleton store, and every latch in
+   * this file survive the transition. The unmount `reset()` and the mount-time
+   * "editing opens on Review" effect are both dead in that path.
+   *
+   * Left alone, "New automation" from a saved automation's locked Watch step
+   * carried the whole edited draft into the create: the heading flipped, the
+   * store still held the saved name, query and action, and Save wrote a second
+   * row from it (or hit the one-automation-per-graph constraint, wearing an
+   * error that named nothing the author had done). The close-guard was equally
+   * blind, diffing against the previous automation's baseline. And a create
+   * opened with different prefill parameters (a new `prefilledGraphId`, a
+   * different use-case card) silently kept the previous prefill, because the
+   * one-shot effects had already latched.
+   *
+   * So the identity change does by hand exactly what unmounting would have
+   * done. The identity is the automation id on edit, and the full prefill
+   * parameter set on create — edit-A → edit-B, edit → create, and create-A →
+   * create-B are all the same transition with the same consequence.
+   *
+   * It is declared ABOVE the prefill and hydration effects on purpose:
+   * effects run in declaration order, so those effects (re-keyed on the same
+   * identity) find their latches re-armed and the draft blanked when they
+   * run for the new identity.
+   *
+   * The baseline is cleared, not captured here: the prefill effects below run
+   * later in this same commit and mutate the draft, so a baseline taken now
+   * would read the prefill as unsaved edits and a freshly reopened create
+   * would prompt "Discard unsaved changes?" with nothing typed. The
+   * create-baseline effect — declared after the prefills and keyed on the
+   * same identity — re-captures it once they have landed.
+   */
+  const drawerIdentity = automationId
+    ? `edit:${automationId}`
+    : `create:${[
+        prefilledGraphId,
+        prefilledSeriesName,
+        initialSource,
+        initialName,
+        initialAction,
+        initialFilters,
+        initialFilterQuery,
+      ]
+        .map((value) => value ?? "")
+        .join("|")}`;
+  const openedForRef = useRef<string>(drawerIdentity);
+  useEffect(() => {
+    if (openedForRef.current === drawerIdentity) return;
+    openedForRef.current = drawerIdentity;
+    reset();
+    hydratedFromServerFor.current = null;
+    baselineRef.current = null;
+    prefilledFromTraces.current = false;
+    prefilledFromGraph.current = false;
+    prefilledFromParams.current = false;
+    seededNameFromGraph.current = false;
+    setStep(automationId ? "review" : "watch");
+  }, [drawerIdentity, automationId, reset, setStep]);
+
+  // Pre-fill conditions from the traces view on a fresh create.
   useEffect(() => {
     if (automationId) return;
     if (prefilledFromTraces.current) return;
@@ -295,14 +381,15 @@ export function AutomationDrawer({
       dispatch({ type: "SET_FILTERS", value: filterParams.filters });
       prefilledFromTraces.current = true;
     }
+    // Latch + identity: everything else read here is intentionally frozen
+    // per drawer opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [drawerIdentity]);
 
   // Pre-fill graph-alert mode from drawer params on a fresh create. Used
-  // by the dashboard "Add alert" entry (Phase 5.2). When set, the drawer
+  // by the dashboard "Add automation" entry (Phase 5.2). When set, the drawer
   // opens with source = customGraph and the graph / series already
   // selected and locked, so the author lands on the threshold rule.
-  const prefilledFromGraph = useRef(false);
   useEffect(() => {
     if (automationId) return;
     if (prefilledFromGraph.current) return;
@@ -320,15 +407,16 @@ export function AutomationDrawer({
     // through the When secondary — the author can still change it there.
     dispatch({ type: "SET_ALERT_TYPE", value: AlertType.WARNING });
     prefilledFromGraph.current = true;
+    // Latch + identity: everything else read here is intentionally frozen
+    // per drawer opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [drawerIdentity]);
 
   // Pre-fill identity + kind from drawer params on a fresh create. Set by
-  // the Alerts & automations page ("New alert" opens straight into alert
-  // mode; use-case cards seed a name and action too). Ordering matters:
+  // the automations page (a graph-watching use-case card opens straight into
+  // graph mode, seeding a name and action too). Ordering matters:
   // SET_SOURCE runs first because switching to customGraph resets any
   // action that alerts don't support.
-  const prefilledFromParams = useRef(false);
   useEffect(() => {
     if (automationId) return;
     if (prefilledFromParams.current) return;
@@ -339,13 +427,6 @@ export function AutomationDrawer({
       !initialFilters &&
       !initialFilterQuery
     ) {
-      return;
-    }
-    // The webhook feature flag can still be loading on mount (it defaults
-    // to false while in flight). Don't latch prefilledFromParams until it
-    // resolves, or a SEND_WEBHOOK prefill on a genuinely enabled project
-    // is silently dropped and never retried.
-    if (initialAction === TriggerAction.SEND_WEBHOOK && webhookFlagLoading) {
       return;
     }
     if (initialSource === "customGraph") {
@@ -360,11 +441,7 @@ export function AutomationDrawer({
     if (initialName) {
       dispatch({ type: "SET_NAME", value: initialName });
     }
-    if (
-      initialAction &&
-      initialAction in CLIENT_PROVIDERS &&
-      (initialAction !== TriggerAction.SEND_WEBHOOK || webhookEnabled)
-    ) {
+    if (initialAction && initialAction in CLIENT_PROVIDERS) {
       dispatch({
         type: "SET_ACTION",
         value: initialAction as TriggerAction,
@@ -397,19 +474,17 @@ export function AutomationDrawer({
       dispatch({ type: "SET_FILTER_QUERY", value: initialFilterQuery });
     }
     prefilledFromParams.current = true;
+    // Latch + identity: everything else read here is intentionally frozen
+    // per drawer opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [webhookFlagLoading]);
+  }, [drawerIdentity]);
 
   // Edit prefill from the saved trigger.
   const triggerQuery = api.automation.getTriggerById.useQuery(
     { triggerId: automationId ?? "", projectId },
     { enabled: !!automationId && !!projectId },
   );
-  // Gate hydration to the FIRST successful read per automationId. tRPC's
-  // background refetch (window-focus, query invalidation) would otherwise
-  // re-fire this effect mid-session and overwrite unsaved edits with the
-  // last-saved row.
-  const hydratedFromServerFor = useRef<string | null>(null);
+
   useEffect(() => {
     if (!automationId) return;
     const row = triggerQuery.data;
@@ -516,16 +591,17 @@ export function AutomationDrawer({
     baselineRef.current = JSON.stringify(next);
   }, [triggerQuery.data, automationId, hydrate]);
 
-  // Capture the create-mode baseline once the synchronous traces-prefill has
-  // had a chance to land (the prefill effect above runs on mount before this
-  // commits). After this, any change to the draft reads as unsaved and the
-  // close-guard kicks in.
+  // Capture the create-mode baseline once the synchronous prefills have had
+  // a chance to land (the prefill effects above are declared before this one,
+  // so they run first in the same commit — on mount and on every identity
+  // change alike). After this, any change to the draft reads as unsaved and
+  // the close-guard kicks in.
   useEffect(() => {
     if (automationId) return;
     if (baselineRef.current !== null) return;
     baselineRef.current = JSON.stringify(useAutomationStore.getState().draft);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [drawerIdentity]);
 
   // Build the example TemplateContext the preview pane (and autocomplete)
   // render against. Static-ish — only depends on the project identity, so the
@@ -575,14 +651,22 @@ export function AutomationDrawer({
   // Seed the name from the watched graph once its row loads — "Latency
   // p95 alert" beats an empty field on the golden Add-alert path. Only
   // when the author hasn't typed anything, and only once.
-  const seededNameFromGraph = useRef(false);
   useEffect(() => {
     if (automationId || seededNameFromGraph.current) return;
     if (!prefilledGraphId || !graphName) return;
     if (useAutomationStore.getState().draft.name.trim() !== "") return;
-    dispatch({ type: "SET_NAME", value: `${graphName} alert` });
+    dispatch({ type: "SET_NAME", value: `${graphName} automation` });
     seededNameFromGraph.current = true;
   }, [automationId, prefilledGraphId, graphName, dispatch]);
+  // ADR-093 §5: a Slack delivery with no token of its own still sends when the
+  // project has an integration, so the preview's block gate has to know.
+  const slackIntegrationStatus = api.slackIntegration.getStatus.useQuery(
+    { projectId },
+    { enabled: !!projectId, refetchOnWindowFocus: false },
+  );
+  const slackIntegrationConnected =
+    slackIntegrationStatus.data?.connected ?? false;
+
   const previewContext = useMemo<
     TemplateContext | GraphAlertTemplateContext | ReportTemplateContext
   >(() => {
@@ -616,7 +700,7 @@ export function AutomationDrawer({
           slug: project?.slug ?? "project",
         },
         trigger: {
-          name: draft.name || "Example alert",
+          name: draft.name || "Example automation",
           alertType: draft.alertType,
         },
         graph: graphName ? { name: graphName } : undefined,
@@ -670,7 +754,12 @@ export function AutomationDrawer({
     const entry = draft.action ? CLIENT_PROVIDERS[draft.action] : undefined;
     const renderOptions =
       entry && isNotifyEntry(entry) && entry.client.previewOptions
-        ? entry.client.previewOptions(draft.slices[draft.action!] as never)
+        ? entry.client.previewOptions({
+            slice: draft.slices[draft.action!] as never,
+            context: {
+              hasProjectSlackIntegration: slackIntegrationConnected,
+            },
+          })
         : {};
     void (async () => {
       try {
@@ -698,6 +787,7 @@ export function AutomationDrawer({
           const rendered = await renderWebhookBody({
             template: slice.template.value.trim() ? slice.template.value : null,
             context: previewContext,
+            contentType: slice.contentType,
             defaultBody: previewDefaults.webhookBody,
           });
           if (token === previewToken.current) {
@@ -750,6 +840,7 @@ export function AutomationDrawer({
     previewContext,
     isGraphAlert,
     isReport,
+    slackIntegrationConnected,
   ]);
 
   // Edit mode must not render the (blank) INITIAL_DRAFT form while the saved
@@ -759,24 +850,22 @@ export function AutomationDrawer({
   // Show a skeleton until the row lands, and an error state if it never does.
   const editLoading = !!automationId && triggerQuery.isLoading;
   const editError = !!automationId && triggerQuery.isError;
-  const webhookReadOnly =
-    !!automationId &&
-    draft.action === TriggerAction.SEND_WEBHOOK &&
-    !webhookEnabled;
 
   const testFire = api.automation.testFireTemplate.useMutation();
   const upsert = api.automation.upsert.useMutation();
   const nameSet = draft.name.trim().length > 0;
   // Cadence is an always-visible inline facet now (ADR-043), so there is no
   // "confirm the cadence" detour to gate on — subject + cadence validity is
-  // folded into conditionsSet.
+  // folded into conditionsSet. An invalid condition row additionally holds
+  // Save: the row is excluded from the emitted query, so saving past it
+  // would persist a wider automation than the one on screen.
   const canSave =
     nameSet &&
     conditionsSet &&
+    !hasInvalidConditionRows &&
     configComplete &&
     !editLoading &&
-    !editError &&
-    !webhookReadOnly;
+    !editError;
 
   const onTestFire = useCallback(() => {
     if (!channel || !projectId || !draft.action) return;
@@ -901,13 +990,31 @@ export function AutomationDrawer({
         traceDebounceMs: draft.traceDebounceMs,
       },
       {
-        onSuccess: () => {
+        onSuccess: (saved) => {
           toaster.create({
             title: automationId ? labels.updatedToast : labels.createdToast,
             type: "success",
             meta: { closable: true },
+            // Saving closes the drawer and leaves the author wherever they
+            // started, which is usually not the automations list. This is the
+            // one moment the app knows exactly which row was written, so it
+            // carries the way back to it.
+            ...(automationId
+              ? {}
+              : {
+                  action: {
+                    label: `View ${labels.noun}`,
+                    onClick: () =>
+                      openDrawer("viewAutomation", { automationId: saved.id }),
+                  },
+                }),
           });
           void queryClient.automation.getTriggers.invalidate();
+          // Edit hydration reads this query ONCE per open and ignores every
+          // later read (so a background refetch can't overwrite keystrokes).
+          // Without this the next open hydrates from the pre-save copy and
+          // shows the value the author just replaced.
+          void queryClient.automation.getTriggerById.invalidate();
           // The dashboard chart card reads its alert state off the graph, not
           // off the trigger list: without these the card still offers "Add
           // alert" after one was just created, and clicking it re-enters CREATE
@@ -931,6 +1038,8 @@ export function AutomationDrawer({
     canSave,
     closeDrawer,
     draft,
+    labels,
+    openDrawer,
     projectId,
     queryClient,
     upsert,
@@ -1019,6 +1128,11 @@ export function AutomationDrawer({
     baselineRef.current !== null &&
     JSON.stringify(draft) !== baselineRef.current;
 
+  // Which footer the drawer is showing. Save and test fire live on the review
+  // overview; every other wizard step gets navigation instead. A schedule keeps
+  // the single-pane composer, so it always shows Save.
+  const showStepNavigation = !isReport && step !== "review";
+
   const requestClose = useCallback(() => {
     if (isDirty) {
       setConfirmDiscardOpen(true);
@@ -1076,21 +1190,63 @@ export function AutomationDrawer({
               </VStack>
             ) : (
               <Box css={{ zoom: 0.9 }}>
-                <MainSectionList
-                  isEdit={!!automationId}
-                  sourceLocked={sourceLocked}
-                  prefilledGraphId={prefilledGraphId}
-                  webhookEnabled={webhookEnabled}
-                />
+                {isReport ? (
+                  <MainSectionList
+                    isEdit={!!automationId}
+                    prefilledGraphId={prefilledGraphId}
+                  />
+                ) : (
+                  <AutomationWizard
+                    projectId={projectId}
+                    isEdit={!!automationId}
+                    prefilledGraphId={prefilledGraphId}
+                    subjectLocked={subjectLocked}
+                    graphName={graphName}
+                    seriesLabel={seriesLabel}
+                    onCreateNew={() => openDrawer("automation", {})}
+                  />
+                )}
               </Box>
             )}
           </Drawer.Body>
           <Drawer.Footer>
             <HStack width="full">
               <Spacer />
+              {/* Mid-wizard, the footer moves between steps and nothing else:
+                  saving and test-firing belong to the review overview, where
+                  the whole automation is on screen. Creating walks forward;
+                  editing entered this step from the overview, so its one way
+                  out is back to it. */}
+              {showStepNavigation ? (
+                automationId ? (
+                  <Button
+                    colorPalette="orange"
+                    onClick={() => setStep("review")}
+                  >
+                    Done
+                  </Button>
+                ) : (
+                  <>
+                    {previousStep(step) ? (
+                      <Button
+                        variant="ghost"
+                        onClick={() => setStep(previousStep(step)!)}
+                      >
+                        Back
+                      </Button>
+                    ) : null}
+                    <Button
+                      colorPalette="orange"
+                      onClick={() => setStep(nextStep(step)!)}
+                    >
+                      Continue
+                    </Button>
+                  </>
+                )
+              ) : null}
               {/* Send test sits next to Save (ADR-043 feedback): once a notify
                   channel is set up, fire the real message before committing. */}
-              {channel && !editLoading && !editError && !webhookReadOnly ? (
+              {!showStepNavigation && channel && !editLoading && !editError ? (
                 <Tooltip
                   content="Finish the delivery setup to send a test."
                   disabled={configComplete}
@@ -1105,25 +1261,26 @@ export function AutomationDrawer({
                   </Button>
                 </Tooltip>
               ) : null}
-              <Tooltip
-                content={saveDisabledReason({
-                  draft,
-                  nameSet,
-                  configComplete,
-                  actionPicked: !!draft.action,
-                  webhookReadOnly,
-                })}
-                disabled={canSave}
-              >
-                <Button
-                  colorPalette="orange"
-                  onClick={onSave}
-                  loading={upsert.isPending}
-                  disabled={!canSave}
+              {showStepNavigation ? null : (
+                <Tooltip
+                  content={saveDisabledReason({
+                    draft,
+                    nameSet,
+                    configComplete,
+                    actionPicked: !!draft.action,
+                  })}
+                  disabled={canSave}
                 >
-                  {labels.saveButton}
-                </Button>
-              </Tooltip>
+                  <Button
+                    colorPalette="orange"
+                    onClick={onSave}
+                    loading={upsert.isPending}
+                    disabled={!canSave}
+                  >
+                    {labels.saveButton}
+                  </Button>
+                </Tooltip>
+              )}
             </HStack>
           </Drawer.Footer>
         </Drawer.Content>
@@ -1202,7 +1359,7 @@ function EmailLinkLandingBanner() {
         </Box>
         <Text textStyle="sm" color="fg">
           Opened from an email notification. You're editing the automation that
-          produced that alert.
+          sent it.
         </Text>
       </HStack>
     </Box>

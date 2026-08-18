@@ -1,8 +1,17 @@
 import { setTimeout as sleep } from "node:timers/promises";
-import { slackDeliveryMethodOf } from "@langwatch/automations/providers/slack";
-import type { WebhookMethod } from "@langwatch/automations/providers/webhook";
+import {
+  type SlackActionParams,
+  slackDeliveryMethodOf,
+} from "@langwatch/automations/providers/slack";
+import {
+  DEFAULT_WEBHOOK_CONTENT_TYPE,
+  type WebhookMethod,
+} from "@langwatch/automations/providers/webhook";
 import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
-import { renderTriggerSlack } from "@langwatch/automations/templating/renderSlack";
+import {
+  renderTriggerSlack,
+  resolveSlackTemplateType,
+} from "@langwatch/automations/templating/renderSlack";
 import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
 import {
   buildTemplateContext,
@@ -26,6 +35,10 @@ import {
   decryptWebhookSigningSecrets,
 } from "~/server/app-layer/automations/providers/webhook/server";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
+import {
+  type ResolvedSlackToken,
+  slackTokenMissingDispatchError,
+} from "~/server/app-layer/automations/slack-integration/slack-token-resolver";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
@@ -99,6 +112,9 @@ interface ActionParams {
   headersEncrypted?: string;
   headers?: Record<string, string>;
   bodyTemplate?: string | null;
+  /** The Content-Type the delivery announces, which also decides the body's
+   *  treatment (JSON checked, anything else verbatim). Absent = JSON. */
+  contentType?: string;
   /** Optional HMAC signing (ADR-040 §3), stored the same way as the header
    *  values. Absent means the delivery goes out unsigned. */
   signingSecretEncrypted?: string;
@@ -132,6 +148,17 @@ export interface TriggerSettlementDispatchDeps extends ConfirmSettledMatchDeps {
   }) => Promise<void>;
   /** ADR-040 §6 delivery-log writer. Optional: absent in tests. */
   recordWebhookDelivery?: WebhookDeliveryRecorder;
+  /**
+   * ADR-093 §5 token resolution: the automation's own stored token, else the
+   * project's Slack integration, else null. Optional so a test that never
+   * dispatches to Slack does not have to fill it; absent behaves as "the
+   * project has no integration", which is what an unwired dispatcher had
+   * before this port existed.
+   */
+  resolveSlackToken?: (params: {
+    projectId: string;
+    actionParams: Pick<SlackActionParams, "slackBotToken">;
+  }) => Promise<ResolvedSlackToken | null>;
   /** ADR-031 per-trigger hourly email cap (dedupKey gates the INCR). */
   consumeEmailCapSlot: (args: {
     projectId: string;
@@ -522,17 +549,37 @@ async function dispatchNotifyDigest({
       // ADR-041: a bot connection posts via the Web API with the gated
       // chart/table/alert blocks open — never the legacy plain-text builder.
       if (slackDeliveryMethodOf(params) === "bot") {
-        const token = decryptSlackBotToken(params);
+        // ADR-093 §5: the automation's own token wins, and the project's Slack
+        // integration serves the rest. The two failures are told apart on
+        // purpose — a missing channel is this automation's configuration, a
+        // missing token anywhere is the project's.
+        // The wired resolver owns the whole decision, so the row's own token
+        // is only decrypted on the fallback path that actually reads it.
+        const ownTokenFallback = (): ResolvedSlackToken | null => {
+          const ownToken = decryptSlackBotToken(params);
+          return ownToken ? { token: ownToken, source: "automation" } : null;
+        };
+        const resolved: ResolvedSlackToken | null = deps.resolveSlackToken
+          ? await deps.resolveSlackToken({ projectId, actionParams: params })
+          : ownTokenFallback();
+        if (!resolved) {
+          throw slackTokenMissingDispatchError({ triggerName: trigger.name });
+        }
+        const token = resolved.token;
         const channel = params.slackChannelId?.trim();
-        if (!token || !channel) {
+        if (!channel) {
           throw new DispatchError({
-            message: `Slack bot connection for trigger "${trigger.name}" is missing its token or channel`,
+            message: `Slack bot connection for trigger "${trigger.name}" is missing its channel`,
+            customerMessage:
+              "This automation has no Slack channel to post in. Pick a channel in its delivery settings.",
             retryable: false,
           });
         }
         const rendered = await renderTriggerSlack({
-          templateType:
-            t.slackTemplateType === "block_kit" ? "block_kit" : "string",
+          templateType: resolveSlackTemplateType({
+            configured: t.slackTemplateType,
+            deliveryMethod: "bot",
+          }),
           template: t.slackTemplate,
           context: buildContext(),
           allowGatedBlocks: true,
@@ -554,8 +601,10 @@ async function dispatchNotifyDigest({
       }
       if (hasCustomSlack) {
         const rendered = await renderTriggerSlack({
-          templateType:
-            t.slackTemplateType === "block_kit" ? "block_kit" : "string",
+          templateType: resolveSlackTemplateType({
+            configured: t.slackTemplateType,
+            deliveryMethod: "webhook",
+          }),
           template: t.slackTemplate,
           context: buildContext(),
         });
@@ -591,11 +640,14 @@ async function dispatchNotifyDigest({
           retryable: false,
         });
       }
-      // ADR-040 §2: Liquid → JSON.parse, falling back to the framework
-      // default envelope on any template failure.
+      // ADR-040 §2: a JSON content type is Liquid → JSON.parse, falling back
+      // to the framework default envelope on any template failure; any other
+      // type is sent exactly as it renders.
+      const contentType = params.contentType ?? DEFAULT_WEBHOOK_CONTENT_TYPE;
       const rendered = await renderWebhookBody({
         template: params.bodyTemplate ?? null,
         context: buildContext(),
+        contentType,
       });
       if (rendered.errors.length > 0) {
         logger.warn(
@@ -619,6 +671,7 @@ async function dispatchNotifyDigest({
         headers: decryptWebhookHeaders(params),
         signingSecrets: decryptWebhookSigningSecrets(params),
         body: rendered.body,
+        contentType,
         triggerName: trigger.name,
       });
       didSend = true;

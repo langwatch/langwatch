@@ -87,12 +87,12 @@ describe("GraphCardHeader", () => {
   });
 
   describe("given no trigger is configured", () => {
-    describe("when the Add alert button is clicked", () => {
+    describe("when the Add automation button is clicked", () => {
       it("opens the automations drawer pre-filled with this graph and its first series", async () => {
         renderHeader();
 
         await userEvent.click(
-          screen.getByRole("button", { name: /add alert/i }),
+          screen.getByRole("button", { name: /add automation/i }),
         );
 
         expect(openDrawerMock).toHaveBeenCalledTimes(1);
@@ -112,7 +112,7 @@ describe("GraphCardHeader", () => {
         });
 
         await userEvent.click(
-          screen.getByRole("button", { name: "Edit alert" }),
+          screen.getByRole("button", { name: "Edit automation" }),
         );
 
         expect(openDrawerMock).toHaveBeenCalledTimes(1);

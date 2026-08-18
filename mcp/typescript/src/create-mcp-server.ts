@@ -3,6 +3,16 @@ import { z } from "zod";
 
 import packageJson from "../package.json" with { type: "json" };
 import { requireApiKey } from "./config.js";
+import {
+  actionParamsSchema,
+  alertTypeSchema,
+  graphAlertSchema,
+  notificationCadenceSchema,
+  reportSchema,
+  templatesSchema,
+  triggerActionSchema,
+  validateActionParamsForAction,
+} from "./schemas/triggers.js";
 import { fetchDocumentation } from "./documentation-fetch.js";
 import {
   createDatasetSchema,
@@ -1278,19 +1288,53 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
   );
 
   server.tool(
+    "platform_get_trigger",
+    "Read one trigger (automation) by its ID, including its delivery configuration. Credential values come back as [redacted]; sending them back unchanged on an update keeps the stored values.",
+    {
+      id: z.string().describe("The trigger ID"),
+    },
+    withToolLogging("platform_get_trigger", async (params) => {
+      requireApiKey();
+      const { getTrigger } = await import("./langwatch-api-triggers.js");
+      const trigger = await getTrigger(params.id);
+      return { content: [{ type: "text", text: JSON.stringify(trigger, null, 2) }] };
+    })
+  );
+
+  server.tool(
     "platform_create_trigger",
-    "Create a new trigger (automation) that fires when conditions are met.",
+    [
+      "Create a trigger (automation).",
+      "",
+      "It is about one of three things: matching traces (send `filters` or `filterQuery`), a metric crossing a threshold on a graph (send `customGraphId`, `graphAlert` and `alertType`), or a schedule (send `report`, on an email or Slack channel).",
+      "`actionParams` is the delivery configuration for the channel named in `action` — recipients for SEND_EMAIL, a destination for SEND_SLACK_MESSAGE, a URL for SEND_WEBHOOK, a dataset and mapping for ADD_TO_DATASET, annotators for ADD_TO_ANNOTATION_QUEUE. It is required: a channel with no configuration cannot deliver, and the save is refused.",
+      "The delivery channel cannot be changed afterwards.",
+    ].join("\n"),
     {
       name: z.string().describe("Trigger name"),
-      action: z.enum(["SEND_EMAIL", "ADD_TO_DATASET", "ADD_TO_ANNOTATION_QUEUE", "SEND_SLACK_MESSAGE"]).describe("Action to take when triggered"),
-      filters: z.string().optional().describe("Filter conditions as JSON string"),
+      action: triggerActionSchema.describe("Which channel it delivers on"),
+      actionParams: actionParamsSchema.describe("The delivery configuration the channel named in `action` reads"),
+      filters: z.string().optional().describe("Trace conditions as a JSON object string, e.g. {\"metadata.labels\":[\"prod\"]}"),
+      filterQuery: z.string().optional().describe("Trace query in the syntax the traces view uses, e.g. status:error. Supersedes `filters`."),
+      customGraphId: z.string().optional().describe("Set to make this an alert on that graph"),
+      graphAlert: graphAlertSchema.optional(),
+      report: reportSchema.optional().describe("Set to make this a scheduled report"),
+      templates: templatesSchema.optional(),
+      notificationCadence: notificationCadenceSchema.optional(),
       message: z.string().optional().describe("Custom alert message"),
-      alertType: z.enum(["CRITICAL", "WARNING", "INFO"]).optional().describe("Alert severity"),
+      alertType: alertTypeSchema.optional().describe("Alert severity. Required for a graph alert."),
     },
     withToolLogging("platform_create_trigger", async (params) => {
       requireApiKey();
       const { createTrigger } = await import("./langwatch-api-triggers.js");
-      let filters: Record<string, unknown> = {};
+      const boundParams = validateActionParamsForAction({
+        action: params.action,
+        actionParams: params.actionParams,
+      });
+      if (!boundParams.ok) {
+        return { content: [{ type: "text", text: `Error: ${boundParams.message}` }] };
+      }
+      let filters: Record<string, unknown> | undefined;
       if (params.filters) {
         try { filters = JSON.parse(params.filters) as Record<string, unknown>; }
         catch { return { content: [{ type: "text", text: "Error: filters must be valid JSON" }] }; }
@@ -1298,7 +1342,14 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       const trigger = await createTrigger({
         name: params.name,
         action: params.action,
+        actionParams: params.actionParams,
         filters,
+        filterQuery: params.filterQuery,
+        customGraphId: params.customGraphId,
+        graphAlert: params.graphAlert,
+        report: params.report,
+        templates: params.templates,
+        notificationCadence: params.notificationCadence,
         message: params.message,
         alertType: params.alertType,
       });
@@ -1308,19 +1359,80 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_update_trigger",
-    "Update a trigger (name, active state, message, alert type).",
+    [
+      "Update a trigger (automation). Anything left out is left alone.",
+      "",
+      "`actionParams` replaces the delivery configuration as a whole, so send every field it should have from now on. A credential the read hid comes back as [redacted]; send that back to keep the stored value. Changing a webhook's `url` means sending its header values in the same call.",
+      "The delivery channel and the kind of automation cannot be changed.",
+    ].join("\n"),
     {
       id: z.string().describe("The trigger ID"),
       name: z.string().optional().describe("New name"),
-      active: z.boolean().optional().describe("Enable or disable"),
-      message: z.string().optional().describe("New alert message"),
-      alertType: z.enum(["CRITICAL", "WARNING", "INFO"]).optional().describe("New alert severity"),
+      active: z.boolean().optional().describe("Resume or pause it"),
+      actionParams: actionParamsSchema.optional().describe("The delivery configuration this automation should have from now on"),
+      filters: z.string().optional().describe("Trace conditions as a JSON object string"),
+      filterQuery: z.string().nullable().optional().describe("Trace query in the syntax the traces view uses. null clears the saved query"),
+      graphAlert: graphAlertSchema.optional().describe("Only for an automation that is already a graph alert"),
+      report: reportSchema.optional().describe("Only for an automation that is already a scheduled report"),
+      templates: templatesSchema.optional(),
+      notificationCadence: notificationCadenceSchema.optional(),
+      message: z.string().nullable().optional().describe("New alert message. null removes the custom message"),
+      alertType: alertTypeSchema.nullable().optional().describe("New alert severity. null clears it"),
     },
     withToolLogging("platform_update_trigger", async (params) => {
       requireApiKey();
-      const { updateTrigger } = await import("./langwatch-api-triggers.js");
-      const trigger = await updateTrigger(params);
+      const { getTrigger, updateTrigger } = await import("./langwatch-api-triggers.js");
+      if (params.actionParams !== undefined) {
+        // The channel cannot change on update, so the SAVED action decides
+        // which shape the replacement configuration must fit.
+        const saved = await getTrigger(params.id);
+        const boundParams = validateActionParamsForAction({
+          action: saved.action,
+          actionParams: params.actionParams,
+        });
+        if (!boundParams.ok) {
+          return { content: [{ type: "text", text: `Error: ${boundParams.message}` }] };
+        }
+      }
+      let filters: Record<string, unknown> | undefined;
+      if (params.filters) {
+        try { filters = JSON.parse(params.filters) as Record<string, unknown>; }
+        catch { return { content: [{ type: "text", text: "Error: filters must be valid JSON" }] }; }
+      }
+      const trigger = await updateTrigger({ ...params, filters });
       return { content: [{ type: "text", text: `Trigger "${trigger.name}" updated (active: ${trigger.active}).` }] };
+    })
+  );
+
+  server.tool(
+    "platform_test_fire_trigger",
+    "Send a trigger's message to the destination it is configured with, to confirm it arrives. Nothing is recorded as a fire.",
+    {
+      id: z.string().describe("The trigger ID"),
+    },
+    withToolLogging("platform_test_fire_trigger", async (params) => {
+      requireApiKey();
+      const { testFireTrigger } = await import("./langwatch-api-triggers.js");
+      const result = await testFireTrigger(params.id);
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    })
+  );
+
+  server.tool(
+    "platform_list_trigger_fires",
+    "What an automation has done, newest first. Metadata only — no message content.",
+    {
+      id: z.string().describe("The trigger ID"),
+      limit: z.number().int().positive().optional().describe("How many fires to return"),
+    },
+    withToolLogging("platform_list_trigger_fires", async (params) => {
+      requireApiKey();
+      const { listTriggerFires } = await import("./langwatch-api-triggers.js");
+      const fires = await listTriggerFires({ id: params.id, limit: params.limit });
+      if (fires.length === 0) {
+        return { content: [{ type: "text", text: "This automation has not fired yet." }] };
+      }
+      return { content: [{ type: "text", text: JSON.stringify(fires, null, 2) }] };
     })
   );
 

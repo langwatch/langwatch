@@ -12,22 +12,32 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { toaster } from "~/components/ui/toaster";
+import { TriggerAction } from "~/generated/prisma/client";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import type { FilterField } from "~/server/filters/types";
 import { AutomationDrawer } from "../AutomationDrawer";
+import { INITIAL_DRAFT } from "../logic/draftReducer";
 import { useAutomationStore } from "../state/automationStore";
 
 // The saved row the edit-mode query resolves to. Mutable so a test can
 // emulate a tRPC background refetch handing back a *different* row after the
 // author has begun editing.
 let mockTriggerRow: Record<string, unknown> | null = null;
+// The row the server holds, as opposed to the copy the client is showing
+// (`mockTriggerRow`). Only the save-round-trip test seeds it; invalidating
+// `getTriggerById` is what moves the server's row into the client's copy,
+// exactly as react-query's refetch-on-invalidate does.
+let mockServerTriggerRow: Record<string, unknown> | null = null;
 // Hoisted so these mock fns are initialized before any vi.mock factory runs —
 // a transitive import (AddParticipants -> ~/utils/api) triggers the api mock
 // during the hoisted import graph, before plain `const` declarations execute.
 const {
   mockGetTriggerByIdQuery,
   mockCloseDrawer,
+  mockOpenDrawer,
   mockInvalidate,
+  mockGetTriggerByIdInvalidate,
   mockGraphsGetAllInvalidate,
   mockGraphsGetByIdInvalidate,
   mockUpsertMutate,
@@ -41,7 +51,14 @@ const {
     error: null as Error | null,
   })),
   mockCloseDrawer: vi.fn(),
+  mockOpenDrawer: vi.fn(),
   mockInvalidate: vi.fn(),
+  // Invalidating drops the client's copy, so the next read comes from the
+  // server. Without a seeded server row this is the no-op the other tests
+  // expect.
+  mockGetTriggerByIdInvalidate: vi.fn(() => {
+    if (mockServerTriggerRow) mockTriggerRow = mockServerTriggerRow;
+  }),
   mockGraphsGetAllInvalidate: vi.fn(),
   mockGraphsGetByIdInvalidate: vi.fn(),
   mockUpsertMutate: vi.fn(),
@@ -50,7 +67,7 @@ const {
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
     closeDrawer: mockCloseDrawer,
-    openDrawer: vi.fn(),
+    openDrawer: mockOpenDrawer,
     drawerOpen: vi.fn(() => false),
     canGoBack: false,
     goBack: vi.fn(),
@@ -68,10 +85,6 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 
 vi.mock("~/hooks/useFilterParams", () => ({
   useFilterParams: () => ({ filterParams: { filters: {} } }),
-}));
-
-vi.mock("~/hooks/useFeatureFlag", () => ({
-  useFeatureFlag: () => ({ enabled: false }),
 }));
 
 vi.mock("~/hooks/useRequiredSession", () => ({
@@ -131,13 +144,26 @@ vi.mock("~/utils/api", () => ({
       getDailyCap: { useQuery: () => ({ data: undefined }) },
     },
     graphs: {
-      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+      // A non-empty fixture — an empty list now renders the "no custom
+      // graphs yet" empty state instead of the picker (B6), which the
+      // `initialSource: "customGraph"` tests below need to be a picker.
+      getAll: {
+        useQuery: () => ({
+          data: [{ id: "graph-1", name: "Latency", trigger: null }],
+          isLoading: false,
+        }),
+      },
       getById: {
         useQuery: () => ({ data: null, isLoading: false }),
       },
     },
     dashboards: {
       getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+    },
+    // ADR-093 §5: the preview's gated-block decision reads whether the project
+    // has a Slack workspace connected.
+    slackIntegration: {
+      getStatus: { useQuery: () => ({ data: { connected: false } }) },
     },
     // The trace-subject query editor previews matches via tracesV2.list.
     tracesV2: {
@@ -146,7 +172,10 @@ vi.mock("~/utils/api", () => ({
       },
     },
     useUtils: () => ({
-      automation: { getTriggers: { invalidate: mockInvalidate } },
+      automation: {
+        getTriggers: { invalidate: mockInvalidate },
+        getTriggerById: { invalidate: mockGetTriggerByIdInvalidate },
+      },
       graphs: {
         getAll: { invalidate: mockGraphsGetAllInvalidate },
         getById: { invalidate: mockGraphsGetByIdInvalidate },
@@ -171,6 +200,13 @@ const renderDrawer = (
     initialFilters?: string;
   } = {},
 ) => render(<AutomationDrawer {...props} />, { wrapper: Wrapper });
+
+/** Walk a fresh create from the Watch step to the Review overview, where the
+ *  whole automation — and the Save button — lives (ADR-093 §4). */
+async function continueToReview(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("button", { name: "Continue" }));
+  await user.click(await screen.findByRole("button", { name: "Continue" }));
+}
 
 /** Locates a native select by one of its option labels — the Field labels
  *  aren't programmatically wired to the NativeSelect fields. */
@@ -231,6 +267,10 @@ describe("AutomationDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockTriggerRow = null;
+    mockServerTriggerRow = null;
+    // Several tests hand `mutate` a save-simulating implementation; drop it
+    // so the next test starts from an inert mutation.
+    mockUpsertMutate.mockReset();
     // Restore the default resolved-query shape — tests that emulate a
     // loading / errored edit query override this per-test.
     mockGetTriggerByIdQuery.mockImplementation(() => ({
@@ -246,9 +286,32 @@ describe("AutomationDrawer", () => {
   });
 
   describe("given a fresh create flow", () => {
-    describe("when the draft has no trigger or type yet", () => {
-      it("disables the create button", async () => {
+    describe("when the drawer opens", () => {
+      /** @scenario "The wizard opens by asking what to watch" */
+      it("asks what the automation should watch, with no type picker", async () => {
         renderDrawer();
+
+        expect(
+          await screen.findByText("What should this automation watch?"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /A trace filter/ }),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /A graph/ }),
+        ).toBeInTheDocument();
+        // The kind picker is gone: choosing what to watch IS the choice that
+        // used to be a type card (ADR-093 §1).
+        expect(screen.queryByText("Type")).not.toBeInTheDocument();
+        expect(screen.queryByText("Source")).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the draft reaches the review step with nothing configured", () => {
+      it("disables the create button", async () => {
+        const user = userEvent.setup();
+        renderDrawer();
+        await continueToReview(user);
 
         const createButton = await screen.findByRole("button", {
           name: "Create automation",
@@ -259,6 +322,7 @@ describe("AutomationDrawer", () => {
       it("explains why saving is blocked on hover", async () => {
         const user = userEvent.setup();
         renderDrawer();
+        await continueToReview(user);
 
         const createButton = await screen.findByRole("button", {
           name: "Create automation",
@@ -275,11 +339,180 @@ describe("AutomationDrawer", () => {
         });
       });
     });
+
+    describe("when the author fills in every step for a trace filter", () => {
+      /** @scenario "Creating an automation that watches a trace filter" */
+      it("shows the whole automation on the review step and saves one that acts on matching traces", async () => {
+        const user = userEvent.setup();
+        renderDrawer();
+
+        // Watch: the conditions themselves are the subject.
+        await user.click(await screen.findByRole("button", { name: "Code" }));
+        fireEvent.change(await screen.findByPlaceholderText(/status:error/i), {
+          target: { value: "status:error" },
+        });
+        await user.click(screen.getByRole("button", { name: "Continue" }));
+
+        // Delivery: one channel and its configuration.
+        await user.click(await screen.findByText("Email"));
+        useAutomationStore.getState().dispatch({
+          type: "SET_SLICE",
+          action: TriggerAction.SEND_EMAIL,
+          slice: {
+            ...useAutomationStore.getState().draft.slices[
+              TriggerAction.SEND_EMAIL
+            ],
+            members: ["ops@acme.com"],
+          },
+        });
+        useAutomationStore.getState().setSection(null);
+        await user.click(
+          await screen.findByRole("button", { name: "Continue" }),
+        );
+
+        // Review: what it watches, the rule, the delivery and the name, all on
+        // one screen.
+        fireEvent.change(screen.getByPlaceholderText("Flag failing traces"), {
+          target: { value: "Flag failures" },
+        });
+        expect(screen.getByText("Watches")).toBeInTheDocument();
+        expect(
+          screen.getAllByText("Trace filter · status:error").length,
+        ).toBeGreaterThan(0);
+        expect(
+          screen.getAllByText(/email to 1 recipient/).length,
+        ).toBeGreaterThan(0);
+
+        const createButton = screen.getByRole("button", {
+          name: "Create automation",
+        });
+        await waitFor(() => expect(createButton).toBeEnabled());
+        await user.click(createButton);
+
+        expect(mockUpsertMutate).toHaveBeenCalledTimes(1);
+        expect(mockUpsertMutate.mock.calls[0]?.[0]).toMatchObject({
+          name: "Flag failures",
+          action: TriggerAction.SEND_EMAIL,
+          filterQuery: "status:error",
+          customGraphId: null,
+          graphAlert: undefined,
+        });
+      });
+    });
+
+    describe("when the author chooses to watch a graph", () => {
+      /** @scenario "Creating an automation that watches a graph" */
+      it("saves one that fires when the metric crosses the threshold", async () => {
+        const user = userEvent.setup();
+        renderDrawer();
+
+        await user.click(screen.getByRole("button", { name: /A graph/ }));
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.source).toBe(
+            "customGraph",
+          );
+        });
+        // The graph, the series and the threshold rule all live in this one
+        // step — what it watches and when it fires.
+        useAutomationStore.getState().dispatch({
+          type: "SET_CUSTOM_GRAPH_ID",
+          value: "graph-1",
+        });
+        useAutomationStore.getState().dispatch({
+          type: "SET_GRAPH_ALERT",
+          value: {
+            seriesName: "0/latency/p95",
+            operator: "gt",
+            threshold: 250,
+            timePeriod: 60,
+          },
+        });
+        useAutomationStore.getState().dispatch({
+          type: "SET_ACTION",
+          value: TriggerAction.SEND_EMAIL,
+        });
+        useAutomationStore.getState().dispatch({
+          type: "SET_SLICE",
+          action: TriggerAction.SEND_EMAIL,
+          slice: {
+            ...useAutomationStore.getState().draft.slices[
+              TriggerAction.SEND_EMAIL
+            ],
+            members: ["ops@acme.com"],
+          },
+        });
+        useAutomationStore.getState().dispatch({
+          type: "SET_NAME",
+          value: "Latency watch",
+        });
+        useAutomationStore.getState().setStep("review");
+
+        const createButton = await screen.findByRole("button", {
+          name: "Create automation",
+        });
+        await waitFor(() => expect(createButton).toBeEnabled());
+        await user.click(createButton);
+
+        expect(mockUpsertMutate.mock.calls[0]?.[0]).toMatchObject({
+          name: "Latency watch",
+          customGraphId: "graph-1",
+          graphAlert: {
+            seriesName: "0/latency/p95",
+            operator: "gt",
+            threshold: 250,
+            timePeriod: 60,
+          },
+        });
+      });
+    });
+
+    describe("when the author closes the wizard part-way through", () => {
+      /** @scenario "Abandoning a create persists nothing" */
+      it("creates no automation", async () => {
+        const user = userEvent.setup();
+        renderDrawer();
+
+        await user.click(await screen.findByRole("button", { name: "Code" }));
+        fireEvent.change(await screen.findByPlaceholderText(/status:error/i), {
+          target: { value: "status:error" },
+        });
+        await user.click(screen.getByRole("button", { name: "Continue" }));
+        await user.click(await screen.findByRole("button", { name: /close/i }));
+        await user.click(
+          await screen.findByRole("button", { name: "Discard" }),
+        );
+
+        expect(mockUpsertMutate).not.toHaveBeenCalled();
+        expect(mockCloseDrawer).toHaveBeenCalled();
+      });
+    });
+
+    describe("when the drawer is reopened with a different create prefill", () => {
+      it("applies the new prefill instead of skipping on the previous opening's latch", async () => {
+        const opened = renderDrawer({ prefilledGraphId: "graph-1" });
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.customGraphId).toBe(
+            "graph-1",
+          );
+        });
+
+        // Same drawer type reopened with new params: no remount, so only the
+        // identity change can re-arm the prefill effects.
+        opened.rerender(<AutomationDrawer prefilledGraphId="graph-2" />);
+
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.customGraphId).toBe(
+            "graph-2",
+          );
+        });
+      });
+    });
   });
 
   describe("given an existing automation in edit mode", () => {
     describe("when the saved row first resolves", () => {
-      it("hydrates the form from the saved row", async () => {
+      /** @scenario "Editing an automation opens the review overview" */
+      it("hydrates the form from the saved row and opens on the review overview", async () => {
         mockTriggerRow = savedRow();
         renderDrawer({ automationId: "trigger-1" });
 
@@ -289,6 +522,185 @@ describe("AutomationDrawer", () => {
           );
         });
         expect(screen.getByText("Edit automation")).toBeInTheDocument();
+        // Editing lands on the overview, never on the first step — and the
+        // drawer itself puts it there, without anyone setting the step.
+        expect(useAutomationStore.getState().step).toBe("review");
+        expect(await screen.findByText("Watches")).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "Edit delivery" }),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "Save changes" }),
+        ).toBeInTheDocument();
+      });
+    });
+
+    describe("when the author starts a new automation from the locked watch step", () => {
+      it("opens a pristine create instead of carrying the edited draft into it", async () => {
+        mockTriggerRow = savedRow({
+          filterQuery: "status:error",
+          filters: JSON.stringify({}),
+        });
+        const opened = renderDrawer({ automationId: "trigger-1" });
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.name).toBe(
+            "Saved automation",
+          );
+        });
+
+        // "New automation" opens the same drawer type, which replaces the URL
+        // params in place rather than remounting — so the component instance,
+        // the store and every hydration latch survive the transition. Re-render
+        // without the id to reproduce exactly that.
+        mockTriggerRow = null;
+        opened.rerender(<AutomationDrawer />);
+
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft).toEqual(INITIAL_DRAFT);
+        });
+        const draft = useAutomationStore.getState().draft;
+        // The specific leaks that produced a duplicate row on Save.
+        expect(draft.name).toBe("");
+        expect(draft.filterQuery).toBeNull();
+        expect(draft.action).toBeNull();
+        // And the create starts where a create starts.
+        expect(useAutomationStore.getState().step).toBe("watch");
+        expect(
+          await screen.findByText("What should this automation watch?"),
+        ).toBeInTheDocument();
+        expect(screen.getByText("Add automation")).toBeInTheDocument();
+      });
+
+      it("re-arms the close guard, so work done in the new one is not dropped silently", async () => {
+        const user = userEvent.setup();
+        mockTriggerRow = savedRow();
+        const opened = renderDrawer({ automationId: "trigger-1" });
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.name).toBe(
+            "Saved automation",
+          );
+        });
+
+        mockTriggerRow = null;
+        opened.rerender(<AutomationDrawer />);
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft).toEqual(INITIAL_DRAFT);
+        });
+
+        // The baseline the guard diffs against is captured on mount, and this
+        // transition is not a mount. Left unarmed, the new automation reads as
+        // clean however much of it the author fills in, and closing throws it
+        // away without a word.
+        fireEvent.change(
+          await screen.findByPlaceholderText("Flag failing traces"),
+          { target: { value: "A new automation" } },
+        );
+        await user.click(await screen.findByRole("button", { name: /close/i }));
+
+        expect(
+          await screen.findByText("Discard unsaved changes?"),
+        ).toBeInTheDocument();
+        expect(mockCloseDrawer).not.toHaveBeenCalled();
+
+        // And discarding still closes it, so the guard is a prompt, not a trap.
+        await user.click(screen.getByRole("button", { name: "Discard" }));
+        expect(mockCloseDrawer).toHaveBeenCalled();
+      });
+
+      it("hydrates the next automation when the drawer moves straight from one to another", async () => {
+        mockTriggerRow = savedRow({ name: "First automation" });
+        const opened = renderDrawer({ automationId: "trigger-1" });
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.name).toBe(
+            "First automation",
+          );
+        });
+
+        // The row for the next one is already cached, so hydration runs in the
+        // same commit as the reset. Whichever effect is declared first wins:
+        // with hydration first it sees a draft still holding the previous
+        // automation, takes its "already editing" branch, latches, and never
+        // runs again — leaving the second automation blank on Review.
+        mockTriggerRow = savedRow({
+          id: "trigger-2",
+          name: "Second automation",
+        });
+        opened.rerender(<AutomationDrawer automationId="trigger-2" />);
+
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.name).toBe(
+            "Second automation",
+          );
+        });
+        expect(useAutomationStore.getState().step).toBe("review");
+      });
+    });
+
+    describe("when the author edits one section and finishes", () => {
+      /** @scenario "Editing one section returns to the overview" */
+      it("comes back to the review overview with the other sections unchanged", async () => {
+        const user = userEvent.setup();
+        mockTriggerRow = savedRow();
+        renderDrawer({ automationId: "trigger-1" });
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.name).toBe(
+            "Saved automation",
+          );
+        });
+        const filtersBefore = useAutomationStore.getState().draft.filters;
+
+        // Editing is hub-and-spoke: this enters the delivery step alone.
+        await user.click(
+          await screen.findByRole("button", { name: "Edit delivery" }),
+        );
+        useAutomationStore.getState().dispatch({
+          type: "SET_SLICE",
+          action: TriggerAction.SEND_EMAIL,
+          slice: {
+            ...useAutomationStore.getState().draft.slices[
+              TriggerAction.SEND_EMAIL
+            ],
+            members: ["ops@acme.com"],
+          },
+        });
+        useAutomationStore.getState().setSection(null);
+        await user.click(await screen.findByRole("button", { name: "Done" }));
+
+        expect(await screen.findByText("Watches")).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "Save changes" }),
+        ).toBeInTheDocument();
+        expect(useAutomationStore.getState().draft.filters).toEqual(
+          filtersBefore,
+        );
+        expect(useAutomationStore.getState().draft.name).toBe(
+          "Saved automation",
+        );
+      });
+    });
+
+    describe("when the author closes the wizard without saving", () => {
+      /** @scenario "Abandoning an edit persists nothing" */
+      it("leaves the stored automation untouched", async () => {
+        const user = userEvent.setup();
+        mockTriggerRow = savedRow();
+        renderDrawer({ automationId: "trigger-1" });
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.name).toBe(
+            "Saved automation",
+          );
+        });
+
+        fireEvent.change(screen.getByDisplayValue("Saved automation"), {
+          target: { value: "Renamed but never saved" },
+        });
+        await user.click(await screen.findByRole("button", { name: /close/i }));
+        await user.click(
+          await screen.findByRole("button", { name: "Discard" }),
+        );
+
+        expect(mockUpsertMutate).not.toHaveBeenCalled();
+        expect(mockCloseDrawer).toHaveBeenCalled();
       });
     });
 
@@ -425,9 +837,9 @@ describe("AutomationDrawer", () => {
     });
   });
 
-  describe("given the drawer opens as a new alert from the page", () => {
+  describe("given the drawer opens to watch a graph from the page", () => {
     describe("when it mounts with initialSource customGraph", () => {
-      it("opens a fresh alert draft with severity defaulted to warning", async () => {
+      it("opens a fresh graph-watching draft with severity defaulted to warning", async () => {
         renderDrawer({ initialSource: "customGraph" });
 
         await waitFor(() => {
@@ -437,7 +849,9 @@ describe("AutomationDrawer", () => {
         });
         // No graph is prefilled or locked — the user picks it.
         expect(useAutomationStore.getState().draft.customGraphId).toBeNull();
-        expect(screen.getByText("New alert")).toBeInTheDocument();
+        // One noun for both subjects: nothing calls this an alert (ADR-093 §1).
+        expect(screen.getByText("Add automation")).toBeInTheDocument();
+        expect(screen.queryByText("New alert")).not.toBeInTheDocument();
       });
 
       it("keeps the graph select enabled so the user picks the graph", async () => {
@@ -458,14 +872,15 @@ describe("AutomationDrawer", () => {
   });
 
   describe("given a use-case card prefill", () => {
-    describe("when a stale param seeds the hidden webhook action", () => {
-      it("ignores the action without exposing webhook authoring copy", async () => {
+    describe("when a param seeds the webhook action", () => {
+      it("seeds the draft with it, since every project delivers on webhooks", async () => {
         renderDrawer({ initialAction: "SEND_WEBHOOK" });
 
         await waitFor(() => {
-          expect(useAutomationStore.getState().draft.action).toBeNull();
+          expect(useAutomationStore.getState().draft.action).toBe(
+            "SEND_WEBHOOK",
+          );
         });
-        expect(screen.queryByText(/webhook/i)).not.toBeInTheDocument();
       });
     });
 
@@ -524,9 +939,10 @@ describe("AutomationDrawer", () => {
     });
   });
 
-  describe("given severity is an alert-only facet", () => {
-    describe("when the draft is an alert", () => {
-      it("shows the severity facet", async () => {
+  describe("given severity is offered only to graph-watching automations", () => {
+    describe("when the draft watches a graph", () => {
+      it("shows the severity facet on the review overview", async () => {
+        const user = userEvent.setup();
         renderDrawer({ initialSource: "customGraph" });
 
         await waitFor(() => {
@@ -534,16 +950,19 @@ describe("AutomationDrawer", () => {
             "customGraph",
           );
         });
+        await continueToReview(user);
+
         expect(screen.getByText(/Severity/)).toBeInTheDocument();
       });
     });
 
-    describe("when the draft is a trace automation", () => {
+    describe("when the draft watches a trace filter", () => {
       it("does not show a severity facet", async () => {
+        const user = userEvent.setup();
         renderDrawer();
+        await continueToReview(user);
 
-        // Automations don't carry a severity (ADR-043) — the facet is gone.
-        await screen.findByText("Type");
+        // A trace-watching automation carries no severity (ADR-043).
         expect(screen.queryByText(/Severity/)).not.toBeInTheDocument();
       });
     });
@@ -590,7 +1009,7 @@ describe("AutomationDrawer", () => {
         expect(useAutomationStore.getState().draft.filterQuery).toBe(
           "status:error",
         );
-        expect(screen.getByText("Edit schedule")).toBeInTheDocument();
+        expect(screen.getByText("Edit report")).toBeInTheDocument();
       });
 
       it("hydrates a graph-source report without stranding a graph alert", async () => {
@@ -621,7 +1040,7 @@ describe("AutomationDrawer", () => {
         renderDrawer({ automationId: "trigger-1" });
 
         const saveButton = await screen.findByRole("button", {
-          name: "Save schedule",
+          name: "Save report",
         });
         await waitFor(() => expect(saveButton).toBeEnabled());
         await user.click(saveButton);
@@ -654,7 +1073,7 @@ describe("AutomationDrawer", () => {
         renderDrawer({ automationId: "trigger-1" });
 
         const saveButton = await screen.findByRole("button", {
-          name: "Save schedule",
+          name: "Save report",
         });
         await waitFor(() => expect(saveButton).toBeEnabled());
         await user.click(saveButton);
@@ -685,7 +1104,7 @@ describe("AutomationDrawer", () => {
           );
         });
         expect(
-          await screen.findByRole("button", { name: "Save schedule" }),
+          await screen.findByRole("button", { name: "Save report" }),
         ).toBeDisabled();
         // And says why, in the cadence field itself.
         expect(
@@ -695,9 +1114,10 @@ describe("AutomationDrawer", () => {
     });
   });
 
-  describe("given a trace query is authored before the type is picked", () => {
-    describe("when the type switches to report", () => {
-      it("keeps the query as the report's trace scope", async () => {
+  describe("given the author moves back to an earlier step", () => {
+    describe("when the watch step is reopened from the rail", () => {
+      /** @scenario "The wizard keeps completed steps in view" */
+      it("summarises the completed step, reopens it, and keeps the later answers", async () => {
         const user = userEvent.setup();
         renderDrawer();
 
@@ -710,15 +1130,121 @@ describe("AutomationDrawer", () => {
             "status:error",
           );
         });
+        await user.click(screen.getByRole("button", { name: "Continue" }));
 
-        await user.click(screen.getByRole("button", { name: /^Schedule/ }));
+        // The step behind the author collapses to a one-line summary that
+        // stays on screen while they work on the next one.
+        expect(
+          await screen.findByRole("button", {
+            name: /Watch.*Trace filter · status:error/,
+          }),
+        ).toBeInTheDocument();
 
-        await waitFor(() => {
-          expect(useAutomationStore.getState().draft.source).toBe("report");
-        });
+        await user.click(screen.getByRole("button", { name: "Continue" }));
+        const nameInput = screen.getByPlaceholderText("Flag failing traces");
+        fireEvent.change(nameInput, { target: { value: "Flag failures" } });
+
+        // The rail carries each reached step, so an earlier one is one click
+        // away — and returning to it loses nothing answered after it.
+        await user.click(screen.getByRole("button", { name: /^Watch/ }));
+
+        expect(
+          await screen.findByText("What should this automation watch?"),
+        ).toBeInTheDocument();
+        expect(useAutomationStore.getState().draft.name).toBe("Flag failures");
         expect(useAutomationStore.getState().draft.filterQuery).toBe(
           "status:error",
         );
+      });
+    });
+  });
+
+  describe("given a saved automation is changed and saved", () => {
+    describe("when the author opens that same automation again", () => {
+      /** @scenario "Editing an automation shows the values that were last saved" */
+      it("shows the value that was saved, not the one it replaced", async () => {
+        const user = userEvent.setup();
+        mockServerTriggerRow = savedReportRow();
+        mockTriggerRow = mockServerTriggerRow;
+        mockUpsertMutate.mockImplementation(
+          (
+            input: { name: string },
+            opts?: { onSuccess?: (saved: { id: string }) => void },
+          ) => {
+            mockServerTriggerRow = savedReportRow({ name: input.name });
+            opts?.onSuccess?.({ id: "trigger-1" });
+          },
+        );
+
+        const firstOpen = renderDrawer({ automationId: "trigger-1" });
+        const nameInput = await screen.findByDisplayValue(
+          "Weekly error digest",
+        );
+        fireEvent.change(nameInput, {
+          target: { value: "Monday quality digest" },
+        });
+        const saveButton = screen.getByRole("button", {
+          name: "Save report",
+        });
+        await waitFor(() => expect(saveButton).toBeEnabled());
+        await user.click(saveButton);
+
+        // Reopening is a fresh mount, and the store wipes itself on unmount —
+        // so the only thing that can fill the name is the row the drawer
+        // reads back.
+        firstOpen.unmount();
+        renderDrawer({ automationId: "trigger-1" });
+
+        expect(
+          await screen.findByDisplayValue("Monday quality digest"),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByDisplayValue("Weekly error digest"),
+        ).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a fully configured new automation", () => {
+    describe("when the author creates it", () => {
+      /** @scenario "The creation toast links to the created automation" */
+      it("offers to open the automation that was created", async () => {
+        const user = userEvent.setup();
+        mockUpsertMutate.mockImplementation(
+          (
+            _input: unknown,
+            opts?: { onSuccess?: (saved: { id: string }) => void },
+          ) => opts?.onSuccess?.({ id: "trigger-created" }),
+        );
+        useAutomationStore.getState().hydrate({
+          ...INITIAL_DRAFT,
+          name: "Flag failing traces",
+          action: TriggerAction.SEND_EMAIL,
+          filterQuery: "status:error",
+          slices: {
+            ...INITIAL_DRAFT.slices,
+            [TriggerAction.SEND_EMAIL]: {
+              ...INITIAL_DRAFT.slices[TriggerAction.SEND_EMAIL],
+              members: ["ops@acme.com"],
+            },
+          },
+        });
+        renderDrawer();
+        await continueToReview(user);
+
+        const createButton = await screen.findByRole("button", {
+          name: "Create automation",
+        });
+        await waitFor(() => expect(createButton).toBeEnabled());
+        await user.click(createButton);
+
+        const created = vi.mocked(toaster.create).mock.calls[0]?.[0];
+        expect(created?.action?.label).toBe("View automation");
+
+        created?.action?.onClick?.();
+        expect(mockOpenDrawer).toHaveBeenCalledWith("viewAutomation", {
+          automationId: "trigger-created",
+        });
       });
     });
   });
