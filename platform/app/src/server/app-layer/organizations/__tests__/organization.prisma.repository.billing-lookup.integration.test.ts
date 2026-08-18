@@ -24,6 +24,12 @@ describe("PrismaOrganizationRepository billing lookup", () => {
   let usageBilled: Organization;
   let tiered: Organization;
   const namespace = `billing-lookup-${nanoid(8)}`;
+  /**
+   * Cleanup reads this, not the fixtures. A create that throws leaves its
+   * fixture undefined, and a teardown that dereferences one fails with an
+   * error of its own in front of the one that actually broke the run.
+   */
+  const createdIds: string[] = [];
 
   beforeAll(async () => {
     repository = new PrismaOrganizationRepository(prisma);
@@ -35,6 +41,7 @@ describe("PrismaOrganizationRepository billing lookup", () => {
         pricingModel: PricingModel.SEAT_EVENT,
       },
     });
+    createdIds.push(usageBilled.id);
 
     tiered = await prisma.organization.create({
       data: {
@@ -43,11 +50,13 @@ describe("PrismaOrganizationRepository billing lookup", () => {
         pricingModel: PricingModel.TIERED,
       },
     });
+    createdIds.push(tiered.id);
   });
 
   afterAll(async () => {
+    if (createdIds.length === 0) return;
     await prisma.organization.deleteMany({
-      where: { id: { in: [usageBilled.id, tiered.id] } },
+      where: { id: { in: createdIds } },
     });
   });
 
