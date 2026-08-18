@@ -47,6 +47,7 @@ type CostPlan = {
   status?: number;
   state?: string;
   rows?: (string | null)[][];
+  columns?: string[];
 };
 
 let server: http.Server;
@@ -125,6 +126,20 @@ beforeEach(async () => {
         send({
           statement_id: "fixture",
           status: { state: costPlan?.state ?? "SUCCEEDED" },
+          manifest: {
+            schema: {
+              columns: (
+                costPlan?.columns ?? [
+                  "statement_id",
+                  "execution_duration_ms",
+                  "hour_total_ms",
+                  "hour_billable_usd",
+                  "currency_code",
+                  "sku_name",
+                ]
+              ).map((name) => ({ name })),
+            },
+          },
           result: { data_array: costPlan?.rows ?? [] },
         });
       });
@@ -223,6 +238,98 @@ describe("a source that names a warehouse", () => {
       ]),
     );
     expect(String(body.statement)).not.toContain(WAREHOUSE_ID);
+  });
+
+  /** @scenario "A billing outage never rewrites a cost that was already worked out" */
+  it("does not price a re-read question it could not get a cost for", async () => {
+    // The message is older than the watermark, so this run is reading it ONLY
+    // to attach cost — it was already recorded, and may already carry a cost
+    // from a run when billing was answering.
+    messageCreatedMs = Date.now() - 60 * 60 * 1000;
+    costPlan = { status: 403 };
+
+    const puller = new DatabricksGeniePuller();
+    const result = await puller.runOnce(
+      {
+        cursor: JSON.stringify({
+          sinceMs: Date.now() - 10 * 60 * 1000,
+          spaceId: null,
+          conversationId: null,
+          sweepHadGap: false,
+          spaceSetFingerprint: null,
+          sweepStartedAtMs: null,
+          sweepOldestPendingMs: null,
+        }),
+        credentials: { token: "dapi-fixture" },
+      },
+      {
+        adapter: DATABRICKS_GENIE_ADAPTER_ID,
+        workspaceUrl: baseUrl,
+        spaceIds: [],
+        schedule: "*/15 * * * *",
+        warehouseId: WAREHOUSE_ID,
+      },
+    );
+
+    // Still recorded for visibility.
+    expect(result.events).toHaveLength(1);
+    // But carrying NO usage hint, so the ledger is not asked to write anything.
+    // Emitting a zero here would overwrite a correct cost with nothing, and a
+    // billing outage would quietly wipe the spend it could not confirm.
+    expect(result.events[0]?.extra?.[PULLED_USAGE_HINT_KEY]).toBeUndefined();
+  });
+
+  /** @scenario "Billing answered in a shape we did not ask for is not priced from" */
+  it("refuses to price when the answer's columns are not the ones asked for", async () => {
+    // The duration and the hour's total swapped. Every value is still a string
+    // and every one still parses, so nothing downstream can notice — but the
+    // question now claims 3600000/900000 of a $6 hour, which is $24: four times
+    // an hour that was never billed at more than six.
+    costPlan = {
+      columns: [
+        "statement_id",
+        "hour_total_ms",
+        "execution_duration_ms",
+        "hour_billable_usd",
+        "currency_code",
+        "sku_name",
+      ],
+      rows: [
+        [
+          STATEMENT_ID,
+          "3600000",
+          "900000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+      ],
+    };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+
+    expect(result.events).toHaveLength(1);
+    expect(hintOf(result).costUsd).toBe("0");
+  });
+
+  /** @scenario "A question's hour is priced whole or not at all" */
+  it("asks about whole hours, so an hour's bill is never split off its queries", async () => {
+    costPlan = { rows: [] };
+
+    await pull({ warehouseId: WAREHOUSE_ID });
+
+    const params = statementBodies[0]!.parameters as {
+      name: string;
+      value: string;
+    }[];
+    const from = Date.parse(params.find((p) => p.name === "from_ts")!.value);
+    const to = Date.parse(params.find((p) => p.name === "to_ts")!.value);
+
+    // The warehouse is billed by the hour and the queries are bucketed by the
+    // hour. A window starting mid-hour drops that hour's bill while keeping its
+    // queries, so every question in it silently prices at nothing.
+    expect(from % (60 * 60 * 1000)).toBe(0);
+    expect(to % (60 * 60 * 1000)).toBe(0);
   });
 
   /** @scenario "A question whose SQL has not reached the billing tables yet" */

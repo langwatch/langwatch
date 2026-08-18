@@ -158,6 +158,35 @@ Feature: Databricks AI/BI Genie puller
       And the message is still recorded for visibility
 
     @integration
+    Scenario: A billing outage never rewrites a cost that was already worked out
+      Given a question whose compute has already been priced
+      When a later run reads it again and the workspace refuses the billing query
+      Then the question keeps the cost it was already given
+      # The re-read exists only to learn a cost. A run that learned none has
+      # nothing to say about this question, and saying "zero" would erase the
+      # answer an earlier run got right — a few minutes of billing trouble would
+      # quietly wipe the spend it could not confirm.
+
+    @integration
+    Scenario: Billing answered in a shape we did not ask for is not priced from
+      Given the workspace answers the billing question with different columns
+      When the puller reads the answer
+      Then no cost is recorded from it
+      And the questions are still recorded
+      # Every value in that answer is text, so the wrong columns parse just as
+      # cleanly as the right ones and price each question off whichever number
+      # happened to land in that position.
+
+    @integration
+    Scenario: A question's hour is priced whole or not at all
+      Given a run whose window begins part-way through an hour
+      When the puller prices the questions asked in that hour
+      Then that hour's compute is either counted in full or not counted
+      # The bill is published per hour and the queries are recorded per hour. A
+      # window cutting an hour in half keeps its queries and loses its bill, so
+      # every question in it prices at nothing while looking properly priced.
+
+    @integration
     Scenario: A billing outage does not discard the questions
       Given the workspace refuses the billing query
       When the puller runs

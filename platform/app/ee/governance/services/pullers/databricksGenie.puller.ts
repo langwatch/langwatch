@@ -268,12 +268,12 @@ priced AS (
   WHERE pick = 1
 )
 SELECT
-  w.statement_id,
-  CAST(w.execution_duration_ms AS STRING),
-  CAST(t.total_ms AS STRING),
-  CAST(pr.billable_usd AS STRING),
-  pr.currency_code,
-  pr.sku_name
+  w.statement_id                          AS statement_id,
+  CAST(w.execution_duration_ms AS STRING) AS execution_duration_ms,
+  CAST(t.total_ms AS STRING)              AS hour_total_ms,
+  CAST(pr.billable_usd AS STRING)         AS hour_billable_usd,
+  pr.currency_code                        AS currency_code,
+  pr.sku_name                             AS sku_name
 FROM windowed w
 JOIN hour_total t ON t.usage_hour = w.usage_hour
 JOIN priced pr ON pr.usage_hour = w.usage_hour
@@ -293,12 +293,39 @@ const warehouseCostResponseSchema = z.object({
     state: z.string(),
     error: z.object({ message: z.string() }).partial().optional(),
   }),
+  manifest: z
+    .object({
+      schema: z
+        .object({
+          columns: z.array(z.object({ name: z.string() })).optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   result: z
     .object({
       data_array: z.array(z.array(z.string().nullable())).optional(),
     })
     .optional(),
 });
+
+/**
+ * The columns `WAREHOUSE_COST_STATEMENT` selects, in order.
+ *
+ * The API answers in `JSON_ARRAY` form — rows are positional, with the names
+ * only in the manifest — so reading a row means trusting that its third value
+ * is still the hour's total. Every value here is a string, which means a
+ * reordered SELECT would not fail any parse: it would quietly price questions
+ * off the wrong column. Checking the manifest turns that into a refusal.
+ */
+const WAREHOUSE_COST_COLUMNS = [
+  "statement_id",
+  "execution_duration_ms",
+  "hour_total_ms",
+  "hour_billable_usd",
+  "currency_code",
+  "sku_name",
+] as const;
 
 /**
  * Anything below this is epoch SECONDS; anything above it is epoch
@@ -320,6 +347,16 @@ const EPOCH_SECONDS_CEILING = 1e11;
 /** Databricks' integer timestamp, in whichever unit it arrived, as epoch ms. */
 function toEpochMs(value: number): number {
   return value < EPOCH_SECONDS_CEILING ? value * 1000 : value;
+}
+
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
+function startOfHourMs(ms: number): number {
+  return Math.floor(ms / ONE_HOUR_MS) * ONE_HOUR_MS;
+}
+
+function endOfHourMs(ms: number): number {
+  return Math.ceil(ms / ONE_HOUR_MS) * ONE_HOUR_MS;
 }
 
 /**
@@ -1071,6 +1108,8 @@ export class DatabricksGeniePuller
       events: withWarehouseCost({
         events: sweep.events,
         costByStatementId,
+        costEnabled: config.warehouseId !== undefined,
+        watermarkMs: cursor.sinceMs,
       }),
       cursor: encode(nextCursor({ previous: cursor, sweep, sweepStartedAtMs })),
       errorCount: 0,
@@ -1933,14 +1972,20 @@ export class DatabricksGeniePuller
           // constant either way and this keeps it one.
           parameters: [
             { name: "warehouse_id", value: warehouseId, type: "STRING" },
+            // Whole hours, both ends. The warehouse is billed per hour and the
+            // statements are bucketed per hour, but the two are filtered
+            // separately: a window starting at 10:37 keeps hour 10's queries
+            // and drops hour 10's bill, so every question in that hour prices
+            // at nothing — and on a re-read that nothing would overwrite a
+            // cost an earlier run had already worked out correctly.
             {
               name: "from_ts",
-              value: new Date(fromMs).toISOString(),
+              value: new Date(startOfHourMs(fromMs)).toISOString(),
               type: "TIMESTAMP",
             },
             {
               name: "to_ts",
-              value: new Date(toMs).toISOString(),
+              value: new Date(endOfHourMs(toMs)).toISOString(),
               type: "TIMESTAMP",
             },
             {
@@ -1962,6 +2007,20 @@ export class DatabricksGeniePuller
             error: statement.status.error?.message,
           },
           "databricks warehouse cost query did not succeed; recording the questions without cost",
+        );
+        return null;
+      }
+
+      const served = statement.manifest?.schema?.columns?.map((c) => c.name);
+      if (served && !WAREHOUSE_COST_COLUMNS.every((n, i) => served[i] === n)) {
+        logger.error(
+          {
+            adapter: this.id,
+            warehouseId,
+            expected: WAREHOUSE_COST_COLUMNS,
+            served,
+          },
+          "databricks warehouse cost query answered with unexpected columns; refusing to price from it",
         );
         return null;
       }
@@ -2103,49 +2162,72 @@ export class DatabricksGeniePuller
  * query for the whole run and a message does not know what its statement cost
  * until that query has come back.
  *
- * A message keeps its zero when its statement is not in the result — it ran no
- * SQL, or its compute has not been published yet. The second case is why the
- * window reaches back past the watermark: the same message is read again on a
- * later run, and because the restatement key is the message's own coordinates
- * and excludes cost, the priced version REPLACES the zero rather than adding a
- * second record for the same question.
+ * Because the restatement key is the message's own coordinates and excludes
+ * cost, re-emitting a message REPLACES its ledger row rather than adding a
+ * second one. That is what lets a late-arriving cost correct an earlier zero —
+ * and it is also why a re-read must never carry a cost it does not know.
+ *
+ * So the three cases are kept apart:
+ *
+ *   priced          → carry the cost.
+ *   new, unpriced   → carry zero, as a question with no known cost always has.
+ *   re-read, unpriced → carry NO usage hint at all, so the event is audit-only
+ *                     and the ledger is not asked to write anything.
+ *
+ * That last case is the whole reason this function knows about the watermark.
+ * A re-read happens only because the source is trying to learn a cost; if it
+ * did not learn one — billing was refused, the hour is not published yet — then
+ * emitting zero would overwrite a figure an earlier run had already worked out
+ * correctly, and a few minutes of billing trouble would quietly wipe the spend
+ * it could not confirm.
  */
 function withWarehouseCost({
   events,
   costByStatementId,
+  costEnabled,
+  watermarkMs,
 }: {
   events: NormalizedPullEvent[];
   costByStatementId: Map<string, string> | null;
+  costEnabled: boolean;
+  /** The watermark this run started from: anything at or below it is a re-read. */
+  watermarkMs: number;
 }): NormalizedPullEvent[] {
-  if (costByStatementId === null || costByStatementId.size === 0) return events;
+  if (!costEnabled) return events;
 
   return events.map((event) => {
     const extra = event.extra;
     if (!extra) return event;
 
-    const statementId = extra.statementId;
-    if (typeof statementId !== "string" || statementId === "") return event;
-
-    const costUsd = costByStatementId.get(statementId);
-    if (costUsd === undefined) return event;
-
     const hint = extra[PULLED_USAGE_HINT_KEY];
     if (typeof hint !== "object" || hint === null) return event;
 
-    return {
-      ...event,
-      // The audit row's own float field, which ADR-088 keeps for continuity and
-      // does not price from. The ledger reads `costUsd` below, as a string, so
-      // the number a customer reconciles never passes through a float.
-      cost_usd: Number(costUsd),
-      extra: {
-        ...extra,
-        [PULLED_USAGE_HINT_KEY]: {
-          ...hint,
-          costUsd,
+    const statementId = extra.statementId;
+    const costUsd =
+      typeof statementId === "string" && statementId !== ""
+        ? costByStatementId?.get(statementId)
+        : undefined;
+
+    if (costUsd !== undefined) {
+      return {
+        ...event,
+        // The audit row's own float field, which ADR-088 keeps for continuity
+        // and does not price from. The ledger reads `costUsd` below, as a
+        // string, so the number a customer reconciles never sees a float.
+        cost_usd: Number(costUsd),
+        extra: {
+          ...extra,
+          [PULLED_USAGE_HINT_KEY]: { ...hint, costUsd },
         },
-      },
-    };
+      };
+    }
+
+    const askedAtMs = Date.parse(event.event_timestamp);
+    const isReread = Number.isFinite(askedAtMs) && askedAtMs <= watermarkMs;
+    if (!isReread) return event;
+
+    const { [PULLED_USAGE_HINT_KEY]: _dropped, ...auditOnly } = extra;
+    return { ...event, extra: auditOnly };
   });
 }
 
