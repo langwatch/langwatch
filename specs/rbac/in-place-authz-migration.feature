@@ -159,14 +159,14 @@ Feature: In-place authorization data migration
     Then "acme" is parked rather than finalized on an unfinished proof
     And the next pass verifies "acme" from the start
 
-  @integration
+  @unit
   Scenario: A finalized organization stops consulting the legacy fallback
     Given "acme" was finalized
     When a permission check runs for a member of "acme"
     Then the answer comes from role bindings alone
     And the legacy team rows are not read
 
-  @integration
+  @unit
   Scenario: An organization that is not finalized keeps today's behaviour exactly
     Given "acme" is pending, migrated, or parked
     When a permission check runs for a member of "acme"
@@ -342,6 +342,13 @@ Feature: In-place authorization data migration
     Given a grant fact from a live write path
     When the fold stores it
     Then the legacy-shaped binding row is written by the fold
+
+  @integration
+  Scenario: A live grant write lands both projected heads through the real fold
+    Given an organization whose grant writes go through the ledger
+    When an admin attaches a role binding
+    Then the projected grant row and its legacy-shaped binding row both land
+    And a fact the legacy tables cannot express lands the grant row alone
 
   # ============================================================================
   # Per-organization write cutover (ADR-092 decision 4)

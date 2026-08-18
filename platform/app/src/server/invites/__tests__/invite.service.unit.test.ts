@@ -977,6 +977,32 @@ describe("InviteService", () => {
           expect(order).toContain("granted");
         });
 
+        it("writes the membership row before it emits any grant command", async () => {
+          const order: string[] = [];
+          (mockPrisma as any).organizationUser.createMany = vi.fn(() => {
+            order.push("member");
+            return Promise.resolve({ count: 1 });
+          });
+          ledger.revokeBindingsWhere.mockImplementation(() => {
+            order.push("emitted");
+            return Promise.resolve(0);
+          });
+          ledger.attachBindings.mockImplementation(() => {
+            order.push("emitted");
+            return Promise.resolve({ attached: [], duplicates: [] });
+          });
+
+          await service.applyInvite({ userId: "user-flow-2", invite });
+
+          // The seat is a transactional row and the grants are ledger
+          // commands, so they cannot share a transaction. This order is what
+          // makes the crash window leave a member holding a seat and no
+          // grants — less access than the invite asked for, never more.
+          expect(order[0]).toBe("member");
+          expect(order.slice(1).every((step) => step === "emitted")).toBe(true);
+          expect(order).toContain("emitted");
+        });
+
         it("names the inviter as the actor, not the person receiving the access", async () => {
           await service.applyInvite({ userId: "user-flow-2", invite });
 

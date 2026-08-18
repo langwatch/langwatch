@@ -14,15 +14,23 @@ vi.mock("~/server/app-layer/authz/ledger", () => ({
   grantsLedgerWriter: () => ledger,
 }));
 
+// No `create`/`update`/`delete` here on purpose: since ADR-092 PR 2 a role
+// definition is a ledger command, so the service can no longer reach those
+// Prisma methods at all. Asserting on them would assert nothing — the ledger
+// writer above is where a refused write has to be observed.
 function buildMockPrisma() {
   return {
     customRole: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
+      findFirst: vi.fn().mockResolvedValue(null),
     },
+    // Reads only, and all answering "nothing holds this role": without them a
+    // delete that slipped past the kind guard would die on an undefined mock
+    // rather than reaching the ledger, and the assertion below would pass for
+    // the wrong reason.
+    roleBinding: { count: vi.fn().mockResolvedValue(0) },
+    teamUser: { count: vi.fn().mockResolvedValue(0) },
     team: {
       findUnique: vi.fn(),
     },
@@ -101,7 +109,7 @@ describe("RoleService", () => {
           ),
         ).rejects.toThrow(RoleNotFoundError);
 
-        expect(prisma.customRole.update).not.toHaveBeenCalled();
+        expect(ledger.defineRole).not.toHaveBeenCalled();
       });
     });
 
@@ -135,7 +143,7 @@ describe("RoleService", () => {
           }),
         ).rejects.toThrow(RoleNotFoundError);
 
-        expect(prisma.customRole.delete).not.toHaveBeenCalled();
+        expect(ledger.deleteRole).not.toHaveBeenCalled();
       });
     });
   });

@@ -3,6 +3,12 @@
  * (specs/rbac/in-place-authz-migration.feature): once the in-place
  * migration FINALIZED an organization, the TeamUser fallback stops being
  * consulted; anywhere short of finalized keeps today's behaviour exactly.
+ *
+ * A unit test, and named one: every Prisma delegate below is a stub, so it
+ * opens no socket and needs no datastore. It was previously named
+ * `-integration` (a hyphen, so not even the `.integration.test.ts` suffix the
+ * lane split reads), which meant the name claimed infrastructure the file
+ * neither used nor was ever given.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";

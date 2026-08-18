@@ -715,6 +715,71 @@ describe("given an organization whose genesis import has landed", () => {
   });
 
   /** @scenario "Completing the genesis import moves an organization's writes onto the ledger" */
+  it("emits the role change carrying both role keys and the grant's own identity", async () => {
+    const { writer, db, sent } = harness({ onLedger: true });
+    db.roleBinding.findFirst
+      // The binding being changed...
+      .mockResolvedValueOnce(legacyRow({ id: "rb_1" }))
+      // ...no sibling already holding the target role at that scope...
+      .mockResolvedValueOnce(null)
+      // ...and the compat row the fold landed, which is what the
+      // read-your-writes poll is looking for.
+      .mockResolvedValueOnce({
+        role: TeamUserRole.ADMIN,
+        customRoleId: null,
+      });
+
+    await writer.changeBindingRole({
+      organizationId: ORG_ID,
+      bindingId: "rb_1",
+      role: TeamUserRole.ADMIN,
+      customRoleId: null,
+      actor: ACTOR,
+    });
+
+    expect(sent.map((command) => command.verb)).toEqual(["changeGrantRole"]);
+    expect(sent[0]!.data).toEqual({
+      tenantId: ORG_ID,
+      organizationId: ORG_ID,
+      commandId: expect.any(String),
+      grantId: "rb_1",
+      from: "member",
+      to: "admin",
+      actor: ACTOR,
+      occurredAtMs: 1_700_000_000_000,
+    });
+    expect(db.roleBinding.update).not.toHaveBeenCalled();
+    expect(db.auditLog.createMany).not.toHaveBeenCalled();
+  });
+
+  /** A change onto a custom role speaks the `custom:<id>` key, which is the
+   *  only vocabulary the ledger has for one. */
+  it("names a custom role by its id rather than by the enum it replaces", async () => {
+    const { writer, db, sent } = harness({ onLedger: true });
+    db.roleBinding.findFirst
+      .mockResolvedValueOnce(legacyRow({ id: "rb_1" }))
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        role: TeamUserRole.CUSTOM,
+        customRoleId: "role_auditor",
+      });
+
+    await writer.changeBindingRole({
+      organizationId: ORG_ID,
+      bindingId: "rb_1",
+      role: TeamUserRole.CUSTOM,
+      customRoleId: "role_auditor",
+      actor: ACTOR,
+    });
+
+    expect(sent[0]!.data).toMatchObject({
+      grantId: "rb_1",
+      from: "member",
+      to: "custom:role_auditor",
+    });
+  });
+
+  /** @scenario "Completing the genesis import moves an organization's writes onto the ledger" */
   it("emits the revoke command and enforces through the projection repository", async () => {
     const { writer, db, sent } = harness({ onLedger: true });
 

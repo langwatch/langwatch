@@ -6,7 +6,7 @@
  * IdP re-pushes on every sync and after every failure.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import {
@@ -49,12 +49,15 @@ const storedMemberRow = {
   customRoleId: null,
 };
 
-const reconcile = (desired: DesiredScimGrant[]) =>
+const reconcile = (
+  desired: DesiredScimGrant[],
+  where: Prisma.RoleBindingWhereInput = { userId: USER_ID },
+) =>
   reconcileScimGrants({
     prisma,
     writer,
     organizationId: ORG_ID,
-    where: { userId: USER_ID },
+    where,
     desired,
     actor: { type: "system", id: "system:scim" },
     mintBindingId: () => "rb_new",
@@ -136,6 +139,59 @@ describe("reconcileScimGrants", () => {
       expect(revokeBindings).toHaveBeenCalledWith(
         expect.objectContaining({ bindingIds: ["rb_custom"] }),
       );
+    });
+  });
+
+  /**
+   * The slice a push is authoritative over is a caller-supplied Prisma filter,
+   * so the only thing keeping a directory sync inside its own tenant is where
+   * the organization lands in that object. It goes LAST, and both halves of
+   * the reconcile — the read that decides what to revoke, and the revoke
+   * itself — carry it.
+   */
+  describe("given a caller-supplied filter naming a different organization", () => {
+    describe("when the projection is read", () => {
+      it("re-states this organization last, so the filter cannot widen out of the tenant", async () => {
+        findMany.mockResolvedValue([]);
+
+        await reconcile([], { userId: USER_ID, organizationId: "org_other" });
+
+        expect(findMany).toHaveBeenCalledTimes(1);
+        expect(findMany.mock.calls[0]![0].where).toEqual({
+          userId: USER_ID,
+          organizationId: ORG_ID,
+        });
+      });
+    });
+
+    describe("when the diff revokes something", () => {
+      it("revokes inside this organization, never the one the filter named", async () => {
+        findMany.mockResolvedValue([storedMemberRow]);
+
+        await reconcile([], { userId: USER_ID, organizationId: "org_other" });
+
+        expect(revokeBindings).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId: ORG_ID,
+            bindingIds: ["rb_1"],
+          }),
+        );
+      });
+    });
+
+    describe("when the diff attaches something", () => {
+      it("attaches inside this organization too", async () => {
+        findMany.mockResolvedValue([]);
+
+        await reconcile([memberOfOrg], {
+          userId: USER_ID,
+          organizationId: "org_other",
+        });
+
+        expect(attachBindings).toHaveBeenCalledWith(
+          expect.objectContaining({ organizationId: ORG_ID }),
+        );
+      });
     });
   });
 
