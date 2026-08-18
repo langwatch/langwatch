@@ -52,8 +52,6 @@ func serviceByName(services []domain.Service, name string) (domain.Service, bool
 // portless proxy's TLS handshake won't come up (#7117): before this, the flag
 // was documented in `haven help env` but nothing read it, so `up` always
 // bootstrapped and routed through the proxy regardless.
-//
-// @scenario "PORTLESS=0 bypasses the proxy bootstrap on up"
 func TestPortlessBypassSkipsProxyBootstrap(t *testing.T) {
 	proxy := &recordingProxy{}
 	o := &Orchestrator{cfg: Config{PortlessDisabled: true}, proxy: proxy}
@@ -69,7 +67,6 @@ func TestPortlessBypassSkipsProxyBootstrap(t *testing.T) {
 	}
 }
 
-// @scenario "Portless enabled still bootstraps the proxy on up"
 func TestPortlessEnabledStillBootstrapsProxy(t *testing.T) {
 	proxy := &recordingProxy{}
 	o := &Orchestrator{cfg: Config{PortlessDisabled: false}, proxy: proxy}
@@ -85,8 +82,6 @@ func TestPortlessEnabledStillBootstrapsProxy(t *testing.T) {
 	}
 }
 
-// @scenario "PORTLESS=0 serves the app directly over HTTP on its own port"
-// @scenario "PORTLESS=0 never registers a hostname with the proxy"
 func TestPortlessBypassProvisionsDirectHTTP(t *testing.T) {
 	store := &fakeStore{slugCache: map[string]string{"/wt/x": "x"}}
 	sys := &playPortSystem{}
@@ -126,8 +121,6 @@ func TestPortlessBypassProvisionsDirectHTTP(t *testing.T) {
 
 // Portless enabled is the existing, unchanged behavior: every routed service
 // shares the proxy's own scheme+port, addressed by hostname.
-//
-// @scenario "Portless enabled routes services through the shared proxy endpoint"
 func TestPortlessEnabledProvisionsThroughProxy(t *testing.T) {
 	store := &fakeStore{slugCache: map[string]string{"/wt/x": "x"}}
 	sys := &playPortSystem{}
@@ -163,8 +156,6 @@ func TestPortlessEnabledProvisionsThroughProxy(t *testing.T) {
 // already-running stack must still trigger a restart, or the escape hatch is a
 // no-op for the most likely real journey: a stack is already up under a broken
 // proxy, the operator sets PORTLESS=0, and `haven up` reports "nothing to do".
-//
-// @scenario "A stack provisioned under one PORTLESS setting restarts when the setting flips"
 func TestReconcileDetectsPortlessSettingChange(t *testing.T) {
 	store := &fakeStore{
 		stacks:    []domain.Stack{{Slug: "feat-x", WorktreeDir: "/wt/feat-x", LauncherPID: 42, PortlessDisabled: false}},
@@ -189,7 +180,35 @@ func TestReconcileDetectsPortlessSettingChange(t *testing.T) {
 	}
 }
 
-// @scenario "PORTLESS=0 serves ClickHouse directly over HTTP on its own port"
+// Down must remove aliases for the mode the stack actually registered them
+// under, not this run's PORTLESS setting — `PORTLESS=0 haven down` tearing
+// down a stack that came up with portless enabled must still remove its
+// aliases, or they leak as dangling routes that can later point at a reused
+// loopback port.
+func TestDownUsesTheStacksOwnPortlessMode(t *testing.T) {
+	ctx := context.Background()
+	params := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}
+	store := &fakeStore{
+		stacks:    []domain.Stack{{Slug: "feat-x", WorktreeDir: "/wt/feat-x", LauncherPID: 42, PortlessDisabled: false}},
+		slugCache: map[string]string{"/wt/feat-x": "feat-x"},
+	}
+	sys := &fakeSystem{alive: map[int]bool{42: true}}
+	proxy := &fakeProxy{}
+	o := &Orchestrator{
+		// This run asks to bypass the proxy, but the stack was provisioned with
+		// it enabled — Down must still clean up under the mode it registered.
+		cfg:   Config{Naming: domain.DefaultNaming(""), PortlessDisabled: true},
+		store: store, sys: sys, proxy: proxy, log: zap.NewNop(),
+	}
+
+	if err := o.Down(ctx, params, false); err != nil {
+		t.Fatalf("Down: %v", err)
+	}
+	if len(proxy.removed) == 0 {
+		t.Error("down must remove the aliases the stack actually registered, even when this run's PORTLESS differs")
+	}
+}
+
 func TestPortlessBypassEnsureClickHouseServesDirectHTTP(t *testing.T) {
 	proxy := &recordingProxy{}
 	o := &Orchestrator{
@@ -214,7 +233,6 @@ func TestPortlessBypassEnsureClickHouseServesDirectHTTP(t *testing.T) {
 	}
 }
 
-// @scenario "Portless enabled routes ClickHouse through the shared proxy endpoint"
 func TestPortlessEnabledEnsureClickHouseRoutesThroughProxy(t *testing.T) {
 	proxy := &recordingProxy{}
 	o := &Orchestrator{

@@ -300,7 +300,7 @@ func (o *Orchestrator) serviceEndpoint(proxyScheme string, proxyPort, ownPort in
 	return proxyScheme, proxyPort
 }
 
-// Up is the launcher hook `make haven up` runs in portless mode.
+// Up is the launcher hook `make haven up` runs, in either routing mode.
 func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) error {
 	if err := o.ensurePortlessProxy(); err != nil {
 		return err
@@ -533,7 +533,8 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 	if err != nil {
 		return err
 	}
-	if st, ok := o.stackBySlug(slug); ok && st.LauncherPID != o.sys.Getpid() && o.sys.ProcessAlive(st.LauncherPID) {
+	st, ok := o.stackBySlug(slug)
+	if ok && st.LauncherPID != o.sys.Getpid() && o.sys.ProcessAlive(st.LauncherPID) {
 		if force {
 			// -f: no grace — SIGKILL the launcher's whole process group at once,
 			// for the stack that is wedged or just needs to be gone NOW.
@@ -545,7 +546,17 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 			fmt.Printf("stopped launcher (pid %d)\n", st.LauncherPID)
 		}
 	}
-	if !o.cfg.PortlessDisabled {
+	// Use the mode the stack was actually provisioned under, not this run's
+	// PORTLESS — `PORTLESS=0 haven down` on a stack that registered its aliases
+	// under portless must still remove them, or they leak (dangling routes that
+	// can later point at a reused loopback port). No registry entry (already
+	// torn down, or never registered) leaves nothing to go on but this run's
+	// setting.
+	portlessDisabled := o.cfg.PortlessDisabled
+	if ok {
+		portlessDisabled = st.PortlessDisabled
+	}
+	if !portlessDisabled {
 		for _, r := range domain.PerWorktreeServices {
 			o.proxy.Remove(r.Name, slug)
 		}
