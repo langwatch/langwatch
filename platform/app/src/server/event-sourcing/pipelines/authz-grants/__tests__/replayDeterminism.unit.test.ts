@@ -136,6 +136,9 @@ async function captureEmissions(): Promise<BackfillGrantEmission[]> {
     revokeGrants: async () => undefined,
     deleteRole: async () => undefined,
     proveMigrationParity: async () => undefined,
+    // The backfill never completes a cutover; the emitter carries the verb
+    // because the cutover migration rides the same port.
+    completeCutover: async () => undefined,
   };
   const migration = new TeamUserBackfillMigration({
     repository,

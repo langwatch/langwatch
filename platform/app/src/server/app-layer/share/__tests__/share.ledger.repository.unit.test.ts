@@ -225,7 +225,10 @@ describe("LedgerShareRepository", () => {
       it("names the audience an organization-visible link is for", async () => {
         const { repository, writer } = buildRepository({ onEngine: true });
 
-        await repository.create({ ...createParams, visibility: "ORGANIZATION" });
+        await repository.create({
+          ...createParams,
+          visibility: "ORGANIZATION",
+        });
 
         expect(writer.attachResourceGrant).toHaveBeenCalledWith(
           expect.objectContaining({

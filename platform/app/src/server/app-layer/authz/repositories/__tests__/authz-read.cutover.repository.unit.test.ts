@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthzReadRepository } from "@langwatch/authz-server";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Prisma } from "~/generated/prisma/client";
 import { resetCutoverGateForTesting } from "../../cutover-gate";
 import { CutoverAwareAuthzReadRepository } from "../authz-read.cutover.repository";
@@ -24,7 +24,9 @@ const spyRepository = (name: string): AuthzReadRepository =>
     findProjectLineage: vi
       .fn()
       .mockResolvedValue({ teamId: "team-1", organizationId: "org-1" }),
-    findTeamOrganization: vi.fn().mockResolvedValue({ organizationId: "org-1" }),
+    findTeamOrganization: vi
+      .fn()
+      .mockResolvedValue({ organizationId: "org-1" }),
   }) as unknown as AuthzReadRepository;
 
 const repositoryFor = (onEngine: boolean) => {
@@ -54,6 +56,7 @@ describe("CutoverAwareAuthzReadRepository", () => {
   });
 
   describe("given the organization is cut over", () => {
+    /** @scenario "A cut-over organization's checks read the ledger's own head" */
     it("collects bindings from the grants head, leaving the legacy head untouched", async () => {
       const { legacy, grants, repository } = repositoryFor(true);
       const args = { userId: "alice", organizationId: "org-1" };

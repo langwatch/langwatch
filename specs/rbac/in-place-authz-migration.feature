@@ -256,7 +256,7 @@ Feature: In-place authorization data migration
     Then the older witness is ignored
     And the later status still holds
 
-  @integration @unimplemented
+  @integration
   Scenario: A clean parity proof and the cutover are recorded as facts
     Given the migration verified "acme" with no disagreement
     When "acme" is cut over
@@ -264,7 +264,7 @@ Feature: In-place authorization data migration
     And the ledger records the cutover with its actor
     And the projection the permission fork reads marks "acme" as on the engine
 
-  @integration @unimplemented
+  @integration
   Scenario: Rolling back a cutover takes effect without a deploy, even with the queue stopped
     Given "acme" was cut over and is served by the engine
     And the queue infrastructure is stopped
@@ -272,7 +272,7 @@ Feature: In-place authorization data migration
     Then the rollback is recorded and applied before the call returns
     And permission checks in "acme" consult the legacy path within the gate's cache window
 
-  @integration @unimplemented
+  @integration
   Scenario: Cutover imports the legacy facts that only exist outside bindings
     Given "acme" has a member whose only admin fact is a legacy organization ADMIN row
     And "acme" has a share link and an operator listed in the platform admin list

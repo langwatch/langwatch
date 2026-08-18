@@ -94,6 +94,7 @@ describe("cutoverOnEngine", () => {
   });
 
   describe("when the cache window elapses", () => {
+    /** @scenario "Rolling back returns an organization to the legacy path within the gate's cache window" */
     it("re-reads a positive answer, which is what makes a rollback land", async () => {
       vi.useFakeTimers();
       const findUnique = vi
@@ -137,8 +138,9 @@ describe("cutoverOnEngine", () => {
     it("caches each one's answer under its own key", async () => {
       const findUnique = vi
         .fn()
-        .mockImplementation(({ where }: { where: { organizationId: string } }) =>
-          Promise.resolve({ onEngine: where.organizationId === "org-1" }),
+        .mockImplementation(
+          ({ where }: { where: { organizationId: string } }) =>
+            Promise.resolve({ onEngine: where.organizationId === "org-1" }),
         );
       const prisma = projectionStub(findUnique);
 

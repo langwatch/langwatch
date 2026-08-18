@@ -208,6 +208,7 @@ describe("the fork at the permission seams", () => {
 
   describe("given an organization that is not cut over", () => {
     describe("when its projection says so", () => {
+      /** @scenario "An organization that has not cut over is unchanged" */
       it("keeps the legacy answer and the stage-A4 shadow", async () => {
         const { ctx, grantFindMany } = buildPrisma({ onEngine: false });
 
@@ -217,7 +218,10 @@ describe("the fork at the permission seams", () => {
           "traces:view",
         );
 
-        expect(result).toEqual({ permitted: false, organizationRole: "MEMBER" });
+        expect(result).toEqual({
+          permitted: false,
+          organizationRole: "MEMBER",
+        });
         expect(userPermissionCheck).toHaveBeenCalledWith(
           expect.objectContaining({
             userId: USER_ID,

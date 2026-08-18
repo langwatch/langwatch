@@ -273,7 +273,7 @@ function buildRepository({
 
 describe("given a member being offboarded", () => {
     describe("given a user with facts on both heads", () => {
-      /** @scenario "Offboarding revokes every fact the user holds" */
+      /** @scenario "Offboarding a user removes every grant, with proof" */
       it("revokes the union of compat rows and grant-head rows, once each", async () => {
         const { repository, offboardMember, grantFindMany } = buildRepository({
           bindingIds: ["shared-1", "compat-only-2"],

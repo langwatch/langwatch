@@ -6,11 +6,12 @@
  * Everything storage-shaped is stubbed - the composition root is what is
  * under test, not Prisma, Redis or the event-sourcing stack.
  */
+
+import { TEAM_USER_BACKFILL_MIGRATION_NAME } from "@langwatch/authz-server";
 import {
   GRANTS_CUTOVER_MIGRATION_NAME,
   GRANTS_GENESIS_IMPORT_MIGRATION_NAME,
 } from "@langwatch/authz-server/migration";
-import { TEAM_USER_BACKFILL_MIGRATION_NAME } from "@langwatch/authz-server";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
@@ -29,11 +30,13 @@ import { registeredMigrations } from "../runtime";
 describe("registeredMigrations", () => {
   describe("when the runner asks what to run", () => {
     it("answers with the three in-place migrations, cutover last", () => {
-      expect(registeredMigrations().map((migration) => migration.name)).toEqual([
-        TEAM_USER_BACKFILL_MIGRATION_NAME,
-        GRANTS_GENESIS_IMPORT_MIGRATION_NAME,
-        GRANTS_CUTOVER_MIGRATION_NAME,
-      ]);
+      expect(registeredMigrations().map((migration) => migration.name)).toEqual(
+        [
+          TEAM_USER_BACKFILL_MIGRATION_NAME,
+          GRANTS_GENESIS_IMPORT_MIGRATION_NAME,
+          GRANTS_CUTOVER_MIGRATION_NAME,
+        ],
+      );
     });
   });
 });

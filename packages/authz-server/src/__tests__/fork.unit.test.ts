@@ -108,7 +108,7 @@ describe("the authz fork", () => {
     });
 
     describe("when legacy would have answered differently", () => {
-      /** @scenario "The reverse-shadow comparison is logged" */
+      /** @scenario "Legacy runs behind the engine as the reverse-shadow comparison" */
       it("keeps the engine's answer and logs the mismatch", async () => {
         const fork = makeFork(memberWithProjectAdmin());
 
@@ -416,7 +416,7 @@ describe("the authz fork", () => {
   });
 
   describe("given an api key whose owner has been downgraded", () => {
-    /** @scenario "The engine applies the api-key owner ceiling" */
+    /** @scenario "An API key is capped by its owner's current grants" */
     it("applies the owner ceiling to the key's own grant", async () => {
       const fork = makeFork(
         makeForkReader({

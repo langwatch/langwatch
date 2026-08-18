@@ -94,7 +94,11 @@ describe("GrantsAuthzReadRepository", () => {
           organizationUser: { findFirst: member() },
           grant: {
             findMany: vi.fn().mockResolvedValue([
-              { roleKey: "member", scopeType: "ORGANIZATION", scopeId: "org-1" },
+              {
+                roleKey: "member",
+                scopeType: "ORGANIZATION",
+                scopeId: "org-1",
+              },
               { roleKey: "viewer", scopeType: "TEAM", scopeId: "team-1" },
             ]),
           },
@@ -337,11 +341,13 @@ describe("GrantsAuthzReadRepository", () => {
         const repository = new GrantsAuthzReadRepository(
           clientFor({
             role: {
-              findMany: vi
-                .fn()
-                .mockResolvedValue([
-                  { id: "role-1", permissions: ["traces:view"], kind: "custom" },
-                ]),
+              findMany: vi.fn().mockResolvedValue([
+                {
+                  id: "role-1",
+                  permissions: ["traces:view"],
+                  kind: "custom",
+                },
+              ]),
             },
           }),
         );
@@ -358,20 +364,20 @@ describe("GrantsAuthzReadRepository", () => {
 
     describe("when the principal is an API key", () => {
       it("allows a system role held by this key alone", async () => {
-        const roleFindMany = vi
-          .fn()
-          .mockResolvedValue([
-            { id: "role-1", permissions: ["traces:view"], kind: "system_api_key" },
-          ]);
-        const grantFindMany = vi
-          .fn()
-          .mockResolvedValue([
-            {
-              roleKey: "custom:role-1",
-              principalType: "API_KEY",
-              principalId: "key-1",
-            },
-          ]);
+        const roleFindMany = vi.fn().mockResolvedValue([
+          {
+            id: "role-1",
+            permissions: ["traces:view"],
+            kind: "system_api_key",
+          },
+        ]);
+        const grantFindMany = vi.fn().mockResolvedValue([
+          {
+            roleKey: "custom:role-1",
+            principalType: "API_KEY",
+            principalId: "key-1",
+          },
+        ]);
         const repository = new GrantsAuthzReadRepository(
           clientFor({
             role: { findMany: roleFindMany },
@@ -390,7 +396,10 @@ describe("GrantsAuthzReadRepository", () => {
           select: { id: true, permissions: true, kind: true },
         });
         expect(grantFindMany).toHaveBeenCalledWith({
-          where: { organizationId: "org-1", roleKey: { in: ["custom:role-1"] } },
+          where: {
+            organizationId: "org-1",
+            roleKey: { in: ["custom:role-1"] },
+          },
           select: { roleKey: true, principalType: true, principalId: true },
         });
         expect(rows).toEqual([{ id: "role-1", permissions: ["traces:view"] }]);
@@ -440,11 +449,13 @@ describe("GrantsAuthzReadRepository", () => {
           const repository = new GrantsAuthzReadRepository(
             clientFor({
               role: {
-                findMany: vi
-                  .fn()
-                  .mockResolvedValue([
-                    { id: "orphan-role", permissions: [], kind: "system_api_key" },
-                  ]),
+                findMany: vi.fn().mockResolvedValue([
+                  {
+                    id: "orphan-role",
+                    permissions: [],
+                    kind: "system_api_key",
+                  },
+                ]),
               },
               grant: { findMany: vi.fn().mockResolvedValue([]) },
             }),
@@ -469,7 +480,11 @@ describe("GrantsAuthzReadRepository", () => {
             role: {
               findMany: vi.fn().mockResolvedValue([
                 { id: "role-1", permissions: ["traces:view"], kind: "custom" },
-                { id: "role-2", permissions: ["secrets:manage"], kind: "system_api_key" },
+                {
+                  id: "role-2",
+                  permissions: ["secrets:manage"],
+                  kind: "system_api_key",
+                },
               ]),
             },
             grant: { findMany: vi.fn().mockResolvedValue([]) },
@@ -765,15 +780,17 @@ describe("GrantsAuthzReadRepository", () => {
     it("returns the owning team and organization, null for an unknown project", async () => {
       const findUnique = vi
         .fn()
-        .mockResolvedValueOnce({ team: { id: "team-1", organizationId: "org-1" } })
+        .mockResolvedValueOnce({
+          team: { id: "team-1", organizationId: "org-1" },
+        })
         .mockResolvedValueOnce(null);
       const repository = new GrantsAuthzReadRepository(
         clientFor({ project: { findUnique } }),
       );
 
-      expect(await repository.findProjectLineage({ projectId: "proj-1" })).toEqual(
-        { teamId: "team-1", organizationId: "org-1" },
-      );
+      expect(
+        await repository.findProjectLineage({ projectId: "proj-1" }),
+      ).toEqual({ teamId: "team-1", organizationId: "org-1" });
       expect(
         await repository.findProjectLineage({ projectId: "proj-ghost" }),
       ).toBeNull();
@@ -790,9 +807,9 @@ describe("GrantsAuthzReadRepository", () => {
         clientFor({ team: { findUnique } }),
       );
 
-      expect(await repository.findTeamOrganization({ teamId: "team-1" })).toEqual(
-        { organizationId: "org-1" },
-      );
+      expect(
+        await repository.findTeamOrganization({ teamId: "team-1" }),
+      ).toEqual({ organizationId: "org-1" });
       expect(
         await repository.findTeamOrganization({ teamId: "team-ghost" }),
       ).toBeNull();

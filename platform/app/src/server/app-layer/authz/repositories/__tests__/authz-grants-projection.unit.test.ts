@@ -14,7 +14,9 @@ import { PrismaAuthzGrantsProjectionRepository } from "../authz-grants-projectio
 
 function makePrisma({
   revokedProjectIds = [],
-}: { revokedProjectIds?: (string | null)[] } = {}) {
+}: {
+  revokedProjectIds?: (string | null)[];
+} = {}) {
   return {
     grant: {
       findMany: vi.fn(async () =>
