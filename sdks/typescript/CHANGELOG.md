@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.6.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.5.0...typescript-sdk@v1.6.0) (2026-08-18)
+
+
+### Features
+
+* **ai-gateway:** virtual keys can auto-expire, and every usage view links to its traces ([#7067](https://github.com/langwatch/langwatch/issues/7067)) ([2e21dc3](https://github.com/langwatch/langwatch/commit/2e21dc3b0529cd627cd7b245c0bec754a2b023c1))
+* **coding-agent:** capture codex conversations and repository identity by default ([#7069](https://github.com/langwatch/langwatch/issues/7069)) ([625ddb6](https://github.com/langwatch/langwatch/commit/625ddb69d626383659f5c6357351ceb1515f3b28))
+* project-scoped coding-agent instrumentation, lazy virtual keys, CLI help cleanup ([#7057](https://github.com/langwatch/langwatch/issues/7057)) ([0f2c353](https://github.com/langwatch/langwatch/commit/0f2c353fa1ac59ac963f8b95fce7a1e43ba6edbe))
+* **scenarios:** judge on remote traces with per-turn propagation and a local dev tunnel ([#7070](https://github.com/langwatch/langwatch/issues/7070)) ([56689a3](https://github.com/langwatch/langwatch/commit/56689a327857169ce0d458a08f9e105ef28e182b))
+* **traces:** remove the legacy trace UI ([#6902](https://github.com/langwatch/langwatch/issues/6902)) ([c2ee570](https://github.com/langwatch/langwatch/commit/c2ee5708c78ea9733bb67b321201d98685dec24d))
+
+
+### Bug Fixes
+
+* **cli:** make scenario run --wait count only its own batch ([#7144](https://github.com/langwatch/langwatch/issues/7144)) ([1a0fd66](https://github.com/langwatch/langwatch/commit/1a0fd66208c63656c2762659e3b02b98382a8449))
+
+
+### Code Refactoring
+
+* **typescript:** move the workspace to TypeScript 7, and stop a typecheck filling a 9 GiB ceiling ([#7081](https://github.com/langwatch/langwatch/issues/7081)) ([f79b748](https://github.com/langwatch/langwatch/commit/f79b74898b6a921823ebd32c57ac2295d79e6113))
+
 ## [1.5.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.4.0...typescript-sdk@v1.5.0) (2026-08-15)
 
 
