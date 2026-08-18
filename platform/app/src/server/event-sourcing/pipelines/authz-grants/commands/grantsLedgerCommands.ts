@@ -168,14 +168,19 @@ export class RevokeGrantsCommand
     command: Command<RevokeGrantsCommandData>,
   ): Promise<GrantRevokedEvent[]> {
     const { organizationId, commandId, revocations, actor } = command.data;
-    return revocations.map(({ grantId, reason }, index) =>
+    return revocations.map(({ grantId, selector, reason }, index) =>
       EventUtils.createEvent<GrantRevokedEvent>({
         aggregateType: AUTHZ_GRANTS_AGGREGATE_TYPE,
         aggregateId: organizationId,
         tenantId: createTenantId(command.tenantId),
         type: GRANT_REVOKED_EVENT_TYPE,
         version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
-        data: { grantId, ...(reason ? { reason } : {}), actor },
+        data: {
+          ...(grantId ? { grantId } : {}),
+          ...(selector ? { selector } : {}),
+          ...(reason ? { reason } : {}),
+          actor,
+        },
         metadata: {},
         occurredAt: command.data.occurredAtMs,
         idempotencyKey: eventIdempotencyKey({ commandId, index }),

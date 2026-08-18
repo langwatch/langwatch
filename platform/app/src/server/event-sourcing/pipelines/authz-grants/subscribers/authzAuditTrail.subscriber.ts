@@ -1,9 +1,14 @@
+import { createLogger } from "@langwatch/observability";
 import type { SubscriberSpec } from "../../../pipeline/processManagerDefinition";
 import {
+  CUTOVER_COMPLETED_EVENT_TYPE,
+  CUTOVER_ROLLED_BACK_EVENT_TYPE,
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
   MEMBER_OFFBOARDED_EVENT_TYPE,
+  MIGRATION_PARITY_PROVED_EVENT_TYPE,
+  MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE,
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
@@ -23,6 +28,23 @@ export const AUTHZ_AUDIT_EVENT_TYPES = [
   MEMBER_OFFBOARDED_EVENT_TYPE,
 ] as const;
 
+/**
+ * The rest of the aggregate's events, listed rather than implied: the cutover
+ * machine's own moves and the migration runner's witnessed transitions are an
+ * operator concern, not an access fact a customer's audit page should carry.
+ *
+ * Stated as a constant so the two lists together must cover the wire union
+ * exactly (`authzAuditTrail.subscriber.unit.test.ts`). A new event type then
+ * fails a test, where before it would have reached the audit page as
+ * `authz.grants.undefined` — or been silently dropped, which is worse.
+ */
+export const AUTHZ_NON_AUDIT_EVENT_TYPES = [
+  MIGRATION_PARITY_PROVED_EVENT_TYPE,
+  CUTOVER_COMPLETED_EVENT_TYPE,
+  CUTOVER_ROLLED_BACK_EVENT_TYPE,
+  MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE,
+] as const;
+
 type AuditableEventType = (typeof AUTHZ_AUDIT_EVENT_TYPES)[number];
 
 /** Stable verbs. The event type is a wire name that may gain a version
@@ -39,6 +61,8 @@ const AUDIT_VERB_BY_EVENT_TYPE: Record<AuditableEventType, string> = {
 };
 
 export const AUTHZ_AUDIT_ACTION_PREFIX = "authz.grants." as const;
+
+const logger = createLogger("langwatch:authz:audit-trail");
 
 /** Every fact these sources author is backdated history that already
  *  happened somewhere else — the legacy tables, an earlier backfill, or a
@@ -102,18 +126,72 @@ export function isAuditableGrantEvent(event: AuthzGrantsEvent): boolean {
   return true;
 }
 
-/** Everything on the event except who did it — the actor is already spread
- *  across the row's own `userId` column, and repeating it in the payload
- *  invites the two to disagree. */
+/**
+ * The payload fields each event family puts in the audit row — an ALLOW-list,
+ * per family.
+ *
+ * It used to be a deny-list of one (`actor`), which meant every field a future
+ * event gains is published to the customer's audit page by default. The
+ * resource tier's `token` is the case that makes this non-negotiable: it IS a
+ * credential, it lives on `grant_attached`, and a deny-list would have copied
+ * it into an `AuditLog` row the moment a share link became a grant. Naming the
+ * fields is what makes adding one a decision instead of an accident.
+ *
+ * The actor is still absent from every list: it is already the row's own
+ * `userId` column, and repeating it invites the two to disagree.
+ */
+const AUDIT_METADATA_FIELDS: Record<AuditableEventType, readonly string[]> = {
+  [GRANT_ATTACHED_EVENT_TYPE]: [
+    "grantId",
+    "principal",
+    "roleKey",
+    "scope",
+    "source",
+    "legacyRole",
+  ],
+  [GRANT_ROLE_CHANGED_EVENT_TYPE]: ["grantId", "from", "to"],
+  [GRANT_REVOKED_EVENT_TYPE]: ["grantId", "selector", "reason"],
+  [ROLE_DEFINED_EVENT_TYPE]: [
+    "roleId",
+    "name",
+    "description",
+    "permissions",
+    "kind",
+  ],
+  [ROLE_PERMISSIONS_CHANGED_EVENT_TYPE]: ["roleId", "permissions"],
+  [ROLE_DELETED_EVENT_TYPE]: ["roleId"],
+  [MEMBER_OFFBOARDED_EVENT_TYPE]: ["userId", "revokedGrantIds"],
+};
+
+/** The named fields this event actually carries. An absent optional field
+ *  stays absent rather than becoming an explicit null. */
 function auditMetadata(event: AuthzGrantsEvent): Record<string, unknown> {
+  const data = event.data as Record<string, unknown>;
   const metadata: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(
-    event.data as Record<string, unknown>,
-  )) {
-    if (key === "actor") continue;
-    metadata[key] = value;
+  for (const field of AUDIT_METADATA_FIELDS[event.type as AuditableEventType] ??
+    []) {
+    if (data[field] !== undefined) metadata[field] = data[field];
   }
   return metadata;
+}
+
+/**
+ * An event type this subscriber subscribed to and cannot name.
+ *
+ * Unreachable while `AUDIT_VERB_BY_EVENT_TYPE` and `AUTHZ_AUDIT_EVENT_TYPES`
+ * agree — the Record's key type is the tuple, so a subscribed type with no
+ * verb fails `pnpm typecheck`, and a test enumerates the schema union so a NEW
+ * event type fails a test rather than the audit page. It throws anyway,
+ * because the alternative it replaces wrote `authz.grants.undefined` into the
+ * customer's audit trail and reported success: a row nobody can query, in a
+ * table nobody re-derives, discovered months later. Throwing hands the job
+ * back to the queue, which retries and then parks it where it can be seen.
+ */
+class UnmappedAuthzAuditEventError extends Error {
+  constructor(type: string) {
+    super(`no audit verb is mapped for the authz grants event ${type}`);
+    this.name = "UnmappedAuthzAuditEventError";
+  }
 }
 
 /** Derived from the event id, which is what makes a re-delivery a no-op:
@@ -125,6 +203,13 @@ export function authzAuditRowId(eventId: string): string {
 export function toAuthzAuditRow(event: AuthzGrantsEvent): AuthzAuditRow {
   const { actor } = guardFields(event);
   const verb = AUDIT_VERB_BY_EVENT_TYPE[event.type as AuditableEventType];
+  if (verb === undefined) {
+    logger.error(
+      { eventType: event.type, eventId: event.id },
+      "the authz audit trail has no verb for an event it subscribes to; no row was written",
+    );
+    throw new UnmappedAuthzAuditEventError(event.type);
+  }
   return {
     id: authzAuditRowId(event.id),
     // Business time, not ledger-accepted time: the row says when access

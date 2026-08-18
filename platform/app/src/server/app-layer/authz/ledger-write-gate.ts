@@ -37,8 +37,11 @@
  * the only shape difference between the two.
  */
 import { GRANTS_GENESIS_IMPORT_MIGRATION_NAME } from "@langwatch/authz-server/migration";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { prisma as appPrisma } from "../../db";
+
+const logger = createLogger("langwatch:authz:ledger-write-gate");
 
 /**
  * The statuses that mean the ledger holds this organization's grant history.
@@ -93,11 +96,21 @@ export async function isOrgOnLedgerWrites({
       select: { status: true },
     });
     onLedger = record !== null && LEDGER_WRITE_STATUSES.includes(record.status);
-  } catch {
+  } catch (error) {
     // Fail safe: an unreadable state table leaves the organization on the
     // imperative path, which is today's behaviour and always works. Caching
     // that miss briefly keeps an outage from putting a read in front of every
     // grant write, and it can only ever delay a cutover, never extend one.
+    //
+    // Said out loud, because the failure is otherwise perfectly silent: a
+    // migrated organization pinned back onto the legacy writer for the cache
+    // TTL looks exactly like one that never migrated, and the only trace it
+    // leaves is grant rows written imperatively for an organization the
+    // operator believes is on the ledger.
+    logger.warn(
+      { organizationId, error, ttlMs: NEGATIVE_CACHE_TTL_MS },
+      "could not read the genesis-import state; this organization's grant writes stay on the legacy path until the cache expires",
+    );
     onLedger = false;
   }
 

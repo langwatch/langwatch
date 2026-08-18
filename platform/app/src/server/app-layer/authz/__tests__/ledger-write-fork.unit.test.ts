@@ -79,6 +79,7 @@ function harness({ onLedger }: { onLedger: boolean }) {
       upsert: vi.fn().mockResolvedValue(undefined),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       count: vi.fn().mockResolvedValue(0),
+      findFirst: vi.fn().mockResolvedValue(null),
     },
     role: { findFirst: vi.fn().mockResolvedValue(null) },
     grant: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
@@ -112,6 +113,22 @@ const binding = {
   scopeType: RoleBindingScopeType.TEAM,
   scopeId: "team_support",
 };
+
+/** The same binding as the legacy table's own row shape — what the batched
+ *  identity pre-check reads back. */
+function legacyRow({ id }: { id: string }) {
+  return {
+    id,
+    organizationId: ORG_ID,
+    userId: "user_sam",
+    groupId: null,
+    apiKeyId: null,
+    role: TeamUserRole.MEMBER,
+    customRoleId: null,
+    scopeType: RoleBindingScopeType.TEAM,
+    scopeId: "team_support",
+  };
+}
 
 /** The audit rows one call produced, as the row-building vocabulary shapes them. */
 function auditRows(
@@ -236,7 +253,9 @@ describe("given an organization the genesis import has not reached", () => {
 
     it("still answers the duplicates the identity pre-check found", async () => {
       const { writer, db } = harness({ onLedger: false });
-      db.roleBinding.findFirst.mockResolvedValueOnce({ id: "rb_existing" });
+      db.roleBinding.findMany.mockResolvedValueOnce([
+        { ...legacyRow({ id: "rb_existing" }) },
+      ]);
 
       const outcome = await writer.attachBindings({
         organizationId: ORG_ID,
@@ -502,7 +521,181 @@ describe("given an organization the genesis import has not reached", () => {
   });
 });
 
+describe("given a batch of bindings to attach", () => {
+  describe("when the identity pre-check runs", () => {
+    it("asks storage once for the whole batch, not once per binding", async () => {
+      const { writer, db } = harness({ onLedger: false });
+
+      await writer.attachBindings({
+        organizationId: ORG_ID,
+        bindings: [
+          binding,
+          { ...binding, bindingId: "rb_2", scopeId: "team_billing" },
+          { ...binding, bindingId: "rb_3", scopeId: "team_ops" },
+        ],
+        actor: ACTOR,
+        onDuplicate: "skip",
+      });
+
+      expect(db.roleBinding.findMany).toHaveBeenCalledTimes(1);
+      expect(db.roleBinding.findFirst).not.toHaveBeenCalled();
+    });
+
+    it("matches each answer back to the binding that owns its identity", async () => {
+      const { writer, db } = harness({ onLedger: false });
+      db.roleBinding.findMany.mockResolvedValueOnce([
+        { ...legacyRow({ id: "rb_existing" }), scopeId: "team_billing" },
+      ]);
+
+      const outcome = await writer.attachBindings({
+        organizationId: ORG_ID,
+        bindings: [
+          binding,
+          { ...binding, bindingId: "rb_2", scopeId: "team_billing" },
+        ],
+        actor: ACTOR,
+        onDuplicate: "skip",
+      });
+
+      expect(outcome).toEqual({
+        attached: ["rb_1"],
+        duplicates: ["rb_existing"],
+      });
+    });
+
+    it("counts a repeat inside the same batch as a duplicate of itself", async () => {
+      const { writer } = harness({ onLedger: false });
+
+      const outcome = await writer.attachBindings({
+        organizationId: ORG_ID,
+        bindings: [binding, { ...binding, bindingId: "rb_2" }],
+        actor: ACTOR,
+        onDuplicate: "skip",
+      });
+
+      expect(outcome).toEqual({ attached: ["rb_1"], duplicates: ["rb_2"] });
+    });
+  });
+});
+
+describe("given a revocation named by filter", () => {
+  describe("when the filter names no organization", () => {
+    it("refuses rather than running across tenants", async () => {
+      const { writer } = harness({ onLedger: true });
+
+      await expect(
+        writer.revokeBindingsWhere({
+          organizationId: "",
+          where: { apiKeyId: "key_1" },
+          actor: ACTOR,
+        }),
+      ).rejects.toThrow(/no organization/);
+    });
+  });
+
+  describe("when the filter names a principal at one scope", () => {
+    /** @scenario "Completing the genesis import moves an organization's writes onto the ledger" */
+    it("carries the identity onto the event, so the fold sweeps what the projection had not seen", async () => {
+      const { writer, db, sent } = harness({ onLedger: true });
+      db.roleBinding.findMany.mockResolvedValueOnce([{ id: "rb_7" }]);
+
+      await writer.revokeBindingsWhere({
+        organizationId: ORG_ID,
+        where: {
+          userId: "user_sam",
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: "team_support",
+        },
+        actor: ACTOR,
+      });
+
+      expect(sent).toHaveLength(1);
+      expect((sent[0]!.data as { revocations: unknown[] }).revocations).toEqual(
+        [
+          {
+            grantId: "rb_7",
+            selector: {
+              principal: { type: "user", id: "user_sam" },
+              scope: { type: "TEAM", id: "team_support" },
+            },
+          },
+        ],
+      );
+    });
+
+    it("still appends when the lagging projection matched nothing at all", async () => {
+      const { writer, sent } = harness({ onLedger: true });
+
+      const revoked = await writer.revokeBindingsWhere({
+        organizationId: ORG_ID,
+        where: { apiKeyId: "key_1" },
+        actor: ACTOR,
+      });
+
+      expect(revoked).toBe(0);
+      expect((sent[0]!.data as { revocations: unknown[] }).revocations).toEqual(
+        [{ selector: { principal: { type: "api_key", id: "key_1" } } }],
+      );
+    });
+  });
+
+  describe("when the filter is one no selector can express", () => {
+    it("revokes the ids alone, exactly as it did before", async () => {
+      const { writer, db, sent } = harness({ onLedger: true });
+      db.roleBinding.findMany.mockResolvedValueOnce([{ id: "rb_7" }]);
+
+      await writer.revokeBindingsWhere({
+        organizationId: ORG_ID,
+        where: { customRoleId: "role_1" },
+        actor: ACTOR,
+      });
+
+      expect((sent[0]!.data as { revocations: unknown[] }).revocations).toEqual(
+        [{ grantId: "rb_7" }],
+      );
+    });
+
+    it("appends nothing when such a filter matched nothing", async () => {
+      const { writer, sent } = harness({ onLedger: true });
+
+      await writer.revokeBindingsWhere({
+        organizationId: ORG_ID,
+        where: { customRoleId: "role_1" },
+        actor: ACTOR,
+      });
+
+      expect(sent).toEqual([]);
+    });
+  });
+});
+
 describe("given an organization whose genesis import has landed", () => {
+  /** The fold writes the compat row `CustomRole`; `Role` is the future head
+   *  and lands in the same `store()`, so polling it would return before the
+   *  row every consumer actually reads exists. */
+  it("waits for the compat role row before returning from a role definition", async () => {
+    const { writer, db } = harness({ onLedger: true });
+    db.customRole.findFirst.mockResolvedValue({
+      name: "Auditor",
+      permissions: ["traces:read"],
+    });
+
+    await writer.defineRole({
+      organizationId: ORG_ID,
+      roleId: "role_1",
+      name: "Auditor",
+      permissions: ["traces:read"],
+      kind: "custom",
+      actor: ACTOR,
+    });
+
+    expect(db.customRole.findFirst).toHaveBeenCalledWith({
+      where: { id: "role_1", organizationId: ORG_ID },
+      select: { name: true, permissions: true },
+    });
+    expect(db.role.findFirst).not.toHaveBeenCalled();
+  });
+
   /** @scenario "Completing the genesis import moves an organization's writes onto the ledger" */
   it("emits the attach command and writes no binding row of its own", async () => {
     const { writer, db, sent } = harness({ onLedger: true });

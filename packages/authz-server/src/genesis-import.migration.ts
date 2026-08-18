@@ -333,7 +333,13 @@ function legacyRoleToFact(row: LegacyRoleRow): RoleFact {
 
 function permissionStrings(stored: unknown): string[] {
   return Array.isArray(stored)
-    ? stored.filter((entry): entry is string => typeof entry === "string")
+    ? stored.filter(
+        // The empty string is not a permission: it names nothing, grants
+        // nothing at decide time, and the wire boundary refuses it — so a
+        // legacy row carrying one would park the whole import rather than
+        // import a role that was already inert.
+        (entry): entry is string => typeof entry === "string" && entry !== "",
+      )
     : [];
 }
 

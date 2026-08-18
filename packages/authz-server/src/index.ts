@@ -87,6 +87,7 @@ export {
 export type {
   GrantEventSource,
   GrantFact,
+  GrantRevocationSelector,
   GrantsLedgerActor,
   GrantsLedgerCutover,
   GrantsLedgerEvent,

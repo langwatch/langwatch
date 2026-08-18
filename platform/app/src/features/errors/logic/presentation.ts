@@ -1108,6 +1108,11 @@ const presentations = {
     describe: () =>
       "It may have been removed already. Reload to see the current bindings.",
   },
+  authz_ledger_unavailable: {
+    title: "Access changes are paused",
+    describe: () =>
+      "We could not record the change just now. Nothing was applied — try again in a moment.",
+  },
   role_binding_already_exists: {
     title: "That role is already bound",
     describe: () =>

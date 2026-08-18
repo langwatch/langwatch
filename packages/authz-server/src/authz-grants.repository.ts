@@ -41,6 +41,16 @@ export type RoleBindingWrite = {
  * customer-facing error.
  */
 export class DuplicateBindingError extends Error {
+  /**
+   * Matched by CODE, never by identity. This error is raised behind an
+   * implementation that may be a database adapter, the ledger writer, or a
+   * writer several modules away, and `instanceof` stops being reliable the
+   * moment one of them is bundled or serialised separately. The code is the
+   * same one the customer-facing `DuplicateGrantError` carries, so the
+   * translation at the service boundary is a lift, not a lookup.
+   */
+  readonly code = "role_binding_already_exists" as const;
+
   constructor() {
     super("role binding already exists at this scope");
     this.name = "DuplicateBindingError";
@@ -56,6 +66,9 @@ export class DuplicateBindingError extends Error {
  * never there.
  */
 export class BindingMissingError extends Error {
+  /** Matched by CODE, for the reason `DuplicateBindingError.code` gives. */
+  readonly code = "role_binding_not_found" as const;
+
   constructor() {
     super("role binding no longer exists");
     this.name = "BindingMissingError";

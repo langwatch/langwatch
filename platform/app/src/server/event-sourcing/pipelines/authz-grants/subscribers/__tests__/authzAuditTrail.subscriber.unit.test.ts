@@ -12,9 +12,13 @@ import {
   ROLE_DELETED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
 } from "../../schemas/constants";
-import type { AuthzGrantsEvent } from "../../schemas/events";
+import {
+  type AuthzGrantsEvent,
+  authzGrantsEventSchema,
+} from "../../schemas/events";
 import {
   AUTHZ_AUDIT_EVENT_TYPES,
+  AUTHZ_NON_AUDIT_EVENT_TYPES,
   type AuthzAuditRow,
   type AuthzAuditTrailStore,
   createAuthzAuditTrailSubscriber,
@@ -261,6 +265,62 @@ describe("authz audit trail subscriber", () => {
         "authz-evt-evt_2Zk",
         "authz-evt-evt_2Zl",
       ]);
+    });
+  });
+
+  describe("when the wire union gains an event type", () => {
+    /** The two lists are the whole aggregate, split. A new member of the
+     *  union belongs to one of them by a decision someone made, and this is
+     *  where an undecided one is caught — rather than on a customer's audit
+     *  page, as `authz.grants.undefined`. */
+    it("covers every event type exactly once, audited or deliberately not", () => {
+      const unionTypes = authzGrantsEventSchema.options
+        .map((option) => option.shape.type.value as string)
+        .sort();
+      const classified = [
+        ...AUTHZ_AUDIT_EVENT_TYPES,
+        ...AUTHZ_NON_AUDIT_EVENT_TYPES,
+      ].sort();
+
+      expect(classified).toEqual(unionTypes);
+      expect(new Set(classified).size).toBe(classified.length);
+    });
+  });
+
+  describe("when an event type carries no audit verb", () => {
+    it("writes no row and fails loudly", async () => {
+      const store = recordingStore();
+
+      await expect(
+        deliver(
+          store,
+          event(CUTOVER_COMPLETED_EVENT_TYPE, { actor: USER_ACTOR }),
+        ),
+      ).rejects.toThrow(/no audit verb/);
+      expect(store.inserts).toHaveLength(0);
+    });
+  });
+
+  describe("when the event carries a field the audit row does not name", () => {
+    /** A deny-list published every future field by default; the resource
+     *  tier's `token` IS a credential and rides `grant_attached`. */
+    it("copies only the named fields into the metadata", async () => {
+      const store = recordingStore();
+      await deliver(
+        store,
+        attached({
+          resource: { token: "tok_secret", permission: "traces:view" },
+          somethingNew: "should not travel",
+        }),
+      );
+
+      expect(store.inserts[0]!.metadata).toEqual({
+        grantId: "grant_1",
+        principal: { type: "user", id: "user_alice" },
+        roleKey: "member",
+        scope: { type: "TEAM", id: "team_client_a" },
+        source: "grants-service",
+      });
     });
   });
 

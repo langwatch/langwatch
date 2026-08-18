@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { attachGrantsCommandDataSchema } from "../schemas/commands";
+import {
+  attachGrantsCommandDataSchema,
+  defineRolesCommandDataSchema,
+  revokeGrantsCommandDataSchema,
+} from "../schemas/commands";
 
 /**
  * The wire boundary's job is to make unrepresentable grants unrepresentable.
@@ -137,6 +141,87 @@ describe("the grants ledger's wire boundary", () => {
         parse({}, { principal: { type: "project", id: "proj_chatbot" } })
           .success,
       ).toBe(false);
+    });
+  });
+
+  describe("when a string field arrives empty", () => {
+    it("refuses a grant id that names nothing", () => {
+      expect(parse({}, { grantId: "" }).success).toBe(false);
+    });
+
+    it("refuses a role key that is the empty string rather than null", () => {
+      expect(parse({}, { roleKey: "" }).success).toBe(false);
+    });
+
+    it("refuses a role whose permission list holds an empty entry", () => {
+      expect(
+        defineRolesCommandDataSchema.safeParse({
+          tenantId: ORG,
+          organizationId: ORG,
+          commandId: "cmd_1",
+          actor: { type: "user", id: "user_admin" },
+          roles: [
+            {
+              roleId: "role_1",
+              name: "Auditor",
+              permissions: ["traces:read", ""],
+              kind: "custom",
+              occurredAtMs: 1_755_000_000_000,
+            },
+          ],
+        }).success,
+      ).toBe(false);
+    });
+  });
+});
+
+describe("the revocation wire boundary", () => {
+  function revoke(entry: Record<string, unknown>) {
+    return revokeGrantsCommandDataSchema.safeParse({
+      tenantId: ORG,
+      organizationId: ORG,
+      commandId: "cmd_1",
+      revocations: [entry],
+      actor: { type: "user", id: "user_admin" },
+      occurredAtMs: 1_755_000_000_000,
+    });
+  }
+
+  describe("given a revocation naming a grant id", () => {
+    it("accepts it", () => {
+      expect(revoke({ grantId: "grant_1" }).success).toBe(true);
+    });
+  });
+
+  describe("given a revocation naming an identity instead", () => {
+    it("accepts a principal with no scope, meaning every scope", () => {
+      expect(
+        revoke({ selector: { principal: { type: "api_key", id: "key_1" } } })
+          .success,
+      ).toBe(true);
+    });
+
+    it("accepts a principal narrowed to one scope", () => {
+      expect(
+        revoke({
+          selector: {
+            principal: { type: "user", id: "user_alice" },
+            scope: { type: "TEAM", id: "team_client_a" },
+          },
+        }).success,
+      ).toBe(true);
+    });
+
+    it("refuses a subject-less selector, which would revoke by nothing", () => {
+      expect(
+        revoke({ selector: { principal: { type: "user", id: null } } }).success,
+      ).toBe(false);
+    });
+  });
+
+  describe("given a revocation naming neither", () => {
+    it("refuses it rather than appending a fact that removes nothing", () => {
+      expect(revoke({ reason: "seat removed" }).success).toBe(false);
     });
   });
 });

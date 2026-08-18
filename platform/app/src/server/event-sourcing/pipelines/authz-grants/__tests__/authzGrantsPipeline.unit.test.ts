@@ -14,6 +14,7 @@ import {
   CUTOVER_COMPLETED_EVENT_TYPE,
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
+  MEMBER_OFFBOARDED_EVENT_TYPE,
   MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE,
 } from "../schemas/constants";
 import type { AuthzGrantsEvent } from "../schemas/events";
@@ -178,6 +179,61 @@ describe("authzGrantsState projection", () => {
       );
       expect(state.grants.grant_1).toBeUndefined();
       expect(state.cutover.onEngine).toBe(true);
+    });
+
+    it("sweeps the grants an offboarding never listed, which is how a lagging projection cannot leave access standing", () => {
+      let state = projection.init();
+      // The writer resolved `revokedGrantIds` from the compat projection, a
+      // fold behind: `grant_2` was appended a moment earlier and is invisible
+      // to that query.
+      for (const grantId of ["grant_1", "grant_2"]) {
+        state = projection.apply(
+          state,
+          ledgerEvent(GRANT_ATTACHED_EVENT_TYPE, {
+            grantId,
+            principal: { type: "user", id: "user_alice" },
+            roleKey: "member",
+            scope: { type: "TEAM", id: "team_client_a" },
+            source: "grants-service",
+            actor: ACTOR,
+          }),
+        );
+      }
+      state = projection.apply(
+        state,
+        ledgerEvent(MEMBER_OFFBOARDED_EVENT_TYPE, {
+          userId: "user_alice",
+          revokedGrantIds: ["grant_1"],
+          actor: ACTOR,
+        }),
+      );
+
+      expect(state.grants.grant_1).toBeUndefined();
+      expect(state.grants.grant_2).toBeUndefined();
+    });
+
+    it("sweeps by the identity a filtered revocation named", () => {
+      let state = projection.init();
+      state = projection.apply(
+        state,
+        ledgerEvent(GRANT_ATTACHED_EVENT_TYPE, {
+          grantId: "grant_key",
+          principal: { type: "api_key", id: "key_1" },
+          roleKey: "member",
+          scope: { type: "PROJECT", id: "proj_chatbot" },
+          source: "grants-service",
+          actor: ACTOR,
+        }),
+      );
+      state = projection.apply(
+        state,
+        ledgerEvent(GRANT_REVOKED_EVENT_TYPE, {
+          selector: { principal: { type: "api_key", id: "key_1" } },
+          actor: ACTOR,
+        }),
+      );
+
+      expect(state.grants.grant_key).toBeUndefined();
     });
 
     it("leaves state untouched for an event from another aggregate", () => {

@@ -37,6 +37,24 @@ export class GrantValidationError extends HandledError {
  * provisioning tool can treat as "already done". Reconciled here (PR 2)
  * BEFORE the write paths moved onto the ledger, so the wire never wobbled
  * between 400 `grant_validation_failed` and the contract.
+ *
+ * THE canonical thrower for `role_binding_already_exists`: every grant write
+ * that goes through GrantsService — which is every write the ledger owns —
+ * raises this class, lifted from the port's storage-level
+ * `DuplicateBindingError` by `rethrowKnownWriteFailure`. The two carry the
+ * same code on purpose: one is the storage signal, one is the customer's
+ * answer, and matching by code (never `instanceof`) is what keeps them
+ * interchangeable across a bundle or a serialisation boundary.
+ *
+ * One twin remains: `RoleBindingAlreadyExistsError`
+ * (`platform/app/src/server/role-bindings/errors.ts`) declares the same code
+ * for the legacy REST service that has not yet moved onto GrantsService. It
+ * goes when that path does; until then
+ * `platform/app/src/server/app-layer/authz/__tests__/duplicate-grant-code.unit.test.ts`
+ * pins the two to one customer-visible contract, so they cannot drift into
+ * answering the same code two different ways. A package cannot import the
+ * app's remediation registry, so the agent-facing `tips` for this code live
+ * there, keyed by code, and are attached by whichever class the path uses.
  */
 export class DuplicateGrantError extends HandledError {
   declare readonly code: "role_binding_already_exists";

@@ -32,6 +32,7 @@ export const APP_ERROR_CODES = [
   "api_key_permission_denied",
   "api_key_reserved_name",
   "api_key_scope_violation",
+  "authz_ledger_unavailable",
   "avatar_image_processing_failed",
   "avatar_image_too_large",
   "avatar_image_type_unsupported",

@@ -24,11 +24,55 @@ import type {
   OffboardCounts,
   RoleBindingWrite,
 } from "@langwatch/authz-server";
-import { BindingMissingError } from "@langwatch/authz-server";
+import {
+  BindingMissingError,
+  DuplicateBindingError,
+} from "@langwatch/authz-server";
 import type { PrismaClient } from "~/generated/prisma/client";
-import type { GrantsLedgerWriter } from "../ledger";
+import {
+  type GrantsLedgerWriter,
+  isRecordNotFound,
+  isUniqueViolation,
+} from "../ledger";
 import { PrismaAuthzGrantsRepository } from "./authz-grants.prisma.repository";
 import { PrismaAuthzReadRepository } from "./authz-read.prisma.repository";
+
+/**
+ * The port's two typed failures, restored on the way out.
+ *
+ * The parent class raised them from ONE place — its own Prisma calls. This
+ * implementation's writes travel through the ledger writer, which owns a
+ * legacy path (raw Prisma), a ledger path, and a synchronous enforcement
+ * write; a duplicate or missing-row signal can surface from any of them. The
+ * port documents `@throws DuplicateBindingError` / `@throws
+ * BindingMissingError`, and GrantsService turns exactly those two into the
+ * customer's 409 and 404 — anything that reaches it as a raw
+ * `PrismaClientKnownRequestError` degrades to an unknown 500 instead, which
+ * is a silently broken REST contract rather than a visible bug.
+ *
+ * Everything else passes through untouched: an infra failure has no action
+ * for the caller and must degrade to "unknown" with its trace id.
+ */
+function rethrowAsPortFailure(error: unknown): never {
+  if (
+    error instanceof DuplicateBindingError ||
+    error instanceof BindingMissingError
+  ) {
+    throw error;
+  }
+  if (isUniqueViolation(error)) throw new DuplicateBindingError();
+  if (isRecordNotFound(error)) throw new BindingMissingError();
+  throw error;
+}
+
+/** Run a write, and let only the port's own vocabulary out of it. */
+async function withPortFailures<T>(write: () => Promise<T>): Promise<T> {
+  try {
+    return await write();
+  } catch (error) {
+    rethrowAsPortFailure(error);
+  }
+}
 
 export class LedgerAuthzGrantsRepository extends PrismaAuthzGrantsRepository {
   constructor(
@@ -38,19 +82,26 @@ export class LedgerAuthzGrantsRepository extends PrismaAuthzGrantsRepository {
     super(db);
   }
 
+  /** @throws DuplicateBindingError on an identical binding at this scope. */
   override async createBinding(
     row: RoleBindingWrite,
     context: { actor: GrantWriteActor },
   ): Promise<void> {
     const { organizationId, ...binding } = row;
-    await this.writer.attachBindings({
-      organizationId,
-      bindings: [binding],
-      actor: context.actor,
-      onDuplicate: "reject",
-    });
+    await withPortFailures(() =>
+      this.writer.attachBindings({
+        organizationId,
+        bindings: [binding],
+        actor: context.actor,
+        onDuplicate: "reject",
+      }),
+    );
   }
 
+  /**
+   * @throws DuplicateBindingError when a sibling already holds the target role.
+   * @throws BindingMissingError when the row is gone.
+   */
   override async updateBindingRole({
     bindingId,
     organizationId,
@@ -64,15 +115,18 @@ export class LedgerAuthzGrantsRepository extends PrismaAuthzGrantsRepository {
     customRoleId: string | null;
     actor: GrantWriteActor;
   }): Promise<void> {
-    await this.writer.changeBindingRole({
-      organizationId,
-      bindingId,
-      role,
-      customRoleId,
-      actor,
-    });
+    await withPortFailures(() =>
+      this.writer.changeBindingRole({
+        organizationId,
+        bindingId,
+        role,
+        customRoleId,
+        actor,
+      }),
+    );
   }
 
+  /** @throws BindingMissingError when the row is gone. */
   override async deleteBinding({
     bindingId,
     organizationId,
@@ -90,13 +144,19 @@ export class LedgerAuthzGrantsRepository extends PrismaAuthzGrantsRepository {
       select: { id: true },
     });
     if (!existing) throw new BindingMissingError();
-    await this.writer.revokeBindings({
-      organizationId,
-      bindingIds: [bindingId],
-      actor,
-    });
+    await withPortFailures(() =>
+      this.writer.revokeBindings({
+        organizationId,
+        bindingIds: [bindingId],
+        actor,
+      }),
+    );
   }
 
+  /**
+   * @throws BindingMissingError when the delete matched nothing.
+   * @throws DuplicateBindingError when the narrower binding already exists.
+   */
   override async replaceBinding({
     deleteWhere,
     create,
@@ -111,25 +171,29 @@ export class LedgerAuthzGrantsRepository extends PrismaAuthzGrantsRepository {
     create: RoleBindingWrite;
     actor: GrantWriteActor;
   }): Promise<void> {
-    const revoked = await this.writer.revokeBindingsWhere({
-      organizationId: deleteWhere.organizationId,
-      where: {
-        scopeType: deleteWhere.scopeType,
-        scopeId: deleteWhere.scopeId,
-        ...deleteWhere.principal,
-      },
-      actor,
-      reason: "replaced by a narrower grant",
-    });
+    const revoked = await withPortFailures(() =>
+      this.writer.revokeBindingsWhere({
+        organizationId: deleteWhere.organizationId,
+        where: {
+          scopeType: deleteWhere.scopeType,
+          scopeId: deleteWhere.scopeId,
+          ...deleteWhere.principal,
+        },
+        actor,
+        reason: "replaced by a narrower grant",
+      }),
+    );
     // Nothing to reduce: the broad grant this call narrows is already gone.
     if (revoked === 0) throw new BindingMissingError();
     const { organizationId, ...binding } = create;
-    await this.writer.attachBindings({
-      organizationId,
-      bindings: [binding],
-      actor,
-      onDuplicate: "reject",
-    });
+    await withPortFailures(() =>
+      this.writer.attachBindings({
+        organizationId,
+        bindings: [binding],
+        actor,
+        onDuplicate: "reject",
+      }),
+    );
   }
 
   override async offboardUser({
@@ -149,6 +213,13 @@ export class LedgerAuthzGrantsRepository extends PrismaAuthzGrantsRepository {
     });
     // The fact first (the ledger is the truth), enforcement with it — the
     // deny holds before the membership rows move.
+    //
+    // The id list is what the compat projection could see, which is a fold
+    // behind the ledger; it is the audit record and the count this call
+    // answers with, NOT the instruction. The fold removes every grant the
+    // principal holds (the reducer's `member_offboarded` sweep), so a grant
+    // appended between this query and the append cannot outlive the
+    // departure.
     await this.writer.offboardMember({
       organizationId,
       userId,
