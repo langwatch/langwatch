@@ -33,4 +33,5 @@ Feature: Remote traceparent adoption across tracing styles
   Scenario: A with-block covers a trace started inside it
     Given the handler wraps its body in a span opened with the extracted context
     When a langwatch trace starts inside that block
-    Then every span carries the remote trace id
+    Then every span inside the block carries the remote trace id
+    And a span opened before the block keeps a different trace id

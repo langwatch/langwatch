@@ -12,7 +12,7 @@
 from typing import Sequence
 
 from opentelemetry import propagate
-from opentelemetry.context import attach, detach
+from opentelemetry.context import Context, attach, detach
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import (
     SimpleSpanProcessor,
@@ -84,7 +84,14 @@ def test_decorated_handler_without_early_extraction_starts_its_own_trace():
     def handler():
         pass
 
-    handler()
+    # Run under an empty context. The scenario is "nothing attached", and
+    # whatever span happens to be current when this test starts would
+    # otherwise parent the handler and decide the assertion below.
+    token = attach(Context())
+    try:
+        handler()
+    finally:
+        detach(token)
 
     assert REMOTE_TRACE_ID not in _trace_ids(exporter)
     assert exporter.spans[0].parent is None
@@ -130,13 +137,21 @@ def test_attach_covers_a_context_manager_trace_and_nested_spans():
 
 def test_a_with_block_covers_a_trace_started_inside_it():
     """The narrower pattern stays valid: a span opened with the extracted
-    context parents everything started inside its block."""
+    context parents everything started inside its block, and only that. Work
+    the handler does before the block stays outside the remote trace, which
+    is the limit that makes middleware the better placement."""
     provider, exporter = _make_provider_and_exporter()
     tracer = provider.get_tracer("agent")
+
+    with tracer.start_as_current_span("before-block"):
+        pass
 
     ctx = propagate.extract(HEADERS)
     with tracer.start_as_current_span("chat", context=ctx):
         with LangWatchTrace(name="inner", tracer_provider=provider):
             pass
 
-    assert _trace_ids(exporter) == {REMOTE_TRACE_ID}
+    by_name = {s.name: s for s in exporter.spans}
+    assert f"{by_name['chat'].context.trace_id:032x}" == REMOTE_TRACE_ID
+    assert f"{by_name['inner'].context.trace_id:032x}" == REMOTE_TRACE_ID
+    assert f"{by_name['before-block'].context.trace_id:032x}" != REMOTE_TRACE_ID
