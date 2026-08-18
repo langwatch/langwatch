@@ -66,7 +66,28 @@ beforeAll(async () => {
 afterAll(async () => {
   await resetApp();
   if (createdOrgIds.length > 0) {
+    // The governance slice provisions its own hidden project on first source
+    // mint, so projects and the team go before the organization does. Every
+    // delete is anchored on the orgs this file created.
+    const projectIds = (
+      await prisma.project.findMany({
+        where: { team: { organizationId: { in: createdOrgIds } } },
+        select: { id: true },
+      })
+    ).map((project) => project.id);
+
     await prisma.ingestionSource.deleteMany({
+      where: { organizationId: { in: createdOrgIds } },
+    });
+    if (projectIds.length > 0) {
+      await prisma.projectSecret.deleteMany({
+        where: { projectId: { in: projectIds } },
+      });
+    }
+    await prisma.project.deleteMany({
+      where: { team: { organizationId: { in: createdOrgIds } } },
+    });
+    await prisma.team.deleteMany({
       where: { organizationId: { in: createdOrgIds } },
     });
     await prisma.organization.deleteMany({
@@ -80,6 +101,14 @@ async function makeOrg(): Promise<string> {
   await prisma.organization.create({
     data: { id, name: `ACME ${id}`, slug: id },
   });
+
+  // The governance slice provisions a hidden project on first source mint and
+  // refuses to do so for an org with no team, so the org needs one before
+  // `createSource` will run at all.
+  await prisma.team.create({
+    data: { name: `ACME Team ${id}`, slug: `${id}-team`, organizationId: id },
+  });
+
   createdOrgIds.push(id);
   return id;
 }
