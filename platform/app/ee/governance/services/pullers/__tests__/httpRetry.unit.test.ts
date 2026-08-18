@@ -64,63 +64,105 @@ async function loadHelper() {
 }
 
 describe("fetchWithRetry", () => {
-  /** @scenario Retry behaviour per response status */
-  it("returns 2xx, retries 429 and 5xx, and fails fast on other 4xx", async () => {
-    const { fetchWithRetry } = await loadHelper();
-    const sleeps: number[] = [];
-    const sleep = async (ms: number) => void sleeps.push(ms);
+  describe("given a response the endpoint returns straight away", () => {
+    describe("when the status is 2xx", () => {
+      /** @scenario "Retry behaviour per response status" */
+      it("returns it without retrying or sleeping", async () => {
+        const { fetchWithRetry } = await loadHelper();
+        const sleeps: number[] = [];
+        const sleep = async (ms: number) => void sleeps.push(ms);
 
-    // 200 — returned, no retry.
-    responseQueue = [{ status: 200, body: { ok: true } }];
-    const ok = await fetchWithRetry({ url: URL_UNDER_TEST, sleep });
-    expect(ok.status).toBe(200);
-    expect(capturedUrls).toHaveLength(1);
-    expect(sleeps).toEqual([]);
+        responseQueue = [{ status: 200, body: { ok: true } }];
+        const ok = await fetchWithRetry({ url: URL_UNDER_TEST, sleep });
 
-    // 429 with Retry-After: 2 — waits the stated two seconds, then succeeds.
-    capturedUrls = [];
-    sleeps.length = 0;
-    responseQueue = [
-      { status: 429, headers: { "retry-after": "2" } },
-      { status: 200, body: { ok: true } },
-    ];
-    const afterRateLimit = await fetchWithRetry({ url: URL_UNDER_TEST, sleep });
-    expect(afterRateLimit.status).toBe(200);
-    expect(sleeps).toEqual([2000]);
-
-    // 429 without Retry-After — falls back to the backoff schedule.
-    capturedUrls = [];
-    sleeps.length = 0;
-    responseQueue = [{ status: 429 }, { status: 200, body: { ok: true } }];
-    const afterBackoff = await fetchWithRetry({ url: URL_UNDER_TEST, sleep });
-    expect(afterBackoff.status).toBe(200);
-    expect(sleeps).toEqual([250]);
-
-    // 503 — retried on the same schedule the 5xx path always used.
-    capturedUrls = [];
-    sleeps.length = 0;
-    responseQueue = [{ status: 503 }, { status: 200, body: { ok: true } }];
-    const afterServerError = await fetchWithRetry({
-      url: URL_UNDER_TEST,
-      sleep,
+        expect(ok.status).toBe(200);
+        expect(capturedUrls).toHaveLength(1);
+        expect(sleeps).toEqual([]);
+      });
     });
-    expect(afterServerError.status).toBe(200);
-    expect(sleeps).toEqual([250]);
-
-    // 400 and 401 — thrown immediately, never retried.
-    for (const status of [400, 401]) {
-      capturedUrls = [];
-      sleeps.length = 0;
-      responseQueue = [{ status }, { status: 200, body: { ok: true } }];
-      await expect(
-        fetchWithRetry({ url: URL_UNDER_TEST, sleep }),
-      ).rejects.toThrow(new RegExp(`HTTP ${status}`));
-      expect(capturedUrls).toHaveLength(1);
-      expect(sleeps).toEqual([]);
-    }
   });
 
-  /** @scenario Retry budget exhausted surfaces the failure rather than returning empty */
+  describe("given the endpoint rate-limits the request", () => {
+    describe("when the 429 carries a Retry-After header", () => {
+      /** @scenario "Retry behaviour per response status" */
+      it("waits exactly the stated interval, not the backoff schedule", async () => {
+        const { fetchWithRetry } = await loadHelper();
+        const sleeps: number[] = [];
+        const sleep = async (ms: number) => void sleeps.push(ms);
+
+        responseQueue = [
+          { status: 429, headers: { "retry-after": "2" } },
+          { status: 200, body: { ok: true } },
+        ];
+        const afterRateLimit = await fetchWithRetry({
+          url: URL_UNDER_TEST,
+          sleep,
+        });
+
+        expect(afterRateLimit.status).toBe(200);
+        expect(sleeps).toEqual([2000]);
+      });
+    });
+
+    describe("when the 429 carries no Retry-After header", () => {
+      /** @scenario "Retry behaviour per response status" */
+      it("falls back to the backoff schedule", async () => {
+        const { fetchWithRetry } = await loadHelper();
+        const sleeps: number[] = [];
+        const sleep = async (ms: number) => void sleeps.push(ms);
+
+        responseQueue = [{ status: 429 }, { status: 200, body: { ok: true } }];
+        const afterBackoff = await fetchWithRetry({
+          url: URL_UNDER_TEST,
+          sleep,
+        });
+
+        expect(afterBackoff.status).toBe(200);
+        expect(sleeps).toEqual([250]);
+      });
+    });
+  });
+
+  describe("given the endpoint fails with a server error", () => {
+    describe("when the status is 5xx", () => {
+      /** @scenario "Retry behaviour per response status" */
+      it("retries on the same schedule the 5xx path always used", async () => {
+        const { fetchWithRetry } = await loadHelper();
+        const sleeps: number[] = [];
+        const sleep = async (ms: number) => void sleeps.push(ms);
+
+        responseQueue = [{ status: 503 }, { status: 200, body: { ok: true } }];
+        const afterServerError = await fetchWithRetry({
+          url: URL_UNDER_TEST,
+          sleep,
+        });
+
+        expect(afterServerError.status).toBe(200);
+        expect(sleeps).toEqual([250]);
+      });
+    });
+  });
+
+  describe("given the endpoint refuses the request", () => {
+    describe.each([400, 401])("when the status is %i", (status) => {
+      /** @scenario "Retry behaviour per response status" */
+      it("throws immediately and never retries", async () => {
+        const { fetchWithRetry } = await loadHelper();
+        const sleeps: number[] = [];
+        const sleep = async (ms: number) => void sleeps.push(ms);
+
+        responseQueue = [{ status }, { status: 200, body: { ok: true } }];
+
+        await expect(
+          fetchWithRetry({ url: URL_UNDER_TEST, sleep }),
+        ).rejects.toThrow(new RegExp(`HTTP ${status}`));
+        expect(capturedUrls).toHaveLength(1);
+        expect(sleeps).toEqual([]);
+      });
+    });
+  });
+
+  /** @scenario "Retry budget exhausted surfaces the failure rather than returning empty" */
   it("throws once the retry budget is spent instead of reporting an empty success", async () => {
     const { fetchWithRetry } = await loadHelper();
     const sleeps: number[] = [];
@@ -137,7 +179,7 @@ describe("fetchWithRetry", () => {
     expect(sleeps).toEqual([250, 500]);
   });
 
-  /** @scenario Retry wait that would overrun the job deadline is not attempted */
+  /** @scenario "Retry wait that would overrun the job deadline is not attempted" */
   it("refuses to sleep past the deadline and hands control back instead", async () => {
     const { fetchWithRetry, RetryDeadlineExceededError } = await loadHelper();
     const sleeps: number[] = [];
@@ -205,7 +247,7 @@ describe("fetchWithRetry", () => {
 });
 
 describe("existing adapters after the 429 change", () => {
-  /** @scenario Existing adapters gain 429 handling without losing their failure signal */
+  /** @scenario "Existing adapters gain 429 handling without losing their failure signal" */
   it("retries a resolvable 429 but still ends the run visibly when it does not resolve", async () => {
     // `http_custom` (http_polling) and `claude_compliance` both route their
     // fetches through this helper now. Before the extraction a 429 fell into

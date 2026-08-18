@@ -22,7 +22,7 @@ const read = (relativeToRepo: string): string =>
   readFileSync(join(REPO_ROOT, relativeToRepo), "utf8");
 
 describe("copilot_studio retirement", () => {
-  /** @scenario The registry no longer resolves the copilot_studio adapter id */
+  /** @scenario "The registry no longer resolves the copilot_studio adapter id" */
   it("resolves microsoft_365_audit and nothing for the retired id", () => {
     registerBuiltInPullers();
 
@@ -34,7 +34,7 @@ describe("copilot_studio retirement", () => {
     expect(pullerAdapterRegistry.ids()).not.toContain("copilot_studio");
   });
 
-  /** @scenario The two known-false copy strings are gone */
+  /** @scenario "The two known-false copy strings are gone" */
   it("no longer claims a Purview API it never called, nor hashing it never did", () => {
     const composer = read(
       "platform/app/ee/governance/dashboard/pages/ingestion-sources.tsx",
@@ -53,7 +53,7 @@ describe("copilot_studio retirement", () => {
     expect(composer).toContain("ActivityFeed.Read");
   });
 
-  /** @scenario Documentation stops describing a poller that has not shipped */
+  /** @scenario "Documentation stops describing a poller that has not shipped" */
   it("documents the shipped puller and keeps the published URL resolving", () => {
     const page = read(
       "docs/ai-governance/ingestion-sources/microsoft-365-audit.mdx",
@@ -69,18 +69,32 @@ describe("copilot_studio retirement", () => {
     // An operator with the retired source needs to know to re-create it.
     expect(page).toContain("re-create");
 
-    const docsJson = read("docs/docs.json");
-    // Nav points at a page that exists.
-    expect(docsJson).toContain(
-      "ai-governance/ingestion-sources/microsoft-365-audit",
-    );
-    // Both previously published URLs still resolve rather than 404.
-    expect(docsJson).toContain(
-      '"source": "/ai-gateway/governance/ingestion-sources/copilot-studio"',
-    );
-    expect(docsJson).toContain(
-      '"source": "/ai-governance/ingestion-sources/copilot-studio"',
-    );
+    // Parsed, not string-matched: a formatter that rewraps docs.json must
+    // not be able to break this test, and a redirect whose destination is
+    // wrong reads exactly like a correct one in the raw text.
+    const docsJson = JSON.parse(read("docs/docs.json")) as {
+      redirects?: Array<{ source: string; destination: string }>;
+    };
+    const redirects = docsJson.redirects ?? [];
+
+    for (const source of [
+      "/ai-gateway/governance/ingestion-sources/copilot-studio",
+      "/ai-governance/ingestion-sources/copilot-studio",
+    ]) {
+      const redirect = redirects.find((entry) => entry.source === source);
+
+      // Both previously published URLs still resolve rather than 404.
+      expect(redirect, `no redirect declared for ${source}`).toBeDefined();
+      expect(redirect?.destination).toBe(
+        "/ai-governance/ingestion-sources/microsoft-365-audit",
+      );
+
+      // And the page it lands on is really there — a redirect to a missing
+      // page is a 404 with extra steps.
+      expect(() =>
+        read(`docs${redirect?.destination ?? ""}.mdx`),
+      ).not.toThrow();
+    }
     // And the old page is genuinely gone, not merely unlinked.
     expect(() =>
       read("docs/ai-governance/ingestion-sources/copilot-studio.mdx"),
@@ -89,7 +103,7 @@ describe("copilot_studio retirement", () => {
 });
 
 describe("ingestion-source picker", () => {
-  /** @scenario copilot_studio can no longer be selected in the picker */
+  /** @scenario "copilot_studio can no longer be selected in the picker" */
   it("offers microsoft_365_audit and not the retired source type", () => {
     const composer = read(
       "platform/app/ee/governance/dashboard/pages/ingestion-sources.tsx",

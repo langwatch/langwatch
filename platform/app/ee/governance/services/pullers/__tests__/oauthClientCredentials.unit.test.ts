@@ -61,7 +61,7 @@ const tokenEndpoint = (tenantId: string) =>
   `https://login.microsoftonline.test/${tenantId}/oauth2/v2.0/token`;
 
 describe("createTokenProvider", () => {
-  /** @scenario Token is fetched once per run and reused for that run's requests */
+  /** @scenario "Token is fetched once per run and reused for that run's requests" */
   it("calls the token endpoint once and hands the same token to every caller", async () => {
     const { createTokenProvider } = await loadProvider();
     responseQueue = [
@@ -110,7 +110,7 @@ describe("createTokenProvider", () => {
     expect(capturedCalls).toHaveLength(1);
   });
 
-  /** @scenario A token expiring mid-run is refreshed before it is used */
+  /** @scenario "A token expiring mid-run is refreshed before it is used" */
   it("refreshes once the refresh margin is crossed, never returning an expired token", async () => {
     const { createTokenProvider, REFRESH_MARGIN_MS } = await loadProvider();
     const refreshed = `${TOKEN}-refreshed`;
@@ -165,7 +165,7 @@ describe("createTokenProvider", () => {
     expect(await provider.getToken()).toBe(`${TOKEN}-2`);
   });
 
-  /** @scenario Token value never reaches logs or error messages */
+  /** @scenario "Token value never reaches logs or error messages" */
   it("keeps the token and the client secret out of every error it raises", async () => {
     const { createTokenProvider, TokenAcquisitionError } = await loadProvider();
     const { fetchWithRetry } = await import("../shared/httpRetry");

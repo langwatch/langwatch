@@ -38,7 +38,7 @@ const record = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("mapAuditRecord", () => {
-  /** @scenario The three user identifiers are mapped to distinct fields */
+  /** @scenario "The three user identifiers are mapped to distinct fields" */
   it("keeps the UPN and the PUID apart and claims no Entra object id", () => {
     const mapped = mapAuditRecord(record());
 
@@ -55,7 +55,7 @@ describe("mapAuditRecord", () => {
     expect(keys.some((k) => /object_id|entra_id|oid/i.test(k))).toBe(false);
   });
 
-  /** @scenario Non-human actors are not attributed to a person */
+  /** @scenario "Non-human actors are not attributed to a person" */
   it("marks application and service-principal actors instead of naming a human", () => {
     for (const userType of [5, 6]) {
       const mapped = mapAuditRecord(record({ UserType: userType }));
@@ -71,7 +71,7 @@ describe("mapAuditRecord", () => {
     expect(human.actor).toBe(UPN);
   });
 
-  /** @scenario Cost and token fields are zero because the source cannot carry them */
+  /** @scenario "Cost and token fields are zero because the source cannot carry them" */
   it("reports zero cost and tokens rather than estimating them", () => {
     const mapped = mapAuditRecord(record());
 
@@ -88,7 +88,7 @@ describe("mapAuditRecord", () => {
     expect(withSize.tokens_input).toBe(0);
   });
 
-  /** @scenario Raw payload is preserved verbatim for downstream replay */
+  /** @scenario "Raw payload is preserved verbatim for downstream replay" */
   it("preserves the original record verbatim", () => {
     const original = record();
     const mapped = mapAuditRecord(original);
@@ -96,7 +96,7 @@ describe("mapAuditRecord", () => {
     expect(JSON.parse(mapped.raw_payload)).toEqual(original);
   });
 
-  /** @scenario AgentId is carried through without asserting an inventory join */
+  /** @scenario "AgentId is carried through without asserting an inventory join" */
   it("carries AgentId verbatim, joins nothing, and records the missing environment", () => {
     const mapped = mapAuditRecord(record());
 
@@ -112,7 +112,7 @@ describe("mapAuditRecord", () => {
     expect(mapped.extra?.environment_id).toBeNull();
   });
 
-  /** @scenario Dedup key is derived only from record content */
+  /** @scenario "Dedup key is derived only from record content" */
   it("derives source_event_id from the record so re-drains collapse", () => {
     const first = mapAuditRecord(record());
     const second = mapAuditRecord(record());
@@ -145,14 +145,14 @@ describe("Microsoft365AuditPuller.validateConfig", () => {
     },
   };
 
-  /** @scenario Config shape validates */
+  /** @scenario "Config shape validates" */
   it("accepts a complete config", () => {
     const adapter = new Microsoft365AuditPuller();
     expect(() => adapter.validateConfig(valid)).not.toThrow();
     expect(adapter.id).toBe("microsoft_365_audit");
   });
 
-  /** @scenario Config missing any credential field is rejected with a registered error code */
+  /** @scenario "Config missing any credential field is rejected with a registered error code" */
   it("rejects each missing credential by name without echoing any value", () => {
     const adapter = new Microsoft365AuditPuller();
 

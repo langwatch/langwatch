@@ -113,7 +113,7 @@ async function runDisableMigration(): Promise<void> {
 }
 
 describe("microsoft_365_audit credential seam", () => {
-  /** @scenario Client secret submitted in the UI reaches the adapter decrypted */
+  /** @scenario "Client secret submitted in the UI reaches the adapter decrypted" */
   it("encrypts the client secret at rest and hands the real value back to the worker", async () => {
     const organizationId = await makeOrg();
     const service = IngestionSourceService.create(prisma);
@@ -161,7 +161,7 @@ describe("microsoft_365_audit credential seam", () => {
 });
 
 describe("copilot_studio disable migration", () => {
-  /** @scenario Existing copilot_studio sources are disabled with a stated reason */
+  /** @scenario "Existing copilot_studio sources are disabled with a stated reason" */
   it("disables the retired sources, states why, and leaves their config intact", async () => {
     const organizationId = await makeOrg();
     const parserConfig = {
@@ -198,7 +198,7 @@ describe("copilot_studio disable migration", () => {
     expect(after.sourceType).toBe("copilot_studio");
   });
 
-  /** @scenario Migration is idempotent and does not clobber a deliberate re-enable */
+  /** @scenario "Migration is idempotent and does not clobber a deliberate re-enable" */
   it("leaves a re-enabled source as the admin set it and never double-stamps", async () => {
     const organizationId = await makeOrg();
     const created = await prisma.ingestionSource.create({
