@@ -966,7 +966,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.26.0"
+version = "1.2.0"
 source = { editable = "../../sdks/python" }
 dependencies = [
     { name = "attrs" },
@@ -989,6 +989,7 @@ dependencies = [
     { name = "retry" },
     { name = "tenacity" },
     { name = "termcolor" },
+    { name = "tqdm" },
 ]
 
 [package.metadata]
@@ -1013,20 +1014,21 @@ requires-dist = [
     { name = "pksuid", specifier = ">=1.1.2" },
     { name = "pydantic", specifier = ">=2" },
     { name = "pytest", marker = "extra == 'tests'", specifier = ">=7.4.2,<10.0.0" },
-    { name = "pytest-asyncio", marker = "extra == 'tests'", specifier = ">=0.21.1,<0.22.0" },
+    { name = "pytest-asyncio", marker = "extra == 'tests'", specifier = ">=0.21.1,<1.5.0" },
     { name = "python-liquid", specifier = ">=2.2.0" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "retry", specifier = ">=0.9.2" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11.1" },
     { name = "tenacity", specifier = ">=8.0.0" },
     { name = "termcolor", specifier = ">=3.0.1" },
+    { name = "tqdm", specifier = ">=4.62.0" },
 ]
 provides-extras = ["langchain", "dspy", "litellm", "dev", "tests"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "black", specifier = ">=26.3.1" }]
 examples = [
-    { name = "anthropic", specifier = ">=0.36.0,<0.114.0" },
+    { name = "anthropic", specifier = ">=0.36.0,<0.122.0" },
     { name = "chainlit", specifier = ">=2.11.1,<3" },
     { name = "cloudpickle", specifier = ">=3.1.1" },
     { name = "dspy-ai", specifier = ">=3.0.3,<4" },
@@ -1040,13 +1042,13 @@ examples = [
     { name = "langchain", specifier = ">=1.0.0,<2.0.0" },
     { name = "langchain-community", specifier = ">=0.3.0,<1.0.0" },
     { name = "langchain-google-vertexai", specifier = ">=2.0.0,<4.0.0" },
-    { name = "langchain-openai", specifier = ">=0.3.0,<1.0.0" },
-    { name = "langchain-text-splitters", specifier = ">=0.3.0,<1.0.0" },
+    { name = "langchain-openai", specifier = ">=1.5.1,<2.0.0" },
+    { name = "langchain-text-splitters", specifier = ">=1.1.2,<2.0.0" },
     { name = "langgraph", specifier = ">=1.0.0,<2.0.0" },
     { name = "langsmith", specifier = ">=0.8.0" },
     { name = "litellm", specifier = ">=1.84.0" },
     { name = "nltk", specifier = ">=3.9.4" },
-    { name = "openai", specifier = ">=1.68.2,<2.45.0" },
+    { name = "openai", specifier = ">=1.68.2,<2.54.0" },
     { name = "openinference-instrumentation-dspy", specifier = ">=0.1.23,<0.2.0" },
     { name = "openinference-instrumentation-litellm", specifier = ">=0.1.19" },
     { name = "openinference-instrumentation-openai", specifier = ">=0.1.30" },
@@ -1060,7 +1062,7 @@ examples = [
     { name = "strands-agents", extras = ["otel"], specifier = ">=1.14.0,<2.0.0" },
     { name = "streamlit", specifier = ">=1.37.1,<2.0.0" },
     { name = "unstructured", extras = ["pdf"], specifier = ">=0.18.18" },
-    { name = "uvicorn", specifier = ">=0.38.0,<0.50.0" },
+    { name = "uvicorn", specifier = ">=0.38.0,<0.53.0" },
 ]
 tests = [
     { name = "factory-boy", specifier = ">=3.3.3" },
