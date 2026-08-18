@@ -25,7 +25,10 @@ import type { PrismaClient } from "~/generated/prisma/client";
  * (@langwatch/authz-server).
  */
 export class PrismaAuthzMigrationRepository
-  implements AuthzMigrationRepository, AuthzGenesisRepository, AuthzCutoverRepository
+  implements
+    AuthzMigrationRepository,
+    AuthzGenesisRepository,
+    AuthzCutoverRepository
 {
   constructor(private readonly prisma: PrismaClient) {}
 

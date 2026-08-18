@@ -100,9 +100,9 @@ export class CutoverAwareAuthzReadRepository implements AuthzReadRepository {
     userId: string;
     organizationId: string;
   }): Promise<LegacyTeamMembership[]> {
-    return (await this.readerFor(args.organizationId)).findLegacyTeamMemberships(
-      args,
-    );
+    return (
+      await this.readerFor(args.organizationId)
+    ).findLegacyTeamMemberships(args);
   }
 
   async findCustomRolePermissions(args: {
@@ -110,9 +110,9 @@ export class CutoverAwareAuthzReadRepository implements AuthzReadRepository {
     principal: AuthzPrincipalRef;
     customRoleIds: readonly string[];
   }): Promise<CustomRolePermissionsRow[]> {
-    return (await this.readerFor(args.organizationId)).findCustomRolePermissions(
-      args,
-    );
+    return (
+      await this.readerFor(args.organizationId)
+    ).findCustomRolePermissions(args);
   }
 
   async findShareLinks(args: {
@@ -139,7 +139,9 @@ export class CutoverAwareAuthzReadRepository implements AuthzReadRepository {
     return this.repositories.legacy.findTeamOrganization(args);
   }
 
-  private async readerFor(organizationId: string): Promise<AuthzReadRepository> {
+  private async readerFor(
+    organizationId: string,
+  ): Promise<AuthzReadRepository> {
     return (await cutoverOnEngine({ prisma: this.prisma, organizationId }))
       ? this.repositories.grants
       : this.repositories.legacy;

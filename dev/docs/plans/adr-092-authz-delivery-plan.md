@@ -443,16 +443,82 @@ under "Per-organization write cutover".
 Reads still do not move: every permission check keeps reading the legacy
 tables, per org, until PR 3.
 
-**Next is PR 3** — the composite per-org cutover migration (remaining facts,
-parity proof over every registry permission, `cutover_completed`), the fork
-at the 10 seams, the collector repoint onto `Grant`/`Role`, ShareService onto
-the ledger, and rollback inside the gate's TTL — then our own organization
-first, in production, before the cohort widens.
+PR 3, delivered 2026-08-18 on `feat/adr-092-per-org-cutover` (stacked on
+PR 2) — reads move, one organization at a time:
 
-The rollout after PR 1–2 merge is one organization at a time: cut an org
-over in one batch (its whole surface into `Grant`s via the ledger), then
-that org reads from the engine — the fork, the collector repoint, and the
-batch import are PR 3.
+1. **The gate** (`app-layer/authz/cutover-gate.ts`): `cutoverOnEngine` reads
+   `AuthzCutoverProjection.onEngine` through a 60s cache in BOTH directions,
+   browser-safe like `legacy-fallback-gate.ts` (caller-supplied Prisma, no
+   module-scope storage), storage error → legacy. Unlike stage B's
+   finalization latch a cutover is reversible, so neither answer may be
+   cached forever: the positive bound is the rollback lever's budget, the
+   negative bound is what lets a completed cutover land fleet-wide with no
+   deploy.
+2. **The fork at the seams**: seven in `api/rbac.ts`, three in
+   `rbac/role-binding-resolver.ts`. A cut-over organization is DECIDED by the
+   engine and the legacy walk runs behind it as the reverse-shadow
+   comparison (`AuthzForkService`, logger `langwatch:authz:fork`,
+   `primary: "engine"`); everyone else keeps the legacy answer with stage
+   A4's shadow behind IT. Each seam's legacy body was factored into one thunk
+   both paths call, so there is a single legacy implementation, not two.
+3. **The collector repoint**: `GrantsAuthzReadRepository` reads
+   `Grant`/`Role` (+`GrantUsage` for share links) with the legacy repo's
+   query shapes and tenancy fencing, and `CutoverAwareAuthzReadRepository`
+   picks the head per organization off the same gate — so "on the engine"
+   means on everywhere at once, and a request can never mix heads.
+4. **The composite cutover migration** (`GrantsCutoverMigration`, registered
+   last): it holds any tenant whose backfill and genesis import have not
+   finalized, then imports the four families of fact that never had a
+   binding row — share links as RESOURCE grants (adopting the link's own id,
+   so circulated tokens keep resolving), `OrganizationUser.role = EXTERNAL`
+   as org-scoped `lite-member`, `Project.apiKey` as a PROJECT-principal
+   grant, and `ADMIN_EMAILS` operators as PLATFORM grants on a sentinel
+   `"platform"` aggregate whose command ids are a function of the user
+   alone, so the hundredth organization's emission dedupes. Then two proofs:
+   the resource import re-read field for field, and the decision-parity
+   sweep — every registry permission, for every member and every key, at
+   organization, team and project scope, collected once through each head
+   and decided by the pure engine. Diffs are recorded as a
+   `proveMigrationParity` fact and hold the organization; clean means
+   `proveMigrationParity` with an empty list, then `completeCutover`, then
+   `onEngine`. Everything imported is a dormant fact in PR 3 — the engine
+   still infers those decisions from membership, so the flip changes who
+   decides and not what is decided.
+5. **ShareService on the ledger** for cut-over organizations: mints and
+   revocations become commands, reads stay on the compat `ShareLink` head
+   (complete by construction), and `viewCount` moves to a ShareService-owned
+   `GrantUsage` row (decision 22) incremented conditionally against the cap
+   and mirrored back onto the compat row, so a rollback finds the count
+   where it left it. The fold never writes accounting.
+6. **The cohort knob** `AUTHZ_CUTOVER_COHORT`, deliberately separate from
+   `SYSTEM_MIGRATIONS_COHORT`: the backfill and the import are dark and can
+   go wide, while the cutover is the one migration that changes who decides.
+   Both are plain `process.env` reads with no env-schema entry, and the trap
+   PR 2 carries forward applies to both — they must be set on the **web and
+   the worker deployments alike**. The worker runs the boot pass; the ops
+   page's "run a pass now" runs the same entry point inside web, so a
+   cohort set on one deployment gives the two processes different answers
+   about which organizations are in it.
+7. **Instant rollback**: the generic ops rollback gained per-migration
+   `rollbackEffects`, invoked after the `rolled_back` pin is written. For
+   the cutover: the `cutover_rolled_back` fact, then the projection flipped
+   off synchronously (decision 7's revocation class), then the epoch bump.
+   The organization is back on legacy within the gate's 60s window, with no
+   deploy and with the queue stopped.
+8. **The doctrine's tests**, on the datastore lane
+   (`app-layer/authz/__tests__/cutover-{fork,rollback,import}.integration.test.ts`):
+   a whole pass to a clean proof with the fork then serving a grant-head-only
+   fact, a rollback applied before the call returns with the queue severed and
+   Redis disconnected, and the three import families landing with their source
+   rows' business time. The three cutover scenarios in
+   `in-place-authz-migration.feature` drop `@unimplemented` and bind to them,
+   and `unified-authorization-engine.feature` gains the per-organization fork
+   block.
+
+**Next is our own organization first, in production** — cut over, watched, and
+used end to end before `AUTHZ_CUTOVER_COHORT` names anyone else. Then the
+cohort widens organization by organization, each one behind its own parity
+proof, with the rollback lever as the only thing anyone has to remember.
 
 ## The identity platform (the next programme) — doors left open
 

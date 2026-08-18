@@ -446,7 +446,9 @@ function audienceFor({
       // A visibility added to the stored enum without an audience here would
       // otherwise mint a link nobody can match.
       const unreachable: never = visibility;
-      throw new Error(`unhandled share link visibility: ${String(unreachable)}`);
+      throw new Error(
+        `unhandled share link visibility: ${String(unreachable)}`,
+      );
     }
   }
 }

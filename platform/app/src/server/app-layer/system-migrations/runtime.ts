@@ -248,8 +248,12 @@ export function registeredMigrations(): SystemMigration[] {
       // the organization is still on legacy, and the forking decorator
       // would answer from one head twice.
       collectors: {
-        legacy: new AuthzCollectorService(new PrismaAuthzReadRepository(prisma)),
-        grants: new AuthzCollectorService(new GrantsAuthzReadRepository(prisma)),
+        legacy: new AuthzCollectorService(
+          new PrismaAuthzReadRepository(prisma),
+        ),
+        grants: new AuthzCollectorService(
+          new GrantsAuthzReadRepository(prisma),
+        ),
       },
       // A knob of its own, deliberately not SYSTEM_MIGRATIONS_COHORT: the
       // backfill and the genesis import are dark and can go wide, while the
