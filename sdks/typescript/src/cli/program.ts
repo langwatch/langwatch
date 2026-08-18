@@ -1618,7 +1618,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .description("Expose a local agent server through a public tunnel and point a registered HTTP agent at it (Ctrl-C restores the previous URL)")
     .option("--port <number>", "Local port to expose (tunnels http://localhost:<number>)")
     .option("--url <url>", "Local URL to expose (mutually exclusive with --port)")
-    .option("--agent <idOrName>", "Which registered HTTP agent to point at the tunnel (picker when omitted)")
+    .option("--agent <idOrName>", "Which registered HTTP agent to point at the tunnel (when omitted: picker, created on the spot if the project has none)")
     .option("--tunnel-url <url>", "Bring your own tunnel URL and skip tunnel provisioning")
     .option("--no-update-url", "Print the tunnel URL without changing the agent")
     .option("--no-auth", "Skip the local auth proxy (for servers that already authenticate requests)")
