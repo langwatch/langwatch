@@ -78,10 +78,17 @@ rather than a dedicated one. Escape hatch, if you know better:
 ### Service dependencies
 
 `api` tests that ingest a trace and wait for something downstream of it —
-`automations-dispatch.spec.ts` in particular — need **ClickHouse** running, as
-projection is what makes a trace visible to the dispatcher. `POST /api/collector`
-returns 200 regardless, so a missing ClickHouse shows up as a dispatch timeout,
-not an ingestion error. Tenant and annotation specs are Postgres-only.
+`automations-dispatch.spec.ts` in particular — need two things beyond Postgres.
+
+**ClickHouse**, because projection is what makes a trace visible to the
+dispatcher. **A worker**, because `POST /api/collector` only enqueues: the
+projection and the process-manager dispatch are both worker work, and
+`pnpm dev` gives you one in-process by default while a bare `pnpm start` does
+not (set `WORKERS_IN_PROCESS=1`, as CI does).
+
+Either one missing looks identical from the test's side — the collector still
+answers 200 and the assertion fails as a dispatch timeout rather than as an
+ingestion error. Tenant and annotation specs need neither.
 
 ## Architecture
 
@@ -282,7 +289,13 @@ E2E tests are configured to run in CI with:
 
 See `.github/workflows/e2e-ci.yml` for the full configuration.
 
-The CI workflow installs dependencies for both `platform/app/` and `tests/agentic-e2e/` and runs tests using `pnpm test` from the e2e directory.
+The CI workflow installs dependencies for both `platform/app/` and
+`tests/agentic-e2e/` and runs the suite from the e2e directory. It picks the
+projects by event: a pull request and the merge queue run `--project=api`,
+while the scheduled run and a push to main run every project, browser tier
+included. It also boots the app with `WORKERS_IN_PROCESS=1` — the headless
+specs assert side effects a worker produces, and a dispatch-only app would
+accept the trace and then never act on it.
 
 **Global Setup (`global-setup.ts`):**
 - Validates environment configuration

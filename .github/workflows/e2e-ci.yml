@@ -16,9 +16,11 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   workflow_dispatch:
-  # Optional: run nightly for regression detection
-  # schedule:
-  #   - cron: '0 6 * * *'  # 6 AM UTC daily
+  # ADR-010 puts the capped browser tier here rather than on every pull
+  # request. detect-changes forces `relevant`/`heavy` true on a schedule
+  # event, so this run reaches the e2e job with no diff to filter on.
+  schedule:
+    - cron: '0 6 * * *'  # 6 AM UTC daily
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -64,6 +66,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
+    # Without this the fallback is GitHub's 6-hour default. The headless tier
+    # polls for asynchronous side effects, so a stack that never becomes ready
+    # fails as timeouts rather than as a boot error, and it must not do that
+    # for six hours.
+    timeout-minutes: 45
     env:
       # App configuration
       DATABASE_URL: "postgresql://prisma:prisma@localhost:5433/testdb?schema=testdb"
@@ -277,6 +284,20 @@ jobs:
           SKIP_CLICKHOUSE_MIGRATE: "true"
           # Launch the runner's preinstalled Google Chrome (no browser download)
           E2E_BROWSER_CHANNEL: chrome
+          # `pnpm start` boots a dispatch-only web process unless this is set:
+          # start.sh only adds a worker lane for WORKERS_IN_PROCESS/START_WORKERS,
+          # and the app hosts the stack in-process only under NODE_ENV=development,
+          # which this job already sets. The headless tier asserts side effects a
+          # worker produces — trace projection and process-manager dispatch — so
+          # without it POST /api/collector returns 200, nothing consumes the
+          # queue, and the automations specs poll until they time out.
+          WORKERS_IN_PROCESS: "1"
+          # ADR-010's tiering, expressed as the only thing that enforces it.
+          # Headless runs on every pull request and in the merge queue; the
+          # capped browser tier costs minutes and a browser, so it runs on the
+          # schedule and on a push to main, not on PRs. Empty means every
+          # project, which is what the scheduled and pre-release runs want.
+          E2E_PROJECTS: "${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && '--project=api' || '' }}"
         run: |
           # Start the app in background
           cd platform/app && PORT=5570 pnpm start &
@@ -285,8 +306,15 @@ jobs:
           # Wait for app to be ready (global-setup.ts also checks, but this ensures the process is up)
           sleep 5
 
-          # Run tests from the self-contained e2e package
-          cd tests/agentic-e2e && pnpm test
+          # Run tests from the self-contained e2e package. E2E_PROJECTS is one
+          # token or empty, and empty must mean "no filter" rather than an empty
+          # argument, so branch on it instead of splitting it.
+          cd tests/agentic-e2e
+          if [ -n "$E2E_PROJECTS" ]; then
+            pnpm test "$E2E_PROJECTS"
+          else
+            pnpm test
+          fi
           TEST_EXIT=$?
 
           # Cleanup

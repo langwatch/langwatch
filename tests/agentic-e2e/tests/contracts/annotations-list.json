@@ -11,7 +11,10 @@
       "updatedAt": "string",
       "email": "any?",
       "scoreOptions": "any?",
-      "expectedOutput": "any?"
+      "expectedOutput": "any?",
+      "anchorKind": "any?",
+      "anchorId": "any?",
+      "anchorPath": "any?"
     }
   ]
 }

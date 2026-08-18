@@ -20,19 +20,33 @@ import { ingestTrace, uniqueTraceId } from "../support/traces";
  *
  * `traceDebounceMs: 0` skips the 30s trace-readiness settle. The field exists
  * for exactly this case: traces known to settle synchronously.
+ *
+ * Each automation filters on a label unique to its own test. That is not
+ * incidental: `automation.upsert` rejects a trace automation whose filters
+ * narrow nothing (`TriggerFiltersRequiredError`), so `filters: {}` cannot be
+ * saved at all — a match-everything automation is deliberately not creatable
+ * through this API. Filtering on a per-test label satisfies that rule and
+ * scopes dispatch to the trace this test ingested, which is what lets these
+ * run alongside the rest of the headless tier.
  */
 
 type Dataset = { id: string; name: string };
 
-/** The dataset read endpoint nests its records; tolerate either envelope. */
+/**
+ * Reads a dataset's rows.
+ *
+ * `GET /api/dataset/:id` answers `{ id, name, slug, ..., data: records }` — its
+ * `data` IS the row array, so reaching for `data.records` on it yields
+ * `undefined` and `listOf` then answers `[]` forever. Use the paginated records
+ * endpoint, which answers `{ data, pagination }`, and hand the payload straight
+ * to `listOf`.
+ */
 async function readRecords(
   api: { get<T>(path: string): Promise<T> },
   datasetId: string,
 ): Promise<Record<string, unknown>[]> {
-  const payload = await api.get<unknown>(`/api/dataset/${datasetId}`);
   return listOf<Record<string, unknown>>(
-    (payload as { data?: { records?: unknown } })?.data?.records ??
-      (payload as { records?: unknown })?.records,
+    await api.get<unknown>(`/api/dataset/${datasetId}/records`),
   );
 }
 
@@ -50,8 +64,10 @@ async function createDataset(
 }
 
 // Dispatch crosses ingestion, projection and the process-manager queue, so
-// these run well past the default per-test budget.
-test.describe.configure({ timeout: 180_000 });
+// these run well past the default per-test budget. The deactivation test is
+// what sets the floor: a 120s positive control, then a 30s settle window, on
+// top of tenant provisioning and four HTTP round trips.
+test.describe.configure({ timeout: 240_000 });
 
 test.describe("Feature: automation dispatch", () => {
   test.describe("given an automation that appends matched traces to a dataset", () => {
@@ -60,12 +76,13 @@ test.describe("Feature: automation dispatch", () => {
         api,
         `Automation target ${Date.now()}`,
       );
+      const label = uniqueTraceId("label");
 
       await trpcMutation(request, "automation.upsert", {
         projectId: tenant.projectId,
-        name: "Append everything",
+        name: "Append labelled traces",
         action: "ADD_TO_DATASET",
-        filters: {},
+        filters: { "metadata.labels": [label] },
         templates: {},
         traceDebounceMs: 0,
         actionParams: {
@@ -83,6 +100,7 @@ test.describe("Feature: automation dispatch", () => {
       const traceId = uniqueTraceId("automation");
       await ingestTrace(api, {
         traceId,
+        labels: [label],
         input: "question for the automation",
         output: "answer for the automation",
       });
@@ -90,7 +108,7 @@ test.describe("Feature: automation dispatch", () => {
       const records = await eventually(
         `dataset ${dataset.id} to receive a record for trace ${traceId}`,
         async () => {
-          const entries = await readRecords(api, dataset.id).catch(() => []);
+          const entries = await readRecords(api, dataset.id);
           return entries.length > 0 ? entries : undefined;
         },
         { timeoutMs: 120_000, intervalMs: 2_000 },
@@ -107,6 +125,7 @@ test.describe("Feature: automation dispatch", () => {
       request,
     }) => {
       const dataset = await createDataset(api, `Inactive target ${Date.now()}`);
+      const label = uniqueTraceId("label");
 
       const created = await trpcMutation<{ id: string }>(
         request,
@@ -115,7 +134,7 @@ test.describe("Feature: automation dispatch", () => {
           projectId: tenant.projectId,
           name: "Append while active",
           action: "ADD_TO_DATASET",
-          filters: {},
+          filters: { "metadata.labels": [label] },
           templates: {},
           traceDebounceMs: 0,
           actionParams: {
@@ -135,6 +154,7 @@ test.describe("Feature: automation dispatch", () => {
       // below its meaning.
       await ingestTrace(api, {
         traceId: uniqueTraceId("automation-active"),
+        labels: [label],
         input: "should be captured",
       });
 
@@ -150,8 +170,12 @@ test.describe("Feature: automation dispatch", () => {
 
       await api.patch(`/api/triggers/${created.id}`, { active: false });
 
+      // Same label as the trace that DID append. If this one is missing from
+      // the dataset it is because the automation is off, not because it never
+      // matched the filter.
       await ingestTrace(api, {
         traceId: uniqueTraceId("automation-inactive"),
+        labels: [label],
         input: "should not be captured",
       });
 
