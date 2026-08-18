@@ -396,7 +396,7 @@
 			}
 		},
 		{
-			// The governed-SQL proof suites (#6480). noMisplacedAssertion is
+			// The LangWatchQL proof suites (#6480). noMisplacedAssertion is
 			// the rule this override uniquely disables; the repo-wide
 			// test-file block above already turns noExcessiveCognitiveComplexity
 			// off for every test file, and it is restated here so the reason
@@ -412,12 +412,12 @@
 			// assertion helpers" case the repo-wide block flags as warn.
 			//
 			// noExcessiveCognitiveComplexity: these are table-driven bodies —
-			// a list of governed datasets, a loop, and a branch per column
+			// a list of LangWatchQL datasets, a loop, and a branch per column
 			// gate. The score counts entries in the table, not tangle, and the
 			// production findings this PR raised were refactored rather than
 			// silenced (see diagnostics.ts and validation/validate.ts).
 			"includes": [
-				"src/server/analytics/governed-sql/**/__tests__/**",
+				"src/server/analytics/lwql/**/__tests__/**",
 				"src/app/api/analytics-sql/__tests__/**"
 			],
 			"linter": {

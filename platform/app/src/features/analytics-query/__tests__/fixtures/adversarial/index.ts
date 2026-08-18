@@ -4,14 +4,14 @@
  *
  * `attacks` is not decoration: `adversarialCorpus.unit.test.ts` asserts each
  * fixture really is refused by the rule it names, and `ruleCoverage.unit.test.ts`
- * reads the same field to prove no governed rule is left without a test.
+ * reads the same field to prove no LangWatchQL rule is left without a test.
  *
  * The 256 KiB specification is deliberately absent — a checked-in file that
  * large is a repository cost with no reading value, so the size ceiling is
  * exercised from a generated specification in `vegaLiteLimits.unit.test.ts`.
  */
 
-import type { GovernedVegaRuleId } from "~/features/analytics-query/visualization/visualization.types";
+import type { LangWatchQLVegaRuleId } from "~/features/analytics-query/visualization/visualization.types";
 
 import callerSuppliedDatasets from "./caller-supplied-datasets.json";
 import configMarkUrl from "./config-mark-url.json";
@@ -41,7 +41,7 @@ import usermetaEmbedOptions from "./usermeta-embed-options.json";
 export interface AdversarialVegaFixture {
   readonly name: string;
   /** The rule that must refuse this fixture. */
-  readonly attacks: GovernedVegaRuleId;
+  readonly attacks: LangWatchQLVegaRuleId;
   readonly spec: unknown;
 }
 
@@ -88,7 +88,7 @@ export const ADVERSARIAL_VEGA_FIXTURES: readonly AdversarialVegaFixture[] = [
     spec: interactiveParamsPastCeiling,
   },
 
-  // Data that did not come from the governed query.
+  // Data that did not come from the LangWatchQL query.
   {
     name: "inline-data-values",
     attacks: "data.inline-values",

@@ -1,5 +1,5 @@
 /**
- * The guard the whole governed analytics SQL family runs on every request.
+ * The guard the whole LangWatchQL analytics SQL family runs on every request.
  *
  * One claim, and it is the reason the function returns a project at all rather
  * than returning void: what comes back is the *credential's* project, never the
@@ -11,13 +11,13 @@
  * organization-scoped rule, which is the whole chain a stub could only agree
  * with. What the pair below can hold without one is its *ordering*.
  *
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { describe, expect, it } from "vitest";
 import type { Project } from "~/generated/prisma/client";
 
-import { callerProject, governedSqlProject } from "../[[...route]]/routeGuards";
+import { callerProject, lwqlProject } from "../[[...route]]/routeGuards";
 
 const projectOf = (id: string): Project =>
   ({ id, teamId: `team-${id}`, slug: id }) as Project;
@@ -65,7 +65,7 @@ describe("given the ordered pair every route in the family calls", () => {
      */
     it("refuses on the path before the feature switch is ever consulted", async () => {
       await expect(
-        governedSqlProject({
+        lwqlProject({
           project: projectOf("project-a"),
           requestedProjectId: "project-b",
         }),

@@ -162,8 +162,8 @@ const MAY_RESOLVE_VIA_APP = new Set([
  *  - `ops/explain-core.ts` connects as `langwatch_ops` under a readonly
  *    profile that rejects every client-side setting, including the
  *    `date_time_input_format` the managed client always sends.
- *  - `analytics/governed-sql/executor.ts` authenticates as the restricted
- *    governed identity, whose server-side profile carries the limits the
+ *  - `analytics/lwql/executor.ts` authenticates as the restricted
+ *    LangWatchQL identity, whose server-side profile carries the limits the
  *    managed client applies client-side; the managed constructor cannot carry
  *    a second identity's credentials, and must not, or the two pools' policies
  *    would be decided in one another's terms.
@@ -176,7 +176,7 @@ const MAY_CONSTRUCT = new Set([
   "src/server/clickhouse/goose.ts",
   "src/server/clickhouse/ttlReconciler.ts",
   "src/server/ops/explain-core.ts",
-  "src/server/analytics/governed-sql/executor.ts",
+  "src/server/analytics/lwql/executor.ts",
   "src/test-utils/clickhouseTestEndpoints.ts",
 ]);
 

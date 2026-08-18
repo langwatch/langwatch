@@ -191,7 +191,7 @@ export const useOrganizationTeamProject = (
         // (no `as` cast) makes the compiler flag any new required column, so a
         // future field can never silently ship unset here. See ADR-057.
         apiKey: "",
-        governedSqlKey: "",
+        lwqlKey: "",
         teamId: "",
         kind: "application",
         firstMessage: true,

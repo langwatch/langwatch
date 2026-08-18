@@ -12,7 +12,7 @@
  * what this keeps is the live count, as a status line a screen reader hears
  * without having to find the panel.
  *
- * @see specs/analytics/governed-sql-workbench.feature
+ * @see specs/analytics/lwql-workbench.feature
  */
 
 import { Box, Text, VStack } from "@chakra-ui/react";

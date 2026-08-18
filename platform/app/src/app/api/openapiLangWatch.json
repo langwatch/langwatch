@@ -4555,7 +4555,7 @@
         },
         "operationId": "postApiV1ProjectsByProjectIdAnalyticsQueryClickhouse",
         "tags": [
-          "Analytics / Governed SQL"
+          "Analytics / LangWatchQL"
         ],
         "parameters": [
           {
@@ -4567,8 +4567,8 @@
             "required": true
           }
         ],
-        "summary": "Run governed analytics SQL",
-        "description": "Executes one read-only ClickHouse SELECT over the governed analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project. Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.",
+        "summary": "Run LangWatchQL analytics SQL",
+        "description": "Executes one read-only ClickHouse SELECT over the LangWatchQL analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project. Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4653,7 +4653,7 @@
       "get": {
         "responses": {
           "200": {
-            "description": "The governed schema, scoped to the caller's permissions",
+            "description": "The LangWatchQL schema, scoped to the caller's permissions",
             "content": {
               "application/json": {
                 "schema": {
@@ -4944,7 +4944,7 @@
         },
         "operationId": "getApiV1ProjectsByProjectIdAnalyticsSchema",
         "tags": [
-          "Analytics / Governed SQL"
+          "Analytics / LangWatchQL"
         ],
         "parameters": [
           {
@@ -4956,8 +4956,8 @@
             "required": true
           }
         ],
-        "summary": "Discover the governed analytics schema",
-        "description": "Lists the governed analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.",
+        "summary": "Discover the LangWatchQL analytics schema",
+        "description": "Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.",
         "security": [
           {
             "project_api_key": []
@@ -5217,7 +5217,7 @@
         },
         "operationId": "getApiV1ProjectsByProjectIdAnalyticsCharts",
         "tags": [
-          "Analytics / Governed SQL"
+          "Analytics / LangWatchQL"
         ],
         "parameters": [
           {
@@ -5230,7 +5230,7 @@
           }
         ],
         "summary": "List saved workbench charts",
-        "description": "Lists every saved governed SQL chart in this project, each with the statement it runs, the parameter values it was saved with and the Vega-Lite specification that draws it. Charts built with the chart builder are a different kind and are not listed here.",
+        "description": "Lists every saved LangWatchQL chart in this project, each with the statement it runs, the parameter values it was saved with and the Vega-Lite specification that draws it. Charts built with the chart builder are a different kind and are not listed here.",
         "security": [
           {
             "project_api_key": []
@@ -5477,7 +5477,7 @@
         },
         "operationId": "postApiV1ProjectsByProjectIdAnalyticsCharts",
         "tags": [
-          "Analytics / Governed SQL"
+          "Analytics / LangWatchQL"
         ],
         "parameters": [
           {
@@ -5490,7 +5490,7 @@
           }
         ],
         "summary": "Save a workbench chart",
-        "description": "Saves a governed SQL statement, its bound parameter values and an optional Vega-Lite specification as one chart. The statement is validated by the governed analytics SQL validator against this key's own permissions, and the specification by the visualization policy, before anything is written — a chart that could not be run or drawn is refused rather than stored.",
+        "description": "Saves a LangWatchQL statement, its bound parameter values and an optional Vega-Lite specification as one chart. The statement is validated by the LangWatchQL analytics SQL validator against this key's own permissions, and the specification by the visualization policy, before anything is written — a chart that could not be run or drawn is refused rather than stored.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -5803,7 +5803,7 @@
         },
         "operationId": "getApiV1ProjectsByProjectIdAnalyticsChartsByChartId",
         "tags": [
-          "Analytics / Governed SQL"
+          "Analytics / LangWatchQL"
         ],
         "parameters": [
           {
@@ -5824,7 +5824,7 @@
           }
         ],
         "summary": "Get a saved workbench chart",
-        "description": "Returns one saved governed SQL chart with its statement, parameter values and specification. A chart saved in another project is reported as not found.",
+        "description": "Returns one saved LangWatchQL chart with its statement, parameter values and specification. A chart saved in another project is reported as not found.",
         "security": [
           {
             "project_api_key": []
@@ -6115,7 +6115,7 @@
         },
         "operationId": "patchApiV1ProjectsByProjectIdAnalyticsChartsByChartId",
         "tags": [
-          "Analytics / Governed SQL"
+          "Analytics / LangWatchQL"
         ],
         "parameters": [
           {
@@ -6389,7 +6389,7 @@
         },
         "operationId": "deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId",
         "tags": [
-          "Analytics / Governed SQL"
+          "Analytics / LangWatchQL"
         ],
         "parameters": [
           {
@@ -6410,7 +6410,7 @@
           }
         ],
         "summary": "Delete a saved workbench chart",
-        "description": "Deletes one saved governed SQL chart. Answers 204 with no body; deleting a chart that is not in this project is reported as not found.",
+        "description": "Deletes one saved LangWatchQL chart. Answers 204 with no body; deleting a chart that is not in this project is reported as not found.",
         "security": [
           {
             "project_api_key": []

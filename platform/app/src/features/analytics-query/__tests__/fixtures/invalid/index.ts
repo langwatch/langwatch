@@ -7,7 +7,7 @@
  * `parseVegaLiteSpecText` is exercised from the test instead.
  */
 
-import type { GovernedVegaRuleId } from "~/features/analytics-query/visualization/visualization.types";
+import type { LangWatchQLVegaRuleId } from "~/features/analytics-query/visualization/visualization.types";
 
 import schemaInvalidEncodingType from "./schema-invalid-encoding-type.json";
 import unknownDataset from "./unknown-dataset.json";
@@ -17,7 +17,7 @@ import unknownSchemaVersion from "./unknown-schema-version.json";
 export interface InvalidVegaFixture {
   readonly name: string;
   /** The rule this fixture must be refused by. */
-  readonly refusedBy: GovernedVegaRuleId;
+  readonly refusedBy: LangWatchQLVegaRuleId;
   readonly spec: unknown;
 }
 

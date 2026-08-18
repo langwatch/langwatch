@@ -300,31 +300,31 @@ const presentations = {
       return field ? `There's no field called "${field}".` : "";
     },
   },
-  governed_sql_unparseable: {
+  lwql_unparseable: {
     title: "This query couldn't be read",
     describe: () => "Check the SQL syntax and try again.",
   },
-  governed_sql_not_permitted: {
+  lwql_not_permitted: {
     title: "This query isn't allowed here",
     describe: () =>
       "This endpoint runs one read-only SELECT over the analytics datasets. Remove anything else and try again.",
   },
-  governed_sql_parameter_missing: {
+  lwql_parameter_missing: {
     title: "This query is missing a value",
     describe: () =>
       "The query declares parameters that weren't given values. Supply one for each and try again.",
   },
-  governed_sql_reserved_parameter_supplied: {
+  lwql_reserved_parameter_supplied: {
     title: "The time window isn't yours to set",
     describe: () =>
       "period_start and period_end come from the period this page is showing. Remove them from your parameters and change the period instead.",
   },
-  governed_sql_reserved_parameter_type: {
+  lwql_reserved_parameter_type: {
     title: "The time window has to be a date and time",
     describe: () =>
       "Declare period_start and period_end as DateTime, for example {period_start:DateTime}, and run the query again.",
   },
-  governed_sql_not_enabled: {
+  lwql_not_enabled: {
     title: "Custom SQL isn't switched on here",
     describe: () =>
       "This project doesn't have the SQL workbench enabled yet. Ask your administrator to switch it on.",
@@ -349,7 +349,7 @@ const presentations = {
     describe: () =>
       "We can't read what was stored for it. Rebuild the chart in the workbench and save it again.",
   },
-  governed_sql_unavailable: {
+  lwql_unavailable: {
     // Names the workspace administrator first: on a self-hosted deployment
     // the reader's own operator controls whether this is provisioned, and
     // LangWatch support cannot switch it on there.

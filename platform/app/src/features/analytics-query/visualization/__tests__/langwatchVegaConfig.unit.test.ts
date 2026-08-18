@@ -13,7 +13,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  type GovernedVegaColorMode,
+  type LangWatchQLVegaColorMode,
   type LangwatchVegaTokens,
   langwatchVegaConfig,
   langwatchVegaPinnedConfig,
@@ -49,7 +49,7 @@ const stringLeaves = (value: unknown): string[] => {
   return [];
 };
 
-const configFor = (colorMode: GovernedVegaColorMode) =>
+const configFor = (colorMode: LangWatchQLVegaColorMode) =>
   langwatchVegaConfig({
     colorMode,
     tokens: colorMode === "dark" ? DARK_TOKENS : LIGHT_TOKENS,
