@@ -110,8 +110,10 @@ secured.access(requires("scenarios:view")).get(
 
     const simulationRuns = getApp().simulations.runs;
 
-    if (batchRunId && scenarioSetId) {
-      // Get runs for a specific batch
+    if (batchRunId) {
+      // Get runs for a specific batch. The scenario set id narrows the query
+      // when given, but the batch id alone is enough: the CLI's --wait polls
+      // with just the batch id it was handed at scheduling time.
       const result = await simulationRuns.getRunDataForBatchRun({
         projectId: project.id,
         scenarioSetId,
