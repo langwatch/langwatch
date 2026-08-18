@@ -10,6 +10,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
+import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
 import { LimitExceededError } from "../../license-enforcement/errors";
 import type { ILicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
@@ -24,15 +25,14 @@ const { mockSendInviteEmail } = vi.hoisted(() => ({
 }));
 
 // An invite's grants are ledger commands (ADR-092 delivery-plan PR 2).
+// Injected straight into the constructor (the writer is DI'd, no module
+// mock needed) so it is testable the same way any other dependency is.
 const ledger = vi.hoisted(() => ({
   attachBindings: vi.fn(),
   revokeBindings: vi.fn(),
   revokeBindingsWhere: vi.fn(),
   defineRole: vi.fn(),
   deleteRole: vi.fn(),
-}));
-vi.mock("~/server/app-layer/authz/ledger", () => ({
-  grantsLedgerWriter: () => ledger,
 }));
 
 vi.mock("../../mailer/inviteEmail", () => ({
@@ -182,7 +182,13 @@ describe("InviteService", () => {
       getActivePlan: vi.fn(),
     };
 
-    service = new InviteService(mockPrisma, mockLicenseRepo, mockPlanProvider);
+    service = new InviteService(
+      mockPrisma,
+      mockLicenseRepo,
+      mockPlanProvider,
+      undefined,
+      ledger as unknown as GrantsLedgerWriter,
+    );
   });
 
   /**

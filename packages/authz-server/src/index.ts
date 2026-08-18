@@ -81,6 +81,14 @@ export type {
   RoleRowShape,
 } from "./ledger/projection-mapping";
 export {
+  bindingIdentityKey,
+  deriveGrantId,
+} from "./ledger/grant-identity";
+export type {
+  BindingIdentityInput,
+  BindingIdentityPrincipal,
+} from "./ledger/grant-identity";
+export {
   emptyGrantsLedgerState,
   reduceGrantsLedger,
 } from "./ledger/grants-ledger.reducer";

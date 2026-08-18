@@ -21,11 +21,9 @@ type TxClient = Prisma.TransactionClient;
 /**
  * The principals holding a team's ADMIN bindings, split by kind.
  *
- * The one read every admin question in this module asks. It used to be
- * written out at each of them, three times, each with its own `select` and its
- * own non-null assertion on `groupId` — three chances for the definition of
- * "administers this team" to drift apart while the last-admin invariant rests
- * on all three agreeing.
+ * The one read every admin question in this module asks — a single
+ * definition of "administers this team" that the last-admin invariant rests
+ * on every caller agreeing with.
  */
 async function readTeamAdminPrincipals({
   tx,
@@ -87,11 +85,11 @@ export async function computeEffectiveAdminUserIds({
  * The effective admin set a planned edit to a team's DIRECT user bindings
  * would leave behind.
  *
- * The team form's guard used to read the post-state back inside the
- * transaction that had just written it. Bindings are ledger facts now
- * (ADR-092), so the plan is decided before anything is emitted: the caller
- * supplies the direct-admin users its plan leaves, and the group-derived
- * admins — which this form cannot edit — still come from the projection.
+ * Bindings are ledger facts (ADR-092 §13), so the plan is decided before
+ * anything is emitted rather than read back post-write inside a
+ * transaction: the caller supplies the direct-admin users its plan leaves,
+ * and the group-derived admins — which this form cannot edit — still come
+ * from the projection.
  */
 export async function projectAdminUserIdsAfterDirectEdit({
   tx,

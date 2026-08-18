@@ -10,7 +10,11 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
-import { grantsLedgerWriter } from "~/server/app-layer/authz/ledger";
+import {
+  type GrantsLedgerWriter,
+  grantsLedgerWriter,
+} from "~/server/app-layer/authz/ledger";
+import { SYSTEM_ACTORS } from "~/server/app-layer/authz/ledger-actor";
 import { InviteService } from "~/server/invites/invite.service";
 import { trackServerEvent } from "~/server/posthog";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -127,9 +131,12 @@ export const beforeUserCreate = async ({
 export const afterUserCreate = async ({
   prisma,
   user,
+  writer = grantsLedgerWriter(),
 }: {
   prisma: PrismaClient;
   user: { id: string; email: string; name: string };
+  /** Injectable so a test can watch the seam without a module mock. */
+  writer?: GrantsLedgerWriter;
 }): Promise<void> => {
   // Same distinct_id posthog-js identifies with client-side (the user id),
   // so this server event joins the browser person.
@@ -174,7 +181,7 @@ export const afterUserCreate = async ({
     // so calling this twice grants nothing twice, and calling it after a
     // membership row turned up on its own is the repair.
     const grantDefaultMembership = () =>
-      grantsLedgerWriter().attachBindings({
+      writer.attachBindings({
         organizationId: org.id,
         bindings: [
           {
@@ -188,7 +195,7 @@ export const afterUserCreate = async ({
         ],
         // The signup is the product acting on a domain rule, not an
         // administrator granting access.
-        actor: { type: "system", id: "system:sso-auto-join" },
+        actor: { type: "system", id: SYSTEM_ACTORS.ssoAutoJoin },
         onDuplicate: "skip",
       });
 

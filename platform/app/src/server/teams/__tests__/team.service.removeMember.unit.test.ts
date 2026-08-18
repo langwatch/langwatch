@@ -20,12 +20,10 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { TeamService } from "../team.service";
 
 const revokeBindings = vi.fn();
-vi.mock("~/server/app-layer/authz/ledger", () => ({
-  grantsLedgerWriter: () => ({ revokeBindings }),
-}));
 
 const teamFindUnique = vi.fn();
 const teamUpdate = vi.fn();
@@ -76,7 +74,11 @@ beforeEach(() => {
   groupMembershipFindMany.mockResolvedValue([]);
   teamUserDeleteMany.mockResolvedValue({ count: 1 });
   revokeBindings.mockResolvedValue(undefined);
-  service = new TeamService(prisma, {} as never);
+  service = new TeamService(
+    prisma,
+    {} as never,
+    { revokeBindings } as unknown as GrantsLedgerWriter,
+  );
 });
 
 describe("given a team with two admins", () => {

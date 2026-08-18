@@ -3,7 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import type { ApiKey, PrismaClient } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
-import type { LedgerActor } from "~/server/app-layer/authz/ledger";
+import { ledgerActorFor } from "~/server/app-layer/authz/ledger-actor";
 import {
   MalformedCustomRolePermissionsError,
   parseCustomRolePermissions,
@@ -101,16 +101,6 @@ type CreatorScope =
  * does not have to know that indirection exists.
  */
 export type ApiKeyDetail = ApiKeyWithBindings & { permissions: string[] };
-
-/**
- * Who a credential change is attributed to in the grants ledger. A key minted
- * or retired by the product itself acts as nobody, so the service is named as
- * the system principal rather than inventing a user.
- */
-const ledgerActorFor = (userId: string | null | undefined): LedgerActor =>
-  userId
-    ? { type: "user", id: userId }
-    : { type: "system", id: "system:api-key-service" };
 
 export class ApiKeyService {
   private readonly repo: ApiKeyRepository;
@@ -306,7 +296,10 @@ export class ApiKeyService {
       });
     }
 
-    const actor = ledgerActorFor(createdByUserId ?? userId);
+    const actor = ledgerActorFor({
+      userId: createdByUserId ?? userId,
+      fallback: "apiKeyService",
+    });
     // BORN DISABLED, ACTIVATED LAST. The row is a plain insert and the grants
     // are ledger commands, so nothing can wrap the two in one transaction.
     // The key is therefore created revoked and un-revoked only once its
@@ -463,7 +456,10 @@ export class ApiKeyService {
       ),
     ];
 
-    const actor = ledgerActorFor(callerUserId);
+    const actor = ledgerActorFor({
+      userId: callerUserId,
+      fallback: "apiKeyService",
+    });
 
     if (bindings && existing.userId) {
       await this.assertBindingsWithinCeiling({
@@ -1015,7 +1011,10 @@ export class ApiKeyService {
         roleIds: customRoleIds,
         apiKeyId: id,
         organizationId,
-        actor: ledgerActorFor(callerUserId),
+        actor: ledgerActorFor({
+          userId: callerUserId,
+          fallback: "apiKeyService",
+        }),
       });
     }
 

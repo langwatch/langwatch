@@ -10,7 +10,10 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { isCustomRole } from "~/server/api/enterprise";
-import { grantsLedgerWriter } from "~/server/app-layer/authz/ledger";
+import {
+  type GrantsLedgerWriter,
+  grantsLedgerWriter,
+} from "~/server/app-layer/authz/ledger";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import type {
   RoleBindingRepository,
@@ -79,6 +82,7 @@ export class TeamService {
     private readonly roleBindingRepo: RoleBindingRepository = new PrismaRoleBindingRepository(
       prisma,
     ),
+    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
   ) {}
 
   /**
@@ -766,7 +770,7 @@ export class TeamService {
       return { idsToRemove, toUpdate, toCreate };
     });
 
-    const writer = grantsLedgerWriter();
+    const writer = this.writer;
     const actor = { type: "user" as const, id: currentUserId };
     // Grants before revocations, the opposite of the batch corrections
     // elsewhere. A save that dies half-way here leaves the OLD access
@@ -872,7 +876,7 @@ export class TeamService {
       data: { id: teamId, name, slug: teamSlug, organizationId },
     });
 
-    await grantsLedgerWriter().attachBindings({
+    await this.writer.attachBindings({
       organizationId,
       bindings: memberBindings,
       actor: { type: "user", id: currentUserId },
@@ -908,7 +912,7 @@ export class TeamService {
       data: { id: teamId, name, slug: teamSlug, organizationId },
     });
 
-    await grantsLedgerWriter().attachBindings({
+    await this.writer.attachBindings({
       organizationId,
       bindings: [
         {
@@ -1082,7 +1086,7 @@ export class TeamService {
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
 
-    await grantsLedgerWriter().revokeBindings({
+    await this.writer.revokeBindings({
       organizationId: removal.organizationId,
       bindingIds: removal.bindingIds,
       actor: { type: "user", id: currentUserId },

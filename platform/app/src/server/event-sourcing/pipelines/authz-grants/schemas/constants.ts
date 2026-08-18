@@ -84,3 +84,9 @@ export const AUTHZ_GRANTS_EVENT_TYPES = [
 ] as const;
 
 export const AUTHZ_GRANTS_EVENT_VERSION_LATEST = "2026-08-17" as const;
+
+/** Stable verb prefix for the pipeline's audit-log `action` column, shared
+ *  by the insert-only subscriber (a migrated organization) and the ledger
+ *  writer's `recordLegacyAudit` (an unmigrated one) — the same action
+ *  vocabulary either way. */
+export const AUTHZ_AUDIT_ACTION_PREFIX = "authz.grants." as const;

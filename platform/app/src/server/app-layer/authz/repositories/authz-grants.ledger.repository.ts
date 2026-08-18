@@ -1,23 +1,23 @@
 /**
- * ADR-092 §13 (delivery plan PR 2) — the ledger-backed implementation of
- * AuthzGrantsRepository: the write port's storage engine is now command
- * emission. Reads (tenancy lookups, manifests) stay the Prisma queries of
- * the parent class; every write appends to the grants ledger through
- * `GrantsLedgerWriter`, which owns read-your-writes convergence, instant
- * revocation enforcement (decision 7), and the epoch bump (decision 19).
+ * ADR-092 §13 — the ledger-backed implementation of AuthzGrantsRepository:
+ * the write port's storage engine is command emission. Reads (tenancy
+ * lookups, manifests) delegate to `PrismaAuthzGrantsRepository`; every write
+ * appends to the grants ledger through `GrantsLedgerWriter`, which owns
+ * read-your-writes convergence, instant revocation enforcement (decision 7),
+ * and the epoch bump (decision 19).
  *
- * Atomicity note, replacing the parent's transactions: `replaceBinding`
- * is a revoke command then an attach command in per-org FIFO — a crash
- * between the two leaves the principal with LESS access than asked, never
- * more (fail-safe by construction), and the retry attaches cleanly.
- * `offboardUser` appends the offboarding fact FIRST (the ledger is the
- * truth — a direct delete without its event would be resurrected by the
- * next fold), enforces the grant deletes synchronously, then removes the
- * membership rows and runs the proof in one transaction. A proof failure
- * rolls back the membership deletes but the revocations stand — again the
- * fail-safe direction — and the retry converges.
+ * Atomicity: `replaceBinding` is a revoke command then an attach command in
+ * per-org FIFO — a crash between the two leaves the principal with LESS
+ * access than asked, never more (fail-safe by construction), and the retry
+ * attaches cleanly. `offboardUser` appends the offboarding fact FIRST (the
+ * ledger is the truth — a direct delete without its event would be
+ * resurrected by the next fold), enforces the grant deletes synchronously,
+ * then removes the membership rows and runs the proof in one transaction. A
+ * proof failure rolls back the membership deletes but the revocations stand
+ * — again the fail-safe direction — and the retry converges.
  */
 import type {
+  AuthzGrantsRepository,
   AuthzReadRepository,
   BindingPrincipalWhere,
   GrantWriteActor,
@@ -40,15 +40,14 @@ import { PrismaAuthzReadRepository } from "./authz-read.prisma.repository";
 /**
  * The port's two typed failures, restored on the way out.
  *
- * The parent class raised them from ONE place — its own Prisma calls. This
- * implementation's writes travel through the ledger writer, which owns a
- * legacy path (raw Prisma), a ledger path, and a synchronous enforcement
- * write; a duplicate or missing-row signal can surface from any of them. The
- * port documents `@throws DuplicateBindingError` / `@throws
- * BindingMissingError`, and GrantsService turns exactly those two into the
- * customer's 409 and 404 — anything that reaches it as a raw
- * `PrismaClientKnownRequestError` degrades to an unknown 500 instead, which
- * is a silently broken REST contract rather than a visible bug.
+ * Writes travel through the ledger writer, which owns a legacy path (raw
+ * Prisma), a ledger path, and a synchronous enforcement write; a duplicate
+ * or missing-row signal can surface from any of them. The port documents
+ * `@throws DuplicateBindingError` / `@throws BindingMissingError`, and
+ * GrantsService turns exactly those two into the customer's 409 and 404 —
+ * anything that reaches it as a raw `PrismaClientKnownRequestError` degrades
+ * to an unknown 500 instead, which is a silently broken REST contract
+ * rather than a visible bug.
  *
  * Everything else passes through untouched: an infra failure has no action
  * for the caller and must degrade to "unknown" with its trace id.
@@ -74,16 +73,54 @@ async function withPortFailures<T>(write: () => Promise<T>): Promise<T> {
   }
 }
 
-export class LedgerAuthzGrantsRepository extends PrismaAuthzGrantsRepository {
+export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
+  private readonly reads: PrismaAuthzGrantsRepository;
+
   constructor(
     private readonly db: PrismaClient,
     private readonly writer: GrantsLedgerWriter,
   ) {
-    super(db);
+    this.reads = new PrismaAuthzGrantsRepository(db);
+  }
+
+  findBinding(
+    ...args: Parameters<PrismaAuthzGrantsRepository["findBinding"]>
+  ): ReturnType<PrismaAuthzGrantsRepository["findBinding"]> {
+    return this.reads.findBinding(...args);
+  }
+
+  findCustomRole(
+    ...args: Parameters<PrismaAuthzGrantsRepository["findCustomRole"]>
+  ): ReturnType<PrismaAuthzGrantsRepository["findCustomRole"]> {
+    return this.reads.findCustomRole(...args);
+  }
+
+  findTeamOrganization(
+    ...args: Parameters<PrismaAuthzGrantsRepository["findTeamOrganization"]>
+  ): ReturnType<PrismaAuthzGrantsRepository["findTeamOrganization"]> {
+    return this.reads.findTeamOrganization(...args);
+  }
+
+  findProjectLineage(
+    ...args: Parameters<PrismaAuthzGrantsRepository["findProjectLineage"]>
+  ): ReturnType<PrismaAuthzGrantsRepository["findProjectLineage"]> {
+    return this.reads.findProjectLineage(...args);
+  }
+
+  findOwnedApiKeys(
+    ...args: Parameters<PrismaAuthzGrantsRepository["findOwnedApiKeys"]>
+  ): ReturnType<PrismaAuthzGrantsRepository["findOwnedApiKeys"]> {
+    return this.reads.findOwnedApiKeys(...args);
+  }
+
+  findPersonalTeams(
+    ...args: Parameters<PrismaAuthzGrantsRepository["findPersonalTeams"]>
+  ): ReturnType<PrismaAuthzGrantsRepository["findPersonalTeams"]> {
+    return this.reads.findPersonalTeams(...args);
   }
 
   /** @throws DuplicateBindingError on an identical binding at this scope. */
-  override async createBinding(
+  async createBinding(
     row: RoleBindingWrite,
     context: { actor: GrantWriteActor },
   ): Promise<void> {
@@ -102,7 +139,7 @@ export class LedgerAuthzGrantsRepository extends PrismaAuthzGrantsRepository {
    * @throws DuplicateBindingError when a sibling already holds the target role.
    * @throws BindingMissingError when the row is gone.
    */
-  override async updateBindingRole({
+  async updateBindingRole({
     bindingId,
     organizationId,
     role,
@@ -127,7 +164,7 @@ export class LedgerAuthzGrantsRepository extends PrismaAuthzGrantsRepository {
   }
 
   /** @throws BindingMissingError when the row is gone. */
-  override async deleteBinding({
+  async deleteBinding({
     bindingId,
     organizationId,
     actor,
@@ -157,7 +194,7 @@ export class LedgerAuthzGrantsRepository extends PrismaAuthzGrantsRepository {
    * @throws BindingMissingError when the delete matched nothing.
    * @throws DuplicateBindingError when the narrower binding already exists.
    */
-  override async replaceBinding({
+  async replaceBinding({
     deleteWhere,
     create,
     actor,
@@ -196,7 +233,7 @@ export class LedgerAuthzGrantsRepository extends PrismaAuthzGrantsRepository {
     );
   }
 
-  override async offboardUser({
+  async offboardUser({
     userId,
     organizationId,
     actor,

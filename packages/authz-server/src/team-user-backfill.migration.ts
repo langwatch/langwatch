@@ -46,7 +46,7 @@ import type {
   LegacyTeamRow,
 } from "./authz-migration.repository";
 import type { AuthzAuditWriter, AuthzEpochBumper } from "./grants.service";
-import { deriveGrantId } from "./ledger/grant-identity";
+import { bindingIdentityKey, deriveGrantId } from "./ledger/grant-identity";
 import type {
   GrantFact,
   GrantsLedgerActor,
@@ -425,15 +425,13 @@ function legacyRowToEmission({
 }
 
 /**
- * Identity as the DATABASE defines it - which is two keys, not one. The
- * partial unique indexes (migration
- * 20260410120000_fix_role_binding_unique_custom_role) key a built-in binding
- * on its role and a custom one on its custom role id, so a custom binding's
- * `role` column is not part of its identity at all.
- *
- * Keying on both would call an existing custom binding "missing" whenever its
- * role happened to differ, and the emission that followed would attach a
- * grant for a fact that already has one.
+ * Identity as the DATABASE defines it, via `bindingIdentityKey`
+ * (@langwatch/authz-server/ledger/grant-identity) - a built-in binding is
+ * keyed on its role, a custom one on its custom role id, so a custom
+ * binding's `role` column is not part of its identity at all. Keying on both
+ * would call an existing custom binding "missing" whenever its role happened
+ * to differ, and the emission that followed would attach a grant for a fact
+ * that already has one.
  *
  * Built-in rows key on the ROLE KEY, not on the raw enum value, because this
  * function is asked to compare two populations written in different
@@ -443,7 +441,8 @@ function legacyRowToEmission({
  * as `VIEWER`. Keyed on the raw enum those two never match: the row is
  * emitted, its projection is never recognized, and `awaitCompatRows` times
  * the organization out into `parked` on every pass, forever. Normalizing
- * both sides through the same mapping is what makes the comparison honest.
+ * both sides through the same mapping (here, before the shared key function
+ * ever sees the role) is what makes the comparison honest.
  */
 function bindingKey(row: {
   userId: string;
@@ -451,7 +450,12 @@ function bindingKey(row: {
   role: TeamUserRole;
   customRoleId: string | null;
 }): string {
-  return row.customRoleId === null
-    ? `${row.userId}::${row.teamId}::builtin::${roleKeyForTeamRole(row.role)}`
-    : `${row.userId}::${row.teamId}::custom::${row.customRoleId}`;
+  return bindingIdentityKey({
+    principal: { userId: row.userId },
+    scopeType: "TEAM",
+    scopeId: row.teamId,
+    role:
+      row.customRoleId === null ? roleKeyForTeamRole(row.role) : row.role,
+    customRoleId: row.customRoleId,
+  });
 }

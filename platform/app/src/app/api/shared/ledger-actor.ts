@@ -16,25 +16,20 @@
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import type { LedgerActor } from "~/server/app-layer/authz/ledger";
+import { ledgerActorFor } from "~/server/app-layer/authz/ledger-actor";
 
 const logger = createLogger("langwatch:api:ledger-actor");
 
-/** The stand-in for a request that names no principal at all. */
-const UNATTRIBUTED_ACTOR: LedgerActor = {
-  type: "system",
-  id: "system:management-api",
-};
-
 export function orgRequestLedgerActor(c: Context): LedgerActor {
   const userId = c.get("apiKeyUserId") as string | null | undefined;
-  if (userId) return { type: "user", id: userId };
-
   const apiKeyId = c.get("apiKeyId") as string | null | undefined;
-  if (apiKeyId) return { type: "system", id: `apikey:${apiKeyId}` };
 
-  logger.warn(
-    { path: c.req.path, method: c.req.method },
-    "an organization-authenticated request named neither a user nor an API key; attributing the grants-ledger write to the management API itself",
-  );
-  return UNATTRIBUTED_ACTOR;
+  if (!userId && !apiKeyId) {
+    logger.warn(
+      { path: c.req.path, method: c.req.method },
+      "an organization-authenticated request named neither a user nor an API key; attributing the grants-ledger write to the management API itself",
+    );
+  }
+
+  return ledgerActorFor({ userId, apiKeyId, fallback: "managementApi" });
 }

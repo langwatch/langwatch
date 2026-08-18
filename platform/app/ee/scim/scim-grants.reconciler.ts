@@ -15,6 +15,7 @@
  * fired-employee case and the deny has to hold before this call returns.
  * Additions are plain queued commands.
  */
+import { bindingIdentityKey } from "@langwatch/authz-server";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import type {
   GrantsLedgerWriter,
@@ -26,9 +27,9 @@ import type {
 export type DesiredScimGrant = Omit<LedgerBindingAttach, "bindingId">;
 
 /**
- * A grant's identity as the projection's partial unique indexes define it: a
- * built-in grant is keyed on its role, a custom one on its custom role id.
- * Two rows with the same key are the same grant, whatever their row ids.
+ * A grant's identity as the projection's partial unique indexes define it -
+ * `bindingIdentityKey` (@langwatch/authz-server). Two rows with the same key
+ * are the same grant, whatever their row ids.
  */
 function grantKey(grant: {
   userId?: string | null;
@@ -39,12 +40,13 @@ function grantKey(grant: {
   role: string;
   customRoleId: string | null;
 }): string {
-  const principal = grant.userId ?? grant.groupId ?? grant.apiKeyId ?? "";
-  const roleIdentity =
-    grant.customRoleId === null
-      ? `builtin:${grant.role}`
-      : `custom:${grant.customRoleId}`;
-  return [principal, grant.scopeType, grant.scopeId, roleIdentity].join("|");
+  return bindingIdentityKey({
+    principal: grant,
+    scopeType: grant.scopeType,
+    scopeId: grant.scopeId,
+    role: grant.role,
+    customRoleId: grant.customRoleId,
+  });
 }
 
 function keyOfDesired(grant: DesiredScimGrant): string {

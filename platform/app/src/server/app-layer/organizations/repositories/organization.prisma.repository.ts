@@ -18,6 +18,7 @@ import {
   type LedgerActor,
   type LedgerBindingAttach,
 } from "~/server/app-layer/authz/ledger";
+import { ledgerActorFor } from "~/server/app-layer/authz/ledger-actor";
 import { findSharedTeamIds } from "~/server/role-bindings/personal-team-scope";
 import { projectAdminUserIdsWithoutDirectRole } from "~/server/teams/effective-team-admins";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -218,16 +219,15 @@ function namesSlug(target: unknown): boolean {
 }
 
 /**
- * Point a member's binding on one scope at a role without replacing the row.
- *
- * Role syncs used to delete and recreate the row, which changed its id in the
- * middle of a save: the member dialog stages removals by id, the seat change
- * applies first and used to churn every id, and the binding batch then carried
- * ids that no longer existed. Updating in place keeps the id, so what the
- * admin staged stays addressable through the whole save, and rows keep their
- * creation order instead of jumping to the bottom of the access list on every
- * correction. Several rows on one scope still collapse to the one this sync
- * sets, exactly as the delete and recreate always did.
+ * Point a member's binding on one scope at a role without replacing the row
+ * — an UPDATE, never a delete-then-recreate, which would change its id
+ * mid-save: the member dialog stages removals by id, and a binding batch
+ * built against ids a churned recreate had already replaced would carry
+ * ids that no longer exist. Keeping the id stable keeps what the admin
+ * staged addressable through the whole save, and rows keep their creation
+ * order instead of jumping to the bottom of the access list on every
+ * correction. Several rows on one scope still collapse to the one this
+ * sync sets.
  */
 async function planUserScopeBinding({
   tx,
@@ -277,8 +277,8 @@ async function planUserScopeBinding({
  * What a scope-binding correction resolves to once the transaction has read
  * the rows: the ids that collapse away, and either the role change on the row
  * that stays or a fresh attach. Planned inside the transaction and emitted
- * after it commits — bindings are ledger facts now, and the ledger is their
- * only writer (ADR-092 delivery-plan PR 2).
+ * after it commits — bindings are ledger facts, and the ledger is their only
+ * writer (ADR-092 §13).
  */
 type ScopeBindingPlan = {
   revokeIds: string[];
@@ -334,17 +334,6 @@ async function emitScopeBindingPlans({
       onDuplicate: "skip",
     });
   }
-}
-
-/**
- * Who a membership write is attributed to. A service credential acts as
- * nobody, so the organization service itself is named as the system
- * principal rather than inventing a user.
- */
-function ledgerActorFor(currentUserId: string | null | undefined): LedgerActor {
-  return currentUserId
-    ? { type: "user", id: currentUserId }
-    : { type: "system", id: "system:organization-service" };
 }
 
 export class PrismaOrganizationRepository implements OrganizationRepository {
@@ -603,7 +592,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           scopeId: created.team.id,
         },
       ],
-      actor: ledgerActorFor(input.userId),
+      actor: ledgerActorFor({
+        userId: input.userId,
+        fallback: "organizationService",
+      }),
       onDuplicate: "skip",
     });
 
@@ -1006,7 +998,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
    */
   async deleteMember(input: DeleteMemberInput): Promise<void> {
     const { organizationId, userId, actingUserId } = input;
-    const actor = ledgerActorFor(actingUserId);
+    const actor = ledgerActorFor({
+      userId: actingUserId,
+      fallback: "organizationService",
+    });
     const revokeTheirGrants = () =>
       this.writer.revokeBindingsWhere({
         organizationId,
@@ -1357,12 +1352,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           if (adminsAfter.size === 0) {
             // A caller who named this team asked for a team-local change, and a
             // team needs an admin. A seat correction did not name it: the
-            // decision was about one person's seat, every shared team is still
-            // administered through any ORGANIZATION-scoped ADMIN binding, and
-            // refusing here used to roll back the organization role change too,
-            // so the seat could not be changed at all while the member was
-            // somebody's only team admin. It goes through, and the team is
-            // reported so the admin who did it is not left to discover this.
+            // decision was about one person's seat, and every shared team is
+            // still administered through any ORGANIZATION-scoped ADMIN binding
+            // — so it goes through, and the team is reported so the admin who
+            // did it is not left to discover this.
             if (teamRoleUpdate.origin === "requested") {
               throw new TeamLastAdminRequiredError(
                 await teamNameFor({ tx, teamId }),
@@ -1471,7 +1464,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         writer: this.writer,
         organizationId,
         plans,
-        actor: ledgerActorFor(input.currentUserId),
+        actor: ledgerActorFor({
+          userId: input.currentUserId,
+          fallback: "organizationService",
+        }),
       });
     } catch (error) {
       if (previousRole !== role) {
@@ -1589,7 +1585,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         writer: this.writer,
         organizationId: planned.organizationId,
         plans: [planned.plan],
-        actor: ledgerActorFor(currentUserId),
+        actor: ledgerActorFor({
+          userId: currentUserId,
+          fallback: "organizationService",
+        }),
       });
     } else {
       const planned = await this.prisma.$transaction(async (tx) => {
@@ -1681,7 +1680,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         writer: this.writer,
         organizationId: planned.organizationId,
         plans: [planned.plan],
-        actor: ledgerActorFor(currentUserId),
+        actor: ledgerActorFor({
+          userId: currentUserId,
+          fallback: "organizationService",
+        }),
       });
     }
   }

@@ -42,11 +42,11 @@ export class RoleRepository {
   constructor(
     private readonly prisma: RolePrismaDelegate,
     /**
-     * Role definitions and the grants that carry them are ledger facts since
-     * ADR-092 delivery-plan PR 2. The writer never rides the caller's
-     * transaction — it appends to ClickHouse and folds through the queue — so
-     * it is composed over the app's own client rather than `prisma` above,
-     * which may be a transaction client.
+     * Role definitions and the grants that carry them are ledger facts
+     * (ADR-092 §13). The writer never rides the caller's transaction — it
+     * appends to ClickHouse and folds through the queue — so it is composed
+     * over the app's own client rather than `prisma` above, which may be a
+     * transaction client.
      */
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
   ) {}
@@ -177,11 +177,10 @@ export class RoleRepository {
    * went.
    *
    * The reference check is a read taken immediately before the delete is
-   * emitted, not a condition riding on the delete itself. It used to be one
-   * conditional statement, which left nothing to interleave with; the role is
-   * a ledger fact now (ADR-092 delivery-plan PR 2) and its deletion is a
-   * command, so the check cannot be part of the write. What that costs is one
-   * race: a binding created between the read and the append is silently
+   * emitted, not a condition riding on the delete itself: the role is a
+   * ledger fact (ADR-092 §13) and its deletion is a command, so the check
+   * cannot be part of the write. What that costs is one race: a binding
+   * created between the read and the append is silently
    * unhooked from the role that grants it, because the relation is emulated
    * in the client (`relationMode = "prisma"`), so deleting the parent nulls
    * the reference instead of refusing. What survives is the guarantee callers
@@ -332,12 +331,11 @@ export class RoleRepository {
 
   /**
    * The `(organizationId, name)` natural key, checked immediately before the
-   * append. It used to be the unique index that answered this - the database
-   * refused the write and the service mapped the constraint failure. The
-   * ledger writes the row through the fold, where a collision would stall the
-   * organization rather than refuse the caller, so the read has to be the
-   * gate. Two renames to one name inside the same instant is the residual
-   * race, and it is the same one the pre-check above always had.
+   * append: the ledger writes the row through the fold, where a collision
+   * would stall the organization rather than refuse the caller, so the read
+   * has to be the gate rather than a unique-index constraint failure. Two
+   * renames to one name inside the same instant is the residual race, and
+   * it is the same one the pre-check above always had.
    */
   private async assertNameFree({
     organizationId,

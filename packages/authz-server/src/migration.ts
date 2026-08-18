@@ -9,7 +9,10 @@
  * so the migration that needs it lives behind this server-only subpath.
  */
 export { GRANTS_GENESIS_IMPORT_MIGRATION_NAME } from "./genesis-import.name";
-export { GrantsGenesisImportMigration } from "./genesis-import.migration";
+export {
+  GENESIS_ACTOR_ID,
+  GrantsGenesisImportMigration,
+} from "./genesis-import.migration";
 export type {
   GenesisDiff,
   GenesisImportDeps,

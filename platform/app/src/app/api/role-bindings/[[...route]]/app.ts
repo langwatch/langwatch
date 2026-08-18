@@ -13,10 +13,10 @@
  * switches the team-derived fallback off, which is worth telling the operator
  * even though the write itself is exactly what they asked for.
  *
- * Every write here is a grants-ledger command (ADR-092 delivery-plan PR 2),
- * so the audit trail is the pipeline's insert-only subscriber (decision 17):
- * these handlers no longer emit `management.roleBinding.*` rows of their own,
- * because that would record the same mutation twice.
+ * Every write here is a grants-ledger command (ADR-092 §13), so the audit
+ * trail is the pipeline's insert-only subscriber (decision 17): these
+ * handlers never emit `management.roleBinding.*` rows of their own — that
+ * would record the same mutation twice.
  */
 import type { BaseApp, VersionBuilder } from "@langwatch/api";
 import type { Context } from "hono";

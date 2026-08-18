@@ -1,6 +1,9 @@
+import type { GrantEventSource } from "@langwatch/authz-server";
+import { GENESIS_ACTOR_ID } from "@langwatch/authz-server/migration";
 import { createLogger } from "@langwatch/observability";
 import type { SubscriberSpec } from "../../../pipeline/processManagerDefinition";
 import {
+  AUTHZ_AUDIT_ACTION_PREFIX,
   CUTOVER_COMPLETED_EVENT_TYPE,
   CUTOVER_ROLLED_BACK_EVENT_TYPE,
   GRANT_ATTACHED_EVENT_TYPE,
@@ -60,23 +63,17 @@ const AUDIT_VERB_BY_EVENT_TYPE: Record<AuditableEventType, string> = {
   [MEMBER_OFFBOARDED_EVENT_TYPE]: "offboard",
 };
 
-export const AUTHZ_AUDIT_ACTION_PREFIX = "authz.grants." as const;
-
 const logger = createLogger("langwatch:authz:audit-trail");
 
 /** Every fact these sources author is backdated history that already
  *  happened somewhere else — the legacy tables, an earlier backfill, or a
  *  key the resolver minted on read. Auditing them would fill the customer's
  *  audit page with thousands of rows for changes nobody made. */
-const NON_AUDITABLE_SOURCES: readonly string[] = [
+const NON_AUDITABLE_SOURCES: readonly GrantEventSource[] = [
   "genesis-import",
   "backfill-b",
   "read-through-mint",
 ];
-
-/** Role events carry no `source`, so the genesis import's role facts are
- *  recognised by the only actor that authors them. */
-const GENESIS_ACTOR_ID = "system:genesis-import";
 
 /** The audit row, in the existing `AuditLog` shape. The store never sees a
  *  Prisma type: the pipeline stays storage-free. */
@@ -117,9 +114,17 @@ function guardFields(event: AuthzGrantsEvent): {
  */
 export function isAuditableGrantEvent(event: AuthzGrantsEvent): boolean {
   const { source, actor } = guardFields(event);
-  if (source !== undefined && NON_AUDITABLE_SOURCES.includes(source)) {
+  // `source` arrives as the wire event's plain string field, wider than the
+  // union the array is pinned to on purpose (see the type above) - the cast
+  // is on this comparison, not on the declaration a rename must still catch.
+  if (
+    source !== undefined &&
+    (NON_AUDITABLE_SOURCES as readonly string[]).includes(source)
+  ) {
     return false;
   }
+  // Role events carry no `source`, so the genesis import's role facts are
+  // recognised by the only actor that authors them.
   if (actor?.type === "system" && actor.id === GENESIS_ACTOR_ID) {
     return false;
   }

@@ -71,10 +71,16 @@ import type {
   GrantsLedgerEmitter,
 } from "./team-user-backfill.migration";
 
-/** The actor on every fact this import authors: no human performed it. */
+/** The system actor id on every fact this import authors: no human
+ *  performed it. Exported so consumers outside this migration (the audit
+ *  trail subscriber, which must recognise the genesis import's role facts
+ *  by their actor) share this one literal instead of each pinning their
+ *  own copy. */
+export const GENESIS_ACTOR_ID = "system:genesis-import" as const;
+
 const GENESIS_ACTOR: GrantsLedgerActor = {
   type: "system",
-  id: "system:genesis-import",
+  id: GENESIS_ACTOR_ID,
 };
 
 /** Entries per command: one command appends one event batch, and a

@@ -1,55 +1,45 @@
 /**
  * Read-through minting for legacy API keys (ADR-092 decision 1: there is no
- * key sunset, ever).
- *
- * A credential minted before grants were rows carries no binding of its own,
- * and what it may do is decided by a branch somewhere rather than by a fact.
- * The compatibility path is not to retire the key — it is to write the fact
- * down the first time the key is used, so the same access survives the day
- * the engine becomes the decider. This is the same shape as the SHA-256 hash
- * upgrade that already rides `ApiKeyService.verify`: a legacy credential
- * quietly brought up to date on first use, off the request's critical path.
+ * key sunset, ever). A credential minted before grants were rows carries no
+ * binding of its own, and what it may do is decided by a branch rather than
+ * a fact. The compatibility path writes the fact down the first time the
+ * key is used, so the same access survives the day the engine becomes the
+ * decider.
  *
  * ABSENCE IS NOT A GRANT. A service key with no bindings authorizes nothing
  * today — `resolveApiKeyPermission` asks the key's own bindings first and
- * denies when there are none — so the org-wide ADMIN written here is not an
- * "existing implicit grant formalized", it is access the credential does not
- * currently have. That is only correct for a key that genuinely predates the
- * ledger era, whose access came from a branch rather than a row. Every other
- * zero-binding key is either broken or momentarily mid-write (a replace that
- * has attached but not yet revoked, a projection still catching up), and
- * widening one to organization ADMIN would be an escalation, not a migration.
+ * denies when there are none — so the org-wide ADMIN written here is access
+ * the credential does not currently have, correct only for a key that
+ * genuinely predates the ledger era. Every other zero-binding key is either
+ * broken or momentarily mid-write (a replace that has attached but not yet
+ * revoked, a projection still catching up), and widening one to
+ * organization ADMIN would be an escalation, not a migration.
  *
  * So the gate is TIME, not shape: the key's own `createdAt` must be strictly
  * earlier than the moment this organization's genesis import first recorded
  * state (`SystemMigrationTenantState` for
  * `GRANTS_GENESIS_IMPORT_MIGRATION_NAME`, read at its EARLIEST timestamp —
- * `createdAt` and `occurredAt` both, because `occurredAt` moves forward with
- * every later transition and a `finalized` stamp weeks later must not
- * retroactively make a key born last week "legacy"). A key created at or
- * after that moment was born into the ledger era and is never minted for, no
- * matter how many bindings it holds. An unreadable or absent state row mints
- * nothing, which is today's behaviour.
+ * `createdAt` and `occurredAt` both, because a `finalized` stamp weeks later
+ * must not retroactively make a key born last week "legacy"). A key created
+ * at or after that moment was born into the ledger era and is never minted
+ * for, no matter how many bindings it holds. An unreadable or absent state
+ * row mints nothing.
  *
- * The shape checks stay on top of the time gate, not instead of it: an
- * ingestion key (its access IS its project binding) and a user-owned key
- * (`create` refuses zero bindings there, so there is no implicit grant to
- * write down) mint nothing either way.
+ * The shape checks stay on top of the time gate: an ingestion key (its
+ * access IS its project binding) and a user-owned key (`create` refuses
+ * zero bindings there) mint nothing either way.
  *
- * Like every other grant write, this is per-organization (decision 4): the
- * mint only runs for an organization whose genesis import has landed. For
- * everyone else the key's legacy branch keeps deciding what it may do —
- * unchanged, and with no ledger fact stated ahead of the history the import
- * still owes that organization.
+ * Per-organization (decision 4): the mint only runs for an organization
+ * whose genesis import has landed; everyone else's legacy branch keeps
+ * deciding what the key may do.
  *
  * Identity is derived, not random (decision 23): the grant id is a function
- * of the fact's content and the key's own `createdAt` — its business time,
- * since that is when the access really began — and the command id is derived
- * from the key. Two requests racing before the projection lands therefore
- * emit the SAME idempotency key and dedupe at the event store, rather than
- * racing two org-ADMIN rows into a partial unique index. The same derivation
- * is what makes this converge with the cutover import rather than duplicate
- * it: both derive the same id from the same fact.
+ * of the fact's content and the key's own `createdAt` (its business time),
+ * and the command id is derived from the key. Two requests racing before
+ * the projection lands emit the SAME idempotency key and dedupe at the
+ * event store, rather than racing two org-ADMIN rows into a partial unique
+ * index — the same derivation the cutover import uses, so the two converge
+ * rather than duplicate.
  */
 import {
   deriveGrantId,
@@ -64,6 +54,7 @@ import {
   type LedgerActor,
   type LedgerBindingAttach,
 } from "~/server/app-layer/authz/ledger";
+import { SYSTEM_ACTORS } from "~/server/app-layer/authz/ledger-actor";
 import { isOrgOnLedgerWrites } from "~/server/app-layer/authz/ledger-write-gate";
 import { prisma as appPrisma } from "~/server/db";
 import type { ApiKeyWithBindings } from "./api-key.repository";
@@ -76,7 +67,7 @@ const logger = createLogger("langwatch:api-key:legacy-grant-mint");
  */
 const READ_THROUGH_MINT_ACTOR: LedgerActor = {
   type: "system",
-  id: "system:read-through-mint",
+  id: SYSTEM_ACTORS.readThroughMint,
 };
 
 /**

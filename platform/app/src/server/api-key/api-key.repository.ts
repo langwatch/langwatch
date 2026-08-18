@@ -16,9 +16,9 @@ import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
 
 /** The grants an API key carries, as the request states them. */
 export type ApiKeyBindingInput = {
-  role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+  role: TeamUserRole;
   customRoleId?: string | null;
-  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeType: RoleBindingScopeType;
   scopeId: string;
 };
 
@@ -38,9 +38,9 @@ export class ApiKeyRepository {
   constructor(
     private readonly prisma: ApiKeyPrismaDelegate,
     /**
-     * A key's grants are ledger facts since ADR-092 delivery-plan PR 2. The
-     * writer never rides the caller's transaction, so it is composed over the
-     * app's own client rather than `prisma` above, which may be one.
+     * A key's grants are ledger facts (ADR-092 §13). The writer never rides
+     * the caller's transaction, so it is composed over the app's own client
+     * rather than `prisma` above, which may be one.
      */
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
   ) {}

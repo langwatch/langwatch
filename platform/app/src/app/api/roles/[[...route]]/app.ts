@@ -12,10 +12,10 @@
  * effect at organization scope (ADR-021): the write-time refusal the role
  * bindings API enforces for those.
  *
- * Every write here is a grants-ledger command (ADR-092 delivery-plan PR 2),
- * so the audit trail is the pipeline's insert-only subscriber (decision 17):
- * these handlers no longer emit `management.role.*` rows of their own,
- * because that would record the same mutation twice.
+ * Every write here is a grants-ledger command (ADR-092 §13), so the audit
+ * trail is the pipeline's insert-only subscriber (decision 17): these
+ * handlers never emit `management.role.*` rows of their own — that would
+ * record the same mutation twice.
  */
 import type { BaseApp, VersionBuilder } from "@langwatch/api";
 import type { Context } from "hono";

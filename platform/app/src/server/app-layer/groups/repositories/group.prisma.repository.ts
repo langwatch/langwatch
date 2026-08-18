@@ -22,14 +22,16 @@ import type {
 } from "./group.repository";
 
 /** The grant a group carries, as the ledger's attach shape reads it. */
-const attachFor = (binding: CreateBindingInput) => ({
-  bindingId: binding.id,
-  principal: { groupId: binding.groupId },
-  role: binding.role,
-  customRoleId: binding.customRoleId,
-  scopeType: binding.scopeType,
-  scopeId: binding.scopeId,
-});
+function attachFor(binding: CreateBindingInput) {
+  return {
+    bindingId: binding.id,
+    principal: { groupId: binding.groupId },
+    role: binding.role,
+    customRoleId: binding.customRoleId,
+    scopeType: binding.scopeType,
+    scopeId: binding.scopeId,
+  };
+}
 
 export class PrismaGroupRepository implements GroupRepository {
   constructor(

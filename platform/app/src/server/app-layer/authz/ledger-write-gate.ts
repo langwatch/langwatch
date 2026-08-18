@@ -1,41 +1,31 @@
 /**
  * The per-organization WRITE fork (ADR-092 decision 4: build dark, cut an
- * organization over all at once, never half).
+ * organization over all at once, never half). The gate ships CLOSED: in
+ * every pod, on every organization, until that organization's genesis
+ * import lands — a deploy of the ledger writer changes nothing on its own.
  *
- * PR 2 moves every grant mutation onto the ledger. Shipping that as a
- * deploy-time switch would flip every organization on the same second, which
- * is precisely the all-at-once behaviour change the in-place doctrine
- * exists to avoid. So the code ships gated CLOSED: on production, in every
- * pod, doing nothing at all until an organization's genesis import lands.
+ * The gate's question is the one fact that already means "this
+ * organization's whole grant history is in the ledger": its
+ * `SystemMigrationTenantState` row for the genesis import. `migrated` or
+ * `finalized` means the ledger holds every existing grant as a fact, so it
+ * can safely become the writer. An absent row, `pending`, `parked` (the
+ * import failed and will be retried) or `rolled_back` (the operator's flip)
+ * all mean the ledger does NOT hold the organization's history, and its
+ * writes stay on the imperative path.
  *
- * The gate's question is the one fact that already means "this organization's
- * whole grant history is in the ledger": its `SystemMigrationTenantState` row
- * for the genesis import. `migrated` or `finalized` means the ledger holds
- * every existing grant as a fact, so it can safely become the writer. An
- * absent row, `pending`, `parked` (the import failed and will be retried) or
- * `rolled_back` (the operator's flip) all mean the ledger does NOT hold the
- * organization's history, and its writes stay on the imperative path they
- * have always taken.
- *
- * Rollback is therefore an ops action, not a deploy: writing `rolled_back` on
- * the org's state row puts it back on the imperative path fleet-wide within
- * the positive cache's TTL. Rows written imperatively while an organization
- * is on the legacy side are ADOPTED by the next genesis pass — the import
- * takes the legacy row's own id as the fact's id, so a re-run is convergent
- * rather than duplicating — which is what makes flip → rollback → re-flip
+ * Rollback is an ops action, not a deploy: writing `rolled_back` on the
+ * org's state row puts it back on the imperative path fleet-wide within the
+ * positive cache's TTL. Rows written imperatively while on the legacy side
+ * are ADOPTED by the next genesis pass (the import takes the legacy row's
+ * own id as the fact's id), which is what makes flip → rollback → re-flip
  * safe rather than a divergence each time.
  *
- * Modelled on ./legacy-fallback-gate.ts, which asks the same shape of
- * question about the same table for the READ fork: same short-TTL in-process
- * cache, same fail-safe direction (an unreadable state table reads as "not
- * migrated", i.e. today's behaviour), same test seam.
- *
- * Placement: this module is server-only, like ./ledger.ts which is its only
- * production caller — it defaults to the app's Prisma singleton so the verbs
- * need not thread a client, and takes one for tests. The read gate next door
- * cannot do that (it is reached from browser-importable modules), which is
- * the only shape difference between the two.
+ * Modelled on ./legacy-fallback-gate.ts (same shape of question for the
+ * READ fork: short-TTL in-process cache, fail-safe direction, test seam).
+ * Server-only, like ./ledger.ts, its only production caller — it defaults
+ * to the app's Prisma singleton so verbs need not thread a client.
  */
+import type { LedgerMigrationStatus } from "@langwatch/authz-server";
 import { GRANTS_GENESIS_IMPORT_MIGRATION_NAME } from "@langwatch/authz-server/migration";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -49,7 +39,10 @@ const logger = createLogger("langwatch:authz:ledger-write-gate");
  * writer may emit. Finalization is about the READ fork (decision-level
  * parity), which is a later and separate question.
  */
-const LEDGER_WRITE_STATUSES: readonly string[] = ["migrated", "finalized"];
+const LEDGER_WRITE_STATUSES: readonly LedgerMigrationStatus[] = [
+  "migrated",
+  "finalized",
+];
 
 const NEGATIVE_CACHE_TTL_MS = 60_000;
 
@@ -95,7 +88,13 @@ export async function isOrgOnLedgerWrites({
       },
       select: { status: true },
     });
-    onLedger = record !== null && LEDGER_WRITE_STATUSES.includes(record.status);
+    // `status` is a plain Prisma string column (no DB enum), wider than the
+    // union the array is pinned to on purpose (see the type above) - the
+    // cast is on this comparison, not on the declaration a rename must
+    // still catch.
+    onLedger =
+      record !== null &&
+      (LEDGER_WRITE_STATUSES as readonly string[]).includes(record.status);
   } catch (error) {
     // Fail safe: an unreadable state table leaves the organization on the
     // imperative path, which is today's behaviour and always works. Caching

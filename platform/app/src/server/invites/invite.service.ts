@@ -11,9 +11,10 @@ import {
   RoleBindingScopeType,
 } from "~/generated/prisma/client";
 import {
+  type GrantsLedgerWriter,
   grantsLedgerWriter,
-  type LedgerActor,
 } from "~/server/app-layer/authz/ledger";
+import { ledgerActorFor } from "~/server/app-layer/authz/ledger-actor";
 import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { isCustomRole } from "../api/enterprise";
@@ -279,6 +280,7 @@ export class InviteService {
     private readonly licenseRepo: ILicenseEnforcementRepository,
     private readonly planProvider: PlanProvider,
     private readonly roleService?: RoleService,
+    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
   ) {}
 
   /**
@@ -583,11 +585,11 @@ export class InviteService {
       throw new OrganizationNotFoundError();
     }
 
-    // Before anything is written: inviting someone who is already a member
-    // used to succeed silently, adding a pending invite beside the membership
-    // it duplicated. Checked ahead of the licence limit so an admin who is at
-    // their seat cap is told the real reason rather than being sold an
-    // upgrade for a seat they already own.
+    // Before anything is written, and ahead of the licence limit: inviting
+    // someone who is already a member is refused rather than silently
+    // duplicated as a pending invite beside the membership, so an admin who
+    // is at their seat cap is told the real reason rather than being sold
+    // an upgrade for a seat they already own.
     await this.assertNotAlreadyMembers({
       emails: invites.map((invite) => invite.email),
       organizationId,
@@ -1249,9 +1251,9 @@ export class InviteService {
    * team/project grants) and each team's grant.
    *
    * The membership row and the acceptance share one transaction; the grants
-   * cannot join it, because they are ledger commands (ADR-092 delivery-plan
-   * PR 2, source `invite`). So the order is membership-and-acceptance first,
-   * grants after, and that order is what makes the invite lifecycle
+   * cannot join it, because they are ledger commands (ADR-092 §13, source
+   * `invite`). So the order is membership-and-acceptance first, grants
+   * after, and that order is what makes the invite lifecycle
    * consistent: **a PENDING invite never carries grants**. `revokeInvite` can
    * therefore delete one without hunting for access to take back — there is
    * none — and the window a crash opens leaves a member who holds a seat and
@@ -1293,15 +1295,16 @@ export class InviteService {
       }),
     ]);
 
-    const writer = grantsLedgerWriter();
+    const writer = this.writer;
     // Who decided this access: the person who sent the invitation, not the
     // person receiving it. The invitee never granted themselves anything, and
     // an audit trail that says they did answers the wrong question. An invite
     // with no recorded sender (the older rows, and the ones a subscription
     // approval creates) is attributed to the service.
-    const actor: LedgerActor = invite.requestedBy
-      ? { type: "user", id: invite.requestedBy }
-      : { type: "system", id: "system:invite-service" };
+    const actor = ledgerActorFor({
+      userId: invite.requestedBy,
+      fallback: "inviteService",
+    });
 
     if (invite.role !== OrganizationUserRole.EXTERNAL) {
       await writer.revokeBindingsWhere({

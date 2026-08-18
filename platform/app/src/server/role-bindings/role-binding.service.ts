@@ -92,8 +92,8 @@ export class RoleBindingService {
     private readonly prisma: PrismaClient,
     private readonly repo: RoleBindingRepository,
     private readonly roleService: RoleService,
-    // Since delivery-plan PR 2 every binding write on this service is a
-    // grants-ledger command; the tables it used to write are projections.
+    // Every binding write on this service is a grants-ledger command; the
+    // RoleBinding table is a projection fed by the fold, never written here.
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
   ) {}
 

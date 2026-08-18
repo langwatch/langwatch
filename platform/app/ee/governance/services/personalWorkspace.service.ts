@@ -31,7 +31,10 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { grantsLedgerWriter } from "~/server/app-layer/authz/ledger";
+import {
+  type GrantsLedgerWriter,
+  grantsLedgerWriter,
+} from "~/server/app-layer/authz/ledger";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 type TxClient = Prisma.TransactionClient;
@@ -55,7 +58,10 @@ export interface PersonalWorkspace {
 }
 
 export class PersonalWorkspaceService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
+  ) {}
 
   /**
    * Idempotently create (or return) the personal workspace for the
@@ -119,20 +125,19 @@ export class PersonalWorkspaceService {
   }): Promise<PersonalWorkspace> {
     // The team, the project and the legacy TeamUser row are not grant facts
     // and keep their transaction; the owner's ADMIN grant on the workspace is
-    // a ledger command (ADR-092 delivery-plan PR 2), so the team it points at
-    // is collected here and the grant is emitted once the team exists.
+    // a ledger command (ADR-092 §13), so the team it points at is collected
+    // here and the grant is emitted once the team exists.
     let grantOnTeamId: string | null = null;
 
     const workspace = await this.prisma.$transaction(async (tx) => {
       const existing = await this.findInTx(tx, { userId, organizationId });
       if (existing) {
-        // The workspace row is here, which says nothing about the grant that
-        // makes it usable: the two no longer share a transaction, so an
-        // earlier ensure() may have committed the team and died before the
-        // append. Every later call then took this short-circuit and the
-        // owner had a workspace they could not administer, with no path back.
-        // Re-assert only when it is actually missing, since this runs on the
-        // session path.
+        // The workspace row existing says nothing about the grant that makes
+        // it usable: the team and the grant are not one transaction, so an
+        // earlier ensure() can have committed the team and died before the
+        // append, leaving an owner with a workspace they cannot administer
+        // and no path back except this repair. Re-assert only when it is
+        // actually missing, since this runs on the session path.
         const ownerGrant = await tx.roleBinding.findFirst({
           where: {
             organizationId,
@@ -231,7 +236,7 @@ export class PersonalWorkspaceService {
     });
 
     if (grantOnTeamId) {
-      await grantsLedgerWriter().attachBindings({
+      await this.writer.attachBindings({
         organizationId,
         bindings: [
           {
