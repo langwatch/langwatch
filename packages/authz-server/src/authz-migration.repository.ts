@@ -15,6 +15,9 @@ export type LegacyTeamRow = {
   teamId: string;
   role: TeamUserRole;
   customRoleId: string | null;
+  /** The row's own createdAt: the business time of the backfilled grant,
+   *  and part of its deterministic identity (grant-identity.ts). */
+  createdAtMs: number;
 };
 
 /** An existing TEAM-scoped user binding, for computing what is missing. */

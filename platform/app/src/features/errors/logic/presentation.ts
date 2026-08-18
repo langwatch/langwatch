@@ -144,6 +144,22 @@ const SEAT_LIMIT_LABELS: Record<string, string> = {
 };
 
 /**
+ * The migration runner's per-tenant statuses as a sentence reads them.
+ *
+ * Authored rather than derived: `meta.status` is a machine sub-classifier, and
+ * this registry's rule for those is to branch on the value and return copy,
+ * never to render the value. Reshaping `rolled_back` into prose with string
+ * surgery also only works by accident — `String.prototype.replace` with a
+ * string pattern converts the FIRST match, so the first status with two
+ * underscores would reach a customer half-converted.
+ */
+const MIGRATION_STATUS_LABELS: Record<string, string> = {
+  migrated: "still held for parity review",
+  parked: "parked for retry",
+  rolled_back: "already rolled back",
+};
+
+/**
  * Whether any code in the error's reason chain (depth-first, nested included)
  * is one of `codes`.
  *
@@ -983,6 +999,20 @@ const presentations = {
     title: "All member seats are in use",
     describe: () =>
       "Free a seat by disabling a membership, or upgrade the plan to add more.",
+  },
+  migration_state_not_found: {
+    title: "No migration state for that organization",
+    describe: () =>
+      "Check the organization id — only organizations a migration has already processed have state to act on.",
+  },
+  migration_rollback_requires_finalized: {
+    title: "Only a finalized organization can be rolled back",
+    describe: (error) => {
+      const state = label(MIGRATION_STATUS_LABELS, str(error, "status", ""));
+      return state
+        ? `This organization is ${state}, so it is already on — or on its way back to — the legacy path.`
+        : "This organization is not finalized, so it is already on the legacy path.";
+    },
   },
   duplicate_invite: {
     title: "They already have an invite",

@@ -4,13 +4,18 @@ import type {
   TenantMigrationRecord,
   TenantMigrationStatus,
 } from "@langwatch/system-migrations";
+import {
+  MigrationRollbackRequiresFinalizedError,
+  MigrationStateNotFoundError,
+} from "./errors";
 
 const logger = createLogger("langwatch:ops:system-migrations");
 
 /**
- * The ops read model over stored migration state. Deliberately narrower than
- * the runner's own port: the runner reads and writes one tenant at a time,
- * the dashboard reads across them and writes nothing.
+ * The ops model over stored migration state. Deliberately narrower than the
+ * runner's own port: the runner reads and writes one tenant at a time; the
+ * dashboard reads across them, and its ONE write is the operator rollback —
+ * finalized → rolled_back, the state machine's only human-driven edge.
  */
 export interface SystemMigrationStateReader {
   findStatusCounts(args: {
@@ -22,6 +27,13 @@ export interface SystemMigrationStateReader {
     statuses: TenantMigrationStatus[];
     limit: number;
   }): Promise<Array<TenantMigrationRecord & { updatedAt: Date }>>;
+
+  findRecord(args: {
+    migrationName: string;
+    tenantId: string;
+  }): Promise<TenantMigrationRecord | null>;
+
+  upsertRecord(record: TenantMigrationRecord): Promise<void>;
 }
 
 /** How many attention rows one migration lists before the page truncates. */
@@ -81,5 +93,52 @@ export class SystemMigrationsService {
       // retries either way.
       logger.error({ error }, "operator-kicked migration pass failed");
     });
+  }
+
+  /**
+   * The operator's rollback: pin a finalized organization back onto its
+   * legacy path (specs/rbac/in-place-authz-migration.feature, "An operator
+   * rolls a finalized organization back to its legacy path"). Only
+   * `finalized` may roll back — every other status either still IS on the
+   * legacy path or is the runner's to move. The legacy-fallback gate picks
+   * the change up within its cache window; later passes leave the
+   * organization alone (rolled_back is terminal until an operator
+   * intervenes again).
+   */
+  async rollBack({
+    migrationName,
+    tenantId,
+    actorUserId,
+  }: {
+    migrationName: string;
+    tenantId: string;
+    actorUserId: string;
+  }): Promise<void> {
+    const record = await this.deps.state.findRecord({
+      migrationName,
+      tenantId,
+    });
+    if (!record) throw new MigrationStateNotFoundError();
+    if (record.status !== "finalized") {
+      throw new MigrationRollbackRequiresFinalizedError({
+        status: record.status,
+      });
+    }
+    const priorReport =
+      record.report != null && typeof record.report === "object"
+        ? (record.report as Record<string, unknown>)
+        : {};
+    await this.deps.state.upsertRecord({
+      ...record,
+      status: "rolled_back",
+      report: {
+        ...priorReport,
+        rolledBack: { by: actorUserId, at: new Date().toISOString() },
+      },
+    });
+    logger.warn(
+      { migrationName, tenantId, actorUserId },
+      "operator rolled a finalized tenant back to its legacy path",
+    );
   }
 }

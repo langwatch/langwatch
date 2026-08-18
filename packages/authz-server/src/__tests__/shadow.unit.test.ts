@@ -4,12 +4,13 @@ import { AuthzCollectorService } from "../authz-collector.service";
 import type { AuthzReadRepository } from "../authz-read.repository";
 import { makeReader } from "./support/authz-read.stub";
 
-const { warn, debug } = vi.hoisted(() => ({
+const { warn, debug, info } = vi.hoisted(() => ({
   warn: vi.fn(),
   debug: vi.fn(),
+  info: vi.fn(),
 }));
 vi.mock("@langwatch/observability", () => ({
-  createLogger: () => ({ warn, debug, info: vi.fn(), error: vi.fn() }),
+  createLogger: () => ({ warn, debug, info, error: vi.fn() }),
 }));
 
 import { AuthzShadowService } from "../authz-shadow.service";
@@ -69,6 +70,7 @@ function readCompletionSignal() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  AuthzShadowService.resetRateAnnouncement();
 });
 
 describe("authz shadow mode", () => {
@@ -88,6 +90,67 @@ describe("authz shadow mode", () => {
 
       expect(reader.findProjectLineage).not.toHaveBeenCalled();
       expect(warn).not.toHaveBeenCalled();
+      // Never-enabled produces no announcement either — a box that has
+      // shadow off must not log about shadow.
+      expect(info).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when shadow mode turns on", () => {
+    /** @scenario "Turning shadow comparison on is itself announced" */
+    it("announces the sample rate once, not per check", async () => {
+      const shadow = makeShadow(makeShadowReader(), { sampleRate: 0.5 });
+
+      shadow.userPermissionCheck({
+        userId: "alice",
+        permission: "traces:view",
+        legacyAllowed: false,
+        projectId: PROJECT,
+        caller: "test",
+      });
+      shadow.userPermissionCheck({
+        userId: "alice",
+        permission: "traces:view",
+        legacyAllowed: false,
+        projectId: PROJECT,
+        caller: "test",
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+
+      const announcements = info.mock.calls.filter(
+        ([, message]) => message === "authz shadow enabled",
+      );
+      expect(announcements).toHaveLength(1);
+      expect(announcements[0]?.[0]).toEqual({ sampleRate: 0.5 });
+    });
+
+    it("announces again when the rate changes, including back to off", async () => {
+      const reader = makeShadowReader();
+      let rate = 1;
+      const shadow = new AuthzShadowService(
+        new AuthzCollectorService(reader),
+        { sampleRate: () => rate, demoProjectId: () => undefined },
+      );
+      const check = () =>
+        shadow.userPermissionCheck({
+          userId: "alice",
+          permission: "traces:view",
+          legacyAllowed: false,
+          projectId: PROJECT,
+          caller: "test",
+        });
+
+      check();
+      rate = 0;
+      check();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      // Match lines are debug, so info carries the announcements alone.
+      const messages = info.mock.calls.map(([, message]) => message);
+      expect(messages).toEqual([
+        "authz shadow enabled",
+        "authz shadow disabled",
+      ]);
     });
   });
 
@@ -120,7 +183,8 @@ describe("authz shadow mode", () => {
   });
 
   describe("when legacy and engine agree", () => {
-    it("stays silent", async () => {
+    /** @scenario "Every shadow comparison is visible in the logs" */
+    it("logs a debug match line — the proof both resolvers ran", async () => {
       const signal = readCompletionSignal();
       const shadow = makeShadow(
         makeShadowReader({
@@ -141,6 +205,21 @@ describe("authz shadow mode", () => {
       await signal.settle();
 
       expect(warn).not.toHaveBeenCalled();
+      // Agreement is the hot path's expected outcome, so it stays at debug -
+      // one line per sampled check at info is production traffic in the log.
+      expect(debug).toHaveBeenCalledWith(
+        expect.objectContaining({
+          caller: "trpc.project",
+          legacyAllowed: false,
+          engineAllowed: false,
+          permission: "traces:view",
+        }),
+        "authz shadow match",
+      );
+      expect(info).not.toHaveBeenCalledWith(
+        expect.anything(),
+        "authz shadow match",
+      );
     });
   });
 
@@ -184,7 +263,8 @@ describe("authz shadow mode", () => {
   });
 
   describe("when the comparison itself fails", () => {
-    it("logs debug and swallows — never affects the response", async () => {
+    /** @scenario "A shadow comparison that fails is a warning, not silence" */
+    it("logs a warning and swallows — never affects the response", async () => {
       const shadow = makeShadow(
         makeShadowReader({
           findProjectLineage: vi.fn().mockRejectedValue(new Error("db down")),
@@ -199,8 +279,12 @@ describe("authz shadow mode", () => {
         caller: "trpc.project",
       });
 
-      await vi.waitFor(() => expect(debug).toHaveBeenCalledTimes(1));
-      expect(warn).not.toHaveBeenCalled();
+      await vi.waitFor(() => expect(warn).toHaveBeenCalledTimes(1));
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({ caller: "trpc.project" }),
+        "authz shadow comparison failed",
+      );
+      expect(debug).not.toHaveBeenCalled();
     });
   });
 

@@ -47,19 +47,23 @@ const opsViewProbe = checkOpsPermission({
 const opsManagePermission = checkOpsPermission({ permission: "ops:manage" });
 
 /**
- * The extra gate on anything that can destroy a queue payload.
+ * The extra gate on an ops write whose damage nobody will notice in time.
  *
  * `ops:manage` already resolves through the admin allow-list, but it is not
  * enough on its own here for two reasons. It is inherited by an impersonation
  * session — `resolveOpsScope` deliberately falls back to the impersonator's own
  * grant — and "acting as" another user is the wrong posture for irreversible
  * infrastructure surgery, because the audit trail names the impersonated
- * account. And deleting a blob is unrecoverable and silent at the queue level:
- * the job that referenced it completes without its handler ever running, so
- * there is no failure for anyone to notice. A typed confirmation makes that a
- * deliberate act rather than a mis-click.
+ * account. And the damage is silent: deleting a blob completes the job that
+ * referenced it without its handler ever running, and pinning an organization
+ * back onto the legacy authorization path changes which tables answer every
+ * permission check for that tenant without failing anything. A typed
+ * confirmation makes either a deliberate act rather than a mis-click.
+ *
+ * A confirmation dialog in the ops UI is not this guard — every one of these
+ * procedures is callable directly.
  */
-function requireBlobStoreWriteAuth(
+function requireDestructiveOpsAuth(
   ctx: {
     session: { user: { impersonator?: { email?: string | null } | null } };
   },
@@ -69,7 +73,7 @@ function requireBlobStoreWriteAuth(
     throw new TRPCError({
       code: "FORBIDDEN",
       message:
-        "Blob store changes cannot be made from an impersonated session. Sign in directly to continue.",
+        "This action cannot be run from an impersonated session. Sign in directly to continue.",
     });
   }
   if (!confirm) {
@@ -1366,7 +1370,7 @@ export const opsRouter = createTRPCRouter({
   //
   // Reads are ops:view. Everything that can destroy a payload additionally
   // requires a non-impersonated session and a typed confirmation — see
-  // `requireBlobStoreWriteAuth`.
+  // `requireDestructiveOpsAuth`.
   // ---------------------------------------------------------------------------
 
   listBlobQueues: protectedProcedure.use(opsViewPermission).query(async () => {
@@ -1419,7 +1423,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       if (!input.dryRun) {
-        requireBlobStoreWriteAuth(ctx, input.confirm);
+        requireDestructiveOpsAuth(ctx, input.confirm);
       }
       return requireOps().blobStore.runCleanup({
         dryRun: input.dryRun,
@@ -1440,7 +1444,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      requireBlobStoreWriteAuth(ctx, input.confirm);
+      requireDestructiveOpsAuth(ctx, input.confirm);
       return requireOps().blobStore.deleteBlob({
         queueName: input.queueName,
         projectId: input.projectId,
@@ -1473,5 +1477,34 @@ export const opsRouter = createTRPCRouter({
     .mutation(() => {
       systemMigrationsService.startPass();
       return { started: true };
+    }),
+
+  /**
+   * The operator rollback: pin a finalized organization back onto its
+   * legacy path. Only `finalized` rolls back; the service refuses anything
+   * else with a handled error. Rolled-back tenants are terminal for the
+   * runner — later passes leave them alone.
+   */
+  rollBackSystemMigrationTenant: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        migrationName: z.string().min(1).max(200),
+        tenantId: z.string().min(1).max(200),
+        // Typed confirmation, same reasoning as `deleteBlob`.
+        confirm: z.literal("ROLL BACK").optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Same posture as the blob-store writes: this procedure is callable
+      // without the dialog, and it decides which tables answer every
+      // permission check for an entire organization.
+      requireDestructiveOpsAuth(ctx, input.confirm);
+      await systemMigrationsService.rollBack({
+        migrationName: input.migrationName,
+        tenantId: input.tenantId,
+        actorUserId: ctx.session.user.id,
+      });
+      return { rolledBack: true };
     }),
 });
