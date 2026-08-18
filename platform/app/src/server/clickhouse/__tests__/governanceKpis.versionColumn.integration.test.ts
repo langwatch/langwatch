@@ -30,8 +30,7 @@ import {
 import { replayGooseMigrationUp } from "./migrationReplay";
 
 const CREATE_MIGRATION = "00031_create_governance_kpis.sql";
-const VERSION_COLUMN_MIGRATION =
-  "00083_governance_kpis_version_column_fix.sql";
+const VERSION_COLUMN_MIGRATION = "00083_governance_kpis_version_column_fix.sql";
 
 const tenantId = `test-kpis-${generate("tenant").toString()}`;
 const sourceId = "src-1";
@@ -163,7 +162,6 @@ describe("governance_kpis version column migration", () => {
       });
     }, 120_000);
 
-    /** @scenario A trace written during the copy is not discarded by the swap */
     it("keeps both the copied row and the one that raced the copy", async () => {
       expect(injectedDuringCopy).toBe(true);
 
@@ -176,14 +174,12 @@ describe("governance_kpis version column migration", () => {
       expect(rows.map((row) => row.SpendUsd)).toEqual([0.25, 0.75]);
     });
 
-    /** @scenario The rebuilt table versions rows by a clock that only moves forward */
     it("versions the rebuilt table by CreatedAt", async () => {
       expect(await versionColumnOf("governance_kpis")).toContain(
         "ReplacingMergeTree(CreatedAt)",
       );
     });
 
-    /** @scenario The scratch table does not outlive the migration */
     it("leaves no scratch table behind", async () => {
       expect(await versionColumnOf("governance_kpis_v2")).toBe("");
     });
@@ -197,7 +193,6 @@ describe("governance_kpis version column migration", () => {
       });
     }, 120_000);
 
-    /** @scenario Re-applying a partially executed migration converges instead of wedging */
     it("converges on the same rows rather than failing", async () => {
       const rows = await readKpiRows();
 
@@ -238,7 +233,6 @@ describe("governance_kpis version column migration", () => {
       await ch.command({ query: "OPTIMIZE TABLE governance_kpis FINAL" });
     }, 120_000);
 
-    /** @scenario A merge keeps the latest fold, not the one with the latest event */
     it("keeps the cumulative totals after merge", async () => {
       const rows = await readKpiRows();
       const refolded = rows.filter((row) => row.TraceId === "trace-refolded");
@@ -285,7 +279,6 @@ describe("governance_kpis version column migration", () => {
       });
     }, 120_000);
 
-    /** @scenario Re-applying after a crash mid-swap converges instead of wedging */
     it("re-applies cleanly and keeps the rows", async () => {
       expect(crashed).toBe(true);
 
@@ -300,5 +293,4 @@ describe("governance_kpis version column migration", () => {
       );
     });
   });
-
 });
