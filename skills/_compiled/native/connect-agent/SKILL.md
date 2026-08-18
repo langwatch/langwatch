@@ -100,6 +100,8 @@ app.use((req, res, next) => {
 });
 ```
 
+The TypeScript middleware needs an initialized OpenTelemetry runtime: a registered context manager and propagator. The LangWatch SDK's `setupObservability()` and the OpenTelemetry `NodeSDK` both register them at startup; without one of them, `context.with` and `propagation.extract` are no-ops.
+
 Confirm the agent reports its traces to the same LangWatch project that runs the scenarios (the same `LANGWATCH_API_KEY` project). Traces sent to another project, or to another observability backend only, are invisible to the judge. If the service has no LangWatch tracing yet, set it up with the `tracing` skill; its prompt is "Instrument my code with LangWatch".
 
 ## Step 5: ASK where the agent runs
