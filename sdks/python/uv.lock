@@ -2223,12 +2223,11 @@ wheels = [
 
 [[package]]
 name = "haystack-ai"
-version = "2.30.2"
+version = "3.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "docstring-parser" },
     { name = "filetype" },
-    { name = "haystack-experimental" },
     { name = "httpx" },
     { name = "jinja2" },
     { name = "jsonschema" },
@@ -2248,23 +2247,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/df/63/aa3f774552f98c6667b66fd0456f2388e14df3ec830a7e795045c728519d/haystack_ai-2.30.2.tar.gz", hash = "sha256:fb9da3113c8e4b8dfb7a3a33af5261a6ffe6648bd2932c9d1df3c1d49175dbf1", size = 498738, upload-time = "2026-06-18T08:36:47.125Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/19/74/f5b82c7bd90345abfff69a76445ee63e9b42f362303946a97bfd5cf49e08/haystack_ai-3.0.0.tar.gz", hash = "sha256:c948a337e7a53d9bc47f3c08c2ad5e52ca6bd44956ad6d9e3512209a056493b4", size = 469683, upload-time = "2026-07-20T12:07:00.615Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5e/eb/8b28d1d7799a6cfa233665f088e3f38bb30a180b6dcd7fe99b831349ef8a/haystack_ai-2.30.2-py3-none-any.whl", hash = "sha256:acb34b984fea390307db16ebe2d7619516f5441ceaa9c30ad28a69148a8bbb7f", size = 720210, upload-time = "2026-06-18T08:36:45.52Z" },
-]
-
-[[package]]
-name = "haystack-experimental"
-version = "0.12.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "docstring-parser" },
-    { name = "filetype" },
-    { name = "haystack-ai" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/9d/ea/259800459ffae72ce23c85f26fa1ddf313fa15248f07be9d587c504bb6db/haystack_experimental-0.12.0.tar.gz", hash = "sha256:110eb29e8e21790b830d7e23a42e448c6a4d33bcd51ead2175f3a07219512c37", size = 72705, upload-time = "2025-07-14T11:50:55.308Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/4e/d6/4852e2b9e301dd3f3544ad4c4357beb2110534834ed7da11bac0160b1eda/haystack_experimental-0.12.0-py3-none-any.whl", hash = "sha256:06d22734d92dc1e8b7d0768efb5a6507d5e37d7623b1e437688f938b8b769f8e", size = 102551, upload-time = "2025-07-14T11:50:56.825Z" },
+    { url = "https://files.pythonhosted.org/packages/89/3f/fa387315618f0c2dcac7178b781476363b7b9edbb0e02c23eb5a60a2392d/haystack_ai-3.0.0-py3-none-any.whl", hash = "sha256:523718f200b27e11c8e33acf29fc8608c2f9951a0877eedf11bf838d06abff05", size = 656076, upload-time = "2026-07-20T12:06:58.875Z" },
 ]
 
 [[package]]
@@ -3452,7 +3437,7 @@ examples = [
     { name = "faiss-cpu", specifier = ">=1.8.0,<2.0.0" },
     { name = "fastapi", specifier = ">=0.115.12" },
     { name = "fonttools", specifier = ">=4.62.0" },
-    { name = "haystack-ai", specifier = ">=2.13.2,<3.0.0" },
+    { name = "haystack-ai", specifier = ">=2.13.2,<4.0.0" },
     { name = "json-repair", specifier = ">=0.42.0" },
     { name = "jupyter", specifier = ">=1.0.0,<2.0.0" },
     { name = "jupyterlab", specifier = ">=4.5.6" },
