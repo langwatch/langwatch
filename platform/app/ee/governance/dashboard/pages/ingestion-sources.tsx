@@ -290,6 +290,11 @@ function resolvePullConfig(
       "Missing or invalid Anthropic fields",
       "Admin API key is required, report must be `usage` or `cost`, bucket width is usage-only and must be 1m/1h/1d, and the backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z).",
     ],
+    claude_compliance: [
+      () => buildClaudeCompliancePullConfig(composer),
+      "Missing Anthropic compliance fields",
+      "Workspace API key is required.",
+    ],
   };
 
   const builder = builders[composer.sourceType];
@@ -1502,6 +1507,19 @@ export function buildAnthropicAdminPullConfig(
       "0 * * * *",
     credentials: { token },
   };
+}
+
+/**
+ * Claude Compliance builder — the frozen puller config
+ * (`CLAUDE_COMPLIANCE_PULL_CONFIG`) only needs the workspace API key
+ * routed into `credentials.token` for the `x-api-key` header template.
+ */
+export function buildClaudeCompliancePullConfig(
+  c: ComposerState,
+): Record<string, unknown> | null {
+  const token = trimmedField(c.parserConfig, "workspaceApiKey");
+  if (!token) return null;
+  return { adapter: "claude_compliance", credentials: { token } };
 }
 
 /** One composer field, trimmed, with an absent key reading as empty. */
