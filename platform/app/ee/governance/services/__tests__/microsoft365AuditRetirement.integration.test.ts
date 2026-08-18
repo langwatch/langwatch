@@ -33,6 +33,7 @@ import { prisma } from "~/server/db";
 const RETIRED_REASON = "[retired] Polled an Entra directory-change feed";
 
 const createdOrgIds: string[] = [];
+const createdUserIds: string[] = [];
 /**
  * Built from UNLIMITED_PLAN rather than FREE_PLAN, and with every tier-defining
  * field overridden. Spreading FREE_PLAN and setting only `type` leaves
@@ -94,9 +95,15 @@ afterAll(async () => {
       where: { id: { in: createdOrgIds } },
     });
   }
+  if (createdUserIds.length > 0) {
+    await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
+  }
 });
 
-async function makeOrg(): Promise<string> {
+async function makeOrg(): Promise<{
+  organizationId: string;
+  actorUserId: string;
+}> {
   const id = `org-m365-${nanoid(8)}`;
   await prisma.organization.create({
     data: { id, name: `ACME ${id}`, slug: id },
@@ -109,8 +116,15 @@ async function makeOrg(): Promise<string> {
     data: { name: `ACME Team ${id}`, slug: `${id}-team`, organizationId: id },
   });
 
+  // IngestionSource.createdById is a real foreign key, so the actor has to be
+  // a real row rather than a string that merely looks like an id.
+  const actor = await prisma.user.create({
+    data: { name: "ACME Admin", email: `${id}-admin@example.com` },
+  });
+  createdUserIds.push(actor.id);
+
   createdOrgIds.push(id);
-  return id;
+  return { organizationId: id, actorUserId: actor.id };
 }
 
 const MIGRATION_SQL_URL = new URL(
@@ -144,7 +158,7 @@ async function runDisableMigration(): Promise<void> {
 describe("microsoft_365_audit credential seam", () => {
   /** @scenario "Client secret submitted in the UI reaches the adapter decrypted" */
   it("encrypts the client secret at rest and hands the real value back to the worker", async () => {
-    const organizationId = await makeOrg();
+    const { organizationId, actorUserId } = await makeOrg();
     const service = IngestionSourceService.create(prisma);
     const clientSecret = `secret-${nanoid(12)}`;
 
@@ -152,7 +166,7 @@ describe("microsoft_365_audit credential seam", () => {
       organizationId,
       sourceType: "microsoft_365_audit",
       name: `acme-m365-${nanoid(6)}`,
-      actorUserId: "test-user",
+      actorUserId,
       pullConfig: {
         adapter: "microsoft_365_audit",
         contentType: "Audit.General",
@@ -192,7 +206,7 @@ describe("microsoft_365_audit credential seam", () => {
 describe("copilot_studio disable migration", () => {
   /** @scenario "Existing copilot_studio sources are disabled with a stated reason" */
   it("disables the retired sources, states why, and leaves their config intact", async () => {
-    const organizationId = await makeOrg();
+    const { organizationId } = await makeOrg();
     const parserConfig = {
       tenantId: "acme-tenant-guid",
       clientId: "acme-app-guid",
@@ -229,7 +243,7 @@ describe("copilot_studio disable migration", () => {
 
   /** @scenario "Migration is idempotent and does not clobber a deliberate re-enable" */
   it("leaves a re-enabled source as the admin set it and never double-stamps", async () => {
-    const organizationId = await makeOrg();
+    const { organizationId } = await makeOrg();
     const created = await prisma.ingestionSource.create({
       data: {
         organizationId,
@@ -264,7 +278,7 @@ describe("copilot_studio disable migration", () => {
   });
 
   it("does not touch sources of any other type", async () => {
-    const organizationId = await makeOrg();
+    const { organizationId } = await makeOrg();
     const other = await prisma.ingestionSource.create({
       data: {
         organizationId,
