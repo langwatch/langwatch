@@ -10,10 +10,10 @@ import { chromium } from "playwright";
  *
  * Prerequisites:
  *   1. Dev stack running: `make quickstart`
- *   2. e2e/auth.json exists — run `npx tsx e2e/save-auth-state.ts` once
- *      to capture rogerio's session interactively (or any persona that has a
- *      personal project + at least one IngestionTemplate binding installed
- *      with traces visible at /me/traces).
+ *   2. e2e/auth.json exists — capture it by hand (sign in, then save the
+ *      storage state) for rogerio, or any persona that has a personal
+ *      project + at least one IngestionTemplate binding installed with
+ *      traces visible at /me/traces. See e2e/README.md.
  *   3. The persona has clicked Connect on at least claude_code so the install
  *      drawer can be re-opened to capture Surface 3 (or uninstall first to
  *      capture the empty drawer state).
@@ -41,7 +41,7 @@ const VIEWPORT = { width: 1440, height: 900 };
 void (async () => {
   if (!fs.existsSync(AUTH_FILE)) {
     console.error(
-      `❌ auth.json missing at ${AUTH_FILE}. Run 'npx tsx e2e/save-auth-state.ts' first.`,
+      `❌ auth.json missing at ${AUTH_FILE}. Capture a session by hand and save the storage state there — see platform/app/e2e/README.md.`,
     );
     process.exit(1);
   }

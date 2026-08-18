@@ -75,7 +75,7 @@
     "test:unit": "pnpm --filter @langwatch/web test:unit",
     "test:component": "pnpm --filter @langwatch/web test:component",
     "test:integration": "pnpm --filter @langwatch/web test:integration",
-    "test:e2e": "pnpm --filter @langwatch/web test:e2e",
+    "test:e2e": "pnpm --filter langwatch-e2e-tests test",
     "test:cli": "pnpm --filter @langwatch/server-cli test",
     "test:sdk": "pnpm --filter langwatch test",
     "typecheck": "pnpm --filter @langwatch/web typecheck",

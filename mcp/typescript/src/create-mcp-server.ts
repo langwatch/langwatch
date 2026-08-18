@@ -1234,11 +1234,11 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       const { getAnnotation } = await import("./langwatch-api-annotations.js");
       const annotation = await getAnnotation(params.id);
       const lines = [
-        `**ID**: ${annotation.id}`,
-        `**Trace ID**: ${annotation.traceId}`,
+        `**ID**: ${annotation.id ?? "—"}`,
+        `**Trace ID**: ${annotation.traceId ?? "—"}`,
         `**Comment**: ${annotation.comment ?? "—"}`,
         `**Score**: ${annotation.isThumbsUp ? "Thumbs Up" : "—"}`,
-        `**Created**: ${annotation.createdAt}`,
+        `**Created**: ${annotation.createdAt ?? "—"}`,
       ];
       return {
         content: [{ type: "text", text: lines.join("\n") }],
