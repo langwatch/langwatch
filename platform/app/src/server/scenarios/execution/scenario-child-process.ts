@@ -172,6 +172,8 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
         langwatchEndpoint,
         langwatchApiKey,
       }),
+      ...(scenario.maxTurns != null && { maxTurns: scenario.maxTurns }),
+      ...(scenario.minTurns != null && { minTurns: scenario.minTurns }),
       metadata: {
         langwatch: {
           targetReferenceId: target.referenceId,
