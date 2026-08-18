@@ -18,6 +18,7 @@ any provider dependency.
 import asyncio
 import os
 import sys
+import threading
 import time
 
 import httpx
@@ -219,6 +220,37 @@ def test_gate_times_out_with_a_clear_error():
         with pytest.raises(server.EvaluationQueueTimeout):
             with gate.admit((("OPENAI_API_KEY", "other"),)):
                 pass
+
+
+def test_capacity_freed_after_the_deadline_does_not_admit():
+    gate = server.EvaluationGate(max_concurrent=1, timeout_seconds=0.05)
+    release = threading.Event()
+
+    def holder():
+        with gate.admit(()):
+            release.wait(2)
+
+    holding = threading.Thread(target=holder)
+    holding.start()
+    deadline = time.monotonic() + 2
+    while gate.active_evaluations == 0:
+        if time.monotonic() >= deadline:
+            pytest.fail("The holder was not admitted within 2s")
+        time.sleep(0.005)
+
+    # Free the capacity only after every waiter's 0.05s deadline has passed:
+    # none of them may be admitted late, and none may linger in the queue.
+    threading.Timer(0.3, release.set).start()
+    for _ in range(3):
+        with pytest.raises(server.EvaluationQueueTimeout):
+            with gate.admit((("OPENAI_API_KEY", "late"),)):
+                pass
+    holding.join(timeout=2)
+    assert not holding.is_alive()
+    assert gate.waiting_environments == []
+    # The gate is healthy afterwards: a fresh request admits immediately.
+    with gate.admit((("OPENAI_API_KEY", "fresh"),)):
+        assert gate.active_evaluations == 1
 
 
 def test_model_env_key_ignores_non_model_vars():

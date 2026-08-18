@@ -152,14 +152,19 @@ class EvaluationGate:
         with self._condition:
             queued = False
             try:
-                while not self._may_admit(key):
+                while True:
+                    # A queued request past its deadline is rejected even if
+                    # capacity happens to free at that same moment: its
+                    # caller already gave up, so running it would only delay
+                    # the live requests behind it.
+                    if queued and time.monotonic() >= deadline:
+                        raise EvaluationQueueTimeout()
+                    if self._may_admit(key):
+                        break
                     if not queued:
                         self._waiting[key] = self._waiting.get(key, 0) + 1
                         queued = True
-                    remaining = deadline - time.monotonic()
-                    if remaining <= 0:
-                        raise EvaluationQueueTimeout()
-                    self._condition.wait(remaining)
+                    self._condition.wait(deadline - time.monotonic())
             finally:
                 if queued:
                     self._leave_queue(key)
