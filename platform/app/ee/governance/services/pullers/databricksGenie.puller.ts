@@ -2011,8 +2011,13 @@ export class DatabricksGeniePuller
         return null;
       }
 
+      // No manifest is a refusal, not a pass. The rows are positional and every
+      // value in them is a string, so without the names there is nothing that
+      // could tell a correct answer from a reordered one — which is the whole
+      // case this check exists for. An answer we cannot check is one we cannot
+      // price from.
       const served = statement.manifest?.schema?.columns?.map((c) => c.name);
-      if (served && !WAREHOUSE_COST_COLUMNS.every((n, i) => served[i] === n)) {
+      if (!served || !WAREHOUSE_COST_COLUMNS.every((n, i) => served[i] === n)) {
         logger.error(
           {
             adapter: this.id,

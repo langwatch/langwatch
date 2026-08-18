@@ -57,11 +57,14 @@ let statementBodies: Record<string, unknown>[];
 let costPlan: CostPlan | null;
 /** Message creation time, moved by tests that care about the read window. */
 let messageCreatedMs: number;
+/** Whether Genie ran a query to answer the question. */
+let messageRanSql: boolean;
 
 beforeEach(async () => {
   statementBodies = [];
   costPlan = null;
   messageCreatedMs = Date.now() - 60_000;
+  messageRanSql = true;
 
   server = http.createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
@@ -91,15 +94,17 @@ beforeEach(async () => {
             status: "COMPLETED",
             created_timestamp: messageCreatedMs,
             user_id: 42,
-            attachments: [
-              {
-                query: {
-                  query: "SELECT count(*) FROM orders",
-                  statement_id: STATEMENT_ID,
-                  query_result_metadata: { row_count: 1 },
-                },
-              },
-            ],
+            attachments: messageRanSql
+              ? [
+                  {
+                    query: {
+                      query: "SELECT count(*) FROM orders",
+                      statement_id: STATEMENT_ID,
+                      query_result_metadata: { row_count: 1 },
+                    },
+                  },
+                ]
+              : [{ text: { content: "I need a bit more detail." } }],
           },
         ],
       });
@@ -310,6 +315,143 @@ describe("a source that names a warehouse", () => {
 
     expect(result.events).toHaveLength(1);
     expect(hintOf(result).costUsd).toBe("0");
+  });
+
+  /** @scenario "Billing answered in a shape we did not ask for is not priced from" */
+  it("refuses to price an answer that does not say what its columns are", async () => {
+    // No manifest at all. The rows still parse — they are strings — so without
+    // the names nothing downstream could tell this answer from a reordered one.
+    costPlan = {
+      columns: [],
+      rows: [
+        [
+          STATEMENT_ID,
+          "3600000",
+          "3600000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+      ],
+    };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+
+    expect(result.events).toHaveLength(1);
+    expect(hintOf(result).costUsd).toBe("0");
+  });
+
+  /** @scenario "A question that ran no SQL is charged nothing" */
+  it("charges nothing for a question Genie answered without a query", async () => {
+    messageRanSql = false;
+    costPlan = {
+      rows: [
+        [
+          STATEMENT_ID,
+          "3600000",
+          "3600000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+      ],
+    };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+
+    expect(result.events).toHaveLength(1);
+    // A priced statement exists in the window; this question simply is not it.
+    expect(hintOf(result).costUsd).toBe("0");
+  });
+
+  /** @scenario "The puller's own billing query is not charged to a question" */
+  it("charges no question for compute no question asked for", async () => {
+    costPlan = {
+      rows: [
+        [
+          "some-other-statement",
+          "3600000",
+          "3600000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+      ],
+    };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+
+    // Compute that belongs to no Genie question — the puller's own billing
+    // query among it — is never handed to whichever question happens to be here.
+    expect(hintOf(result).costUsd).toBe("0");
+  });
+
+  /** @scenario "The cost is the published rate, not the customer's negotiated one" */
+  it("never presents the figure as the customer's invoice", async () => {
+    costPlan = {
+      rows: [
+        [
+          STATEMENT_ID,
+          "3600000",
+          "3600000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+      ],
+    };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+
+    expect(hintOf(result).costUsd).toBe("6");
+    // The account's discount is on no table this token reads, so the figure is
+    // the published rate and has to say so.
+    expect(hintOf(result).costStatus).toBe("estimate");
+  });
+
+  /** @scenario "Cost that arrives late corrects the record rather than adding one" */
+  it("corrects a question's zero when the bill lands, on the same record", async () => {
+    messageCreatedMs = Date.now() - 30 * 60 * 1000;
+
+    // First run: the compute has not been published yet.
+    costPlan = { rows: [] };
+    const first = await pull({ warehouseId: WAREHOUSE_ID });
+    expect(hintOf(first).costUsd).toBe("0");
+
+    // Second run, after the bill lands.
+    costPlan = {
+      rows: [
+        [
+          STATEMENT_ID,
+          "3600000",
+          "3600000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+      ],
+    };
+    const second = await pull({ warehouseId: WAREHOUSE_ID });
+
+    expect(hintOf(second).costUsd).toBe("6");
+    // Same question, so the same record — the ledger replaces on these
+    // coordinates rather than adding a second row for one question.
+    expect(second.events[0]?.source_event_id).toBe(
+      first.events[0]?.source_event_id,
+    );
+    expect(
+      (
+        second.events[0]?.extra?.[PULLED_USAGE_HINT_KEY] as {
+          dimensions: unknown;
+        }
+      ).dimensions,
+    ).toEqual(
+      (
+        first.events[0]?.extra?.[PULLED_USAGE_HINT_KEY] as {
+          dimensions: unknown;
+        }
+      ).dimensions,
+    );
   });
 
   /** @scenario "A question's hour is priced whole or not at all" */
