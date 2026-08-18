@@ -137,8 +137,24 @@ describe("agent dev target resolution", () => {
 				expect(agent.name).toBe("My Local Agent");
 				expect(mockPrompts).toHaveBeenCalledWith(
 					expect.objectContaining({
-						initial: path.basename(process.cwd()),
+						initial: path.basename(process.cwd()) || "my-agent",
 					}),
+				);
+			});
+
+			it("offers my-agent when the directory has no basename", async () => {
+				setTTY(true);
+				vi.spyOn(process, "cwd").mockReturnValue("/");
+				mockPrompts.mockResolvedValue({ name: "my-agent" });
+				const { service } = makeService({ agents: [] });
+
+				await resolveTargetAgent({
+					service,
+					localUrl: "http://localhost:8010/agent/chat",
+				});
+
+				expect(mockPrompts).toHaveBeenCalledWith(
+					expect.objectContaining({ initial: "my-agent" }),
 				);
 			});
 
