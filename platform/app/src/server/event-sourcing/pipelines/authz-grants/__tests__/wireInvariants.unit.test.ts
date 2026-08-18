@@ -105,6 +105,10 @@ describe("the grants ledger's wire boundary", () => {
       ).toBe(false);
     });
 
+    it("refuses a roleless grant at TEAM scope - a null role key spells absence, and only a RESOURCE grant may spell it", () => {
+      expect(parse({}, { roleKey: null }).success).toBe(false);
+    });
+
     it("refuses a resource grant that also carries a role", () => {
       expect(
         parse(

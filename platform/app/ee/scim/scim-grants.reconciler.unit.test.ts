@@ -49,10 +49,13 @@ const storedMemberRow = {
   customRoleId: null,
 };
 
-const reconcile = (
-  desired: DesiredScimGrant[],
-  where: Prisma.RoleBindingWhereInput = { userId: USER_ID },
-) =>
+const reconcile = ({
+  desired,
+  where = { userId: USER_ID },
+}: {
+  desired: DesiredScimGrant[];
+  where?: Prisma.RoleBindingWhereInput;
+}) =>
   reconcileScimGrants({
     prisma,
     writer,
@@ -74,7 +77,7 @@ describe("reconcileScimGrants", () => {
     it("attaches only the missing one, as a scim fact", async () => {
       findMany.mockResolvedValue([]);
 
-      const outcome = await reconcile([memberOfOrg]);
+      const outcome = await reconcile({ desired: [memberOfOrg] });
 
       expect(outcome).toEqual({ attached: 1, revoked: 0 });
       expect(attachBindings).toHaveBeenCalledWith(
@@ -92,7 +95,7 @@ describe("reconcileScimGrants", () => {
     it("emits nothing at all", async () => {
       findMany.mockResolvedValue([storedMemberRow]);
 
-      const outcome = await reconcile([memberOfOrg]);
+      const outcome = await reconcile({ desired: [memberOfOrg] });
 
       expect(outcome).toEqual({ attached: 0, revoked: 0 });
       expect(attachBindings).not.toHaveBeenCalled();
@@ -104,7 +107,7 @@ describe("reconcileScimGrants", () => {
     it("revokes it, which is what carries the instant deny", async () => {
       findMany.mockResolvedValue([storedMemberRow]);
 
-      const outcome = await reconcile([]);
+      const outcome = await reconcile({ desired: [] });
 
       expect(outcome).toEqual({ attached: 0, revoked: 1 });
       expect(revokeBindings).toHaveBeenCalledWith(
@@ -120,7 +123,7 @@ describe("reconcileScimGrants", () => {
         { ...storedMemberRow, role: TeamUserRole.VIEWER },
       ]);
 
-      const outcome = await reconcile([memberOfOrg]);
+      const outcome = await reconcile({ desired: [memberOfOrg] });
 
       expect(outcome).toEqual({ attached: 1, revoked: 1 });
       expect(revokeBindings).toHaveBeenCalledBefore(attachBindings);
@@ -133,7 +136,7 @@ describe("reconcileScimGrants", () => {
         { ...storedMemberRow, id: "rb_custom", customRoleId: "cr_1" },
       ]);
 
-      const outcome = await reconcile([memberOfOrg]);
+      const outcome = await reconcile({ desired: [memberOfOrg] });
 
       expect(outcome).toEqual({ attached: 1, revoked: 1 });
       expect(revokeBindings).toHaveBeenCalledWith(
@@ -149,12 +152,15 @@ describe("reconcileScimGrants", () => {
    * the reconcile — the read that decides what to revoke, and the revoke
    * itself — carry it.
    */
-  describe("given a caller-supplied filter naming a different organization", () => {
+  describe("when the caller-supplied filter names a different organization", () => {
     describe("when the projection is read", () => {
       it("re-states this organization last, so the filter cannot widen out of the tenant", async () => {
         findMany.mockResolvedValue([]);
 
-        await reconcile([], { userId: USER_ID, organizationId: "org_other" });
+        await reconcile({
+          desired: [],
+          where: { userId: USER_ID, organizationId: "org_other" },
+        });
 
         expect(findMany).toHaveBeenCalledTimes(1);
         expect(findMany.mock.calls[0]![0].where).toEqual({
@@ -168,7 +174,10 @@ describe("reconcileScimGrants", () => {
       it("revokes inside this organization, never the one the filter named", async () => {
         findMany.mockResolvedValue([storedMemberRow]);
 
-        await reconcile([], { userId: USER_ID, organizationId: "org_other" });
+        await reconcile({
+          desired: [],
+          where: { userId: USER_ID, organizationId: "org_other" },
+        });
 
         expect(revokeBindings).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -183,9 +192,9 @@ describe("reconcileScimGrants", () => {
       it("attaches inside this organization too", async () => {
         findMany.mockResolvedValue([]);
 
-        await reconcile([memberOfOrg], {
-          userId: USER_ID,
-          organizationId: "org_other",
+        await reconcile({
+          desired: [memberOfOrg],
+          where: { userId: USER_ID, organizationId: "org_other" },
         });
 
         expect(attachBindings).toHaveBeenCalledWith(
@@ -199,7 +208,7 @@ describe("reconcileScimGrants", () => {
     it("stays silent rather than emitting an empty command", async () => {
       findMany.mockResolvedValue([]);
 
-      const outcome = await reconcile([]);
+      const outcome = await reconcile({ desired: [] });
 
       expect(outcome).toEqual({ attached: 0, revoked: 0 });
       expect(attachBindings).not.toHaveBeenCalled();

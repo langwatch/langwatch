@@ -17,6 +17,7 @@ export const SYSTEM_ACTORS = {
   apiKeyService: "system:api-key-service",
   inviteService: "system:invite-service",
   migrationRunner: "system:migration-runner",
+  personalWorkspace: "system:personal-workspace",
   readThroughMint: "system:read-through-mint",
   ssoAutoJoin: "system:sso-auto-join",
 } as const satisfies Record<string, string>;

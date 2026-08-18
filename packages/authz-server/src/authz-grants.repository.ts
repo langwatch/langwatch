@@ -87,10 +87,10 @@ export type OffboardCounts = {
 
 export interface AuthzGrantsRepository extends ScopeLineageRepository {
   /** @throws DuplicateBindingError on a unique-index collision. */
-  createBinding(
-    row: RoleBindingWrite,
-    context: { actor: GrantWriteActor },
-  ): Promise<void>;
+  createBinding(args: {
+    row: RoleBindingWrite;
+    actor: GrantWriteActor;
+  }): Promise<void>;
   /**
    * @throws DuplicateBindingError on a unique-index collision.
    * @throws BindingMissingError when the row is gone.

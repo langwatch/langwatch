@@ -77,7 +77,7 @@ describe("given a create that collides with an identical binding", () => {
       } as Partial<GrantsLedgerWriter>);
 
       await expect(
-        repository.createBinding(binding, { actor: ACTOR }),
+        repository.createBinding({ row: binding, actor: ACTOR }),
       ).rejects.toMatchObject({ code: "role_binding_already_exists" });
     });
   });
@@ -89,7 +89,7 @@ describe("given a create that collides with an identical binding", () => {
       } as Partial<GrantsLedgerWriter>);
 
       await expect(
-        repository.createBinding(binding, { actor: ACTOR }),
+        repository.createBinding({ row: binding, actor: ACTOR }),
       ).rejects.toMatchObject({ code: "role_binding_already_exists" });
     });
   });
@@ -184,7 +184,7 @@ describe("given a write that failed for a reason the caller cannot act on", () =
       } as Partial<GrantsLedgerWriter>);
 
       const error = await repository
-        .createBinding(binding, { actor: ACTOR })
+        .createBinding({ row: binding, actor: ACTOR })
         .catch((raised: unknown) => raised);
 
       expect(error).toBeInstanceOf(Error);

@@ -239,10 +239,13 @@ export class RoleService {
     return { ...role, permissions: role.permissions as string[] };
   }
 
-  async createRole(
-    params: CreateRoleParams,
-    { actor }: { actor: LedgerActor },
-  ) {
+  async createRole({
+    params,
+    actor,
+  }: {
+    params: CreateRoleParams;
+    actor: LedgerActor;
+  }) {
     if (params.name.startsWith("apikey:")) {
       throw new RoleReservedNameError();
     }
@@ -264,11 +267,15 @@ export class RoleService {
     };
   }
 
-  async updateRole(
-    roleId: string,
-    params: UpdateRoleParams,
-    { actor }: { actor: LedgerActor },
-  ) {
+  async updateRole({
+    roleId,
+    params,
+    actor,
+  }: {
+    roleId: string;
+    params: UpdateRoleParams;
+    actor: LedgerActor;
+  }) {
     if (params.name?.startsWith("apikey:")) {
       throw new RoleReservedNameError();
     }
@@ -286,7 +293,7 @@ export class RoleService {
     };
   }
 
-  async deleteRole(roleId: string, { actor }: { actor: LedgerActor }) {
+  async deleteRole({ roleId, actor }: { roleId: string; actor: LedgerActor }) {
     const role = await this.repository.findByIdWithUsers(roleId);
 
     if (!role || role.kind !== CUSTOM_ROLE_KIND.CUSTOM) {
@@ -350,11 +357,15 @@ export class RoleService {
     return { success: true };
   }
 
-  async removeRoleFromUser(
-    userId: string,
-    teamId: string,
-    { actor }: { actor: LedgerActor },
-  ) {
+  async removeRoleFromUser({
+    userId,
+    teamId,
+    actor,
+  }: {
+    userId: string;
+    teamId: string;
+    actor: LedgerActor;
+  }) {
     await assertNoPersonalTeamScope({
       client: this.prisma,
       scopes: [{ scopeType: RoleBindingScopeType.TEAM, scopeId: teamId }],

@@ -1006,7 +1006,12 @@ describe("InviteService", () => {
         it("names the inviter as the actor, not the person receiving the access", async () => {
           await service.applyInvite({ userId: "user-flow-2", invite });
 
-          for (const [envelope] of ledger.attachBindings.mock.calls) {
+          const emitted = [
+            ...ledger.attachBindings.mock.calls,
+            ...ledger.revokeBindingsWhere.mock.calls,
+          ];
+          expect(emitted).not.toHaveLength(0);
+          for (const [envelope] of emitted) {
             expect(envelope.actor).toEqual({
               type: "user",
               id: "user-inviter",
@@ -1037,7 +1042,12 @@ describe("InviteService", () => {
             invite: { ...invite, requestedBy: null },
           });
 
-          for (const [envelope] of ledger.attachBindings.mock.calls) {
+          const emitted = [
+            ...ledger.attachBindings.mock.calls,
+            ...ledger.revokeBindingsWhere.mock.calls,
+          ];
+          expect(emitted).not.toHaveLength(0);
+          for (const [envelope] of emitted) {
             expect(envelope.actor).toEqual({
               type: "system",
               id: "system:invite-service",

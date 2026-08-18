@@ -120,15 +120,15 @@ const createRoleHandler = async (
   }: { input: z.infer<typeof createRoleSchema>; app: RolesFamilyApp },
 ) => {
   const organization = organizationOf(c);
-  const role = await app.roles.createRole(
-    {
+  const role = await app.roles.createRole({
+    params: {
       organizationId: organization.id,
       name: input.name,
       description: input.description ?? null,
       permissions: input.permissions,
     },
-    { actor: orgRequestLedgerActor(c) },
-  );
+    actor: orgRequestLedgerActor(c),
+  });
   return roleWire(role);
 };
 

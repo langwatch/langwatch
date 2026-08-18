@@ -25,6 +25,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import {
   isTeamRoleAllowedForOrganizationRole,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
 } from "~/utils/memberRoleConstraints";
 import { GROWTH_SEAT_PLAN_TYPES } from "../../../../../ee/billing/utils/growthSeatEvent";
@@ -1276,7 +1277,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             userId,
             scopeType: RoleBindingScopeType.ORGANIZATION,
             scopeId: organizationId,
-            role: role as unknown as TeamUserRole,
+            role: ORGANIZATION_TO_TEAM_ROLE_MAP[role],
             customRoleId: null,
           }),
         );

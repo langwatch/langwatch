@@ -172,15 +172,15 @@ describe("RoleService Tests", () => {
     it("creates new custom role", async () => {
       mockPrisma.customRole.findUnique.mockResolvedValue(null);
 
-      const result = await roleService.createRole(
-        {
+      const result = await roleService.createRole({
+        params: {
           organizationId: "org-123",
           name: "Data Analyst",
           description: "Can view analytics and datasets",
           permissions: ["analytics:view", "datasets:view"],
         },
-        { actor },
-      );
+        actor,
+      });
 
       // The answer IS the emitted fact: the row follows through the fold.
       expect(result).toMatchObject({
@@ -212,24 +212,24 @@ describe("RoleService Tests", () => {
       mockPrisma.customRole.findUnique.mockResolvedValue(existingRole);
 
       await expect(
-        roleService.createRole(
-          {
+        roleService.createRole({
+          params: {
             organizationId: "org-123",
             name: "Data Analyst",
             permissions: ["analytics:view"],
           },
-          { actor },
-        ),
+          actor,
+        }),
       ).rejects.toThrow(RoleDuplicateNameError);
       await expect(
-        roleService.createRole(
-          {
+        roleService.createRole({
+          params: {
             organizationId: "org-123",
             name: "Data Analyst",
             permissions: ["analytics:view"],
           },
-          { actor },
-        ),
+          actor,
+        }),
       ).rejects.toThrow("A role with this name already exists");
     });
   });
@@ -259,15 +259,15 @@ describe("RoleService Tests", () => {
           where.organizationId_name ? null : existingRole,
       );
 
-      const result = await roleService.updateRole(
-        "role-1",
-        {
+      const result = await roleService.updateRole({
+        roleId: "role-1",
+        params: {
           name: "Senior Data Analyst",
           description: "Updated description",
           permissions: ["analytics:view", "analytics:manage"],
         },
-        { actor },
-      );
+        actor,
+      });
 
       expect(result).toMatchObject({
         name: updatedRole.name,
@@ -280,11 +280,11 @@ describe("RoleService Tests", () => {
       mockPrisma.customRole.findUnique.mockResolvedValue(null);
 
       await expect(
-        roleService.updateRole(
-          "nonexistent-role",
-          { name: "Updated Role" },
-          { actor },
-        ),
+        roleService.updateRole({
+          roleId: "nonexistent-role",
+          params: { name: "Updated Role" },
+          actor,
+        }),
       ).rejects.toMatchObject({ code: "custom_role_not_found" });
     });
   });
@@ -304,7 +304,7 @@ describe("RoleService Tests", () => {
       mockPrisma.customRole.findUnique.mockResolvedValue(mockRoleWithUsers);
       mockPrisma.customRole.findFirst.mockResolvedValue(mockRoleWithUsers);
 
-      const result = await roleService.deleteRole("role-1", { actor });
+      const result = await roleService.deleteRole({ roleId: "role-1", actor });
 
       expect(result).toEqual({ success: true });
       expect(ledger.deleteRole).toHaveBeenCalledWith(
@@ -343,7 +343,7 @@ describe("RoleService Tests", () => {
       mockPrisma.$queryRaw.mockResolvedValueOnce([{ count: 1n }]);
 
       await expect(
-        roleService.deleteRole("role-1", { actor }),
+        roleService.deleteRole({ roleId: "role-1", actor }),
       ).rejects.toMatchObject({
         code: "custom_role_in_use",
       });
@@ -354,7 +354,7 @@ describe("RoleService Tests", () => {
       mockPrisma.customRole.findUnique.mockResolvedValue(null);
 
       await expect(
-        roleService.deleteRole("nonexistent-role", { actor }),
+        roleService.deleteRole({ roleId: "nonexistent-role", actor }),
       ).rejects.toMatchObject({ code: "custom_role_not_found" });
     });
 
@@ -371,12 +371,12 @@ describe("RoleService Tests", () => {
 
       mockPrisma.customRole.findUnique.mockResolvedValue(mockRoleWithUsers);
 
-      await expect(roleService.deleteRole("role-1", { actor })).rejects.toThrow(
-        RoleInUseError,
-      );
-      await expect(roleService.deleteRole("role-1", { actor })).rejects.toThrow(
-        "Cannot delete role that is assigned to 2 user(s)",
-      );
+      await expect(
+        roleService.deleteRole({ roleId: "role-1", actor }),
+      ).rejects.toThrow(RoleInUseError);
+      await expect(
+        roleService.deleteRole({ roleId: "role-1", actor }),
+      ).rejects.toThrow("Cannot delete role that is assigned to 2 user(s)");
     });
   });
 
@@ -540,11 +540,11 @@ describe("RoleService Tests", () => {
       });
       mockPrisma.teamUser.update.mockResolvedValue({});
 
-      const result = await roleService.removeRoleFromUser(
-        "user-123",
-        "team-123",
-        { actor },
-      );
+      const result = await roleService.removeRoleFromUser({
+        userId: "user-123",
+        teamId: "team-123",
+        actor,
+      });
 
       expect(result).toEqual({ success: true });
       expect(ledger.revokeBindingsWhere).toHaveBeenCalledWith(

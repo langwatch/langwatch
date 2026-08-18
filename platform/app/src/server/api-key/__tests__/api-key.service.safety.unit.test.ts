@@ -150,7 +150,7 @@ function buildPrisma() {
     },
   };
 
-  return { prisma: prisma as any, mockTx: prisma, txState };
+  return { prisma: prisma as any, txState };
 }
 
 describe("ApiKeyService — safety invariants (mocked)", () => {

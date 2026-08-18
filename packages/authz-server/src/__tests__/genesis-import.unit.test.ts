@@ -34,17 +34,19 @@ class FakeGenesisRepository implements AuthzGenesisRepository {
   grantHeadIds: string[] = [];
   roleHeads: RoleHeadRow[] = [];
   /** What the proof's re-read sees, when a test wants the compat view to
-   *  have moved under it. The inventory read always sees `bindingRows`. */
+   *  have moved under it. Reads see `bindingRows` until the fake ledger
+   *  lands the import. */
   bindingRowsAfterImport: LegacyBindingRow[] | null = null;
-  private bindingReads = 0;
+  /** Flipped by the fake ledger when the import's grants land, so the
+   *  proof's re-read is keyed on WHEN it happens rather than on how many
+   *  reads preceded it. */
+  importHasLanded = false;
 
   async findOrganizationCreatedAtMs(): Promise<number | null> {
     return this.organizationCreatedAtMs;
   }
   async findLegacyBindingRows(): Promise<LegacyBindingRow[]> {
-    const isInventoryRead = this.bindingReads === 0;
-    this.bindingReads += 1;
-    if (isInventoryRead) return this.bindingRows;
+    if (!this.importHasLanded) return this.bindingRows;
     return this.bindingRowsAfterImport ?? this.bindingRows;
   }
   async findLegacyRoleRows(): Promise<LegacyRoleRow[]> {
@@ -91,6 +93,7 @@ class FakeLedger implements GrantsLedgerEmitter {
   }): Promise<void> {
     this.calls.push({ verb: "attachGrants", commandId, grants });
     if (!this.projectionConverges) return;
+    this.repository.importHasLanded = true;
     this.repository.grantHeadIds.push(...grants.map((g) => g.grantId));
   }
 

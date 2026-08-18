@@ -17,6 +17,7 @@ import {
 import { ledgerActorFor } from "~/server/app-layer/authz/ledger-actor";
 import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "~/utils/memberRoleConstraints";
 import { isCustomRole } from "../api/enterprise";
 import { LimitExceededError } from "../license-enforcement/errors";
 import { RoleService } from "../role/role.service";
@@ -57,16 +58,6 @@ const INVITE_BATCH_TXN_TIMEOUT_MS = 20_000;
  * should not fail a batch before it has done any work.
  */
 const INVITE_BATCH_TXN_MAX_WAIT_MS = 10_000;
-
-/** Mapping from organization roles to default team roles. */
-export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<
-  OrganizationUserRole,
-  TeamUserRole
-> = {
-  [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
-  [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
-  [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
-} as const;
 
 import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";

@@ -55,11 +55,16 @@ export interface TeamRepository {
   }): Promise<void>;
 
   /**
-   * Revoke every TEAM-scoped grant one user holds on a team, and answer how
-   * many there were. Every one of them, not the first found: permissions at a
-   * scope are the union of the roles held there, so a member granted both
-   * Member and Viewer would otherwise keep the team through the grant the
-   * removal did not reach.
+   * Revoke every TEAM-scoped grant one user holds on a team. Every one of
+   * them, not the first found: permissions at a scope are the union of the
+   * roles held there, so a member granted both Member and Viewer would
+   * otherwise keep the team through the grant the removal did not reach.
+   *
+   * The returned number is how many bindings the compat projection matched,
+   * not a membership verdict. On the ledger path the projection can lag the
+   * ledger by one fold, and the revocation is appended even when the
+   * projection matched nothing, so `0` does not prove the user held no
+   * grants — only that the projection showed none at the time.
    */
   revokeMembership(params: {
     teamId: string;

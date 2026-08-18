@@ -23,6 +23,7 @@ import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { decrypt } from "~/utils/encryption";
 import {
   isTeamRoleAllowedForOrganizationRole,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
 } from "~/utils/memberRoleConstraints";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -33,10 +34,7 @@ import {
   InviteNotFoundError,
   OrganizationNotFoundError,
 } from "../../invites/errors";
-import {
-  InviteService,
-  ORGANIZATION_TO_TEAM_ROLE_MAP,
-} from "../../invites/invite.service";
+import { InviteService } from "../../invites/invite.service";
 import { LimitExceededError } from "../../license-enforcement/errors";
 import { LicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
 import {

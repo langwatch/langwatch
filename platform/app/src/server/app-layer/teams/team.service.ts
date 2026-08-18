@@ -313,11 +313,11 @@ export class TeamRestService {
       throw new PersonalTeamProtectedError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
     }
 
-    const inOrganization = await this.repo.isUserInOrganization({
+    const isInOrganization = await this.repo.isUserInOrganization({
       userId,
       organizationId,
     });
-    if (!inOrganization) throw new UserNotInOrganizationError(userId);
+    if (!isInOrganization) throw new UserNotInOrganizationError(userId);
 
     try {
       await this.repo.grantMembership({

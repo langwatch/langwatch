@@ -186,32 +186,33 @@ const joinSsoOrganization = async ({
     email: user.email,
   });
 
+  if (pendingInvite) {
+    await InviteService.create(prisma).applyInvite({
+      userId: user.id,
+      invite: pendingInvite,
+    });
+    announceSsoAutoJoin({ user, org, inviteId: pendingInvite.id });
+    return;
+  }
+
+  // The membership row is not a grant fact and keeps its imperative
+  // write; the organization-scoped grant that comes with it is a ledger
+  // command, emitted once the membership exists (ADR-092).
   try {
-    if (pendingInvite) {
-      await InviteService.create(prisma).applyInvite({
+    await prisma.organizationUser.create({
+      data: {
         userId: user.id,
-        invite: pendingInvite,
-      });
-    } else {
-      // The membership row is not a grant fact and keeps its imperative
-      // write; the organization-scoped grant that comes with it is a ledger
-      // command, emitted once the membership exists (ADR-092).
-      await prisma.organizationUser.create({
-        data: {
-          userId: user.id,
-          organizationId: org.id,
-          role: "MEMBER",
-        },
-      });
-      await grantDefaultOrgMembership({
-        writer,
         organizationId: org.id,
-        userId: user.id,
-      });
-    }
+        role: "MEMBER",
+      },
+    });
   } catch (err) {
-    // P2002 (unique constraint) means another concurrent OAuth callback
-    // or a retry already created this membership. Idempotent success.
+    // P2002 (unique constraint) on THIS insert means another concurrent
+    // OAuth callback or a retry already created this membership. Idempotent
+    // success. The catch guards the membership write alone — a P2002 from
+    // any other constraint (an applied invite's rows, the grant below) is a
+    // real failure and propagates instead of being logged as an
+    // already-present membership.
     if (
       !(err instanceof Prisma.PrismaClientKnownRequestError) ||
       err.code !== "P2002"
@@ -225,19 +226,21 @@ const joinSsoOrganization = async ({
     // The membership row existing says nothing about the grant beside it:
     // the concurrent callback that created it may have died in between,
     // and the two writes no longer share a transaction. Re-assert, which
-    // is a no-op when the other attempt finished. An invite carries its
-    // own grants at its own roles, so this only covers the default path.
-    if (!pendingInvite) {
-      await grantDefaultOrgMembership({
-        writer,
-        organizationId: org.id,
-        userId: user.id,
-      });
-    }
+    // is a no-op when the other attempt finished.
+    await grantDefaultOrgMembership({
+      writer,
+      organizationId: org.id,
+      userId: user.id,
+    });
     return;
   }
 
-  announceSsoAutoJoin({ user, org, inviteId: pendingInvite?.id ?? null });
+  await grantDefaultOrgMembership({
+    writer,
+    organizationId: org.id,
+    userId: user.id,
+  });
+  announceSsoAutoJoin({ user, org, inviteId: null });
 };
 
 /**

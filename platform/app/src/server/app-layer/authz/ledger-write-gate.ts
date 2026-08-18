@@ -57,12 +57,35 @@ const NEGATIVE_CACHE_TTL_MS = 60_000;
 const POSITIVE_CACHE_TTL_MS = 60_000;
 
 /**
+ * The ceiling on how many organizations' answers are held at once. The TTL
+ * alone does not bound the map — an expired entry is only dropped when its
+ * own organization is asked about again, so organizations that never return
+ * would sit in memory for the life of the pod. Mirrors the legacy-grant-mint
+ * guard's sweep (src/server/api-key/legacy-grant-mint.ts).
+ */
+const GATE_CACHE_MAX_ENTRIES = 10_000;
+
+/**
  * One entry per organization holding the last answer and the moment it stops
  * counting. A single map (rather than one per answer) keeps the two
  * directions from disagreeing and lets an expired entry be dropped on the
- * way past instead of accumulating for the life of the pod.
+ * way past; the sweep below bounds the entries no query ever revisits.
  */
 const cached = new Map<string, { isOnLedger: boolean; expiresAt: number }>();
+
+/**
+ * Drop the expired answers, and if that was not enough, drop them all.
+ * Losing the whole cache costs one migration-state read per organization on
+ * its next grant write — the price every miss already pays — while an
+ * unbounded map costs the pod.
+ */
+function sweepGateCache(): void {
+  const now = Date.now();
+  for (const [organizationId, entry] of cached) {
+    if (entry.expiresAt <= now) cached.delete(organizationId);
+  }
+  if (cached.size >= GATE_CACHE_MAX_ENTRIES) cached.clear();
+}
 
 export async function isOrgOnLedgerWrites({
   organizationId,
@@ -113,6 +136,7 @@ export async function isOrgOnLedgerWrites({
     isOnLedger = false;
   }
 
+  if (cached.size >= GATE_CACHE_MAX_ENTRIES) sweepGateCache();
   cached.set(organizationId, {
     isOnLedger,
     expiresAt:

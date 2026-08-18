@@ -35,6 +35,7 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
+import { SYSTEM_ACTORS } from "~/server/app-layer/authz/ledger-actor";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 type TxClient = Prisma.TransactionClient;
@@ -58,10 +59,14 @@ export interface PersonalWorkspace {
 }
 
 export class PersonalWorkspaceService {
+  private readonly writer: GrantsLedgerWriter;
+
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-  ) {}
+    deps: { writer?: GrantsLedgerWriter } = {},
+  ) {
+    this.writer = deps.writer ?? grantsLedgerWriter();
+  }
 
   /**
    * Idempotently create (or return) the personal workspace for the
@@ -320,7 +325,7 @@ export class PersonalWorkspaceService {
       ],
       // Nobody decided this: the workspace is the product's own, and its
       // owner administers it by construction.
-      actor: { type: "system", id: "system:personal-workspace" },
+      actor: { type: "system", id: SYSTEM_ACTORS.personalWorkspace },
       onDuplicate: "skip",
     });
   }

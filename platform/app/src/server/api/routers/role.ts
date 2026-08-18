@@ -71,15 +71,15 @@ export const roleRouter = createTRPCRouter({
       });
 
       const roleService = new RoleService(ctx.prisma);
-      return await roleService.createRole(
-        {
+      return await roleService.createRole({
+        params: {
           organizationId: input.organizationId,
           name: input.name,
           description: input.description,
           permissions: input.permissions,
         },
-        { actor: { type: "user", id: ctx.session.user.id } },
-      );
+        actor: { type: "user", id: ctx.session.user.id },
+      });
     }),
 
   update: protectedProcedure
@@ -118,15 +118,15 @@ export const roleRouter = createTRPCRouter({
     })
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
-      return await roleService.updateRole(
-        input.roleId,
-        {
+      return await roleService.updateRole({
+        roleId: input.roleId,
+        params: {
           name: input.name,
           description: input.description,
           permissions: input.permissions,
         },
-        { actor: { type: "user", id: ctx.session.user.id } },
-      );
+        actor: { type: "user", id: ctx.session.user.id },
+      });
     }),
 
   delete: protectedProcedure
@@ -152,7 +152,8 @@ export const roleRouter = createTRPCRouter({
     })
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
-      return await roleService.deleteRole(input.roleId, {
+      return await roleService.deleteRole({
+        roleId: input.roleId,
         actor: { type: "user", id: ctx.session.user.id },
       });
     }),
@@ -216,7 +217,9 @@ export const roleRouter = createTRPCRouter({
     .use(checkTeamPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
-      return await roleService.removeRoleFromUser(input.userId, input.teamId, {
+      return await roleService.removeRoleFromUser({
+        userId: input.userId,
+        teamId: input.teamId,
         actor: { type: "user", id: ctx.session.user.id },
       });
     }),

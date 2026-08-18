@@ -111,10 +111,10 @@ export interface GroupRepository {
     Array<RoleBinding & { customRole: { id: string; name: string } | null }>
   >;
 
-  createBinding(
-    data: CreateBindingInput,
-    context: { actor: LedgerActor },
-  ): Promise<CreatedBinding>;
+  createBinding(params: {
+    data: CreateBindingInput;
+    actor: LedgerActor;
+  }): Promise<CreatedBinding>;
 
   findBinding(params: {
     id: string;

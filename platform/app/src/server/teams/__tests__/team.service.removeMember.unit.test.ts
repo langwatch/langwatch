@@ -138,6 +138,18 @@ describe("given a team whose only admin is the person being removed", () => {
 describe("given the scope of the revocation", () => {
   describe("when the member holds several grants on one team", () => {
     it("collects every one of them, since permissions at a scope are their union", async () => {
+      const teamBindings = [
+        { id: "rb_a", userId: "user_a", groupId: null },
+        { id: "rb_a2", userId: "user_a", groupId: null },
+        { id: "rb_b", userId: "user_b", groupId: null },
+      ];
+      bindingFindMany.mockImplementation(
+        async ({ where }: { where?: Record<string, unknown> }) =>
+          where?.userId
+            ? teamBindings.filter((b) => b.userId === where.userId)
+            : teamBindings,
+      );
+
       await service.removeMember({
         teamId: "team_1",
         userId: "user_a",
@@ -151,6 +163,9 @@ describe("given the scope of the revocation", () => {
             scopeId: "team_1",
           }),
         }),
+      );
+      expect(revokeBindings).toHaveBeenCalledWith(
+        expect.objectContaining({ bindingIds: ["rb_a", "rb_a2"] }),
       );
     });
   });

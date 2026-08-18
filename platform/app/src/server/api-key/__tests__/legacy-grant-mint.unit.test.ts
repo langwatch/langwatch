@@ -1,60 +1,31 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import type { ApiKeyWithBindings } from "../api-key.repository";
-import { ApiKeyService } from "../api-key.service";
 import {
   legacyGrantForKey,
   mintLegacyKeyGrant,
   resetLegacyMintGuardForTests,
 } from "../legacy-grant-mint";
+import {
+  afterGenesis,
+  CREATED_AT,
+  GENESIS_AT,
+  KEY_ID,
+  ORG_ID,
+  onMigratedOrg,
+  serviceKey,
+  settle,
+  writerSpy,
+} from "./legacy-grant-mint.fixtures";
 
-vi.mock("../api-key-token.utils", () => ({
-  generateApiKeyToken: vi.fn(),
-  splitApiKeyToken: () => ({ lookupId: "lookup_1", secret: "secret" }),
-  verifySecret: () => "match",
-  hashSecret: () => "hashed",
-  INGEST_KEY_PREFIX: "ik-lw-",
-}));
-
-const ORG_ID = "org_1";
-const KEY_ID = "apikey_1";
-const CREATED_AT = new Date("2024-03-01T10:00:00.000Z");
-/** The organization's genesis import began after this key was created. */
-const GENESIS_AT = new Date("2024-06-01T00:00:00.000Z");
-
-function serviceKey(
-  overrides: Partial<ApiKeyWithBindings> = {},
-): ApiKeyWithBindings {
-  return {
-    id: KEY_ID,
-    name: "deploy bot",
-    organizationId: ORG_ID,
-    userId: null,
-    createdAt: CREATED_AT,
-    ingestSourceType: null,
-    roleBindings: [],
-    ...overrides,
-  } as ApiKeyWithBindings;
-}
-
-function writerSpy() {
-  const attachBindings = vi
-    .fn()
-    .mockResolvedValue({ attached: [], duplicates: [] });
-  return {
-    attachBindings,
-    writer: { attachBindings } as unknown as GrantsLedgerWriter,
-  };
-}
-
-/** Lets the fire-and-forget promise settle before assertions on failure. */
-const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
-
-/** The mint is per-organization; these cases are about an org past genesis. */
-const onMigratedOrg = async () => true;
-
-/** The key under test predates this organization's genesis import. */
-const afterGenesis = async () => GENESIS_AT;
+/** The suite's default mint: an org past genesis, a key from before it. */
+const mintDefault = (writer: GrantsLedgerWriter) =>
+  mintLegacyKeyGrant({
+    apiKey: serviceKey(),
+    writer,
+    onLedgerWrites: onMigratedOrg,
+    genesisMomentFor: afterGenesis,
+  });
 
 describe("legacy API key read-through mint", () => {
   beforeEach(() => {
@@ -66,12 +37,7 @@ describe("legacy API key read-through mint", () => {
     it("mints the organization-scoped admin grant the mint path already documents", async () => {
       const { attachBindings, writer } = writerSpy();
 
-      mintLegacyKeyGrant({
-        apiKey: serviceKey(),
-        writer,
-        onLedgerWrites: onMigratedOrg,
-        genesisMomentFor: afterGenesis,
-      });
+      mintDefault(writer);
       await settle();
 
       expect(attachBindings).toHaveBeenCalledTimes(1);
@@ -97,12 +63,7 @@ describe("legacy API key read-through mint", () => {
     it("carries the key's own creation time as the fact's business time", async () => {
       const { attachBindings, writer } = writerSpy();
 
-      mintLegacyKeyGrant({
-        apiKey: serviceKey(),
-        writer,
-        onLedgerWrites: onMigratedOrg,
-        genesisMomentFor: afterGenesis,
-      });
+      mintDefault(writer);
       await settle();
 
       expect(attachBindings.mock.calls[0]![0].occurredAtMs).toBe(
@@ -114,12 +75,7 @@ describe("legacy API key read-through mint", () => {
     it("does not wait for the projection", async () => {
       const { attachBindings, writer } = writerSpy();
 
-      mintLegacyKeyGrant({
-        apiKey: serviceKey(),
-        writer,
-        onLedgerWrites: onMigratedOrg,
-        genesisMomentFor: afterGenesis,
-      });
+      mintDefault(writer);
       await settle();
 
       expect(attachBindings.mock.calls[0]![0].awaitProjection).toBe(false);
@@ -129,18 +85,8 @@ describe("legacy API key read-through mint", () => {
     it("emits once while the projection is still catching up", async () => {
       const { attachBindings, writer } = writerSpy();
 
-      mintLegacyKeyGrant({
-        apiKey: serviceKey(),
-        writer,
-        onLedgerWrites: onMigratedOrg,
-        genesisMomentFor: afterGenesis,
-      });
-      mintLegacyKeyGrant({
-        apiKey: serviceKey(),
-        writer,
-        onLedgerWrites: onMigratedOrg,
-        genesisMomentFor: afterGenesis,
-      });
+      mintDefault(writer);
+      mintDefault(writer);
       await settle();
 
       expect(attachBindings).toHaveBeenCalledTimes(1);
@@ -152,21 +98,11 @@ describe("legacy API key read-through mint", () => {
       const startedAt = Date.now();
       const clock = vi.spyOn(Date, "now").mockReturnValue(startedAt);
       try {
-        mintLegacyKeyGrant({
-          apiKey: serviceKey(),
-          writer,
-          onLedgerWrites: onMigratedOrg,
-          genesisMomentFor: afterGenesis,
-        });
+        mintDefault(writer);
         await settle();
 
         clock.mockReturnValue(startedAt + 61_000);
-        mintLegacyKeyGrant({
-          apiKey: serviceKey(),
-          writer,
-          onLedgerWrites: onMigratedOrg,
-          genesisMomentFor: afterGenesis,
-        });
+        mintDefault(writer);
         await settle();
 
         expect(attachBindings).toHaveBeenCalledTimes(2);
@@ -360,22 +296,10 @@ describe("legacy API key read-through mint", () => {
         .mockResolvedValue({ attached: [], duplicates: [] });
       const writer = { attachBindings } as unknown as GrantsLedgerWriter;
 
-      expect(() =>
-        mintLegacyKeyGrant({
-          apiKey: serviceKey(),
-          writer,
-          onLedgerWrites: onMigratedOrg,
-          genesisMomentFor: afterGenesis,
-        }),
-      ).not.toThrow();
+      expect(() => mintDefault(writer)).not.toThrow();
       await settle();
 
-      mintLegacyKeyGrant({
-        apiKey: serviceKey(),
-        writer,
-        onLedgerWrites: onMigratedOrg,
-        genesisMomentFor: afterGenesis,
-      });
+      mintDefault(writer);
       await settle();
       expect(attachBindings).toHaveBeenCalledTimes(2);
     });
@@ -387,79 +311,7 @@ describe("legacy API key read-through mint", () => {
       });
       const writer = { attachBindings } as unknown as GrantsLedgerWriter;
 
-      expect(() =>
-        mintLegacyKeyGrant({
-          apiKey: serviceKey(),
-          writer,
-          onLedgerWrites: onMigratedOrg,
-          genesisMomentFor: afterGenesis,
-        }),
-      ).not.toThrow();
-    });
-  });
-});
-
-describe("API key verification", () => {
-  beforeEach(() => {
-    resetLegacyMintGuardForTests();
-  });
-
-  function serviceWith({
-    apiKey,
-    mintLegacyGrant,
-  }: {
-    apiKey: ApiKeyWithBindings | null;
-    mintLegacyGrant: (args: { apiKey: ApiKeyWithBindings }) => void;
-  }) {
-    const repo = {
-      findByLookupId: vi.fn().mockResolvedValue(apiKey),
-      upgradeHash: vi.fn().mockResolvedValue(undefined),
-    };
-    return new ApiKeyService({
-      prisma: {} as never,
-      repo: repo as never,
-      roleRepo: {} as never,
-      mintLegacyGrant,
-    });
-  }
-
-  describe("when a legacy key verifies", () => {
-    /** @scenario "A legacy service key states its access the first time it is used" */
-    it("mints its grant on the resolution path", async () => {
-      const mintLegacyGrant = vi.fn();
-      const apiKey = serviceKey();
-      const service = serviceWith({ apiKey, mintLegacyGrant });
-
-      await expect(service.verify({ token: "sk-lw-x_y" })).resolves.toBe(
-        apiKey,
-      );
-
-      expect(mintLegacyGrant).toHaveBeenCalledWith({ apiKey });
-    });
-  });
-
-  describe("when the credential does not resolve", () => {
-    it("mints nothing", async () => {
-      const mintLegacyGrant = vi.fn();
-      const service = serviceWith({ apiKey: null, mintLegacyGrant });
-
-      await expect(service.verify({ token: "sk-lw-x_y" })).resolves.toBeNull();
-
-      expect(mintLegacyGrant).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when a revoked key is presented", () => {
-    it("mints nothing", async () => {
-      const mintLegacyGrant = vi.fn();
-      const service = serviceWith({
-        apiKey: serviceKey({ revokedAt: new Date() }),
-        mintLegacyGrant,
-      });
-
-      await expect(service.verify({ token: "sk-lw-x_y" })).resolves.toBeNull();
-
-      expect(mintLegacyGrant).not.toHaveBeenCalled();
+      expect(() => mintDefault(writer)).not.toThrow();
     });
   });
 });

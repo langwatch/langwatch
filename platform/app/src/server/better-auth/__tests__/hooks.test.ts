@@ -64,7 +64,6 @@ const makePrismaMock = (overrides: PrismaMockOverrides = {}): PrismaClient => {
     // else's transaction client. `$connect` is what marks this stub as the
     // root client it stands in for.
     $connect: vi.fn(),
-    $transaction: (writes: Promise<unknown>[]) => Promise.all(writes),
     organization: { findUnique: vi.fn().mockResolvedValue(null) },
     organizationInvite: { findFirst: vi.fn().mockResolvedValue(null) },
     organizationUser: {
@@ -85,15 +84,16 @@ const makePrismaMock = (overrides: PrismaMockOverrides = {}): PrismaClient => {
     },
   };
   const merged: PrismaMockOverrides = { ...base, ...overrides };
-  // Support both $transaction forms: array form (returns the ops) and
-  // callback form (invokes the callback with this same mock as `tx`, so
-  // tests continue to assert against `prisma.xxx` spies).
+  // One $transaction handling both forms: the array form awaits the
+  // already-started writes, and the callback form hands this same mock back
+  // as `tx`, so tests keep asserting against the `prisma.xxx` spies. An
+  // override that brings its own $transaction wins.
   if (!merged.$transaction) {
     merged.$transaction = vi.fn().mockImplementation(async (arg: unknown) => {
       if (typeof arg === "function") {
         return (arg as (tx: unknown) => unknown)(merged);
       }
-      return arg;
+      return Promise.all(arg as Promise<unknown>[]);
     });
   }
   return merged as unknown as PrismaClient;

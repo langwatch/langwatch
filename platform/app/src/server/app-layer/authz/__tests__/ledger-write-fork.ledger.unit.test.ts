@@ -14,6 +14,7 @@ vi.mock("../epoch", () => ({
   bumpAuthzEpoch: vi.fn().mockResolvedValue(undefined),
 }));
 
+import { bumpAuthzEpoch } from "../epoch";
 import {
   ACTOR,
   binding,
@@ -156,6 +157,9 @@ describe("given an organization whose genesis import has landed", () => {
     expect(db.roleBinding.create).not.toHaveBeenCalled();
     expect(db.roleBinding.createMany).not.toHaveBeenCalled();
     expect(db.auditLog.createMany).not.toHaveBeenCalled();
+    // The epoch bump is what invalidates cached permission decisions; the
+    // ledger path must bump it just as the legacy path does.
+    expect(bumpAuthzEpoch).toHaveBeenCalledWith({ organizationId: ORG_ID });
   });
 
   /** @scenario "Completing the genesis import moves an organization's writes onto the ledger" */

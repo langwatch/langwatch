@@ -231,10 +231,13 @@ export class PrismaGroupRepository implements GroupRepository {
     });
   }
 
-  async createBinding(
-    data: CreateBindingInput,
-    { actor }: { actor: LedgerActor },
-  ): Promise<CreatedBinding> {
+  async createBinding({
+    data,
+    actor,
+  }: {
+    data: CreateBindingInput;
+    actor: LedgerActor;
+  }): Promise<CreatedBinding> {
     // "reject", not "skip": the returned id is the caller-minted one, so a
     // skipped duplicate would hand back an id for a row that was never
     // created. The service maps `DuplicateBindingError` to the 409 conflict.
@@ -278,6 +281,7 @@ export class PrismaGroupRepository implements GroupRepository {
       organizationId,
       bindingIds: [id],
       actor,
+      reason: "group binding removed",
     });
   }
 

@@ -796,6 +796,12 @@ export class GrantsLedgerWriter {
   /**
    * Revoke every binding matching a filter; answers how many it revoked.
    *
+   * The count is ADVISORY: it is the number of rows the lagging compat
+   * projection could see when the filter ran. On the ledger path the event
+   * carries a selector where one can be expressed, so the fold's sweep can
+   * revoke grants the count never included — `0` means "none visible yet",
+   * not "none existed". Callers must not derive existence from it.
+   *
    * SEAM, to be narrowed: `where` is a raw `Prisma.RoleBindingWhereInput`, so
    * a storage type is part of a port every call site now depends on, and the
    * filter cannot be carried onto the event except for the shapes

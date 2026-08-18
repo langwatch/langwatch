@@ -120,16 +120,19 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
   }
 
   /** @throws DuplicateBindingError on an identical binding at this scope. */
-  async createBinding(
-    row: RoleBindingWrite,
-    context: { actor: GrantWriteActor },
-  ): Promise<void> {
+  async createBinding({
+    row,
+    actor,
+  }: {
+    row: RoleBindingWrite;
+    actor: GrantWriteActor;
+  }): Promise<void> {
     const { organizationId, ...binding } = row;
     await withPortFailures(() =>
       this.writer.attachBindings({
         organizationId,
         bindings: [binding],
-        actor: context.actor,
+        actor,
         onDuplicate: "reject",
       }),
     );

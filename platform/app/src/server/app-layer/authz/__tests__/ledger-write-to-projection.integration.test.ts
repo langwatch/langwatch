@@ -309,7 +309,11 @@ describe("given an organization whose grant writes go through the ledger", () =>
               principal: { type: "user", id: userId },
               roleKey: "lite-member",
               scope: { type: "ORGANIZATION", id: organization.id },
-              source: "genesis-import",
+              // A live source, so the compat write keeps its upsert: the
+              // null mapping is then the ONLY thing suppressing the
+              // RoleBinding row. (A genesis-imported fact is update-only and
+              // would author no row for ANY roleKey, representable or not.)
+              source: "grants-service",
               actor: { type: "user", id: userId },
               occurredAtMs: 1_700_000_000_000,
             },

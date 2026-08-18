@@ -48,7 +48,7 @@ work already merged (A = the engine #6894, B = the self-migration #7079).
 | 20 | **Per-user legacy ADMIN facts are in the import inventory.** `OrganizationUser.role = ADMIN` with zero bindings is a live fallback path (`specs/ai-gateway/rbac-legacy-admin-fallback.feature`); the floor row covers members only. The genesis import mints an org-scoped admin grant per such user, `occurredAt` from the row's `createdAt`. |
 | 21 | **Public REST names are frozen.** `/role-bindings`, the `bindings` wire shape, and `role_binding_already_exists` (409, `role-bindings-rest-api.feature:92`) are customer contracts — the no-sunset philosophy applies to API names exactly as to old keys. The Grant/Role rename never leaks to the wire; no `/grants` API until a customer need exists. |
 | 22 | **Resource-tier facts live on `Grant`; accounting does not.** `token`, `permission`, `expiresAt`, `maxViews` are fact columns set by the mint event, fold-owned like every other column. `viewCount` has a different writer (ShareService, per view), so it moves to a ShareService-owned accounting row (`GrantUsage { grantId, viewCount, lastViewedAt }`) when ShareService moves onto the ledger in PR 3 — never onto the projection table. |
-| 23 | **Event idempotency is commandId-based.** Every command mints a random `commandId` at the boundary; retries reuse it; each emitted event carries `idempotencyKey = <commandId>:<index>`. Legitimate repeats (same action twice in a second) can never be deduped away, and retries always are. Migrations derive commandIds deterministically from source rows (`genesis:<rowId>`, `backfill-b:<rowId>` — the identity programme's backfill shape). Where an upstream system id exists (the general house pattern, e.g. trace ids) it remains the key; commandId is for facts born from direct user action. Grant ids stay content-derived on top, so re-imports converge by upsert regardless. |
+| 23 | **Event idempotency is commandId-based.** Every command mints a random `commandId` at the boundary; retries reuse it; each emitted event carries `idempotencyKey = <commandId>:<index>`. Legitimate repeats (same action twice in a second) can never be deduped away, and retries always are. Migrations derive commandIds deterministically — but from chunk position over the id-sorted source rows, not from row identity: the genesis import emits `genesis:<kind>:<org>:<index>` and the stage-B backfill `backfill-b:<org>:<index>` plus `backfill-b:parity:<org>`; that is what ships today. Runtime commandIds are caller-minted KSUIDs; imports adopt the legacy row's own id as the grant/role id, never as the commandId. OPEN: whether migration commandIds should be re-keyed per source row — chunk membership can shift when a source row is deleted between an aborted pass and its retry — is under discussion on PR 2's review (comment 3802500637) and not yet decided. Where an upstream system id exists (the general house pattern, e.g. trace ids) it remains the key; commandId is for facts born from direct user action. Grant ids stay content-derived on top, so re-imports converge by upsert regardless. |
 | 24 | *(2026-08-18)* **Write paths fork per org.** The ledger becomes the writer for an organization only when its genesis import completes; everyone else keeps the imperative path. Deploy changes nothing until an org migrates. |
 
 ## The final data structure
@@ -378,9 +378,10 @@ PR 1) — the ledger is the only writer, still dark:
    at the organization's own creation time and a per-user org-scoped admin
    grant for every zero-binding `OrganizationUser.role = ADMIN`
    (decision 20). The proof re-reads the compat view field for field against
-   the originals; drift holds the org with a bounded report. A custom row's
-   normalized `role` column is not drift — the partial unique indexes never
-   keyed that row's identity on it.
+   the originals; drift holds the org with a bounded report. No column is
+   carved out, `role` included: a custom row's emission carries the stored
+   value as `legacyRole`, the compat upsert reproduces it, and a rewrite to
+   CUSTOM is drift like any other.
 2. **Every write path emits commands and writes no grant table**: the
    role-binding service and its REST surface, org/team/project/group writes,
    the role editor and API-key bindings, invites, the signup bootstrap and

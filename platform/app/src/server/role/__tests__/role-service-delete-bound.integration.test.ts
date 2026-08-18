@@ -91,7 +91,8 @@ describe("RoleService.deleteRole, given a role referenced by role bindings", () 
     const service = new RoleService(prisma);
 
     await expect(
-      service.deleteRole(boundRoleId, {
+      service.deleteRole({
+        roleId: boundRoleId,
         actor: { type: "user" as const, id: "actor_1" },
       }),
     ).rejects.toBeInstanceOf(RoleInUseError);
@@ -201,7 +202,8 @@ describe("RoleService.deleteRole, given a role referenced by role bindings", () 
 
     const service = new RoleService(prisma);
     await expect(
-      service.deleteRole(unboundRole.id, {
+      service.deleteRole({
+        roleId: unboundRole.id,
         actor: { type: "user" as const, id: "actor_1" },
       }),
     ).resolves.toEqual({

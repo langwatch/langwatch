@@ -106,7 +106,7 @@ export class GrantsService {
 
     const row = this.bindingRow({ who, role, where, organizationId });
     try {
-      await repository.createBinding(row, { actor: writeActor(actor) });
+      await repository.createBinding({ row, actor: writeActor(actor) });
     } catch (error) {
       rethrowKnownWriteFailure(error, {
         scopeType: where.type,

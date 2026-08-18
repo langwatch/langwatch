@@ -36,10 +36,10 @@
  *
  * The proof is the compat projection byte-equalling the original rows: every
  * binding row still there, id-equal and field-equal, and every CustomRole
- * matched by an id-equal `Role` head. One carve-out: a row with a
- * `customRoleId` is not compared on `role`, because the fold normalizes it
- * to CUSTOM and the partial unique indexes key custom rows on the custom
- * role id, never on the role column (PR 1's replay test pinned this). Drift
+ * matched by an id-equal `Role` head. No column is carved out, `role`
+ * included: a custom row's emission carries the stored value as
+ * `legacyRole`, so the compat upsert must reproduce it, and a rewrite to
+ * CUSTOM is drift like any other. Drift
  * HOLDS the organization with the differences in its report; a clean sweep
  * finalizes it. No epoch bump and no `migration_parity_proved` fact — this
  * import changes no decision, and the proof fact belongs to the backfill and
@@ -341,9 +341,12 @@ function permissionStrings(stored: unknown): string[] {
   return Array.isArray(stored)
     ? stored.filter(
         // The empty string is not a permission: it names nothing, grants
-        // nothing at decide time, and the wire boundary refuses it — so a
-        // legacy row carrying one would park the whole import rather than
-        // import a role that was already inert.
+        // nothing at decide time, and the wire boundary refuses it — so it
+        // is dropped here rather than carried into the fact (decision 2
+        // measured zero such rows in production). NOTE: `roleDiffs` compares
+        // normalized against normalized, so a dropped entry never shows up
+        // as drift — the proof checks the head against the emitted fact,
+        // not against the raw column.
         (entry): entry is string => typeof entry === "string" && entry !== "",
       )
     : [];

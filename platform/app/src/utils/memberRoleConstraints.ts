@@ -2,6 +2,16 @@ import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 
 export type TeamRoleValue = TeamUserRole | `custom:${string}`;
 
+/** Mapping from organization roles to default team roles. */
+export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<
+  OrganizationUserRole,
+  TeamUserRole
+> = {
+  [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
+  [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
+  [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
+} as const;
+
 export function getOrganizationRoleLabel(role: OrganizationUserRole): string {
   if (role === OrganizationUserRole.ADMIN) return "Organization Admin";
   if (role === OrganizationUserRole.MEMBER) return "Organization Member";

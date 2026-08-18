@@ -381,7 +381,7 @@ export const groupRouter = createTRPCRouter({
         // The settings page asks before it gets here ("re-created by your IdP
         // on next sync. Delete anyway?"), which is the answer the API surface
         // has nobody to ask for.
-        evenIfDirectoryManaged: true,
+        shouldBypassDirectoryManagement: true,
       });
 
       return { success: true };
@@ -558,7 +558,7 @@ export const groupRouter = createTRPCRouter({
       });
       return service.applyGroupEdits({
         organizationId: input.organizationId,
-        actor: { type: "user", id: ctx.session.user.id },
+        actor: ledgerActor(ctx.session.user.id),
         groupId: input.groupId,
         rename: resolvedRename,
         bindingIdsToDelete: input.bindingIdsToDelete,

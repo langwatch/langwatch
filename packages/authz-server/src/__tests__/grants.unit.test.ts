@@ -93,8 +93,8 @@ describe("GrantsService.attach", () => {
       });
 
       expect(result.bindingId).toBe("rb_test_ksuid");
-      expect(repository.createBinding).toHaveBeenCalledWith(
-        {
+      expect(repository.createBinding).toHaveBeenCalledWith({
+        row: {
           bindingId: "rb_test_ksuid",
           organizationId: ORG,
           scopeType: "TEAM",
@@ -103,8 +103,8 @@ describe("GrantsService.attach", () => {
           customRoleId: null,
           principal: { userId: "alice" },
         },
-        { actor: WRITE_ACTOR },
-      );
+        actor: WRITE_ACTOR,
+      });
       expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
     });
   });

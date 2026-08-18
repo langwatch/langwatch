@@ -36,7 +36,7 @@ describe("the ledger write gate", () => {
     resetLedgerWriteGateForTests();
   });
 
-  describe("given the organization's genesis import state row", () => {
+  describe("when the organization has a genesis import state row", () => {
     it("asks about the genesis import, not any other migration", async () => {
       const { findUnique, prisma } = stateTable("migrated");
 
@@ -65,7 +65,7 @@ describe("the ledger write gate", () => {
     });
   });
 
-  describe("given no state row at all", () => {
+  describe("when no state row exists at all", () => {
     it("leaves the organization on the legacy path", async () => {
       const { prisma } = stateTable(null);
 
@@ -75,7 +75,7 @@ describe("the ledger write gate", () => {
     });
   });
 
-  describe("given the state table cannot be read", () => {
+  describe("when the state table cannot be read", () => {
     it("fails safe onto the legacy path rather than propagating", async () => {
       const findUnique = vi.fn().mockRejectedValue(new Error("pg is down"));
       const prisma = {

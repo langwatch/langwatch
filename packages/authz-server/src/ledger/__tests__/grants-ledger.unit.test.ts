@@ -240,7 +240,10 @@ describe("grants ledger reducer", () => {
             occurredAtMs: 9,
           },
         ];
-        expect(apply(stream)).toEqual(apply(stream));
+        const firstFold = apply(stream);
+        const replayFold = apply(stream);
+
+        expect(replayFold).toEqual(firstFold);
       });
 
       it("keeps a grant attached after the offboarding, which is a re-onboarding", () => {

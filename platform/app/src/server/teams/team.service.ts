@@ -825,34 +825,37 @@ export class TeamService {
     name: string;
     members: MemberInput[];
   }): Promise<MembershipPlan> {
-    return await this.prisma.$transaction(async (tx) => {
-      const currentBindings = await tx.roleBinding.findMany({
-        where: {
+    return await this.prisma.$transaction(
+      async (tx) => {
+        const currentBindings = await tx.roleBinding.findMany({
+          where: {
+            organizationId,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: teamId,
+            userId: { not: null },
+          },
+          select: { id: true, userId: true, role: true, customRoleId: true },
+        });
+
+        const plan = diffMembership({ currentBindings, members });
+
+        await this.assertEditKeepsAnAdmin({
+          tx,
           organizationId,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: teamId,
-          userId: { not: null },
-        },
-        select: { id: true, userId: true, role: true, customRoleId: true },
-      });
+          teamId,
+          teamName: name,
+          directAdminUserIdsAfter: directAdminUserIdsAfterPlan({
+            currentBindings,
+            plan,
+          }),
+        });
 
-      const plan = diffMembership({ currentBindings, members });
+        await tx.team.update({ where: { id: teamId }, data: { name } });
 
-      await this.assertEditKeepsAnAdmin({
-        tx,
-        organizationId,
-        teamId,
-        teamName: name,
-        directAdminUserIdsAfter: directAdminUserIdsAfterPlan({
-          currentBindings,
-          plan,
-        }),
-      });
-
-      await tx.team.update({ where: { id: teamId }, data: { name } });
-
-      return plan;
-    });
+        return plan;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   /**
@@ -1043,7 +1046,7 @@ export class TeamService {
   }): Promise<Team> {
     const teamNanoId = nanoid();
     const teamId = `team_${teamNanoId}`;
-    const teamSlug = `${slugify(name, { lower: true, strict: true })}-${teamId.substring(0, 6)}`;
+    const teamSlug = `${slugify(name, { lower: true, strict: true })}-${teamNanoId.substring(0, 6)}`;
 
     const team = await this.prisma.team.create({
       data: { id: teamId, name, slug: teamSlug, organizationId },

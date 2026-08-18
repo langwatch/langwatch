@@ -9,7 +9,7 @@ const contextWith = (values: Record<string, string | null | undefined>) =>
   }) as unknown as Context;
 
 describe("the grants-ledger actor of an organization-authenticated request", () => {
-  describe("given a key that acts for a person", () => {
+  describe("when the key acts for a person", () => {
     it("names the person", () => {
       expect(
         orgRequestLedgerActor(
@@ -19,7 +19,7 @@ describe("the grants-ledger actor of an organization-authenticated request", () 
     });
   });
 
-  describe("given a key that acts for nobody", () => {
+  describe("when the key acts for nobody", () => {
     it("names the credential, so a provisioning run's writes group together", () => {
       expect(
         orgRequestLedgerActor(
@@ -29,7 +29,7 @@ describe("the grants-ledger actor of an organization-authenticated request", () 
     });
   });
 
-  describe("given a request carrying neither a user nor a key id", () => {
+  describe("when the request carries neither a user nor a key id", () => {
     it("attributes the write to the management API rather than to apikey:undefined", () => {
       const actor = orgRequestLedgerActor(contextWith({}));
 

@@ -91,13 +91,12 @@ describe("PersonalWorkspaceService.ensure", () => {
   beforeEach(() => {
     prisma = makePrisma();
     writer = makeWriter();
-    service = new PersonalWorkspaceService(
-      prisma as unknown as PrismaClient,
+    service = new PersonalWorkspaceService(prisma as unknown as PrismaClient, {
       writer,
-    );
+    });
   });
 
-  describe("given the workspace already exists", () => {
+  describe("when the workspace already exists", () => {
     describe("when the owner still holds a grant on the personal team", () => {
       it("returns the workspace without emitting a grant", async () => {
         prisma.team.findFirst.mockResolvedValueOnce(teamRow);
@@ -132,7 +131,7 @@ describe("PersonalWorkspaceService.ensure", () => {
     });
   });
 
-  describe("given a concurrent ensure() won the create race (P2002)", () => {
+  describe("when a concurrent ensure() won the create race (P2002)", () => {
     beforeEach(() => {
       // In-transaction lookups see nothing (live: null, archived: null), the
       // create loses to the winner's committed row, and the post-catch

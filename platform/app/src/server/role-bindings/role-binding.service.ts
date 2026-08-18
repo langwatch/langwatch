@@ -1,4 +1,3 @@
-import { DuplicateBindingError } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
 import { TRPCError } from "@trpc/server";
 import {
@@ -40,9 +39,19 @@ import { assertNoPersonalTeamScope } from "./personal-team-scope";
  * writer checks binding identity before it emits, so there is no P2002 to
  * sniff any more); the write paths map it to the deterministic conflict code
  * a provisioning tool can treat as "already done".
+ *
+ * Matched by CODE, never `instanceof`: the class arrives from
+ * `@langwatch/authz-server`, and identity stops being reliable the moment
+ * that package is bundled or serialised separately (the rule
+ * `grant-validation.ts` states on the declaration itself).
  */
 function isDuplicateBinding(error: unknown): boolean {
-  return error instanceof DuplicateBindingError;
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code: unknown }).code === "role_binding_already_exists"
+  );
 }
 
 type ScopeRows = {

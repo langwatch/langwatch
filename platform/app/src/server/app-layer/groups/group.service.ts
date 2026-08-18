@@ -1,4 +1,3 @@
-import { DuplicateBindingError } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
 import type {
   Group,
@@ -246,7 +245,7 @@ export class GroupRestService {
     id,
     organizationId,
     actor,
-    evenIfDirectoryManaged = false,
+    shouldBypassDirectoryManagement = false,
   }: {
     id: string;
     organizationId: string;
@@ -258,14 +257,14 @@ export class GroupRestService {
      * SCIM group will be re-created by your IdP on next sync. Delete anyway?"
      * and the admin answers it.
      */
-    evenIfDirectoryManaged?: boolean;
+    shouldBypassDirectoryManagement?: boolean;
   }): Promise<void> {
     const group = await this.repo.findGroupOnly({ id, organizationId });
     if (!group) throw new GroupNotFoundError();
     // Deleting is the most destructive thing that can happen to a group the
     // directory owns: every grant it carries goes with it, and the next sync
     // pushes the group back without them.
-    if (group.scimSource && !evenIfDirectoryManaged) {
+    if (group.scimSource && !shouldBypassDirectoryManagement) {
       throw new ScimManagedGroupError(id);
     }
 
@@ -388,8 +387,8 @@ export class GroupRestService {
     await this.assertNoPersonalTeamScope([{ scopeType, scopeId }]);
 
     try {
-      return await this.repo.createBinding(
-        {
+      return await this.repo.createBinding({
+        data: {
           id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
           organizationId,
           groupId,
@@ -399,13 +398,21 @@ export class GroupRestService {
           scopeType,
           scopeId,
         },
-        { actor },
-      );
+        actor,
+      });
     } catch (error) {
       // The repository rejects duplicate identities rather than skipping
       // them: a skipped duplicate would return a binding id for a row that
-      // was never created.
-      if (error instanceof DuplicateBindingError) {
+      // was never created. Matched by CODE, never `instanceof`: the ledger's
+      // `DuplicateBindingError` arrives from `@langwatch/authz-server`, and
+      // identity stops being reliable the moment that package is bundled or
+      // serialised separately (the rule its declaration states).
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        (error as { code: unknown }).code === "role_binding_already_exists"
+      ) {
         throw new RoleBindingAlreadyExistsError({
           meta: { scopeType, scopeId },
         });

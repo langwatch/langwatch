@@ -102,11 +102,11 @@ describe("RoleService", () => {
         });
 
         await expect(
-          service.updateRole(
-            "cr_1",
-            { name: "hijacked" },
-            { actor: { type: "user" as const, id: "actor_1" } },
-          ),
+          service.updateRole({
+            roleId: "cr_1",
+            params: { name: "hijacked" },
+            actor: { type: "user" as const, id: "actor_1" },
+          }),
         ).rejects.toThrow(RoleNotFoundError);
 
         expect(ledger.defineRole).not.toHaveBeenCalled();
@@ -116,11 +116,11 @@ describe("RoleService", () => {
     describe("when renaming to reserved prefix", () => {
       it("throws RoleReservedNameError", async () => {
         await expect(
-          service.updateRole(
-            "cr_1",
-            { name: "apikey:sneaky" },
-            { actor: { type: "user" as const, id: "actor_1" } },
-          ),
+          service.updateRole({
+            roleId: "cr_1",
+            params: { name: "apikey:sneaky" },
+            actor: { type: "user" as const, id: "actor_1" },
+          }),
         ).rejects.toThrow(RoleReservedNameError);
       });
     });
@@ -138,7 +138,8 @@ describe("RoleService", () => {
         });
 
         await expect(
-          service.deleteRole("cr_1", {
+          service.deleteRole({
+            roleId: "cr_1",
             actor: { type: "user" as const, id: "actor_1" },
           }),
         ).rejects.toThrow(RoleNotFoundError);
@@ -175,14 +176,14 @@ describe("RoleService", () => {
     describe("when name uses reserved apikey: prefix", () => {
       it("rejects before any persistence", async () => {
         await expect(
-          service.createRole(
-            {
+          service.createRole({
+            params: {
               organizationId: "org_1",
               name: "apikey:sneaky",
               permissions: ["traces:view"],
             },
-            { actor: { type: "user", id: "actor_1" } },
-          ),
+            actor: { type: "user", id: "actor_1" },
+          }),
         ).rejects.toThrow(RoleReservedNameError);
 
         expect(ledger.defineRole).not.toHaveBeenCalled();
