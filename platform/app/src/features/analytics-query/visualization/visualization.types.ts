@@ -25,7 +25,9 @@ export interface LangWatchQLDatasetColumn {
 export interface LangWatchQLVegaLiteChartProps {
   spec: unknown;
   datasets: Readonly<Record<string, LangWatchQLDataset>>;
-  columnsByDataset: Readonly<Record<string, readonly LangWatchQLDatasetColumn[]>>;
+  columnsByDataset: Readonly<
+    Record<string, readonly LangWatchQLDatasetColumn[]>
+  >;
   ariaLabel?: string;
 }
 

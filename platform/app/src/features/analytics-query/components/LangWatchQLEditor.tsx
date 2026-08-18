@@ -25,8 +25,8 @@ import {
   LWQL_LANGUAGE,
   useLangWatchQLMonaco,
 } from "../hooks/useLangWatchQLMonaco";
-import type { LangWatchQLSchemaModel } from "../logic/lwqlSchemaModel";
 import type { LangWatchQLEditorMarker } from "../logic/lwqlFailure";
+import type { LangWatchQLSchemaModel } from "../logic/lwqlSchemaModel";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,

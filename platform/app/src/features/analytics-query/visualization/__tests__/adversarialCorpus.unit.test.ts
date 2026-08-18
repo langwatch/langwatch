@@ -11,11 +11,11 @@
 import { describe, expect, it } from "vitest";
 
 import { ADVERSARIAL_VEGA_FIXTURES } from "../../__tests__/fixtures/adversarial";
+import { INVALID_VEGA_FIXTURES } from "../../__tests__/fixtures/invalid";
 import {
   LWQL_FIXTURE_COLUMNS,
   LWQL_FIXTURE_ROW_COUNTS,
 } from "../../__tests__/fixtures/lwqlDatasetRegistry";
-import { INVALID_VEGA_FIXTURES } from "../../__tests__/fixtures/invalid";
 import { VALID_VEGA_FIXTURES } from "../../__tests__/fixtures/valid";
 import { validateVegaLiteSpec } from "../validateVegaLiteSpec";
 

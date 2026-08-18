@@ -19,8 +19,8 @@ import { ADVERSARIAL_VEGA_FIXTURES } from "../../__tests__/fixtures/adversarial"
 import { INVALID_VEGA_FIXTURES } from "../../__tests__/fixtures/invalid";
 import { LWQL_VEGA_RULES } from "../vegaLitePolicy";
 import {
-  LWQL_VEGA_RULE_IDS,
   type LangWatchQLVegaRuleId,
+  LWQL_VEGA_RULE_IDS,
   VEGA_VALIDATION_ERROR_CODES,
 } from "../visualization.types";
 

@@ -17,9 +17,8 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LangWatchQLEditor } from "../components/LangWatchQLEditor";
-import { lwqlSchemaModel } from "../logic/lwqlSchemaModel";
-
 import { LWQL_LANGUAGE_ITEMS } from "../logic/lwqlLanguageItems";
+import { lwqlSchemaModel } from "../logic/lwqlSchemaModel";
 import {
   SCHEMA_AVAILABLE_COLUMN_NAMES,
   SCHEMA_DATASET_NAMES,

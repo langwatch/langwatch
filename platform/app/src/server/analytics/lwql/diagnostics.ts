@@ -70,8 +70,7 @@ export const LWQL_DIAGNOSTIC_CODES = [
   "INCOMPLETE_COMPARISON_PERIOD",
 ] as const;
 
-export type LangWatchQLDiagnosticCode =
-  (typeof LWQL_DIAGNOSTIC_CODES)[number];
+export type LangWatchQLDiagnosticCode = (typeof LWQL_DIAGNOSTIC_CODES)[number];
 
 /**
  * A structured note about a result that is correct but worth reading twice.

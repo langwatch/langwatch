@@ -58,9 +58,7 @@ export type LangWatchQLTimeWindowParameter =
 export function isLangWatchQLTimeWindowParameter(
   name: string,
 ): name is LangWatchQLTimeWindowParameter {
-  return (LWQL_TIME_WINDOW_PARAMETERS as readonly string[]).includes(
-    name,
-  );
+  return (LWQL_TIME_WINDOW_PARAMETERS as readonly string[]).includes(name);
 }
 
 /**

@@ -181,9 +181,7 @@ describe("the Custom query page", () => {
 
         const copy = copyFor(lwqlUnavailablePayload());
         expect(await screen.findByText(copy.title)).toBeInTheDocument();
-        expect(
-          screen.queryByTestId("lwql-workbench"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("lwql-workbench")).not.toBeInTheDocument();
       });
     });
   });
@@ -202,9 +200,7 @@ describe("the Custom query page", () => {
 
         expect(await screen.findByText(switchedOff.title)).toBeInTheDocument();
         expect(screen.queryByText(unprovisioned.title)).not.toBeInTheDocument();
-        expect(
-          screen.queryByTestId("lwql-workbench"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("lwql-workbench")).not.toBeInTheDocument();
       });
     });
   });
@@ -217,9 +213,7 @@ describe("the Custom query page", () => {
         renderPage();
 
         expect(screen.getByText("Access Restricted")).toBeInTheDocument();
-        expect(
-          screen.queryByTestId("lwql-workbench"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("lwql-workbench")).not.toBeInTheDocument();
         expect(screen.queryByText("Custom query")).not.toBeInTheDocument();
       });
     });
@@ -235,9 +229,7 @@ describe("the Custom query page", () => {
         expect(
           await screen.findByText("LangWatchQL · project-scoped"),
         ).toBeInTheDocument();
-        expect(
-          screen.getByTestId("lwql-workbench"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("lwql-workbench")).toBeInTheDocument();
       });
 
       /** @scenario "The workbench is unreachable while LangWatchQL is not provisioned" */

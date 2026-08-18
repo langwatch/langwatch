@@ -160,9 +160,7 @@ function evaluationResult(): LangWatchQLQueryResult {
 
 function renderedRows(): HTMLElement[] {
   return Array.from(
-    document.querySelectorAll<HTMLElement>(
-      '[data-testid="lwql-result-row"]',
-    ),
+    document.querySelectorAll<HTMLElement>('[data-testid="lwql-result-row"]'),
   );
 }
 

@@ -917,7 +917,11 @@ function enterFunction({ node, frame, ctx }: NodeArgs): Frame | null {
     reportRefusedFunction({ name, node, frame, ctx });
     return frame;
   }
-  if (frame.block && isLangWatchQLAggregateFunction(name) && !isWindowCall(node)) {
+  if (
+    frame.block &&
+    isLangWatchQLAggregateFunction(name) &&
+    !isWindowCall(node)
+  ) {
     frame.block.isAggregated = true;
   }
   return frame;

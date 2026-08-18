@@ -29,12 +29,12 @@ import { CONTENT_CATEGORIES } from "../../../data-privacy/dataPrivacy.types";
 import { CONTENT_KEY_CATALOG } from "../../../data-privacy/dropKeyCatalog";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import {
+  isContentGated,
+  isPostgresResident,
   type LangWatchQLDedupStrategy,
   lwqlAllowedTables,
   lwqlGatedColumns,
   lwqlGrainColumns,
-  isContentGated,
-  isPostgresResident,
 } from "../catalog/types";
 import {
   definerViewAuditQuery,
@@ -403,9 +403,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
       const [sourceTable] = lwqlSourceTables({
         names: harness.names,
         sourceDatabase: facts,
-        views: LWQL_VIEW_CATALOG.filter(
-          (view) => view.name === "simulations",
-        ),
+        views: LWQL_VIEW_CATALOG.filter((view) => view.name === "simulations"),
       });
       // Before the try, because the `finally` reattaches the policy using this
       // same entry: a catalog rename would otherwise throw inside the try and
@@ -665,9 +663,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
           ROLLUP_MERGE_TOTALS.evaluation,
         ],
       ] as const) {
-        const view = LWQL_VIEW_CATALOG.find(
-          (entry) => entry.name === name,
-        )!;
+        const view = LWQL_VIEW_CATALOG.find((entry) => entry.name === name)!;
         const measures = view.columns.filter((column) => column.summed);
         const expected = totals;
 
@@ -1049,9 +1045,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
      */
     /** @scenario "A time predicate on a LangWatchQL view prunes partitions" */
     it("prunes partitions, and each dedup strategy's cost is recorded", async () => {
-      const view = LWQL_VIEW_CATALOG.find(
-        (entry) => entry.name === "traces",
-      );
+      const view = LWQL_VIEW_CATALOG.find((entry) => entry.name === "traces");
       // Before the try, because the `finally` below re-applies the shipped view
       // using this same entry: a catalog rename would otherwise throw inside
       // the try and then throw again while restoring, masking the first

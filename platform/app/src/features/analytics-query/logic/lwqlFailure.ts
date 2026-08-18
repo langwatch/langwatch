@@ -22,8 +22,7 @@ import { readHandledError } from "~/features/errors/logic/readHandledError";
 /** The codes the workbench presents differently from one another. */
 export const LWQL_UNPARSEABLE_CODE = "lwql_unparseable";
 export const LWQL_NOT_PERMITTED_CODE = "lwql_not_permitted";
-export const LWQL_PARAMETER_MISSING_CODE =
-  "lwql_parameter_missing";
+export const LWQL_PARAMETER_MISSING_CODE = "lwql_parameter_missing";
 export const LWQL_RESERVED_PARAMETER_SUPPLIED_CODE =
   "lwql_reserved_parameter_supplied";
 export const LWQL_UNAVAILABLE_CODE = "lwql_unavailable";

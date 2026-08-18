@@ -396,7 +396,7 @@
 			}
 		},
 		{
-			// The lwql-SQL proof suites (#6480). noMisplacedAssertion is
+			// The LangWatchQL proof suites (#6480). noMisplacedAssertion is
 			// the rule this override uniquely disables; the repo-wide
 			// test-file block above already turns noExcessiveCognitiveComplexity
 			// off for every test file, and it is restated here so the reason

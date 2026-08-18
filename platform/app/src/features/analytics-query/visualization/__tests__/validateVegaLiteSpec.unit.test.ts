@@ -6,15 +6,14 @@
  * plain node IS the server-import-safety commitment, not an accident of setup.
  */
 import { describe, expect, it, vi } from "vitest";
-
-import {
-  LWQL_FIXTURE_COLUMNS,
-  LWQL_FIXTURE_ROW_COUNTS,
-} from "../../__tests__/fixtures/lwqlDatasetRegistry";
 import {
   schemaInvalidEncodingType,
   unknownSchemaVersion,
 } from "../../__tests__/fixtures/invalid";
+import {
+  LWQL_FIXTURE_COLUMNS,
+  LWQL_FIXTURE_ROW_COUNTS,
+} from "../../__tests__/fixtures/lwqlDatasetRegistry";
 import {
   barOverQueryResult,
   lookupBetweenRegisteredDatasets,

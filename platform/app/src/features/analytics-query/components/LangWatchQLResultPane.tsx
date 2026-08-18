@@ -48,14 +48,14 @@ import type { LangWatchQLQueryResult } from "~/server/analytics/lwql";
 import { formatNumber } from "~/utils/formatNumber";
 
 import {
+  type LangWatchQLFailure,
   LWQL_TIMEOUT_CODE,
   LWQL_UNPARSEABLE_CODE,
-  type LangWatchQLFailure,
   readLangWatchQLFailure,
 } from "../logic/lwqlFailure";
 import {
-  type LangWatchQLRequestState,
   isLangWatchQLResultStale,
+  type LangWatchQLRequestState,
 } from "../logic/lwqlRequestState";
 import { LangWatchQLDiagnostics } from "./LangWatchQLDiagnostics";
 import { LangWatchQLResultMeta } from "./LangWatchQLResultMeta";
@@ -279,8 +279,8 @@ function EmptyState({ onInsertExample }: { onInsertExample?: () => void }) {
         lineHeight="1.6"
         maxWidth="420px"
       >
-        The LangWatchQL datasets on the left are ready — open one to see what a row
-        means and what you can select. Nothing runs until you press{" "}
+        The LangWatchQL datasets on the left are ready — open one to see what a
+        row means and what you can select. Nothing runs until you press{" "}
         <strong>Run query</strong>.
       </Text>
       {onInsertExample && (

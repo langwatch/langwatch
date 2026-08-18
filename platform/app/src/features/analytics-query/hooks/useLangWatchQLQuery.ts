@@ -24,12 +24,12 @@ import {
   type LangWatchQLRequestController,
 } from "../logic/lwqlRequestController";
 import {
+  isLangWatchQLResultStale,
   type LangWatchQLActionLabel,
   type LangWatchQLParameterValue,
   type LangWatchQLRequestState,
   type LangWatchQLTimeWindowValues,
   lwqlActionLabel,
-  isLangWatchQLResultStale,
 } from "../logic/lwqlRequestState";
 
 export interface UseLangWatchQLQuery {

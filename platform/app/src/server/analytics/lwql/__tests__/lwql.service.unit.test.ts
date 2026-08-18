@@ -564,9 +564,7 @@ describe("given the LangWatchQL service", () => {
           timeWindow: TIME_WINDOW,
         });
 
-      expect(await codeOf(run)).toBe(
-        "lwql_reserved_parameter_supplied",
-      );
+      expect(await codeOf(run)).toBe("lwql_reserved_parameter_supplied");
       expect(await metaOf(run)).toEqual({ parameters: ["period_start"] });
       expect(
         executor.calls,

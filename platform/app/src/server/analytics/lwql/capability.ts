@@ -61,13 +61,11 @@ import { createHash } from "node:crypto";
  *   in its raw form. Never logged, never sent to the database, and never
  *   returned to a caller.
  */
-export function lwqlTenantCapability({
-  secret,
-}: {
-  secret: string;
-}): string {
+export function lwqlTenantCapability({ secret }: { secret: string }): string {
   if (!secret) {
-    throw new Error("LangWatchQL tenant capability requires a non-empty secret");
+    throw new Error(
+      "LangWatchQL tenant capability requires a non-empty secret",
+    );
   }
   return createHash("sha256").update(secret).digest("hex");
 }

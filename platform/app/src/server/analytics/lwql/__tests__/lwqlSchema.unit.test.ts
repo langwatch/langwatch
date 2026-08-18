@@ -307,9 +307,7 @@ describe("given the LangWatchQL schema catalog", () => {
     it("keeps every other dataset, rather than hiding the schema", () => {
       expect(
         schemaWith(WITHOUT_CONTENT).datasets.map((dataset) => dataset.name),
-      ).toEqual(
-        LWQL_VIEW_CATALOG.map((view) => `${DATABASE}.${view.name}`),
-      );
+      ).toEqual(LWQL_VIEW_CATALOG.map((view) => `${DATABASE}.${view.name}`));
     });
 
     it("names the dataset's permission on each of its columns", () => {

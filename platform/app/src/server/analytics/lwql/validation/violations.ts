@@ -59,8 +59,7 @@ export const LWQL_VIOLATION_CODES = [
   "UNSUPPORTED_SYNTAX",
 ] as const;
 
-export type LangWatchQLViolationCode =
-  (typeof LWQL_VIOLATION_CODES)[number];
+export type LangWatchQLViolationCode = (typeof LWQL_VIOLATION_CODES)[number];
 
 /**
  * Where in the query the offending construct sits.

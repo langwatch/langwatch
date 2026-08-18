@@ -50,13 +50,13 @@
 import { LWQL_VIEW_CATALOG } from "./catalog/lwqlViews";
 import {
   columnExpression,
+  isPostgresResident,
   type LangWatchQLDedupStrategy,
   type LangWatchQLViewColumn,
   type LangWatchQLViewDefinition,
   lwqlGrainColumns,
   lwqlPostgresViews,
   lwqlViewSourceColumns,
-  isPostgresResident,
 } from "./catalog/types";
 import {
   DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
@@ -64,11 +64,11 @@ import {
   postgresEngineTableStatement,
 } from "./postgresMapping";
 import {
+  KEY_MAP_COLUMNS,
   type LangWatchQLNames,
   type LangWatchQLTable,
   lwqlGrantStatement,
   lwqlRowPolicyStatement,
-  KEY_MAP_COLUMNS,
 } from "./provisioning";
 
 /**
@@ -504,9 +504,7 @@ export function lwqlSourceColumnGrantStatement({
   sourceDatabase: string;
   view: LangWatchQLViewDefinition;
 }): string {
-  const columns = lwqlGrantedSourceColumns(view)
-    .map(quotedColumn)
-    .join(", ");
+  const columns = lwqlGrantedSourceColumns(view).map(quotedColumn).join(", ");
   return (
     `GRANT SELECT(${columns}) ON ${sourceRelation({ names, sourceDatabase, view })} ` +
     `TO ${assertIdentifier(names.restrictedUser, "restrictedUser")}`
@@ -636,9 +634,7 @@ export function lwqlPostgresReaderConnectionLimit({
   headroom?: number;
 } = {}): number {
   return (
-    lwqlPostgresViews(views).length *
-      connectionPoolSize *
-      concurrentCatalogs +
+    lwqlPostgresViews(views).length * connectionPoolSize * concurrentCatalogs +
     headroom
   );
 }
@@ -739,8 +735,8 @@ export function lwqlViewSetupStatements({
         : lwqlSourceColumnGrantStatement({ names, sourceDatabase, view }),
     ),
     ...views.map((view) => lwqlGrantStatement({ names, table: view.name })),
-    ...lwqlSourceTables({ names, sourceDatabase, views }).map(
-      (lwqlTable) => lwqlRowPolicyStatement({ names, lwqlTable }),
+    ...lwqlSourceTables({ names, sourceDatabase, views }).map((lwqlTable) =>
+      lwqlRowPolicyStatement({ names, lwqlTable }),
     ),
   ];
 }

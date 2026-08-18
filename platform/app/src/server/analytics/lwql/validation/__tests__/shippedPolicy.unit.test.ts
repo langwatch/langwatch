@@ -18,13 +18,7 @@ const APP_ROOT = fileURLToPath(new URL("../../../../../../", import.meta.url));
 /** `platform/app/` → repository root */
 const REPO_ROOT = join(APP_ROOT, "..", "..");
 const ADR_ROOT = join(REPO_ROOT, "dev", "docs", "adr");
-const LWQL_ROOT = join(
-  APP_ROOT,
-  "src",
-  "server",
-  "analytics",
-  "lwql",
-);
+const LWQL_ROOT = join(APP_ROOT, "src", "server", "analytics", "lwql");
 
 /**
  * Packages that would mean a BI platform, a query engine, or a semantic layer
@@ -141,10 +135,7 @@ describe("what the LangWatchQL API ships", () => {
         "a 0.x parser whose AST is the validator's security contract is pinned, not ranged",
       ).toMatch(/^\d+\.\d+\.\d+$/);
       expect(
-        readFileSync(
-          join(LWQL_ROOT, "validation", "parser.ts"),
-          "utf8",
-        ),
+        readFileSync(join(LWQL_ROOT, "validation", "parser.ts"), "utf8"),
       ).toContain('from "@clickhouse/parser"');
     });
   });
@@ -187,7 +178,7 @@ describe("what the LangWatchQL API ships", () => {
       // follows the index must land on one answer, not two that could diverge.
       //
       // Read off the *filename*, not the body. A body search cannot tell an ADR
-      // that owns the policy from one that cites it, and the sibling lwql-SQL
+      // that owns the policy from one that cites it, and the sibling LangWatchQL
       // ADRs legitimately cite it — 082 and 084 both name table functions and
       // SSRF while deciding something else entirely. An ADR *titled* for the
       // policy is the ambiguity worth failing on.

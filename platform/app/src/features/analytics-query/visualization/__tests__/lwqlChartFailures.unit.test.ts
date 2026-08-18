@@ -19,9 +19,7 @@ describe("the refusals the chart layer raises", () => {
   describe("given a failure from inside the chart runtime", () => {
     /** @scenario "Chart failures are distinct intentional states, never a blank chart" */
     it("carries the reason under the render.failure rule", () => {
-      const failure = lwqlRenderFailure(
-        new Error("Unrecognized signal name"),
-      );
+      const failure = lwqlRenderFailure(new Error("Unrecognized signal name"));
 
       expect(failure.rule).toBe("render.failure");
       expect(failure.code).toBe("render-failure");

@@ -51,8 +51,8 @@ import {
 } from "~/server/analytics/lwql/__tests__/lwqlClickHouseHarness";
 import { LWQL_VIEW_CATALOG } from "~/server/analytics/lwql/catalog/lwqlViews";
 import {
-  type LangWatchQLViewDefinition,
   isPostgresResident,
+  type LangWatchQLViewDefinition,
 } from "~/server/analytics/lwql/catalog/types";
 import {
   lwqlViewSetupStatements,

@@ -8,8 +8,8 @@
  */
 
 import type {
-  LangWatchQLSchema,
   LangWatchQLQueryResult,
+  LangWatchQLSchema,
 } from "~/server/analytics/lwql";
 
 /**

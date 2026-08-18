@@ -12,9 +12,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   filterLangWatchQLSchemaModel,
-  lwqlSchemaModel,
   lwqlCompletionItems,
   lwqlHoverFor,
+  lwqlSchemaModel,
 } from "../logic/lwqlSchemaModel";
 
 import {
@@ -99,9 +99,7 @@ describe("mapping the LangWatchQL schema response", () => {
       it("answers from the response and stays silent about withheld columns", () => {
         const model = lwqlSchemaModel(SCHEMA_RESPONSE);
 
-        expect(
-          lwqlHoverFor({ model, identifier: "latency_ms" }),
-        ).toEqual({
+        expect(lwqlHoverFor({ model, identifier: "latency_ms" })).toEqual({
           title: "analytics.traces_daily.latency_ms",
           detail: "Float64",
           documentation: "End to end latency of the trace. Measured in ms.",
@@ -109,9 +107,9 @@ describe("mapping the LangWatchQL schema response", () => {
         expect(
           lwqlHoverFor({ model, identifier: "total_cost" }),
         ).toBeUndefined();
-        expect(
-          lwqlHoverFor({ model, identifier: "traces_daily" })?.title,
-        ).toBe("analytics.traces_daily");
+        expect(lwqlHoverFor({ model, identifier: "traces_daily" })?.title).toBe(
+          "analytics.traces_daily",
+        );
       });
     });
   });

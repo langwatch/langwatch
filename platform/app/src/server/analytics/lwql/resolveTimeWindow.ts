@@ -34,11 +34,11 @@ import {
 } from "./errors";
 import {
   formatLangWatchQLDateTimeParameter,
-  LWQL_PERIOD_START_PARAMETER,
-  type LangWatchQLTimeWindow,
-  type LangWatchQLTimeWindowParameter,
   isLangWatchQLDateTimeParameterType,
   isLangWatchQLTimeWindowParameter,
+  type LangWatchQLTimeWindow,
+  type LangWatchQLTimeWindowParameter,
+  LWQL_PERIOD_START_PARAMETER,
 } from "./timeWindow";
 import type { LangWatchQLParameter } from "./validation/validate";
 
@@ -72,9 +72,7 @@ function valueFor(
   timeWindow: LangWatchQLTimeWindow,
 ): string {
   return formatLangWatchQLDateTimeParameter(
-    name === LWQL_PERIOD_START_PARAMETER
-      ? timeWindow.start
-      : timeWindow.end,
+    name === LWQL_PERIOD_START_PARAMETER ? timeWindow.start : timeWindow.end,
   );
 }
 

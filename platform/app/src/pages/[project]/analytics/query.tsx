@@ -47,9 +47,7 @@ function AvailabilityFallback({
   }
 
   const unavailableState =
-    reason === "disabled"
-      ? lwqlNotEnabledPayload()
-      : lwqlUnavailablePayload();
+    reason === "disabled" ? lwqlNotEnabledPayload() : lwqlUnavailablePayload();
 
   return <HandledErrorState error={unavailableState} fullHeight={false} />;
 }

@@ -294,12 +294,7 @@ export function LangWatchQLChartMode({
   }
 
   return (
-    <VStack
-      align="stretch"
-      gap={3}
-      height="full"
-      data-testid="lwql-chart-mode"
-    >
+    <VStack align="stretch" gap={3} height="full" data-testid="lwql-chart-mode">
       {onOpenSpecification && (
         <HStack justify="flex-end">
           <Button

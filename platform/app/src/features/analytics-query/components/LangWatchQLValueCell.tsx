@@ -101,9 +101,7 @@ function ExpandedValue({
    * thousand in the table. Every other kind shows exactly what it copies.
    */
   const full =
-    cell.kind === "structured"
-      ? cell.pretty
-      : (lwqlCellCopyText(cell) ?? "");
+    cell.kind === "structured" ? cell.pretty : (lwqlCellCopyText(cell) ?? "");
 
   return (
     <Popover.Root

@@ -53,10 +53,7 @@ import {
   lwqlGatedColumns,
   lwqlVisibleViews,
 } from "./catalog/types";
-import {
-  type LangWatchQLDiagnostic,
-  lwqlDiagnostics,
-} from "./diagnostics";
+import { type LangWatchQLDiagnostic, lwqlDiagnostics } from "./diagnostics";
 import {
   LangWatchQLParameterMissingError,
   LangWatchQLUnavailableError,

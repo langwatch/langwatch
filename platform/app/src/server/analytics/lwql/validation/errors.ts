@@ -42,22 +42,18 @@ export class LangWatchQLUnparseableError extends HandledError {
     violations: readonly LangWatchQLViolation[],
     options: { reasons?: readonly Error[] } = {},
   ) {
-    super(
-      "lwql_unparseable",
-      "The submitted SQL could not be parsed.",
-      {
-        httpStatus: 400,
-        fault: "customer",
-        meta: violationMeta(violations),
-        ...remediation("lwql_unparseable"),
-        ...options,
-      },
-    );
+    super("lwql_unparseable", "The submitted SQL could not be parsed.", {
+      httpStatus: 400,
+      fault: "customer",
+      meta: violationMeta(violations),
+      ...remediation("lwql_unparseable"),
+      ...options,
+    });
     this.name = "LangWatchQLUnparseableError";
   }
 }
 
-/** The query parses, but the lwql-SQL policy refuses it. */
+/** The query parses, but the LangWatchQL policy refuses it. */
 export class LangWatchQLNotPermittedError extends HandledError {
   declare readonly code: "lwql_not_permitted";
 

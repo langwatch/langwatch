@@ -30,6 +30,8 @@ import {
 import { LWQL_VIEW_CATALOG, lwqlViewByName } from "../lwqlViews";
 import {
   columnExpression,
+  isContentGated,
+  isPostgresResident,
   LWQL_COLUMN_UNITS,
   lwqlAllowedTables,
   lwqlColumnGates,
@@ -38,8 +40,6 @@ import {
   lwqlGrainColumns,
   lwqlViewSourceColumns,
   lwqlVisibleViews,
-  isContentGated,
-  isPostgresResident,
 } from "../types";
 
 /** `Map['key']` accesses in a column expression, with the key captured. */
@@ -910,9 +910,7 @@ describe("given the LangWatchQL view catalog", () => {
     it("leaves a column's gates alone when its dataset is ungated", () => {
       const traces = lwqlViewByName("traces")!;
       for (const column of traces.columns) {
-        expect(lwqlColumnGates({ view: traces, column })).toBe(
-          column.gates,
-        );
+        expect(lwqlColumnGates({ view: traces, column })).toBe(column.gates);
       }
     });
 

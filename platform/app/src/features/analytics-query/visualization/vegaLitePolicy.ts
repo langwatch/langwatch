@@ -26,8 +26,8 @@ import {
 import { TRANSFORM_ANALYZERS } from "./vegaLiteTransforms";
 import {
   type DatasetRowCounts,
-  LWQL_VEGA_RULE_IDS,
   type LangWatchQLVegaRuleId,
+  LWQL_VEGA_RULE_IDS,
   type VegaValidationError,
   type VegaValidationErrorCode,
   type VegaValidationWarning,

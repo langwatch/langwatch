@@ -15,14 +15,13 @@
 import type { Monaco, OnMount } from "@monaco-editor/react";
 import type { editor, languages } from "monaco-editor";
 import { useCallback, useEffect, useRef } from "react";
-
+import type { LangWatchQLEditorMarker } from "../logic/lwqlFailure";
+import { LWQL_LANGUAGE_ITEMS } from "../logic/lwqlLanguageItems";
 import {
   type LangWatchQLSchemaModel,
   lwqlCompletionItems,
   lwqlHoverFor,
 } from "../logic/lwqlSchemaModel";
-import type { LangWatchQLEditorMarker } from "../logic/lwqlFailure";
-import { LWQL_LANGUAGE_ITEMS } from "../logic/lwqlLanguageItems";
 
 type MonacoEditorInstance = editor.IStandaloneCodeEditor;
 

@@ -43,8 +43,8 @@ import type {
 import type { Protections } from "../../traces/protections";
 import { isUniqueConstraintError } from "../../utils/prismaErrors";
 import {
-  type LangWatchQLService,
   getLangWatchQLService,
+  type LangWatchQLService,
 } from "../lwql/lwql.service";
 import {
   SavedWorkbenchChartAlreadyExistsError,

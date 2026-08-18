@@ -13,11 +13,11 @@
 import { useMemo } from "react";
 
 import { referencedDatasetNames } from "../visualization/buildLangWatchQLVegaSpec";
-import { lwqlEmptyEncodingFailure } from "../visualization/lwqlChartFailures";
 import {
   langwatchVegaConfig,
   langwatchVegaPinnedConfig,
 } from "../visualization/langwatchVegaConfig";
+import { lwqlEmptyEncodingFailure } from "../visualization/lwqlChartFailures";
 import {
   encodedFieldsByDataset,
   scanLangWatchQLChartValues,
@@ -36,7 +36,9 @@ import { useLangwatchVegaTokens } from "./useLangwatchVegaTokens";
 
 export interface LangWatchQLChartModel {
   /** Where the running view attaches, or would attach. */
-  readonly containerRef: ReturnType<typeof useLangWatchQLVegaView>["containerRef"];
+  readonly containerRef: ReturnType<
+    typeof useLangWatchQLVegaView
+  >["containerRef"];
   readonly state: LangWatchQLVegaViewState;
   /** The refusals to show. Empty means nothing refused this chart. */
   readonly failures: readonly VegaValidationError[];

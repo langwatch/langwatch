@@ -18,8 +18,8 @@ import {
   type LangWatchQLExecuteRequest,
 } from "../logic/lwqlRequestController";
 import {
-  lwqlActionLabel,
   isLangWatchQLResultStale,
+  lwqlActionLabel,
 } from "../logic/lwqlRequestState";
 
 import { lwqlResult } from "./lwqlFixtures";

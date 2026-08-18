@@ -31,19 +31,17 @@ import { useLangWatchQLQuery } from "../hooks/useLangWatchQLQuery";
 import { useLangWatchQLSchema } from "../hooks/useLangWatchQLSchema";
 import { useSavedChartWiring } from "../hooks/useSavedChartWiring";
 import {
+  type LangWatchQLEditorMarker,
   LWQL_PARAMETER_MISSING_CODE,
   LWQL_RESERVED_PARAMETER_SUPPLIED_CODE,
-  type LangWatchQLEditorMarker,
   lwqlEditorMarkers,
   readLangWatchQLFailure,
 } from "../logic/lwqlFailure";
 import {
+  isLangWatchQLResultStale,
   type LangWatchQLRequestState,
   type LangWatchQLTimeWindowValues,
-  isLangWatchQLResultStale,
 } from "../logic/lwqlRequestState";
-
-import { LangWatchQLSchemaBrowser } from "./LangWatchQLSchemaBrowser";
 import { LangWatchQLEditor } from "./LangWatchQLEditor";
 import {
   type LangWatchQLParametersChange,
@@ -53,6 +51,7 @@ import {
   LangWatchQLResultPane,
   type LangWatchQLResultView,
 } from "./LangWatchQLResultPane";
+import { LangWatchQLSchemaBrowser } from "./LangWatchQLSchemaBrowser";
 import { LangWatchQLTimeWindowEditor } from "./LangWatchQLTimeWindowEditor";
 import { LazyLangWatchQLChartMode } from "./LazyLangWatchQLChartMode";
 import { SavedChartsToolbar } from "./SavedChartsToolbar";
@@ -101,9 +100,7 @@ function failureView(state: LangWatchQLRequestState): FailureView {
     // mean, so only the code decides which form answers them. Every other
     // refusal is about the statement.
     missingParameters:
-      failure.code === LWQL_PARAMETER_MISSING_CODE
-        ? failure.parameters
-        : [],
+      failure.code === LWQL_PARAMETER_MISSING_CODE ? failure.parameters : [],
     reservedParameters:
       failure.code === LWQL_RESERVED_PARAMETER_SUPPLIED_CODE
         ? failure.parameters

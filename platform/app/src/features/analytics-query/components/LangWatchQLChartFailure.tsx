@@ -97,7 +97,9 @@ export interface LangWatchQLChartFailureProps {
  * the test id, so "each case renders its own intentional state" is observable
  * rather than asserted about prose.
  */
-export function LangWatchQLChartFailure({ errors }: LangWatchQLChartFailureProps) {
+export function LangWatchQLChartFailure({
+  errors,
+}: LangWatchQLChartFailureProps) {
   const leading = errors[0];
   if (leading === undefined) return null;
 

@@ -41,8 +41,8 @@ import type {
 } from "../visualization/visualization.types";
 
 import { ADVERSARIAL_VEGA_FIXTURES } from "./fixtures/adversarial";
-import { LWQL_FIXTURE_COLUMNS } from "./fixtures/lwqlDatasetRegistry";
 import { INVALID_VEGA_FIXTURES } from "./fixtures/invalid";
+import { LWQL_FIXTURE_COLUMNS } from "./fixtures/lwqlDatasetRegistry";
 import { VALID_VEGA_FIXTURES } from "./fixtures/valid";
 
 /**
@@ -227,8 +227,7 @@ async function attemptToRender(entry: CorpusEntry): Promise<CorpusOutcome> {
 
     const refusalShown = await poll(
       () =>
-        container.querySelector('[data-testid="lwql-chart-failure"]') !==
-        null,
+        container.querySelector('[data-testid="lwql-chart-failure"]') !== null,
     );
     // `idle` is the runtime never having been enabled — the refusal stopped
     // this specification before anything was handed to Vega.

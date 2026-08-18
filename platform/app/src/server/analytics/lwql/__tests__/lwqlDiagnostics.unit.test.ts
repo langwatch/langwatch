@@ -19,9 +19,9 @@ import { describe, expect, it } from "vitest";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import { lwqlAllowedTables } from "../catalog/types";
 import {
+  type LangWatchQLDiagnostic,
   LWQL_CLEAN_DIAGNOSTICS_MEANING,
   LWQL_DIAGNOSTIC_CODES,
-  type LangWatchQLDiagnostic,
   lwqlDiagnostics,
 } from "../diagnostics";
 import type { LangWatchQLColumn } from "../executor";

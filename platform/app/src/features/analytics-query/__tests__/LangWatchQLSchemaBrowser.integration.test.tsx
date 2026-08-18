@@ -122,9 +122,7 @@ describe("the LangWatchQL schema browser", () => {
         renderBrowser();
         expand("analytics.traces_daily");
 
-        const withheld = screen.getByTestId(
-          "lwql-schema-column-total_cost",
-        );
+        const withheld = screen.getByTestId("lwql-schema-column-total_cost");
         expect(withheld).toHaveAttribute("aria-disabled", "true");
         expect(within(withheld).getByText("no access")).toBeInTheDocument();
         expect(withheld).toHaveAttribute(

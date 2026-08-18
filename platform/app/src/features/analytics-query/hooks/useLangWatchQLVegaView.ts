@@ -27,18 +27,22 @@ import {
   buildLangWatchQLVegaSpec,
   type LangWatchQLVegaSpecBuild,
 } from "../visualization/buildLangWatchQLVegaSpec";
-import { lwqlRenderFailure } from "../visualization/lwqlChartFailures";
 import type {
   LangWatchQLVegaColorMode,
   LangWatchQLVegaConfig,
 } from "../visualization/langwatchVegaConfig";
+import { lwqlRenderFailure } from "../visualization/lwqlChartFailures";
 import { createNoNetworkVegaLoader } from "../visualization/noNetworkVegaLoader";
 import type {
   LangWatchQLDataset,
   VegaValidationError,
 } from "../visualization/visualization.types";
 
-export type LangWatchQLVegaViewStatus = "idle" | "embedding" | "ready" | "failed";
+export type LangWatchQLVegaViewStatus =
+  | "idle"
+  | "embedding"
+  | "ready"
+  | "failed";
 
 export interface LangWatchQLVegaViewState {
   readonly status: LangWatchQLVegaViewStatus;
@@ -75,7 +79,10 @@ export interface UseLangWatchQLVegaViewResult {
 type LangWatchQLVegaDatasets = UseLangWatchQLVegaViewInput["datasets"];
 
 const IDLE: LangWatchQLVegaViewState = { status: "idle", failure: null };
-const EMBEDDING: LangWatchQLVegaViewState = { status: "embedding", failure: null };
+const EMBEDDING: LangWatchQLVegaViewState = {
+  status: "embedding",
+  failure: null,
+};
 const READY: LangWatchQLVegaViewState = { status: "ready", failure: null };
 
 /**

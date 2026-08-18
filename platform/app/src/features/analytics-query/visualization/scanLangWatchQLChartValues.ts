@@ -49,7 +49,9 @@ export function encodedFieldsByDataset({
 }: {
   spec: unknown;
   datasetNames: readonly string[];
-  columnsByDataset: Readonly<Record<string, readonly LangWatchQLDatasetColumn[]>>;
+  columnsByDataset: Readonly<
+    Record<string, readonly LangWatchQLDatasetColumn[]>
+  >;
 }): Record<string, string[]> {
   const referenced = new Set<string>();
   for (const { node } of visitJsonObjects(spec)) {

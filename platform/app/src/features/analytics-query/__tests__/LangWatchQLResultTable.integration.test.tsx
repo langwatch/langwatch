@@ -233,9 +233,9 @@ describe("the LangWatchQL result table", () => {
           }),
         );
 
-        expect(
-          await screen.findByTestId("lwql-value-full"),
-        ).toHaveTextContent("counts");
+        expect(await screen.findByTestId("lwql-value-full")).toHaveTextContent(
+          "counts",
+        );
 
         fireEvent.click(
           screen.getByRole("button", {
@@ -347,9 +347,9 @@ describe("the LangWatchQL result table", () => {
           }),
         );
 
-        expect(
-          screen.getByTestId("lwql-result-empty"),
-        ).toHaveTextContent("The query ran and matched no rows.");
+        expect(screen.getByTestId("lwql-result-empty")).toHaveTextContent(
+          "The query ran and matched no rows.",
+        );
         // The columns stay on screen, so the member can see what they asked for.
         expect(screen.getAllByRole("columnheader")).toHaveLength(1);
       });

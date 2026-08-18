@@ -20,9 +20,9 @@ import {
 } from "../../__tests__/fixtures/lwqlDatasetRegistry";
 import { validateVegaLiteSpec } from "../validateVegaLiteSpec";
 import {
-  LWQL_VEGA_RULES,
-  type LangWatchQLVegaLimitName,
   LWQL_VEGA_LIMITS as L,
+  type LangWatchQLVegaLimitName,
+  LWQL_VEGA_RULES,
 } from "../vegaLitePolicy";
 import { VEGA_LITE_SCHEMA_URL as S } from "../vegaLiteSchema";
 import type { DatasetRowCounts } from "../visualization.types";

@@ -1,5 +1,5 @@
 /**
- * The lwql-SQL gate, driven through the real ClickHouse parser.
+ * The LangWatchQL gate, driven through the real ClickHouse parser.
  *
  * Every case here submits SQL text rather than a hand-built tree, so a rule
  * that stops matching what the grammar actually produces turns this red. The

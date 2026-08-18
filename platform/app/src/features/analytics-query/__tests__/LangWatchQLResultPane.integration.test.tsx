@@ -28,7 +28,7 @@ import type {
   LangWatchQLRequestState,
 } from "../logic/lwqlRequestState";
 
-import { lwqlResult, handledErrorEnvelope } from "./lwqlFixtures";
+import { handledErrorEnvelope, lwqlResult } from "./lwqlFixtures";
 
 const SUBMITTED_SQL = "SELECT trace_id FROM analytics.traces_daily";
 
@@ -142,12 +142,12 @@ describe("the LangWatchQL result pane", () => {
           }),
         );
 
-        expect(
-          screen.getByTestId("lwql-result-chip"),
-        ).toHaveTextContent("Previous submission");
-        expect(
-          screen.getByTestId("lwql-stale-notice"),
-        ).toHaveTextContent("The statement changed after this ran");
+        expect(screen.getByTestId("lwql-result-chip")).toHaveTextContent(
+          "Previous submission",
+        );
+        expect(screen.getByTestId("lwql-stale-notice")).toHaveTextContent(
+          "The statement changed after this ran",
+        );
       });
 
       it("drops the label once the draft matches the snapshot that produced the result", () => {
@@ -162,9 +162,9 @@ describe("the LangWatchQL result pane", () => {
         ).not.toBeInTheDocument();
         // Each statistic is a value element beside a caption element, so the
         // concatenated text content carries no space between the two.
-        expect(
-          screen.getByTestId("lwql-result-summary"),
-        ).toHaveTextContent(/1\s*rows returned/);
+        expect(screen.getByTestId("lwql-result-summary")).toHaveTextContent(
+          /1\s*rows returned/,
+        );
       });
     });
   });
@@ -186,9 +186,9 @@ describe("the LangWatchQL result pane", () => {
           }),
         );
 
-        expect(
-          screen.getByTestId("lwql-result-chip"),
-        ).toHaveTextContent("Previous submission");
+        expect(screen.getByTestId("lwql-result-chip")).toHaveTextContent(
+          "Previous submission",
+        );
       });
     });
   });
@@ -504,8 +504,7 @@ describe("the LangWatchQL result pane", () => {
     describe("when the result header renders", () => {
       /** @scenario "The visible answer wears a state chip naming where it stands" */
       it("labels current, partial, stale, refused, and timed out answers", () => {
-        const chip = () =>
-          screen.getByTestId("lwql-result-chip").textContent;
+        const chip = () => screen.getByTestId("lwql-result-chip").textContent;
 
         const { unmount: unmountCurrent } = render(
           <ChakraProvider value={defaultSystem}>
@@ -614,9 +613,9 @@ describe("the LangWatchQL result pane", () => {
           stateWith({ answer: { kind: "result", result: truncatedResult() } }),
         );
 
-        expect(
-          screen.getByTestId("lwql-truncation-banner"),
-        ).toHaveTextContent("Showing the first 412 rows");
+        expect(screen.getByTestId("lwql-truncation-banner")).toHaveTextContent(
+          "Showing the first 412 rows",
+        );
       });
 
       /** @scenario "The truncation banner tells the truth about how much arrived" */
@@ -638,9 +637,9 @@ describe("the LangWatchQL result pane", () => {
           stateWith({ answer: { kind: "result", result: truncatedResult() } }),
         );
 
-        expect(
-          screen.getByTestId("lwql-truncation-banner"),
-        ).toHaveTextContent("Partial result");
+        expect(screen.getByTestId("lwql-truncation-banner")).toHaveTextContent(
+          "Partial result",
+        );
       });
     });
   });
@@ -680,12 +679,10 @@ describe("the LangWatchQL result pane", () => {
           }),
         );
 
-        expect(
-          screen.getByTestId("lwql-result-empty"),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByTestId("lwql-result-summary"),
-        ).toHaveTextContent("rows returned");
+        expect(screen.getByTestId("lwql-result-empty")).toBeInTheDocument();
+        expect(screen.getByTestId("lwql-result-summary")).toHaveTextContent(
+          "rows returned",
+        );
       });
     });
   });

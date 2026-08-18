@@ -335,12 +335,7 @@ export function LangWatchQLParametersEditor({
   );
 
   return (
-    <VStack
-      align="stretch"
-      gap={2}
-      width="full"
-      data-testid="lwql-parameters"
-    >
+    <VStack align="stretch" gap={2} width="full" data-testid="lwql-parameters">
       <HStack gap={2}>
         <Button
           size="xs"

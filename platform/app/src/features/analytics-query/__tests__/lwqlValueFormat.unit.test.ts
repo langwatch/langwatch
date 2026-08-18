@@ -38,18 +38,12 @@ describe("a LangWatchQL result value", () => {
           missing: lwqlCellText(
             readLangWatchQLCell({ row, column: "absentColumn" }),
           ),
-          null: lwqlCellText(
-            readLangWatchQLCell({ row, column: "nullValue" }),
-          ),
-          zero: lwqlCellText(
-            readLangWatchQLCell({ row, column: "zero" }),
-          ),
+          null: lwqlCellText(readLangWatchQLCell({ row, column: "nullValue" })),
+          zero: lwqlCellText(readLangWatchQLCell({ row, column: "zero" })),
           emptyString: lwqlCellText(
             readLangWatchQLCell({ row, column: "emptyString" }),
           ),
-          nan: lwqlCellText(
-            readLangWatchQLCell({ row, column: "notANumber" }),
-          ),
+          nan: lwqlCellText(readLangWatchQLCell({ row, column: "notANumber" })),
           infinity: lwqlCellText(
             readLangWatchQLCell({ row, column: "infinite" }),
           ),
@@ -99,14 +93,10 @@ describe("a LangWatchQL result value", () => {
       /** @scenario "Nothing coerces distinct emptiness and non-finite values together" */
       it("tells negative infinity from positive infinity", () => {
         expect(
-          lwqlCellText(
-            describeLangWatchQLValue(Number.NEGATIVE_INFINITY),
-          ),
+          lwqlCellText(describeLangWatchQLValue(Number.NEGATIVE_INFINITY)),
         ).toBe("-Infinity");
         expect(
-          lwqlCellText(
-            describeLangWatchQLValue(Number.POSITIVE_INFINITY),
-          ),
+          lwqlCellText(describeLangWatchQLValue(Number.POSITIVE_INFINITY)),
         ).toBe("Infinity");
       });
 
@@ -150,9 +140,7 @@ describe("a LangWatchQL result value", () => {
       it("leaves an ordinary number readable without grouping separators", () => {
         // `toLocaleString` would make this "1,234,567" — digits the value does
         // not have, in a cell a member may be reading as data.
-        expect(lwqlCellText(describeLangWatchQLValue(1234567))).toBe(
-          "1234567",
-        );
+        expect(lwqlCellText(describeLangWatchQLValue(1234567))).toBe("1234567");
       });
     });
   });
@@ -182,9 +170,7 @@ describe("a LangWatchQL result value", () => {
         expect(cell.display.endsWith("…")).toBe(true);
         // The bound is on the display only; the copy is the whole thing.
         expect(cell.copy).toBe(JSON.stringify(value));
-        expect(cell.copy.length).toBeGreaterThan(
-          LWQL_VALUE_PREVIEW_LIMIT,
-        );
+        expect(cell.copy.length).toBeGreaterThan(LWQL_VALUE_PREVIEW_LIMIT);
       });
 
       /** @scenario "Structured values render bounded, readable, and copyable" */

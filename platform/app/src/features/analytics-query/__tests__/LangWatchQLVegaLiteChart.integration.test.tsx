@@ -158,9 +158,7 @@ const chart = ({
 );
 
 const failureCode = () =>
-  screen
-    .getByTestId("lwql-chart-failure")
-    .getAttribute("data-failure-code");
+  screen.getByTestId("lwql-chart-failure").getAttribute("data-failure-code");
 
 beforeEach(() => {
   vega.state.calls = [];
@@ -256,7 +254,9 @@ describe("the LangWatchQL Vega-Lite chart", () => {
         );
         await waitFor(() => expect(vega.state.calls).toHaveLength(1));
 
-        const reloaded: LangWatchQLDataset = [{ model: "gpt-5-mini", total: 9 }];
+        const reloaded: LangWatchQLDataset = [
+          { model: "gpt-5-mini", total: 9 },
+        ];
         rerender(
           <ChakraProvider value={defaultSystem}>
             <LangWatchQLVegaLiteChart
@@ -454,9 +454,9 @@ describe("the LangWatchQL Vega-Lite chart", () => {
 
       await screen.findByTestId("lwql-chart-failure");
       expect(failureCode()).toBe("render-failure");
-      expect(
-        screen.getByTestId("lwql-chart-failure").textContent,
-      ).toContain("Unrecognized signal name");
+      expect(screen.getByTestId("lwql-chart-failure").textContent).toContain(
+        "Unrecognized signal name",
+      );
     });
 
     /** @scenario "Chart failures are distinct intentional states, never a blank chart" */
@@ -470,9 +470,9 @@ describe("the LangWatchQL Vega-Lite chart", () => {
 
       await screen.findByTestId("lwql-chart-failure");
       expect(failureCode()).toBe("render-failure");
-      expect(
-        screen.getByTestId("lwql-chart-failure").textContent,
-      ).toContain("Spec build gave out");
+      expect(screen.getByTestId("lwql-chart-failure").textContent).toContain(
+        "Spec build gave out",
+      );
       // The failure has to come instead of the embed, not alongside it.
       expect(vega.state.calls).toHaveLength(0);
     });

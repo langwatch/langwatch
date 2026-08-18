@@ -47,8 +47,8 @@ export {
   closeLangWatchQLService,
   createLangWatchQLService,
   DEFAULT_LWQL_DATABASE,
-  LangWatchQLService,
   getLangWatchQLService,
+  LangWatchQLService,
   setLangWatchQLService,
 } from "./lwql.service";
 export type { LangWatchQLTimeWindowResolution } from "./resolveTimeWindow";
@@ -63,9 +63,9 @@ export { MAX_LWQL_LENGTH } from "./sqlText";
 export type { LangWatchQLTimeWindow } from "./timeWindow";
 export {
   formatLangWatchQLDateTimeParameter,
+  isLangWatchQLDateTimeParameterType,
+  isLangWatchQLTimeWindowParameter,
   LWQL_PERIOD_END_PARAMETER,
   LWQL_PERIOD_START_PARAMETER,
   LWQL_TIME_WINDOW_PARAMETERS,
-  isLangWatchQLDateTimeParameterType,
-  isLangWatchQLTimeWindowParameter,
 } from "./timeWindow";

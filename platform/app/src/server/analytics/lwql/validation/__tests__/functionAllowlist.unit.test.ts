@@ -42,7 +42,7 @@ function functionRefusalMessage(result: LangWatchQLValidation): string {
   );
 }
 
-describe("the lwql-SQL function allowlist", () => {
+describe("the LangWatchQL function allowlist", () => {
   describe("given the SQL the LangWatchQL questions are written in", () => {
     /** @scenario "Only the functions a LangWatchQL question needs can be called" */
     it.each([

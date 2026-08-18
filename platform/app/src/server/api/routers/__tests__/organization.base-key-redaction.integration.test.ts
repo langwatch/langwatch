@@ -228,10 +228,7 @@ describe("Feature: base key in the organizations payload", () => {
       ["a caller who can change the project", () => updaterCaller],
       ["a caller who can only view the project", () => viewerCaller],
     ])("withholds it from the payload for %s", async (_label, caller) => {
-      const lwqlKey = await projectLangWatchQLKeyFor(
-        caller(),
-        projectId,
-      );
+      const lwqlKey = await projectLangWatchQLKeyFor(caller(), projectId);
 
       expect(lwqlKey).toBe("");
       expect(lwqlKey).not.toBe(storedLangWatchQLKey);

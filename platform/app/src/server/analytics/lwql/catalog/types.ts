@@ -34,12 +34,7 @@ import type { Protections } from "../../../traces/protections";
  * inventing a fact. Written with the standard symbol where one exists, because
  * `ms` and `USD` are the notation, not an abbreviation of the word.
  */
-export const LWQL_COLUMN_UNITS = [
-  "ms",
-  "USD",
-  "tokens",
-  "tokens/s",
-] as const;
+export const LWQL_COLUMN_UNITS = ["ms", "USD", "tokens", "tokens/s"] as const;
 
 export type LangWatchQLColumnUnit = (typeof LWQL_COLUMN_UNITS)[number];
 
@@ -474,14 +469,18 @@ export function lwqlViewSourceColumns(
  */
 export function isPostgresResident(
   view: LangWatchQLViewDefinition,
-): view is LangWatchQLViewDefinition & { postgres: LangWatchQLPostgresMapping } {
+): view is LangWatchQLViewDefinition & {
+  postgres: LangWatchQLPostgresMapping;
+} {
   return view.postgres !== undefined;
 }
 
 /** The PostgreSQL-resident datasets of a catalog, in catalog order. */
 export function lwqlPostgresViews(
   views: readonly LangWatchQLViewDefinition[],
-): readonly (LangWatchQLViewDefinition & { postgres: LangWatchQLPostgresMapping })[] {
+): readonly (LangWatchQLViewDefinition & {
+  postgres: LangWatchQLPostgresMapping;
+})[] {
   return views.filter(isPostgresResident);
 }
 
