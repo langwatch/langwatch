@@ -62,6 +62,7 @@ export class ApiKeyRepository {
     ingestSourceType,
     ingestionTemplateId,
     createdByDeviceLabel,
+    startsDisabled = false,
   }: {
     name: string;
     description?: string | null;
@@ -75,6 +76,13 @@ export class ApiKeyRepository {
     ingestSourceType?: string | null;
     ingestionTemplateId?: string | null;
     createdByDeviceLabel?: string | null;
+    /**
+     * Born revoked, to be activated once the key's grants are facts (see
+     * {@link activate}). The row and its grants cannot share a transaction —
+     * the grants are ledger commands — so the key is unusable until the
+     * writes it depends on have landed.
+     */
+    startsDisabled?: boolean;
   }): Promise<ApiKey> {
     return this.prisma.apiKey.create({
       data: {
@@ -90,7 +98,20 @@ export class ApiKeyRepository {
         ingestSourceType: ingestSourceType ?? null,
         ingestionTemplateId: ingestionTemplateId ?? null,
         createdByDeviceLabel: createdByDeviceLabel ?? null,
+        ...(startsDisabled ? { revokedAt: new Date() } : {}),
       },
+    });
+  }
+
+  /**
+   * Clear the revocation a {@link create} with `startsDisabled` set, once the
+   * key's grants exist. The last step of a create, and the only one that
+   * makes the credential able to authenticate.
+   */
+  async activate({ id }: { id: string }): Promise<ApiKey> {
+    return this.prisma.apiKey.update({
+      where: { id },
+      data: { revokedAt: null },
     });
   }
 
@@ -342,9 +363,23 @@ export class ApiKeyRepository {
   }
 
   /**
-   * Replaces all grants on an API key: revoke what it holds, then attach the
-   * set the caller asked for. Revoke first, so a crash between the two leaves
-   * the credential with less access than asked for, never more.
+   * Replaces all grants on an API key: attach the set the caller asked for,
+   * then revoke everything else the key still holds.
+   *
+   * ATTACH FIRST, REVOKE AFTER. The two writes are ledger commands and cannot
+   * share a transaction, so their order is the only fail-safety left, and the
+   * invariant it buys is: a crash between them leaves the credential holding
+   * the union of what it had and what was asked for — never nothing. The
+   * revoke-first order left a window in which the key held ZERO grants, which
+   * is both an outage for whoever is using it and the shape the read-through
+   * mint treats as "legacy" (see ./legacy-grant-mint.ts, which additionally
+   * gates on the key predating the ledger era so this window can never widen
+   * a key to organization ADMIN).
+   *
+   * The revoke names the ids to spare rather than the ones to take, so a
+   * binding attached a moment ago — or an identical one that was already
+   * there and was therefore skipped as a duplicate — is never revoked by the
+   * write that asked for it.
    */
   async replaceRoleBindings({
     apiKeyId,
@@ -357,18 +392,23 @@ export class ApiKeyRepository {
     bindings: ApiKeyBindingInput[];
     actor: LedgerActor;
   }): Promise<{ count: number }> {
-    await this.writer.revokeBindingsWhere({
-      organizationId,
-      where: { apiKeyId },
-      actor,
-      reason: "api key grants replaced",
-    });
-    return this.createRoleBindings({
+    const attached = await this.attachRoleBindings({
       apiKeyId,
       organizationId,
       bindings,
       actor,
     });
+    const keep = [...attached.attached, ...attached.duplicates];
+    await this.writer.revokeBindingsWhere({
+      organizationId,
+      where: {
+        apiKeyId,
+        ...(keep.length > 0 ? { id: { notIn: keep } } : {}),
+      },
+      actor,
+      reason: "api key grants replaced",
+    });
+    return { count: attached.attached.length };
   }
 
   async findOrgMembership({
@@ -542,9 +582,34 @@ export class ApiKeyRepository {
     bindings: ApiKeyBindingInput[];
     actor: LedgerActor;
   }): Promise<{ count: number }> {
-    if (bindings.length === 0) return { count: 0 };
+    const outcome = await this.attachRoleBindings({
+      apiKeyId,
+      organizationId,
+      bindings,
+      actor,
+    });
+    return { count: outcome.attached.length };
+  }
 
-    const outcome = await this.writer.attachBindings({
+  /**
+   * The attach itself, with the outcome intact: which ids were written and
+   * which identical rows were already there. `replaceRoleBindings` needs both
+   * to know what its revoke must spare.
+   */
+  private async attachRoleBindings({
+    apiKeyId,
+    organizationId,
+    bindings,
+    actor,
+  }: {
+    apiKeyId: string;
+    organizationId: string;
+    bindings: ApiKeyBindingInput[];
+    actor: LedgerActor;
+  }): Promise<{ attached: string[]; duplicates: string[] }> {
+    if (bindings.length === 0) return { attached: [], duplicates: [] };
+
+    return this.writer.attachBindings({
       organizationId,
       bindings: bindings.map((b) => ({
         bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
@@ -557,6 +622,5 @@ export class ApiKeyRepository {
       actor,
       onDuplicate: "skip",
     });
-    return { count: outcome.attached.length };
   }
 }

@@ -84,7 +84,13 @@ function createMockPrisma() {
       findFirst: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn().mockResolvedValue([]),
-      update: vi.fn(),
+      // Prisma answers an update with the row as it now stands, which is what
+      // the create path's activation (revokedAt back to null) returns to its
+      // caller.
+      update: vi.fn().mockImplementation(async (args: any) => {
+        const created = await client.apiKey.create.mock.results.at(-1)?.value;
+        return { ...(created ?? { id: args.where.id }), ...args.data };
+      }),
     },
     roleBinding: {
       findFirst: vi.fn(),

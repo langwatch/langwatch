@@ -1,3 +1,13 @@
+/**
+ * Every "rejects before persistence" case here names TWO sentinels: no ledger
+ * command, and no key row.
+ *
+ * The second one used to be implied — the whole create ran inside one Prisma
+ * transaction, so a late refusal took the row with it. Since ADR-092
+ * delivery-plan PR 2 the grants are ledger commands and the row is a plain
+ * insert, so a validation the service performs after the insert would leave a
+ * credential behind while every ledger sentinel stayed green.
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiKeyService } from "../api-key.service";
 
@@ -545,6 +555,7 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
 
         expect(ledger.defineRole).not.toHaveBeenCalled();
         expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
 
@@ -582,6 +593,7 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
 
         expect(ledger.defineRole).not.toHaveBeenCalled();
         expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
 
@@ -620,6 +632,7 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
 
         expect(ledger.defineRole).not.toHaveBeenCalled();
         expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
     describe("when create sends restricted mode with only built-in bindings", () => {
@@ -640,6 +653,7 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
 
         expect(ledger.defineRole).not.toHaveBeenCalled();
         expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
 
@@ -662,6 +676,7 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
 
         expect(ledger.defineRole).not.toHaveBeenCalled();
         expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
 
@@ -701,6 +716,7 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
 
         expect(ledger.defineRole).not.toHaveBeenCalled();
         expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
   });
@@ -723,6 +739,7 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
 
         expect(ledger.defineRole).not.toHaveBeenCalled();
         expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
 
@@ -743,6 +760,7 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
 
         expect(ledger.defineRole).not.toHaveBeenCalled();
         expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
 
@@ -781,6 +799,7 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
 
         expect(ledger.defineRole).not.toHaveBeenCalled();
         expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
 
@@ -801,6 +820,7 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
 
         expect(ledger.defineRole).not.toHaveBeenCalled();
         expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
   });
@@ -952,6 +972,7 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
 
         expect(ledger.defineRole).not.toHaveBeenCalled();
         expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
 

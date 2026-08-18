@@ -95,7 +95,26 @@ function buildMockPrisma() {
         updatedAt: new Date(),
       }),
       findUnique: vi.fn(),
-      update: vi.fn(),
+      // Activation reads back the row it flips live, the way Prisma's update
+      // answers with the updated record.
+      update: vi.fn().mockImplementation(({ data }: { data: object }) =>
+        Promise.resolve({
+          id: "ak_1",
+          name: "Test Key",
+          userId: USER_ID,
+          organizationId: ORG_ID,
+          lookupId: "testlookup1234",
+          hashedSecret: "hashedsecret123",
+          permissionMode: "restricted",
+          createdByUserId: null,
+          expiresAt: null,
+          revokedAt: null,
+          lastUsedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          ...data,
+        }),
+      ),
     },
     roleBinding: {
       findFirst: vi.fn().mockResolvedValue({

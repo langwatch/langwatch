@@ -151,8 +151,13 @@ export class ApiKeyService {
   }
 
   /**
-   * Creates a new API key with the given role bindings inside a transaction.
-   * Returns the plaintext token (shown once) plus the persisted record.
+   * Creates a new API key with the given role bindings. Returns the plaintext
+   * token (shown once) plus the persisted record.
+   *
+   * There is no transaction to hold the two together — the grants are ledger
+   * commands — so the key is written revoked and activated only after they
+   * land. A create that dies halfway leaves an inert credential rather than a
+   * live one with no grants.
    *
    * Enforces two invariants before persisting:
    *   1. The target user is a member of the target organization.
@@ -302,6 +307,14 @@ export class ApiKeyService {
     }
 
     const actor = ledgerActorFor(createdByUserId ?? userId);
+    // BORN DISABLED, ACTIVATED LAST. The row is a plain insert and the grants
+    // are ledger commands, so nothing can wrap the two in one transaction.
+    // The key is therefore created revoked and un-revoked only once its
+    // grants are facts: a crash, a throw, or a queue outage anywhere in
+    // between leaves a credential that authenticates nothing — the invariant
+    // is that a failed create leaves less-or-equal access, never a live token
+    // with no grants (which is also the shape the read-through mint refuses
+    // to widen, see ./legacy-grant-mint.ts).
     const apiKey = await this.repo.create({
       name,
       description,
@@ -315,6 +328,7 @@ export class ApiKeyService {
       ingestSourceType,
       ingestionTemplateId,
       createdByDeviceLabel,
+      startsDisabled: true,
     });
 
     if (sortedPermissions) {
@@ -343,7 +357,7 @@ export class ApiKeyService {
       });
     }
 
-    return { token, apiKey };
+    return { token, apiKey: await this.repo.activate({ id: apiKey.id }) };
   }
 
   /**

@@ -19,6 +19,8 @@ vi.mock("../api-key-token.utils", () => ({
 const ORG_ID = "org_1";
 const KEY_ID = "apikey_1";
 const CREATED_AT = new Date("2024-03-01T10:00:00.000Z");
+/** The organization's genesis import began after this key was created. */
+const GENESIS_AT = new Date("2024-06-01T00:00:00.000Z");
 
 function serviceKey(
   overrides: Partial<ApiKeyWithBindings> = {},
@@ -51,6 +53,9 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 /** The mint is per-organization; these cases are about an org past genesis. */
 const onMigratedOrg = async () => true;
 
+/** The key under test predates this organization's genesis import. */
+const afterGenesis = async () => GENESIS_AT;
+
 describe("legacy API key read-through mint", () => {
   beforeEach(() => {
     resetLegacyMintGuardForTests();
@@ -65,6 +70,7 @@ describe("legacy API key read-through mint", () => {
         apiKey: serviceKey(),
         writer,
         onLedgerWrites: onMigratedOrg,
+        genesisMomentFor: afterGenesis,
       });
       await settle();
 
@@ -95,6 +101,7 @@ describe("legacy API key read-through mint", () => {
         apiKey: serviceKey(),
         writer,
         onLedgerWrites: onMigratedOrg,
+        genesisMomentFor: afterGenesis,
       });
       await settle();
 
@@ -111,6 +118,7 @@ describe("legacy API key read-through mint", () => {
         apiKey: serviceKey(),
         writer,
         onLedgerWrites: onMigratedOrg,
+        genesisMomentFor: afterGenesis,
       });
       await settle();
 
@@ -125,15 +133,46 @@ describe("legacy API key read-through mint", () => {
         apiKey: serviceKey(),
         writer,
         onLedgerWrites: onMigratedOrg,
+        genesisMomentFor: afterGenesis,
       });
       mintLegacyKeyGrant({
         apiKey: serviceKey(),
         writer,
         onLedgerWrites: onMigratedOrg,
+        genesisMomentFor: afterGenesis,
       });
       await settle();
 
       expect(attachBindings).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A key that is busy authenticating mints once, not once per request" */
+    it("emits again once the note expires, so the guard is a cache and not a record", async () => {
+      const { attachBindings, writer } = writerSpy();
+      const startedAt = Date.now();
+      const clock = vi.spyOn(Date, "now").mockReturnValue(startedAt);
+      try {
+        mintLegacyKeyGrant({
+          apiKey: serviceKey(),
+          writer,
+          onLedgerWrites: onMigratedOrg,
+          genesisMomentFor: afterGenesis,
+        });
+        await settle();
+
+        clock.mockReturnValue(startedAt + 61_000);
+        mintLegacyKeyGrant({
+          apiKey: serviceKey(),
+          writer,
+          onLedgerWrites: onMigratedOrg,
+          genesisMomentFor: afterGenesis,
+        });
+        await settle();
+
+        expect(attachBindings).toHaveBeenCalledTimes(2);
+      } finally {
+        clock.mockRestore();
+      }
     });
 
     it("derives the same identity for the same fact, so a repeat dedupes", () => {
@@ -152,6 +191,7 @@ describe("legacy API key read-through mint", () => {
         apiKey: serviceKey(),
         writer,
         onLedgerWrites: async () => false,
+        genesisMomentFor: afterGenesis,
       });
       await settle();
 
@@ -166,6 +206,7 @@ describe("legacy API key read-through mint", () => {
         apiKey: serviceKey(),
         writer,
         onLedgerWrites: async () => migrated,
+        genesisMomentFor: afterGenesis,
       });
       await settle();
       expect(attachBindings).not.toHaveBeenCalled();
@@ -175,10 +216,80 @@ describe("legacy API key read-through mint", () => {
         apiKey: serviceKey(),
         writer,
         onLedgerWrites: async () => migrated,
+        genesisMomentFor: afterGenesis,
       });
       await settle();
 
       expect(attachBindings).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given a key created after the organization's genesis import", () => {
+    it("mints nothing, so an empty binding set is never widened to organization admin", async () => {
+      const { attachBindings, writer } = writerSpy();
+      const bornOnLedger = serviceKey({
+        createdAt: new Date(GENESIS_AT.getTime() + 60_000),
+      });
+
+      mintLegacyKeyGrant({
+        apiKey: bornOnLedger,
+        writer,
+        onLedgerWrites: onMigratedOrg,
+        genesisMomentFor: afterGenesis,
+      });
+      await settle();
+
+      expect(attachBindings).not.toHaveBeenCalled();
+    });
+
+    it("mints nothing for a key created at the genesis moment itself", async () => {
+      const { attachBindings, writer } = writerSpy();
+
+      mintLegacyKeyGrant({
+        apiKey: serviceKey({ createdAt: GENESIS_AT }),
+        writer,
+        onLedgerWrites: onMigratedOrg,
+        genesisMomentFor: afterGenesis,
+      });
+      await settle();
+
+      expect(attachBindings).not.toHaveBeenCalled();
+    });
+
+    it("mints nothing while a replace has attached but not yet revoked", async () => {
+      const { attachBindings, writer } = writerSpy();
+      // The transient window a de-transactioned write leaves: the key holds
+      // no bindings for an instant, and it was created long after genesis.
+      const midReplace = serviceKey({
+        createdAt: new Date(GENESIS_AT.getTime() + 86_400_000),
+        roleBindings: [],
+      });
+
+      mintLegacyKeyGrant({
+        apiKey: midReplace,
+        writer,
+        onLedgerWrites: onMigratedOrg,
+        genesisMomentFor: afterGenesis,
+      });
+      await settle();
+
+      expect(attachBindings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an organization with no genesis import state to read", () => {
+    it("mints nothing rather than assuming the key is old", async () => {
+      const { attachBindings, writer } = writerSpy();
+
+      mintLegacyKeyGrant({
+        apiKey: serviceKey(),
+        writer,
+        onLedgerWrites: onMigratedOrg,
+        genesisMomentFor: async () => null,
+      });
+      await settle();
+
+      expect(attachBindings).not.toHaveBeenCalled();
     });
   });
 
@@ -195,6 +306,7 @@ describe("legacy API key read-through mint", () => {
         apiKey: bound,
         writer,
         onLedgerWrites: onMigratedOrg,
+        genesisMomentFor: afterGenesis,
       });
       await settle();
 
@@ -213,6 +325,7 @@ describe("legacy API key read-through mint", () => {
         apiKey: personal,
         writer,
         onLedgerWrites: onMigratedOrg,
+        genesisMomentFor: afterGenesis,
       });
       await settle();
 
@@ -230,6 +343,7 @@ describe("legacy API key read-through mint", () => {
         apiKey: ingestion,
         writer,
         onLedgerWrites: onMigratedOrg,
+        genesisMomentFor: afterGenesis,
       });
       await settle();
 
@@ -251,6 +365,7 @@ describe("legacy API key read-through mint", () => {
           apiKey: serviceKey(),
           writer,
           onLedgerWrites: onMigratedOrg,
+          genesisMomentFor: afterGenesis,
         }),
       ).not.toThrow();
       await settle();
@@ -259,6 +374,7 @@ describe("legacy API key read-through mint", () => {
         apiKey: serviceKey(),
         writer,
         onLedgerWrites: onMigratedOrg,
+        genesisMomentFor: afterGenesis,
       });
       await settle();
       expect(attachBindings).toHaveBeenCalledTimes(2);
@@ -276,6 +392,7 @@ describe("legacy API key read-through mint", () => {
           apiKey: serviceKey(),
           writer,
           onLedgerWrites: onMigratedOrg,
+          genesisMomentFor: afterGenesis,
         }),
       ).not.toThrow();
     });
