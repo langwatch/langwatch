@@ -398,7 +398,6 @@ const LEGACY_INERT: string[] = [
   "specs/event-sourcing/pipeline-model.feature",
   "specs/event-sourcing/process-roles.feature",
   "specs/event-sourcing/redis-fold-cache.feature",
-  "specs/event-sourcing/work-conserving-fair-dispatch.feature",
   "specs/experiments-v3/autosave-status.feature",
   "specs/experiments-v3/dataset-inline-editing.feature",
   "specs/experiments-v3/evaluation-creation-entrypoints.feature",

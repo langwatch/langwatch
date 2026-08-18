@@ -9,6 +9,7 @@ import {
 } from "./blobConstants";
 import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua";
 import { CachedLuaScript } from "./cachedLuaScript";
+import { gqJobsDispatchedOverrideTotal } from "./metrics";
 
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
@@ -1140,6 +1141,12 @@ end
 
 local dispatched = scanBatch(tenantCap, false, 0)
 
+-- Slots this eval filled by overriding the cap, reported alongside the results.
+-- Without it a high parked count is unreadable: "the cap is throttling work"
+-- and "the fleet is saturated so the override had no slot to give" produce the
+-- same gauge, and only this number tells them apart.
+local overrideDispatched = 0
+
 -- Work-conserving override: spare local slots remain (dispatched < maxJobs) but
 -- nothing more was admittable under the cap, while over-cap work sits parked.
 -- Fairness binds only under contention; spare capacity = no contention, so fill
@@ -1148,10 +1155,12 @@ local dispatched = scanBatch(tenantCap, false, 0)
 -- remaining slots; this pod's free-slot budget keeps the fleet total at G.
 if globalBudget > 0 and tenantCap > 0 and dispatched < maxJobs and redis.call("SCARD", keyPrefix .. "parked-tenants") > 0 then
   unparkLeastServedParked(readyKey, keyPrefix, pausedJobKey, nowMs, maxJobs - dispatched)
+  local beforeOverride = dispatched
   dispatched = scanBatch(tenantCap, true, dispatched)
+  overrideDispatched = dispatched - beforeOverride
 end
 
-return results
+return {results, overrideDispatched}
 `;
 
 /**
@@ -2202,17 +2211,37 @@ export class GroupStagingScripts {
       String(readGlobalBudget()),
     );
 
-    if (!result || !Array.isArray(result) || result.length < 4) {
+    // The script returns [flatResults, overrideDispatched]. The count rides
+    // back with the results rather than living in a Redis key because a
+    // Prometheus counter has to be per-process: one shared key reported by
+    // every pod would multiply under sum(), the way the blocked-groups gauge
+    // already does.
+    if (!Array.isArray(result)) {
+      return [];
+    }
+
+    const [rawResults, rawOverride] = result as [unknown, unknown];
+    const flat = Array.isArray(rawResults) ? rawResults : [];
+    const overrideDispatched = Number(rawOverride);
+
+    if (Number.isFinite(overrideDispatched) && overrideDispatched > 0) {
+      gqJobsDispatchedOverrideTotal.inc(
+        { queue_name: this.queueName },
+        overrideDispatched,
+      );
+    }
+
+    if (flat.length < 4) {
       return [];
     }
 
     const dispatched: DispatchResult[] = [];
-    for (let i = 0; i < result.length; i += 4) {
+    for (let i = 0; i < flat.length; i += 4) {
       dispatched.push({
-        stagedJobId: String(result[i]),
-        groupId: String(result[i + 1]),
-        jobDataJson: String(result[i + 2]),
-        originalScore: Number(result[i + 3]),
+        stagedJobId: String(flat[i]),
+        groupId: String(flat[i + 1]),
+        jobDataJson: String(flat[i + 2]),
+        originalScore: Number(flat[i + 3]),
       });
     }
 
