@@ -1,0 +1,366 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+/**
+ * @vitest-environment node
+ *
+ * The Genie adapter's cost path, driven through `runOnce` against a fixture
+ * workspace.
+ *
+ * The arithmetic has its own file. What is asserted here is the wiring around
+ * it: that naming a warehouse is what asks for billing at all, that a question
+ * whose statement is priced carries that price out of the adapter, and — the
+ * one that would otherwise be silent — that a source which prices its questions
+ * keeps reading them long enough for the price to exist.
+ *
+ * No database. The adapter's output is a list of events, and every claim here is
+ * about that list, so the ledger is somebody else's test.
+ */
+
+import { vi } from "vitest";
+
+// `ssrfProtection` builds its validator once at module load from these, and the
+// fixture workspace is on loopback. Hoisted for the same reason the sibling
+// integration test hoists it: a `beforeAll` runs long after that evaluation.
+vi.hoisted(() => {
+  process.env.IS_SAAS = "false";
+  process.env.BLOCK_LOCAL_HTTP_CALLS = "false";
+});
+
+import http from "http";
+import type { AddressInfo } from "net";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import {
+  DATABRICKS_GENIE_ADAPTER_ID,
+  DatabricksGeniePuller,
+} from "../databricksGenie.puller";
+import { WAREHOUSE_COST_SETTLING_LAG_MS } from "../databricksWarehouseCost";
+import { PULLED_USAGE_HINT_KEY } from "../pulledUsageRecord";
+
+const SPACE_ID = "space-1";
+const CONVERSATION_ID = "conv-1";
+const MESSAGE_ID = "msg-1";
+const STATEMENT_ID = "stmt-abc";
+const WAREHOUSE_ID = "095eb666b2ed2762";
+
+type CostPlan = {
+  status?: number;
+  state?: string;
+  rows?: (string | null)[][];
+};
+
+let server: http.Server;
+let baseUrl: string;
+/** Bodies the fixture was asked to run a statement with, in order. */
+let statementBodies: Record<string, unknown>[];
+let costPlan: CostPlan | null;
+/** Message creation time, moved by tests that care about the read window. */
+let messageCreatedMs: number;
+
+beforeEach(async () => {
+  statementBodies = [];
+  costPlan = null;
+  messageCreatedMs = Date.now() - 60_000;
+
+  server = http.createServer((req, res) => {
+    const url = new URL(req.url ?? "/", "http://localhost");
+    res.setHeader("content-type", "application/json");
+    res.statusCode = 200;
+    const send = (body: unknown) => res.end(JSON.stringify(body));
+
+    if (url.pathname === "/api/2.0/genie/spaces") {
+      return send({ spaces: [{ space_id: SPACE_ID, title: "Revenue" }] });
+    }
+    if (url.pathname === `/api/2.0/genie/spaces/${SPACE_ID}/conversations`) {
+      return send({
+        conversations: [
+          { conversation_id: CONVERSATION_ID, title: "How many?" },
+        ],
+      });
+    }
+    if (
+      url.pathname ===
+      `/api/2.0/genie/spaces/${SPACE_ID}/conversations/${CONVERSATION_ID}/messages`
+    ) {
+      return send({
+        messages: [
+          {
+            message_id: MESSAGE_ID,
+            content: "How many orders last week?",
+            status: "COMPLETED",
+            created_timestamp: messageCreatedMs,
+            user_id: 42,
+            attachments: [
+              {
+                query: {
+                  query: "SELECT count(*) FROM orders",
+                  statement_id: STATEMENT_ID,
+                  query_result_metadata: { row_count: 1 },
+                },
+              },
+            ],
+          },
+        ],
+      });
+    }
+    if (url.pathname.startsWith("/api/2.0/preview/scim/v2/Users/")) {
+      return send({
+        id: "42",
+        userName: "dana@acme.test",
+        displayName: "Dana Hoffman",
+        active: true,
+      });
+    }
+    if (url.pathname === "/api/2.0/sql/statements" && req.method === "POST") {
+      let raw = "";
+      req.on("data", (chunk) => (raw += chunk));
+      req.on("end", () => {
+        statementBodies.push(
+          JSON.parse(raw || "{}") as Record<string, unknown>,
+        );
+        if (costPlan?.status) {
+          res.statusCode = costPlan.status;
+          return send({ message: "permission denied" });
+        }
+        send({
+          statement_id: "fixture",
+          status: { state: costPlan?.state ?? "SUCCEEDED" },
+          result: { data_array: costPlan?.rows ?? [] },
+        });
+      });
+      return;
+    }
+
+    res.statusCode = 404;
+    send({ error: `unrouted ${url.pathname}` });
+  });
+
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+});
+
+afterEach(async () => {
+  await new Promise<void>((resolve) => {
+    server.close(() => resolve());
+  });
+});
+
+async function pull({ warehouseId }: { warehouseId?: string }) {
+  const puller = new DatabricksGeniePuller();
+  return await puller.runOnce(
+    { cursor: null, credentials: { token: "dapi-fixture" } },
+    {
+      adapter: DATABRICKS_GENIE_ADAPTER_ID,
+      workspaceUrl: baseUrl,
+      spaceIds: [],
+      schedule: "*/15 * * * *",
+      ...(warehouseId ? { warehouseId } : {}),
+    },
+  );
+}
+
+/** The `pulled_usage` hint on the one message the fixture serves. */
+function hintOf(result: { events: { extra?: Record<string, unknown> }[] }) {
+  const extra = result.events[0]?.extra;
+  return (extra?.[PULLED_USAGE_HINT_KEY] ?? {}) as Record<string, unknown>;
+}
+
+describe("a source with no warehouse", () => {
+  /** @scenario "A question costs nothing when no warehouse is named" */
+  it("records the question at zero and never asks about billing", async () => {
+    const result = await pull({});
+
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0]?.cost_usd).toBe(0);
+    expect(hintOf(result).costUsd).toBe("0");
+    // The claim that matters: not merely that cost is zero, but that a source
+    // which opted out never went near the billing tables.
+    expect(statementBodies).toHaveLength(0);
+  });
+});
+
+describe("a source that names a warehouse", () => {
+  /** @scenario "The compute behind a question is charged to the person who asked" */
+  it("carries the question's share of the warehouse bill", async () => {
+    costPlan = {
+      rows: [
+        [
+          STATEMENT_ID,
+          "1800000",
+          "3600000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+      ],
+    };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+
+    // Half the hour's execution time, so half its $6 bill.
+    expect(hintOf(result).costUsd).toBe("3");
+    expect(result.events[0]?.cost_usd).toBe(3);
+    // Still an estimate: the figure is a share worked out from list prices.
+    expect(hintOf(result).costStatus).toBe("estimate");
+    // And still attributed to the person who asked.
+    expect(result.events[0]?.actor).toBe("dana@acme.test");
+  });
+
+  /** @scenario "The billing query only ever runs on the configured workspace" */
+  it("asks the configured warehouse, with the id bound rather than pasted in", async () => {
+    costPlan = { rows: [] };
+
+    await pull({ warehouseId: WAREHOUSE_ID });
+
+    expect(statementBodies).toHaveLength(1);
+    const body = statementBodies[0]!;
+    expect(body.warehouse_id).toBe(WAREHOUSE_ID);
+    // Bound as a parameter. Interpolating it into the statement would make the
+    // statement a function of stored configuration.
+    expect(body.parameters).toEqual(
+      expect.arrayContaining([
+        { name: "warehouse_id", value: WAREHOUSE_ID, type: "STRING" },
+      ]),
+    );
+    expect(String(body.statement)).not.toContain(WAREHOUSE_ID);
+  });
+
+  /** @scenario "A question whose SQL has not reached the billing tables yet" */
+  it("records the question anyway when its compute is not published yet", async () => {
+    costPlan = { rows: [] };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+
+    expect(result.events).toHaveLength(1);
+    expect(hintOf(result).costUsd).toBe("0");
+  });
+
+  /** @scenario "A billing outage does not discard the questions" */
+  it("keeps the questions when the workspace refuses the billing query", async () => {
+    costPlan = { status: 403 };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+
+    expect(result.events).toHaveLength(1);
+    expect(hintOf(result).costUsd).toBe("0");
+    // Not an error count: the sweep did its job. A source that reported a
+    // failure here would look broken to an admin who has simply not granted
+    // the billing tables.
+    expect(result.errorCount).toBe(0);
+  });
+
+  it("keeps the questions when the billing query is cancelled on its wait", async () => {
+    costPlan = { state: "PENDING" };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+
+    expect(result.events).toHaveLength(1);
+    expect(hintOf(result).costUsd).toBe("0");
+  });
+
+  /** @scenario "Compute the workspace prices in another currency is not converted" */
+  it("records no cost for compute priced in another currency", async () => {
+    costPlan = {
+      rows: [
+        [
+          STATEMENT_ID,
+          "3600000",
+          "3600000",
+          "6.00",
+          "EUR",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+      ],
+    };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+
+    expect(result.events).toHaveLength(1);
+    expect(hintOf(result).costUsd).toBe("0");
+  });
+
+  /** @scenario "A source that prices its questions keeps looking back far enough" */
+  it("still reads a question older than the watermark would allow", async () => {
+    // Asked an hour ago: past the five-minute watermark lag, so a source that
+    // did not widen its window would never see it again — and its cost only
+    // becomes available at about this age.
+    messageCreatedMs = Date.now() - 60 * 60 * 1000;
+    costPlan = {
+      rows: [
+        [
+          STATEMENT_ID,
+          "3600000",
+          "3600000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+      ],
+    };
+
+    // A cursor whose watermark has already moved past the message.
+    const puller = new DatabricksGeniePuller();
+    const result = await puller.runOnce(
+      {
+        cursor: JSON.stringify({
+          sinceMs: Date.now() - 10 * 60 * 1000,
+          spaceId: null,
+          conversationId: null,
+          sweepHadGap: false,
+          spaceSetFingerprint: null,
+          sweepStartedAtMs: null,
+          sweepOldestPendingMs: null,
+        }),
+        credentials: { token: "dapi-fixture" },
+      },
+      {
+        adapter: DATABRICKS_GENIE_ADAPTER_ID,
+        workspaceUrl: baseUrl,
+        spaceIds: [],
+        schedule: "*/15 * * * *",
+        warehouseId: WAREHOUSE_ID,
+      },
+    );
+
+    expect(result.events).toHaveLength(1);
+    expect(hintOf(result).costUsd).toBe("6");
+    // The window it asked billing about reaches back at least as far.
+    const from = String(
+      (
+        statementBodies[0]!.parameters as { name: string; value: string }[]
+      ).find((p) => p.name === "from_ts")?.value,
+    );
+    expect(Date.parse(from)).toBeLessThanOrEqual(
+      Date.now() - WAREHOUSE_COST_SETTLING_LAG_MS + 60_000,
+    );
+  });
+
+  /** @scenario "A source that prices nothing does not widen its window" */
+  it("does not re-read an old question when the source prices nothing", async () => {
+    messageCreatedMs = Date.now() - 60 * 60 * 1000;
+
+    const puller = new DatabricksGeniePuller();
+    const result = await puller.runOnce(
+      {
+        cursor: JSON.stringify({
+          sinceMs: Date.now() - 10 * 60 * 1000,
+          spaceId: null,
+          conversationId: null,
+          sweepHadGap: false,
+          spaceSetFingerprint: null,
+          sweepStartedAtMs: null,
+          sweepOldestPendingMs: null,
+        }),
+        credentials: { token: "dapi-fixture" },
+      },
+      {
+        adapter: DATABRICKS_GENIE_ADAPTER_ID,
+        workspaceUrl: baseUrl,
+        spaceIds: [],
+        schedule: "*/15 * * * *",
+      },
+    );
+
+    expect(result.events).toHaveLength(0);
+  });
+});

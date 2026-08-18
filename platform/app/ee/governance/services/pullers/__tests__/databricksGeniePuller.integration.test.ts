@@ -796,7 +796,7 @@ describe("given a Genie workspace the credential can fully read", () => {
       expect(row.ActorEmail).toBe("priya.nair@acme.test");
     });
 
-    /** @scenario "A question costs nothing and is never priced" */
+    /** @scenario "A question costs nothing when no warehouse is named" */
     it("records the questions with no cost attached", async () => {
       const totals = await pulledTotalsFor({
         tenantId: seeded.govProjectId,

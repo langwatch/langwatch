@@ -1280,6 +1280,12 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "Leave empty to cover every space the token can see",
       hint: "Comma-separated. Empty is the usual setting — new spaces are then covered the day someone creates them.",
     },
+    {
+      key: "warehouseId",
+      label: "SQL warehouse ID (optional)",
+      placeholder: "095eb666b2ed2762",
+      hint: "The warehouse that answers these spaces' questions. Set it to attribute the compute behind each question to the person who asked; leave it empty and questions are recorded at zero cost, which is what Genie itself charges. The token additionally needs SELECT on the `system` catalogue, which only a metastore admin can grant — without it questions are still recorded, without cost. The figure is a share of the hourly bill at list prices, so it is an estimate, not the invoice.",
+    },
   ],
   s3_custom: [
     {
@@ -1589,6 +1595,7 @@ function buildDatabricksGeniePullConfig(
   const p = c.parserConfig;
   const workspaceUrl = (p.workspaceUrl ?? "").trim().replace(/\/+$/, "");
   const token = (p.credentialsToken ?? "").trim();
+  const warehouseId = (p.warehouseId ?? "").trim();
   if (!workspaceUrl || !token) return null;
 
   return {
@@ -1604,6 +1611,10 @@ function buildDatabricksGeniePullConfig(
       c.pullSchedule.trim() ||
       PULL_SCHEDULE_DEFAULTS.databricks_genie ||
       "*/15 * * * *",
+    // Omitted rather than sent empty: the adapter reads "no warehouse named" as
+    // "do not price these questions", and an empty string is a warehouse id it
+    // would then ask the workspace about.
+    ...(warehouseId ? { warehouseId } : {}),
     credentials: { token },
   };
 }
@@ -1714,7 +1725,10 @@ const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
     // winning the merge would fail the adapter's `.datetime()` check at
     // pull time.
     anthropic_admin: ["report", "bucketWidth", "startingAt"],
-    databricks_genie: ["workspaceUrl", "spaceIds"],
+    // `warehouseId` is here because the builder DROPS it when empty. Left to
+    // the merge, the raw form value would persist `warehouseId: ""`, which the
+    // adapter reads as a warehouse to go ask the workspace about.
+    databricks_genie: ["workspaceUrl", "spaceIds", "warehouseId"],
   };
 
 // Skip sentinel for a parserConfig entry that must not be persisted, kept

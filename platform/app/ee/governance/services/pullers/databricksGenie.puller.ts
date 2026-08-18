@@ -57,6 +57,12 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import {
+  allocateWarehouseCost,
+  costReadFloorMs,
+  GENIE_CLIENT_APPLICATION,
+  warehouseCostRowSchema,
+} from "./databricksWarehouseCost";
 import { PULLED_USAGE_HINT_KEY } from "./pulledUsageRecord";
 import type {
   NormalizedPullEvent,
@@ -146,6 +152,18 @@ export const databricksGeniePullConfigSchema = z.object({
   /** ISO instant the very first run starts from. Later runs use the cursor. */
   startingAt: z.string().datetime().optional(),
   schedule: z.string().default("*/15 * * * *"),
+  /**
+   * The SQL warehouse that answers this space's questions. Naming it is what
+   * opts the source into attributing the compute behind each question; leaving
+   * it out keeps the source's records at a cost of zero, which is what Genie
+   * itself charges.
+   *
+   * It is optional because the grants it needs are not the ones the rest of this
+   * adapter needs. Reading the billing tables requires `SELECT` on `system` from
+   * a metastore administrator, and a workspace whose owner has not issued it
+   * should still get its Genie activity rather than a failing source.
+   */
+  warehouseId: z.string().min(1).optional(),
 });
 export type DatabricksGeniePullConfig = z.infer<
   typeof databricksGeniePullConfigSchema
@@ -163,6 +181,124 @@ export type DatabricksGeniePullConfig = z.infer<
  * sinks; the alternative silently loses messages at the boundary.
  */
 const WATERMARK_LAG_MS = 5 * 60 * 1000;
+
+/**
+ * Longer than a Genie list call, because this one asks the metastore to
+ * aggregate two system tables and the warehouse may be asleep when it arrives.
+ * A serverless warehouse cold-starts in seconds, but not always in five.
+ */
+const WAREHOUSE_COST_TIMEOUT_MS = 60_000;
+
+/**
+ * Per-statement cost for the window, from the warehouse's own billing.
+ *
+ * Read it as three independent facts joined by the hour they share:
+ *
+ *   `windowed`    every statement the warehouse ran, Genie's or not
+ *   `hour_total`  how much execution time that hour held IN TOTAL
+ *   `hour_dbu`    what the warehouse was billed for that hour, per SKU
+ *
+ * `hour_total` deliberately sums `windowed` rather than filtering to Genie. A
+ * warehouse shared with dashboards and scheduled jobs whose denominator counted
+ * only Genie's queries would hand Genie the entire warehouse bill. Live
+ * validation put Genie at 13.3% of one workspace's warehouse compute; the rest
+ * is real spend belonging to traffic nobody asked Genie for, and it stays
+ * unattributed rather than being redistributed to whoever happens to be here.
+ *
+ * `priced` picks ONE price row per hour and SKU, preferring USD and then the
+ * most recently effective. Without that the join fans out: a SKU listed in two
+ * currencies would return the hour's bill twice and double every question in
+ * it. Rows with no matching price come back with nulls rather than being
+ * dropped, so the caller can say so instead of silently reporting zero.
+ *
+ * Statements are bucketed by the hour their `start_time` falls in, which is how
+ * the billing table buckets too. A statement straddling an hour boundary is
+ * charged wholly to the hour it began — an approximation, and the same one the
+ * live validation used.
+ */
+const WAREHOUSE_COST_STATEMENT = `
+WITH windowed AS (
+  SELECT
+    statement_id,
+    client_application,
+    execution_duration_ms,
+    date_trunc('HOUR', start_time) AS usage_hour
+  FROM system.query.history
+  WHERE compute.warehouse_id = :warehouse_id
+    AND start_time >= :from_ts
+    AND start_time < :to_ts
+    AND execution_duration_ms IS NOT NULL
+),
+hour_total AS (
+  SELECT usage_hour, SUM(execution_duration_ms) AS total_ms
+  FROM windowed
+  GROUP BY usage_hour
+),
+hour_dbu AS (
+  SELECT
+    date_trunc('HOUR', usage_start_time) AS usage_hour,
+    sku_name,
+    SUM(usage_quantity) AS dbu
+  FROM system.billing.usage
+  WHERE usage_metadata.warehouse_id = :warehouse_id
+    AND usage_start_time >= :from_ts
+    AND usage_start_time < :to_ts
+    AND usage_unit = 'DBU'
+  GROUP BY 1, 2
+),
+priced AS (
+  SELECT usage_hour, sku_name, currency_code, billable_usd
+  FROM (
+    SELECT
+      d.usage_hour,
+      d.sku_name,
+      p.currency_code,
+      CAST(d.dbu * p.pricing.effective_list.default AS DECIMAL(38, 12)) AS billable_usd,
+      ROW_NUMBER() OVER (
+        PARTITION BY d.usage_hour, d.sku_name
+        ORDER BY CASE WHEN p.currency_code = 'USD' THEN 0 ELSE 1 END,
+                 p.price_start_time DESC
+      ) AS pick
+    FROM hour_dbu d
+    LEFT JOIN system.billing.list_prices p
+      ON p.sku_name = d.sku_name
+     AND d.usage_hour >= p.price_start_time
+     AND (p.price_end_time IS NULL OR d.usage_hour < p.price_end_time)
+  )
+  WHERE pick = 1
+)
+SELECT
+  w.statement_id,
+  CAST(w.execution_duration_ms AS STRING),
+  CAST(t.total_ms AS STRING),
+  CAST(pr.billable_usd AS STRING),
+  pr.currency_code,
+  pr.sku_name
+FROM windowed w
+JOIN hour_total t ON t.usage_hour = w.usage_hour
+JOIN priced pr ON pr.usage_hour = w.usage_hour
+WHERE w.client_application = :genie_app
+LIMIT 50000
+`;
+
+/**
+ * The Statement Execution API's reply, as far as this adapter cares.
+ *
+ * `data_array` is rows of strings — the API stringifies every value, including
+ * the decimal this query casts — which is exactly what money needs, because a
+ * float never exists anywhere along the path.
+ */
+const warehouseCostResponseSchema = z.object({
+  status: z.object({
+    state: z.string(),
+    error: z.object({ message: z.string() }).partial().optional(),
+  }),
+  result: z
+    .object({
+      data_array: z.array(z.array(z.string().nullable())).optional(),
+    })
+    .optional(),
+});
 
 /**
  * Anything below this is epoch SECONDS; anything above it is epoch
@@ -915,8 +1051,27 @@ export class DatabricksGeniePuller
       return { events: [], cursor: options.cursor, errorCount: 1 };
     }
 
+    // After the sweep, not during it: one billing query for the whole run, and
+    // the window it asks about is the window the sweep actually read. Asking
+    // first would either guess that window or ask per space.
+    const costByStatementId = await this.warehouseCost({
+      config,
+      token,
+      options,
+      budget,
+      fromMs: costReadFloorMs({
+        sinceMs: cursor.sinceMs,
+        nowMs: sweepStartedAtMs,
+        costEnabled: config.warehouseId !== undefined,
+      }),
+      toMs: Date.now(),
+    });
+
     return {
-      events: sweep.events,
+      events: withWarehouseCost({
+        events: sweep.events,
+        costByStatementId,
+      }),
       cursor: encode(nextCursor({ previous: cursor, sweep, sweepStartedAtMs })),
       errorCount: 0,
     };
@@ -1000,7 +1155,20 @@ export class DatabricksGeniePuller
         options,
         budget,
         space,
-        sinceMs: cursor.sinceMs,
+        // Not `cursor.sinceMs` directly: a source that prices its questions
+        // reads further back than its watermark, because a question's compute
+        // is published well after the question. The watermark itself is
+        // untouched — `nextCursor` derives it from the cursor, not from this —
+        // so this only ever widens what a run reads.
+        // Read against the clock rather than the sweep's anchor: "far enough
+        // back that the bill has landed" is a statement about now. A resumed
+        // sweep carries an anchor that may be hours old, and deriving the floor
+        // from it would widen the window for no benefit.
+        sinceMs: costReadFloorMs({
+          sinceMs: cursor.sinceMs,
+          nowMs: Date.now(),
+          costEnabled: config.warehouseId !== undefined,
+        }),
         identities,
         resumeConversationId,
       });
@@ -1669,9 +1837,10 @@ export class DatabricksGeniePuller
       actor: identity.email || identity.key,
       action: "genie_query",
       target: space.title ?? space.space_id,
-      // Genie bills nothing per message. See the file header: the warehouse
-      // DBUs the generated SQL burns are billed elsewhere and are not on this
-      // API, so the record says zero and declines to call it the full invoice.
+      // Zero at the point the message is built, always. Genie bills nothing per
+      // message, and the warehouse compute behind it is not on this API — a
+      // source that names a warehouse has that share attached afterwards, once
+      // the run's one billing query has answered. See `withWarehouseCost`.
       cost_usd: 0,
       tokens_input: 0,
       tokens_output: 0,
@@ -1697,10 +1866,11 @@ export class DatabricksGeniePuller
         actorUserId: message.user_id === null ? "" : String(message.user_id),
         [PULLED_USAGE_HINT_KEY]: {
           costBasis: "provider_reported",
-          // Not `exact`. Zero is Genie's own per-message price, but the
-          // warehouse cost behind the question is invoiced through Databricks'
-          // system tables, which this API does not expose. `estimate` says
-          // that plainly instead of claiming we hold the whole figure.
+          // Never `exact`, whether or not a warehouse is named. With none, zero
+          // is only Genie's own per-message price and says nothing about the
+          // compute behind the question. With one, the figure is a share of an
+          // hourly bill worked out from LIST prices, because the account's
+          // negotiated rate is on no table this token can read.
           costStatus: "estimate",
           costUsd: "0",
           dimensions,
@@ -1711,6 +1881,177 @@ export class DatabricksGeniePuller
   }
 
   /** One authenticated GET, budgeted and abortable. */
+  /**
+   * What each Genie statement in the window cost, or null if it cannot be
+   * worked out.
+   *
+   * Null rather than throwing, in every failure mode. This runs alongside a
+   * sweep whose job is to record what people asked of the data, and that job
+   * does not depend on this one: a workspace that has not granted the billing
+   * tables, or whose metastore is briefly unavailable, should still get its
+   * activity. The alternative trades the thing that always works for the thing
+   * that sometimes does.
+   */
+  private async warehouseCost({
+    config,
+    token,
+    options,
+    budget,
+    fromMs,
+    toMs,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+    fromMs: number;
+    toMs: number;
+  }): Promise<Map<string, string> | null> {
+    const warehouseId = config.warehouseId;
+    if (!warehouseId) return null;
+
+    try {
+      const payload = await this.post({
+        config,
+        token,
+        options,
+        budget,
+        path: "/api/2.0/sql/statements",
+        body: {
+          warehouse_id: warehouseId,
+          statement: WAREHOUSE_COST_STATEMENT,
+          // One request, no polling. A query that cannot finish inside the
+          // wait is cancelled and this run simply reports no cost — the next
+          // run asks again, and the questions were recorded regardless. Polling
+          // would hold a run open on the slowest thing it does.
+          wait_timeout: "30s",
+          on_wait_timeout: "CANCEL",
+          format: "JSON_ARRAY",
+          disposition: "INLINE",
+          // Bound, never interpolated. The warehouse id and the window arrive
+          // from stored configuration and a clock, but the statement is a
+          // constant either way and this keeps it one.
+          parameters: [
+            { name: "warehouse_id", value: warehouseId, type: "STRING" },
+            {
+              name: "from_ts",
+              value: new Date(fromMs).toISOString(),
+              type: "TIMESTAMP",
+            },
+            {
+              name: "to_ts",
+              value: new Date(toMs).toISOString(),
+              type: "TIMESTAMP",
+            },
+            {
+              name: "genie_app",
+              value: GENIE_CLIENT_APPLICATION,
+              type: "STRING",
+            },
+          ],
+        },
+      });
+
+      const statement = warehouseCostResponseSchema.parse(payload);
+      if (statement.status.state !== "SUCCEEDED") {
+        logger.warn(
+          {
+            adapter: this.id,
+            warehouseId,
+            state: statement.status.state,
+            error: statement.status.error?.message,
+          },
+          "databricks warehouse cost query did not succeed; recording the questions without cost",
+        );
+        return null;
+      }
+
+      const rows = (statement.result?.data_array ?? []).flatMap((columns) => {
+        const parsed = warehouseCostRowSchema.safeParse({
+          statementId: columns[0],
+          executionDurationMs: columns[1],
+          hourTotalMs: columns[2],
+          hourBillableUsd: columns[3] ?? null,
+          currencyCode: columns[4] ?? null,
+          skuName: columns[5] ?? "",
+        });
+        return parsed.success ? [parsed.data] : [];
+      });
+
+      const { costByStatementId, skipped } = allocateWarehouseCost({ rows });
+      if (skipped.length > 0) {
+        logger.warn(
+          {
+            adapter: this.id,
+            warehouseId,
+            skipped: skipped.length,
+            // The reasons, not the rows: a workspace priced in one currency
+            // produces one reason repeated a thousand times.
+            reasons: [...new Set(skipped.map((entry) => entry.reason))],
+            skus: [...new Set(skipped.map((entry) => entry.skuName))],
+          },
+          "some databricks warehouse compute could not be priced; those questions carry no cost",
+        );
+      }
+      return costByStatementId;
+    } catch (error) {
+      logger.warn(
+        {
+          adapter: this.id,
+          warehouseId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "databricks warehouse cost is unavailable; recording the questions without cost",
+      );
+      return null;
+    }
+  }
+
+  private async post({
+    config,
+    token,
+    options,
+    budget,
+    path,
+    body,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+    path: string;
+    body: unknown;
+  }): Promise<unknown> {
+    const url = new URL(path, config.workspaceUrl);
+
+    const signal = options.signal
+      ? AbortSignal.any([
+          options.signal,
+          AbortSignal.timeout(WAREHOUSE_COST_TIMEOUT_MS),
+        ])
+      : AbortSignal.timeout(WAREHOUSE_COST_TIMEOUT_MS);
+
+    budget.spend();
+    const response = await ssrfSafeFetch(url.toString(), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal,
+    });
+    if (!response.ok) {
+      throw new GenieHttpError({
+        status: response.status,
+        statusText: response.statusText,
+        path,
+      });
+    }
+    return await response.json();
+  }
+
   private async get({
     config,
     token,
@@ -1753,6 +2094,59 @@ export class DatabricksGeniePuller
     }
     return await response.json();
   }
+}
+
+/**
+ * The swept events with each question's share of the warehouse bill attached.
+ *
+ * Attached here rather than where the event is built, because the bill is one
+ * query for the whole run and a message does not know what its statement cost
+ * until that query has come back.
+ *
+ * A message keeps its zero when its statement is not in the result — it ran no
+ * SQL, or its compute has not been published yet. The second case is why the
+ * window reaches back past the watermark: the same message is read again on a
+ * later run, and because the restatement key is the message's own coordinates
+ * and excludes cost, the priced version REPLACES the zero rather than adding a
+ * second record for the same question.
+ */
+function withWarehouseCost({
+  events,
+  costByStatementId,
+}: {
+  events: NormalizedPullEvent[];
+  costByStatementId: Map<string, string> | null;
+}): NormalizedPullEvent[] {
+  if (costByStatementId === null || costByStatementId.size === 0) return events;
+
+  return events.map((event) => {
+    const extra = event.extra;
+    if (!extra) return event;
+
+    const statementId = extra.statementId;
+    if (typeof statementId !== "string" || statementId === "") return event;
+
+    const costUsd = costByStatementId.get(statementId);
+    if (costUsd === undefined) return event;
+
+    const hint = extra[PULLED_USAGE_HINT_KEY];
+    if (typeof hint !== "object" || hint === null) return event;
+
+    return {
+      ...event,
+      // The audit row's own float field, which ADR-088 keeps for continuity and
+      // does not price from. The ledger reads `costUsd` below, as a string, so
+      // the number a customer reconciles never passes through a float.
+      cost_usd: Number(costUsd),
+      extra: {
+        ...extra,
+        [PULLED_USAGE_HINT_KEY]: {
+          ...hint,
+          costUsd,
+        },
+      },
+    };
+  });
 }
 
 function encode(cursor: GenieCursor): string {

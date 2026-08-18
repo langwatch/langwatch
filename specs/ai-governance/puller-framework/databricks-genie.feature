@@ -4,8 +4,11 @@ Feature: Databricks AI/BI Genie puller
   against the person who asked
   So that I can answer "who asked what of our data, and what ran against it"
 
-  Genie is free per message today, so these records exist for VISIBILITY, not
-  for spend. They carry a cost of zero and must never invent one.
+  Genie charges nothing per message. The warehouse compute that answers the
+  question does, and that spend is billed to the customer whether or not anyone
+  attributes it. So a source that names a warehouse gets each question's share
+  of that compute; a source that names none carries a cost of zero and must
+  never invent one.
 
   Background:
     Given an IngestionSource of type `databricks_genie`
@@ -31,13 +34,156 @@ Feature: Databricks AI/BI Genie puller
     # account's own, and nothing anywhere reports a failure.
 
   @integration
-  Scenario: A question costs nothing and is never priced
-    Given a Genie message
-    When the puller records it
+  Scenario: A question costs nothing when no warehouse is named
+    Given a Genie source configured without a warehouse
+    When the puller records a message
     Then the recorded cost is zero
-    And the cost is not presented as the customer's final invoice
-    # Genie itself bills nothing per message; the warehouse compute behind the
-    # question is invoiced separately and is not visible on this API.
+    And the puller does not ask the workspace about billing
+    # Genie itself bills nothing per message. Naming the warehouse is what
+    # opts a source into attributing the compute behind the question.
+
+  Rule: A named warehouse turns each question's share of compute into cost
+
+    Databricks does not price a Genie question. It bills the warehouse for the
+    hours it was awake, and reports the SQL each question ran. The share is
+    ours to compute, so every scenario here is about not overstating it.
+
+    @integration
+    Scenario: The compute behind a question is charged to the person who asked
+      Given a Genie source that names the warehouse answering its questions
+      And a message whose generated SQL ran on that warehouse
+      When the puller records it
+      Then the record carries a cost above zero
+      And the cost is attributed to the person who asked the question
+      And the cost is marked an estimate
+
+    @integration
+    Scenario: An hour's compute is split across the questions that used it
+      Given a warehouse billed for one hour of compute
+      And two questions ran in that hour, one taking twice as long as the other
+      When the puller records them
+      Then the longer question carries twice the cost of the shorter
+      And together they carry no more than the hour's billed compute
+      # The warehouse is billed for being awake, not per query. Anything that
+      # hands every query the whole hour reports the bill once per question.
+
+    @integration
+    Scenario: Other traffic on the warehouse keeps its share of the bill
+      Given a warehouse billed for one hour of compute
+      And half that hour was spent on queries no Genie question asked for
+      When the puller prices the Genie questions in that hour
+      Then they carry at most half the hour's billed compute
+      And the rest is left unattributed
+      # Dividing the hour across Genie's queries alone hands Genie the whole
+      # warehouse bill, including the dashboards and jobs sharing it.
+
+    @integration
+    Scenario: The puller's own billing query is not charged to a question
+      Given the puller asks the warehouse for its billing
+      When that query appears in the warehouse's own history
+      Then no question is charged for it
+
+    @integration
+    Scenario: Genie's own free usage is never charged
+      Given the workspace bills a free-usage line for Genie alongside the warehouse
+      When the puller prices a question
+      Then only the warehouse compute is counted
+      And the free-usage line adds nothing
+
+    @integration
+    Scenario: A question whose SQL has not reached the billing tables yet
+      Given a message whose generated SQL is too recent to appear in query history
+      When the puller records it
+      Then the record carries a cost of zero
+      And the message is recorded for visibility regardless
+
+    @integration
+    Scenario: Cost that arrives late corrects the record rather than adding one
+      Given a message first recorded before its compute was billed
+      When a later run reads it again and the compute is now billed
+      Then the message still appears once
+      And the cost it carries is the billed one
+      # Same question, same coordinates, so the same record. A second row here
+      # would double the reported spend of every question near the boundary.
+
+    @integration
+    Scenario: A source that prices its questions keeps looking back far enough
+      Given a Genie source that names a warehouse
+      When a run finishes
+      Then the next run still reads the questions asked since the compute
+      behind them could have been billed
+      # Databricks publishes a query's compute well after the query. A source
+      # that stops looking at a question five minutes after it was asked can
+      # never learn what it cost, and every question would sit at zero forever.
+
+    @integration
+    Scenario: A source that prices nothing does not widen its window
+      Given a Genie source configured without a warehouse
+      When a run finishes
+      Then the next run reads only the questions asked since the last one
+      # The look-back is bought with requests against the workspace. Only a
+      # source that has something to learn from it should pay.
+
+    @integration
+    Scenario: A question that ran no SQL is charged nothing
+      Given a message Genie answered without running a query
+      When the puller records it
+      Then the recorded cost is zero
+
+    @integration
+    Scenario: The cost is the published rate, not the customer's negotiated one
+      Given a workspace whose account has a discount off the published rate
+      When the puller prices a question
+      Then the cost is worked out from the published rate
+      And it is marked an estimate
+      And it is not presented as the customer's final invoice
+      # The discount is not on any table this token can read. Naming the number
+      # an estimate is the whole difference between a useful figure and one
+      # somebody reconciles against a bill and finds wrong.
+
+    @integration
+    Scenario: Compute the workspace prices in another currency is not converted
+      Given the warehouse's billed compute is priced in a currency other than USD
+      When the puller prices a question
+      Then no cost is recorded for it
+      And the run reports why
+      # A guessed conversion rate is a number nobody can reconcile against the
+      # invoice, and it would look exactly like a real one.
+
+    @integration
+    Scenario: Compute the workspace has no published price for is not guessed
+      Given the warehouse's billed compute has no published price
+      When the puller prices a question
+      Then no cost is recorded for it
+      And the message is still recorded for visibility
+
+    @integration
+    Scenario: A billing outage does not discard the questions
+      Given the workspace refuses the billing query
+      When the puller runs
+      Then the messages are still recorded
+      And the failure is reported
+      And the watermark stays where it was
+      # Visibility is the floor. Losing a run's activity because its cost could
+      # not be worked out trades the thing that always works for the one that
+      # sometimes does.
+
+    @integration
+    Scenario: A fraction of a cent survives the record
+      Given a question whose share of compute is a small fraction of a cent
+      When the puller records it
+      Then the cost is kept at full precision
+      And it is not rounded to zero
+      # A per-question share of an hourly bill is routinely sub-cent. Rounding
+      # at the record makes a busy workspace report nothing at all.
+
+    @unit
+    Scenario: The billing query only ever runs on the configured workspace
+      Given a Genie source that names a warehouse
+      When the puller asks for billing
+      Then the question is sent to the workspace address on the source
+      # Same secret, same reasoning as every other call this adapter makes: the
+      # address on the source decides where the token goes.
 
   @integration
   Scenario: Identity resolves to the directory's object id when it has one
