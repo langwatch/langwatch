@@ -32948,29 +32948,33 @@ NEVER weaken, bypass, or remove the existing authentication for normal traffic. 
 The platform sends a W3C `traceparent` header on every call, one trace per conversation turn. When the server adopts it, the spans the agent produces land in that same trace, and the judge reads them before its verdict. A criterion like "the agent looked up the order before answering" then passes on evidence instead of on the reply's wording.
 
 - If the service uses OpenTelemetry HTTP auto-instrumentation, adoption already happens. Verify it in the code and change nothing.
-- Otherwise, extract the context from the request headers and open the handler's root span inside it.
+- Otherwise, attach the extracted context in a middleware that runs before any tracing starts. Do not extract inside the handler body: a handler decorated with `@langwatch.trace()` opens its root span before the body runs, so an extraction there is too late and the agent's spans land in a separate trace. The middleware placement covers every tracing style: decorators, `with langwatch.trace()`, autotrack, community instrumentations, and plain OpenTelemetry spans.
 
-**Python:**
+**Python (ASGI middleware, e.g. FastAPI):**
 
 ```python
-from opentelemetry import propagate, trace
+from opentelemetry import propagate
+from opentelemetry.context import attach, detach
 
-tracer = trace.get_tracer("my-agent")
-
-def handle_chat(request):
-    ctx = propagate.extract(dict(request.headers))
-    with tracer.start_as_current_span("chat", context=ctx):
-        return run_agent(request)
+@app.middleware("http")
+async def adopt_remote_trace(request, call_next):
+    token = attach(propagate.extract(dict(request.headers)))
+    try:
+        return await call_next(request)
+    finally:
+        detach(token)
 ```
 
-**TypeScript:**
+For Flask, attach in `before_request` (keep the token on `g`) and detach in `teardown_request`.
+
+**TypeScript (middleware, registered before the routes):**
 
 ```typescript
 import { context, propagation } from "@opentelemetry/api";
 
-app.post("/chat", (req, res) => {
+app.use((req, res, next) => {
   const ctx = propagation.extract(context.active(), req.headers);
-  context.with(ctx, () => handleChat(req, res));
+  context.with(ctx, () => next());
 });
 ```
 
@@ -33135,30 +33139,34 @@ For the response, set `outputPath` to where the reply text lives. If the endpoin
 
 The platform sends a W3C `traceparent` header on every call, one trace per conversation turn. When your server adopts it, the spans your agent produces land in that same trace, and the judge reads them before its verdict: tool calls, database writes, retrievals. A criterion like "the agent looked up the order before answering" then passes on evidence instead of on the reply's wording.
 
-With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens and you change nothing. Without it, extract the context from the request headers and open your handler's root span inside it:
+With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens and you change nothing. Without it, attach the extracted context in a middleware that runs before any tracing starts. Do not extract inside the handler body: a handler decorated with `@langwatch.trace()` opens its root span before the body runs, so an extraction there comes too late and the agent's spans land in a separate trace. The middleware placement covers every tracing style: decorators, `with langwatch.trace()`, autotrack, community instrumentations, and plain OpenTelemetry spans.
 
 
   ### Python
 
     ```python
-    from opentelemetry import propagate, trace
+    from opentelemetry import propagate
+    from opentelemetry.context import attach, detach
 
-    tracer = trace.get_tracer("my-agent")
-
-    def handle_chat(request):
-        ctx = propagate.extract(dict(request.headers))
-        with tracer.start_as_current_span("chat", context=ctx):
-            return run_agent(request)
+    @app.middleware("http")
+    async def adopt_remote_trace(request, call_next):
+        token = attach(propagate.extract(dict(request.headers)))
+        try:
+            return await call_next(request)
+        finally:
+            detach(token)
     ```
+
+    For Flask, attach in `before_request` (keep the token on `g`) and detach in `teardown_request`.
 
   ### TypeScript
 
     ```typescript
     import { context, propagation } from "@opentelemetry/api";
 
-    app.post("/chat", (req, res) => {
+    app.use((req, res, next) => {
       const ctx = propagation.extract(context.active(), req.headers);
-      context.with(ctx, () => handleChat(req, res));
+      context.with(ctx, () => next());
     });
     ```
 
@@ -49079,29 +49087,33 @@ NEVER weaken, bypass, or remove the existing authentication for normal traffic. 
 The platform sends a W3C `traceparent` header on every call, one trace per conversation turn. When the server adopts it, the spans the agent produces land in that same trace, and the judge reads them before its verdict. A criterion like "the agent looked up the order before answering" then passes on evidence instead of on the reply's wording.
 
 - If the service uses OpenTelemetry HTTP auto-instrumentation, adoption already happens. Verify it in the code and change nothing.
-- Otherwise, extract the context from the request headers and open the handler's root span inside it.
+- Otherwise, attach the extracted context in a middleware that runs before any tracing starts. Do not extract inside the handler body: a handler decorated with `@langwatch.trace()` opens its root span before the body runs, so an extraction there is too late and the agent's spans land in a separate trace. The middleware placement covers every tracing style: decorators, `with langwatch.trace()`, autotrack, community instrumentations, and plain OpenTelemetry spans.
 
-**Python:**
+**Python (ASGI middleware, e.g. FastAPI):**
 
 ```python
-from opentelemetry import propagate, trace
+from opentelemetry import propagate
+from opentelemetry.context import attach, detach
 
-tracer = trace.get_tracer("my-agent")
-
-def handle_chat(request):
-    ctx = propagate.extract(dict(request.headers))
-    with tracer.start_as_current_span("chat", context=ctx):
-        return run_agent(request)
+@app.middleware("http")
+async def adopt_remote_trace(request, call_next):
+    token = attach(propagate.extract(dict(request.headers)))
+    try:
+        return await call_next(request)
+    finally:
+        detach(token)
 ```
 
-**TypeScript:**
+For Flask, attach in `before_request` (keep the token on `g`) and detach in `teardown_request`.
+
+**TypeScript (middleware, registered before the routes):**
 
 ```typescript
 import { context, propagation } from "@opentelemetry/api";
 
-app.post("/chat", (req, res) => {
+app.use((req, res, next) => {
   const ctx = propagation.extract(context.active(), req.headers);
-  context.with(ctx, () => handleChat(req, res));
+  context.with(ctx, () => next());
 });
 ```
 
