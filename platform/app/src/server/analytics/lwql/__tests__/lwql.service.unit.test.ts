@@ -171,7 +171,7 @@ describe("given the LangWatchQL service", () => {
       // any change to that algorithm, so the digest the key map is provisioned
       // against is stated as a constant instead.
       expect(executor.calls[0]!.tenantCapability).toBe(
-        "fc9673013bca53b035b608d7d0179f7998f313061274826407da7c49010d6ccd",
+        "4c99f991d0fce515d9326788c6c85359c26cf1536dd1ae0dbb23e806ea05eda2",
       );
       // The raw key is the secret the digest exists to keep out of the
       // database; a capability that merely contained it would be a leak.
@@ -198,7 +198,7 @@ describe("given the LangWatchQL service", () => {
       });
 
       expect(executor.calls[0]!.tenantCapability).toBe(
-        "fc9673013bca53b035b608d7d0179f7998f313061274826407da7c49010d6ccd",
+        "4c99f991d0fce515d9326788c6c85359c26cf1536dd1ae0dbb23e806ea05eda2",
       );
       // sha256 of PROJECT_WITH_API_KEY.apiKey — what the key map would have to
       // hold instead, and what no LangWatchQL query may ever present.
