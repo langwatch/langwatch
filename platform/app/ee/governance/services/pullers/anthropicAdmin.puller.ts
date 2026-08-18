@@ -135,6 +135,32 @@ function defaultStartingAt(report: "usage" | "cost"): string {
   return d.toISOString();
 }
 
+/** Cap on how much of an error response body we log. */
+const MAX_ERROR_BODY_BYTES = 4_096;
+
+/**
+ * Best-effort read of a non-OK response body, bounded so an unexpectedly
+ * large payload doesn't blow up logs or memory.
+ */
+async function safeResponseText(response: Response): Promise<string> {
+  try {
+    const raw = await response.text();
+    if (raw.length <= MAX_ERROR_BODY_BYTES) return raw;
+    return `${raw.slice(0, MAX_ERROR_BODY_BYTES)}… [truncated]`;
+  } catch {
+    return "";
+  }
+}
+
+async function fetchPageError(
+  response: Response,
+  report: string,
+): Promise<Error> {
+  const detail = await safeResponseText(response);
+  const suffix = detail ? `: ${detail}` : "";
+  return new Error(`HTTP ${response.status} (anthropic ${report}_report)${suffix}`);
+}
+
 /** One group-by row inside a usage bucket. Unknown fields are tolerated. */
 const usageResultSchema = z
   .object({
@@ -383,17 +409,7 @@ export class AnthropicAdminPuller
       signal,
     });
     if (!response.ok) {
-      // Read the body so the actual API error message reaches the logs —
-      // HTTP/2 has no statusText, and without this the 400 is opaque.
-      let detail = "";
-      try {
-        detail = await response.text();
-      } catch {
-        // Best-effort; some responses have no body.
-      }
-      throw new Error(
-        `HTTP ${response.status} (anthropic ${config.report}_report)${detail ? `: ${detail}` : ""}`,
-      );
+      throw await fetchPageError(response, config.report);
     }
     return await response.json();
   }
