@@ -132,6 +132,7 @@ The setup that `langwatch claude` and `langwatch instrument claude` write turns 
 | `OTEL_LOG_TOOL_DETAILS` | What each tool call was asked to do, such as the command text or the change to a file |
 | `OTEL_LOG_TOOL_CONTENT` | What each tool call returned, including the contents of files it read |
 | `OTEL_LOG_RAW_API_BODIES` | The request and the response of every model call |
+| `OTEL_LOG_ASSISTANT_RESPONSES` | The response text of the assistant, without the rest of the request or response body |
 
 Remove the flags from `~/.claude/settings.json` to keep only the usage numbers: tokens, cost, model, latency, the tool call tree and the subagent tree stay, and the content stops.
 
@@ -155,9 +156,11 @@ Claude Code shortens each inline body at 60 kilobytes. `CLAUDE_CODE_OTEL_CONTENT
   </Accordion>
 
   <Accordion title="The trace has no response">
-    `OTEL_LOG_RAW_API_BODIES` is missing. Claude Code reports the response text of the assistant on its `api_response_body` event only, and that event is off by default.
+    Both `OTEL_LOG_RAW_API_BODIES` and `OTEL_LOG_ASSISTANT_RESPONSES` are missing. Claude Code reports the response text of the assistant on its `api_response_body` event (needs `OTEL_LOG_RAW_API_BODIES=1`, and carries the full request and response JSON) or on its lighter `assistant_response` event (needs `OTEL_LOG_ASSISTANT_RESPONSES=1`, and carries only the response text). Both are off by default. Set `OTEL_LOG_ASSISTANT_RESPONSES=1` if you want the response without the rest of the body.
 
-    Claude Code also reports `api_response_body` for work that is not a conversation, such as an autosuggestion or a session title. LangWatch filters those out, so a title never becomes the output of a trace.
+    Claude Code docs describe `OTEL_LOG_ASSISTANT_RESPONSES` as falling back to the value of `OTEL_LOG_USER_PROMPTS`. Don't rely on that fallback: set it explicitly.
+
+    Claude Code also reports `api_response_body` and `assistant_response` for work that is not a conversation, such as an autosuggestion or a session title. LangWatch filters those out, so a title never becomes the output of a trace.
   </Accordion>
 
   <Accordion title="The telemetry goes to the wrong workspace">
@@ -193,6 +196,7 @@ export OTEL_LOG_USER_PROMPTS=1
 export OTEL_LOG_TOOL_DETAILS=1
 export OTEL_LOG_TOOL_CONTENT=1
 export OTEL_LOG_RAW_API_BODIES=1
+export OTEL_LOG_ASSISTANT_RESPONSES=1
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
@@ -224,6 +228,7 @@ Claude Code reads the same variables from the `env` block of `~/.claude/settings
     "OTEL_LOG_TOOL_DETAILS": "1",
     "OTEL_LOG_TOOL_CONTENT": "1",
     "OTEL_LOG_RAW_API_BODIES": "1",
+    "OTEL_LOG_ASSISTANT_RESPONSES": "1",
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "https://app.langwatch.ai/api/otel",
     "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer ik-lw-your-ingest-key",
