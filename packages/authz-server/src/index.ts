@@ -80,10 +80,10 @@ export type {
   GrantScopeTypeDb,
   RoleRowShape,
 } from "./ledger/projection-mapping";
-export {
-  bindingIdentityKey,
-  deriveGrantId,
-} from "./ledger/grant-identity";
+// Grant identity derivation is deliberately NOT re-exported here: it imports
+// `node:crypto`, and this root entry is browser-evaluable by construction
+// (see the header of ./migration.ts). The values live on
+// `@langwatch/authz-server/migration`; only the erased types stay.
 export type {
   BindingIdentityInput,
   BindingIdentityPrincipal,

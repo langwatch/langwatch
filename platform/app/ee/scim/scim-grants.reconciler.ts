@@ -15,7 +15,7 @@
  * fired-employee case and the deny has to hold before this call returns.
  * Additions are plain queued commands.
  */
-import { bindingIdentityKey } from "@langwatch/authz-server";
+import { bindingIdentityKey } from "@langwatch/authz-server/migration";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import type {
   GrantsLedgerWriter,

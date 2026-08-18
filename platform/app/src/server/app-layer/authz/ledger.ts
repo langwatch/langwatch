@@ -44,13 +44,17 @@ import {
 import {
   BindingMissingError,
   type BindingPrincipalWhere,
-  bindingIdentityKey,
   DuplicateBindingError,
   type GrantRevocationSelector,
   type GrantWriteActor,
   type LedgerScopeType,
   type RoleBindingWrite,
 } from "@langwatch/authz-server";
+// The migration subpath, not the root: grant identity touches `node:crypto`,
+// and the package root is browser-evaluable by construction (the client
+// bundle reaches it through the shadow fork). See the header of
+// `@langwatch/authz-server/migration`.
+import { bindingIdentityKey } from "@langwatch/authz-server/migration";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";

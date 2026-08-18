@@ -17,7 +17,7 @@ export type {
   GenesisDiff,
   GenesisImportDeps,
 } from "./genesis-import.migration";
-export { deriveGrantId } from "./ledger/grant-identity";
+export { bindingIdentityKey, deriveGrantId } from "./ledger/grant-identity";
 export { TeamUserBackfillMigration } from "./team-user-backfill.migration";
 export type {
   BackfillGrantEmission,
