@@ -28,6 +28,9 @@ class FakeSlackIntegrationRepository implements SlackIntegrationRepository {
   legacy: LegacySlackTokenAutomation[] = [];
   unswitchable = new Set<string>();
   clearedIds: string[] = [];
+  /** Rows that exist and carry no token — the `already_clear` case. Kept apart
+   *  from "no such row", which the contract calls `failed`. */
+  tokenless = new Set<string>();
 
   async findByProject({ projectId }: { projectId: string }) {
     return this.rows.get(projectId) ?? null;
@@ -74,7 +77,9 @@ class FakeSlackIntegrationRepository implements SlackIntegrationRepository {
   }): Promise<ClearOwnSlackTokenOutcome> {
     if (this.unswitchable.has(triggerId)) return "failed";
     if (!this.legacy.some((row) => row.id === triggerId)) {
-      return "already_clear";
+      // Mirrors the Prisma repository: a row that is simply gone is `failed`;
+      // only a row that exists without a token is `already_clear`.
+      return this.tokenless.has(triggerId) ? "already_clear" : "failed";
     }
     this.clearedIds.push(triggerId);
     this.legacy = this.legacy.filter((row) => row.id !== triggerId);
@@ -258,6 +263,8 @@ describe("SlackIntegrationService", () => {
       const { repo, service } = makeService();
       await service.setup({ ...setupInput, botToken: "xoxb-live" });
       repo.legacy = [{ id: "automation-1", name: "Error spike" }];
+      // Still a row, already switched over: the outcome the caller wanted.
+      repo.tokenless.add("automation-already-migrated");
 
       const result = await service.clearLegacyTokens({
         projectId: "project-1",
