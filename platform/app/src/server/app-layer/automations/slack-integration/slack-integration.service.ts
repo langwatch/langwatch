@@ -1,7 +1,9 @@
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { decrypt, encrypt } from "~/utils/encryption";
 import {
   fetchSlackWorkspaceIdentity,
+  isSlackTransportFailure,
   type SlackWorkspaceIdentity,
 } from "../delivery/slackWebApi";
 import {
@@ -13,6 +15,8 @@ import type {
   LegacySlackTokenAutomation,
   SlackIntegrationRepository,
 } from "./repositories/slack-integration.repository";
+
+const logger = createLogger("langwatch:automations:slack-integration");
 
 /**
  * What a client is allowed to know about the project's Slack connection:
@@ -113,10 +117,7 @@ export class SlackIntegrationService {
     if (!verified.ok) {
       // A transport failure is infrastructure, not a token refusal — it stays
       // a plain Error and degrades to the generic unknown at the boundary.
-      if (
-        verified.error === "request_failed" ||
-        verified.error === "bad_response"
-      ) {
+      if (isSlackTransportFailure(verified.error)) {
         throw new Error(
           `Slack auth.test did not answer usably: ${verified.error}`,
         );
@@ -206,7 +207,14 @@ export class SlackIntegrationService {
         if (outcome === "cleared") cleared++;
         else if (outcome === "already_clear") alreadyClear++;
         else failed++;
-      } catch {
+      } catch (error) {
+        // The card reports "N switched, 1 failed" and tells the operator to
+        // try again. Without the cause, nobody — including support — can say
+        // why. The ids are opaque internal identifiers, logged raw on purpose.
+        logger.error(
+          { error, projectId, triggerId },
+          "clearing a legacy Slack token failed",
+        );
         failed++;
       }
     }

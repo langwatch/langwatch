@@ -164,6 +164,26 @@ describe("SlackIntegrationService", () => {
       expect(repo.rows.size).toBe(0);
     });
 
+    it("reports an unreachable Slack as infrastructure, not as a bad token", async () => {
+      // "We could not reach Slack" must not reach the operator as "that token
+      // is invalid" — a plain Error degrades to the generic unknown at the
+      // boundary, which is what an infrastructure failure should read as.
+      const { repo, service } = makeService({
+        verify: async () => ({ ok: false, error: "request_failed" }),
+      });
+
+      const error = await service
+        .setup({ ...setupInput, botToken: "xoxb-live" })
+        .then(
+          () => null,
+          (thrown: unknown) => thrown,
+        );
+
+      expect(error).toBeInstanceOf(Error);
+      expect((error as { code?: string }).code).toBeUndefined();
+      expect(repo.rows.size).toBe(0);
+    });
+
     /** @scenario "A token Slack rejects is refused at setup" */
     it("leaves a working connection in place when a rotation is refused", async () => {
       const repo = new FakeSlackIntegrationRepository();

@@ -832,7 +832,16 @@ export const automationRouter = createTRPCRouter({
             contentType: z
               .string()
               .default(DEFAULT_WEBHOOK_CONTENT_TYPE)
-              .transform((v) => v.replace(/[\r\n\0]+/g, " ").trim()),
+              .transform((v) => {
+                // A transform runs after validation and is not re-checked, and
+                // stripping can empty the value outright ("\r\n", "   ").
+                // sendWebhook assigns Content-Type verbatim, so an empty string
+                // would ship a blank header rather than no header.
+                const sanitized = v.replace(/[\r\n\0]+/g, " ").trim();
+                return sanitized === ""
+                  ? DEFAULT_WEBHOOK_CONTENT_TYPE
+                  : sanitized;
+              }),
           })
           .nullable()
           .default(null),

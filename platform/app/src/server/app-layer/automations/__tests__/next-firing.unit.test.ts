@@ -49,10 +49,12 @@ describe("describeNextFiring", () => {
           trigger: subject({ triggerKind: TriggerKind.REPORT }),
           reportSchedule: {
             triggerId: "trigger-1",
-            // `getReportSchedules` already nulls this for a paused entry; the
-            // paused flag is asserted independently so a future read that
-            // stops doing so cannot make the view promise a send.
-            nextRunAt: null,
+            // `getReportSchedules` already nulls this for a paused entry, so
+            // the stale instant here is deliberately the case that read does
+            // NOT produce today: the paused flag has to win on its own, or a
+            // future read that stops nulling would make the view promise a
+            // send. With `null` the assertion could not tell the difference.
+            nextRunAt: new Date("2026-08-13T09:00:00.000Z"),
             lastRunAt: new Date("2026-08-11T09:00:00.000Z"),
             active: false,
           },

@@ -6,20 +6,11 @@ import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import { parseJsonObject } from "./parseJsonObject";
 import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
-
-/** Parses a flag value that must be a JSON OBJECT — `JSON.parse("5")` and
- *  `JSON.parse("[1]")` both succeed, and either would corrupt the payload. */
-function parseJsonObject(raw: string): Record<string, unknown> {
-  const parsed: unknown = JSON.parse(raw);
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new Error("not a JSON object");
-  }
-  return parsed as Record<string, unknown>;
-}
 
 /**
  * Returns the created trigger rather than printing it: the output port renders

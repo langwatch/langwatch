@@ -80,6 +80,25 @@ describe("sendHttpDestination", () => {
       });
     });
 
+    it("redacts a legacy Set-Cookie2 value the same as Set-Cookie", async () => {
+      mockedFetch.mockResolvedValue(
+        new Response("nope", {
+          status: 401,
+          headers: {
+            "Set-Cookie2": 'session="live-session-value"; Version="1"',
+            "x-request-id": "req-2",
+          },
+        }) as unknown as MockedResponse,
+      );
+
+      const result = await send();
+
+      expect(result.responseHeaders).toMatchObject({
+        "set-cookie2": "[redacted]",
+        "x-request-id": "req-2",
+      });
+    });
+
     it("caps an oversized response body", async () => {
       fetchResolves(200, "x".repeat(100_000));
       const res = await send();

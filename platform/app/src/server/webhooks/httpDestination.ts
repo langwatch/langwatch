@@ -69,6 +69,9 @@ type SsrfResponseHeaders = Awaited<ReturnType<typeof ssrfSafeFetch>>["headers"];
  *  at capture — the name still appears, which is the debugging signal. */
 const SENSITIVE_RESPONSE_HEADERS = new Set([
   "set-cookie",
+  // RFC 2965. Obsolete, but a receiver is free to still send it, and it
+  // carries exactly what `set-cookie` carries.
+  "set-cookie2",
   "cookie",
   "authorization",
   "proxy-authorization",

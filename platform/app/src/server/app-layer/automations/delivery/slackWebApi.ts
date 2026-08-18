@@ -171,6 +171,25 @@ export interface SlackWorkspaceIdentity {
   teamName: string;
 }
 
+/**
+ * The failures that mean "no usable answer from Slack" rather than "Slack
+ * refused this token". Slack's own refusal codes are open-ended strings, so
+ * these two cannot be a closed union on the result — but they are the whole
+ * reason the caller can tell infrastructure apart from a bad token, and the
+ * caller must not re-spell them. Declared beside the return sites so a rename
+ * moves both together.
+ */
+const SLACK_TRANSPORT_FAILURES = ["request_failed", "bad_response"] as const;
+export type SlackTransportFailure = (typeof SLACK_TRANSPORT_FAILURES)[number];
+
+/** Whether a failure from {@link fetchSlackWorkspaceIdentity} means Slack never
+ *  answered, as opposed to answering with a refusal. */
+export function isSlackTransportFailure(
+  error: string,
+): error is SlackTransportFailure {
+  return (SLACK_TRANSPORT_FAILURES as readonly string[]).includes(error);
+}
+
 /** External input: Slack's `auth.test` body is validated, never cast — a
  *  payload that is not this shape reads as `bad_response`. */
 const slackAuthTestResponseSchema = z.object({

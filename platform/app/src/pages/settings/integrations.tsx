@@ -361,6 +361,58 @@ function SlackIntegrationCard() {
   );
 }
 
+/** Four states, said apart: still reading, could not read, connected, and not
+ *  connected. Collapsing the first two into "Not connected." would invite an
+ *  admin to paste a second token for a workspace this project already has. */
+function SlackConnectionStatusLine({
+  status,
+}: {
+  status: {
+    isLoading: boolean;
+    error: unknown;
+    data?: { connected: boolean; slackTeamName?: string | null } | null;
+  };
+}) {
+  if (status.isLoading) {
+    return (
+      <HStack gap={2}>
+        <Text fontSize="sm" color="fg.muted">
+          Checking this project&rsquo;s Slack connection&hellip;
+        </Text>
+      </HStack>
+    );
+  }
+  if (status.error) {
+    return (
+      <HStack gap={2}>
+        <Text fontSize="sm" color="fg.error">
+          {describeError({
+            error: status.error,
+            fallbackTitle: "Couldn't read this project's Slack connection",
+          })}
+        </Text>
+      </HStack>
+    );
+  }
+  if (!status.data?.connected) {
+    return (
+      <HStack gap={2}>
+        <Text fontSize="sm" color="fg.muted">
+          Not connected.
+        </Text>
+      </HStack>
+    );
+  }
+  return (
+    <HStack gap={2}>
+      <Badge colorPalette="green" variant="subtle">
+        Connected
+      </Badge>
+      <Text fontSize="sm">{status.data.slackTeamName}</Text>
+    </HStack>
+  );
+}
+
 /** Connection state, the paste-a-token form, and the legacy-token census for
  *  one project. Setup and rotation are the same form because they are the same
  *  write: Slack revalidates the token and the ciphertext is replaced. */
@@ -390,20 +442,7 @@ function SlackProjectConnection({
 
   return (
     <VStack align="stretch" gap={3} data-testid="slack-project-connection">
-      <HStack gap={2}>
-        {connected ? (
-          <>
-            <Badge colorPalette="green" variant="subtle">
-              Connected
-            </Badge>
-            <Text fontSize="sm">{status.data?.slackTeamName}</Text>
-          </>
-        ) : (
-          <Text fontSize="sm" color="fg.muted">
-            Not connected.
-          </Text>
-        )}
-      </HStack>
+      <SlackConnectionStatusLine status={status} />
       <SlackLegacyTokenCensus
         projectId={projectId}
         count={census.data?.count ?? 0}
@@ -443,10 +482,10 @@ function SlackLegacyTokenCensus({
   workspaceName: string | null;
   onSwitched: () => void;
 }) {
-  const [confirming, setConfirming] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
   const switchAll = api.slackIntegration.switchToIntegration.useMutation({
     onSuccess: ({ cleared, alreadyClear, failed }) => {
-      setConfirming(false);
+      setIsConfirming(false);
       onSwitched();
       // A row that already carried no token is where the switch was taking
       // it, so it reads as switched rather than failed.
@@ -505,15 +544,15 @@ function SlackLegacyTokenCensus({
             variant="outline"
             alignSelf="flex-start"
             loading={switchAll.isPending}
-            onClick={() => setConfirming(true)}
+            onClick={() => setIsConfirming(true)}
           >
             Use the project integration
           </Button>
         ) : null}
       </VStack>
       <ConfirmDialog
-        open={confirming}
-        onOpenChange={setConfirming}
+        open={isConfirming}
+        onOpenChange={setIsConfirming}
         title={confirmation.title}
         message={confirmation.message}
         confirmLabel={confirmation.confirmLabel}
@@ -593,13 +632,13 @@ function SlackTokenForm({
   onChanged: () => void;
 }) {
   const [token, setToken] = useState("");
-  const [showForm, setShowForm] = useState(false);
+  const [isFormShown, setIsFormShown] = useState(false);
 
   const { connect, disconnect } = useSlackConnection({
     projectName,
     onConnected: () => {
       setToken("");
-      setShowForm(false);
+      setIsFormShown(false);
     },
     onChanged,
   });
@@ -613,10 +652,14 @@ function SlackTokenForm({
     );
   }
 
-  if (connected && !showForm) {
+  if (connected && !isFormShown) {
     return (
       <HStack gap={2}>
-        <Button variant="outline" size="sm" onClick={() => setShowForm(true)}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIsFormShown(true)}
+        >
           Replace token
         </Button>
         <Button
@@ -659,7 +702,7 @@ function SlackTokenForm({
             variant="outline"
             size="sm"
             onClick={() => {
-              setShowForm(false);
+              setIsFormShown(false);
               setToken("");
             }}
           >
@@ -675,7 +718,7 @@ function SlackTokenForm({
  *  per automation; it belongs here now, once per project. */
 function SlackAppSetupCallout() {
   const [stepsOpen, setStepsOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
   const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
     () => () => {
@@ -684,22 +727,31 @@ function SlackAppSetupCallout() {
     [],
   );
 
+  const copyFailed = () =>
+    toaster.create({
+      type: "error",
+      title: "Couldn't copy the manifest",
+      description: "Select the manifest text and copy it manually.",
+    });
+
   const copyManifest = () => {
-    // "Manifest copied" only after the write lands — a denied clipboard must
+    // The Clipboard API is absent over plain HTTP, which self-hosted instances
+    // run — and an optional call there resolves to nothing at all, leaving the
+    // button silent. A missing API says the same thing as a denied write.
+    const clipboard = navigator.clipboard;
+    if (!clipboard) {
+      copyFailed();
+      return;
+    }
+    // "Manifest isCopied" only after the write lands — a denied clipboard must
     // not claim otherwise.
-    navigator.clipboard
-      ?.writeText(SLACK_APP_MANIFEST)
+    clipboard
+      .writeText(SLACK_APP_MANIFEST)
       .then(() => {
-        setCopied(true);
-        copyResetTimer.current = setTimeout(() => setCopied(false), 1500);
+        setIsCopied(true);
+        copyResetTimer.current = setTimeout(() => setIsCopied(false), 1500);
       })
-      .catch(() =>
-        toaster.create({
-          type: "error",
-          title: "Couldn't copy the manifest",
-          description: "Select the manifest text and copy it manually.",
-        }),
-      );
+      .catch(copyFailed);
   };
 
   return (
@@ -730,7 +782,7 @@ function SlackAppSetupCallout() {
             _hover={{ color: "fg" }}
             onClick={copyManifest}
           >
-            {copied ? "Manifest copied" : "Copy app manifest"}
+            {isCopied ? "Manifest isCopied" : "Copy app manifest"}
           </Button>
           <Button
             variant="plain"
@@ -749,7 +801,7 @@ function SlackAppSetupCallout() {
             <List.Item>
               <Text fontSize="xs" color="fg.muted">
                 Create the app with &ldquo;From a manifest,&rdquo; choose the
-                YAML format, and paste the copied manifest — it sets the
+                YAML format, and paste the isCopied manifest — it sets the
                 permissions for you.
               </Text>
             </List.Item>

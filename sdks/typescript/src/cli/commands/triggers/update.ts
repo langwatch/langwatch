@@ -5,6 +5,7 @@ import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import { parseJsonObject } from "./parseJsonObject";
 import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -39,15 +40,17 @@ export const updateTriggerCommand = async (
   let parsedActionParams: Record<string, unknown> | undefined;
   try {
     if (options.filters) {
-      parsedFilters = JSON.parse(options.filters) as Record<string, unknown>;
+      parsedFilters = parseJsonObject(options.filters);
     }
     if (options.actionParams) {
-      parsedActionParams = JSON.parse(options.actionParams) as Record<string, unknown>;
+      parsedActionParams = parseJsonObject(options.actionParams);
     }
   } catch {
     failSpinner({
       spinner,
-      error: commandValidationError("--filters and --action-params must be valid JSON"),
+      error: commandValidationError(
+        "--filters and --action-params must be valid JSON objects",
+      ),
       action: "update trigger",
     });
     process.exit(1);
