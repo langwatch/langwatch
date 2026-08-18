@@ -40,6 +40,11 @@ finally:
     else:
         os.environ["DISABLE_EVALUATORS_PRELOAD"] = _original_preload
 
+# The server captured original_env while the temporary preload flag was set,
+# and the gate restores that snapshot after every burst. Rebase it on the
+# clean environment so the restore cannot leak the flag into other tests.
+server.original_env = os.environ.copy()
+
 
 @pytest.fixture
 def slow_exact_match(monkeypatch):
@@ -129,6 +134,7 @@ async def test_different_env_evaluations_never_overlap(slow_exact_match):
 
 @pytest.mark.anyio
 async def test_environment_is_restored_after_the_burst(slow_exact_match):
+    expected_env = dict(os.environ)
     transport = httpx.ASGITransport(app=server.app)
     env = {"OPENAI_API_KEY": "must-not-outlive-the-burst"}
     async with httpx.AsyncClient(
@@ -144,8 +150,67 @@ async def test_environment_is_restored_after_the_burst(slow_exact_match):
             )
         )
 
-    assert os.environ.get("OPENAI_API_KEY") != "must-not-outlive-the-burst"
-    assert "PATH" in os.environ
+    # The whole environment, not just the injected credential, is back to its
+    # pre-burst state. PYTEST_CURRENT_TEST is pytest's own per-phase marker:
+    # it was set after the server captured its baseline, so the restore
+    # legitimately drops it and pytest re-sets it on the next phase.
+    def without_pytest_marker(env: dict) -> dict:
+        return {k: v for k, v in env.items() if k != "PYTEST_CURRENT_TEST"}
+
+    assert without_pytest_marker(dict(os.environ)) == without_pytest_marker(
+        expected_env
+    )
+
+
+@pytest.mark.anyio
+async def test_waiting_environment_runs_before_later_requests_for_the_old_one(
+    slow_exact_match,
+):
+    transport = httpx.ASGITransport(app=server.app)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", timeout=120
+    ) as client:
+
+        def post(key: str):
+            return asyncio.create_task(
+                client.post(
+                    "/langevals/exact_match/evaluate",
+                    json=evaluation_request({"OPENAI_API_KEY": key}),
+                )
+            )
+
+        first_generation = [post("tenant-a-key") for _ in range(2)]
+        deadline = time.monotonic() + 5
+        while server.evaluation_gate.active_evaluations == 0:
+            if time.monotonic() >= deadline:
+                pytest.fail("The first generation was not admitted within 5s")
+            await asyncio.sleep(0.01)
+
+        tenant_b = post("tenant-b-key")
+        deadline = time.monotonic() + 5
+        while not server.evaluation_gate.waiting_environments:
+            if time.monotonic() >= deadline:
+                pytest.fail("The waiting environment never queued within 5s")
+            await asyncio.sleep(0.01)
+
+        # Arrives while tenant B is already waiting, so it must queue BEHIND
+        # tenant B even though its env matches the running generation.
+        late_tenant_a = post("tenant-a-key")
+
+        responses = await asyncio.gather(
+            *first_generation, tenant_b, late_tenant_a
+        )
+
+    assert all(r.status_code == 200 for r in responses)
+    by_key: dict[str, list[dict]] = {}
+    for observation in slow_exact_match:
+        by_key.setdefault(observation["openai_key"], []).append(observation)
+    b_evaluation = by_key["tenant-b-key"][0]
+    late_a_started = max(o["started"] for o in by_key["tenant-a-key"])
+    # Generations run in first-waiter order: B before the A request that
+    # queued after it, with no overlap between the generations.
+    assert b_evaluation["started"] < late_a_started
+    assert late_a_started >= b_evaluation["finished"]
 
 
 def test_gate_times_out_with_a_clear_error():

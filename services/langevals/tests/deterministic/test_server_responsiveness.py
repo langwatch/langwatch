@@ -44,6 +44,11 @@ finally:
     else:
         os.environ["DISABLE_EVALUATORS_PRELOAD"] = _original_preload
 
+# The server captured original_env while the temporary preload flag was set,
+# and it restores that snapshot after evaluations. Rebase it on the clean
+# environment so the restore cannot leak the flag into other tests.
+server.original_env = os.environ.copy()
+
 
 def big_text(kb: int, seed: int) -> str:
     rng = random.Random(seed)

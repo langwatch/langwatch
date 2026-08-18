@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from contextlib import asynccontextmanager, contextmanager
 import asyncio
 import os
@@ -98,16 +99,22 @@ class EvaluationGate:
     write identical values, so they can, and on a single-project install
     (where every request carries the same provider keys) that is every
     evaluation. The gate tracks the env of the in-flight evaluations as a
-    generation: same-env requests run together up to `max_concurrent`, a
-    request with a different env waits for the previous generation to drain,
-    and the process environment is restored once the last one leaves.
+    generation: same-env requests run together up to `max_concurrent`, and
+    waiters queue per env key in arrival order. As soon as any request waits,
+    the running generation stops admitting new entries, so a steady stream
+    with one env cannot starve the others: generations run strictly in the
+    order their first waiter arrived. The process environment is restored
+    once the last evaluation of a generation leaves.
     """
 
     def __init__(self, max_concurrent: int, timeout_seconds: float):
         self._condition = threading.Condition()
         self._active = 0
         self._key: Optional[tuple] = None
-        self._switch_pending = False
+        # Waiting env keys in first-arrival order, each with its waiter
+        # count. Timed-out waiters remove themselves, so a key nobody waits
+        # for anymore can never block the queue.
+        self._waiting: OrderedDict[tuple, int] = OrderedDict()
         self._max_concurrent = max_concurrent
         self._timeout_seconds = timeout_seconds
 
@@ -115,27 +122,48 @@ class EvaluationGate:
     def active_evaluations(self) -> int:
         return self._active
 
+    @property
+    def waiting_environments(self) -> list[tuple]:
+        return list(self._waiting)
+
+    def _may_admit(self, key: tuple) -> bool:
+        if self._active >= self._max_concurrent:
+            return False
+        front = next(iter(self._waiting), None)
+        if front is not None and front != key:
+            return False
+        # Either join the open generation with the same env, or start a new
+        # generation on a drained gate.
+        return self._key == key or self._key is None
+
+    def _leave_queue(self, key: tuple) -> None:
+        remaining = self._waiting.get(key, 0) - 1
+        if remaining > 0:
+            self._waiting[key] = remaining
+        else:
+            self._waiting.pop(key, None)
+            # The queue front may have changed; blocked waiters of the next
+            # key must re-check instead of sitting out their own deadline.
+            self._condition.notify_all()
+
     @contextmanager
     def admit(self, key: tuple):
         deadline = time.monotonic() + self._timeout_seconds
         with self._condition:
-            while (
-                self._active >= self._max_concurrent
-                or (self._key is not None and self._key != key)
-                or (self._switch_pending and self._active > 0)
-            ):
-                if self._key is not None and self._key != key:
-                    # Close the running generation to new entries, so a
-                    # steady stream with one env cannot starve a request
-                    # with another env: the generation drains, then whoever
-                    # wakes first starts the next one.
-                    self._switch_pending = True
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise EvaluationQueueTimeout()
-                self._condition.wait(remaining)
+            queued = False
+            try:
+                while not self._may_admit(key):
+                    if not queued:
+                        self._waiting[key] = self._waiting.get(key, 0) + 1
+                        queued = True
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise EvaluationQueueTimeout()
+                    self._condition.wait(remaining)
+            finally:
+                if queued:
+                    self._leave_queue(key)
             self._key = key
-            self._switch_pending = False
             self._active += 1
         try:
             yield
