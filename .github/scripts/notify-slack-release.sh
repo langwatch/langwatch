@@ -71,47 +71,44 @@ CHANGELOG_CONTENT=$(echo "$CHANGELOG_CONTENT" | sed \
   | sed -E 's/ \(\[#[0-9]+\]\(([^)]+)\)\)/: \1/g' \
   | sed -E 's/ \(\[[0-9a-f]+\]\([^)]+\)\)//g')
 
-# Escape special characters for JSON
-CHANGELOG_JSON=$(echo "$CHANGELOG_CONTENT" | jq -Rs .)
+# Slack caps a section's text at 3000 characters and rejects the whole
+# payload as invalid_blocks past it, so split the changelog into chunks at
+# line boundaries and give each chunk its own section block.
+CHUNKS_JSON=$(printf '%s' "$CHANGELOG_CONTENT" | awk -v max=2900 '
+  {
+    if (buf != "" && length(buf) + length($0) + 1 > max) { print buf; print "__LW_CHUNK_BREAK__"; buf = "" }
+    buf = (buf == "" ? $0 : buf "\n" $0)
+  }
+  END { if (buf != "") print buf }
+' | jq -Rs 'split("\n__LW_CHUNK_BREAK__\n") | map(select(length > 0)) | map(sub("\n$"; ""))')
 
-# Create the Slack message with blocks for better formatting
-MESSAGE=$(cat <<EOF
-{
-  "blocks": [
-    {
-      "type": "header",
-      "text": {
-        "type": "plain_text",
-        "text": "$MOTIVATIONAL_MESSAGE",
-        "emoji": true
-      }
-    },
-    {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": "*$COMPONENT_NAME v$VERSION* has been released! 🎉"
-      }
-    },
-    {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": $CHANGELOG_JSON
-      }
-    },
-    {
-      "type": "divider"
-    }
-  ]
-}
-EOF
-)
+RELEASES_URL="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-langwatch/langwatch}/releases"
 
-# Send to Slack
-curl -X POST \
+MESSAGE=$(jq -n \
+  --arg header "$MOTIVATIONAL_MESSAGE" \
+  --arg intro "*$COMPONENT_NAME v$VERSION* has been released! 🎉" \
+  --arg releases_url "$RELEASES_URL" \
+  --argjson chunks "$CHUNKS_JSON" \
+  '{blocks: ([
+      {type: "header", text: {type: "plain_text", text: $header, emoji: true}},
+      {type: "section", text: {type: "mrkdwn", text: $intro}}
+    ]
+    + ($chunks[0:4] | map({type: "section", text: {type: "mrkdwn", text: .}}))
+    + (if ($chunks | length) > 4 then
+        [{type: "section", text: {type: "mrkdwn", text: ("_Changelog truncated. Full notes: " + $releases_url + "_")}}]
+      else [] end)
+    + [{type: "divider"}])}')
+
+# Send to Slack. The webhook answers 200 "ok" on success and an error string
+# such as invalid_blocks otherwise, so the body is the success signal.
+RESPONSE=$(curl -sS -X POST \
   -H 'Content-type: application/json' \
   --data "$MESSAGE" \
-  "$SLACK_WEBHOOK_URL"
+  "$SLACK_WEBHOOK_URL")
+
+if [ "$RESPONSE" != "ok" ]; then
+  echo "❌ Slack rejected the notification: $RESPONSE"
+  exit 1
+fi
 
 echo "✅ Slack notification sent successfully!"
