@@ -248,6 +248,7 @@ import {
   ProcessAuditRepository,
 } from "./ops/process-audit.repository";
 import { QueueService } from "./ops/queue.service";
+import { QueueAuditRepository } from "./ops/queue-audit.repository";
 import { ReplayService } from "./ops/replay.service";
 import { BlobStoreRedisRepository } from "./ops/repositories/blob-store.redis.repository";
 import { NullBlobStoreRepository } from "./ops/repositories/blob-store.repository";
@@ -437,6 +438,18 @@ export function initializeDefaultApp(options?: {
     ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
     : new NullSpanStorageRepository();
 
+  // Resolves the per-tenant retention cascade; shared by the DSPy CH repo
+  // (which stamps dspy_steps as a traces-category table), the read floors that
+  // bound `evaluation_runs`, and the data-retention services wired further
+  // below. Constructed here rather than beside those services because the
+  // evaluation-run repository below needs it and is built first — without it
+  // that read floor silently falls back to the platform default, which is the
+  // whole point of making it tenant-aware.
+  const dataRetentionPolicyRepo = new DataRetentionPolicyRepository(prisma);
+  const retentionPolicyCache = new RetentionPolicyCache(
+    dataRetentionPolicyRepo,
+  );
+
   const traceSummary = traced(
     new TraceSummaryService(
       clickhouseEnabled
@@ -449,7 +462,10 @@ export function initializeDefaultApp(options?: {
   const evaluationRuns = traced(
     new EvaluationRunService(
       clickhouseEnabled
-        ? new EvaluationRunClickHouseRepository(resolveClickHouseClient)
+        ? new EvaluationRunClickHouseRepository({
+            resolveClient: resolveClickHouseClient,
+            retentionResolver: retentionPolicyCache,
+          })
         : new NullEvaluationRunRepository(),
     ),
     "EvaluationRunService",
@@ -532,14 +548,6 @@ export function initializeDefaultApp(options?: {
       workflowExecutor: { runEvaluationWorkflow },
     }),
     "EvaluationExecutionService",
-  );
-
-  // Resolves the per-tenant retention cascade; shared by the DSPy CH repo
-  // (which stamps dspy_steps as a traces-category table) and the data-retention
-  // services wired further below.
-  const dataRetentionPolicyRepo = new DataRetentionPolicyRepository(prisma);
-  const retentionPolicyCache = new RetentionPolicyCache(
-    dataRetentionPolicyRepo,
   );
 
   const dspySteps = traced(
@@ -1204,6 +1212,16 @@ export function initializeDefaultApp(options?: {
     enterprisePipelines: {
       prisma,
       runsWorkers: roleRunsWorkers(config.processRole),
+      // Pulled provider cost shares the gateway debits' ClickHouse gate: it
+      // lands in the same ledger table, so without ClickHouse there is nowhere
+      // for it to go. The pipeline still records every observation on the log.
+      pulledUsageLedger: clickhouseEnabled
+        ? {
+            budgetCHRepository: new GatewayBudgetClickHouseRepository(
+              resolveClickHouseClient,
+            ),
+          }
+        : undefined,
     },
     projects,
     monitors,
@@ -1621,7 +1639,10 @@ export function initializeDefaultApp(options?: {
     : new NullEventExplorerRepository();
 
   const ops = {
-    queues: new QueueService(queueRepo),
+    queues: new QueueService({
+      repo: queueRepo,
+      audit: new QueueAuditRepository(prisma),
+    }),
     scheduler: new SchedulerOpsService({
       repo: new PrismaScheduledJobRepository(prisma),
       audit: new SchedulerAuditRepository(prisma),
@@ -2141,7 +2162,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     nurturing: undefined,
     usageLimits: UsageLimitService.createNull(),
     ops: {
-      queues: new QueueService(new NullQueueRepository()),
+      queues: new QueueService({ repo: new NullQueueRepository() }),
       scheduler: new SchedulerOpsService({
         repo: new NullScheduledJobRepository(),
       }),

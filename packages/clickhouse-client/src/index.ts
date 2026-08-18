@@ -106,3 +106,15 @@ export {
   QueryTracer,
   SPAN_ATTRIBUTES,
 } from "./tracing";
+export type {
+  RetentionDaysProvider,
+  RetentionFloorLogger,
+  RetentionFloorQuery,
+  RetentionFloorServiceOptions,
+} from "./retentionFloor";
+export {
+  DEFAULT_RETENTION_CACHE_MAX_ENTRIES,
+  DEFAULT_RETENTION_CACHE_TTL_MS,
+  DEFAULT_RETENTION_FLOOR_MARGIN_MS,
+  RetentionFloorService,
+} from "./retentionFloor";

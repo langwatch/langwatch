@@ -138,6 +138,47 @@ async function insertGovernanceLogRecord(
   });
 }
 
+async function insertGovernanceOcsfEvent(params: {
+  ch: ClickHouseClient;
+  tenantId: string;
+  sourceId: string;
+  occurredAt: Date;
+}): Promise<void> {
+  const eventId = `ocsf-${nanoid()}`;
+  await params.ch.insert({
+    table: "governance_ocsf_events",
+    values: [
+      {
+        TenantId: params.tenantId,
+        EventId: eventId,
+        TraceId: `pull:${eventId}`,
+        SourceId: params.sourceId,
+        SourceType: "anthropic_admin",
+        ActivityId: 6,
+        SeverityId: 1,
+        EventTime: params.occurredAt,
+        ActorUserId: "pulled-user",
+        ActorEmail: "pulled@example.com",
+        ActorEnduserId: "",
+        ActionName: "usage_report",
+        TargetName: "claude-haiku-4-5",
+        AnomalyAlertId: "",
+        RawOcsfJson: JSON.stringify({
+          metadata: {
+            extension: {
+              cost_usd: 0.0042,
+              tokens_input: 8,
+              tokens_output: 5,
+            },
+          },
+        }),
+      },
+    ],
+    format: "JSONEachRow",
+    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 1 },
+  });
+}
+
 describe("ActivityMonitorService — read-side queries against unified trace store", () => {
   const namespace = `am-svc-${nanoid(8)}`;
   let ch: ClickHouseClient;
@@ -291,6 +332,15 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       },
       inWindow,
     );
+    // Pulled Admin API event path. Unlike push-mode traces/logs, these rows
+    // land directly in the OCSF audit store and must still appear in the
+    // source detail metrics and recent-event list.
+    await insertGovernanceOcsfEvent({
+      ch,
+      tenantId: primaryGovProject.id,
+      sourceId: primarySourceId,
+      occurredAt: inWindow,
+    });
 
     // Persist the IngestionSource rows so ingestionSourcesHealth has metadata
     // to roll up. The PG side is the source of truth for source identity;
@@ -323,6 +373,15 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
   });
 
   afterAll(async () => {
+    await ch
+      .command({
+        query:
+          "DELETE FROM governance_ocsf_events WHERE TenantId IN ({tenantIds:Array(String)})",
+        query_params: {
+          tenantIds: [primaryGovProject.id, crossGovProject.id],
+        },
+      })
+      .catch(() => undefined);
     await prisma.ingestionSource
       .deleteMany({
         where: { organizationId: { in: [primaryOrg.id, crossOrg.id] } },
@@ -654,15 +713,15 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
   });
 
   describe("when querying ingestionSourcesHealth()", () => {
-    it("returns per-source eventsLast24h summed across trace_summaries + stored_log_records", async () => {
+    it("returns per-source eventsLast24h across pushed and pulled event stores", async () => {
       const service = ActivityMonitorService.create(prisma);
       const rows = await service.ingestionSourcesHealth({
         organizationId: primaryOrg.id,
       });
       const primary = rows.find((r) => r.id === primarySourceId);
       const secondary = rows.find((r) => r.id === secondarySourceId);
-      // Primary OTel source has 2 traces in last 24h
-      expect(primary?.eventsLast24h).toBe(2);
+      // Primary source has 2 pushed traces + 1 pulled OCSF event in last 24h
+      expect(primary?.eventsLast24h).toBe(3);
       // Secondary cowork source has 1 log_record in last 24h (trace was 14d ago)
       expect(secondary?.eventsLast24h).toBe(1);
     });
@@ -675,10 +734,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
         organizationId: primaryOrg.id,
         sourceId: primarySourceId,
       });
-      // 2 traces in 24h; 0 log records for primary source
-      expect(metrics.events24h).toBe(2);
-      expect(metrics.events7d).toBe(2);
-      expect(metrics.events30d).toBe(2);
+      // 2 pushed traces + 1 pulled OCSF event for the primary source
+      expect(metrics.events24h).toBe(3);
+      expect(metrics.events7d).toBe(3);
+      expect(metrics.events30d).toBe(3);
       expect(metrics.lastSuccessIso).not.toBeNull();
     });
   });
@@ -691,12 +750,25 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
         sourceId: primarySourceId,
         limit: 50,
       });
-      expect(rows.length).toBe(2);
+      expect(rows.length).toBe(3);
       const actors = rows.map((r) => r.actor);
       expect(actors).toContain("alice@example.com");
       expect(actors).toContain("bob@example.com");
-      // Cross-source rows excluded
-      expect(rows.every((r) => r.eventType === "otel_generic")).toBe(true);
+      expect(actors).toContain("pulled@example.com");
+      expect(rows).toContainEqual(
+        expect.objectContaining({
+          eventType: "anthropic_admin",
+          action: "usage_report",
+          target: "claude-haiku-4-5",
+          costUsd: 0.0042,
+          tokensInput: 8,
+          tokensOutput: 5,
+        }),
+      );
+      // Cross-source rows excluded; only this source's pushed and pulled types.
+      expect(new Set(rows.map((r) => r.eventType))).toEqual(
+        new Set(["otel_generic", "anthropic_admin"]),
+      );
     });
   });
 

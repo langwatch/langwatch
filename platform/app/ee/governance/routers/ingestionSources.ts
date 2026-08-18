@@ -47,6 +47,13 @@ const statusSchema = z.enum(["active", "disabled", "awaiting_first_event"]);
  * to a malicious admin would let them craft replay tokens. The
  * `_rotation` slot inside parserConfig is also stripped for the same
  * reason; it's an internal grace-window record, not user-facing.
+ *
+ * `credentials` goes the same way, and for exactly the same reason one step
+ * further on. It is the upstream secret, sealed — unreadable, but not inert:
+ * re-encryption is idempotent, so a client holding the envelope could send it
+ * back beside a changed destination host and have us decrypt a secret it never
+ * knew and post it there. The UI has no use for it either way; it collects a
+ * fresh secret when one is being set and sends nothing when it is not.
  */
 function toDto(row: {
   id: string;
@@ -65,7 +72,9 @@ function toDto(row: {
 }) {
   const parser = (row.parserConfig as Record<string, unknown>) ?? {};
   const safeParser = Object.fromEntries(
-    Object.entries(parser).filter(([k]) => !k.startsWith("_")),
+    Object.entries(parser).filter(
+      ([k]) => !k.startsWith("_") && k !== "credentials",
+    ),
   );
   return {
     id: row.id,

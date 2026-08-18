@@ -1,11 +1,11 @@
 {
   "charts/clickhouse-serverless": "0.3.0",
   "sdks/go": "0.3.0",
-  "sdks/typescript": "1.5.0",
+  "sdks/typescript": "1.6.0",
   "sdks/python": "1.2.0",
   "mcp/typescript": "2.0.0",
   "services/langevals": "3.0.0",
-  ".": "3.13.0",
-  "skills": "1.1.0",
+  ".": "3.14.0",
+  "skills": "1.2.0",
   "plugins/langwatch": "1.0.0"
 }

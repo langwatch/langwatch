@@ -327,9 +327,11 @@ describe.skipIf(!hasTestcontainers)(
           const { prisma } = await import("~/server/db");
 
           // No resolvers wired at all — the list-grid construction shape.
-          const listService = new ClickHouseTraceService(
-            prisma as ConstructorParameters<typeof ClickHouseTraceService>[0],
-          );
+          const listService = new ClickHouseTraceService({
+            prisma: prisma as ConstructorParameters<
+              typeof ClickHouseTraceService
+            >[0]["prisma"],
+          });
 
           const result = await listService.getAllTracesForProject(
             {

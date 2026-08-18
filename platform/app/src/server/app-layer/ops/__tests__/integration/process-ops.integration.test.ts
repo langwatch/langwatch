@@ -514,4 +514,422 @@ describe("process ops against a real Postgres", () => {
       expect(row.attempts).toBe(0);
     });
   });
+
+  // ── Dead-letter recovery (specs/ops/dead-letter-recovery.feature) ────────
+
+  describe("when the operator discards and bulk-recovers dead letters", () => {
+    const store = new PrismaProcessStore(prisma);
+
+    /** @scenario Discarding a dead message marks it and keeps it */
+    it("marks the row discarded, keeps it, audits it, and the dispatcher never leases it", async () => {
+      const nsDiscard = `${ns}.discard.one`;
+      const id = await seedDeadMessage({
+        processName: nsDiscard,
+        processKey: "dl-discard",
+        messageKey: "dead-discard",
+        retiredAt: new Date(NOW - 30_000),
+      });
+
+      const result = await service.discardDeadMessage({
+        ref: {
+          processName: nsDiscard,
+          projectId: PROJECT,
+          processKey: "dl-discard",
+        },
+        messageId: id,
+        actorUserId: ACTOR,
+      });
+      expect(result.discarded).toBe(true);
+
+      // A mark, not a delete: the row is retained as its own audit trail.
+      const row = await prisma.processManagerOutbox.findFirstOrThrow({
+        where: { id, projectId: PROJECT },
+      });
+      expect(row.status).toBe("discarded");
+
+      // The dispatcher's claim only sees pending rows, so a discarded row is
+      // never leased even when it is long past due.
+      const leased = await store.leaseDueMessages({
+        now: NOW + 60 * 60_000,
+        limit: 100,
+        leaseDurationMs: 1000,
+        processNames: [nsDiscard],
+      });
+      expect(leased).toEqual([]);
+
+      const audit = await prisma.auditLog.findFirst({
+        where: {
+          action: "process_discard_dead_message",
+          targetId: { startsWith: nsDiscard },
+        },
+      });
+      expect(audit?.userId).toBe(ACTOR);
+      expect(audit?.metadata).toMatchObject({ messageKey: "dead-discard" });
+    });
+
+    /** @scenario Only a dead message can be discarded */
+    it("leaves a pending message unchanged and reports it was not dead", async () => {
+      const nsGuard = `${ns}.discard.guard`;
+      const row = await prisma.processManagerOutbox.create({
+        data: {
+          processName: nsGuard,
+          projectId: PROJECT,
+          processKey: "dl-guard",
+          tenantId: PROJECT,
+          messageKey: "pending-guard",
+          intentType: "opstest.intent",
+          payload: {},
+          traceCarrier: {},
+          status: "pending",
+          nextAttemptAt: new Date(NOW),
+          createdAt: new Date(NOW),
+          updatedAt: new Date(NOW),
+        },
+      });
+
+      const result = await service.discardDeadMessage({
+        ref: {
+          processName: nsGuard,
+          projectId: PROJECT,
+          processKey: "dl-guard",
+        },
+        messageId: row.id,
+        actorUserId: ACTOR,
+      });
+      expect(result.discarded).toBe(false);
+
+      const after = await prisma.processManagerOutbox.findFirstOrThrow({
+        where: { id: row.id, projectId: PROJECT },
+      });
+      expect(after.status).toBe("pending");
+    });
+
+    /** @scenario Discarded messages leave the dead-letter count */
+    it("drops discarded rows from the listing and the counts", async () => {
+      const nsCount = `${ns}.discard.count`;
+      const keepId = await seedDeadMessage({
+        processName: nsCount,
+        processKey: "dl-count",
+        messageKey: "dead-count-keep",
+        retiredAt: new Date(NOW - 20_000),
+      });
+      const dropId = await seedDeadMessage({
+        processName: nsCount,
+        processKey: "dl-count",
+        messageKey: "dead-count-drop",
+        retiredAt: new Date(NOW - 10_000),
+      });
+
+      await service.discardDeadMessage({
+        ref: {
+          processName: nsCount,
+          projectId: PROJECT,
+          processKey: "dl-count",
+        },
+        messageId: dropId,
+        actorUserId: ACTOR,
+      });
+
+      const { messages, byProcess } = await service.getDeadLetters({
+        processName: nsCount,
+        page: 1,
+        pageSize: 10,
+      });
+      expect(messages.map((m) => m.id)).toEqual([keepId]);
+      expect(byProcess.find((row) => row.processName === nsCount)?.count).toBe(
+        1,
+      );
+    });
+
+    /** @scenario Every dead letter shown can be redriven in one act */
+    it("redrives one process name's dead letters and leaves the others dead", async () => {
+      const nsBulkA = `${ns}.bulk.redrive.a`;
+      const nsBulkB = `${ns}.bulk.redrive.b`;
+      const a1 = await seedDeadMessage({
+        processName: nsBulkA,
+        processKey: "dl-bulk-a",
+        messageKey: "bulk-a-1",
+        retiredAt: new Date(NOW - 20_000),
+      });
+      const a2 = await seedDeadMessage({
+        processName: nsBulkA,
+        processKey: "dl-bulk-a2",
+        messageKey: "bulk-a-2",
+        retiredAt: new Date(NOW - 10_000),
+      });
+      const b1 = await seedDeadMessage({
+        processName: nsBulkB,
+        processKey: "dl-bulk-b",
+        messageKey: "bulk-b-1",
+        retiredAt: new Date(NOW - 15_000),
+      });
+
+      // The jitter window is measured from the redrive itself, not from module
+      // load: a slow suite reaching this test a minute late would otherwise
+      // fail a perfectly good spread.
+      const redrivenAtStart = Date.now();
+      const result = await service.redriveDeadLetters({
+        processName: nsBulkA,
+        actorUserId: ACTOR,
+      });
+      const redrivenAtEnd = Date.now();
+      expect(result.redriven).toBe(2);
+
+      const rows = await prisma.processManagerOutbox.findMany({
+        where: { id: { in: [a1, a2, b1] }, projectId: PROJECT },
+      });
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      expect(byId.get(a1)?.status).toBe("pending");
+      expect(byId.get(a1)?.attempts).toBe(0);
+      expect(byId.get(a2)?.status).toBe("pending");
+      expect(byId.get(b1)?.status).toBe("dead");
+
+      const audit = await prisma.auditLog.findFirst({
+        where: {
+          action: "process_redrive_dead_letters",
+          // A bulk act names no instance, so its target is the fleet marker
+          // and the scope it ran under lives in metadata.
+          targetId: "fleet",
+          metadata: { equals: { redriven: 2, scope: nsBulkA } },
+        },
+      });
+      expect(audit?.projectId).toBeNull();
+      expect(audit?.metadata).toMatchObject({ redriven: 2, scope: nsBulkA });
+
+      // Due times are spread, not stacked on one instant: a fleet redrive
+      // that made every message due simultaneously would hand the dispatcher
+      // one batch the size of the backlog.
+      const redriven = await prisma.processManagerOutbox.findMany({
+        where: { id: { in: [a1, a2] }, projectId: PROJECT },
+        select: { nextAttemptAt: true },
+      });
+      const dueTimes = redriven.map((row) => row.nextAttemptAt.getTime());
+      for (const due of dueTimes) {
+        expect(due).toBeGreaterThanOrEqual(redrivenAtStart);
+        expect(due).toBeLessThanOrEqual(redrivenAtEnd + 60_000);
+      }
+    });
+
+    /** @scenario Every dead letter shown can be discarded in one act */
+    it("discards one process name's dead letters and leaves the others dead", async () => {
+      const nsBulkA = `${ns}.bulk.discard.a`;
+      const nsBulkB = `${ns}.bulk.discard.b`;
+      const a1 = await seedDeadMessage({
+        processName: nsBulkA,
+        processKey: "dl-bulkd-a",
+        messageKey: "bulkd-a-1",
+        retiredAt: new Date(NOW - 20_000),
+      });
+      const b1 = await seedDeadMessage({
+        processName: nsBulkB,
+        processKey: "dl-bulkd-b",
+        messageKey: "bulkd-b-1",
+        retiredAt: new Date(NOW - 15_000),
+      });
+
+      const result = await service.discardDeadLetters({
+        processName: nsBulkA,
+        actorUserId: ACTOR,
+      });
+      expect(result.discarded).toBe(1);
+
+      const rows = await prisma.processManagerOutbox.findMany({
+        where: { id: { in: [a1, b1] }, projectId: PROJECT },
+      });
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      expect(byId.get(a1)?.status).toBe("discarded");
+      expect(byId.get(b1)?.status).toBe("dead");
+
+      const audit = await prisma.auditLog.findFirst({
+        where: {
+          action: "process_discard_dead_letters",
+          targetId: "fleet",
+          metadata: { equals: { discarded: 1, scope: nsBulkA } },
+        },
+      });
+      expect(audit?.projectId).toBeNull();
+      expect(audit?.metadata).toMatchObject({ discarded: 1, scope: nsBulkA });
+    });
+
+    /** @scenario Each failed delivery records why it failed */
+    it("stores one entry per failed attempt, oldest first, with the killer marked", async () => {
+      const nsAttempts = `${ns}.attempts`;
+      const id = await seedDeadMessage({
+        processName: nsAttempts,
+        processKey: "dl-attempts",
+        messageKey: "dead-attempts",
+        retiredAt: new Date(NOW - 5_000),
+      });
+      const identity = {
+        processName: nsAttempts,
+        projectId: PROJECT,
+        messageKey: "dead-attempts",
+      };
+
+      await store.recordFailedAttempt({
+        identity,
+        attempt: {
+          attempt: 1,
+          occurredAt: NOW - 10_000,
+          outcome: "retry_scheduled",
+          errorType: "DispatchError",
+          errorMessage: "receiver returned 503",
+          retryAfterMs: 90_000,
+        },
+      });
+      await store.recordFailedAttempt({
+        identity,
+        attempt: {
+          attempt: 2,
+          occurredAt: NOW - 5_000,
+          outcome: "dead",
+          errorType: "DispatchError",
+          errorMessage: "receiver returned 410",
+        },
+      });
+
+      const attempts = await service.getOutboxAttempts({
+        outboxId: id,
+        projectId: PROJECT,
+      });
+      expect(attempts.map((a) => a.attempt)).toEqual([1, 2]);
+      expect(attempts[0]?.outcome).toBe("retry_scheduled");
+      expect(attempts[0]?.errorMessage).toBe("receiver returned 503");
+      expect(attempts[0]?.retryAfterMs).toBe(90_000);
+      expect(attempts[1]?.outcome).toBe("dead");
+    });
+
+    /** @scenario Discarded messages age out on the dead-letter window */
+    it("reaps discarded rows on the dead-letter retention window", async () => {
+      const nsSweep = `${ns}.sweep.discarded`;
+      const staleId = await seedDeadMessage({
+        processName: nsSweep,
+        processKey: "dl-sweep",
+        messageKey: "discard-stale",
+        retiredAt: new Date(NOW - 60_000),
+      });
+      const freshId = await seedDeadMessage({
+        processName: nsSweep,
+        processKey: "dl-sweep",
+        messageKey: "discard-fresh",
+        retiredAt: new Date(NOW - 60_000),
+      });
+      for (const id of [staleId, freshId]) {
+        const { discarded } = await service.discardDeadMessage({
+          ref: {
+            processName: nsSweep,
+            projectId: PROJECT,
+            processKey: "dl-sweep",
+          },
+          messageId: id,
+          actorUserId: ACTOR,
+        });
+        expect(discarded).toBe(true);
+      }
+      // Discard stamps updatedAt, so age the stale one past the window by
+      // hand — the sweep reaps by that column.
+      await prisma.processManagerOutbox.updateMany({
+        where: { id: staleId, projectId: PROJECT },
+        data: { updatedAt: new Date(NOW - 40 * 24 * 60 * 60 * 1000) },
+      });
+
+      // The sweep is fleet-wide, so its returned count includes whatever else
+      // the database holds; what this asserts is which of THESE two rows it
+      // took.
+      await store.deleteDeadOutboxBatch({
+        before: NOW - 30 * 24 * 60 * 60 * 1000,
+        limit: 100,
+      });
+
+      const survivors = await prisma.processManagerOutbox.findMany({
+        where: { id: { in: [staleId, freshId] }, projectId: PROJECT },
+        select: { id: true },
+      });
+      expect(survivors.map((row) => row.id)).toEqual([freshId]);
+    });
+
+    /** @scenario A redriven message keeps the history of both its lives */
+    it("orders a redriven message's attempts by when they happened, not by number", async () => {
+      const nsLives = `${ns}.lives`;
+      const id = await seedDeadMessage({
+        processName: nsLives,
+        processKey: "dl-lives",
+        messageKey: "dead-lives",
+        retiredAt: new Date(NOW - 5_000),
+      });
+      const identity = {
+        processName: nsLives,
+        projectId: PROJECT,
+        messageKey: "dead-lives",
+      };
+
+      // First life, then a redrive resets the counter, then a second life —
+      // so both lives carry an attempt numbered 1.
+      await store.recordFailedAttempt({
+        identity,
+        attempt: {
+          attempt: 1,
+          occurredAt: NOW - 30_000,
+          outcome: "dead",
+          errorType: "DispatchError",
+          errorMessage: "first life",
+        },
+      });
+      await store.recordFailedAttempt({
+        identity,
+        attempt: {
+          attempt: 1,
+          occurredAt: NOW - 10_000,
+          outcome: "dead",
+          errorType: "DispatchError",
+          errorMessage: "second life",
+        },
+      });
+
+      const attempts = await service.getOutboxAttempts({
+        outboxId: id,
+        projectId: PROJECT,
+      });
+      expect(attempts.map((a) => a.errorMessage)).toEqual([
+        "first life",
+        "second life",
+      ]);
+      // Row identity, not the attempt number, is what stays unique.
+      expect(new Set(attempts.map((a) => a.id)).size).toBe(2);
+      expect(new Set(attempts.map((a) => a.attempt)).size).toBe(1);
+    });
+
+    /** @scenario Attempt history dies with its message */
+    it("cascades attempt rows when the message row is deleted", async () => {
+      const nsCascade = `${ns}.cascade`;
+      const id = await seedDeadMessage({
+        processName: nsCascade,
+        processKey: "dl-cascade",
+        messageKey: "dead-cascade",
+        retiredAt: new Date(NOW - 5_000),
+      });
+      await store.recordFailedAttempt({
+        identity: {
+          processName: nsCascade,
+          projectId: PROJECT,
+          messageKey: "dead-cascade",
+        },
+        attempt: {
+          attempt: 1,
+          occurredAt: NOW - 5_000,
+          outcome: "dead",
+          errorType: "DispatchError",
+          errorMessage: "receiver returned 410",
+        },
+      });
+
+      await prisma.processManagerOutbox.deleteMany({
+        where: { id, projectId: PROJECT },
+      });
+      const orphaned = await prisma.processManagerOutboxAttempt.findMany({
+        where: { outboxId: id, projectId: PROJECT },
+      });
+      expect(orphaned).toEqual([]);
+    });
+  });
 });

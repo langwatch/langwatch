@@ -190,8 +190,8 @@ export class ProcessOutboxWorker {
         limit: this.batchSize,
       });
     } catch (error) {
-      this.logger.error(
-        { error: error instanceof Error ? error.message : String(error) },
+      this.logger.warn(
+        { error },
         "ProcessOutboxWorker drain failed; the next poll will retry",
       );
     }

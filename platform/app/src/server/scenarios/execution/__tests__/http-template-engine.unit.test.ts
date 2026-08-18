@@ -28,7 +28,6 @@ function inputWith(content: string | unknown[]): AgentInput {
     messages: [{ role: "user", content: content as string }],
     newMessages: [{ role: "user", content: content as string }],
     requestedRole: AgentRole.AGENT,
-    propagationHeaders: {},
     scenarioState: {} as AgentInput["scenarioState"],
     scenarioConfig: {} as AgentInput["scenarioConfig"],
   };

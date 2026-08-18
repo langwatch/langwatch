@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.2.0](https://github.com/langwatch/langwatch/compare/skills@v1.1.0...skills@v1.2.0) (2026-08-18)
+
+
+### Features
+
+* **scenarios:** judge on remote traces with per-turn propagation and a local dev tunnel ([#7070](https://github.com/langwatch/langwatch/issues/7070)) ([56689a3](https://github.com/langwatch/langwatch/commit/56689a327857169ce0d458a08f9e105ef28e182b))
+* **scenarios:** scenario run parameters and http secret references ([#6906](https://github.com/langwatch/langwatch/issues/6906)) ([a21b7a1](https://github.com/langwatch/langwatch/commit/a21b7a15f0a98e6a5a4754eea0b8a33729561d24))
+* **sdk:** judge n-way target comparisons from the experiment SDKs ([#6863](https://github.com/langwatch/langwatch/issues/6863)) ([9c34d3c](https://github.com/langwatch/langwatch/commit/9c34d3c37418ecf6d29b0e521d66fca0661a45d8))
+
+
+### Documentation
+
+* rewrite marketing language in simple technical English ([#7020](https://github.com/langwatch/langwatch/issues/7020)) ([68faaf5](https://github.com/langwatch/langwatch/commit/68faaf577bf9623c7ffbf8e1a8a500deabf3e036))
+
+
+### Code Refactoring
+
+* **typescript:** move the workspace to TypeScript 7, and stop a typecheck filling a 9 GiB ceiling ([#7081](https://github.com/langwatch/langwatch/issues/7081)) ([f79b748](https://github.com/langwatch/langwatch/commit/f79b74898b6a921823ebd32c57ac2295d79e6113))
+
 ## [1.1.0](https://github.com/langwatch/langwatch/compare/skills@v1.0.0...skills@v1.1.0) (2026-08-05)
 
 

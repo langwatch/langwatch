@@ -235,6 +235,8 @@ export const ScenarioConfigSchema = z.object({
   situation: z.string(),
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
+  maxTurns: z.number().int().optional(),
+  minTurns: z.number().int().optional(),
 });
 export type ScenarioConfig = z.infer<typeof ScenarioConfigSchema>;
 

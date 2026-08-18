@@ -11,7 +11,7 @@
     "test:integration": "vitest run __tests__/hook-bundle.integration.test.ts"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.2.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.0"
   }

@@ -4,6 +4,7 @@ import type {
   AppendIntentsResult,
   CommitResult,
   DueWake,
+  FailedOutboxAttempt,
   LeasedOutboxMessageRecord,
   NewOutboxMessage,
   OutboxMessageIdentity,
@@ -81,6 +82,7 @@ export class InMemoryProcessStore implements ProcessStore {
   /** Inbox key to the epoch ms it was consumed at, which retention reaps by. */
   private readonly inbox = new Map<string, number>();
   private readonly messages = new Map<string, StoredMessage>();
+  private readonly attempts = new Map<string, FailedOutboxAttempt[]>();
 
   async findByRef<State = unknown>(params: {
     ref: ProcessRef;
@@ -272,6 +274,21 @@ export class InMemoryProcessStore implements ProcessStore {
     return { applied: true };
   }
 
+  async recordFailedAttempt(params: {
+    identity: OutboxMessageIdentity;
+    attempt: FailedOutboxAttempt;
+  }): Promise<void> {
+    if (!this.messages.has(messageKeyOf(params.identity))) return;
+    const existing = this.attempts.get(messageKeyOf(params.identity)) ?? [];
+    existing.push(params.attempt);
+    this.attempts.set(messageKeyOf(params.identity), existing);
+  }
+
+  /** Test read for the attempt history, mirroring the durable table. */
+  findFailedAttempts(identity: OutboxMessageIdentity): FailedOutboxAttempt[] {
+    return this.attempts.get(messageKeyOf(identity)) ?? [];
+  }
+
   async releaseLease(params: {
     identity: OutboxMessageIdentity;
     leaseToken: string;
@@ -327,10 +344,21 @@ export class InMemoryProcessStore implements ProcessStore {
         message.dispatchedAt >= params.before
       )
         continue;
-      this.messages.delete(key);
+      this.deleteMessage(key);
       deleted++;
     }
     return deleted;
+  }
+
+  /**
+   * Every outbox deletion goes through here, so the attempt rows leave with
+   * their message on all of them — the durable store cascades, and a fake
+   * that shed them on only one path would model a leak the real one does not
+   * have.
+   */
+  private deleteMessage(key: string): void {
+    this.messages.delete(key);
+    this.attempts.delete(key);
   }
 
   async deleteDispatchedOutboxBatch(params: {
@@ -351,11 +379,14 @@ export class InMemoryProcessStore implements ProcessStore {
     limit: number;
   }): Promise<number> {
     // Reaped by `updatedAt`, the same column the durable store uses, which
-    // the markFailed that retired the row stamped.
+    // the markFailed that retired the row stamped. `discarded` rides the same
+    // family for the reason given on the durable store: no other predicate
+    // matches it, so leaving it out makes it immortal.
     return this.deleteOutboxBatch(
       params,
       (message) =>
-        message.status === "dead" && message.updatedAt < params.before,
+        (message.status === "dead" || message.status === "discarded") &&
+        message.updatedAt < params.before,
     );
   }
 
@@ -383,7 +414,7 @@ export class InMemoryProcessStore implements ProcessStore {
     for (const [key, message] of this.messages) {
       if (deleted >= params.limit) break;
       if (!matches(message)) continue;
-      this.messages.delete(key);
+      this.deleteMessage(key);
       deleted++;
     }
     return deleted;

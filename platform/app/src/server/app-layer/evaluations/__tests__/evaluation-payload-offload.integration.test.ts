@@ -169,7 +169,9 @@ beforeAll(async () => {
     clickhouseClientModule.getClickHouseClientForProject,
   ).mockResolvedValue(ch);
 
-  evalRepo = new EvaluationRunClickHouseRepository(async () => ch);
+  evalRepo = new EvaluationRunClickHouseRepository({
+    resolveClient: async () => ch,
+  });
   eventRepo = new EventRepositoryClickHouse(async () => ch);
 
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "eval-offload-int-"));

@@ -10,14 +10,19 @@ import {
   createCustomerIoSimulationSyncSubscriber,
 } from "../customerIoSimulationSync.subscriber";
 
-// Suppress logger output
+// Suppresses logger output, and is a single shared instance so the level a
+// failure earns can be asserted — the module keeps the logger it was handed at
+// import time, so a per-call factory would leave the test holding an object
+// nothing ever writes to.
+const logger = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+
 vi.mock("@langwatch/observability", () => ({
-  createLogger: () => ({
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  }),
+  createLogger: () => logger,
 }));
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
@@ -276,6 +281,32 @@ describe("customerIoSimulationSync subscriber", () => {
       await expect(
         subscriber.handler(createEvent(), CONTEXT),
       ).resolves.toBeUndefined();
+    });
+
+    /**
+     * Swallowing it is deliberate — a marketing sync must not fail the
+     * simulation pipeline — but it also means nothing is rethrown and no
+     * retry is scheduled, so this sync is gone. Nothing above will ever
+     * report it, which is what makes the discarding layer the one that must.
+     */
+    /** @scenario "Work discarded without a throw is logged at error" */
+    it("reports the discarded sync at error level", async () => {
+      logger.warn.mockClear();
+      logger.error.mockClear();
+      const failure = new Error("CIO down");
+      const nurturing = createMockNurturing();
+      vi.mocked(nurturing.identifyUser).mockRejectedValue(failure);
+      const subscriber = createCustomerIoSimulationSyncSubscriber(
+        createDeps({ nurturing }),
+      );
+
+      await subscriber.handler(createEvent(), CONTEXT);
+
+      expect(logger.warn).not.toHaveBeenCalled();
+      expect(logger.error).toHaveBeenCalledTimes(1);
+      expect(logger.error.mock.calls[0]?.[0]).toMatchObject({
+        error: failure,
+      });
     });
   });
 

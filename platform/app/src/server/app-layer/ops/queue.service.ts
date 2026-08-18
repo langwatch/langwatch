@@ -1,3 +1,7 @@
+import {
+  NullQueueAuditSink,
+  type QueueAuditSink,
+} from "./queue-audit.repository";
 import type {
   BlockedSummary,
   DlqGroupInfo,
@@ -7,8 +11,36 @@ import type {
 } from "./repositories/queue.repository";
 import type { GroupInfo, ParkedGroupInfo, QueueSummaryInfo } from "./types";
 
+/** What an error with no recognizable class name is recorded as. */
+const UNTYPED_ERROR_SHAPE = "untyped_error";
+
+/**
+ * Reduce raw job errors to something safe to keep in a durable audit row.
+ *
+ * Only a leading error CLASS survives — `TimeoutError`, `HttpError`. Anything
+ * else becomes a fixed placeholder, because a job's error text is arbitrary
+ * and its first words are no safer than its last: `"alice@example.com payment
+ * failed"` leads with the address. Enough for an operator to see "these all
+ * died the same way" and no more; the full message stays on the failing job.
+ */
+function summarizeErrorShapes(messages: string[]): string[] {
+  const shapes = new Set<string>();
+  for (const message of messages) {
+    const named = /^([A-Za-z][A-Za-z0-9_]*(?:Error|Exception))\b/.exec(message);
+    shapes.add(named?.[1]?.slice(0, 80) ?? UNTYPED_ERROR_SHAPE);
+    if (shapes.size >= 5) break;
+  }
+  return [...shapes];
+}
+
 export class QueueService {
-  constructor(readonly repo: QueueRepository) {}
+  readonly repo: QueueRepository;
+  private readonly audit: QueueAuditSink;
+
+  constructor(params: { repo: QueueRepository; audit?: QueueAuditSink }) {
+    this.repo = params.repo;
+    this.audit = params.audit ?? new NullQueueAuditSink();
+  }
 
   async getQueues(): Promise<QueueSummaryInfo[]> {
     const queueNames = await this.repo.discoverQueueNames();
@@ -249,6 +281,65 @@ export class QueueService {
     errorFilter?: string;
   }): Promise<{ replayedCount: number; jobsReplayed: number }> {
     return this.repo.replayAllFromDlq(params);
+  }
+
+  /**
+   * Redrive exactly the DLQ groups the operator's filter showed, audited.
+   * Explicit ids, not a re-evaluated filter: the confirmation and the act
+   * must cover the same groups (specs/ops/dead-letter-recovery.feature).
+   */
+  async redriveManyFromDlq(params: {
+    queueName: string;
+    groupIds: string[];
+    requestedBy: string;
+  }): Promise<{ redrivenCount: number; jobsRedriven: number }> {
+    const { requestedBy, ...rest } = params;
+    const result = await this.repo.redriveManyFromDlq(rest);
+    if (result.redrivenCount > 0) {
+      await this.audit.append({
+        actorUserId: requestedBy,
+        action: "queue_redrive_dlq_groups",
+        queueName: params.queueName,
+        metadata: {
+          groupIds: params.groupIds.slice(0, 50),
+          requestedGroups: params.groupIds.length,
+          ...result,
+        },
+      });
+    }
+    return result;
+  }
+
+  /**
+   * Discard exactly the DLQ groups the operator's filter showed. The Redis
+   * entries are removed (they TTL away regardless); the audit row IS the
+   * retained mark, carrying the queue, groups, job counts and last errors.
+   */
+  async discardManyFromDlq(params: {
+    queueName: string;
+    groupIds: string[];
+    requestedBy: string;
+  }): Promise<{ discardedCount: number; jobsDiscarded: number }> {
+    const { requestedBy, ...rest } = params;
+    const { lastErrors, ...result } = await this.repo.discardManyFromDlq(rest);
+    if (result.discardedCount > 0) {
+      await this.audit.append({
+        actorUserId: requestedBy,
+        action: "queue_discard_dlq_groups",
+        queueName: params.queueName,
+        metadata: {
+          groupIds: params.groupIds.slice(0, 50),
+          requestedGroups: params.groupIds.length,
+          // A job's error message is arbitrary thrown text and can carry
+          // customer payload; the audit log is long-lived and widely read, so
+          // it records the SHAPE of the failure rather than its content. The
+          // full message stays where it already was, on the failing job.
+          lastErrorTypes: summarizeErrorShapes(lastErrors),
+          ...result,
+        },
+      });
+    }
+    return result;
   }
 
   async canaryRedrive(params: {

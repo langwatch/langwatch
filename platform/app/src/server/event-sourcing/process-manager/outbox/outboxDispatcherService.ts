@@ -16,6 +16,7 @@ import {
 import { toSafeFailureDiagnostic } from "../failureDiagnostic";
 import type { JsonValue } from "../json";
 import type {
+  FailedOutboxAttempt,
   LeasedOutboxMessageRecord,
   OutboxMessageIdentity,
   ProcessStore,
@@ -139,6 +140,37 @@ function retryAfterMsOf(error: unknown): number | undefined {
 function isTerminalError(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   return Reflect.get(error, "retryable") === false;
+}
+
+/**
+ * What the attempt log records (specs/ops/dead-letter-recovery.feature).
+ *
+ * `toSafeFailureDiagnostic` redacts every message, because an arbitrary
+ * thrown error can carry payload. A DispatchError's message is different: it
+ * is the delivery diagnostic our own dispatch endpoints assembled on purpose
+ * (ADR-027), and the attempt log is the admin-gated ops surface such a
+ * diagnostic exists for — redacting it there would leave the operator with
+ * "Operation failed" eight times over.
+ *
+ * The gate is the stable `name`, not the `retryable` field alone. Anything can
+ * carry a boolean `retryable`; only our own class stamps `DispatchError` in
+ * its constructor. Checked by name rather than `instanceof` because the error
+ * may have crossed a worker or serialisation boundary that stripped the
+ * prototype, which is the same reason the house rule prefers a code to a
+ * class check.
+ */
+function toAttemptDiagnostic(error: unknown): {
+  errorType: string;
+  errorMessage: string;
+} {
+  if (
+    error instanceof Error &&
+    error.name === "DispatchError" &&
+    typeof Reflect.get(error, "retryable") === "boolean"
+  ) {
+    return { errorType: error.name, errorMessage: error.message };
+  }
+  return toSafeFailureDiagnostic(error);
 }
 
 /**
@@ -295,6 +327,21 @@ export class OutboxDispatcherService {
       intentType: message.intentType,
       status: "dead",
     });
+    // A retirement kills the message without a delivery error to record, so
+    // the kill still gets an attempt entry — otherwise the one death mode
+    // with no exception would be the one with no history.
+    await this.recordAttemptBestEffort({
+      message,
+      attempt: {
+        attempt: message.attempts,
+        occurredAt: now,
+        outcome: "dead",
+        errorType: "AttemptsExhausted",
+        errorMessage:
+          "Exhausted delivery attempts without ever acknowledging — the " +
+          "handler is either not settling or repeatedly outliving the lease.",
+      },
+    });
     // Intentionally retain this opaque operational ID for retirement diagnostics.
     this.logger.error(
       {
@@ -310,6 +357,36 @@ export class OutboxDispatcherService {
         "acknowledging — retiring it as dead. Its handler is either not " +
         "settling or repeatedly outliving the lease.",
     );
+  }
+
+  /**
+   * The attempt log is diagnosis, not accounting: a failed history write must
+   * never fail the delivery bookkeeping, so the entry is the only loss
+   * (specs/ops/dead-letter-recovery.feature).
+   */
+  private async recordAttemptBestEffort(params: {
+    message: LeasedOutboxMessageRecord;
+    attempt: FailedOutboxAttempt;
+  }): Promise<void> {
+    try {
+      await this.store.recordFailedAttempt({
+        identity: identityOf(params.message),
+        attempt: params.attempt,
+      });
+    } catch (error) {
+      const { errorType, errorMessage } = toSafeFailureDiagnostic(error);
+      this.logger.warn(
+        {
+          processName: params.message.processName,
+          messageKey: params.message.messageKey,
+          intentType: params.message.intentType,
+          attempt: params.attempt.attempt,
+          errorType,
+          errorMessage,
+        },
+        "Failed to record an outbox attempt entry; delivery accounting is unaffected",
+      );
+    }
   }
 
   /** Hand a batch tail back to the pool because the lease budget ran out. */
@@ -508,6 +585,20 @@ export class OutboxDispatcherService {
             processName: message.processName,
             intentType: message.intentType,
             status: dead ? "dead" : "retried",
+          });
+          const attemptRetryAfterMs = retryAfterMsOf(error);
+          const attemptDiagnostic = toAttemptDiagnostic(error);
+          await this.recordAttemptBestEffort({
+            message,
+            attempt: {
+              attempt,
+              occurredAt: now,
+              outcome: dead ? "dead" : "retry_scheduled",
+              ...attemptDiagnostic,
+              ...(attemptRetryAfterMs !== undefined
+                ? { retryAfterMs: attemptRetryAfterMs }
+                : {}),
+            },
           });
           if (dead || attempt === 1) {
             // Intentionally retain this opaque operational ID for delivery diagnostics.

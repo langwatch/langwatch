@@ -185,7 +185,7 @@ export class EventRepositoryClickHouse implements EventRepository {
 
       return mapEventLogRows({ rows, tenantId, aggregateType, aggregateId });
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         {
           tenantId,
           aggregateType,
@@ -259,7 +259,7 @@ export class EventRepositoryClickHouse implements EventRepository {
 
       return mapEventLogRows({ rows, tenantId, aggregateType, aggregateId });
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         {
           tenantId,
           aggregateType,
@@ -303,7 +303,7 @@ export class EventRepositoryClickHouse implements EventRepository {
       const rows = await result.json<EventLogRow>();
       return mapEventLogRows({ rows, tenantId, aggregateType, aggregateId });
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         { ...request, aggregateId: String(aggregateId), error },
         "Failed to get paged event records up to event from ClickHouse",
       );
@@ -420,7 +420,7 @@ export class EventRepositoryClickHouse implements EventRepository {
 
       return count;
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         {
           tenantId,
           aggregateType,

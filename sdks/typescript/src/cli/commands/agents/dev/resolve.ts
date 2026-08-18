@@ -3,6 +3,7 @@
  * which registered HTTP agent to repoint.
  */
 
+import * as path from "node:path";
 import chalk from "chalk";
 import prompts from "prompts";
 import {
@@ -45,6 +46,13 @@ export function resolveLocalUrl(options: {
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       fail("--url must be an http or https URL");
     }
+    // The URL is stored in the agent's platform config and printed by the
+    // session, so credentials embedded in it would leak both ways.
+    if (parsed.username || parsed.password) {
+      fail(
+        "--url must not carry a username or password. Pass the URL without credentials.",
+      );
+    }
     return options.url;
   }
   fail(
@@ -79,14 +87,17 @@ function rememberedAgentForDirectory(): string | undefined {
  *
  *   1. `--agent <id|name>`: an exact id, else a name match over HTTP agents.
  *   2. The agent remembered for this directory from a previous run.
- *   3. An interactive picker over the project's HTTP agents (TTY only).
+ *   3. An interactive picker over the project's HTTP agents (TTY only), which
+ *      offers to create one when the project has none yet.
  */
 export async function resolveTargetAgent({
   service,
   agentFlag,
+  localUrl,
 }: {
   service: AgentsApiService;
   agentFlag?: string;
+  localUrl: string;
 }): Promise<AgentResponse> {
   const listing = await service.list({ limit: 100 });
   const httpAgents = listing.data.filter((agent) => agent.type === "http");
@@ -98,7 +109,7 @@ export async function resolveTargetAgent({
   const remembered = agentFromMemory(httpAgents);
   if (remembered) return remembered;
 
-  return pickHttpAgent(httpAgents);
+  return pickHttpAgent({ service, httpAgents, localUrl });
 }
 
 /** `--agent <id|name>`: an exact id, else a name match over HTTP agents. */
@@ -154,14 +165,56 @@ function agentFromMemory(httpAgents: AgentResponse[]): AgentResponse | undefined
   return match;
 }
 
+const CREATE_INSTRUCTIONS =
+  "This project has no HTTP agents. Create one first: langwatch agent create \"My Agent\" --type http --config '{\"url\":\"https://...\"}'";
+
+/**
+ * The project has no HTTP agents yet: offer to create one on the spot (TTY
+ * only). The created agent points at the local server, so after the session
+ * restores it, its URL states what it targeted; edit it in the UI when the
+ * agent gets a deployed address.
+ */
+async function createHttpAgentInteractively({
+  service,
+  localUrl,
+}: {
+  service: AgentsApiService;
+  localUrl: string;
+}): Promise<AgentResponse> {
+  const answer = await prompts({
+    type: "text",
+    name: "name",
+    message: `This project has no HTTP agents. Name a new one (will point at ${localUrl}):`,
+    initial: path.basename(process.cwd()) || "my-agent",
+  });
+  const name = typeof answer.name === "string" ? answer.name.trim() : "";
+  if (!name) {
+    fail(CREATE_INSTRUCTIONS);
+  }
+  const created = await service.create({
+    name,
+    type: "http",
+    config: { url: localUrl, method: "POST" },
+  });
+  console.log(chalk.green(`Created HTTP agent "${created.name}".`));
+  return created;
+}
+
 /** The only HTTP agent, else an interactive picker over them (TTY only). */
-async function pickHttpAgent(
-  httpAgents: AgentResponse[],
-): Promise<AgentResponse> {
+async function pickHttpAgent({
+  service,
+  httpAgents,
+  localUrl,
+}: {
+  service: AgentsApiService;
+  httpAgents: AgentResponse[];
+  localUrl: string;
+}): Promise<AgentResponse> {
   if (httpAgents.length === 0) {
-    fail(
-      "This project has no HTTP agents. Create one first: langwatch agent create \"My Agent\" --type http --config '{\"url\":\"https://...\"}'",
-    );
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
+      fail(CREATE_INSTRUCTIONS);
+    }
+    return createHttpAgentInteractively({ service, localUrl });
   }
   if (httpAgents.length === 1) {
     return httpAgents[0]!;

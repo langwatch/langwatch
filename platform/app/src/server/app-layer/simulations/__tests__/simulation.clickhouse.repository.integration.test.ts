@@ -271,6 +271,79 @@ describe("SimulationClickHouseRepository (integration)", () => {
         expect(result.runs[0]!.metadata).toEqual(metadata);
       });
     });
+
+    describe("when no scenario set id is given", () => {
+      /** @scenario "A batch id alone filters the list" */
+      it("returns the batch's runs and no others", async () => {
+        const batchRunId = `batch-only-${nanoid()}`;
+        const wantedRunId = `run-only-${nanoid()}`;
+
+        await insertRow(
+          ch,
+          makeInsertRow({ ScenarioRunId: wantedRunId, BatchRunId: batchRunId }),
+        );
+        await insertRow(ch, makeInsertRow({ Status: "IN_PROGRESS" }));
+
+        const result = await repo.getRunDataForBatchRun({
+          projectId: tenantId,
+          batchRunId,
+        });
+
+        expect(result.changed).toBe(true);
+        if (!result.changed) throw new Error("expected changed");
+        expect(result.runs.map((r) => r.scenarioRunId)).toEqual([wantedRunId]);
+      });
+    });
+
+    describe("when the scenario set id is the empty string", () => {
+      /** @scenario "An empty scenario set id still selects the default set" */
+      it("keeps the default set filter instead of dropping it", async () => {
+        const batchRunId = `batch-default-${nanoid()}`;
+        // The default set holds both storage values: "" from rows written
+        // before the set id got its name, and "default" from rows after.
+        const legacyDefaultRunId = `run-legacy-default-${nanoid()}`;
+        const namedDefaultRunId = `run-named-default-${nanoid()}`;
+
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: legacyDefaultRunId,
+            BatchRunId: batchRunId,
+            ScenarioSetId: "",
+          }),
+        );
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: namedDefaultRunId,
+            BatchRunId: batchRunId,
+            ScenarioSetId: "default",
+          }),
+        );
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-other-set-${nanoid()}`,
+            BatchRunId: batchRunId,
+            ScenarioSetId: `set-named-${nanoid()}`,
+          }),
+        );
+
+        const result = await repo.getRunDataForBatchRun({
+          projectId: tenantId,
+          scenarioSetId: "",
+          batchRunId,
+        });
+
+        expect(result.changed).toBe(true);
+        if (!result.changed) throw new Error("expected changed");
+        // The two default rows share a CreatedAt, so their order is not
+        // decided; only membership is.
+        expect(result.runs.map((r) => r.scenarioRunId).sort()).toEqual(
+          [legacyDefaultRunId, namedDefaultRunId].sort(),
+        );
+      });
+    });
   });
 
   describe("getAllRunDataForScenarioSet()", () => {

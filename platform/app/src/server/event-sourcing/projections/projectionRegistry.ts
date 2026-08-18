@@ -214,14 +214,29 @@ export class ProjectionRegistry<EventType extends Event = Event> {
       return;
     }
     if (!this.router) {
-      this.logger.warn(
-        "ProjectionRegistry.dispatch called before initialize(). Events will be dropped.",
+      // Error, not warning: nothing is thrown and nothing retries, so this is
+      // the last layer that can report the loss. The router is absent either
+      // before initialize() or after close() — in prod it is overwhelmingly
+      // the latter, dispatches still in flight when SIGTERM lands. Naming only
+      // the first case sent five days of shutdown drops looking for a boot
+      // race. See specs/observability/retryable-failure-log-level.feature.
+      this.logger.error(
+        { eventCount: events.length },
+        "ProjectionRegistry has no router (not initialized, or already closed); events dropped",
       );
       return;
     }
     await this.router.dispatch(events, context);
   }
 
+  /**
+   * Release the router, after which any further dispatch drops its events.
+   *
+   * That makes the ORDER this is called in load-bearing: it must come after the
+   * queue that feeds it has stopped, or jobs still draining will dispatch into
+   * a closed registry. See `EventSourcing.close()` and
+   * `specs/event-sourcing/worker-graceful-shutdown.feature`.
+   */
   async close(): Promise<void> {
     await this.queueManager?.close();
     this.queueManager = undefined;

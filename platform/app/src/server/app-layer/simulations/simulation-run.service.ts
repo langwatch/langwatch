@@ -53,7 +53,7 @@ export class SimulationRunService {
 
   async getRunDataForBatchRun(params: {
     projectId: string;
-    scenarioSetId: string;
+    scenarioSetId?: string;
     batchRunId: string;
     sinceTimestamp?: number;
   }): Promise<BatchRunDataResult> {

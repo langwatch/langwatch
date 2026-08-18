@@ -291,8 +291,8 @@ export class SimulationRunStateRepositoryClickHouse<
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
-        { scenarioRunId, tenantId: context.tenantId, error: errorMessage },
+      logger.warn(
+        { scenarioRunId, tenantId: context.tenantId, error },
         "Failed to get projection from ClickHouse",
       );
       throw new StoreError(
@@ -361,12 +361,12 @@ export class SimulationRunStateRepositoryClickHouse<
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         {
           tenantId: context.tenantId,
           scenarioRunId: String(projection.aggregateId),
           projectionId: projection.id,
-          error: errorMessage,
+          error,
         },
         "Failed to store projection in ClickHouse",
       );
@@ -435,11 +435,11 @@ export class SimulationRunStateRepositoryClickHouse<
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         {
           tenantId: context.tenantId,
           count: projections.length,
-          error: errorMessage,
+          error,
         },
         "Failed to batch store simulation projections in ClickHouse",
       );

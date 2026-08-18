@@ -143,10 +143,52 @@ describe.skipIf(!hasTestcontainers)(
           expect(stack).toContain("explodingHandlerForStackAssertion");
         });
       });
+
+      describe("when a later attempt succeeds", () => {
+        // The whole point of the level split. A run that recovers has not
+        // failed, so it must leave nothing at error — otherwise every
+        // transient ClickHouse refusal pages someone for work that landed.
+        /** @scenario "A retried attempt that later succeeds leaves no error record" */
+        it("leaves a warning for the failed attempt and nothing at error", async () => {
+          let attempts = 0;
+          const queue = createQueue(async () => {
+            attempts += 1;
+            if (attempts === 1) {
+              throw new Error("Too many queries in flight");
+            }
+          });
+          const warnSpy = spyOnLogger(queue, "warn");
+          const errorSpy = spyOnLogger(queue, "error");
+          await queue.waitUntilReady();
+
+          await queue.send({ id: "job-1", groupId: "g1" });
+
+          await vi.waitFor(
+            () => {
+              expect(attempts).toBeGreaterThanOrEqual(2);
+            },
+            { timeout: 15000, interval: 50 },
+          );
+
+          expect(
+            loggedObjectFor(
+              warnSpy,
+              "Job attempt failed, re-staged with backoff",
+            ),
+          ).toBeDefined();
+          expect(
+            loggedObjectFor(
+              errorSpy,
+              "Group blocked after exhausted retries, job re-staged",
+            ),
+          ).toBeUndefined();
+        });
+      });
     });
 
     describe("given a handler that throws a non-retryable error", () => {
       describe("when the job skips retries and the group is blocked", () => {
+        /** @scenario "The layer that gives up logs at error" */
         it("logs the full Error on both the non-retryable and blocked records", async () => {
           function invalidPayloadHandlerForStackAssertion(): never {
             throw new ValidationError("bad payload", "field");
