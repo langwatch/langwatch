@@ -1,6 +1,6 @@
 {
   "name": "@langwatch/web",
-  "version": "3.13.0",
+  "version": "3.14.0",
   "private": true,
   "engines": {
     "node": "24.x || 25.x || 26.x",
