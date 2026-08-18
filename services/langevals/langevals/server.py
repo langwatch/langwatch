@@ -22,7 +22,7 @@ from langevals.utils import (
 dotenv.load_dotenv()
 
 from fastapi import FastAPI, HTTPException, Request
-from typing import List, Optional
+from typing import Callable, List, Optional
 from langevals_core.base_evaluator import (
     EvaluationResultSkipped,
     EvaluationResultError,
@@ -107,7 +107,12 @@ class EvaluationGate:
     once the last evaluation of a generation leaves.
     """
 
-    def __init__(self, max_concurrent: int, timeout_seconds: float):
+    def __init__(
+        self,
+        max_concurrent: int,
+        timeout_seconds: float,
+        clock: Callable[[], float] = time.monotonic,
+    ):
         self._condition = threading.Condition()
         self._active = 0
         self._key: Optional[tuple] = None
@@ -117,6 +122,10 @@ class EvaluationGate:
         self._waiting: OrderedDict[tuple, int] = OrderedDict()
         self._max_concurrent = max_concurrent
         self._timeout_seconds = timeout_seconds
+        # The queue deadline reads the clock through this attribute, so a
+        # test can move a blocked waiter past its deadline at a chosen
+        # moment and check what the gate does when capacity frees after it.
+        self._clock = clock
 
     @property
     def active_evaluations(self) -> int:
@@ -148,7 +157,7 @@ class EvaluationGate:
 
     @contextmanager
     def admit(self, key: tuple):
-        deadline = time.monotonic() + self._timeout_seconds
+        deadline = self._clock() + self._timeout_seconds
         with self._condition:
             queued = False
             try:
@@ -157,14 +166,14 @@ class EvaluationGate:
                     # capacity happens to free at that same moment: its
                     # caller already gave up, so running it would only delay
                     # the live requests behind it.
-                    if queued and time.monotonic() >= deadline:
+                    if queued and self._clock() >= deadline:
                         raise EvaluationQueueTimeout()
                     if self._may_admit(key):
                         break
                     if not queued:
                         self._waiting[key] = self._waiting.get(key, 0) + 1
                         queued = True
-                    self._condition.wait(deadline - time.monotonic())
+                    self._condition.wait(deadline - self._clock())
             finally:
                 if queued:
                     self._leave_queue(key)

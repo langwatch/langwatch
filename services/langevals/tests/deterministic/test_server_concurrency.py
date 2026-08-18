@@ -47,6 +47,38 @@ finally:
 server.original_env = os.environ.copy()
 
 
+class ManualClock:
+    """A monotonic clock the test moves by hand.
+
+    Real time cannot produce one of the cases the gate has to handle: a
+    request that is still queued after its deadline passed. On a real clock
+    such a waiter wakes on its own timeout the moment the deadline passes, so
+    capacity can never free while it is both queued and expired. Advancing
+    this clock puts the blocked waiter past its deadline first, and the
+    release then follows.
+    """
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._now = 0.0
+
+    def __call__(self) -> float:
+        with self._lock:
+            return self._now
+
+    def advance(self, seconds: float) -> None:
+        with self._lock:
+            self._now += seconds
+
+
+def wait_until(condition, description: str, timeout: float = 5) -> None:
+    deadline = time.monotonic() + timeout
+    while not condition():
+        if time.monotonic() >= deadline:
+            pytest.fail(f"{description} within {timeout}s")
+        time.sleep(0.005)
+
+
 @pytest.fixture
 def slow_exact_match(monkeypatch):
     from langevals_langevals.exact_match import ExactMatchEvaluator
@@ -223,31 +255,47 @@ def test_gate_times_out_with_a_clear_error():
 
 
 def test_capacity_freed_after_the_deadline_does_not_admit():
-    gate = server.EvaluationGate(max_concurrent=1, timeout_seconds=0.05)
+    clock = ManualClock()
+    gate = server.EvaluationGate(max_concurrent=1, timeout_seconds=30, clock=clock)
     release = threading.Event()
+    late_key = (("OPENAI_API_KEY", "late"),)
+    late_outcome: list[str] = []
 
     def holder():
         with gate.admit(()):
-            release.wait(2)
+            release.wait(5)
+
+    def late_request():
+        try:
+            with gate.admit(late_key):
+                late_outcome.append("admitted")
+        except server.EvaluationQueueTimeout:
+            late_outcome.append("timed out")
 
     holding = threading.Thread(target=holder)
     holding.start()
-    deadline = time.monotonic() + 2
-    while gate.active_evaluations == 0:
-        if time.monotonic() >= deadline:
-            pytest.fail("The holder was not admitted within 2s")
-        time.sleep(0.005)
+    wait_until(lambda: gate.active_evaluations == 1, "The holder was not admitted")
 
-    # Free the capacity only after every waiter's 0.05s deadline has passed:
-    # none of them may be admitted late, and none may linger in the queue.
-    threading.Timer(0.3, release.set).start()
-    for _ in range(3):
-        with pytest.raises(server.EvaluationQueueTimeout):
-            with gate.admit((("OPENAI_API_KEY", "late"),)):
-                pass
-    holding.join(timeout=2)
+    waiting = threading.Thread(target=late_request)
+    waiting.start()
+    wait_until(
+        lambda: gate.waiting_environments == [late_key],
+        "The late request never queued",
+    )
+
+    # The deadline of the queued request passes BEFORE the capacity it waits
+    # for frees. Its caller already gave up, so the gate must reject it
+    # instead of starting it now and delaying the live requests behind it.
+    clock.advance(31)
+    release.set()
+
+    waiting.join(timeout=5)
+    holding.join(timeout=5)
+    assert not waiting.is_alive()
     assert not holding.is_alive()
+    assert late_outcome == ["timed out"]
     assert gate.waiting_environments == []
+    assert gate.active_evaluations == 0
     # The gate is healthy afterwards: a fresh request admits immediately.
     with gate.admit((("OPENAI_API_KEY", "fresh"),)):
         assert gate.active_evaluations == 1
