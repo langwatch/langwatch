@@ -202,7 +202,13 @@ delta comparison.
   | `settle_timeout` | `3m` | How long each stage waits for the pipeline to drain, as a Go duration. Raise it when a bigger `scale` outruns a small runner. |
 
   A timeout from `settle_timeout` means the run is **inconclusive**, not
-  that the code is wrong — the same distinction the resource numbers get.
+  that the code is wrong — the same distinction the resource numbers get. The
+  driver enforces that itself: a stage that gives up waiting still verifies and
+  still reports its counts, but its shortfalls (lost spans, under-counted
+  summaries, missing summaries) exit **2** rather than 1, because a span that
+  has not landed *yet* reads exactly like a span that never will. Violations
+  waiting cannot explain — a cross-tenant leak, a span stored more often than
+  it was sent — stay a hard failure whether or not the stage settled.
 - **On a PR:** requires **both** a path match (`event-sourcing/**`,
   `charts/clickhouse-serverless/**`, the driver, or the workflow) **and** the
   `benchmark` label. Both conditions, deliberately — this is expensive and
@@ -237,9 +243,11 @@ exact same span stream — payload generation is fully deterministic, and the
 PRNG is bit-identical across runs.
 
 Exit codes are distinct on purpose: **0** passed, **1** found a correctness
-violation (the pipeline is wrong, go look), **2** could not run at all
-(misconfigured, or ClickHouse unreachable — says nothing about the code under
-test). Do not collapse 1 and 2; a run that never happened is not a green run.
+violation (the pipeline is wrong, go look), **2** reached no verdict —
+misconfigured, ClickHouse unreachable, or a stage that timed out settling and
+so cannot tell lag from loss. It says nothing about the code under test. Do not
+collapse 1 and 2; a run that never reached a verdict is not a green run, and it
+is not a red one either.
 
 The pure core — load generation, the correctness rules, and the reporting —
 has unit tests that need no infrastructure:

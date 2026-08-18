@@ -14,25 +14,35 @@ import (
 	"time"
 )
 
+// RunOutcome is what a completed run found: the violations, and whether the
+// benchmark was in a position to trust them.
+//
+// Settled is false when any stage gave up waiting for the pipeline to catch
+// up. Its shortfalls may be lag rather than loss, which is the difference
+// between a failed run and an inconclusive one — see ClassifyRun.
+type RunOutcome struct {
+	Violations []Violation
+	Settled    bool
+}
+
 // RunBenchmark executes every stage and writes the artifacts.
 //
-// It returns the violations it found; a non-empty failure set is reported by
-// the caller as a non-zero exit, not as an error — an error here means the
-// benchmark could not be run at all, which is a different thing from the
-// benchmark finding a bug.
-func RunBenchmark(ctx context.Context, args RunArgs, out streams) ([]Violation, error) {
+// It returns what it found; violations are reported by the caller as a
+// non-zero exit, not as an error — an error here means the benchmark could not
+// be run at all, which is a different thing from the benchmark finding a bug.
+func RunBenchmark(ctx context.Context, args RunArgs, out streams) (RunOutcome, error) {
 	// 0 takes the default byte budget.
 	plan, err := PlanBenchmark(args.Scale, 0)
 	if err != nil {
-		return nil, err
+		return RunOutcome{}, err
 	}
 	if err := AssertWithinBudget(plan); err != nil {
-		return nil, err
+		return RunOutcome{}, err
 	}
 
 	client, sender, err := openRun(ctx, args, out)
 	if err != nil {
-		return nil, err
+		return RunOutcome{}, err
 	}
 
 	var results []StageResult
@@ -53,7 +63,7 @@ func RunBenchmark(ctx context.Context, args RunArgs, out streams) ([]Violation, 
 			Ledger: ledger,
 		})
 		if err != nil {
-			return nil, err
+			return RunOutcome{}, err
 		}
 		results = append(results, result)
 
@@ -63,14 +73,17 @@ func RunBenchmark(ctx context.Context, args RunArgs, out streams) ([]Violation, 
 	}
 
 	if err := writeArtifacts(args, plan, results); err != nil {
-		return nil, err
+		return RunOutcome{}, err
 	}
 
-	var all []Violation
+	outcome := RunOutcome{Settled: true}
 	for _, result := range results {
-		all = append(all, result.Violations...)
+		outcome.Violations = append(outcome.Violations, result.Violations...)
+		if result.SettleTimedOut {
+			outcome.Settled = false
+		}
 	}
-	return all, nil
+	return outcome, nil
 }
 
 // openRun builds the two clients the run needs, prepares the output directory,
@@ -170,7 +183,7 @@ func runStage(ctx context.Context, run stageRun) (StageResult, error) {
 		ToMs:   time.Now().UnixMilli() + 60*60_000,
 	}
 
-	violations, err := settleAndVerify(ctx, run, stageSettle{
+	checked, err := settleAndVerify(ctx, run, stageSettle{
 		Traces:  traces,
 		Outcome: outcome,
 		Window:  window,
@@ -182,11 +195,12 @@ func runStage(ctx context.Context, run stageRun) (StageResult, error) {
 	sampling = false
 
 	return stageResultOf(stagePlan, stageTally{
-		StartedAtMs: startedAtMs,
-		Traces:      traces,
-		Outcome:     outcome,
-		Violations:  violations,
-		Samples:     stopSampling(),
+		StartedAtMs:    startedAtMs,
+		Traces:         traces,
+		Outcome:        outcome,
+		Violations:     checked.Violations,
+		SettleTimedOut: !checked.Settled,
+		Samples:        stopSampling(),
 	}), nil
 }
 
@@ -196,7 +210,11 @@ type stageTally struct {
 	Traces      []generatedTrace
 	Outcome     sendOutcome
 	Violations  []Violation
-	Samples     []ResourceSample
+	// SettleTimedOut is true when the stage verified a pipeline that had not
+	// visibly caught up. Phrased as the exception rather than as "settled" so
+	// the zero value is the ordinary case.
+	SettleTimedOut bool
+	Samples        []ResourceSample
 }
 
 // stageResultOf assembles the record written to results.json. FinishedAtMs is
@@ -219,6 +237,7 @@ func stageResultOf(plan StagePlan, tally stageTally) StageResult {
 		RequestsSent:   tally.Outcome.Requests,
 		RequestsFailed: tally.Outcome.Failures,
 		Violations:     tally.Violations,
+		SettleTimedOut: tally.SettleTimedOut,
 		Samples:        tally.Samples,
 	}
 }
@@ -230,9 +249,21 @@ type stageSettle struct {
 	Window  TimeWindow
 }
 
+// stageChecks is one stage's verdict material: what the rules found, and
+// whether the pipeline had caught up when they ran.
+type stageChecks struct {
+	Violations []Violation
+	Settled    bool
+}
+
 // settleAndVerify waits for the pipeline to catch up, then runs every
 // correctness check including the resend probe.
-func settleAndVerify(ctx context.Context, run stageRun, settle stageSettle) ([]Violation, error) {
+//
+// It verifies even when the settle loop timed out — the counts are still
+// worth reporting, and the leak and double-count rules do not care about lag —
+// but it carries the timeout out with the violations so the caller can tell a
+// slow pipeline from a broken one.
+func settleAndVerify(ctx context.Context, run stageRun, settle stageSettle) (stageChecks, error) {
 	args := run.Args
 	tracesByTenant, expectedByTenant := stageExpectations(settle.Traces, settle.Outcome)
 	active := args.Tenants[:run.Plan.Tenants]
@@ -243,7 +274,7 @@ func settleAndVerify(ctx context.Context, run stageRun, settle stageSettle) ([]V
 		run.Ledger[tenantID] = append(run.Ledger[tenantID], traceIDs...)
 	}
 
-	waitForSettle(ctx, run.Client, settleWatch{
+	settled := waitForSettle(ctx, run.Client, settleWatch{
 		Tenants:          active,
 		TracesByTenant:   tracesByTenant,
 		ExpectedByTenant: expectedByTenant,
@@ -261,7 +292,7 @@ func settleAndVerify(ctx context.Context, run stageRun, settle stageSettle) ([]V
 		TenantOwnTraceIds: run.Ledger,
 	})
 	if err != nil {
-		return nil, err
+		return stageChecks{}, err
 	}
 
 	resendViolations, err := runResendProbe(ctx, run.Client, stageResend{
@@ -272,10 +303,13 @@ func settleAndVerify(ctx context.Context, run stageRun, settle stageSettle) ([]V
 		Sender: run.Sender,
 	})
 	if err != nil {
-		return nil, err
+		return stageChecks{}, err
 	}
 
-	return append(violations, resendViolations...), nil
+	return stageChecks{
+		Violations: append(violations, resendViolations...),
+		Settled:    settled,
+	}, nil
 }
 
 // stageExpectations derives what the settle loop should wait for: which traces

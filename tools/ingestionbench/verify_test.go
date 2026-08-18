@@ -423,18 +423,82 @@ func TestFindResendDrift(t *testing.T) {
 
 // @scenario "A benchmark that could not run is not reported as a passing run"
 // @scenario "A correctness violation fails the run"
-func TestIsFailure(t *testing.T) {
-	t.Run("treats any violation as a hard failure", func(t *testing.T) {
-		if !IsFailure([]Violation{{Kind: ViolationLostSpans, TenantId: "t", Detail: "d"}}) {
-			t.Errorf("got false, want true")
-		}
+// @scenario "A pipeline that never caught up is inconclusive, not lost data"
+// @scenario "A violation lag cannot explain still fails a run that never settled"
+func TestClassifyRun(t *testing.T) {
+	lostSpans := Violation{Kind: ViolationLostSpans, TenantId: "t", Detail: "d"}
+	leak := Violation{Kind: ViolationCrossTenantLeak, TenantId: "t", Detail: "d"}
+	doubleCounted := Violation{Kind: ViolationDoubleCounted, TenantId: "t", Detail: "d"}
+
+	t.Run("given the pipeline settled", func(t *testing.T) {
+		t.Run("treats any violation as a hard failure", func(t *testing.T) {
+			if got := ClassifyRun([]Violation{lostSpans}, true); got != VerdictViolated {
+				t.Errorf("got %v, want VerdictViolated", got)
+			}
+		})
+
+		t.Run("passes a clean run", func(t *testing.T) {
+			if got := ClassifyRun(nil, true); got != VerdictPassed {
+				t.Errorf("got %v, want VerdictPassed", got)
+			}
+		})
 	})
 
-	t.Run("passes a clean run", func(t *testing.T) {
-		if IsFailure(nil) {
-			t.Errorf("got true, want false")
-		}
+	t.Run("when a stage gave up waiting for the pipeline", func(t *testing.T) {
+		t.Run("reports shortfalls as inconclusive rather than as loss", func(t *testing.T) {
+			// The whole point: an ingestion path that is slow rather than
+			// wrong must not fail the build as if data were gone.
+			for _, kind := range []ViolationKind{ViolationLostSpans, ViolationUnderCounted, ViolationMissingSummary} {
+				got := ClassifyRun([]Violation{{Kind: kind, TenantId: "t", Detail: "d"}}, false)
+				if got != VerdictInconclusive {
+					t.Errorf("%s: got %v, want VerdictInconclusive", kind, got)
+				}
+			}
+		})
+
+		t.Run("still fails on a violation lag cannot explain", func(t *testing.T) {
+			// No amount of further waiting stores one tenant's span under
+			// another tenant's id, or stores a span more often than it was
+			// sent. Those stay failures however the settle loop ended.
+			for _, violation := range []Violation{leak, doubleCounted} {
+				if got := ClassifyRun([]Violation{violation}, false); got != VerdictViolated {
+					t.Errorf("%s: got %v, want VerdictViolated", violation.Kind, got)
+				}
+			}
+		})
+
+		t.Run("fails when a real violation sits among the shortfalls", func(t *testing.T) {
+			if got := ClassifyRun([]Violation{lostSpans, leak}, false); got != VerdictViolated {
+				t.Errorf("got %v, want VerdictViolated", got)
+			}
+		})
+
+		t.Run("passes a run that found nothing", func(t *testing.T) {
+			// Every rule ran and held. The timeout only demotes shortfalls it
+			// could have caused; it does not invent a problem.
+			if got := ClassifyRun(nil, false); got != VerdictPassed {
+				t.Errorf("got %v, want VerdictPassed", got)
+			}
+		})
 	})
+}
+
+// @scenario "A pipeline that never caught up is inconclusive, not lost data"
+func TestRunVerdictExitCode(t *testing.T) {
+	// The exit code is the contract CI reads; the log line is only for humans.
+	cases := []struct {
+		verdict RunVerdict
+		want    int
+	}{
+		{VerdictPassed, 0},
+		{VerdictViolated, 1},
+		{VerdictInconclusive, 2},
+	}
+	for _, c := range cases {
+		if got := c.verdict.ExitCode(); got != c.want {
+			t.Errorf("verdict %v: got exit %d, want %d", c.verdict, got, c.want)
+		}
+	}
 }
 
 // @scenario "A run that finds a violation is distinguishable from a broken run"

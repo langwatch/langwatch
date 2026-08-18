@@ -29,21 +29,35 @@ func (r countRow) spans() int { return int(r.SpanCount) }
 
 func (r countRow) events() int { return int(r.EventCount) }
 
-// waitForSettle polls until the pipeline has caught up, or the timeout expires.
+// waitForSettle polls until the pipeline has caught up, and reports whether it
+// did before the timeout expired.
 //
 // Polls rather than sleeping a flat interval: a fixed sleep is either wasteful
 // or (much worse) too short under load, which turns a slow pipeline into a
 // false "lost spans" failure.
-func waitForSettle(ctx context.Context, client *chClient, watch settleWatch) {
+//
+// The returned bool is the only place the difference between "caught up" and
+// "gave up waiting" exists. Verification runs either way — the counts are worth
+// having, and most of the checks are unaffected by lag — but a caller that
+// threw this away would report a still-draining pipeline as lost data. It is
+// what makes the run INCONCLUSIVE rather than FAILED; see ClassifyRun.
+func waitForSettle(ctx context.Context, client *chClient, watch settleWatch) bool {
 	deadline := time.Now().Add(watch.Timeout)
 	interval := 250 * time.Millisecond
 
 	for time.Now().Before(deadline) {
+		// A canceled run has not settled, and polling a dead context only
+		// spins until the deadline: every query fails instantly and every
+		// sleep returns instantly.
+		if ctx.Err() != nil {
+			return false
+		}
+
 		if storedCaughtUp(ctx, client, watch) {
 			// One extra beat so any in-flight fold write lands before we read
 			// the summaries; reading a half-written projection looks like a bug.
 			sleep(ctx, time.Second)
-			return
+			return true
 		}
 
 		sleep(ctx, interval)
@@ -51,8 +65,9 @@ func waitForSettle(ctx context.Context, client *chClient, watch settleWatch) {
 	}
 
 	fmt.Fprintf(watch.Log,
-		"[benchmark] settle timeout after %s — verifying anyway. Shortfalls below may be lag "+
-			"rather than loss; check the stage duration.\n", watch.Timeout)
+		"[benchmark] settle timeout after %s — verifying anyway. Shortfalls below are reported "+
+			"as INCONCLUSIVE rather than as loss; check the stage duration.\n", watch.Timeout)
+	return false
 }
 
 // settleWatch is what one settle loop is waiting on.

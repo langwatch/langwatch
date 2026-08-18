@@ -48,11 +48,12 @@ type streams struct {
 
 // Run is the ingestionbench CLI. It returns the process exit code: 0 when the
 // benchmark passed, 1 when it found a correctness violation, 2 when it could
-// not be run at all.
+// not decide.
 //
 // The distinction matters. Exit 1 means the pipeline is wrong and someone must
-// look; exit 2 means the benchmark itself could not reach ClickHouse, or was
-// misconfigured, and says nothing about the code under test.
+// look; exit 2 means the benchmark reached no verdict — it could not be
+// configured, could not reach ClickHouse, or saw a stage give up waiting for
+// the pipeline to catch up — and says nothing about the code under test.
 func Run(args []string, stdout, stderr io.Writer) int {
 	out := streams{Out: stdout, Err: stderr}
 	if len(args) == 0 {
@@ -180,20 +181,41 @@ func runBenchmarkCommand(ctx context.Context, args []string, out streams) int {
 		return 2
 	}
 
-	violations, err := RunBenchmark(ctx, resolved, out)
+	outcome, err := RunBenchmark(ctx, resolved, out)
 	if err != nil {
 		fmt.Fprintf(out.Err, "[benchmark] could not run: %v\n", err)
 		return 2
 	}
 
-	if IsFailure(violations) {
-		fmt.Fprintf(out.Err, "[benchmark] FAILED with %d correctness violation(s).\n%s\n",
-			len(violations), SummarizeViolations(violations))
-		return 1
-	}
+	return reportVerdict(outcome, out)
+}
 
-	fmt.Fprintln(out.Out, "[benchmark] all stages passed.")
-	return 0
+// reportVerdict says what the run concluded and returns the exit code that
+// carries it.
+//
+// The wording and the exit code are decided in one place on purpose: a log
+// line that says FAILED next to an exit code that means "could not tell" is
+// worse than either signal alone.
+func reportVerdict(outcome RunOutcome, out streams) int {
+	verdict := ClassifyRun(outcome.Violations, outcome.Settled)
+	switch verdict {
+	case VerdictViolated:
+		fmt.Fprintf(out.Err, "[benchmark] FAILED with %d correctness violation(s).\n%s\n",
+			len(outcome.Violations), SummarizeViolations(outcome.Violations))
+	case VerdictInconclusive:
+		// Deliberately not exit 1: a stage stopped waiting before the pipeline
+		// caught up, so every shortfall below is as consistent with a slow
+		// path as with a lost span. Raising -settle-timeout is the next step,
+		// not opening a data-loss investigation.
+		fmt.Fprintf(out.Err,
+			"[benchmark] INCONCLUSIVE: a stage timed out waiting for the pipeline to catch up, "+
+				"and the %d shortfall(s) below may be lag rather than loss. Re-run with a longer "+
+				"-settle-timeout.\n%s\n",
+			len(outcome.Violations), SummarizeViolations(outcome.Violations))
+	default:
+		fmt.Fprintln(out.Out, "[benchmark] all stages passed.")
+	}
+	return verdict.ExitCode()
 }
 
 // envOr returns the environment variable, or fallback when it is unset.

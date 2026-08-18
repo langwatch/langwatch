@@ -313,9 +313,71 @@ func FindResendDrift(opts FindResendDriftOptions) []Violation {
 	return violations
 }
 
-// IsFailure reports whether the run must fail. Any violation is a hard failure.
-func IsFailure(violations []Violation) bool {
-	return len(violations) > 0
+// RunVerdict is what a finished run concluded about the pipeline.
+type RunVerdict int
+
+const (
+	// VerdictPassed is every rule holding on data the benchmark could read.
+	VerdictPassed RunVerdict = iota
+	// VerdictViolated is the pipeline being wrong: someone has to look.
+	VerdictViolated
+	// VerdictInconclusive is the benchmark not being able to tell, which says
+	// nothing about the code under test.
+	VerdictInconclusive
+)
+
+// ExitCode maps a verdict onto the process exit code the CLI documents.
+func (v RunVerdict) ExitCode() int {
+	switch v {
+	case VerdictViolated:
+		return 1
+	case VerdictInconclusive:
+		return 2
+	default:
+		return 0
+	}
+}
+
+// lagExplains reports whether an ingestion path that simply had not caught up
+// yet could produce this kind of violation on data that was never lost.
+//
+// Shortfalls can: a span not stored YET reads exactly like a span never
+// stored, and a summary not folded YET reads exactly like a projection that
+// never ran. Storing MORE than was sent, or storing one tenant's span under
+// another tenant's id, cannot — no amount of further waiting turns those into
+// a correct pipeline, so they stay failures however the settle loop ended.
+func lagExplains(kind ViolationKind) bool {
+	switch kind {
+	case ViolationLostSpans, ViolationUnderCounted, ViolationMissingSummary:
+		return true
+	default:
+		return false
+	}
+}
+
+// ClassifyRun decides a run's verdict from what it found and whether every
+// stage saw the pipeline catch up before it verified.
+//
+// The settled flag is the whole point of this function. Verifying an
+// unsettled pipeline produces shortfalls that are indistinguishable from
+// data loss when read as counts alone, and reporting those as a correctness
+// failure fails the build for a path that is slow rather than wrong. The
+// difference is knowable exactly once — at the moment the settle loop gives
+// up — so it is carried here instead of being left in a log line for a human
+// to notice.
+func ClassifyRun(violations []Violation, settled bool) RunVerdict {
+	if len(violations) == 0 {
+		return VerdictPassed
+	}
+	if settled {
+		return VerdictViolated
+	}
+	for _, violation := range violations {
+		if !lagExplains(violation.Kind) {
+			return VerdictViolated
+		}
+	}
+	return VerdictInconclusive
 }
 
 // SummarizeViolations renders a human-readable violation summary, grouped by

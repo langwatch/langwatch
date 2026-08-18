@@ -42,6 +42,12 @@ type StageResult struct {
 	RequestsSent   int
 	RequestsFailed int
 	Violations     []Violation
+	// SettleTimedOut is true when the stage verified a pipeline that had not
+	// visibly caught up, so its shortfalls may be lag rather than loss. Kept
+	// in results.json because it is what decides whether a shortfall is a
+	// failure or an inconclusive result, and reading the artifact without it
+	// would show violations the run did not fail on.
+	SettleTimedOut bool
 	Samples        []ResourceSample
 }
 
@@ -193,25 +199,64 @@ func RenderResourceBreakdown(results []StageResult) string {
 }
 
 // RenderCorrectnessSection renders the verdict, naming only failing stages.
+//
+// The heading is the verdict the exit code carries, so a reader of the job
+// summary and a reader of the exit status never disagree: a run whose only
+// shortfalls came from a stage that never settled is INCONCLUSIVE in both.
 func RenderCorrectnessSection(results []StageResult) string {
-	total := 0
+	var all []Violation
+	settled := true
 	for _, r := range results {
-		total += len(r.Violations)
-	}
-	if total == 0 {
-		return "## Correctness\n\n" +
-			"All stages passed: no lost spans, no double-counted `SpanCount`, no cross-tenant leakage."
+		all = append(all, r.Violations...)
+		if r.SettleTimedOut {
+			settled = false
+		}
 	}
 
 	var b strings.Builder
-	b.WriteString("## Correctness\n\n**This run FAILED.**\n")
+	b.WriteString("## Correctness\n\n")
+
+	switch ClassifyRun(all, settled) {
+	case VerdictPassed:
+		b.WriteString("All stages passed: no lost spans, no double-counted `SpanCount`, no cross-tenant leakage.")
+		writeUnsettledStages(&b, results)
+		return b.String()
+	case VerdictInconclusive:
+		b.WriteString("**This run was INCONCLUSIVE.**\n\n" +
+			"The shortfalls below come from a stage that gave up waiting for the pipeline to " +
+			"catch up, so they may be lag rather than loss. Re-run with a longer settle timeout " +
+			"before reading them as a regression.\n")
+	default:
+		b.WriteString("**This run FAILED.**\n")
+	}
+
 	for _, r := range results {
 		if len(r.Violations) == 0 {
 			continue
 		}
 		fmt.Fprintf(&b, "\n### `%s`\n\n%s\n", r.Stage, SummarizeViolations(r.Violations))
 	}
+	writeUnsettledStages(&b, results)
 	return b.String()
+}
+
+// writeUnsettledStages names the stages that stopped waiting, if any.
+//
+// Worth saying even on a passing run: it is the signal that the settle timeout
+// is too short for this scale, and the next run at the same size may well be
+// the one that cannot decide.
+func writeUnsettledStages(b *strings.Builder, results []StageResult) {
+	var stages []string
+	for _, r := range results {
+		if r.SettleTimedOut {
+			stages = append(stages, fmt.Sprintf("`%s`", r.Stage))
+		}
+	}
+	if len(stages) == 0 {
+		return
+	}
+	fmt.Fprintf(b, "\nStages that timed out settling: %s. Raise `settle_timeout` for a run at this scale.\n",
+		strings.Join(stages, ", "))
 }
 
 // RenderJobSummaryOptions are the inputs to RenderJobSummary.

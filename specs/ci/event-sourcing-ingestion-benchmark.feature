@@ -97,6 +97,23 @@ Feature: Event-sourcing ingestion benchmark and stability workflow
     Then it reports a correctness failure naming the affected traces
     And the report separates it from a benchmark that failed to execute
 
+  @ci @reporting @unit
+  Scenario: A pipeline that never caught up is inconclusive, not lost data
+    Given a stage gives up waiting for the pipeline to catch up
+    And the only shortfalls it then finds are counts that lag would explain
+    When the run ends
+    Then it reports the run as inconclusive rather than as a correctness failure
+    And it tells the reader to re-run with a longer settle timeout
+    And a slow ingestion path is never reported as data loss
+
+  @ci @reporting @unit
+  Scenario: A violation lag cannot explain still fails a run that never settled
+    Given a stage gives up waiting for the pipeline to catch up
+    And one tenant's spans were stored under another tenant's id
+    When the run ends
+    Then it reports a correctness failure
+    And waiting longer is not offered as an explanation
+
   # ---------------------------------------------------------------------------
   # Stage 1 — serial stream. The fold hot path and per-aggregate FIFO.
   # ---------------------------------------------------------------------------

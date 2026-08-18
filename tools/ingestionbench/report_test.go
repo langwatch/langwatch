@@ -224,6 +224,50 @@ func TestRenderCorrectnessSection(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("when a stage timed out settling", func(t *testing.T) {
+		unsettled := func(violations []Violation) []StageResult {
+			return []StageResult{newResult(func(r *StageResult) {
+				r.Stage = StageConcurrent
+				r.SettleTimedOut = true
+				r.Violations = violations
+			})}
+		}
+
+		t.Run("calls a shortfall inconclusive rather than a failure", func(t *testing.T) {
+			// The summary and the exit code have to agree: a reader who sees
+			// FAILED here and a 2 in the log cannot tell which one to believe.
+			section := RenderCorrectnessSection(unsettled(
+				[]Violation{{Kind: ViolationLostSpans, TenantId: "t", Detail: "boom"}}))
+
+			if !strings.Contains(section, "**This run was INCONCLUSIVE.**") {
+				t.Errorf("section does not declare the run inconclusive: %q", section)
+			}
+			if strings.Contains(section, "**This run FAILED.**") {
+				t.Errorf("section reports a still-draining pipeline as a failure")
+			}
+			if !strings.Contains(section, "settle timeout") {
+				t.Errorf("section does not tell the reader what to change")
+			}
+		})
+
+		t.Run("still fails on a violation lag cannot explain", func(t *testing.T) {
+			section := RenderCorrectnessSection(unsettled(
+				[]Violation{{Kind: ViolationCrossTenantLeak, TenantId: "t", Detail: "boom"}}))
+
+			if !strings.Contains(section, "**This run FAILED.**") {
+				t.Errorf("section excuses a cross-tenant leak as lag: %q", section)
+			}
+		})
+
+		t.Run("names the stage even on a clean run", func(t *testing.T) {
+			section := RenderCorrectnessSection(unsettled(nil))
+
+			if !strings.Contains(section, "Stages that timed out settling: `"+string(StageConcurrent)+"`") {
+				t.Errorf("passing run hides that a stage stopped waiting: %q", section)
+			}
+		})
+	})
 }
 
 // @scenario "Resource usage never fails the run on an absolute threshold"
