@@ -1,9 +1,10 @@
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 import asyncio
 import os
 import signal
 import sys
 import threading
+import time
 import dotenv
 from fastapi.responses import RedirectResponse
 
@@ -24,6 +25,7 @@ from typing import List, Optional
 from langevals_core.base_evaluator import (
     EvaluationResultSkipped,
     EvaluationResultError,
+    models_env_vars,
 )
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from mangum import Mangum
@@ -52,19 +54,106 @@ app.add_middleware(StagedPayloadMiddleware)
 
 original_env = os.environ.copy()
 
-# Evaluations mutate the process environment (the request's `env` becomes env
-# vars for litellm), so only one evaluation may run at a time per process.
-# The lock keeps that invariant now that the endpoint runs in a worker thread
-# instead of holding the event loop hostage: with the loop free, /healthcheck
-# always answers and Kubernetes probes stay green while evaluations queue.
-evaluation_lock = threading.Lock()
-# Both knobs are read while the server boots: a blank or mistyped value in a
+# The knobs are read while the server boots: a blank or mistyped value in a
 # manifest falls back to the default instead of stopping the pod.
 EVALUATION_QUEUE_TIMEOUT_SECONDS = (
     positive_float_or_none(os.getenv("LANGEVALS_QUEUE_TIMEOUT")) or 300.0
 )
 MAX_EVALUATIONS_IN_PARALLEL = (
     positive_int_or_none(os.getenv("MAX_EVALUATIONS_IN_PARALLEL")) or 50
+)
+MAX_CONCURRENT_EVALUATIONS = (
+    positive_int_or_none(os.getenv("MAX_CONCURRENT_EVALUATIONS")) or 8
+)
+
+
+def model_env_key(env: Optional[dict[str, str]]) -> tuple:
+    """The part of a request's `env` that gets written into `os.environ`.
+
+    Mirrors the filter in `BaseEvaluator.set_model_envs`: model provider
+    credentials and litellm passthrough variables. Two requests with the same
+    key write the same process environment, so they can run at the same time.
+    """
+    if not env:
+        return ()
+    return tuple(
+        sorted(
+            (key, value)
+            for key, value in env.items()
+            if key in models_env_vars or key.startswith("X_LITELLM_")
+        )
+    )
+
+
+class EvaluationQueueTimeout(Exception):
+    """Raised when a request waited out the queue timeout without admission."""
+
+
+class EvaluationGate:
+    """Admits evaluations concurrently while they share one environment.
+
+    Evaluations write their request `env` into `os.environ` because litellm
+    reads credentials implicitly, so two evaluations with different
+    credentials must never overlap. Two evaluations with the same credentials
+    write identical values, so they can, and on a single-project install
+    (where every request carries the same provider keys) that is every
+    evaluation. The gate tracks the env of the in-flight evaluations as a
+    generation: same-env requests run together up to `max_concurrent`, a
+    request with a different env waits for the previous generation to drain,
+    and the process environment is restored once the last one leaves.
+    """
+
+    def __init__(self, max_concurrent: int, timeout_seconds: float):
+        self._condition = threading.Condition()
+        self._active = 0
+        self._key: Optional[tuple] = None
+        self._switch_pending = False
+        self._max_concurrent = max_concurrent
+        self._timeout_seconds = timeout_seconds
+
+    @property
+    def active_evaluations(self) -> int:
+        return self._active
+
+    @contextmanager
+    def admit(self, key: tuple):
+        deadline = time.monotonic() + self._timeout_seconds
+        with self._condition:
+            while (
+                self._active >= self._max_concurrent
+                or (self._key is not None and self._key != key)
+                or (self._switch_pending and self._active > 0)
+            ):
+                if self._key is not None and self._key != key:
+                    # Close the running generation to new entries, so a
+                    # steady stream with one env cannot starve a request
+                    # with another env: the generation drains, then whoever
+                    # wakes first starts the next one.
+                    self._switch_pending = True
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise EvaluationQueueTimeout()
+                self._condition.wait(remaining)
+            self._key = key
+            self._switch_pending = False
+            self._active += 1
+        try:
+            yield
+        finally:
+            with self._condition:
+                self._active -= 1
+                if self._active == 0:
+                    # Drop the request credentials (and anything an evaluator
+                    # library set) the moment nothing is running anymore.
+                    os.environ.clear()
+                    os.environ.update(original_env)
+                    self._key = None
+                self._condition.notify_all()
+
+
+evaluation_gate = EvaluationGate(
+    max_concurrent=MAX_CONCURRENT_EVALUATIONS,
+    timeout_seconds=EVALUATION_QUEUE_TIMEOUT_SECONDS,
 )
 
 
@@ -123,27 +212,23 @@ def create_evaluator_routes(evaluator_cls):
         # Sync endpoint: FastAPI runs it in a worker thread, so a long
         # evaluation never blocks the event loop and /healthcheck stays
         # responsive under load.
-        if not evaluation_lock.acquire(timeout=EVALUATION_QUEUE_TIMEOUT_SECONDS):
+        try:
+            with evaluation_gate.admit(model_env_key(req.env)):
+                if module_name == "ragas":
+                    nest_asyncio_if_running_loop()
+                # Constructing the evaluator writes the request env into
+                # os.environ (set_model_envs). Everything admitted together
+                # carries the same key, so concurrent writes are identical.
+                evaluator = evaluator_cls(settings=(req.settings or {}), env=req.env)  # type: ignore
+                return evaluator.evaluate_batch(
+                    req.data,
+                    max_evaluations_in_parallel=MAX_EVALUATIONS_IN_PARALLEL,
+                )
+        except EvaluationQueueTimeout:
             raise HTTPException(
                 status_code=503,
                 detail="Evaluation queue is full, retry in a moment",
             )
-        try:
-            if module_name == "ragas":
-                nest_asyncio_if_running_loop()
-            os.environ.clear()
-            os.environ.update(
-                original_env
-            )  # always try to set env vars from the original env back again to avoid side effects
-            evaluator = evaluator_cls(settings=(req.settings or {}), env=req.env)  # type: ignore
-            return evaluator.evaluate_batch(
-                req.data,
-                max_evaluations_in_parallel=MAX_EVALUATIONS_IN_PARALLEL,
-            )
-        finally:
-            os.environ.clear()
-            os.environ.update(original_env)
-            evaluation_lock.release()
 
 
 evaluators = load_evaluator_packages()

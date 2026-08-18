@@ -71,13 +71,13 @@ async def test_healthcheck_answers_while_an_evaluation_runs():
         evaluation = asyncio.create_task(
             client.post("/ragas/context_f1/evaluate", json=SLOW_EVALUATION)
         )
-        # Wait until the evaluation holds the lock, so the healthcheck below
-        # is provably sent while an evaluation is running. A fixed sleep can
+        # Wait until the evaluation is admitted, so the healthcheck below is
+        # provably sent while an evaluation is running. A fixed sleep can
         # lose that race under CPU pressure and pass without testing anything.
         deadline = time.monotonic() + 5
-        while not server.evaluation_lock.locked():
+        while server.evaluation_gate.active_evaluations == 0:
             if time.monotonic() >= deadline:
-                pytest.fail("The evaluation did not take the lock within 5s")
+                pytest.fail("The evaluation was not admitted within 5s")
             await asyncio.sleep(0.01)
         health_started = time.monotonic()
         health = await client.get("/healthcheck")
