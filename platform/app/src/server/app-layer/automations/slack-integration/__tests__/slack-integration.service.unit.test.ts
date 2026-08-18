@@ -8,7 +8,7 @@ vi.mock("~/utils/encryption", () => ({
 }));
 
 import type { HandledError } from "@langwatch/handled-error";
-import type { SlackIntegration } from "@prisma/client";
+import type { SlackIntegration } from "~/generated/prisma/client";
 import type { SlackWorkspaceIdentity } from "../../delivery/slackWebApi";
 import type {
   ClearOwnSlackTokenOutcome,

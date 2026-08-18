@@ -111,7 +111,7 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: { connected: false }, isLoading: false }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       automation: {
         getTriggerById: { invalidate: mockInvalidateTriggerById },
       },
@@ -210,7 +210,7 @@ describe("given the unified automations table", () => {
   });
 
   describe("when the user confirms the deletion", () => {
-    /** @scenario Confirming the dialog deletes the row and the drawer cache */
+    /** @scenario Confirming the dialog deletes the row everywhere it could reappear */
     it("deletes the row and invalidates the drawer cache", async () => {
       mockDeleteMutate.mockImplementation((_input, opts) => {
         opts.onSuccess();

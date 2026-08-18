@@ -19,7 +19,7 @@ describe("persistSlackActionParams", () => {
   // integration serves the delivery, so persist must accept a bot connection
   // with nothing in the token field rather than refusing it.
   describe("when a bot connection carries no token at all", () => {
-    /** @scenario "New automations never store a token" */
+    /** @scenario "New automations rely on the project integration, not a token of their own" */
     it("stores no token rather than refusing the save", () => {
       const stored = persistSlackActionParams({
         incoming: { slackDelivery: "bot", slackChannelId: "C1" },

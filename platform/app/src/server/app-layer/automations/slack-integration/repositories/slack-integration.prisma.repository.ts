@@ -1,6 +1,6 @@
 import type { SlackActionParams } from "@langwatch/automations/providers/slack";
-import type { PrismaClient, SlackIntegration } from "@prisma/client";
-import { TriggerAction } from "@prisma/client";
+import type { PrismaClient, SlackIntegration } from "~/generated/prisma/client";
+import { TriggerAction } from "~/generated/prisma/client";
 import type {
   ClearOwnSlackTokenOutcome,
   LegacySlackTokenAutomation,

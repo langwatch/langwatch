@@ -59,7 +59,7 @@ function ReportsContent() {
     { enabled: !!projectId && !!activeDashboardId },
   );
 
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
   const deleteGraph = api.graphs.delete.useMutation();
   const updateLayout = api.graphs.updateLayout.useMutation();
   const batchUpdateLayouts = api.graphs.batchUpdateLayouts.useMutation();

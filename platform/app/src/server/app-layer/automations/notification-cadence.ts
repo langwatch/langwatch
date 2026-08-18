@@ -1,5 +1,5 @@
 import type { NotificationCadence } from "@langwatch/automations/cadences";
-import type { TriggerAction } from "@prisma/client";
+import type { TriggerAction } from "~/generated/prisma/client";
 import { NOTIFY_TRIGGER_ACTIONS } from "./dispatch/triggerActionDispatch";
 
 /**

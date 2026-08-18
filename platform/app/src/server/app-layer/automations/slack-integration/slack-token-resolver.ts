@@ -1,5 +1,5 @@
 import type { SlackActionParams } from "@langwatch/automations/providers/slack";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { SlackIntegrationMissingError } from "../errors";
 import { decryptSlackBotToken } from "../providers/slack/server";

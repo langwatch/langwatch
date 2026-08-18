@@ -351,7 +351,7 @@ function SlackProjectConnection({
   projectId: string;
   projectName: string | null;
 }) {
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const status = api.slackIntegration.getStatus.useQuery({ projectId });
   // Per SELECTED project, answered by the server with the status read — the
   // picker can reach projects the session is not on, where the session

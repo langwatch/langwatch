@@ -1,4 +1,4 @@
-import type { SlackIntegration } from "@prisma/client";
+import type { SlackIntegration } from "~/generated/prisma/client";
 
 /** An automation that still carries its own encrypted Slack bot token. */
 export interface LegacySlackTokenAutomation {

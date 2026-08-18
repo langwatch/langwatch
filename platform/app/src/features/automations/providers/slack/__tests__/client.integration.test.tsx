@@ -1004,7 +1004,7 @@ describe("Slack client slice contract", () => {
     // The token belongs to the project now (ADR-093 §5), so it is not something
     // the author has left unfinished — completeness is the channel.
     describe("when the channel is set and no token is stored", () => {
-      /** @scenario "New automations never store a token" */
+      /** @scenario "New automations rely on the project integration, not a token of their own" */
       it("reports the config as complete", () => {
         expect(
           slackClient.isComplete(botSlice({ botTokenAlreadySet: false })),

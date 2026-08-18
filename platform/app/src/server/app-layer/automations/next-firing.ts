@@ -21,7 +21,7 @@ import {
   NOTIFICATION_CADENCES,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
-import { type TriggerAction, TriggerKind } from "@prisma/client";
+import { type TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import { computeScheduledFor } from "./dispatch/triggerActionDispatch";
 import { GRAPH_TRIGGER_HEARTBEAT_INTERVAL_MS } from "./graph-trigger-heartbeat";
 import type { ReportSchedule } from "./trigger.service";

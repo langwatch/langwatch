@@ -7,8 +7,8 @@ vi.mock("~/utils/encryption", () => ({
   decrypt: (value: string) => value.replace(/^enc\(/, "").replace(/\)$/, ""),
 }));
 
-import type { Trigger } from "@prisma/client";
-import { TriggerAction, TriggerKind } from "@prisma/client";
+import type { Trigger } from "~/generated/prisma/client";
+import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import type { PublicApiTestFireInput } from "../public-api-trigger.service";
 import { PublicApiTriggerService } from "../public-api-trigger.service";
 import type { TriggerService } from "../trigger.service";

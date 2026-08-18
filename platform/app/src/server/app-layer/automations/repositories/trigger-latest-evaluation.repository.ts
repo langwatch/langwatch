@@ -19,6 +19,9 @@ export type EvaluationSkipCode =
   /** The graph groups by a field with more distinct values than a threshold
    *  read can carry, so the check cannot be answered as configured. */
   | "result_too_large"
+  /** The saved series asks for a percentage of a per-entity measurement,
+   *  which the query builder refuses rather than answer wrongly. */
+  | "series_percentage_unsupported"
   /** The alert is switched off, so no check was performed. */
   | "inactive";
 

@@ -131,7 +131,7 @@ function AutomationsPage() {
   const section = sectionFromPath(router.pathname);
   const details = sectionDetails[section];
   const basePath = project ? `/${project.slug}/automations` : "/auth/signin";
-  const trpcUtils = api.useContext();
+  const trpcUtils = api.useUtils();
 
   // Row pending a delete confirmation (#6716: deletion was immediate and
   // irreversible). Holding the row itself, not just its id, lets the dialog

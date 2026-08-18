@@ -28,7 +28,7 @@ import {
   sanitizeTriggerFilters,
   type TriggerFilterValue,
 } from "~/server/filters/types";
-import { api, type RouterOutputs } from "~/utils/api";
+import { api } from "~/utils/api";
 import { formatMilliseconds } from "~/utils/formatMilliseconds";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { queryIsStructurable } from "../logic/conditionQuery";
@@ -217,15 +217,6 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
   if (view === "empty") {
     return <NoGraphsYet projectSlug={project?.slug} />;
   }
-
-  const selectGraph = (customGraphId: string | null) => {
-    dispatch({ type: "SET_CUSTOM_GRAPH_ID", value: customGraphId });
-    // Reset the series — the previous key won't exist on the new graph.
-    dispatch({
-      type: "SET_GRAPH_ALERT",
-      value: { ...draft.graphAlert, seriesName: "" },
-    });
-  };
 
   return (
     <VStack align="stretch" gap={4}>

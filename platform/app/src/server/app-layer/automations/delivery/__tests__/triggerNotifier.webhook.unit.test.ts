@@ -11,7 +11,7 @@ vi.mock("~/server/mailer/emailSender", () => ({
   computeDefaultFrom: () => "noreply@langwatch.test",
 }));
 
-import { AlertType } from "@prisma/client";
+import { AlertType } from "~/generated/prisma/client";
 import { sendHttpDestination } from "~/server/webhooks/httpDestination";
 import {
   type TestFireTriggerInput,
