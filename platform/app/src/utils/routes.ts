@@ -135,10 +135,6 @@ export const projectRoutes = {
     title: "My Queue",
     parent: "annotations",
   },
-  triggers: {
-    path: "/[project]/triggers",
-    title: "Triggers",
-  },
   automations: {
     path: "/[project]/automations",
     title: "Automations",
