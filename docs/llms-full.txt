@@ -1278,6 +1278,10 @@ LangWatch supports the following SCIM group operations:
 | `replace displayName` | Rename the group | Group name updated in LangWatch |
 | `replace members` | Full member replacement | Adds new, removes old members |
 
+A `replace` that carries no member list leaves the group's membership alone — replacing an unrelated attribute never removes anyone. Sending `members` as an empty list is a member list, and does clear the group, as does an explicit `null`.
+
+To clear a group you have to say so, either with an empty list or with an explicit `null`. A missing `members` value, a non-`null` value that is not a list, or a list holding entries without a usable id — no string `value`, or a blank one — says nothing we can act on and is treated as saying nothing about membership rather than as saying "no members" — a malformed payload should not revoke anyone's access. Only the member replacement is left unapplied: any other recognized attribute in the same operation, such as `displayName`, still takes effect. The unapplied part is recorded in the server logs.
+
 ### Supported Filter
 
 Groups can be filtered by `displayName` using a case-insensitive `eq` filter:
