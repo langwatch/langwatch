@@ -71,3 +71,36 @@ Feature: Agent dev tunnel
     When I pick a target for a simulation
     Then that agent shows a local tunnel badge
     And agents without the marker show no badge
+
+  # `--agent` is optional: the session reuses the agent remembered for the
+  # directory, auto-picks a lone HTTP agent, and offers an interactive picker
+  # over several. The scenarios below pin the edges of that selection.
+
+  Scenario: With no HTTP agents, an interactive session creates one on the spot
+    Given the project has no HTTP agents
+    And the session runs in a terminal
+    When the developer confirms the offered agent name
+    Then the session registers a new HTTP agent pointing at the local server
+    And the offered name defaults to the current directory's name
+    And the new agent is the session's target
+
+  Scenario: A local URL carrying credentials is refused
+    Given a --url value with a username and password embedded in it
+    When the session resolves the local server to expose
+    Then the session fails and says to pass the URL without credentials
+
+  Scenario: Declining the offered agent name ends the session with instructions
+    Given the project has no HTTP agents
+    And the session runs in a terminal
+    When the developer cancels the name prompt
+    Then the session fails and names the agent create command
+
+  Scenario: With no HTTP agents and no terminal, the session names the create command
+    Given the project has no HTTP agents
+    And the session runs without a terminal
+    Then the session fails and names the agent create command
+
+  Scenario: With several HTTP agents and no terminal, the session names the agent flag
+    Given the project has several HTTP agents and no --agent flag
+    And the session runs without a terminal
+    Then the session fails and says to pass --agent to skip the picker

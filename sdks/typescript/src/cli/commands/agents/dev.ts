@@ -106,7 +106,11 @@ export async function startAgentDevSession(
   await resolveCredentials({ apiKey: options.apiKey });
 
   const service = new AgentsApiService();
-  const agent = await resolveTargetAgent({ service, agentFlag: options.agent });
+  const agent = await resolveTargetAgent({
+    service,
+    agentFlag: options.agent,
+    localUrl,
+  });
   rememberAgentForDirectory(agent.id);
 
   // A bring-your-own tunnel forwards straight to the user's own server, so
