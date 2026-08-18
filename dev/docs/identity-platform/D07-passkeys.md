@@ -11,7 +11,7 @@ Passkeys become first-class identifiers: WebAuthn ceremonies via the official pl
 - New dependency `@better-auth/passkey@1.6.23` (pins to core; pulls `@simplewebauthn/*`).
 - Hand-written Prisma model matching the plugin schema: `Passkey` (name, publicKey, userId, credentialID, counter, deviceType, backedUp, transports, aaguid).
 - Mirror rows: `provider="passkey"`, `providerAccountId=credentialID`, maintained by the pipeline from passkey-ceremony events (lifecycle columns owned per the D01 rule).
-- `identityEventsPlugin` matchers: `/passkey/verify-registration`, `/passkey/verify-authentication`, `/passkey/delete-passkey`. The plugin's `registration.afterVerification`/`authentication.afterVerification` callbacks are pre-write — used for gating/enrichment only, never as the event source.
+- Passkey table writes arrive through the identity adapter (R10) like every other model; ceremony context is stamped by `/passkey/verify-registration`, `/passkey/verify-authentication`, `/passkey/delete-passkey`. The plugin's `registration.afterVerification`/`authentication.afterVerification` callbacks are pre-write — used for gating/enrichment only, never as the event source.
 - Platform and cross-platform authenticators; discoverable-credential (username-less) sign-in where supported.
 - Router integration: passkey appears in the uniform method picker (hook point left by D03).
 - Sessions minted via passkey carry `amr` including `phw` (phishing-resistant) — whether that satisfies org MFA policy is Open Q4 (ADR-4).
@@ -22,7 +22,7 @@ Passkeys become first-class identifiers: WebAuthn ceremonies via the official pl
 
 # Research
 
-- better-auth 1.6.23: passkey is a **separate package**, not in core; plugin migrations Kysely-only ⇒ hand-written Prisma model; plugin tables bypass `databaseHooks` ⇒ endpoint hooks are the reliable interception.
+- better-auth 1.6.23: passkey is a **separate package**, not in core; plugin migrations Kysely-only ⇒ hand-written Prisma model; plugin tables bypass `databaseHooks` — moot under R10: the identity adapter sees plugin-table writes uniformly.
 - Greenfield — no existing spec coverage; new `.feature` files.
 
 # Technical Plan

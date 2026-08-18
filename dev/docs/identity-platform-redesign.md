@@ -4,7 +4,7 @@ Self-hosted auth, per-org SSO, MFA, passkeys, SCIM, join-requests — built on t
 
 **Status:** epic spec. Deliverable specs live in `dev/docs/identity-platform/D*.md`; sequencing and gates in `dev/docs/identity-platform/delivery-plan.md`.
 **Working branch/worktree:** `feat/sso-thinking` (`.claude/worktrees/sso-thinking`)
-**Precondition:** the unified authorization program (ADR ~081, "unified authz") has **landed on main** — registry, one engine, `grants.*`, edge Principal middleware, PATs-as-principals. This epic consumes that API; it does not build it.
+**Precondition:** the unified authorization program (**ADR-092**, now the event-sourced **grants ledger** — see `dev/docs/plans/adr-092-authz-delivery-plan.md`, branch `feat/adr-092-grants-ledger`) has landed far enough that `grants.*` is the only membership writer and checks go through `authz.*` — that is its **PR 2**, not full rbac.ts deletion (its PR 4). This epic consumes that API; it does not build it. The ledger program also hands this one three ready-made pieces: the per-pipeline Redis-loss breaker primitive (its PR 1; consumed by D02), the `@langwatch/system-migrations` package (landed, #7079; carries D01's backfill and D04's grandfathering), and the dispatch doctrine this epic mirrors.
 **Review history:** Notion round 1 (identifiers storage, Redis resilience, self-hosted single-SSO priority, join-requests + invitation resilience); corpus audit round 2 (`review-spec` against `specs/` + `dev/docs/adr/` — findings folded in below); restructure round 3 (RBAC assumed done; epic → deliverables → delivery plan).
 
 # Overview
@@ -13,17 +13,17 @@ LangWatch's auth already migrated from NextAuth/Auth0-as-library to better-auth 
 
 This program makes identity first-class and self-service:
 
-- An **identifiers** model: one user, many attach/detach-able verified identifiers (email, password, OAuth, OIDC/SAML, passkey), tombstoned forever. Storage = the **existing `Account` table adapted in place** (column-ownership split, see D01).
+- An **identifiers** model: one user, many attach/detach-able verified identifiers (email, password, OAuth, OIDC/SAML, passkey), tombstoned forever. Storage = the **existing `Account` table adapted in place** (column-truth rule, see D01).
 - A first-class, event-sourced **SsoConnection** per organization with a guarded lifecycle, domain verification, and org-admin self-service onboarding. Self-hosted priority: single-SSO deployments auto-redirect straight to the IdP.
 - **Domain join-requests** (ask-to-join with org-admin approval, or domain auto-join where the org opts in) and **resilient invitations** (identifier-aware acceptance, inviter one-click resend) — the fixes for the invitation dead-end support load and for the orphaned organizations sign-up keeps minting.
 - A **first-party sign-in & sign-up UI** (D13): Auth0 owned the front-door screens; every unauthenticated screen is rebuilt in-product, and sign-up offers join-your-team **before** create-a-workspace.
 - **MFA (TOTP + backup codes, never SMS)** and **passkeys**, using better-auth plugins for protocol while our domain model remains the record.
 - SCIM scoped per connection, producing commands/events, writing membership exclusively through `grants.*`.
 - **Two separate identity surfaces**: a platform-ops identity lookup (cross-org support tooling) and an org-admin surface inside org settings.
-- **Login survives Redis loss**: a circuit breaker scoped to the auth path degrades identity commands to inline processing and sessions to PG-only.
+- **Sign-in never touches the event pipeline**: sessions and OAuth tokens are repository-written rows, never events (R12), so the hot path reads and writes Postgres only. Ceremony commands ride the standard pipeline on the one shared ClickHouse event log (R13); D02's breaker keeps them working through a Redis outage and degrades sessions to PG-only.
 - Auth0 dies slowly: enterprise customers migrate one at a time onto direct OIDC; then Auth0 code, config, and spend are deleted.
 
-Everything runs on the existing event-sourcing framework (ClickHouse `event_log`, GroupQueue, state projections to Postgres, process managers) — no new infrastructure. Authorization is expressed entirely in the unified authz API (`registry`, `authz.require`, `grants.*`, `useCan`) — no seams, no interim verbs.
+Everything runs on the existing event-sourcing framework — commands → events → applies/projections, process managers — appending to the same ClickHouse `event_log` as every other pipeline (R13: one log, no identity-private event store). Postgres holds the projections and the row-truth values (emails, credentials, sessions); the sign-in hot path touches only Postgres because sessions and tokens never become events (R12). Authorization is expressed entirely in the unified authz API (`registry`, `authz.require`, `grants.*`, `useCan`) — no seams, no interim verbs.
 
 # Requirements
 
@@ -32,7 +32,7 @@ Requirements are stated here at domain level; the normative, implementable versi
 ## Domain: Identifiers → D01
 
 - A user has many identifiers; exactly one PRIMARY email identifier. Types: `email`, `password`, `oauth` (google/github/gitlab/azure-ad), `oidc`, `saml`, `passkey`.
-- Storage: the `Account` table adapted in place. **Column ownership:** better-auth's adapter owns protocol columns (row-truth); the identity pipeline owns lifecycle columns (`state`, `connectionId`, `verifiedAt`, `attachedAt`, `detachedAt`; event-truth, replay rebuilds them). This amends the ADR-022/015 replay contract and ships with an ADR that says so.
+- Storage: the `Account` table adapted in place. **One writer (R10, our adapter):** better-auth supplies protocol logic only — its database adapter reads from the tables the pipeline maintains and routes every domain-significant write through an identity command, so the pipeline is the only thing that writes identity state. Within the pipeline, *value* columns holding protocol material (password hash, OAuth tokens, TOTP secrets) are row-truth written by command handlers and excluded from replay; *lifecycle* columns are event-truth and replay rebuilds them. This amends ADR-022/015 (handler-written value columns are row-truth, outside the replay contract) and ships with D01's ADR.
 - Multiple verified email identifiers per user (aliases). Login works with any active credential; **login is never gated on email verification** — verification gates routing, linking, and join-matching. Notifications always to PRIMARY; `User.email` polyfilled from PRIMARY.
 - Attach requires ceremony evidence, never bare input. Detach is guarded (≥1 remaining verified identifier + ≥1 recovery path). Tombstones forever.
 
@@ -51,7 +51,7 @@ Requirements are stated here at domain level; the normative, implementable versi
 
 ## Domain: Resilience (Redis loss) → D02
 
-- Login must survive Redis being down: sessions PG-only, identity commands inline via the framework's in-memory processor, behind a per-process circuit breaker scoped to the auth path. Amends ADR-007's process-role rule for this one pipeline; other pipelines stall by design.
+- Sign-in must survive Redis being down. The hot path emits no commands (sessions and tokens are repository rows, R12); ceremony commands fail over to the framework's in-memory processor behind D02's breaker; better-auth session reads/writes degrade to PG-only on the secondary-storage seam (reusing the grants ledger's PR 1 breaker primitive); process managers and subscribers stall and drain by design; rate limiting fails open with logging for the window.
 
 ## Domain: Enterprise SSO connections → D04, D05
 
@@ -92,13 +92,13 @@ Shared command handlers; separate pages, routes, and queries. The ops tool must 
 
 ## Cross-cutting
 
-- Event-sourced on the existing framework; pseudonymized event payloads (ids/hashes/enums — PII only in deletable PG tables; precedent ADR-052's content boundary, generalized and pinned by this program's ADR).
+- Event-sourced on the existing framework. Event payloads carry what the fact needs: opaque ids (`userId`, `accountId`, `connectionId`), enums, timestamps, email **domains**, `identifierHash = HMAC-SHA256(per-user key, normalized value)` for uniqueness and correlation (the key is a deletable PG row) — and the normalized **email itself where the fact is about one** (attach, verification, invite targeting). Secrets never appear in any event. Erasure (R11) wipes the email fields out of the affected events — a ClickHouse mutation, routine practice for PII in append-only logs — and deletes the HMAC key, so replay reproduces the erased state. The grants ledger stays fully pseudonymized (ADR-092 §13); identity carries emails because its facts *are* emails, and the difference is pinned in ADR-1.
 - Type safety end-to-end: zod-derived command payloads, event unions with compile-enforced handlers, registry-derived `Permission` type, `Authorized<scope>` witnesses, discriminated identifier types.
 - Every deliverable flag-gated, shadow-compared where it replaces routing, independently revertible (one deliberate exception: the session-shape cutover's forced re-login, D06).
 
 # Out of Scope
 
-- The unified authorization engine itself — **done** (ADR ~081). This program only consumes it.
+- The unified authorization engine itself — the grants ledger program (ADR-092 §13; see Precondition for how far it must have landed). This program only consumes it.
 - Personal-workspace lifecycle (deletion, nav confusion) — owned by the navigation revamp. The authz blocker (lite-member as a role) was resolved by the authz program.
 - Authorization for resources (resource tier / share grants) — authz ADR.
 - Fleet-wide Redis decoupling — only the auth path gets the circuit breaker.
@@ -118,7 +118,7 @@ Investigation on `origin/main` (full detail carried in the deliverable specs):
 - **SCIM today** (`platform/app/ee/scim/`): full SCIM v2 at `/api/scim/v2`, per-org `ScimToken`, direct writes to `OrganizationUser`/`RoleBinding` with unconditional MEMBER role, Auth0 log-stream webhook.
 - **Data model:** `User` (email unique, `pendingSsoSetup`, no password), `Account`, `Session` (PG + Redis dual-write, `impersonating` JSON), `Organization.ssoDomain/ssoProvider`, `OrganizationInvite` (2-day expiry).
 - **Event-sourcing framework** (`platform/app/src/server/event-sourcing/`): GroupQueue per-aggregate FIFO, CH `event_log` with idempotency dedup, PG state projections, process managers (inbox/outbox, revision-CAS, wakes, idempotent retry), in-memory processor for no-Redis operation. Doctrine ADRs: 007 (pipeline model + process roles), 015 (replay coordination), 022 (event log source of truth), 049 (PG operational projections), 052 (PM substrate + content boundary), 066 (fold contract).
-- **better-auth plugin reality:** `passkey` and `sso` are separate packages; `twoFactor` in core; `databaseHooks` don't fire for plugin tables → custom endpoint-hook plugin; plugin migrations Kysely-only → hand-written Prisma models.
+- **better-auth plugin reality:** `passkey` and `sso` are separate packages; `twoFactor` in core; `databaseHooks` don't fire for plugin tables — but the **database adapter sees every write from every plugin uniformly**, which is the structural argument for R10's own-adapter model over endpoint hooks; plugin migrations Kysely-only → hand-written Prisma models.
 - **SaaS infra:** Auth0 is dashboard-only (not Terraform); `AUTH0_*` arrives via the opaque `langwatch_secrets` blob; agents-box Playwright QA logs in via Auth0 and breaks at cutover.
 - **Support pain (production threads):** invited user with Google-linked account failing SSO (fixed by archiving the user); `unable_to_link_account` loop (fixed by DB reset; invite expired mid-debug); personal-workspace admins blocking lite-member conversion (resolved by the authz program). Root cause: invisible identity states + no guarded support actions.
 - **Corpus audit (review-spec round 2):** existing specs that assert what this program changes are mapped per-deliverable in the delivery plan's spec-amendment table; ADR conflicts (007 process roles, 015/022 replay contract, 027 interception mechanism) are carried as explicit amendments in D01–D03.
@@ -128,16 +128,16 @@ Decisions settled in design discussion:
 | # | Decision | Outcome |
 |---|----------|---------|
 | Q1 | Event-store mechanics | Existing framework as-is; no new outbox infrastructure |
-| Q2 | Plugin vs domain state | Split: plugin tables hold protocol state; domain events via custom endpoint-hook plugin |
+| Q2 | Plugin vs domain state | better-auth handles protocol only; all reads and writes go through our adapter (R10) |
 | Q3 | Domain-claim safety | No blocklist; LangWatch ops manual approval |
 | Q4 | Ownership scope | Global first-verifier-owns on SaaS; per-instance self-hosted |
 | Q5 | Identifier linking | Auto-link when unambiguous; org-admin confirmation when ambiguous |
 | Q6 | Self-hosted verification | Ops-assisted, bound to the license system |
-| Q8 | PII in events | Pseudonymized payloads; PII only in deletable PG tables |
+| Q8 | PII in events | Events carry the normalized email where the fact is about one; never secrets, never names beyond the value itself. Hashes are HMAC-keyed per user; erasure wipes emails out of the events and shreds the key (R11) |
 | Q9 | Auth0 migration ownership | Engineering/CS-run playbook (wizard shape pending — Open Questions) |
 | Q10 | Legacy sessions | One forced re-login at D06 (precedent: better-auth cutover) |
-| R1 | Identifiers storage | Adapt `Account` in place, column-ownership rule; amends ADR-022/015 replay contract (ADR ships with D01) |
-| R2 | Redis resilience | Circuit breaker scoped to the auth path; amends ADR-007 process roles for this pipeline (ADR ships with D02) |
+| R1 | Identifiers storage | Adapt `Account` in place, column-truth rule (value columns row-truth, lifecycle columns event-truth); amends ADR-022/015 replay contract (ADR ships with D01) |
+| R2 | Redis resilience | The sign-in hot path emits no commands (R12); ceremony commands fail over to the framework's in-memory processor behind D02's breaker, sessions degrade to PG-only on better-auth's secondary-storage seam, PMs stall and drain, rate limiting fails open (ADR ships with D02) |
 | R3 | Multi-method sign-in | Cloud priority; self-hosted = single SSO + auto-redirect + break-glass local path |
 | R4 | Rate limiting | Nothing beyond better-auth's existing limiter |
 | R5 | Join requests & invites | `domainJoin` modes `off \| request \| auto` (default `request` for cloud self-serve; forced `off` for SSO orgs/self-hosted; public domains never match); fixed default role; identifier-aware invites + one-click resend + 14-day expiry |
@@ -145,6 +145,10 @@ Decisions settled in design discussion:
 | R7 | Identity surfaces | Two separate UIs; shared command handlers; separate pages/routes/queries |
 | R8 | Aliases & verification | Multiple verified emails; login never gated on verification; ceremony = verification for OAuth/SSO; notifications to PRIMARY; `User.email` polyfilled |
 | R9 | Legacy Auth0 callback URIs | Temporary redirect shim through the grace period with a per-org usage metric, deleted at D10 — customers are never forced to reconfigure their IdP mid-migration |
+| R10 | better-auth integration | **Our own adapter**: better-auth is the protocol engine for *everything* (core, twoFactor, passkey, sso plugins), but it never writes the database — we implement its first-class adapter contract via `createAdapter` (the same plug point the stock Prisma adapter implements; no wrapping or interception). Reads query the pipeline-maintained PG tables through repositories; domain-significant writes become identity commands dispatched waited through the pipeline: guards → events appended to the shared ClickHouse log → applies feed the projections on the calling path — command → event → projection, never a projection write from a handler; the protocol values ride only on the command and land through the credentials repository (row-truth). Guards therefore veto *before* the write exists, plugin tables are covered uniformly (the `databaseHooks`-don't-fire gap disappears), and there is no enrich-after-write drift window for replay to disagree with. Endpoint `hooks.before` shrink to stamping ceremony context (which flow this write belongs to) onto request-scoped storage for the adapter to read. High-churn protocol writes (session rows, OAuth token refreshes) stay row-truth repository writes with no events (R12) — declared per (model, operation) in a routing table in D01 |
+| R11 | Erasure vs the immutable log | Erasure is itself an event — and the one sanctioned mutation of the log. The erase command wipes the email fields out of the user's prior events (a ClickHouse mutation; ids, enums and hashes stay), deletes the PG value rows and protocol tables, shreds the per-user HMAC key (remaining hashes become unlinkable noise), and emits `user_erased`. Replay *reproduces the erased state* because the log itself no longer carries the value. Encrypting event PII under an org key was rejected: a key inside an immutable log cannot rotate |
+| R12 | Sessions and tokens | Never events — session rows and OAuth token refreshes are better-auth protocol churn, written row-truth through repositories (`SessionRepository`, token columns via the credentials repository). No session lifecycle events either; the session inventory reads the table |
+| R13 | Event-log storage | **One log.** Identity events append to the same ClickHouse `event_log` as every other pipeline — no Postgres event store, no outbox, no per-pipeline store split. Postgres holds projections and row-truth values (emails, credentials, sessions). Sign-in tolerates ClickHouse being down because the hot path emits no events (R12); a CH outage degrades ceremonies (sign-up, attach, connection admin) to a clear retryable error for the window |
 
 # Architecture Overview
 
@@ -215,11 +219,11 @@ flowchart TB
         SE --> EN["authz engine (one resolver)"]
     end
 
-    subgraph BA["better-auth (protocol engine)"]
+    subgraph BA["better-auth (protocol engine — R10 identity adapter)"]
         CORE[core: email/pwd, OAuth]
         TF[twoFactor plugin]
         PK["@better-auth/passkey"]
-        IE["identityEventsPlugin (ours)<br/>endpoint hooks.after → commands"]
+        IE["identity adapter (ours, createAdapter)<br/>reads ← PG tables · writes → commands<br/>(session/token churn: direct row-truth)"]
         CORE --> IE
         TF --> IE
         PK --> IE
@@ -228,7 +232,7 @@ flowchart TB
     subgraph ES["Event-sourced identity domain"]
         CMD[defineCommand handlers] --> GQ["GroupQueue (per-aggregate FIFO)"]
         GQ --> CB{"circuit breaker<br/>(auth path only)"}
-        CB -->|closed| CH[("ClickHouse event_log<br/>pseudonymized")]
+        CB -->|closed| CH[("ClickHouse event_log — shared<br/>emails wiped on erasure, R11")]
         CB -->|"open (Redis down)"| INLINE[inline in-process processing]
         INLINE --> CH
         CH --> PRJ["apply lifecycle → Account columns<br/>+ projections: sso_connections ·<br/>mfa_enrollments · scim_sync_state · join_requests"]
@@ -296,7 +300,7 @@ Thirteen deliverables, each independently shippable and flag-gated. Normative de
 Cross-deliverable conventions:
 
 - Pipeline layout `platform/app/src/server/event-sourcing/pipelines/identity/` per the langy/automations doctrine (ADR-049/052); type identifiers in `schemas/typeIdentifiers.ts`.
-- `identityEventsPlugin` (~100 lines): endpoint `hooks.after` matchers translating better-auth successes/`APIError`s into domain commands. Failures emit events too (they feed the ops "why?" view).
+- The **identity adapter** (R10): implemented with better-auth's `createAdapter` factory; reads go through repositories, domain-significant writes become commands dispatched waited — better-auth reads its own write back immediately because command → event → apply completes before the adapter returns. A small endpoint-hook plugin stamps ceremony context (flow, request metadata, actor) onto request-scoped storage so the adapter knows *why* a row is being written; protocol failures/`APIError`s still emit events (they feed the ops "why?" view).
 - Testing: in-memory `EventSourcing` harness + `InMemoryProcessStore`; replay-parity tests for lifecycle columns.
 
 # Milestones
@@ -315,7 +319,7 @@ See `identity-platform/delivery-plan.md` — dependency graph, flags, exit gates
 - **Break-glass local path**: bound to break-glass bindings only, audited, rate-limited.
 - **Teardown lockout**: invariant guard (no user left with only the torn-down connection's identifiers) + live break-glass binding with expiry warnings.
 - **MFA bypass paths**: disable requires password+TOTP or audited org-admin action; impersonation requires an MFA-verified actor when policy demands; legacy sessions destroyed at D06 precisely because they can't prove `amr`.
-- **PII in the immutable log**: pseudonymized payloads; erasure deletes PG rows and protocol tables; events keep only ids/hashes.
+- **PII in the log**: emails appear in events only where the fact needs them; erasure wipes those fields via ClickHouse mutation, deletes PG rows and protocol tables, and shreds the per-user HMAC key; secrets never appear in any event.
 - **SCIM token scope**: per-connection; cross-org writes impossible; de-enroll failures are visible dead-letters.
 - **Plugin protocol secrets**: TOTP secrets and backup codes live in plugin tables (encrypted/hashed), never in events.
 - **Rate limiting**: better-auth's existing limiter only; one acceptance check that the router endpoint is covered. When the Redis breaker is open, rate limiting fails open (logged) — accepted for outage windows.
@@ -335,8 +339,11 @@ See `identity-platform/delivery-plan.md` — dependency graph, flags, exit gates
 10. ~~Legacy `/api/auth/callback/auth0` redirect URIs~~ — **resolved (R9)**: temporary translation shim with per-org usage metric through the grace period; removed at D10 once traffic is zero.
 11. **License-gate timing**: `specs/licensing/sso-license-gating.feature:16-17` asserts startup-decided gating ("never mid-flight"). Per-method router policy naturally evaluates per-request. Keep restart semantics for self-hosted license changes, or accept mid-flight evaluation? (Lean: keep startup semantics for the license gate specifically.)
 12. **Sign-up enumeration tension**: `signup-does-not-strand-an-account.feature:58-61` returns `email_already_registered`, in tension with the no-oracle stance on sign-up. Deliberate decision needed (sign-up enumeration is conventionally accepted; the no-oracle invariant is scoped to sign-in).
-13. **Member-initiated invites (`WAITING_APPROVAL`)**: today a MEMBER can request an invite that an ADMIN approves before it goes out (`specs/members/update-pending-invitation.feature:94-99`). D11's state model (PENDING → ACCEPTED | EXPIRED | REVOKED) doesn't carry it. Keep as a fifth state, or retire it since D12's join requests serve the same motivation from the joiner's side? Decide before D11's spec amendment.
+13. ~~Member-initiated invites (`WAITING_APPROVAL`)~~ — **resolved: retired**. The invite state model is PENDING → ACCEPTED | EXPIRED | REVOKED; D12's join requests carry the member-wants-a-colleague-in motivation from the joiner's side. D11's `update-pending-invitation.feature` amendment drops the WAITING_APPROVAL scenarios.
 14. **Existing orphaned organizations**: D12/D13 stop new ones being minted, but production already carries a long tail of abandoned single-user orgs. Sweep them (delete empty orgs whose owner is active elsewhere on the same domain), build a merge tool, or leave them? Needs a product decision and a data pass to size the pool.
+15. ~~Sessions in or out of the event flow~~ — **resolved (R12): out**. Session rows and OAuth token refreshes are row-truth repository writes; no coarse lifecycle events either — the session inventory reads the table.
+16. **Ceremony-context stamping**: the identity adapter learns *why* a write happens from request-scoped context set by `hooks.before`. Better-auth internals that write outside a request (background token refresh, cron-ish cleanup) need a declared default context — enumerate those paths during D01 and decide whether any of them is domain-significant.
+17. ~~Creating an organization while your domain matches one~~ — **resolved: soft notice**. Org creation stays available everywhere; on a matching domain the create screen shows the join affordance inline ("Acme Corp is already here — join instead?"), never a block.
 
 # Still left to think about
 

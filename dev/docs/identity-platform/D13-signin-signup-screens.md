@@ -14,11 +14,31 @@ Auth0 owned the front-door visuals; retiring it means every screen an unauthenti
 - **Sign-up**: email step → verification → method choice (password or social, reusing the picker components). After verification, the **join-before-create interstitial** (hook filled by D12): if the domain matches an org, "join Acme Corp" / auto-join leads and "create a new organization" is the secondary action. An organization is created only when the user explicitly chooses it or no match exists — sign-up stops defaulting into a fresh org nobody will ever use.
 - **Password reset**: request + reset screens; availability under SSO/cloud mode per Open Q9; uniform response whether or not the email exists.
 - **Email verification states**: sent, verified, expired-link, resend.
+- **Invitation acceptance**: the invite-link landing — org name, inviter, and the same method picker (accept via any verified method matching the invite email, D11's rule). Signed-in variant: confirm-and-join. Signed-out variant: sign in or sign up first, the invite riding through the ceremony untouched. EXPIRED offers "ask for a new invitation" (pings the inviter, whose side is one-click resend); REVOKED ends without detail. D11 ships the acceptance logic inside today's members screens; this deliverable renders it as part of the first-party set.
 - **Deny/guidance states**: JIT-off denial with guidance, wrong-method guidance (points at the method the account actually has), deactivated account, license-gated SSO, suspended connection.
 - **Hook points left, not built**: MFA challenge (D06), passkey button + no-email sign-in (D07), interstitial content and matching (D12).
 - Consistent with the product design system; no Auth0-hosted pages, assets, or redirects anywhere on the unauthenticated surface.
 
 **Cutover:** the screens ship dark behind `IDENTITY_ROUTER_V2` and appear at the enforce flip together with D03's routing. Shadow mode never renders them (it compares routing decisions only).
+
+**Where the UI lives** (all first-party app routes; zero Auth0-hosted pages):
+
+```text
+unauthenticated (this deliverable)
+  /auth/signin              identifier-first email step → routed outcome (picker | IdP redirect)
+  /auth/signin?local=1      self-hosted break-glass local login
+  /auth/signup              email → verification → method choice → join-before-create interstitial
+  /auth/reset · /auth/reset/<token>       password reset request + completion
+  /auth/verify/<token>      email verification states (sent · verified · expired · resend)
+  /invite/<code>            invitation acceptance (logic from D11)
+  /auth/join                join-before-create interstitial (content and matching from D12)
+
+authenticated identity surfaces (later deliverables — listed for orientation)
+  Settings → SSO            connection onboarding wizard (D05) · Auth0 migration wizard (D09) · domainJoin setting (D12)
+  Settings → Members        invitations with states + one-click resend (D11); absorbed by the org-admin surface at D05
+  Settings → Identity       the org-admin surface (D05): link confirmations, member identifiers, join-request approvals (D12)
+  ee/admin → Identity       platform-ops identity lookup (D05), cross-org, ops-gated
+```
 
 # Out of Scope
 
@@ -28,7 +48,7 @@ Auth0 owned the front-door visuals; retiring it means every screen an unauthenti
 
 - Today's screens are thin because Auth0's Universal Login carried the weight; there is no first-party UI for method choice, verification states, or recovery guidance.
 - Sign-up today always lands in workspace creation — the direct source of the orphaned-organization problem (users create a solo org, later get invited to the real one, the solo org lingers forever).
-- Spec impacts: `specs/auth/auth-signin-flows.feature` ports to router + screens (with D03); `signup-does-not-strand-an-account.feature` anchors survive; new `.feature` files for the full screen set.
+- Spec impacts: `specs/auth/auth-signin-flows.feature` ports to router + screens (with D03); `signup-does-not-strand-an-account.feature` anchors survive; `sign-in-failure-messages.feature` is an anchor — the new screens keep saying *why* a sign-in failed (wrong password, rate-limit wait, origin mismatch); new `.feature` files for the full screen set.
 
 # Technical Plan
 

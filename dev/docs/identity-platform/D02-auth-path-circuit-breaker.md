@@ -4,12 +4,12 @@ Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 1 �
 
 # Overview
 
-Today, Redis down ⇒ nobody can sign in ⇒ nobody can even open the app to see what's wrong. This deliverable puts a circuit breaker on the auth path: when Redis staging is unhealthy, identity commands process inline in the web process and sessions go PG-only. Everything else stalls and catches up. Pulled ahead of the router cutover (D03) deliberately — the cutover should not be the moment we learn Redis-loss kills sign-in.
+Today, Redis down ⇒ nobody can sign in ⇒ nobody can even open the app to see what's wrong. This deliverable applies the grants ledger's per-pipeline circuit breaker (its PR 1 — a shared primitive, consumed here, not built here) to the auth path: when Redis staging is unhealthy, identity commands process inline in the web process and sessions go PG-only. Everything else stalls and catches up. The sign-in hot path itself emits no commands at all (R12 — sessions and tokens are repository rows), so the command seam exists for the ceremonies (sign-up, attach, detach), not for sign-in. Pulled ahead of the router cutover (D03) deliberately — the cutover should not be the moment we learn Redis-loss kills sign-in.
 
 # Requirements
 
 - Breaker wraps two seams: (a) GroupQueue staging for the identity pipeline, (b) better-auth Redis secondary-storage calls.
-- Per-process, in-memory state; opens on staging/read failures; half-open probes on a timer; no meta-dependency on Redis to detect Redis being down.
+- The primitive is the ledger's (its PR 1): per-process, in-memory state; opens on staging/read failures; half-open probes on a timer; no meta-dependency on Redis to detect Redis being down. This deliverable registers the identity pipeline with it and builds no breaker of its own.
 - Breaker open ⇒ identity commands dispatch through the framework's **in-memory processor** (synchronous, in the web process); sessions read/write PG only (PG is already the dual-write source of truth).
 - Non-identity pipelines (langy, analytics, automations) never see the breaker — they stall and drain on recovery.
 - Rate limiting degrades to fail-open-with-logging while the breaker is open (accepted for outage windows; flagged in Security).
@@ -18,20 +18,21 @@ Today, Redis down ⇒ nobody can sign in ⇒ nobody can even open the app to see
 # Out of Scope
 
 - Fleet-wide Redis decoupling. Any other pipeline's resilience. Queue-level persistence changes.
+- ClickHouse loss: sign-in is unaffected by construction (R12 — the hot path emits no events); ceremony commands surface a clear retryable error for the outage window. No CH breaker.
 
 # Research
 
-- **Corpus-audit finding this deliverable resolves:** ADR-007:84-89 pins process roles — "**web**: Only dispatches commands and events to queues. Does not start BullMQ workers… ensures that the web servers remains responsive." Inline processing in the web role contradicts this; no ADR sanctions in-memory production processing (007:114 lists `Memory` stores under test support only). ADR-2 must amend 007 **for the identity pipeline only**, with the load analysis (identity volume is hundreds of commands/day — in-process processing is safe at that scale; this is not a general precedent).
+- **Corpus-audit finding this deliverable resolves:** ADR-007:84-89 pins process roles — "**web**: Only dispatches commands and events to queues. Does not start BullMQ workers… ensures that the web servers remains responsive." Inline processing in the web role deviates from this; the sanction is ADR-007's shared amendment **"Redis-loss circuit breaker for named pipelines"** (2026-08-17, lands with ledger PR 1), which names `authz_grants` and expects `identity` to join. ADR-2 adds `identity` to that amendment with its own load analysis (identity volume is hundreds of commands/day — in-process processing is safe at that scale); the amendment's boundary — named pipelines only, never a fleet-wide default — stands.
 - Countervailing doctrine in our favor: ADR-049:31-33,270-273 — Redis already removed from durable state for PG-operational domains; "a Redis outage cannot erase a committed Postgres projection." PG-only sessions align with 049.
 - The in-memory processor already exists in the framework for no-Redis operation — this deliverable productionizes it for one pipeline.
 
 # Technical Plan
 
-1. Breaker primitive: per-process state machine (closed/open/half-open), failure detection on the two seams, probe timer.
+1. Adopt the shared breaker primitive (ledger PR 1); wire its failure detection to the two seams. No new primitive.
 2. Seam (a): identity command dispatch checks the breaker; open ⇒ route to the in-memory processor instead of GroupQueue staging.
 3. Seam (b): wrap better-auth's Redis secondary-storage calls; open ⇒ skip Redis, PG only.
 4. Metrics: state transitions, inline-processed command count, probe outcomes.
-5. ADR-2: amendment to ADR-007 scoped to the identity pipeline, including the failure-semantics analysis and the explicit "no other pipeline gets this" boundary.
+5. ADR-2: add `identity` to ADR-007's shared Redis-loss amendment, carrying the identity-specific failure-semantics analysis (the amendment's named-pipelines-only boundary stands).
 6. Tests: unit (breaker transitions), integration (dev-compose Redis kill mid-flow).
 
 # Exit gate / rollback

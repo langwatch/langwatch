@@ -27,6 +27,26 @@ stateDiagram-v2
 - Group → role-binding mapping UI stays; its writes also go through `grants.attach`. SCIM-managed group provenance guards (no rename/member edits outside SCIM) survive.
 - Connection teardown revokes its SCIM tokens (lifecycle event → PM intent).
 
+# Data structures
+
+```text
+ScimToken
+  + connectionId  string  FK → sso_connections; the token's entire write authority
+User
+  + externalId    string? IdP-stable identity (survives email changes)
+```
+
+`ScimSync` events (`tenantId = organizationId`, `aggregateId = scimSyncId`; SCIM payload PII stays out per the D01 rule — user references are `userId`/`externalId`):
+
+```jsonc
+// lw.identity.scim_user_pushed    { scimSyncId, connectionId, userId, externalId, op: "create" | "update" | "deactivate" }
+// lw.identity.scim_group_mapped   { scimSyncId, connectionId, groupId, roleKey }
+// lw.identity.scim_apply_failed   { scimSyncId, connectionId, op, errorCode }       → dead-letter evidence
+// lw.identity.scim_token_revoked  { scimSyncId, connectionId, cause: "revoke" | "teardown" }
+```
+
+Membership consequences are grants-ledger events, not SCIM events: the reconciler dispatches `grants.attach`/`grants.offboard`, whose `grant_attached`/`grant_revoked` facts carry `source: "scim"` and `actor: { "type": "system", "id": "<connectionId>" }` — the shape the ledger already accommodates.
+
 # Out of Scope
 
 - SCIM protocol surface changes (v2 Users+Groups already complete). Seat/billing classification (license system owns it; lite-member-as-role was the authz program).
@@ -35,7 +55,7 @@ stateDiagram-v2
 
 - Today: `platform/app/ee/scim/` — full SCIM v2 at `/api/scim/v2`, per-org bearer tokens, direct writes with unconditional MEMBER role, Auth0 log-stream webhook (dies at D10; customers repoint at D09).
 - Doctrine anchor: `specs/event-sourcing/pipeline-model.feature` (pipelines own their commands/events/projections); content-boundary precedent ADR-052.
-- Corpus-audit spec impacts: `scim-group-mapping.feature` — 20/24 scenarios `@unimplemented`; amend deprovisioning (:170-178) from "direct RoleBinding records removed" to the grants-offboard framing now, while it's cheap. `groups-rest-api.feature` — provenance guards (:83-87, :120-123, :140-143) are anchors that survive.
+- Corpus-audit spec impacts: `scim-group-mapping.feature` — 20/24 scenarios `@unimplemented`; amend deprovisioning (:170-178) from "direct RoleBinding records removed" to the grants-offboard framing now, while it's cheap. `groups-rest-api.feature` — provenance guards (:83-86, :101-104, :129-132, :149-152) are anchors that survive. `specs/organizations/scim-tokens-rest-api.feature` — the REST mint/revoke contract gains connection scoping (create names a connection); the secret-shown-once and no-secrets-in-list anchors survive.
 
 # Technical Plan
 
@@ -44,7 +64,7 @@ stateDiagram-v2
 3. ScimSync aggregate, events, projection; SCIM endpoints become command producers (same external API).
 4. Process manager: de-enroll → `grants.offboard` with postcondition check; retry with backoff; dead-letter visibility in the ops surface.
 5. Group mapping UI write path repointed to `grants.attach`.
-6. Amend `scim-group-mapping.feature`; integration test asserting the offboard postcondition.
+6. Amend `scim-group-mapping.feature` and `scim-tokens-rest-api.feature`; integration test asserting the offboard postcondition.
 
 # Exit gate / rollback
 
@@ -55,7 +75,7 @@ stateDiagram-v2
 
 - Token scope: per-connection; cross-org writes impossible by construction.
 - De-enroll is the highest-stakes SCIM operation — replayable event + proven postcondition + visible failure, never silent.
-- SCIM payload PII stays out of events (pseudonymization rule, D01).
+- SCIM events carry ids/externalIds and the email where the fact is about one, never tokens or secrets (D01 payload rules).
 
 # Open Questions
 

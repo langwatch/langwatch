@@ -43,9 +43,34 @@ stateDiagram-v2
 
 - Guards evaluated against folded state in the command handler: `activate` needs ≥1 verified domain + ≥1 live break-glass binding (interim ops-granted until D05); `verifyDomain` refuses domains owned by another ACTIVE connection (global on SaaS, per-instance self-hosted); `requestTeardown` refuses while any user holds only this connection's identifiers.
 - Domain claims need LangWatch ops manual approval — no automated blocklist. Disputes resolved from event history.
-- Grandfathering: existing `Organization.ssoDomain/ssoProvider` orgs get backfill events producing VERIFIED/ACTIVE connections (event payloads note `legacy-grandfathered` source). Legacy `auth0`/`okta` Account rows re-pointed (`connectionId`) to the grandfathered connections.
+- Grandfathering rides `@langwatch/system-migrations` as a `SystemMigration` named `identity-d04-connection-grandfather`: existing `Organization.ssoDomain/ssoProvider` orgs get backfill events producing VERIFIED/ACTIVE connections (event payloads note `legacy-grandfathered` source); legacy `auth0`/`okta` Account rows re-pointed (`connectionId`) to the grandfathered connections. Proof for `finalized`: the connection-based routing decision matches the string-based one for every domain the org carries — the same comparison `SSOCONN_ROUTING` shadow mode runs, evaluated per tenant.
 - Router integration: `SSOCONN_ROUTING` shadow-compares connection-based routing vs string-based routing on every login; then enforce; then `ssoDomain` writes stop and the columns become derived/legacy.
 - Backoffice edits connections (parity with today's super-admin string-setting).
+
+# Data structures
+
+Aggregate `sso_connection`; `tenantId = organizationId`, `aggregateId = connectionId`. Payload rules per D01: ids, domains, enums, hashes — IdP client secrets and DNS tokens never appear (secrets live in the projection's `idpMetadata.secretRef`, events carry the reference; the DNS ceremony stores the token's hash):
+
+```jsonc
+// lw.identity.connection_registered
+{ "data": {
+    "connectionId": "ssoc_…",
+    "organizationId": "org_…",
+    "type": "oidc",
+    "idp": { "issuer": "https://login.acme.okta.com", "clientIdRef": "cred_…" },
+    "actor": { "type": "user", "id": "user_…" }
+} }
+
+// lw.identity.domain_claimed        { connectionId, domain: "acme.com", actor }
+// lw.identity.domain_claim_approved { connectionId, domain, actor: { type: "user", id: <ops user> } }
+// lw.identity.verification_requested{ connectionId, domain, method: "dns-txt" | "license-token", tokenHash: "sha256:…" }
+// lw.identity.domain_verified       { connectionId, domain, method }
+// lw.identity.connection_activated  { connectionId, testLoginAccountId, actor }
+// lw.identity.connection_suspended / _resumed / teardown_requested / connection_torn_down
+//   — all { connectionId, actor, reason? }; grandfathered orgs' events carry "source": "legacy-grandfathered"
+```
+
+Projection `SsoConnection` (Prisma model above) is fold-written; the router reads it and nothing else on the hot path.
 
 # Out of Scope
 
