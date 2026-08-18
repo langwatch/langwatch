@@ -1,9 +1,19 @@
 import { Field, Input, Text, Textarea, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useRef } from "react";
-import { Controller, type UseFormReturn, useForm } from "react-hook-form";
+import {
+  Controller,
+  type FieldError,
+  type UseFormRegister,
+  type UseFormReturn,
+  useForm,
+} from "react-hook-form";
 import { z } from "zod";
 import { scenarioParameterDefinitionsSchema } from "~/server/scenarios/parameters";
+import {
+  DEFAULT_SCENARIO_MAX_TURNS,
+  MAX_SCENARIO_MAX_TURNS,
+} from "~/server/scenarios/scenario.constants";
 import { CriteriaInput } from "./ui/CriteriaInput";
 import { SectionHeader } from "./ui/SectionHeader";
 
@@ -19,6 +29,17 @@ export const scenarioFormSchema = z.object({
   situation: z.string(),
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
+  // null means "use the default turn cap". The register call normalizes an
+  // empty input to null before this schema runs.
+  maxTurns: z
+    .number({ invalid_type_error: "Maximum turns must be a whole number" })
+    .int("Maximum turns must be a whole number")
+    .min(1, `Maximum turns must be between 1 and ${MAX_SCENARIO_MAX_TURNS}`)
+    .max(
+      MAX_SCENARIO_MAX_TURNS,
+      `Maximum turns must be between 1 and ${MAX_SCENARIO_MAX_TURNS}`,
+    )
+    .nullable(),
   parameters: scenarioParameterDefinitionsSchema,
 });
 
@@ -49,6 +70,7 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
       situation: "",
       criteria: [],
       labels: [],
+      maxTurns: null,
       parameters: [],
       ...defaultValues,
     },
@@ -128,6 +150,52 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
           )}
         />
       </VStack>
+
+      {/* MAXIMUM TURNS Section */}
+      <MaxTurnsField register={register} error={errors.maxTurns} />
+    </VStack>
+  );
+}
+
+/**
+ * Empty input means "use the default", so it stores null. Non-numeric text
+ * passes through untouched so the schema rejects it visibly instead of
+ * silently falling back to the default.
+ */
+function normalizeMaxTurnsInput(value: unknown): unknown {
+  if (value === "" || value === null || value === undefined) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? value : parsed;
+}
+
+function MaxTurnsField({
+  register,
+  error,
+}: {
+  register: UseFormRegister<ScenarioFormData>;
+  error?: FieldError;
+}) {
+  return (
+    <VStack align="stretch" gap={3}>
+      <Field.Root invalid={!!error}>
+        <Field.Label>
+          <SectionHeader as="span">Maximum turns</SectionHeader>
+        </Field.Label>
+        <Text fontSize="13px" color="fg.muted">
+          How many conversation turns the simulation may take before it stops.
+          Leave empty to use the default of {DEFAULT_SCENARIO_MAX_TURNS} turns.
+        </Text>
+        <Input
+          type="number"
+          width="120px"
+          min={1}
+          max={MAX_SCENARIO_MAX_TURNS}
+          {...register("maxTurns", { setValueAs: normalizeMaxTurnsInput })}
+        />
+        <Field.ErrorText>{error?.message}</Field.ErrorText>
+      </Field.Root>
     </VStack>
   );
 }
@@ -154,6 +222,7 @@ function useResetOnDefaultsChange({
           defaultValues.situation,
           defaultValues.criteria,
           defaultValues.labels,
+          defaultValues.maxTurns,
           defaultValues.parameters,
         ])
       : null;
@@ -165,6 +234,7 @@ function useResetOnDefaultsChange({
           situation: "",
           criteria: [],
           labels: [],
+          maxTurns: null,
           parameters: [],
           ...defaultValues,
         });

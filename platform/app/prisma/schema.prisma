@@ -2213,6 +2213,10 @@ model Scenario {
   // DEFAULT-role models. See specs/scenarios/scenario-model-selection.feature.
   simulatorModel  String?
   judgeModel      String?
+  // Optional cap on conversation turns for a run. When null the run uses
+  // the scenario SDK default (10). See
+  // specs/scenarios/scenario-max-turns.feature.
+  maxTurns        Int?
   lastUpdatedById String?
   lastUpdatedBy   User?     @relation(fields: [lastUpdatedById], references: [id])
   archivedAt      DateTime?

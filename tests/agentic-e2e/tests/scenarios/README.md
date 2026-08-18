@@ -8,6 +8,7 @@ These tests implement scenarios from:
 - `specs/scenarios/scenario-library.feature`
 - `specs/scenarios/scenario-editor.feature`
 - `specs/scenarios/scenario-execution.feature`
+- `specs/scenarios/scenario-max-turns.feature`
 
 ## Test Files
 
@@ -17,6 +18,7 @@ These tests implement scenarios from:
 | `scenario-library.spec.ts` | Library | Navigation, empty state |
 | `scenario-editor.spec.ts` | Editor | Create, edit, workflow lifecycle |
 | `scenario-execution.spec.ts` | Execution | Page loads, content display |
+| `scenario-turn-cap.spec.ts` | Max turns | Turn cap create/reopen/clear round trip |
 
 ## Architecture
 

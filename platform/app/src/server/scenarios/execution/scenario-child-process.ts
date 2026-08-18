@@ -155,6 +155,8 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
       id: scenario.id,
       name: scenario.name,
       description: scenario.situation,
+      // undefined lets the SDK apply its own default of 10 turns.
+      maxTurns: scenario.maxTurns,
       setId: context.setId,
       agents: [
         adapter,

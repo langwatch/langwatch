@@ -79,6 +79,10 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // assistant's rules are tested here (and nowhere else), so scenarios about
   // what an instruction teaches can only bind from this root.
   "skills/_tests",
+  // The CI-run playwright suite (`.spec.ts`, .github/workflows/e2e-ci.yml).
+  // It is the only place a browser-driven @e2e scenario can bind — without
+  // this root every such scenario would be stuck on @unimplemented.
+  "tests/agentic-e2e/tests",
   // CI guards run under `node --test` from the workflow that uses them, not
   // vitest, and their tests live beside them. Without this root, a scenario
   // describing what a guard refuses could only ever be @unimplemented.
@@ -649,7 +653,10 @@ const LEGACY_INERT: string[] = [
   "specs/workflows/workflow-management.feature",
 ];
 
-const TEST_FILE_RE = /\.test\.tsx?$/;
+// `.spec.ts` is the playwright naming convention under
+// tests/agentic-e2e/tests. Exported so the policy is pinned by
+// scripts/__tests__/check-feature-parity.unit.test.ts.
+export const TEST_FILE_RE = /\.(test|spec)\.tsx?$/;
 const BATS_FILE_RE = /\.bats$/;
 const SHELL_TEST_FILE_RE = /\.sh$/;
 const GO_TEST_FILE_RE = /_test\.go$/;

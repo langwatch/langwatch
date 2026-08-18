@@ -235,6 +235,11 @@ export const ScenarioConfigSchema = z.object({
   situation: z.string(),
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
+  /**
+   * Cap on conversation turns. Optional so a job queued before the field
+   * existed still parses; absent means the scenario SDK default (10).
+   */
+  maxTurns: z.number().int().min(1).optional(),
 });
 export type ScenarioConfig = z.infer<typeof ScenarioConfigSchema>;
 
