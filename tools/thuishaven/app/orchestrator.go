@@ -146,7 +146,10 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	if err != nil {
 		return domain.Stack{}, nil, err
 	}
-	scheme, pport := o.proxy.Endpoint()
+	proxyScheme, proxyPort := "", 0
+	if o.cfg.ShouldUsePortless {
+		proxyScheme, proxyPort = o.proxy.Endpoint()
+	}
 	// ports[0..nSvc-1] back the routed services (app/gateway/nlp/langyagent, in
 	// PerWorktreeServices order); ports[nSvc] is the API backend behind app's /api,
 	// ports[nSvc+1] the worker metrics endpoint.
@@ -176,7 +179,6 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		svc := domain.Service{
 			Name: r.Name, Role: r.Role, Port: ports[i],
 			Hostname: o.cfg.Naming.Hostname(r.Name, slug),
-			URL:      o.cfg.Naming.URL(r.Name, slug, scheme, pport),
 		}
 		// A service this worktree opts out of (gateway/nlp/langyagent) resolves to a
 		// live baseline stack's copy when one exists, so its URL stays defined. With
@@ -191,8 +193,19 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 				svc.Port = 0
 			}
 		}
+		if o.cfg.ShouldUsePortless {
+			// The proxy routes every service through one shared scheme+port by
+			// hostname, so the URL is defined even for a dead route (a 502, by
+			// design — see above).
+			svc.URL = o.cfg.Naming.URL(r.Name, slug, proxyScheme, proxyPort)
+		} else if svc.Port != 0 {
+			// No proxy: each service is reached directly on its own loopback port,
+			// plain HTTP. A genuinely unavailable service has no port to reach it
+			// on, so it gets no URL either.
+			svc.URL = o.cfg.Naming.URL(r.Name, slug, "http", svc.Port)
+		}
 		st.Services = append(st.Services, svc)
-		if svc.Port != 0 {
+		if svc.Port != 0 && o.cfg.ShouldUsePortless {
 			if err := o.proxy.Register(svc.Name, slug, svc.Port); err != nil {
 				o.log.Warn("alias registration failed", zap.String("host", svc.Hostname), zap.Error(err))
 			}
@@ -212,8 +225,10 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		return domain.Stack{}, nil, err
 	}
 	cleanup := func() {
-		for _, s := range st.Services {
-			o.proxy.Remove(s.Name, slug)
+		if o.cfg.ShouldUsePortless {
+			for _, s := range st.Services {
+				o.proxy.Remove(s.Name, slug)
+			}
 		}
 		o.store.RemoveStack(slug)
 	}
@@ -250,10 +265,17 @@ func (o *Orchestrator) heartbeat(ctx context.Context, st domain.Stack) {
 	}
 }
 
-// Up is the launcher hook `make haven up` runs in portless mode.
-func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) error {
-	// Bootstrap is part of up, not a command: a fresh machine installs portless,
-	// trusts the CA, and starts the proxy right here (each step idempotent).
+// ensurePortlessProxy installs, trusts, and starts the portless proxy — part of
+// `up`'s bootstrap, not a separate command, so a fresh machine self-configures
+// on the first `haven up` (each step idempotent). PORTLESS=0 skips all of it:
+// the escape hatch for a machine where the proxy's TLS handshake won't come up
+// (#7117). Callers must then serve every service plain HTTP on its own loopback
+// port instead, with no proxy involved — see provision's use of
+// Config.ShouldUsePortless.
+func (o *Orchestrator) ensurePortlessProxy() error {
+	if !o.cfg.ShouldUsePortless {
+		return nil
+	}
 	if !o.proxy.Installed() {
 		fmt.Println("portless is not installed — installing it (one time)…")
 		if err := o.proxy.Install(); err != nil {
@@ -262,6 +284,14 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	}
 	if err := o.proxy.EnsureReady(); err != nil {
 		return fmt.Errorf("could not start the portless proxy: %w", err)
+	}
+	return nil
+}
+
+// Up is the launcher hook `make haven up` runs in portless mode.
+func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) error {
+	if err := o.ensurePortlessProxy(); err != nil {
+		return err
 	}
 	slug, err := o.resolveSlug(p)
 	if err != nil {
@@ -495,11 +525,13 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 			fmt.Printf("stopped launcher (pid %d)\n", st.LauncherPID)
 		}
 	}
-	for _, r := range domain.PerWorktreeServices {
-		o.proxy.Remove(r.Name, slug)
+	if o.cfg.ShouldUsePortless {
+		for _, r := range domain.PerWorktreeServices {
+			o.proxy.Remove(r.Name, slug)
+		}
+		o.proxy.Remove(domain.ClickHouseService, slug)
+		o.proxy.Remove(domain.PostgresService, slug)
 	}
-	o.proxy.Remove(domain.ClickHouseService, slug)
-	o.proxy.Remove(domain.PostgresService, slug)
 	o.store.RemoveStack(slug)
 	fmt.Printf("stack %q torn down (databases kept — `haven db reset` for fresh ones)\n", slug)
 	return nil
@@ -526,14 +558,19 @@ func (o *Orchestrator) ensureClickHouse(ctx context.Context, st *domain.Stack) {
 	}
 	st.ClickHouseHTTPPort = port
 	st.ClickHouseDatabase = db
-	scheme, pport := o.proxy.Endpoint()
+	scheme, epPort := "http", port
+	if o.cfg.ShouldUsePortless {
+		scheme, epPort = o.proxy.Endpoint()
+	}
 	st.Services = append(st.Services, domain.Service{
 		Name: domain.ClickHouseService, Role: "ClickHouse (this stack's DB)", Port: port,
 		Hostname: o.cfg.Naming.Hostname(domain.ClickHouseService, st.Slug),
-		URL:      o.cfg.Naming.URL(domain.ClickHouseService, st.Slug, scheme, pport),
+		URL:      o.cfg.Naming.URL(domain.ClickHouseService, st.Slug, scheme, epPort),
 	})
-	if err := o.proxy.Register(domain.ClickHouseService, st.Slug, port); err != nil {
-		o.log.Warn("clickhouse alias registration failed", zap.Error(err))
+	if o.cfg.ShouldUsePortless {
+		if err := o.proxy.Register(domain.ClickHouseService, st.Slug, port); err != nil {
+			o.log.Warn("clickhouse alias registration failed", zap.Error(err))
+		}
 	}
 }
 

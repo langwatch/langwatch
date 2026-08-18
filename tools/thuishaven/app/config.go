@@ -55,6 +55,12 @@ type Config struct {
 	// terminal is quiet and the full detail lives in Grafana. "" opts out and leaves
 	// the console to .env. Resolved from LW_OBS_CONSOLE_LEVEL.
 	ObservabilityConsoleLevel string
+	// ShouldUsePortless routes a worktree's stack through the portless proxy
+	// (hostname URLs, shared TLS port). PORTLESS=0 disables it: `up` never
+	// starts, trusts, or registers with the proxy, and every service's own
+	// loopback port is served plain over HTTP instead — the documented escape
+	// hatch for a machine where the portless proxy's TLS won't come up.
+	ShouldUsePortless bool
 }
 
 // PlanOptions decide which services `up` runs and how.
