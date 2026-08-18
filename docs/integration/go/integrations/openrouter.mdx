@@ -65,7 +65,7 @@ func main() {
 	)
 
 	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model: "anthropic/claude-3.5-sonnet",
+		Model: "anthropic/claude-sonnet-5",
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.UserMessage("Hello via OpenRouter!"),
 		},
