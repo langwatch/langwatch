@@ -8,6 +8,7 @@ import {
   Heading,
   HStack,
   Input,
+  NativeSelect,
   Spacer,
   Spinner,
   Text,
@@ -843,30 +844,26 @@ function SourceComposerDrawer({
                 <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
                   Source type
                 </Text>
-                <select
-                  value={composer.sourceType}
-                  onChange={(e) =>
-                    setComposer({
-                      ...composer,
-                      sourceType: e.target.value as SourceType,
-                      parserConfig: {},
-                      ottlStatements: [],
-                    })
-                  }
-                  style={{
-                    padding: "8px",
-                    border: "1px solid var(--chakra-colors-border-muted)",
-                    borderRadius: "var(--chakra-radii-sm)",
-                    background: "white",
-                    fontSize: "14px",
-                  }}
-                >
-                  {sourceTypeOptions.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label} · {o.mode}
-                    </option>
-                  ))}
-                </select>
+                <NativeSelect.Root size="sm">
+                  <NativeSelect.Field
+                    value={composer.sourceType}
+                    onChange={(e) =>
+                      setComposer({
+                        ...composer,
+                        sourceType: e.target.value as SourceType,
+                        parserConfig: {},
+                        ottlStatements: [],
+                      })
+                    }
+                  >
+                    {sourceTypeOptions.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label} · {o.mode}
+                      </option>
+                    ))}
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
                 {!isEnterprise && (
                   <Text fontSize="xs" color="fg.muted">
                     Other source types are available on Enterprise plans.
@@ -879,7 +876,6 @@ function SourceComposerDrawer({
                 </Text>
                 <Input
                   size="sm"
-                  backgroundColor="white"
                   value={composer.name}
                   onChange={(e) =>
                     setComposer({ ...composer, name: e.target.value })
@@ -899,7 +895,6 @@ function SourceComposerDrawer({
               </Text>
               <Textarea
                 size="sm"
-                backgroundColor="white"
                 rows={2}
                 value={composer.description}
                 onChange={(e) =>
@@ -1061,7 +1056,6 @@ function SourceEditDrawer({
               </Text>
               <Input
                 size="sm"
-                backgroundColor="white"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
@@ -1072,7 +1066,6 @@ function SourceEditDrawer({
               </Text>
               <Textarea
                 size="sm"
-                backgroundColor="white"
                 rows={2}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -1644,7 +1637,6 @@ function ParserConfigFields({
           {f.key === "parserDsl" || f.key === "eventMappingDsl" ? (
             <Textarea
               size="sm"
-              backgroundColor="white"
               rows={6}
               value={values[f.key] ?? ""}
               onChange={(e) => onChange({ ...values, [f.key]: e.target.value })}
@@ -1654,7 +1646,6 @@ function ParserConfigFields({
           ) : (
             <Input
               size="sm"
-              backgroundColor="white"
               type={isSecretFieldKey(f.key) ? "password" : "text"}
               value={values[f.key] ?? ""}
               onChange={(e) => onChange({ ...values, [f.key]: e.target.value })}
@@ -1691,7 +1682,6 @@ function PullScheduleField({
       </Text>
       <Input
         size="sm"
-        backgroundColor="white"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={defaultSchedule}
