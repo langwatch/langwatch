@@ -133,6 +133,11 @@ export type ShareLinkFactRow = {
   visibility: "PUBLIC" | "ORGANIZATION" | "PROJECT";
   expiresAtMs: number | null;
   maxViews: number | null;
+  /** Views already spent on this link. Carried because the cutover has to
+   *  hand the budget over, not restart it: the engine takes a cut-over
+   *  organization's count from `GrantUsage`, and an unseeded link with
+   *  `maxViews` set would go live again with a full budget. */
+  viewCount: number;
   createdAtMs: number;
 };
 
@@ -173,6 +178,16 @@ export type ResourceGrantRow = {
   principalId: string | null;
   expiresAtMs: number | null;
   maxViews: number | null;
+  /** From `GrantUsage`, the tier's view-accounting row: zero when the link
+   *  has no usage row, which is what an unviewed link looks like. */
+  viewCount: number;
+};
+
+/** One share link's spent views, as the cutover hands them over. */
+export type ResourceGrantUsageSeed = {
+  grantId: string;
+  projectId: string;
+  viewCount: number;
 };
 
 /**
@@ -214,6 +229,20 @@ export interface AuthzCutoverRepository
   findResourceGrantRows(args: {
     organizationId: string;
   }): Promise<ResourceGrantRow[]>;
+
+  /**
+   * Hand each imported link's spent views over to the usage row that becomes
+   * their authority.
+   *
+   * CREATE-IF-ABSENT, and the implementation must not weaken that: a re-run
+   * that updated would walk back a view consumed since the seed, and the
+   * cutover would give a customer's spent budget back to whoever holds the
+   * token.
+   */
+  seedResourceGrantUsage(args: {
+    organizationId: string;
+    seeds: readonly ResourceGrantUsageSeed[];
+  }): Promise<void>;
 
   /** Every scope the decision-parity proof decides over. */
   findOrganizationTeamAndProjectIds(args: {

@@ -57,6 +57,7 @@ import { PrismaAuthzGrantsProjectionRepository } from "../repositories/authz-gra
 import { PrismaAuthzMigrationRepository } from "../repositories/authz-migration.prisma.repository";
 import { GrantsAuthzReadRepository } from "../repositories/authz-read.grants.repository";
 import { PrismaAuthzReadRepository } from "../repositories/authz-read.prisma.repository";
+import { legacyOrganizationDecide } from "../repositories/cutover-parity.legacy-decide";
 import { authzCollector } from "../runtime";
 
 /** The fold runs inline, so a wait that never has to wait may be short. */
@@ -256,6 +257,10 @@ export function cutoverMigrations({
           new GrantsAuthzReadRepository(prisma),
         ),
       },
+      // The third leg, composed exactly as production composes it: the real
+      // `hasOrganizationPermission`, which at proof time still runs its
+      // legacy body because the organization is not on the engine yet.
+      legacyDecide: legacyOrganizationDecide(prisma),
       cutoverCohort,
       adminEmails,
       now: () => Date.now(),

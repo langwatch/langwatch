@@ -13,7 +13,7 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ warn, debug, info, error: vi.fn() }),
 }));
 
-import { AuthzForkService } from "../authz-fork.service";
+import { type AuthzForkOptions, AuthzForkService } from "../authz-fork.service";
 
 const ORG = "org-1";
 const TEAM = "team-1";
@@ -48,9 +48,13 @@ function makeForkReader(overrides: Partial<AuthzReadRepository> = {}) {
   });
 }
 
-function makeFork(reader: AuthzReadRepository) {
+function makeFork(
+  reader: AuthzReadRepository,
+  options: Partial<AuthzForkOptions> = {},
+) {
   return new AuthzForkService(new AuthzCollectorService(reader), {
     demoProjectId: () => undefined,
+    ...options,
   });
 }
 
@@ -64,6 +68,7 @@ const memberWithProjectAdmin = (overrides: Partial<AuthzReadRepository> = {}) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  AuthzForkService.resetRateAnnouncement();
 });
 
 describe("the authz fork", () => {
@@ -93,7 +98,7 @@ describe("the authz fork", () => {
       expect(legacy).toHaveBeenCalledTimes(1);
       releaseLegacy(true);
       await vi.waitFor(() =>
-        expect(info).toHaveBeenCalledWith(
+        expect(debug).toHaveBeenCalledWith(
           expect.objectContaining({
             caller: "trpc.project",
             permission: "traces:view",
@@ -176,7 +181,7 @@ describe("the authz fork", () => {
 
         expect(decision.allowed).toBe(true);
         expect(legacy).not.toHaveBeenCalled();
-        expect(info).not.toHaveBeenCalled();
+        expect(debug).not.toHaveBeenCalled();
         expect(warn).not.toHaveBeenCalled();
       });
     });
@@ -235,7 +240,7 @@ describe("the authz fork", () => {
         organizationRole: "MEMBER",
       });
       await vi.waitFor(() =>
-        expect(info).toHaveBeenCalledWith(
+        expect(debug).toHaveBeenCalledWith(
           expect.objectContaining({
             // The candidate that settled it is the one the comparison names.
             permission: "traces:view",
@@ -266,7 +271,7 @@ describe("the authz fork", () => {
         expect(decision.allowed).toBe(false);
         expect(decision.matchedPermission).toBeUndefined();
         await vi.waitFor(() =>
-          expect(info).toHaveBeenCalledWith(
+          expect(debug).toHaveBeenCalledWith(
             expect.objectContaining({
               permission: "datasets:manage | traces:manage",
               engineAllowed: false,
@@ -337,7 +342,7 @@ describe("the authz fork", () => {
         }),
         "authz fork mismatch",
       );
-      expect(info).toHaveBeenCalledTimes(3);
+      expect(debug).toHaveBeenCalledTimes(3);
     });
 
     describe("when a project's team is unknown to the caller", () => {
@@ -508,6 +513,172 @@ describe("the authz fork", () => {
         expect(reader.findUserBindings).not.toHaveBeenCalled();
         expect(reader.findOrganizationRole).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  /**
+   * The fail-closed posture, on every method that can be handed an id the
+   * engine cannot place. It is one branch per method and each one is a
+   * separate decision to deny, so each one is asserted: a method that
+   * returned its collected snapshot's answer for an unresolved scope would
+   * decide at the wrong scope, and nothing downstream would notice.
+   */
+  describe("given an id no scope can be resolved from", () => {
+    describe("when several candidate permissions are asked", () => {
+      it("denies, and files the unresolved outcome against legacy", async () => {
+        const fork = makeFork(
+          makeForkReader({
+            findProjectLineage: vi.fn().mockResolvedValue(null),
+          }),
+        );
+
+        const decision = await fork.decideUserPermissionsAny({
+          userId: "alice",
+          permissions: ["traces:view", "datasets:manage"],
+          projectId: "proj-ghost",
+          caller: "trpc.projectAny",
+          legacy: async () => ({ allowed: true }),
+        });
+
+        expect(decision).toEqual({ allowed: false, organizationRole: null });
+        await vi.waitFor(() => expect(warn).toHaveBeenCalledTimes(1));
+        expect(warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            scopeType: "unresolved",
+            permission: "traces:view | datasets:manage",
+            engineAllowed: false,
+            legacyAllowed: true,
+          }),
+          "authz fork mismatch",
+        );
+      });
+    });
+
+    describe("when a named principal is asked", () => {
+      it("denies, and files the unresolved outcome against legacy", async () => {
+        const reader = makeForkReader({
+          findProjectLineage: vi.fn().mockResolvedValue(null),
+        });
+        const fork = makeFork(reader);
+
+        const allowed = await fork.decidePrincipalPermission({
+          principal: { type: "apiKey", id: "key-1" },
+          organizationId: ORG,
+          projectId: "proj-ghost",
+          permission: "datasets:manage",
+          caller: "apiKeyPath.keyBindings",
+          legacy: async () => true,
+        });
+
+        expect(allowed).toBe(false);
+        // No collection at all: there is no scope to collect for.
+        expect(reader.findApiKeyBindings).not.toHaveBeenCalled();
+        await vi.waitFor(() => expect(warn).toHaveBeenCalledTimes(1));
+        expect(warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            scopeType: "unresolved",
+            principalType: "apiKey",
+            engineAllowed: false,
+            legacyAllowed: true,
+          }),
+          "authz fork mismatch",
+        );
+      });
+    });
+
+    describe("when an api key with an owner ceiling is asked", () => {
+      it("denies, and files the unresolved outcome against legacy", async () => {
+        const reader = makeForkReader({
+          findProjectLineage: vi.fn().mockResolvedValue(null),
+        });
+        const fork = makeFork(reader);
+
+        const allowed = await fork.decideApiKeyPermission({
+          apiKeyId: "key-1",
+          ownerUserId: "dave",
+          organizationId: ORG,
+          projectId: "proj-ghost",
+          permission: "datasets:manage",
+          caller: "apiKeyPath.ceiling",
+          legacy: async () => true,
+        });
+
+        expect(allowed).toBe(false);
+        expect(reader.findApiKeyBindings).not.toHaveBeenCalled();
+        expect(reader.findUserBindings).not.toHaveBeenCalled();
+        await vi.waitFor(() => expect(warn).toHaveBeenCalledTimes(1));
+        expect(warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            scopeType: "unresolved",
+            engineAllowed: false,
+            legacyAllowed: true,
+          }),
+          "authz fork mismatch",
+        );
+      });
+    });
+  });
+
+  describe("given the comparison rate is turned down to zero", () => {
+    it("answers from the engine, runs no legacy thunk, and says it stopped", async () => {
+      const legacy = vi.fn(async () => false);
+      let rate = 1;
+      const fork = makeFork(memberWithProjectAdmin(), {
+        comparisonRate: () => rate,
+      });
+      const check = () =>
+        fork.decideUserPermission({
+          userId: "alice",
+          permission: "traces:view",
+          projectId: PROJECT,
+          caller: "trpc.project",
+          legacy,
+        });
+
+      await check();
+      rate = 0;
+      const decision = await check();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(decision.allowed).toBe(true);
+      // The first check compared; the second did not.
+      expect(legacy).toHaveBeenCalledTimes(1);
+      // Silence at warn has to be readable as agreement, so the fact that
+      // comparing STOPPED is announced rather than inferred from it.
+      expect(info).toHaveBeenCalledWith(
+        { comparisonRate: 0 },
+        "authz fork comparison disabled",
+      );
+    });
+  });
+
+  describe("given more comparisons than the in-flight bound allows", () => {
+    it("sheds the ones over the bound and still answers every check", async () => {
+      // A legacy resolver that never settles: exactly the shape the bound
+      // exists for, since nothing upstream waits for these.
+      const legacy = vi.fn(() => new Promise<boolean>(() => undefined));
+      const fork = makeFork(memberWithProjectAdmin(), {
+        maxInFlightComparisons: 2,
+      });
+
+      const decisions = await Promise.all(
+        [1, 2, 3, 4].map(() =>
+          fork.decideUserPermission({
+            userId: "alice",
+            permission: "traces:view",
+            projectId: PROJECT,
+            caller: "trpc.project",
+            legacy,
+          }),
+        ),
+      );
+
+      expect(decisions.every((decision) => decision.allowed)).toBe(true);
+      expect(legacy).toHaveBeenCalledTimes(2);
+      expect(debug).toHaveBeenCalledWith(
+        expect.objectContaining({ ceiling: 2 }),
+        "authz fork comparison shed",
+      );
     });
   });
 });

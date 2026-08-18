@@ -52,6 +52,9 @@ class SweepRepository implements AuthzCutoverRepository {
   async findResourceGrantRows(): Promise<ResourceGrantRow[]> {
     return [];
   }
+  async seedResourceGrantUsage(): Promise<void> {
+    throw new Error("this organization holds no share links to seed");
+  }
   async findOrganizationTeamAndProjectIds(): Promise<OrganizationScopeInventory> {
     return { teamIds: [TEAM], projects: [{ id: PROJECT, teamId: TEAM }] };
   }

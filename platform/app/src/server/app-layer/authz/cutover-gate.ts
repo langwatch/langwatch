@@ -80,6 +80,25 @@ export async function cutoverOnEngine({
   return onEngine;
 }
 
+/**
+ * Drop ONE organization's cached answer, so the very next check re-reads the
+ * projection. The rollback effect calls this straight after flipping
+ * `onEngine` off, which is what closes the window where the pod that served
+ * the operator's own rollback keeps answering "on engine" from its own cache.
+ *
+ * Deliberately POD-LOCAL: this is a module map, so it invalidates the process
+ * that calls it and nothing else. Every other pod converges on the TTL above,
+ * which is the bound the spec already promises ("within the gate's cache
+ * window"). Cross-pod invalidation would need a bus and would buy 60 seconds.
+ */
+export function invalidateCutoverGate({
+  organizationId,
+}: {
+  organizationId: string;
+}): void {
+  cached.delete(organizationId);
+}
+
 /** The cache, dropped - for tests that cut an org over mid-suite. */
 export function resetCutoverGateForTesting(): void {
   cached.clear();

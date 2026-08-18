@@ -58,6 +58,7 @@ export type {
   PlatformAdminUserFact,
   ProjectCredentialFact,
   ResourceGrantRow,
+  ResourceGrantUsageSeed,
   RoleHeadRow,
   ShareLinkFactRow,
   TeamBindingWrite,
@@ -107,6 +108,7 @@ export type {
   BindingIdentityPrincipal,
 } from "./ledger/grant-identity";
 export {
+  CUTOVER_COMPLETION_REFUSALS,
   emptyGrantsLedgerState,
   reduceGrantsLedger,
 } from "./ledger/grants-ledger.reducer";

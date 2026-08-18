@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CUTOVER_COMPLETION_REFUSALS,
   emptyGrantsLedgerState,
   reduceGrantsLedger,
   type GrantsLedgerEvent,
@@ -43,16 +44,84 @@ describe("grants ledger reducer, migration lifecycle", () => {
         expect(state.cutover.onEngine).toBe(true);
         expect(state.cutover.provedAtMs).toBe(5);
         expect(state.cutover.parityDiffs).toEqual([]);
+        expect(state.cutover.completionRefusedReason).toBeNull();
+      });
+    });
+
+    describe("when a completion arrives with no proof behind it", () => {
+      it("leaves the organization on legacy and records why", () => {
+        // The flip is earned by a proof, and this is where that is
+        // enforced: any writer - a retried migration, an ops action, a
+        // replayed script - reaches the engine only through this fold.
+        const state = apply([
+          { kind: "cutover_completed", actor: ACTOR, occurredAtMs: 6 },
+        ]);
+
+        expect(state.cutover.onEngine).toBe(false);
+        expect(state.cutover.completionRefusedReason).toBe(
+          CUTOVER_COMPLETION_REFUSALS.UNPROVEN,
+        );
+        expect(state.cutover.changedAtMs).toBe(6);
+      });
+    });
+
+    describe("when a completion arrives on a proof that found disagreements", () => {
+      it("leaves the organization on legacy and names the outstanding diffs", () => {
+        const state = apply([
+          {
+            kind: "migration_parity_proved",
+            diffs: ["user:u1 traces:view organization:org_acme legacy=true engine=false"],
+            occurredAtMs: 5,
+          },
+          { kind: "cutover_completed", actor: ACTOR, occurredAtMs: 6 },
+        ]);
+
+        expect(state.cutover.onEngine).toBe(false);
+        expect(state.cutover.completionRefusedReason).toBe(
+          CUTOVER_COMPLETION_REFUSALS.DIFFS,
+        );
+      });
+    });
+
+    describe("when a refused organization proves clean and completes again", () => {
+      it("flips, and stops saying it was refused", () => {
+        const state = apply([
+          { kind: "cutover_completed", actor: ACTOR, occurredAtMs: 6 },
+          { kind: "migration_parity_proved", diffs: [], occurredAtMs: 7 },
+          { kind: "cutover_completed", actor: ACTOR, occurredAtMs: 8 },
+        ]);
+
+        expect(state.cutover.onEngine).toBe(true);
+        expect(state.cutover.completionRefusedReason).toBeNull();
       });
     });
 
     describe("when the cutover is rolled back", () => {
       it("puts the organization back on the legacy path", () => {
         const state = apply([
+          { kind: "migration_parity_proved", diffs: [], occurredAtMs: 5 },
           { kind: "cutover_completed", actor: ACTOR, occurredAtMs: 6 },
           { kind: "cutover_rolled_back", actor: ACTOR, occurredAtMs: 7 },
         ]);
         expect(state.cutover.onEngine).toBe(false);
+      });
+    });
+
+    describe("when a rolled-back organization completes again", () => {
+      /** The re-cutover path: an operator rolls back, the cause is fixed, and
+       *  the organization cuts over a second time. The proof it already has
+       *  is still standing, so the second completion is not asking for
+       *  anything the first did not earn. */
+      it("puts it back on the engine", () => {
+        const state = apply([
+          { kind: "migration_parity_proved", diffs: [], occurredAtMs: 5 },
+          { kind: "cutover_completed", actor: ACTOR, occurredAtMs: 6 },
+          { kind: "cutover_rolled_back", actor: ACTOR, occurredAtMs: 7 },
+          { kind: "cutover_completed", actor: ACTOR, occurredAtMs: 8 },
+        ]);
+
+        expect(state.cutover.onEngine).toBe(true);
+        expect(state.cutover.changedAtMs).toBe(8);
       });
     });
 
@@ -63,6 +132,7 @@ describe("grants ledger reducer, migration lifecycle", () => {
         // last-write-wins over one row. Without the guard this rollback
         // wins on arrival order alone.
         const state = apply([
+          { kind: "migration_parity_proved", diffs: [], occurredAtMs: 19 },
           { kind: "cutover_completed", actor: ACTOR, occurredAtMs: 20 },
           { kind: "cutover_rolled_back", actor: ACTOR, occurredAtMs: 10 },
         ]);
@@ -86,10 +156,17 @@ describe("grants ledger reducer, migration lifecycle", () => {
 
     describe("when the same cutover fact is folded twice", () => {
       it("converges rather than dropping the fact that produced the state", () => {
+        const proved: GrantsLedgerEvent = {
+          kind: "migration_parity_proved",
+          diffs: [],
+          occurredAtMs: 19,
+        };
         const once = apply([
+          proved,
           { kind: "cutover_completed", actor: ACTOR, occurredAtMs: 20 },
         ]);
         const twice = apply([
+          proved,
           { kind: "cutover_completed", actor: ACTOR, occurredAtMs: 20 },
           { kind: "cutover_completed", actor: ACTOR, occurredAtMs: 20 },
         ]);

@@ -16,6 +16,7 @@ export {
 export type {
   CutoverDeps,
   CutoverResourceDiff,
+  UnmatchedAdminEmailsReport,
 } from "./cutover.migration";
 export { GRANTS_GENESIS_IMPORT_MIGRATION_NAME } from "./genesis-import.name";
 export {

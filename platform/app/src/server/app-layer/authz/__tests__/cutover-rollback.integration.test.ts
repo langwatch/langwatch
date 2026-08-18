@@ -63,9 +63,10 @@ describe("given a cut-over organization rolled back with the queue stopped", () 
 
   /**
    * `system-migrations/runtime.ts`'s `rollBackAuthzCutover`, with its ledger
-   * send captured instead of queued: the fact, then the synchronous
-   * projection flip, then the epoch bump. Same order, and the order is the
-   * point - the enforcement is what has to hold without the fold.
+   * send captured instead of queued: the synchronous projection flip, then
+   * the epoch bump, then the fact. Same order, and the order is the point -
+   * the enforcement is what has to hold without the fold, so it goes first
+   * and the append is best-effort behind it.
    */
   const service = () =>
     new SystemMigrationsService({
@@ -74,11 +75,11 @@ describe("given a cut-over organization rolled back with the queue stopped", () 
       runPass: async () => null,
       rollbackEffects: {
         [GRANTS_CUTOVER_MIGRATION_NAME]: async ({ tenantId, actorUserId }) => {
-          appended.push({ organizationId: tenantId, actorUserId });
           await new PrismaAuthzGrantsProjectionRepository(
             prisma,
           ).enforceCutoverRollback({ organizationId: tenantId });
           await bumpAuthzEpoch({ organizationId: tenantId });
+          appended.push({ organizationId: tenantId, actorUserId });
         },
       },
     });
@@ -92,8 +93,11 @@ describe("given a cut-over organization rolled back with the queue stopped", () 
       dbIndex: process.env.REDIS_DB_INDEX,
     });
     if (!connection) {
+      // Named as the code reads it: the connect call above takes REDIS_URL
+      // (and its cluster/db siblings), so pointing an operator at a variable
+      // nothing here reads sends them to set the wrong one.
       throw new Error(
-        "This suite needs Redis. Set LANGWATCH_TEST_REDIS_URL in platform/app/.env.",
+        "This suite needs Redis. Set REDIS_URL (or REDIS_CLUSTER_ENDPOINTS) in platform/app/.env.",
       );
     }
     connection.disconnect();

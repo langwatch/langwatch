@@ -77,6 +77,26 @@ const RESOURCE_KIND_FROM_DB: Record<
   THREAD: "thread",
 };
 
+/**
+ * The stored column is a plain `TEXT` — Prisma has no enum behind it, and the
+ * row can be read back from a database an older writer, a hand-run statement
+ * or a partially applied migration also touched. So the value is PARSED, not
+ * asserted: `undefined` for anything that is not one of the two kinds, which
+ * `grantRowToFact` then treats exactly as it treats a missing column.
+ *
+ * Casting instead put `RESOURCE_KIND_FROM_DB[<anything>]` in front of the
+ * engine as `kind: undefined`, which reads as a resource grant that names no
+ * kind of thing — a share row that matches whichever resource is asked about.
+ */
+function resourceKindFromDb(
+  value: string | null,
+): ResourceGrantTerms["kind"] | undefined {
+  if (value === "TRACE" || value === "THREAD") {
+    return RESOURCE_KIND_FROM_DB[value];
+  }
+  return undefined;
+}
+
 export interface GrantRowShape {
   id: string;
   organizationId: string;
@@ -134,6 +154,7 @@ export function grantFactToRow({
 }
 
 export function grantRowToFact(row: GrantRowShape): GrantFact {
+  const resourceKind = resourceKindFromDb(row.resourceKind);
   return {
     grantId: row.id,
     principal: { type: PRINCIPAL_FROM_DB[row.principalType], id: row.principalId },
@@ -142,16 +163,17 @@ export function grantRowToFact(row: GrantRowShape): GrantFact {
     ...(row.legacyRole != null
       ? { legacyRole: row.legacyRole as LegacyBindingRole }
       : {}),
-    // All four identity columns or none: a row missing one of them cannot
-    // describe a resource grant, and inventing a default would put a fact in
-    // front of the engine that names the wrong thing.
+    // All four identity columns or none, and the kind has to PARSE as one of
+    // the two the tier has: a row missing one of them cannot describe a
+    // resource grant, and inventing a default would put a fact in front of
+    // the engine that names the wrong thing.
     ...(row.token != null &&
     row.permission != null &&
-    row.resourceKind != null &&
+    resourceKind !== undefined &&
     row.projectId != null
       ? {
           resource: {
-            kind: RESOURCE_KIND_FROM_DB[row.resourceKind as GrantResourceKindDb],
+            kind: resourceKind,
             projectId: row.projectId,
             token: row.token,
             permission: row.permission,

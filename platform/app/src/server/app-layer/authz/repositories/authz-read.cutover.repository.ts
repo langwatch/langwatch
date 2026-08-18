@@ -30,6 +30,22 @@
  * When the project is unknown there is no organization to ask about, so the
  * call goes to legacy: an unresolvable scope must not be a silent head swap.
  *
+ * ONE HEAD PER PASS. The gate's answer is cached with a TTL, and a collect is
+ * several reads: without a pass boundary that TTL can expire BETWEEN two of
+ * them, and the snapshot the engine decides from is half compat bindings and
+ * half ledger grants - a state that never existed in either head. So the
+ * decision is memoized per organization for the lifetime of ONE instance, and
+ * `beginPass()` hands the collector a fresh instance to hold for exactly one
+ * snapshot.
+ *
+ * The memo has to be per-pass rather than per-instance-forever because the
+ * composition root holds ONE of these for the whole process
+ * (`authz/runtime.ts`'s `authzCollector`): pinning that instance would pin
+ * every organization's head until the pod restarted, and a rollback - the
+ * emergency lever - would stop working. Instances the fork and shadow compose
+ * per request are short-lived either way, so both shapes agree on the same
+ * rule: a pin lasts one snapshot, never longer.
+ *
  * Browser-safety: like everything else under ./authz, this composes from a
  * caller-supplied Prisma handle and holds no module-scope storage.
  */
@@ -51,6 +67,16 @@ import { GrantsAuthzReadRepository } from "./authz-read.grants.repository";
 import { PrismaAuthzReadRepository } from "./authz-read.prisma.repository";
 
 export class CutoverAwareAuthzReadRepository implements AuthzReadRepository {
+  /**
+   * The head this instance has already committed to, per organization. A
+   * PROMISE rather than a resolved value, so two reads racing inside one pass
+   * share the one gate call instead of both starting their own.
+   */
+  private readonly pinnedHeads = new Map<
+    string,
+    Promise<AuthzReadRepository>
+  >();
+
   constructor(
     private readonly prisma: Prisma.TransactionClient,
     private readonly repositories: {
@@ -61,6 +87,12 @@ export class CutoverAwareAuthzReadRepository implements AuthzReadRepository {
       grants: new GrantsAuthzReadRepository(prisma),
     },
   ) {}
+
+  /** A view of this decorator whose head pins for one snapshot — see the
+   *  module comment for why the pin may not outlive it. */
+  beginPass(): AuthzReadRepository {
+    return new CutoverAwareAuthzReadRepository(this.prisma, this.repositories);
+  }
 
   async findOrganizationRole(args: {
     userId: string;
@@ -142,8 +174,15 @@ export class CutoverAwareAuthzReadRepository implements AuthzReadRepository {
   private async readerFor(
     organizationId: string,
   ): Promise<AuthzReadRepository> {
-    return (await cutoverOnEngine({ prisma: this.prisma, organizationId }))
-      ? this.repositories.grants
-      : this.repositories.legacy;
+    const pinned = this.pinnedHeads.get(organizationId);
+    if (pinned) return pinned;
+    const resolving = cutoverOnEngine({
+      prisma: this.prisma,
+      organizationId,
+    }).then((onEngine) =>
+      onEngine ? this.repositories.grants : this.repositories.legacy,
+    );
+    this.pinnedHeads.set(organizationId, resolving);
+    return resolving;
   }
 }

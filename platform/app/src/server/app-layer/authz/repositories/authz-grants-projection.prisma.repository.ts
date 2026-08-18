@@ -236,6 +236,7 @@ export class PrismaAuthzGrantsProjectionRepository
         onEngine: cutover?.onEngine ?? false,
         provedAtMs: cutover?.provedAt?.getTime() ?? null,
         parityDiffs: (cutover?.parityDiffs as string[] | null) ?? [],
+        completionRefusedReason: cutover?.completionRefusedReason ?? null,
         changedAtMs: cutover?.changedAt?.getTime() ?? null,
       },
       migrationStates: Object.fromEntries(
@@ -768,6 +769,10 @@ export class PrismaAuthzGrantsProjectionRepository
           ? new Date(state.cutover.provedAtMs)
           : null,
       parityDiffs: state.cutover.parityDiffs,
+      // Why the newest completion fact did not flip this organization. The
+      // fold cannot log from inside a pure reducer, so the refusal travels as
+      // state and lands here, where an operator can see it.
+      completionRefusedReason: state.cutover.completionRefusedReason,
       changedAt:
         state.cutover.changedAtMs != null
           ? new Date(state.cutover.changedAtMs)

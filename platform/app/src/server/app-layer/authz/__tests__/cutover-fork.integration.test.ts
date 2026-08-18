@@ -113,6 +113,11 @@ describe("given an organization whose cutover pass runs to a clean proof", () =>
       // the organization is in the cohort.
       cutoverCohort: (tenantId) => tenantId === organization.id,
     });
+    // Exiting this loop unfinished would leave the assertions below failing
+    // on the flip rather than on the reason it never happened, so the loop
+    // names what held it.
+    let lastReport: unknown = null;
+    let finalized = false;
     for (let pass = 0; pass < MAX_PASSES; pass++) {
       await runMigrationPassForTenant({
         prisma,
@@ -127,27 +132,42 @@ describe("given an organization whose cutover pass runs to a clean proof", () =>
           },
         },
       });
-      if (record?.status === "finalized") break;
+      lastReport = record?.report ?? record?.status ?? null;
+      if (record?.status === "finalized") {
+        finalized = true;
+        break;
+      }
+    }
+    if (!finalized) {
+      throw new Error(
+        `the cutover pass did not finalize in ${MAX_PASSES} passes; it last reported ${JSON.stringify(
+          lastReport,
+        )}`,
+      );
     }
   });
 
   afterAll(async () => {
-    if (!organization?.id) return;
+    // Every row this suite creates is named, and every id is read the
+    // guarded way: `cleanupTestRows` refuses an entry it cannot identify and
+    // reports it, which is only reachable if the id arrives as undefined
+    // rather than as a TypeError one line earlier.
     await cleanupTestRows(prisma, [
-      ["grantUsage", { organizationId: organization.id }],
-      ["grant", { organizationId: organization.id }],
-      ["role", { organizationId: organization.id }],
-      ["roleBinding", { organizationId: organization.id }],
-      ["customRole", { organizationId: organization.id }],
-      ["authzProjectionCursor", { organizationId: organization.id }],
-      ["authzCutoverProjection", { organizationId: organization.id }],
-      ["systemMigrationTenantState", { tenantId: organization.id }],
-      ["teamUser", { teamId: team.id }],
-      ["organizationUser", { organizationId: organization.id }],
-      ["project", { id: project.id }],
-      ["team", { id: team.id }],
-      ...(userId ? ([["user", { id: userId }]] as const) : []),
-      ["organization", { id: organization.id }],
+      ["grantUsage", { organizationId: organization?.id }],
+      ["shareLink", { projectId: project?.id }],
+      ["grant", { organizationId: organization?.id }],
+      ["role", { organizationId: organization?.id }],
+      ["roleBinding", { organizationId: organization?.id }],
+      ["customRole", { organizationId: organization?.id }],
+      ["authzProjectionCursor", { organizationId: organization?.id }],
+      ["authzCutoverProjection", { organizationId: organization?.id }],
+      ["systemMigrationTenantState", { tenantId: organization?.id }],
+      ["teamUser", { teamId: team?.id }],
+      ["organizationUser", { organizationId: organization?.id }],
+      ["project", { id: project?.id }],
+      ["team", { id: team?.id }],
+      ["user", { id: userId }],
+      ["organization", { id: organization?.id }],
     ]);
   });
 

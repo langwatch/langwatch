@@ -301,6 +301,12 @@ export class LedgerShareRepository implements ShareRepository {
         where: {
           grantId,
           organizationId,
+          // The project is part of the row's tenancy, not decoration: it is
+          // what the resource fact is anchored to, and every other query in
+          // this repository already fences on it. Naming it here keeps the
+          // conditional consume from ever counting a view against a row that
+          // belongs to a different project.
+          projectId,
           ...(capped ? { viewCount: { lt: maxViews } } : {}),
         },
         data: { viewCount: { increment: 1 }, lastViewedAt: new Date() },

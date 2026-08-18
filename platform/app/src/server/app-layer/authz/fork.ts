@@ -33,6 +33,22 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { CutoverAwareAuthzReadRepository } from "./repositories/authz-read.cutover.repository";
 import { demoProjectId } from "./shadow";
 
+/**
+ * `AUTHZ_FORK_COMPARISON_RATE` as a sample rate, defaulting to ON: the
+ * detached legacy comparison is what proves an on-engine organization keeps
+ * deciding the way legacy would have (D-PR3-2), so unset means every check
+ * compares. "0"/"off" turns it down when the double-read costs too much;
+ * a fraction samples. Read per check so the knob moves without a restart.
+ */
+function parseForkComparisonRate(): number {
+  const raw = process.env.AUTHZ_FORK_COMPARISON_RATE;
+  if (!raw) return 1;
+  if (raw === "1" || raw === "true") return 1;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return 1;
+  return Math.min(1, Math.max(0, parsed));
+}
+
 export function authzForkFor(prisma: PrismaClient): AuthzForkService {
   return new AuthzForkService(
     // The same per-organization repository the composition root collects
@@ -41,6 +57,9 @@ export function authzForkFor(prisma: PrismaClient): AuthzForkService {
     // the head that organization is now served from, which is the whole point
     // of the cutover.
     new AuthzCollectorService(new CutoverAwareAuthzReadRepository(prisma)),
-    { demoProjectId },
+    {
+      demoProjectId,
+      comparisonRate: parseForkComparisonRate,
+    },
   );
 }

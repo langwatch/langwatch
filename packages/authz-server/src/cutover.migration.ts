@@ -37,6 +37,17 @@
  * rows), the event store dedupes them, and the proofs re-read live state. A
  * `previous` record therefore needs no special-casing at all.
  *
+ * Idempotent is not the same as "one command id per organization", and the
+ * difference is where the two process facts live. A command id has to be a
+ * function of WHAT IS BEING SAID, not merely of who it is about, or the
+ * store's dedupe silently swallows a second, different claim about the same
+ * organization: the parity fact is keyed on its diff set (so hold → fix →
+ * re-prove records the fix rather than keeping the failure forever), the
+ * completion on the pass's own timestamp (so an organization rolled back and
+ * cut over again can actually flip a second time), and the platform chunk on
+ * its contents (so a changed ADMIN_EMAILS is a new command rather than a
+ * duplicate of the old one). See `parityCommandId`.
+ *
  * Dormant facts (decision 13): the lite-member, project-credential and
  * PLATFORM rows this import writes are STORED but no PR-3 decision reads
  * them — the engine still infers those answers exactly as it does today,
@@ -51,6 +62,7 @@ import {
   type AuthzScopeRef,
   type CollectedGrants,
 } from "@langwatch/authz";
+import { createLogger } from "@langwatch/observability";
 import type {
   SystemMigration,
   TenantMigrationOutcome,
@@ -77,6 +89,8 @@ import type {
   GrantsLedgerEmitter,
 } from "./team-user-backfill.migration";
 import { TEAM_USER_BACKFILL_MIGRATION_NAME } from "./team-user-backfill.name";
+
+const logger = createLogger("langwatch:authz:cutover");
 
 /**
  * The aggregate platform-scope facts live on.
@@ -130,6 +144,20 @@ export type CutoverResourceDiff = {
   actual?: string | null;
 };
 
+/**
+ * What the report says about admin addresses with no account behind them.
+ *
+ * An email address is personal data and a migration report is a stored JSON
+ * blob on an ops page, so the report carries a COUNT and a masked digest per
+ * address - enough for an operator to recognise the typo they made, not
+ * enough to be a list of email addresses at rest. The full list goes to one
+ * log line, where retention and access are already governed.
+ */
+export type UnmatchedAdminEmailsReport = {
+  count: number;
+  digests: string[];
+};
+
 export type CutoverDeps = {
   repository: AuthzCutoverRepository;
   ledger: GrantsLedgerEmitter;
@@ -143,6 +171,28 @@ export type CutoverDeps = {
     legacy: AuthzCollectorService;
     grants: AuthzCollectorService;
   };
+  /**
+   * The THIRD leg of the parity proof: the real legacy resolver, as the
+   * request path calls it, injected the same way the collectors are (this
+   * package cannot import the platform's rbac module).
+   *
+   * The two-collector legs compare two READERS through one engine, so
+   * anything the legacy RESOLVER does that the engine does not - a floor it
+   * applies, a fallback it unions, an order it stops in - is invisible to
+   * them by construction: both sides run the same decision function. This leg
+   * closes that: for each member, at ORGANIZATION scope (the cheapest scope
+   * that still exercises the resolver's own quirks), the engine's answer is
+   * compared with what the resolver actually returns today.
+   *
+   * Optional because a composition that has not wired it still proves the
+   * other two legs; the report says how many subjects the leg verified, so
+   * "not wired" reads as zero rather than as clean.
+   */
+  legacyDecide?: (args: {
+    userId: string;
+    organizationId: string;
+    permission: string;
+  }) => Promise<boolean>;
   /**
    * Whether this organization may cut over yet. Composed in the app from
    * the cohort helper and its own environment knob — the package reads no
@@ -202,6 +252,7 @@ export class GrantsCutoverMigration implements SystemMigration {
 
     await this.emit({ organizationId, emissions, signal });
     await this.awaitConvergence({ organizationId, emissions, signal });
+    await this.seedShareViewBudgets({ organizationId });
 
     const resourceDiffs = await this.proveResourceImport({ organizationId });
     if (resourceDiffs.length > 0) {
@@ -218,15 +269,17 @@ export class GrantsCutoverMigration implements SystemMigration {
     }
 
     const parity = await this.proveDecisionParity({ organizationId, signal });
+    const provenDiffs = parity.diffs.slice(0, MAX_PROVEN_DIFFS);
     if (parity.diffs.length > 0) {
       // The disagreement is recorded as a fact before the tenant is held:
       // the ledger is where the argument lives, the report is where an
-      // operator reads it. Deterministic commandId, so a crash between this
-      // send and the state write re-runs and dedupes.
+      // operator reads it. The commandId carries the proof's OWN identity —
+      // see `parityCommandId`, and why a per-organization id alone made the
+      // hold-fix-reprove path unable to record the fix.
       await this.deps.ledger.proveMigrationParity({
         organizationId,
-        commandId: `cutover:parity:${organizationId}`,
-        diffs: parity.diffs.slice(0, MAX_PROVEN_DIFFS),
+        commandId: parityCommandId({ organizationId, diffs: provenDiffs }),
+        diffs: provenDiffs,
         occurredAtMs: this.deps.now(),
       });
       return {
@@ -244,15 +297,22 @@ export class GrantsCutoverMigration implements SystemMigration {
 
     await this.deps.ledger.proveMigrationParity({
       organizationId,
-      commandId: `cutover:parity:${organizationId}`,
+      commandId: parityCommandId({ organizationId, diffs: [] }),
       diffs: [],
       occurredAtMs: this.deps.now(),
     });
+    const completedAtMs = this.deps.now();
     await this.deps.ledger.completeCutover({
       organizationId,
-      commandId: `cutover:complete:${organizationId}`,
+      // The pass's own timestamp, because a completion carries no content to
+      // be identified by and the SAME organization may legitimately have to
+      // complete twice: an operator rolls a cutover back, the cause is fixed,
+      // and the organization cuts over again. A per-organization id made the
+      // second completion a duplicate the event store swallowed, and the
+      // organization then waited forever for a flip nobody would ever fold.
+      commandId: `cutover:complete:${organizationId}:${completedAtMs}`,
       actor: CUTOVER_ACTOR,
-      occurredAtMs: this.deps.now(),
+      occurredAtMs: completedAtMs,
     });
     await this.awaitCutoverOnEngine({ organizationId, signal });
 
@@ -299,7 +359,7 @@ export class GrantsCutoverMigration implements SystemMigration {
     organizationId: string;
   }): Promise<{
     emissions: PlannedEmissions;
-    unmatchedAdminEmails: string[];
+    unmatchedAdminEmails: UnmatchedAdminEmailsReport;
   }> {
     const [shareLinkRows, externalMembers, projectCredentials] =
       await Promise.all([
@@ -313,6 +373,16 @@ export class GrantsCutoverMigration implements SystemMigration {
         ? []
         : await this.deps.repository.findUsersByEmail({ emails });
     const matched = new Set(admins.map((user) => user.email.toLowerCase()));
+    const unmatched = emails.filter((email) => !matched.has(email));
+    if (unmatched.length > 0) {
+      // The full list lives HERE and only here. It is operational detail an
+      // engineer needs once, on a surface that already governs retention -
+      // not a permanent JSON column on a report an ops page renders.
+      logger.warn(
+        { organizationId, unmatchedAdminEmails: unmatched },
+        "cutover found platform-admin addresses with no account behind them",
+      );
+    }
 
     return {
       emissions: {
@@ -336,8 +406,12 @@ export class GrantsCutoverMigration implements SystemMigration {
       // Not fatal, and deliberately so: ADMIN_EMAILS stays the LIVE authority
       // for platform access until contract (decision 13), so an address with
       // no account behind it changes nothing about who can do what. It is
-      // reported because it is almost always a typo or a departed colleague.
-      unmatchedAdminEmails: emails.filter((email) => !matched.has(email)),
+      // reported because it is almost always a typo or a departed colleague -
+      // masked, because the report is stored (see UnmatchedAdminEmailsReport).
+      unmatchedAdminEmails: {
+        count: unmatched.length,
+        digests: unmatched.map(maskEmail),
+      },
     };
   }
 
@@ -367,13 +441,21 @@ export class GrantsCutoverMigration implements SystemMigration {
       }
     }
     // The sentinel aggregate, addressed as its own tenant. The commandId
-    // carries no organization on purpose: every organization's cutover
-    // emits exactly this command, and the event store dedupes it.
+    // carries no organization on purpose - every organization's cutover
+    // emits the same operators and the event store dedupes them - but it
+    // DOES carry a hash of the chunk's contents, because ADMIN_EMAILS is a
+    // live list that changes between cutovers. Keyed on the index alone,
+    // the first organization to cut over after an operator was added
+    // emitted `cutover:platform:0` with a different membership and the
+    // store swallowed it: the new operator's PLATFORM fact never landed,
+    // and nothing anywhere said so.
     for (const [index, chunk] of chunked(emissions.platform).entries()) {
       this.assertNotAborted(signal);
       await this.deps.ledger.attachGrants({
         organizationId: PLATFORM_AUTHZ_TENANT_ID,
-        commandId: `cutover:platform:${index}`,
+        commandId: `cutover:platform:${contentHash(
+          chunk.map((grant) => grant.grantId),
+        )}:${index}`,
         grants: chunk,
       });
     }
@@ -423,6 +505,47 @@ export class GrantsCutoverMigration implements SystemMigration {
           present.has(id),
         );
       },
+    });
+  }
+
+  /**
+   * Carry each imported link's views ALREADY SPENT onto the usage row that
+   * becomes their authority.
+   *
+   * Without this the cutover silently refills every capped share link a
+   * customer had partly consumed: the engine's liveness read takes the count
+   * from `GrantUsage`, an absent row reads as zero views, and a link with
+   * `maxViews: 1` that had already been opened went live again the moment its
+   * organization cut over.
+   *
+   * Deliberately OUTSIDE the fold, and this is the one place in the migration
+   * where that needs saying. View accounting has never been fold-owned
+   * (decision 22): it has a different writer, a different rate, and a
+   * projection pass that touched it would reset every budget in the
+   * organization. So the seed is a create-if-absent write here, which is
+   * idempotent for the same reason the fold's writes are - the usage row's id
+   * IS the grant id - and, because it never updates, a re-run can never walk a
+   * view that has since been consumed back off the row.
+   */
+  private async seedShareViewBudgets({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<void> {
+    const rows = await this.deps.repository.findShareLinkRows({
+      organizationId,
+    });
+    const seeds = rows
+      .filter((row) => row.viewCount > 0)
+      .map((row) => ({
+        grantId: row.id,
+        projectId: row.projectId,
+        viewCount: row.viewCount,
+      }));
+    if (seeds.length === 0) return;
+    await this.deps.repository.seedResourceGrantUsage({
+      organizationId,
+      seeds,
     });
   }
 
@@ -501,7 +624,11 @@ export class GrantsCutoverMigration implements SystemMigration {
     signal?: AbortSignal;
   }): Promise<{
     diffs: string[];
-    verified: { membersVerified: number; apiKeysVerified: number };
+    verified: {
+      membersVerified: number;
+      apiKeysVerified: number;
+      resolverSubjectsVerified: number;
+    };
   }> {
     const [memberIds, apiKeyIds, inventory] = await Promise.all([
       this.deps.repository.findOrganizationMemberIds({ organizationId }),
@@ -512,6 +639,7 @@ export class GrantsCutoverMigration implements SystemMigration {
     ]);
     const scopes = scopesOf({ organizationId, inventory });
     const diffs: string[] = [];
+    let resolverSubjectsVerified = 0;
 
     for (const userId of memberIds) {
       // Throw rather than return what we have: an aborted sweep proves
@@ -533,6 +661,12 @@ export class GrantsCutoverMigration implements SystemMigration {
             this.engine.decide({ grants, permission, scope }).allowed,
         }),
       );
+      if (this.deps.legacyDecide) {
+        diffs.push(
+          ...(await this.resolverDiffs({ userId, organizationId, grants })),
+        );
+        resolverSubjectsVerified += 1;
+      }
     }
 
     for (const apiKeyId of apiKeyIds) {
@@ -584,8 +718,56 @@ export class GrantsCutoverMigration implements SystemMigration {
       verified: {
         membersVerified: memberIds.length,
         apiKeysVerified: apiKeyIds.length,
+        resolverSubjectsVerified,
       },
     };
+  }
+
+  /**
+   * The third leg: the engine against the REAL legacy resolver, at
+   * organization scope, for one member.
+   *
+   * Its own diff family (`resolver=`), because it answers a different
+   * question from the other two. `legacy=`/`engine=` lines say the two
+   * READERS disagree; a `resolver=` line says both readers agree and the
+   * thing that has been deciding for this customer all along still says
+   * something else - which is the only kind of disagreement the flip can
+   * actually surprise anybody with.
+   *
+   * Every permission is asked in parallel: the resolver is several queries
+   * per call, and the registry is a fixed, small list, so the sweep costs one
+   * round of concurrent reads per member rather than one after another.
+   */
+  private async resolverDiffs({
+    userId,
+    organizationId,
+    grants,
+  }: {
+    userId: string;
+    organizationId: string;
+    grants: CollectedGrants;
+  }): Promise<string[]> {
+    const legacyDecide = this.deps.legacyDecide;
+    if (!legacyDecide) return [];
+    const scope: AuthzScopeRef = { type: "organization", id: organizationId };
+    const outcomes = await Promise.all(
+      ALL_PERMISSIONS.map(async (permission) => ({
+        permission,
+        fromResolver: await legacyDecide({
+          userId,
+          organizationId,
+          permission,
+        }),
+        fromEngine: this.engine.decide({ grants, permission, scope }).allowed,
+      })),
+    );
+    return outcomes.flatMap(({ permission, fromResolver, fromEngine }) =>
+      fromResolver === fromEngine
+        ? []
+        : [
+            `user:${userId} ${permission} organization:${organizationId} resolver=${fromResolver} engine=${fromEngine}`,
+          ],
+    );
   }
 
   private async ownerGrants({
@@ -651,6 +833,65 @@ type PlannedEmissions = {
   projectCredentials: BackfillGrantEmission[];
   platform: BackfillGrantEmission[];
 };
+
+/**
+ * A short, stable digest of a list of strings (FNV-1a, base 36).
+ *
+ * Not a security hash and not trying to be: what it has to do is be a pure
+ * function of content, be the same on every machine and every re-run, and be
+ * short enough to live inside a command id. Nothing reads it back.
+ */
+function contentHash(parts: readonly string[]): string {
+  // A separator no id, permission or diff line contains, so ["a", "b"] and
+  // ["a b"] are different inputs rather than the same one.
+  const input = parts.join("\u0000");
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < input.length; index++) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  // The count travels with the digest: an empty list and a one-line one must
+  // never collide, and this is the cheapest way to say so.
+  return `${hash.toString(36)}-${parts.length}`;
+}
+
+/**
+ * The parity fact's command id: the organization AND what the proof found.
+ *
+ * The designed operator path is hold, fix, re-prove — and with the
+ * organization alone as the id, the event store kept the FIRST proof and
+ * dropped every later one. The failed proof was therefore the permanent
+ * record while the cutover completed on the strength of a clean sweep nobody
+ * could see: the ledger said "diffs outstanding" for an organization that had
+ * been on the engine for a month.
+ *
+ * Keyed on the diff set instead, each distinct verdict lands exactly once: a
+ * re-run that finds the same disagreement is still the same claim and still
+ * dedupes, while the clean proof that follows a fix is a different claim and
+ * gets its own fact.
+ */
+function parityCommandId({
+  organizationId,
+  diffs,
+}: {
+  organizationId: string;
+  diffs: readonly string[];
+}): string {
+  return `cutover:parity:${organizationId}:${contentHash(diffs)}`;
+}
+
+/**
+ * An address as the report may keep it: the first two characters of the local
+ * part, its domain, and a digest of the whole. Enough for an operator to
+ * recognise `op**@langwatch.ai` as the entry they mistyped; not a mailing
+ * list at rest. An address with no `@` is masked whole.
+ */
+function maskEmail(email: string): string {
+  const at = email.lastIndexOf("@");
+  const digest = contentHash([email]);
+  if (at <= 0) return `***:${digest}`;
+  return `${email.slice(0, Math.min(2, at))}***${email.slice(at)}:${digest}`;
+}
 
 function chunked<T>(items: T[]): T[][] {
   const chunks: T[][] = [];
@@ -881,6 +1122,10 @@ function resourceDiffs({
     ["principalId", principal.id, grant.principalId],
     ["expiresAt", numberField(row.expiresAtMs), numberField(grant.expiresAtMs)],
     ["maxViews", numberField(row.maxViews), numberField(grant.maxViews)],
+    // The budget is part of the link, not decoration on it: a link reproduced
+    // with the right cap and no views spent is a link the cutover refilled.
+    // Compared here so that never passes silently for being invisible.
+    ["viewCount", numberField(row.viewCount), numberField(grant.viewCount)],
   ];
   return compared.flatMap(([field, expected, actual]) =>
     expected === actual

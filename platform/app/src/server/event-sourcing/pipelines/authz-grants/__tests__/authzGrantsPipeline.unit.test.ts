@@ -27,6 +27,7 @@ import {
   GRANT_REVOKED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
   MEMBER_OFFBOARDED_EVENT_TYPE,
+  MIGRATION_PARITY_PROVED_EVENT_TYPE,
   MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE,
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
@@ -237,12 +238,29 @@ describe("authzGrantsState projection", () => {
           actor: ACTOR,
         }),
       );
+      // The completion only flips an organization that has a clean proof
+      // standing behind it, so the proof is part of the stream.
+      state = projection.apply(
+        state,
+        ledgerEvent(MIGRATION_PARITY_PROVED_EVENT_TYPE, { diffs: [] }),
+      );
       state = projection.apply(
         state,
         ledgerEvent(CUTOVER_COMPLETED_EVENT_TYPE, { actor: ACTOR }),
       );
       expect(state.grants.grant_1).toBeUndefined();
       expect(state.cutover.onEngine).toBe(true);
+      expect(state.cutover.completionRefusedReason).toBeNull();
+    });
+
+    it("refuses a completion with no parity proof behind it, and says why", () => {
+      const state = projection.apply(
+        projection.init(),
+        ledgerEvent(CUTOVER_COMPLETED_EVENT_TYPE, { actor: ACTOR }),
+      );
+
+      expect(state.cutover.onEngine).toBe(false);
+      expect(state.cutover.completionRefusedReason).toBe("parity_unproven");
     });
 
     it("sweeps the grants an offboarding never listed, which is how a lagging projection cannot leave access standing", () => {

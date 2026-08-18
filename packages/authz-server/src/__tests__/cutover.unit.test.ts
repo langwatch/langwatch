@@ -8,6 +8,7 @@ import type {
   PlatformAdminUserFact,
   ProjectCredentialFact,
   ResourceGrantRow,
+  ResourceGrantUsageSeed,
   ShareLinkFactRow,
 } from "../authz-migration.repository";
 import {
@@ -16,7 +17,12 @@ import {
   PLATFORM_AUTHZ_TENANT_ID,
 } from "../cutover.migration";
 import { GRANTS_GENESIS_IMPORT_MIGRATION_NAME } from "../genesis-import.name";
-import type { GrantsLedgerActor } from "../ledger/grants-ledger.reducer";
+import {
+  emptyGrantsLedgerState,
+  type GrantsLedgerActor,
+  type GrantsLedgerState,
+  reduceGrantsLedger,
+} from "../ledger/grants-ledger.reducer";
 import type {
   BackfillGrantEmission,
   GrantsLedgerEmitter,
@@ -55,6 +61,10 @@ class FakeCutoverRepository implements AuthzCutoverRepository {
   onEngine = false;
   /** Flip on to have the projection never report the flip. */
   cutoverNeverLands = false;
+  /** The usage rows the seed created, keyed by grant id - create-if-absent,
+   *  exactly as the Prisma implementation's `skipDuplicates` behaves. */
+  usageRows = new Map<string, number>();
+  seedCalls: ResourceGrantUsageSeed[][] = [];
 
   async findMigrationTenantStatuses({
     migrationNames,
@@ -86,7 +96,26 @@ class FakeCutoverRepository implements AuthzCutoverRepository {
     return this.adminUsers.filter((user) => emails.includes(user.email));
   }
   async findResourceGrantRows(): Promise<ResourceGrantRow[]> {
-    return this.resourceGrantRows ?? this.landedResourceRows;
+    // An explicit list IS what the head says, drift and all. Otherwise the
+    // rows are derived from what the ledger landed, joined to the usage
+    // table the way the Prisma repository joins it.
+    if (this.resourceGrantRows) return this.resourceGrantRows;
+    return this.landedResourceRows.map((row) => ({
+      ...row,
+      viewCount: this.usageRows.get(row.grantId) ?? 0,
+    }));
+  }
+  async seedResourceGrantUsage({
+    seeds,
+  }: {
+    organizationId: string;
+    seeds: readonly ResourceGrantUsageSeed[];
+  }): Promise<void> {
+    this.seedCalls.push([...seeds]);
+    for (const seed of seeds) {
+      if (this.usageRows.has(seed.grantId)) continue;
+      this.usageRows.set(seed.grantId, seed.viewCount);
+    }
   }
   async findOrganizationTeamAndProjectIds(): Promise<OrganizationScopeInventory> {
     return this.inventory;
@@ -116,12 +145,18 @@ type LedgerCall =
       commandId: string;
       grants: BackfillGrantEmission[];
     }
-  | { verb: "proveMigrationParity"; commandId: string; diffs: string[] }
+  | {
+      verb: "proveMigrationParity";
+      commandId: string;
+      diffs: string[];
+      occurredAtMs: number;
+    }
   | {
       verb: "completeCutover";
       organizationId: string;
       commandId: string;
       actor: GrantsLedgerActor;
+      occurredAtMs: number;
     };
 
 /** The ledger as the cutover sees it, converging into the fake's heads. */
@@ -161,6 +196,7 @@ class FakeLedger implements GrantsLedgerEmitter {
                 principalId: grant.principal.id,
                 expiresAtMs: grant.resource.expiresAtMs ?? null,
                 maxViews: grant.resource.maxViews ?? null,
+                viewCount: 0,
               },
             ],
       ),
@@ -174,26 +210,39 @@ class FakeLedger implements GrantsLedgerEmitter {
   async proveMigrationParity({
     commandId,
     diffs,
+    occurredAtMs,
   }: {
     organizationId: string;
     commandId: string;
     diffs: string[];
     occurredAtMs: number;
   }): Promise<void> {
-    this.calls.push({ verb: "proveMigrationParity", commandId, diffs });
+    this.calls.push({
+      verb: "proveMigrationParity",
+      commandId,
+      diffs,
+      occurredAtMs,
+    });
   }
 
   async completeCutover({
     organizationId,
     commandId,
     actor,
+    occurredAtMs,
   }: {
     organizationId: string;
     commandId: string;
     actor: GrantsLedgerActor;
     occurredAtMs: number;
   }): Promise<void> {
-    this.calls.push({ verb: "completeCutover", organizationId, commandId, actor });
+    this.calls.push({
+      verb: "completeCutover",
+      organizationId,
+      commandId,
+      actor,
+      occurredAtMs,
+    });
     if (!this.repository.cutoverNeverLands) this.repository.onEngine = true;
   }
 }
@@ -248,6 +297,7 @@ function shareLinkRow(
     visibility: "PUBLIC",
     expiresAtMs: null,
     maxViews: null,
+    viewCount: 0,
     createdAtMs: SHARE_CREATED_AT_MS,
     ...overrides,
   };
@@ -258,6 +308,9 @@ describe("GrantsCutoverMigration", () => {
   let ledger: FakeLedger;
   let cohort: boolean;
   let adminEmails: string[];
+  /** A clock that only ever moves forward, so two passes in the same
+   *  millisecond are still two passes. */
+  let clock: number;
 
   const migration = () =>
     new GrantsCutoverMigration({
@@ -266,7 +319,7 @@ describe("GrantsCutoverMigration", () => {
       collectors: { legacy: collectorOf(), grants: collectorOf() },
       cutoverCohort: () => cohort,
       adminEmails: () => adminEmails,
-      now: () => Date.now(),
+      now: () => clock++,
       poll: { intervalMs: 1, timeoutMs: 50 },
     });
 
@@ -280,6 +333,7 @@ describe("GrantsCutoverMigration", () => {
     ledger = new FakeLedger(repository);
     cohort = true;
     adminEmails = [];
+    clock = 1_700_000_000_000;
   });
 
   describe("given an organization whose earlier migrations have not finished", () => {
@@ -451,9 +505,11 @@ describe("GrantsCutoverMigration", () => {
         expect(platformCalls).toEqual([
           expect.objectContaining({
             organizationId: "platform",
-            // No organization in the id: every organization's cutover emits
-            // exactly this command, and the store dedupes it.
-            commandId: "cutover:platform:0",
+            // No organization in the id - every organization's cutover
+            // emits the same operators and the store dedupes them - but a
+            // hash of the chunk, so a CHANGED operator list is a new
+            // command rather than a duplicate of the old one.
+            commandId: expect.stringMatching(/^cutover:platform:[^:]+:0$/),
             grants: [
               expect.objectContaining({
                 principal: { type: "user", id: "user_ops" },
@@ -477,7 +533,7 @@ describe("GrantsCutoverMigration", () => {
           `cutover:share-links:${ORG}:0`,
           `cutover:lite-members:${ORG}:0`,
           `cutover:project-keys:${ORG}:0`,
-          "cutover:platform:0",
+          expect.stringMatching(/^cutover:platform:[^:]+:0$/),
         ]);
       });
 
@@ -514,10 +570,18 @@ describe("GrantsCutoverMigration", () => {
         const outcome = await migration().migrateTenant({ tenantId: ORG });
 
         expect(outcome.status).toBe("finalized");
-        expect(outcome.report).toMatchObject({
-          unmatchedAdminEmails: ["gone@langwatch.ai"],
-          platformGrants: 1,
-        });
+        const report = outcome.report as {
+          unmatchedAdminEmails: { count: number; digests: string[] };
+        };
+        expect(report.unmatchedAdminEmails.count).toBe(1);
+        // Masked, because the report is stored: enough to recognise the
+        // typo, not a list of addresses at rest.
+        expect(report.unmatchedAdminEmails.digests).toHaveLength(1);
+        expect(report.unmatchedAdminEmails.digests[0]).toMatch(
+          /^go\*\*\*@langwatch\.ai:/,
+        );
+        expect(JSON.stringify(report)).not.toContain("gone@langwatch.ai");
+        expect(outcome.report).toMatchObject({ platformGrants: 1 });
       });
     });
 
@@ -561,6 +625,7 @@ describe("GrantsCutoverMigration", () => {
             principalId: null,
             expiresAtMs: null,
             maxViews: null,
+            viewCount: 0,
           },
         ];
 
@@ -632,7 +697,7 @@ describe("GrantsCutoverMigration", () => {
         },
         cutoverCohort: () => cohort,
         adminEmails: () => adminEmails,
-        now: () => Date.now(),
+        now: () => clock++,
         poll: { intervalMs: 1, timeoutMs: 50 },
       });
 
@@ -660,7 +725,11 @@ describe("GrantsCutoverMigration", () => {
         const parity = ledger.calls.find(
           (call) => call.verb === "proveMigrationParity",
         );
-        expect(parity).toMatchObject({ commandId: `cutover:parity:${ORG}` });
+        expect(parity).toMatchObject({
+          commandId: expect.stringMatching(
+            new RegExp(`^cutover:parity:${ORG}:`),
+          ),
+        });
         expect(
           (parity as { diffs: string[] }).diffs.length,
         ).toBeGreaterThan(0);
@@ -689,14 +758,23 @@ describe("GrantsCutoverMigration", () => {
         expect(ledger.calls).toEqual([
           {
             verb: "proveMigrationParity",
-            commandId: `cutover:parity:${ORG}`,
+            commandId: expect.stringMatching(
+              new RegExp(`^cutover:parity:${ORG}:`),
+            ),
             diffs: [],
+            occurredAtMs: expect.any(Number),
           },
           {
             verb: "completeCutover",
             organizationId: ORG,
-            commandId: `cutover:complete:${ORG}`,
+            // The pass's own timestamp: a completion carries no content to
+            // be identified by, and an organization may legitimately have
+            // to complete twice after a rollback.
+            commandId: expect.stringMatching(
+              new RegExp(`^cutover:complete:${ORG}:\\d+$`),
+            ),
             actor: { type: "system", id: "system:grants-cutover" },
+            occurredAtMs: expect.any(Number),
           },
         ]);
         expect(outcome.status).toBe("finalized");
@@ -716,4 +794,317 @@ describe("GrantsCutoverMigration", () => {
       });
     });
   });
+
+  /**
+   * The designed operator path: the proof holds the organization, somebody
+   * fixes the cause, and the next pass proves clean. What the event store
+   * keeps at the end of it has to be the SECOND proof - and with a command id
+   * that named only the organization it kept the first, so the ledger's
+   * permanent record of a cut-over organization was the failure.
+   *
+   * The fold is run here rather than asserted about, because "what the ledger
+   * ends up saying" is exactly the reducer's answer to these two events.
+   */
+  describe("given a proof that held the organization and a later one that did not", () => {
+    beforeEach(() => {
+      repository.memberIds = ["user_sam"];
+    });
+
+    describe("when both proofs reach the ledger", () => {
+      it("folds to the clean proof, not to the disagreement it replaced", async () => {
+        let disagree = true;
+        const machine = () =>
+          new GrantsCutoverMigration({
+            repository,
+            ledger,
+            collectors: {
+              legacy: collectorOf({
+                grantsFor: (id) =>
+                  disagree
+                    ? {
+                        ...emptyGrants({ principal: { type: "user", id } }),
+                        organizationRole: "ADMIN",
+                        isOrgMember: true,
+                        bindings: [
+                          {
+                            role: "ADMIN",
+                            customRoleId: null,
+                            scopeType: "ORGANIZATION",
+                            scopeId: ORG,
+                          },
+                        ],
+                      }
+                    : null,
+              }),
+              grants: collectorOf(),
+            },
+            cutoverCohort: () => cohort,
+            adminEmails: () => adminEmails,
+            now: () => clock++,
+            poll: { intervalMs: 1, timeoutMs: 50 },
+          });
+
+        const held = await machine().migrateTenant({ tenantId: ORG });
+        disagree = false;
+        const clean = await machine().migrateTenant({ tenantId: ORG });
+
+        expect(held.status).toBe("migrated");
+        expect(clean.status).toBe("finalized");
+
+        const proofs = ledger.calls.filter(
+          (call) => call.verb === "proveMigrationParity",
+        ) as Array<{ commandId: string; diffs: string[]; occurredAtMs: number }>;
+        expect(proofs).toHaveLength(2);
+        // Different claims, different keys - which is the whole fix: an
+        // event store that dedupes on the key keeps both.
+        expect(proofs[0]!.commandId).not.toBe(proofs[1]!.commandId);
+
+        const folded = foldParityProofs(proofs);
+        expect(folded.cutover.parityDiffs).toEqual([]);
+        expect(folded.cutover.provedAtMs).toBe(proofs[1]!.occurredAtMs);
+      });
+
+      it("keeps one fact per distinct verdict, however many times it re-runs", async () => {
+        await migration().migrateTenant({ tenantId: ORG });
+        await migration().migrateTenant({ tenantId: ORG });
+
+        const commandIds = ledger.calls
+          .filter((call) => call.verb === "proveMigrationParity")
+          .map((call) => call.commandId);
+        // Two passes, the same clean verdict: the same claim, so the same
+        // key, so one fact once the store has deduped it.
+        expect(new Set(commandIds).size).toBe(1);
+      });
+    });
+  });
+
+  describe("given an organization cut over, rolled back, and cut over again", () => {
+    describe("when the second completion reaches the ledger", () => {
+      it("names itself differently, so the flip is not deduped away", async () => {
+        await migration().migrateTenant({ tenantId: ORG });
+        // The rollback: the projection is pinned back onto legacy, and the
+        // next pass has to be able to flip it a second time.
+        repository.onEngine = false;
+
+        await migration().migrateTenant({ tenantId: ORG });
+
+        const completions = ledger.calls.filter(
+          (call) => call.verb === "completeCutover",
+        );
+        expect(completions).toHaveLength(2);
+        expect(completions[0]!.commandId).not.toBe(completions[1]!.commandId);
+      });
+    });
+  });
+
+  describe("given the platform-admin list changed between two cutovers", () => {
+    describe("when the second organization cuts over", () => {
+      it("names a different command, so the new operator's fact lands", async () => {
+        repository.adminUsers = [
+          { userId: "user_ops", email: "ops@langwatch.ai", createdAtMs: 1 },
+          { userId: "user_new", email: "new@langwatch.ai", createdAtMs: 2 },
+        ];
+
+        adminEmails = ["ops@langwatch.ai"];
+        await migration().migrateTenant({ tenantId: ORG });
+        adminEmails = ["ops@langwatch.ai", "new@langwatch.ai"];
+        await migration().migrateTenant({ tenantId: "org_other" });
+
+        const platformCommands = ledger.calls
+          .filter(
+            (call) =>
+              call.verb === "attachGrants" &&
+              call.organizationId === PLATFORM_AUTHZ_TENANT_ID,
+          )
+          .map((call) => call.commandId);
+        expect(platformCommands).toHaveLength(2);
+        expect(platformCommands[0]).not.toBe(platformCommands[1]);
+      });
+
+      it("names the same command when the list did not change", async () => {
+        adminEmails = ["ops@langwatch.ai"];
+        repository.adminUsers = [
+          { userId: "user_ops", email: "ops@langwatch.ai", createdAtMs: 1 },
+        ];
+
+        await migration().migrateTenant({ tenantId: ORG });
+        await migration().migrateTenant({ tenantId: "org_other" });
+
+        const platformCommands = ledger.calls
+          .filter(
+            (call) =>
+              call.verb === "attachGrants" &&
+              call.organizationId === PLATFORM_AUTHZ_TENANT_ID,
+          )
+          .map((call) => call.commandId);
+        expect(platformCommands[0]).toBe(platformCommands[1]);
+      });
+    });
+  });
+
+  /**
+   * The view budget is the one part of a share link the fold does not own, so
+   * it is the one part the import can silently drop - and dropping it hands a
+   * spent link back to whoever holds the token.
+   */
+  describe("given a share link a customer has partly used up", () => {
+    beforeEach(() => {
+      repository.shareLinkRows = [
+        shareLinkRow({ id: "share_1", maxViews: 3, viewCount: 2 }),
+      ];
+    });
+
+    describe("when the cutover imports it", () => {
+      it("carries the views already spent onto the usage row", async () => {
+        const outcome = await migration().migrateTenant({ tenantId: ORG });
+
+        expect(outcome.status).toBe("finalized");
+        expect(repository.seedCalls).toEqual([
+          [{ grantId: "share_1", projectId: "proj_chatbot", viewCount: 2 }],
+        ]);
+        expect(repository.usageRows.get("share_1")).toBe(2);
+      });
+
+      it("leaves a budget already handed over alone on a second pass", async () => {
+        await migration().migrateTenant({ tenantId: ORG });
+        // A view consumed between the two passes: the seed must never walk
+        // it back.
+        repository.usageRows.set("share_1", 3);
+
+        await migration().migrateTenant({ tenantId: ORG });
+
+        expect(repository.usageRows.get("share_1")).toBe(3);
+      });
+    });
+
+    describe("when the import reproduced the link with a fresh budget", () => {
+      it("holds the organization rather than refilling it silently", async () => {
+        repository.resourceGrantRows = [
+          {
+            grantId: "share_1",
+            token: "tok_abc",
+            resourceKind: "TRACE",
+            resourceId: "trace_1",
+            projectId: "proj_chatbot",
+            principalType: "ANYONE",
+            principalId: null,
+            expiresAtMs: null,
+            maxViews: 3,
+            viewCount: 0,
+          },
+        ];
+
+        const outcome = await migration().migrateTenant({ tenantId: ORG });
+
+        expect(outcome.status).toBe("migrated");
+        const report = outcome.report as {
+          kind: string;
+          diffs: CutoverResourceDiff[];
+        };
+        expect(report.kind).toBe("cutover_resource_drift");
+        expect(report.diffs).toEqual([
+          {
+            kind: "resource_changed",
+            id: "share_1",
+            field: "viewCount",
+            expected: "2",
+            actual: "0",
+          },
+        ]);
+      });
+    });
+  });
+
+  /**
+   * The third leg (finding: the two-collector proof cannot see a resolver
+   * quirk, because both of its sides run the same decision function). The
+   * quirk fixture is the shape that comparison is blind to by construction:
+   * two readers that agree exactly, and a resolver that answers something
+   * else anyway.
+   */
+  describe("given a legacy resolver that answers differently from the engine", () => {
+    beforeEach(() => {
+      repository.memberIds = ["user_sam"];
+    });
+
+    const withResolver = (
+      legacyDecide: NonNullable<
+        ConstructorParameters<typeof GrantsCutoverMigration>[0]["legacyDecide"]
+      >,
+    ) =>
+      new GrantsCutoverMigration({
+        repository,
+        ledger,
+        // Both readers agree about everything: the row-level comparison has
+        // nothing at all to report.
+        collectors: { legacy: collectorOf(), grants: collectorOf() },
+        legacyDecide,
+        cutoverCohort: () => cohort,
+        adminEmails: () => adminEmails,
+        now: () => clock++,
+        poll: { intervalMs: 1, timeoutMs: 50 },
+      });
+
+    describe("when the parity proof sweeps", () => {
+      it("catches the disagreement the two readers cannot see, as its own family", async () => {
+        const outcome = await withResolver(async ({ permission }) =>
+          permission === "traces:view" ? true : false,
+        ).migrateTenant({ tenantId: ORG });
+
+        expect(outcome.status).toBe("migrated");
+        const report = outcome.report as {
+          kind: string;
+          diffs: string[];
+          resolverSubjectsVerified: number;
+        };
+        expect(report.kind).toBe("cutover_parity_diffs");
+        expect(report.diffs).toEqual([
+          `user:user_sam traces:view organization:${ORG} resolver=true engine=false`,
+        ]);
+        expect(report.resolverSubjectsVerified).toBe(1);
+        expect(
+          ledger.calls.some((call) => call.verb === "completeCutover"),
+        ).toBe(false);
+      });
+
+      it("lets the organization through when the resolver agrees too", async () => {
+        const outcome = await withResolver(async () => false).migrateTenant({
+          tenantId: ORG,
+        });
+
+        expect(outcome.status).toBe("finalized");
+        expect(outcome.report).toMatchObject({ resolverSubjectsVerified: 1 });
+      });
+    });
+
+    describe("when no resolver is wired in", () => {
+      it("says so in the report rather than reading as clean", async () => {
+        const outcome = await migration().migrateTenant({ tenantId: ORG });
+
+        expect(outcome.report).toMatchObject({
+          kind: "cutover_clean",
+          resolverSubjectsVerified: 0,
+        });
+      });
+    });
+  });
 });
+
+/** The two parity facts, through the real reducer, in the order the passes
+ *  emitted them. */
+function foldParityProofs(
+  proofs: ReadonlyArray<{ diffs: string[]; occurredAtMs: number }>,
+): GrantsLedgerState {
+  return proofs.reduce(
+    (state, proof) =>
+      reduceGrantsLedger({
+        state,
+        event: {
+          kind: "migration_parity_proved",
+          diffs: proof.diffs,
+          occurredAtMs: proof.occurredAtMs,
+        },
+      }),
+    emptyGrantsLedgerState({ organizationId: ORG }),
+  );
+}

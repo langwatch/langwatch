@@ -148,10 +148,23 @@ export class AuthzCollectorService {
           legacyTeamMemberships: [],
           customRolePermissions: new Map(),
         };
+      // One pass, one head. A collect is several reads and the reader in
+      // front of them may route per organization on a cached, TTL-bounded
+      // decision; opening a pass fixes that decision for the whole snapshot,
+      // so an expiry mid-collect cannot hand the engine half a legacy
+      // binding list and half a ledger one (`beginPass` on the port).
       case "apiKey":
-        return this.collectApiKeyGrants({ principal, organizationId });
+        return this.collectApiKeyGrants({
+          principal,
+          organizationId,
+          reader: this.beginPass(),
+        });
       case "user":
-        return this.collectUserGrants({ principal, organizationId });
+        return this.collectUserGrants({
+          principal,
+          organizationId,
+          reader: this.beginPass(),
+        });
       default: {
         // A principal kind added to the union without a collect path here
         // would otherwise silently resolve to "no grants" - a fail-open
@@ -214,14 +227,23 @@ export class AuthzCollectorService {
       }));
   }
 
+  /** The reader for ONE snapshot: the routing decision behind it is taken
+   *  once and held for every read the snapshot is built from. A reader that
+   *  owns a single head offers no `beginPass` and is used directly. */
+  private beginPass(): AuthzReadRepository {
+    return this.reader.beginPass?.() ?? this.reader;
+  }
+
   private async collectApiKeyGrants({
     principal,
     organizationId,
+    reader,
   }: {
     principal: Extract<AuthzPrincipalRef, { type: "apiKey" }>;
     organizationId: string;
+    reader: AuthzReadRepository;
   }): Promise<CollectedGrants> {
-    const bindings = await this.reader.findApiKeyBindings({
+    const bindings = await reader.findApiKeyBindings({
       apiKeyId: principal.id,
       organizationId,
     });
@@ -239,6 +261,7 @@ export class AuthzCollectorService {
         principal,
         organizationId,
         customRoleIds: dedupeCustomRoleIds(bindings, []),
+        reader,
       }),
     };
   }
@@ -246,18 +269,20 @@ export class AuthzCollectorService {
   private async collectUserGrants({
     principal,
     organizationId,
+    reader,
   }: {
     principal: Extract<AuthzPrincipalRef, { type: "user" }>;
     organizationId: string;
+    reader: AuthzReadRepository;
   }): Promise<CollectedGrants> {
     const [organizationRole, directBindings, groupBindings, legacyRows] =
       await Promise.all([
-        this.reader.findOrganizationRole({
+        reader.findOrganizationRole({
           userId: principal.id,
           organizationId,
         }),
-        this.reader.findUserBindings({ userId: principal.id, organizationId }),
-        this.reader.findGroupBindings({
+        reader.findUserBindings({ userId: principal.id, organizationId }),
+        reader.findGroupBindings({
           userId: principal.id,
           organizationId,
         }),
@@ -266,7 +291,7 @@ export class AuthzCollectorService {
         // exist (the TeamUser union at the end of legacy
         // hasOrganizationPermissionLegacy); the engine applies the
         // per-scope gating rules.
-        this.reader.findLegacyTeamMemberships({
+        reader.findLegacyTeamMemberships({
           userId: principal.id,
           organizationId,
         }),
@@ -284,6 +309,7 @@ export class AuthzCollectorService {
         principal,
         organizationId,
         customRoleIds: dedupeCustomRoleIds(bindings, legacyRows),
+        reader,
       }),
     };
   }
@@ -292,14 +318,16 @@ export class AuthzCollectorService {
     principal,
     organizationId,
     customRoleIds,
+    reader,
   }: {
     principal: AuthzPrincipalRef;
     organizationId: string;
     customRoleIds: string[];
+    reader: AuthzReadRepository;
   }): Promise<Map<string, readonly string[]>> {
     if (customRoleIds.length === 0) return new Map();
     return parseCustomRolePermissions(
-      await this.reader.findCustomRolePermissions({
+      await reader.findCustomRolePermissions({
         organizationId,
         principal,
         customRoleIds,

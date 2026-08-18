@@ -216,4 +216,71 @@ describe("CutoverAwareAuthzReadRepository", () => {
       expect(findUnique).toHaveBeenCalledTimes(1);
     });
   });
+
+  /**
+   * A collect is several reads and the gate's answer is cached with a TTL, so
+   * an expiry BETWEEN two of them would hand the engine half a compat binding
+   * list and half a ledger one - a snapshot of a state that never existed on
+   * either head. One instance is one pass, and one pass is one head.
+   */
+  describe("when the gate's cached answer expires mid-pass", () => {
+    const gateFlippingAfterFirstRead = () => {
+      const findUnique = vi
+        .fn()
+        .mockResolvedValueOnce({ onEngine: true })
+        .mockResolvedValue({ onEngine: false });
+      const prisma = {
+        authzCutoverProjection: { findUnique },
+      } as unknown as Prisma.TransactionClient;
+      const legacy = spyRepository("legacy");
+      const grants = spyRepository("grants");
+      return {
+        findUnique,
+        legacy,
+        grants,
+        repository: new CutoverAwareAuthzReadRepository(prisma, {
+          legacy,
+          grants,
+        }),
+      };
+    };
+
+    it("keeps the whole pass on the head it started on", async () => {
+      const { legacy, grants, repository } = gateFlippingAfterFirstRead();
+      const args = { userId: "alice", organizationId: "org-1" };
+
+      await repository.findUserBindings(args);
+      // The TTL, expired: without a pin the next read consults the projection
+      // again and lands on the other head.
+      resetCutoverGateForTesting();
+      await repository.findGroupBindings(args);
+      await repository.findCustomRolePermissions({
+        organizationId: "org-1",
+        principal: { type: "user", id: "alice" },
+        customRoleIds: ["role-1"],
+      });
+
+      expect(grants.findUserBindings).toHaveBeenCalledTimes(1);
+      expect(grants.findGroupBindings).toHaveBeenCalledTimes(1);
+      expect(grants.findCustomRolePermissions).toHaveBeenCalledTimes(1);
+      expect(legacy.findUserBindings).not.toHaveBeenCalled();
+      expect(legacy.findGroupBindings).not.toHaveBeenCalled();
+      expect(legacy.findCustomRolePermissions).not.toHaveBeenCalled();
+    });
+
+    it("lets the NEXT pass see the flip, so a rollback still takes effect", async () => {
+      // The pin may not outlive one snapshot: the composition root holds a
+      // single decorator for the whole process, and a permanent pin there
+      // would survive every rollback until the pod restarted.
+      const { legacy, grants, repository } = gateFlippingAfterFirstRead();
+      const args = { userId: "alice", organizationId: "org-1" };
+
+      await repository.findUserBindings(args);
+      resetCutoverGateForTesting();
+      await repository.beginPass!().findUserBindings(args);
+
+      expect(grants.findUserBindings).toHaveBeenCalledTimes(1);
+      expect(legacy.findUserBindings).toHaveBeenCalledTimes(1);
+    });
+  });
 });

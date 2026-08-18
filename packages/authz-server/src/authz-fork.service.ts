@@ -21,13 +21,28 @@
  *      "authz fork comparison failed" line and nothing else.
  *
  * Logging mirrors shadow exactly, plus `primary: "engine"` so one query
- * separates the two populations: info `authz fork match`, warn
- * `authz fork mismatch`, warn `authz fork comparison failed`. There is no
- * sample rate — a cut-over organization is decided by the engine on every
- * check by definition, and comparing every one of those is what earns the
- * confidence to contract legacy away (PR 4). `compare: false` silences the
- * comparison for callers that ask the same question dozens of times in a loop;
- * it never silences the decision.
+ * separates the two populations: DEBUG `authz fork match`, warn
+ * `authz fork mismatch`, warn `authz fork comparison failed`. A match is the
+ * expected outcome on a request-rate hot path — at info it is a line per
+ * check per pod, which is the same reasoning that put shadow's match line at
+ * debug. Silence at warn is therefore the good news; the proof that the
+ * comparison is running at all is the info-level rate announcement, one line
+ * per change.
+ *
+ * The comparison DEFAULTS ON at 1.0, and that default is the design rather
+ * than an oversight: a cut-over organization is decided by the engine on
+ * every check by definition, and comparing every one of those is what earns
+ * the confidence to contract legacy away (PR 4). The rate exists so an
+ * operator can throttle a detached second resolver under load without a
+ * deploy — the same `parseShadowRate` semantics shadow reads — and the
+ * in-flight bound exists because these thunks are fire-and-forget: nothing
+ * upstream applies back-pressure to them, so a slow legacy resolver would
+ * otherwise queue one unresolved promise (and one database connection) per
+ * check with no ceiling. Over the bound the comparison is dropped, never
+ * awaited.
+ *
+ * `compare: false` silences the comparison for callers that ask the same
+ * question dozens of times in a loop; it never silences the decision.
  *
  * An unresolvable scope DENIES, and says so through the same comparison — the
  * fail-closed posture shadow already documents, now load-bearing.
@@ -50,7 +65,30 @@ const logger = createLogger("langwatch:authz:fork");
 export type AuthzForkOptions = {
   /** Mirrors isDemoProject()'s dynamic env read. */
   demoProjectId: () => string | undefined;
+  /**
+   * How much of the traffic runs the detached legacy comparison, read per
+   * check so it can be turned down without a deploy. Same semantics as
+   * shadow's `sampleRate`: `<= 0` off, `>= 1` every check, anything between
+   * is a per-check coin toss.
+   *
+   * Defaults to 1 — see the header: the comparison is the evidence PR 4 is
+   * built on, so it is on unless somebody deliberately turns it down.
+   */
+  comparisonRate?: () => number;
+  /**
+   * Ceiling on comparisons in flight at once, per service instance. The
+   * thunks are detached, so this is the only thing standing between a slow
+   * legacy resolver and unbounded queued work. Defaults to 100.
+   */
+  maxInFlightComparisons?: number;
 };
+
+/** The default when the composition root names no rate: every check. */
+const DEFAULT_COMPARISON_RATE = 1;
+
+/** The default in-flight ceiling; generous enough that a healthy resolver
+ *  never reaches it, small enough that a stalled one cannot pile up. */
+const DEFAULT_MAX_IN_FLIGHT_COMPARISONS = 100;
 
 /**
  * The engine's answer in the shape the legacy seams return: the organization
@@ -78,6 +116,18 @@ type LegacyThunk<T> = () => Promise<T>;
 
 export class AuthzForkService {
   private readonly engine = new AuthzEngine();
+  /** Comparisons started and not yet settled, for the in-flight bound. */
+  private inFlightComparisons = 0;
+  /**
+   * The rate announcement latch is static for the reason shadow's is: the app
+   * composes a fresh service per request, so a per-instance latch would
+   * announce on every check instead of on every change.
+   */
+  private static lastAnnouncedRate: number | undefined;
+
+  static resetRateAnnouncement(): void {
+    AuthzForkService.lastAnnouncedRate = undefined;
+  }
 
   constructor(
     private readonly collector: AuthzCollectorService,
@@ -288,8 +338,10 @@ export class AuthzForkService {
       projectsMap.set(projectId, decideAt(scope));
     }
 
-    if (compare) {
-      void (async () => {
+    // One admission decision for the whole batch: the maps are compared as a
+    // unit, and half a batch's lines would read as a batch that disagreed.
+    if (this.admitsComparison(compare)) {
+      this.runDetached(caller, async () => {
         try {
           const legacyMaps = await legacy();
           for (const [teamId, engineAllowed] of teamsMap) {
@@ -322,7 +374,7 @@ export class AuthzForkService {
         } catch (error) {
           logger.warn({ error, caller }, "authz fork comparison failed");
         }
-      })();
+      });
     }
 
     return {
@@ -539,8 +591,8 @@ export class AuthzForkService {
     compare: boolean;
     knownDivergence?: (legacyAllowed: boolean) => string | undefined;
   }): void {
-    if (!compare) return;
-    void (async () => {
+    if (!this.admitsComparison(compare)) return;
+    this.runDetached(caller, async () => {
       try {
         const legacyAllowed = await legacy();
         this.logOutcome({
@@ -556,12 +608,69 @@ export class AuthzForkService {
       } catch (error) {
         logger.warn({ error, caller }, "authz fork comparison failed");
       }
-    })();
+    });
   }
 
   /**
-   * Every comparison logs — the info line is the proof that both resolvers
-   * ran and agreed, so silence means "not comparing", never "no news".
+   * Whether THIS check's comparison runs: the caller has to want it, the
+   * rate has to admit it, and there has to be room in flight for it. All
+   * three are checked before the thunk is touched, so a refused comparison
+   * costs nothing at all — not a query, not a promise.
+   */
+  private admitsComparison(compare: boolean): boolean {
+    if (!compare) return false;
+    if (!this.sampled()) return false;
+    const ceiling =
+      this.options.maxInFlightComparisons ?? DEFAULT_MAX_IN_FLIGHT_COMPARISONS;
+    if (this.inFlightComparisons >= ceiling) {
+      // Debug, not warn: shedding a detached comparison is the bound doing
+      // its job, and the caller's answer is unaffected either way.
+      logger.debug(
+        { inFlight: this.inFlightComparisons, ceiling },
+        "authz fork comparison shed",
+      );
+      return false;
+    }
+    return true;
+  }
+
+  private sampled(): boolean {
+    const rate = (this.options.comparisonRate ?? (() => DEFAULT_COMPARISON_RATE))();
+    this.announceRate(rate);
+    if (!(rate > 0)) return false;
+    if (rate >= 1) return true;
+    return Math.random() < rate;
+  }
+
+  private announceRate(rate: number): void {
+    if (rate === AuthzForkService.lastAnnouncedRate) return;
+    const wasEnabled = (AuthzForkService.lastAnnouncedRate ?? 0) > 0;
+    AuthzForkService.lastAnnouncedRate = rate;
+    if (rate > 0) {
+      logger.info({ comparisonRate: rate }, "authz fork comparison enabled");
+    } else if (wasEnabled) {
+      logger.info({ comparisonRate: rate }, "authz fork comparison disabled");
+    }
+  }
+
+  /** Run the comparison detached, counted in and out so the in-flight bound
+   *  means something. The body already swallows its own failures; the
+   *  `finally` is what guarantees the counter comes back down anyway. */
+  private runDetached(caller: string, body: () => Promise<void>): void {
+    this.inFlightComparisons += 1;
+    void body()
+      .catch((error: unknown) => {
+        logger.warn({ error, caller }, "authz fork comparison failed");
+      })
+      .finally(() => {
+        this.inFlightComparisons -= 1;
+      });
+  }
+
+  /**
+   * Every admitted comparison logs — the match line is the proof that both
+   * resolvers ran and agreed, so silence at warn means "they agreed", and
+   * the proof that comparing is happening at all is the rate announcement.
    * `primary: "engine"` is what separates these lines from shadow's: same
    * two verdicts, opposite authority.
    */
@@ -597,7 +706,7 @@ export class AuthzForkService {
       primary: "engine",
     };
     if (legacyAllowed === engineAllowed) {
-      logger.info(detail, "authz fork match");
+      logger.debug(detail, "authz fork match");
       return;
     }
     logger.warn(detail, "authz fork mismatch");

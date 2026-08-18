@@ -140,6 +140,12 @@ describe("given an organization whose legacy facts live outside its bindings", (
       // import does with the operators it names.
       adminEmails: () => [OPERATOR_EMAIL],
     });
+    // A silent exit from this loop leaves every assertion below failing on
+    // a missing grant, which reads as "the import did not state the fact"
+    // when the truth is usually that the pass was still waiting on
+    // something. So the loop names what blocked it.
+    let lastReport: unknown = null;
+    let finalized = false;
     for (let pass = 0; pass < MAX_PASSES; pass++) {
       await runMigrationPassForTenant({
         prisma,
@@ -154,7 +160,18 @@ describe("given an organization whose legacy facts live outside its bindings", (
           },
         },
       });
-      if (record?.status === "finalized") break;
+      lastReport = record?.report ?? record?.status ?? null;
+      if (record?.status === "finalized") {
+        finalized = true;
+        break;
+      }
+    }
+    if (!finalized) {
+      throw new Error(
+        `the cutover pass did not finalize in ${MAX_PASSES} passes; it last reported ${JSON.stringify(
+          lastReport,
+        )}`,
+      );
     }
   });
 

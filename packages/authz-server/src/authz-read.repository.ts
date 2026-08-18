@@ -107,4 +107,24 @@ export interface AuthzReadRepository extends ScopeLineageRepository {
     tokens: readonly string[];
     links: ReadonlyArray<{ kind: ShareableResourceKind; id: string }>;
   }): Promise<ShareLinkRow[]>;
+
+  /**
+   * OPTIONAL. A reader that routes between two heads implements this to hand
+   * back a view of itself that answers from ONE head for as long as the
+   * caller holds it.
+   *
+   * Why the port carries it at all: a collect is several reads, and the
+   * per-organization cutover routing behind them is a cached decision with a
+   * TTL. Without a pass boundary that TTL can expire BETWEEN two reads of one
+   * collect, and the snapshot handed to the engine is then half legacy
+   * bindings and half ledger grants — a decision made from a state that never
+   * existed. `beginPass()` is where the collector says "these reads are one
+   * answer"; a reader that owns a single head implements nothing and is
+   * unaffected.
+   *
+   * It must return a view whose lifetime is the caller's, never `this` for a
+   * reader that is shared (the composition root holds one collector for the
+   * whole process), or the pin outlives every rollback.
+   */
+  beginPass?(): AuthzReadRepository;
 }

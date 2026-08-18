@@ -9,8 +9,35 @@ describe("cohortIncludes", () => {
         cohortIncludes({ isSaaS: false, cohort: undefined, tenantId: "any" }),
       ).toBe(true);
       expect(
-        cohortIncludes({ isSaaS: false, cohort: "none", tenantId: "any" }),
+        cohortIncludes({ isSaaS: false, cohort: "", tenantId: "any" }),
       ).toBe(true);
+      expect(
+        cohortIncludes({ isSaaS: false, cohort: "   ", tenantId: "any" }),
+      ).toBe(true);
+    });
+
+    describe("when the operator sets a cohort", () => {
+      it('opts the whole installation out on "none"', () => {
+        expect(
+          cohortIncludes({ isSaaS: false, cohort: "none", tenantId: "any" }),
+        ).toBe(false);
+      });
+
+      it("takes the listed organizations literally, like cloud does", () => {
+        const cohort = "org1, org2";
+        expect(
+          cohortIncludes({ isSaaS: false, cohort, tenantId: "org1" }),
+        ).toBe(true);
+        expect(
+          cohortIncludes({ isSaaS: false, cohort, tenantId: "org3" }),
+        ).toBe(false);
+      });
+
+      it('still includes everything on "all"', () => {
+        expect(
+          cohortIncludes({ isSaaS: false, cohort: "all", tenantId: "any" }),
+        ).toBe(true);
+      });
     });
   });
 

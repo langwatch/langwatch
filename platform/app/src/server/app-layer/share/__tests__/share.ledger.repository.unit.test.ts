@@ -1,12 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type {
-  Prisma,
-  PrismaClient,
-  ShareLink,
-} from "~/generated/prisma/client";
+import type { PrismaClient, ShareLink } from "~/generated/prisma/client";
 import { resetCutoverGateForTesting } from "../../authz/cutover-gate";
 import type { GrantsLedgerWriter } from "../../authz/ledger";
-import { GrantsAuthzReadRepository } from "../../authz/repositories/authz-read.grants.repository";
 import { LedgerShareRepository } from "../repositories/share.ledger.repository";
 import type { ShareRepository } from "../repositories/share.repository";
 
@@ -17,14 +12,19 @@ import type { ShareRepository } from "../repositories/share.repository";
  * consumes is counted once - on the usage row that is its authority, and
  * mirrored onto the compat row that a rollback would make the authority
  * again.
+ *
+ * What this file asserts is the STATEMENTS the repository issues and the
+ * branch it takes. What the database does with them - the conditional
+ * increment losing to a cap, the unique violation that tells a first view
+ * from a spent one, and the count the engine's share-link read then reports -
+ * is Postgres behaviour, and a mock of it is only ever a restatement of what
+ * we already believe. Those cases live in
+ * `share.ledger.repository.integration.test.ts`, against a real one.
  */
 
 const ORGANIZATION_ID = "organization_share_1";
 const PROJECT_ID = "project_share_1";
 const TRACE_ID = "trace_share_1";
-
-const uniqueViolation = () =>
-  Object.assign(new Error("unique constraint failed"), { code: "P2002" });
 
 const shareRow = (overrides: Partial<ShareLink> = {}): ShareLink =>
   ({
@@ -411,7 +411,11 @@ describe("LedgerShareRepository", () => {
 
         expect(consumed).toBe(true);
         expect(updateMany).toHaveBeenCalledWith({
-          where: { grantId: "share_1", organizationId: ORGANIZATION_ID },
+          where: {
+            grantId: "share_1",
+            organizationId: ORGANIZATION_ID,
+            projectId: PROJECT_ID,
+          },
           data: expect.objectContaining({ viewCount: { increment: 1 } }),
         });
         expect(create).not.toHaveBeenCalled();
@@ -436,53 +440,13 @@ describe("LedgerShareRepository", () => {
           where: {
             grantId: "share_1",
             organizationId: ORGANIZATION_ID,
+            // The project is part of the row's tenancy, not decoration: a
+            // consume must never count against another project's row.
+            projectId: PROJECT_ID,
             viewCount: { lt: 3 },
           },
           data: expect.objectContaining({ viewCount: { increment: 1 } }),
         });
-      });
-
-      it("refuses the view on a spent link and leaves the compat count alone", async () => {
-        const updateMany = vi.fn().mockResolvedValue({ count: 0 });
-        const create = vi.fn().mockRejectedValue(uniqueViolation());
-        const { repository, legacy } = buildRepository({
-          onEngine: true,
-          grantIds: ["share_1"],
-          usage: { updateMany, create },
-        });
-
-        const consumed = await repository.consumeView({
-          id: "share_1",
-          projectId: PROJECT_ID,
-          maxViews: 1,
-        });
-
-        expect(consumed).toBe(false);
-        expect(legacy.consumeView).not.toHaveBeenCalled();
-      });
-
-      it("retries the conditional increment when another viewer created the row first", async () => {
-        // The race the create is there to resolve: two first views, one row.
-        const updateMany = vi
-          .fn()
-          .mockResolvedValueOnce({ count: 0 })
-          .mockResolvedValueOnce({ count: 1 });
-        const create = vi.fn().mockRejectedValue(uniqueViolation());
-        const { repository, legacy } = buildRepository({
-          onEngine: true,
-          grantIds: ["share_1"],
-          usage: { updateMany, create },
-        });
-
-        const consumed = await repository.consumeView({
-          id: "share_1",
-          projectId: PROJECT_ID,
-          maxViews: 5,
-        });
-
-        expect(consumed).toBe(true);
-        expect(updateMany).toHaveBeenCalledTimes(2);
-        expect(legacy.consumeView).toHaveBeenCalledTimes(1);
       });
 
       it("counts on the compat row alone for a link the ledger never knew about", async () => {
@@ -507,84 +471,6 @@ describe("LedgerShareRepository", () => {
           maxViews: 1,
         });
       });
-    });
-  });
-
-  /**
-   * The two halves of decision 22 meeting: what this repository writes is
-   * what the engine's grant-backed liveness read reports. Both speak of the
-   * usage row by `grantId`, which is the share link's own id - if either
-   * side named the row differently, a consumed view would read back as
-   * unconsumed and a spent link would keep resolving.
-   */
-  describe("given a view consumed on the ledger", () => {
-    it("is the view count the engine's share-link read reports", async () => {
-      const usageRows = new Map<string, number>();
-      const grantRow = {
-        id: "share_1",
-        principalType: "ANYONE",
-        resourceKind: "TRACE",
-        scopeId: TRACE_ID,
-        projectId: PROJECT_ID,
-        expiresAt: null,
-        maxViews: 2,
-        token: "tok_abc",
-      };
-      const prismaModels = {
-        project: {
-          findUnique: vi.fn().mockResolvedValue({
-            team: { id: "team_1", organizationId: ORGANIZATION_ID },
-          }),
-        },
-        authzCutoverProjection: {
-          findUnique: vi.fn().mockResolvedValue({ onEngine: true }),
-        },
-        grant: { findMany: vi.fn().mockResolvedValue([grantRow]) },
-        grantUsage: {
-          updateMany: vi.fn(async ({ where }: { where: any }) => {
-            const current = usageRows.get(where.grantId);
-            if (current === undefined) return { count: 0 };
-            if (where.viewCount && current >= where.viewCount.lt) {
-              return { count: 0 };
-            }
-            usageRows.set(where.grantId, current + 1);
-            return { count: 1 };
-          }),
-          create: vi.fn(async ({ data }: { data: any }) => {
-            if (usageRows.has(data.grantId)) throw uniqueViolation();
-            usageRows.set(data.grantId, data.viewCount);
-          }),
-          findMany: vi.fn(async ({ where }: { where: any }) =>
-            [...usageRows.entries()]
-              .filter(([grantId]) => where.grantId.in.includes(grantId))
-              .map(([grantId, viewCount]) => ({ grantId, viewCount })),
-          ),
-        },
-      };
-      const repository = new LedgerShareRepository({
-        legacy: spyLegacy(),
-        prisma: prismaModels as unknown as PrismaClient,
-        writer: () => ({}) as unknown as GrantsLedgerWriter,
-      });
-
-      await repository.consumeView({
-        id: "share_1",
-        projectId: PROJECT_ID,
-        maxViews: 2,
-      });
-
-      const engineReader = new GrantsAuthzReadRepository(
-        prismaModels as unknown as Prisma.TransactionClient,
-      );
-      const links = await engineReader.findShareLinks({
-        projectId: PROJECT_ID,
-        tokens: ["tok_abc"],
-        links: [{ kind: "trace", id: TRACE_ID }],
-      });
-
-      expect(links).toEqual([
-        expect.objectContaining({ resourceId: TRACE_ID, viewCount: 1 }),
-      ]);
     });
   });
 });

@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { cutoverOnEngine, resetCutoverGateForTesting } from "../cutover-gate";
+import {
+  cutoverOnEngine,
+  invalidateCutoverGate,
+  resetCutoverGateForTesting,
+} from "../cutover-gate";
 
 /**
  * The gate's whole contract is the two things a cutover needs from it: an
@@ -151,6 +155,51 @@ describe("cutoverOnEngine", () => {
         false,
       );
       expect(findUnique).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("when a rollback invalidates one organization", () => {
+    it("re-reads that organization immediately, without waiting out the window", async () => {
+      const findUnique = vi
+        .fn()
+        .mockResolvedValueOnce({ onEngine: true })
+        .mockResolvedValueOnce({ onEngine: false });
+      const prisma = projectionStub(findUnique);
+
+      expect(await cutoverOnEngine({ prisma, organizationId: "org-1" })).toBe(
+        true,
+      );
+      invalidateCutoverGate({ organizationId: "org-1" });
+      expect(await cutoverOnEngine({ prisma, organizationId: "org-1" })).toBe(
+        false,
+      );
+
+      expect(findUnique).toHaveBeenCalledTimes(2);
+    });
+
+    it("leaves every other organization's cached answer alone", async () => {
+      const findUnique = vi
+        .fn()
+        .mockImplementation(
+          ({ where }: { where: { organizationId: string } }) =>
+            Promise.resolve({ onEngine: where.organizationId === "org-2" }),
+        );
+      const prisma = projectionStub(findUnique);
+
+      await cutoverOnEngine({ prisma, organizationId: "org-1" });
+      await cutoverOnEngine({ prisma, organizationId: "org-2" });
+      invalidateCutoverGate({ organizationId: "org-1" });
+
+      expect(await cutoverOnEngine({ prisma, organizationId: "org-2" })).toBe(
+        true,
+      );
+      expect(findUnique).toHaveBeenCalledTimes(2);
+    });
+
+    it("is safe for an organization the pod never cached", () => {
+      expect(() =>
+        invalidateCutoverGate({ organizationId: "org-never-seen" }),
+      ).not.toThrow();
     });
   });
 

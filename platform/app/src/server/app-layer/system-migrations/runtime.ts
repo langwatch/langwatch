@@ -15,6 +15,7 @@ import {
   type GrantsLedgerEmitter,
   TeamUserBackfillMigration,
 } from "@langwatch/authz-server/migration";
+import { createLogger } from "@langwatch/observability";
 import {
   type MigrationPassSummary,
   type SystemMigration,
@@ -25,6 +26,7 @@ import { env } from "~/env.mjs";
 import type { Prisma } from "~/generated/prisma/client";
 import { prisma } from "../../db";
 import { tryGetApp } from "../app";
+import { invalidateCutoverGate } from "../authz/cutover-gate";
 import { bumpAuthzEpoch } from "../authz/epoch";
 import { authzGrantsCommands } from "../authz/ledger";
 import { SYSTEM_ACTORS } from "../authz/ledger-actor";
@@ -32,6 +34,7 @@ import { PrismaAuthzGrantsProjectionRepository } from "../authz/repositories/aut
 import { PrismaAuthzMigrationRepository } from "../authz/repositories/authz-migration.prisma.repository";
 import { GrantsAuthzReadRepository } from "../authz/repositories/authz-read.grants.repository";
 import { PrismaAuthzReadRepository } from "../authz/repositories/authz-read.prisma.repository";
+import { legacyOrganizationDecide } from "../authz/repositories/cutover-parity.legacy-decide";
 import { authzCollector } from "../authz/runtime";
 import { cohortIncludes } from "./cohort";
 import { RedisMigrationLeaseRepository } from "./repositories/migration-lease.redis.repository";
@@ -39,6 +42,8 @@ import { PrismaOrganizationTenantSource } from "./repositories/organization-tena
 import { PrismaSystemMigrationStateRepository } from "./repositories/system-migration-state.prisma.repository";
 import { WitnessingSystemMigrationStateRepository } from "./repositories/witnessing-migration-state.repository";
 import { SystemMigrationsService } from "./system-migrations.service";
+
+const logger = createLogger("langwatch:system-migrations:runtime");
 
 /**
  * The composed state repository, wrapped so every lifecycle transition is
@@ -88,18 +93,36 @@ export const systemMigrationsService = new SystemMigrationsService({
 
 /**
  * Rolling one organization off the engine, applied before the operator's
- * call returns (delivery-plan decision 7 / D-PR3-9). Three steps, in this
- * order:
+ * call returns (delivery-plan decision 7 / D-PR3-9).
  *
- *   1. The FACT: `cutover_rolled_back`, so the ledger records the decision
- *      and a replay reproduces it. The commandId carries the moment, since
- *      an organization may legitimately be rolled back more than once and
- *      each is its own event.
- *   2. The ENFORCEMENT: the projection flipped off synchronously — the
+ * ENFORCEMENT FIRST, and that ordering is the whole design. The projection
+ * is the enforcement authority — `AuthzCutoverProjection.onEngine` is what
+ * every fork in the request path reads through the cutover gate — while the
+ * ledger records HISTORY. The rollback lever exists for the incident where
+ * the engine is deciding wrongly, and an event-store append can hang for
+ * tens of seconds in exactly that incident; putting the append first meant
+ * the operator's rollback timed out with the engine still deciding. So:
+ *
+ *   1. The ENFORCEMENT: the projection flipped off synchronously — the
  *      revocation-class direct write, shaped so it can only deny early.
  *      This is what makes the rollback hold with the queue stopped.
+ *   2. This pod's gate cache, dropped, so the process that served the
+ *      operator stops answering "on engine" from its own memory. Pod-local
+ *      by design; the rest of the fleet converges on the gate's TTL.
  *   3. The EPOCH bump, so cached passports and decisions for the
  *      organization are invalidated alongside the flip.
+ *   4. The FACT: `cutover_rolled_back`, so a replay reproduces the decision
+ *      — BEST EFFORT. A ledger that cannot take the append must not undo an
+ *      enforcement that already holds, so the failure is logged loudly and
+ *      the rollback stands. What is lost is replay fidelity for one
+ *      decision, never the enforcement.
+ *
+ * IDEMPOTENT, because the service re-runs this on every rollback retry: the
+ * flip is an upsert, the cache drop and the epoch bump are safe to repeat,
+ * and the command id is derived from `decidedAt` (the moment the rollback
+ * was DECIDED, stable across retries of that decision) rather than from the
+ * clock, so a retry dedupes on the event store's idempotency key while a
+ * later rollback of a re-cutover organization gets a fresh id.
  *
  * Fleet-wide propagation is bounded by the cutover gate's 60s TTL: pods
  * already holding a positive answer stop honouring it within that window.
@@ -108,23 +131,35 @@ export const systemMigrationsService = new SystemMigrationsService({
 async function rollBackAuthzCutover({
   tenantId,
   actorUserId,
+  decidedAt,
 }: {
   tenantId: string;
   actorUserId: string;
+  decidedAt: string;
 }): Promise<void> {
   const organizationId = tenantId;
-  await (await authzGrantsCommands()).commands.rollBackCutover.send({
-    tenantId: organizationId,
-    organizationId,
-    commandId: `cutover:rollback:${organizationId}:${Date.now()}`,
-    actor: { type: "user", id: actorUserId },
-    reason: "operator rollback",
-    occurredAtMs: Date.now(),
-  });
   await new PrismaAuthzGrantsProjectionRepository(
     prisma,
   ).enforceCutoverRollback({ organizationId });
+  invalidateCutoverGate({ organizationId });
   await bumpAuthzEpoch({ organizationId });
+
+  const decidedAtMs = Date.parse(decidedAt);
+  try {
+    await (await authzGrantsCommands()).commands.rollBackCutover.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId: `cutover:rollback:${organizationId}:${decidedAt}`,
+      actor: { type: "user", id: actorUserId },
+      reason: "operator rollback",
+      occurredAtMs: Number.isFinite(decidedAtMs) ? decidedAtMs : Date.now(),
+    });
+  } catch (error) {
+    logger.error(
+      { error, organizationId, actorUserId, decidedAt },
+      "cutover rollback enforced but its ledger fact was not appended - the organization IS off the engine; replay will not show why",
+    );
+  }
 }
 
 /**
@@ -255,14 +290,19 @@ export function registeredMigrations(): SystemMigration[] {
           new GrantsAuthzReadRepository(prisma),
         ),
       },
+      // The third parity leg: the REAL legacy resolver, not a collector over
+      // the legacy head — resolver-resident quirks are exactly what the two
+      // row-head collectors cannot see.
+      legacyDecide: legacyOrganizationDecide(prisma),
       // A knob of its own, deliberately not SYSTEM_MIGRATIONS_COHORT: the
       // backfill and the genesis import are dark and can go wide, while the
       // cutover is the one migration that changes who decides, so it
-      // advances organization by organization. Self-hosted cuts over
-      // automatically once its prerequisites finalize - the in-place
+      // advances organization by organization. Left unset, self-hosted cuts
+      // over automatically once its prerequisites finalize - the in-place
       // doctrine (an operator never learns it happened), and what makes
       // that safe is the parity proof standing between the import and the
-      // flip.
+      // flip. Set, it is an explicit cohort on every deployment shape, so a
+      // self-hosted operator can opt out with `none`.
       cutoverCohort: (tenantId) =>
         cohortIncludes({
           isSaaS: env.IS_SAAS === true,

@@ -12,6 +12,7 @@ import type {
   PlatformAdminUserFact,
   ProjectCredentialFact,
   ResourceGrantRow,
+  ResourceGrantUsageSeed,
   RoleHeadRow,
   ShareLinkFactRow,
   TeamBindingWrite,
@@ -289,6 +290,7 @@ export class PrismaAuthzMigrationRepository
         visibility: true,
         expiresAt: true,
         maxViews: true,
+        viewCount: true,
         createdAt: true,
       },
     });
@@ -302,8 +304,34 @@ export class PrismaAuthzMigrationRepository
       visibility: row.visibility,
       expiresAtMs: row.expiresAt?.getTime() ?? null,
       maxViews: row.maxViews,
+      viewCount: row.viewCount,
       createdAtMs: row.createdAt.getTime(),
     }));
+  }
+
+  /**
+   * The view budgets, handed over rather than restarted. `skipDuplicates` is
+   * the whole safety argument: a row that already exists is a budget the
+   * ledger has been counting since the first seed, and overwriting it would
+   * refund views a customer already spent.
+   */
+  async seedResourceGrantUsage({
+    organizationId,
+    seeds,
+  }: {
+    organizationId: string;
+    seeds: readonly ResourceGrantUsageSeed[];
+  }): Promise<void> {
+    if (seeds.length === 0) return;
+    await this.prisma.grantUsage.createMany({
+      data: seeds.map((seed) => ({
+        grantId: seed.grantId,
+        organizationId,
+        projectId: seed.projectId,
+        viewCount: seed.viewCount,
+      })),
+      skipDuplicates: true,
+    });
   }
 
   async findExternalMemberFacts({
@@ -388,6 +416,17 @@ export class PrismaAuthzMigrationRepository
         maxViews: true,
       },
     });
+    if (rows.length === 0) return [];
+    // The view budget lives on its own table (decision 22), so the proof's
+    // "field for field" needs a second read to see it. No usage row means no
+    // view has been counted, which is exactly zero.
+    const usages = await this.prisma.grantUsage.findMany({
+      where: { organizationId, grantId: { in: rows.map((row) => row.id) } },
+      select: { grantId: true, viewCount: true },
+    });
+    const viewCounts = new Map(
+      usages.map((usage) => [usage.grantId, usage.viewCount]),
+    );
     return rows.map((row) => ({
       grantId: row.id,
       token: row.token,
@@ -398,6 +437,7 @@ export class PrismaAuthzMigrationRepository
       principalId: row.principalId,
       expiresAtMs: row.expiresAt?.getTime() ?? null,
       maxViews: row.maxViews,
+      viewCount: viewCounts.get(row.id) ?? 0,
     }));
   }
 
