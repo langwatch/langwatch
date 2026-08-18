@@ -19,23 +19,20 @@
  * row, and the compat column is a mirror this repository maintains so an
  * organization rolled back to legacy keeps counting from where it got to.
  */
+import {
+  SHARE_LINK_PERMISSION,
+  shareVisibilityAudience,
+} from "@langwatch/authz-server";
 import { nanoid } from "nanoid";
 import type { PrismaClient, ShareLink } from "~/generated/prisma/client";
 import { cutoverOnEngine } from "../../authz/cutover-gate";
-import type {
-  GrantsLedgerWriter,
-  LedgerActor,
-  LedgerResourcePrincipal,
-} from "../../authz/ledger";
+import type { GrantsLedgerWriter, LedgerActor } from "../../authz/ledger";
 import type {
   CreateShareLinkParams,
   ShareRepository,
   ShareResourceType,
   ShareWithProject,
 } from "./share.repository";
-
-/** The single permission a share link has ever conferred (ADR-057). */
-const SHARE_LINK_PERMISSION = "traces:view";
 
 /**
  * Nothing in the port carries who is acting — `ShareService` revokes on
@@ -120,7 +117,7 @@ export class LedgerShareRepository implements ShareRepository {
       organizationId,
       grantId: id,
       projectId: params.projectId,
-      principal: audienceFor({
+      principal: shareVisibilityAudience({
         visibility,
         organizationId,
         projectId: params.projectId,
@@ -428,33 +425,5 @@ export class LedgerShareRepository implements ShareRepository {
       organizationId,
     });
     return onEngine ? organizationId : null;
-  }
-}
-
-/** ADR-057's visibility, as the audience the fact names. */
-function audienceFor({
-  visibility,
-  organizationId,
-  projectId,
-}: {
-  visibility: NonNullable<CreateShareLinkParams["visibility"]>;
-  organizationId: string;
-  projectId: string;
-}): LedgerResourcePrincipal {
-  switch (visibility) {
-    case "PUBLIC":
-      return { type: "anyone", id: null };
-    case "ORGANIZATION":
-      return { type: "organization", id: organizationId };
-    case "PROJECT":
-      return { type: "project", id: projectId };
-    default: {
-      // A visibility added to the stored enum without an audience here would
-      // otherwise mint a link nobody can match.
-      const unreachable: never = visibility;
-      throw new Error(
-        `unhandled share link visibility: ${String(unreachable)}`,
-      );
-    }
   }
 }

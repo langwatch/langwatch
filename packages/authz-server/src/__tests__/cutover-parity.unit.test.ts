@@ -5,6 +5,7 @@
  * the comparison, and the engine deciding it is the real one.
  */
 import type { CollectedGrants } from "@langwatch/authz";
+import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AuthzCollectorService } from "../authz-collector.service";
 import type {
@@ -31,7 +32,9 @@ const PROJECT = "proj_chatbot";
 class SweepRepository implements AuthzCutoverRepository {
   onEngine = false;
 
-  async findMigrationTenantStatuses(): Promise<Record<string, string | null>> {
+  async findMigrationTenantStatuses(): Promise<
+    Record<string, TenantMigrationStatus | null>
+  > {
     return {
       [TEAM_USER_BACKFILL_MIGRATION_NAME]: "finalized",
       [GRANTS_GENESIS_IMPORT_MIGRATION_NAME]: "finalized",
@@ -55,7 +58,7 @@ class SweepRepository implements AuthzCutoverRepository {
   async seedResourceGrantUsage(): Promise<void> {
     throw new Error("this organization holds no share links to seed");
   }
-  async findOrganizationTeamAndProjectIds(): Promise<OrganizationScopeInventory> {
+  async findOrganizationScopeInventory(): Promise<OrganizationScopeInventory> {
     return { teamIds: [TEAM], projects: [{ id: PROJECT, teamId: TEAM }] };
   }
   async findOrganizationMemberIds(): Promise<string[]> {

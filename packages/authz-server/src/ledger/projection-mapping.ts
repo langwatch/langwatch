@@ -9,6 +9,12 @@ import type {
   RoleFact,
 } from "./grants-ledger.reducer";
 
+/** The single permission a share link has ever conferred (ADR-057) - the one
+ *  spelling every minter and every importer of a share-link grant uses
+ *  (`cutover.migration.ts`'s import and the platform's `LedgerShareRepository`
+ *  mint, both). */
+export const SHARE_LINK_PERMISSION = "traces:view";
+
 /**
  * Pure row mapping for the grants ledger's Postgres projection: reducer
  * facts ↔ `Grant`/`Role` rows (the future head) and reducer facts → the
@@ -34,7 +40,12 @@ export type GrantPrincipalTypeDb =
 /** The Grant table's scope vocabulary — same five names as the ledger's. */
 export type GrantScopeTypeDb = LedgerScopeType;
 
-const PRINCIPAL_TO_DB: Record<LedgerPrincipalType, GrantPrincipalTypeDb> = {
+/** The ledger's principal vocabulary → the Grant table's, the only place this
+ *  translation may be written (module docblock, decision 10). Every other
+ *  site that needs it - the cutover import's diff report, the read
+ *  repository's exclusivity check - imports this map rather than restating
+ *  it, so a vocabulary added here cannot go stale anywhere else. */
+export const PRINCIPAL_TO_DB: Record<LedgerPrincipalType, GrantPrincipalTypeDb> = {
   user: "USER",
   api_key: "API_KEY",
   group: "GROUP",
@@ -61,7 +72,10 @@ const PRINCIPAL_FROM_DB: Record<GrantPrincipalTypeDb, LedgerPrincipalType> = {
  *  one lives at exactly one seam. */
 export type GrantResourceKindDb = "TRACE" | "THREAD";
 
-const RESOURCE_KIND_TO_DB: Record<
+/** The single seam for the ledger's lowercase resource kind ↔ the Grant/
+ *  ShareLink tables' uppercase spelling - `authz-read.grants.repository.ts`
+ *  imports this rather than keeping its own copy. */
+export const RESOURCE_KIND_TO_DB: Record<
   ResourceGrantTerms["kind"],
   GrantResourceKindDb
 > = {
@@ -344,14 +358,80 @@ export interface CompatShareLinkRowShape {
 
 /** Principal → the ShareLink audience the legacy column spells out. A
  *  resource fact naming any other principal has no legacy audience to be,
- *  so it stays future-head-only. */
-const SHARE_VISIBILITY_BY_PRINCIPAL: Partial<
+ *  so it stays future-head-only. Exported so the read repository's own
+ *  (DB-keyed) visibility lookup can be derived from this one rather than
+ *  restated - see `SHARE_VISIBILITY_BY_PRINCIPAL_DB` below. */
+export const SHARE_VISIBILITY_BY_PRINCIPAL: Partial<
   Record<LedgerPrincipalType, CompatShareLinkRowShape["visibility"]>
 > = {
   anyone: "PUBLIC",
   organization: "ORGANIZATION",
   project: "PROJECT",
 };
+
+/**
+ * The same lookup, keyed by the Grant table's stored (uppercase) principal
+ * spelling instead of the ledger's own - what a repository reading `Grant`
+ * rows straight off Postgres needs, since the column never carries the
+ * ledger's lowercase vocabulary. Derived from `SHARE_VISIBILITY_BY_PRINCIPAL`
+ * and `PRINCIPAL_TO_DB` rather than listed a second time, so the two lookups
+ * cannot silently diverge.
+ *
+ * Keyed by plain `string` rather than `GrantPrincipalTypeDb`: a caller reads
+ * this off a stored, ungoverned column (see `resourceKindFromDb`'s own
+ * reasoning), so the lookup has to accept whatever string is there and answer
+ * `undefined` for anything outside the three visibility-bearing principals -
+ * not refuse to compile against it.
+ */
+export const SHARE_VISIBILITY_BY_PRINCIPAL_DB: Record<
+  string,
+  CompatShareLinkRowShape["visibility"] | undefined
+> = Object.fromEntries(
+  (Object.entries(SHARE_VISIBILITY_BY_PRINCIPAL) as Array<
+    [LedgerPrincipalType, CompatShareLinkRowShape["visibility"]]
+  >).map(([principalType, visibility]) => [
+    PRINCIPAL_TO_DB[principalType],
+    visibility,
+  ]),
+);
+
+/** ADR-057 visibility → the ledger principal it names, the inverse of
+ *  `SHARE_VISIBILITY_BY_PRINCIPAL` above. The one seam a share link's
+ *  audience translation lives at in either direction: the cutover import
+ *  (`cutover.migration.ts`, reading a legacy row) and the platform's
+ *  `LedgerShareRepository` (minting a new one) used to carry the same
+ *  switch statement independently. */
+export type ShareLinkAudience =
+  | { type: "anyone"; id: null }
+  | { type: "organization"; id: string }
+  | { type: "project"; id: string };
+
+export function shareVisibilityAudience({
+  visibility,
+  organizationId,
+  projectId,
+}: {
+  visibility: CompatShareLinkRowShape["visibility"];
+  organizationId: string;
+  projectId: string;
+}): ShareLinkAudience {
+  switch (visibility) {
+    case "PUBLIC":
+      return { type: "anyone", id: null };
+    case "ORGANIZATION":
+      return { type: "organization", id: organizationId };
+    case "PROJECT":
+      return { type: "project", id: projectId };
+    default: {
+      // A visibility added to the stored enum without an audience here would
+      // otherwise mint or import a link nobody can match.
+      const unreachable: never = visibility;
+      throw new Error(
+        `unhandled share link visibility: ${String(unreachable)}`,
+      );
+    }
+  }
+}
 
 /**
  * RESOURCE facts only. A fact at any other scope, a resource fact carrying

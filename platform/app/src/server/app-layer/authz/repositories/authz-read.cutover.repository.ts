@@ -6,23 +6,14 @@
  * about, asks the cutover gate whether that organization is served by the
  * engine, and delegates.
  *
- * The delegation table, in full:
- *
- *   findOrganizationRole   → legacy always (OrganizationUser; identical query)
- *   findApiKeyOwner        → legacy always (ApiKey; identical query, no org)
- *   findProjectLineage     → legacy always (Project→Team; identical query)
- *   findTeamOrganization   → legacy always (Team; identical query)
- *   findUserBindings       → gate(organizationId)
- *   findGroupBindings      → gate(organizationId)
- *   findApiKeyBindings     → gate(organizationId)
- *   findLegacyTeamMemberships → gate(organizationId)
- *   findCustomRolePermissions → gate(organizationId)
- *   findShareLinks         → gate(org resolved from the project's lineage)
- *
- * The four "legacy always" rows are not an exception to the fork: membership
- * and lineage are not grants and were never projected onto the ledger's head,
- * so both implementations run the SAME query against the SAME table. Forking
- * them would buy a caller nothing and cost a gate read per call.
+ * `findOrganizationRole`, `findApiKeyOwner`, `findProjectLineage` and
+ * `findTeamOrganization` go to legacy always, unconditionally - not an
+ * exception to the fork: membership and lineage are not grants and were
+ * never projected onto the ledger's head, so both implementations run the
+ * SAME query against the SAME table. Forking them would buy a caller nothing
+ * and cost a gate read per call. Every other read goes through `readerFor`,
+ * gated on the organization it is about (`findShareLinks`'s organization
+ * comes from the project's lineage - see below).
  *
  * `findShareLinks` carries a project, not an organization - the port's shape,
  * because ShareLink's tenancy is its project. The lineage read that resolves
@@ -156,7 +147,16 @@ export class CutoverAwareAuthzReadRepository implements AuthzReadRepository {
       projectId: args.projectId,
     });
     if (!lineage) return this.repositories.legacy.findShareLinks(args);
-    return (await this.readerFor(lineage.organizationId)).findShareLinks(args);
+    // The organization is already known from the lineage read above - handed
+    // straight to the reader rather than left for it to resolve a second
+    // time. Without this, a cut-over organization's share-link check ran the
+    // same `project.findUnique` lineage query twice: once here to pick the
+    // head, once more inside `GrantsAuthzReadRepository.findShareLinks` to
+    // learn the organization its own query needed.
+    return (await this.readerFor(lineage.organizationId)).findShareLinks({
+      ...args,
+      organizationId: lineage.organizationId,
+    });
   }
 
   async findProjectLineage(args: {

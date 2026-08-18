@@ -29,6 +29,10 @@ import type {
   OrganizationRole,
   ShareLinkRow,
 } from "@langwatch/authz-server";
+import {
+  RESOURCE_KIND_TO_DB,
+  SHARE_VISIBILITY_BY_PRINCIPAL_DB,
+} from "@langwatch/authz-server";
 import type { Prisma } from "~/generated/prisma/client";
 import { CUSTOM_ROLE_KIND } from "../../../role/role-kind";
 
@@ -40,28 +44,6 @@ const BINDING_SCOPE_TYPES: readonly RoleBindingScopeType[] = [
   "TEAM",
   "PROJECT",
 ];
-
-/** `Grant.principalType` → the ShareLink audience the read port speaks.
- *  Mirrors `SHARE_VISIBILITY_BY_PRINCIPAL` in the ledger's projection
- *  mapping, from the DB's spelling rather than the ledger's. */
-const SHARE_VISIBILITY_BY_PRINCIPAL_TYPE: Record<
-  string,
-  ShareLinkRow["visibility"] | undefined
-> = {
-  ANYONE: "PUBLIC",
-  ORGANIZATION: "ORGANIZATION",
-  PROJECT: "PROJECT",
-};
-
-/** `ShareableResourceKind` → the stored `Grant.resourceKind` spelling, which
- *  is ShareLink's own uppercase enum (the column inherits it). */
-const RESOURCE_KIND_TO_DB: Record<
-  ShareableResourceKind,
-  ShareLinkRow["resourceType"]
-> = {
-  trace: "TRACE",
-  thread: "THREAD",
-};
 
 export class GrantsAuthzReadRepository implements AuthzReadRepository {
   constructor(private readonly prisma: Prisma.TransactionClient) {}
@@ -261,22 +243,59 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
    * would admit far more than this call needs - the lineage read the collector
    * already performs supplies the organizationId, and the query is bounded the
    * ordinary way.
+   *
+   * `organizationId` is OPTIONAL and exists only so a caller who has already
+   * resolved the project's lineage (`CutoverAwareAuthzReadRepository`, which
+   * reads it to decide which head to ask) can hand it straight over instead
+   * of this method resolving it again - the same row, read twice per
+   * share-link check otherwise. A caller with no lineage of its own still
+   * gets the fallback resolve.
    */
   async findShareLinks({
     projectId,
     tokens,
     links,
+    organizationId,
   }: {
     projectId: string;
     tokens: readonly string[];
     links: ReadonlyArray<{ kind: ShareableResourceKind; id: string }>;
+    organizationId?: string;
   }): Promise<ShareLinkRow[]> {
     if (tokens.length === 0 || links.length === 0) return [];
-    const lineage = await this.findProjectLineage({ projectId });
-    if (!lineage) return [];
-    const rows = await this.prisma.grant.findMany({
+    const resolvedOrganizationId =
+      organizationId ??
+      (await this.findProjectLineage({ projectId }))?.organizationId;
+    if (!resolvedOrganizationId) return [];
+
+    const rows = await this.findResourceGrantCandidates({
+      organizationId: resolvedOrganizationId,
+      projectId,
+      tokens,
+      links,
+    });
+    if (rows.length === 0) return [];
+
+    const viewCounts = await this.findViewCounts(rows.map((row) => row.id));
+    return rows.flatMap((row) => shareLinkRowFrom({ row, viewCounts }));
+  }
+
+  /** The RESOURCE grants a share-link check may match: possession (the
+   *  presented tokens) AND one of the presented resource links. */
+  private async findResourceGrantCandidates({
+    organizationId,
+    projectId,
+    tokens,
+    links,
+  }: {
+    organizationId: string;
+    projectId: string;
+    tokens: readonly string[];
+    links: ReadonlyArray<{ kind: ShareableResourceKind; id: string }>;
+  }): Promise<ShareLinkGrantCandidateRow[]> {
+    return this.prisma.grant.findMany({
       where: {
-        organizationId: lineage.organizationId,
+        organizationId,
         projectId,
         scopeType: "RESOURCE",
         token: { in: [...tokens] },
@@ -295,37 +314,18 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
         maxViews: true,
       },
     });
-    if (rows.length === 0) return [];
+  }
+
+  /** The view budget lives on its own table (decision 22); a resource with no
+   *  usage row has been viewed zero times. */
+  private async findViewCounts(
+    grantIds: readonly string[],
+  ): Promise<Map<string, number>> {
     const usages = await this.prisma.grantUsage.findMany({
-      where: { grantId: { in: rows.map((row) => row.id) } },
+      where: { grantId: { in: [...grantIds] } },
       select: { grantId: true, viewCount: true },
     });
-    const viewCounts = new Map(
-      usages.map((usage) => [usage.grantId, usage.viewCount]),
-    );
-    const shareLinks: ShareLinkRow[] = [];
-    for (const row of rows) {
-      const visibility = SHARE_VISIBILITY_BY_PRINCIPAL_TYPE[row.principalType];
-      // A RESOURCE grant naming a user, a group, a team or a key is a share
-      // audience `ShareVisibility` cannot express, so the legacy shim never
-      // answered for it either. Skipped silently: a shape the compat head
-      // never held is not a failure.
-      if (!visibility) continue;
-      if (row.resourceKind !== "TRACE" && row.resourceKind !== "THREAD") {
-        continue;
-      }
-      if (row.projectId == null) continue;
-      shareLinks.push({
-        resourceType: row.resourceKind,
-        resourceId: row.scopeId,
-        projectId: row.projectId,
-        visibility,
-        expiresAt: row.expiresAt,
-        maxViews: row.maxViews,
-        viewCount: viewCounts.get(row.id) ?? 0,
-      });
-    }
-    return shareLinks;
+    return new Map(usages.map((usage) => [usage.grantId, usage.viewCount]));
   }
 
   /** Lineage is not a grant: the legacy query, unchanged. */
@@ -395,27 +395,27 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
       },
       select: { roleKey: true, principalType: true, principalId: true },
     });
-    const held = new Map<string, { mine: boolean; foreign: boolean }>();
+    const held = new Map<string, { isMine: boolean; isForeign: boolean }>();
     for (const holder of holders) {
       const role = bindingRole(holder.roleKey);
       if (role?.customRoleId == null) continue;
       const entry = held.get(role.customRoleId) ?? {
-        mine: false,
-        foreign: false,
+        isMine: false,
+        isForeign: false,
       };
       if (
         holder.principalType === "API_KEY" &&
         holder.principalId === apiKeyId
       ) {
-        entry.mine = true;
+        entry.isMine = true;
       } else {
-        entry.foreign = true;
+        entry.isForeign = true;
       }
       held.set(role.customRoleId, entry);
     }
     return new Set(
       [...held.entries()]
-        .filter(([, entry]) => entry.mine && !entry.foreign)
+        .filter(([, entry]) => entry.isMine && !entry.isForeign)
         .map(([roleId]) => roleId),
     );
   }
@@ -429,8 +429,8 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
  *
  * A row this cannot translate - `lite-member`, a null key (RESOURCE and
  * PLATFORM rows), anything else - is SKIPPED, not defaulted. Those are the
- * dormant head-only facts the cutover imports (PR3_DESIGN.md, the dormant-fact
- * principle): they are stored so contract can make them load-bearing, and
+ * dormant head-only facts the cutover imports (dev/docs/plans/adr-092-authz-delivery-plan.md,
+ * decision 13, the dormant-fact principle): they are stored so contract can make them load-bearing, and
  * until then their decisions are still inferred from membership by the engine's
  * org-role floor, exactly as they were before the cutover. Translating one into
  * a binding here would change a decision the cutover promised not to change.
@@ -474,4 +474,48 @@ function bindingRole(
 
 function isBindingScope(scopeType: string): scopeType is RoleBindingScopeType {
   return (BINDING_SCOPE_TYPES as readonly string[]).includes(scopeType);
+}
+
+/** The columns `findResourceGrantCandidates` selects off `Grant`. */
+type ShareLinkGrantCandidateRow = {
+  id: string;
+  principalType: string;
+  resourceKind: string | null;
+  scopeId: string;
+  projectId: string | null;
+  expiresAt: Date | null;
+  maxViews: number | null;
+};
+
+/**
+ * One `Grant` candidate row → the `ShareLinkRow` the port speaks, or nothing
+ * when the row is a shape the legacy shim never held. Three independent
+ * reasons a row is skipped rather than translated - an audience
+ * `ShareVisibility` cannot express, a resource kind that is not TRACE or
+ * THREAD, or no project - each of them silent: skipping is not a failure
+ * here, it is a row `findShareLinks`'s WHERE admitted that this port simply
+ * never answers for.
+ */
+function shareLinkRowFrom({
+  row,
+  viewCounts,
+}: {
+  row: ShareLinkGrantCandidateRow;
+  viewCounts: Map<string, number>;
+}): ShareLinkRow[] {
+  const visibility = SHARE_VISIBILITY_BY_PRINCIPAL_DB[row.principalType];
+  if (!visibility) return [];
+  if (row.resourceKind !== "TRACE" && row.resourceKind !== "THREAD") return [];
+  if (row.projectId == null) return [];
+  return [
+    {
+      resourceType: row.resourceKind,
+      resourceId: row.scopeId,
+      projectId: row.projectId,
+      visibility,
+      expiresAt: row.expiresAt,
+      maxViews: row.maxViews,
+      viewCount: viewCounts.get(row.id) ?? 0,
+    },
+  ];
 }

@@ -11,11 +11,16 @@
  * design - see the TTL note below - so neither direction of the answer may be
  * cached forever.
  *
+ * Caching, coalescing and the fail-safe/warn behaviour live in
+ * ./per-organization-cached-gate.ts, shared with ./legacy-fallback-gate.ts;
+ * this module supplies only the query and the TTL.
+ *
  * Browser-safety: same posture as ./legacy-fallback-gate.ts and ./shadow.ts -
  * no module-scope Prisma or Redis; the caller hands in its client. rbac.ts
  * stays importable for its enums.
  */
 import type { PrismaClient } from "~/generated/prisma/client";
+import { perOrganizationCachedFlag } from "./per-organization-cached-gate";
 
 /**
  * Both directions expire on the same bound, and sixty seconds is what the
@@ -38,13 +43,31 @@ import type { PrismaClient } from "~/generated/prisma/client";
  */
 const CACHE_TTL_MS = 60_000;
 
+const gate = perOrganizationCachedFlag({
+  name: "cutover-gate",
+  positiveTtlMs: CACHE_TTL_MS,
+  negativeTtlMs: CACHE_TTL_MS,
+});
+
 /**
- * One entry per organization, holding the last answer and the moment it stops
- * counting. A single map (rather than one per answer) is what keeps the two
- * directions from disagreeing, and lets an expired entry be dropped on the way
- * past instead of accumulating for the life of the pod.
+ * The projection read itself, with no caching - what the gate's cache miss
+ * runs, and what `findCutoverOnEngine` (the cutover migration's own
+ * repository, awaiting the flip it just made) runs too. One query function so
+ * the two can never drift onto different predicates.
  */
-const cached = new Map<string, { onEngine: boolean; expiresAt: number }>();
+export async function queryCutoverOnEngine({
+  prisma,
+  organizationId,
+}: {
+  prisma: Pick<PrismaClient, "authzCutoverProjection">;
+  organizationId: string;
+}): Promise<boolean> {
+  const record = await prisma.authzCutoverProjection.findUnique({
+    where: { organizationId },
+    select: { onEngine: true },
+  });
+  return record?.onEngine === true;
+}
 
 export async function cutoverOnEngine({
   prisma,
@@ -53,31 +76,10 @@ export async function cutoverOnEngine({
   prisma: Pick<PrismaClient, "authzCutoverProjection">;
   organizationId: string;
 }): Promise<boolean> {
-  const entry = cached.get(organizationId);
-  if (entry !== undefined) {
-    if (Date.now() < entry.expiresAt) return entry.onEngine;
-    cached.delete(organizationId);
-  }
-  let onEngine = false;
-  try {
-    const record = await prisma.authzCutoverProjection.findUnique({
-      where: { organizationId },
-      select: { onEngine: true },
-    });
-    onEngine = record?.onEngine === true;
-  } catch {
-    // Fail safe: an unreadable projection reads as "not cut over", which is
-    // today's behaviour - the legacy path, with the engine shadowing it.
-    // Caching that miss briefly is deliberate (it keeps an outage from putting
-    // a read on every permission check) and it can only ever delay a cutover
-    // taking effect, never extend one past its rollback.
-    onEngine = false;
-  }
-  cached.set(organizationId, {
-    onEngine,
-    expiresAt: Date.now() + CACHE_TTL_MS,
+  return gate.get({
+    organizationId,
+    read: () => queryCutoverOnEngine({ prisma, organizationId }),
   });
-  return onEngine;
 }
 
 /**
@@ -96,10 +98,10 @@ export function invalidateCutoverGate({
 }: {
   organizationId: string;
 }): void {
-  cached.delete(organizationId);
+  gate.invalidate({ organizationId });
 }
 
 /** The cache, dropped - for tests that cut an org over mid-suite. */
 export function resetCutoverGateForTesting(): void {
-  cached.clear();
+  gate.resetForTesting();
 }

@@ -171,6 +171,7 @@ describe("systemMigrationsService", () => {
 
   describe("given a rollback whose ledger append failed", () => {
     describe("when the operator retries it", () => {
+      /** @scenario "An operator retries a rollback whose effect did not fully apply" */
       it("re-enforces and appends under the id the first attempt used", async () => {
         const state = storedState({
           status: "finalized",

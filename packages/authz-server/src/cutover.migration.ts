@@ -80,10 +80,12 @@ import type {
 import { GRANTS_CUTOVER_MIGRATION_NAME } from "./cutover.name";
 import { GRANTS_GENESIS_IMPORT_MIGRATION_NAME } from "./genesis-import.name";
 import { deriveGrantId } from "./ledger/grant-identity";
-import type {
-  GrantsLedgerActor,
-  LedgerPrincipal,
-} from "./ledger/grants-ledger.reducer";
+import type { GrantsLedgerActor } from "./ledger/grants-ledger.reducer";
+import {
+  PRINCIPAL_TO_DB,
+  SHARE_LINK_PERMISSION,
+  shareVisibilityAudience,
+} from "./ledger/projection-mapping";
 import type {
   BackfillGrantEmission,
   GrantsLedgerEmitter,
@@ -125,9 +127,6 @@ const MAX_REPORTED_DIFFS = 50;
 const MAX_PROVEN_DIFFS = 200;
 
 const DEFAULT_POLL = { intervalMs: 500, timeoutMs: 120_000 };
-
-/** The single permission a share link has ever conferred (ADR-057). */
-const SHARE_PERMISSION = "traces:view";
 
 /** The prerequisite migrations, in the order they must have finalized. */
 const PREREQUISITE_MIGRATIONS: readonly string[] = [
@@ -633,7 +632,7 @@ export class GrantsCutoverMigration implements SystemMigration {
     const [memberIds, apiKeyIds, inventory] = await Promise.all([
       this.deps.repository.findOrganizationMemberIds({ organizationId }),
       this.deps.repository.findOrganizationApiKeyIds({ organizationId }),
-      this.deps.repository.findOrganizationTeamAndProjectIds({
+      this.deps.repository.findOrganizationScopeInventory({
         organizationId,
       }),
     ]);
@@ -916,7 +915,11 @@ function shareLinkEmission({
 }): BackfillGrantEmission {
   return {
     grantId: row.id,
-    principal: shareLinkPrincipal({ organizationId, row }),
+    principal: shareVisibilityAudience({
+      visibility: row.visibility,
+      organizationId,
+      projectId: row.projectId,
+    }),
     // Resource facts carry no role: their single permission is in the terms.
     roleKey: null,
     scope: { type: "RESOURCE", id: row.resourceId },
@@ -924,7 +927,7 @@ function shareLinkEmission({
       kind: row.resourceType === "THREAD" ? "thread" : "trace",
       projectId: row.projectId,
       token: row.token,
-      permission: SHARE_PERMISSION,
+      permission: SHARE_LINK_PERMISSION,
       ...(row.userId === null ? {} : { createdByUserId: row.userId }),
       ...(row.expiresAtMs === null ? {} : { expiresAtMs: row.expiresAtMs }),
       ...(row.maxViews === null ? {} : { maxViews: row.maxViews }),
@@ -933,30 +936,6 @@ function shareLinkEmission({
     occurredAtMs: row.createdAtMs,
     actor: CUTOVER_ACTOR,
   };
-}
-
-/** The audience an ADR-057 visibility means, as a ledger principal. */
-function shareLinkPrincipal({
-  organizationId,
-  row,
-}: {
-  organizationId: string;
-  row: Pick<ShareLinkFactRow, "visibility" | "projectId">;
-}): LedgerPrincipal {
-  switch (row.visibility) {
-    case "PUBLIC":
-      return { type: "anyone", id: null };
-    case "ORGANIZATION":
-      return { type: "organization", id: organizationId };
-    case "PROJECT":
-      return { type: "project", id: row.projectId };
-    default: {
-      // A visibility added to the stored enum without a principal here would
-      // otherwise fall out as undefined and import a link nobody can match.
-      const unreachable: never = row.visibility;
-      throw new Error(`unhandled share link visibility: ${String(unreachable)}`);
-    }
-  }
 }
 
 /**
@@ -1056,9 +1035,16 @@ function platformEmission({
   };
 }
 
-/** The admin list as the live check reads it: comma-separated, trimmed,
- *  case-insensitive, blanks dropped. */
-function normalizedAdminEmails(raw: string[]): string[] {
+/**
+ * The admin list as the live check (`ee/admin/isAdmin.ts`'s `adminEmailList`)
+ * reads it: comma-separated, trimmed, case-insensitive, blanks dropped.
+ *
+ * A separate implementation of the same parse rather than a shared one - this
+ * package cannot import the platform's `ee/` tree. Exported so a pinning test
+ * on the platform side (which CAN import both) can assert the two never
+ * disagree on the same input; see `adminEmailList`'s own tests.
+ */
+export function normalizedAdminEmails(raw: string[]): string[] {
   return [
     ...new Set(
       raw.map((email) => email.trim().toLowerCase()).filter((email) => email),
@@ -1112,13 +1098,17 @@ function resourceDiffs({
   if (!grant) {
     return [{ kind: "resource_missing", id: row.id }];
   }
-  const principal = shareLinkPrincipal({ organizationId, row });
+  const principal = shareVisibilityAudience({
+    visibility: row.visibility,
+    organizationId,
+    projectId: row.projectId,
+  });
   const compared: Array<[string, string | null, string | null]> = [
     ["token", row.token, grant.token],
     ["kind", row.resourceType, (grant.resourceKind ?? "").toUpperCase() || null],
     ["resourceId", row.resourceId, grant.resourceId],
     ["projectId", row.projectId, grant.projectId],
-    ["principalType", ledgerPrincipalTypeDb(principal.type), grant.principalType],
+    ["principalType", PRINCIPAL_TO_DB[principal.type], grant.principalType],
     ["principalId", principal.id, grant.principalId],
     ["expiresAt", numberField(row.expiresAtMs), numberField(grant.expiresAtMs)],
     ["maxViews", numberField(row.maxViews), numberField(grant.maxViews)],
@@ -1140,11 +1130,6 @@ function resourceDiffs({
           },
         ],
   );
-}
-
-/** The ledger's lowercase principal type as the column spells it. */
-function ledgerPrincipalTypeDb(type: LedgerPrincipal["type"]): string {
-  return type.toUpperCase();
 }
 
 function numberField(value: number | null): string | null {

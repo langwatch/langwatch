@@ -108,7 +108,13 @@ describe("CutoverAwareAuthzReadRepository", () => {
       expect(legacy.findProjectLineage).toHaveBeenCalledWith({
         projectId: "proj-1",
       });
-      expect(grants.findShareLinks).toHaveBeenCalledWith(args);
+      // The resolved organization is handed straight to the delegate, so it
+      // does not run the same lineage query a second time to learn what this
+      // call already knows.
+      expect(grants.findShareLinks).toHaveBeenCalledWith({
+        ...args,
+        organizationId: "org-1",
+      });
       expect(legacy.findShareLinks).not.toHaveBeenCalled();
     });
   });

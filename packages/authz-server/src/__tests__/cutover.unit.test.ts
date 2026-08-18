@@ -1,4 +1,5 @@
 import type { CollectedGrants } from "@langwatch/authz";
+import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AuthzCollectorService } from "../authz-collector.service";
 import type {
@@ -41,7 +42,7 @@ const ADMIN_CREATED_AT_MS = 1_670_000_000_000;
  * emission said. Both are what the migration's two proofs re-read.
  */
 class FakeCutoverRepository implements AuthzCutoverRepository {
-  prerequisiteStatuses: Record<string, string | null> = {
+  prerequisiteStatuses: Record<string, TenantMigrationStatus | null> = {
     [TEAM_USER_BACKFILL_MIGRATION_NAME]: "finalized",
     [GRANTS_GENESIS_IMPORT_MIGRATION_NAME]: "finalized",
   };
@@ -71,7 +72,7 @@ class FakeCutoverRepository implements AuthzCutoverRepository {
   }: {
     tenantId: string;
     migrationNames: readonly string[];
-  }): Promise<Record<string, string | null>> {
+  }): Promise<Record<string, TenantMigrationStatus | null>> {
     return Object.fromEntries(
       migrationNames.map((name) => [
         name,
@@ -117,7 +118,7 @@ class FakeCutoverRepository implements AuthzCutoverRepository {
       this.usageRows.set(seed.grantId, seed.viewCount);
     }
   }
-  async findOrganizationTeamAndProjectIds(): Promise<OrganizationScopeInventory> {
+  async findOrganizationScopeInventory(): Promise<OrganizationScopeInventory> {
     return this.inventory;
   }
   async findOrganizationMemberIds(): Promise<string[]> {

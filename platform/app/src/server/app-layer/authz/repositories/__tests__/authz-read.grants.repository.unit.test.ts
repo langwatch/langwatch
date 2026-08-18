@@ -572,6 +572,34 @@ describe("GrantsAuthzReadRepository", () => {
       });
     });
 
+    describe("when the caller already knows the organization", () => {
+      it("skips resolving the project's lineage a second time", async () => {
+        const lineageFindUnique = vi.fn();
+        const grantFindMany = vi.fn().mockResolvedValue([]);
+        const repository = new GrantsAuthzReadRepository(
+          clientFor({
+            project: { findUnique: lineageFindUnique },
+            grant: { findMany: grantFindMany },
+            grantUsage: { findMany: vi.fn() },
+          }),
+        );
+
+        await repository.findShareLinks({
+          projectId: "proj-1",
+          tokens: ["tok-1"],
+          links: [{ kind: "trace", id: "trace-1" }],
+          organizationId: "org-1",
+        });
+
+        expect(lineageFindUnique).not.toHaveBeenCalled();
+        expect(grantFindMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ organizationId: "org-1" }),
+          }),
+        );
+      });
+    });
+
     it("maps each principal onto the share audience it stands for", async () => {
       const expiresAt = new Date("2026-01-01T00:00:00.000Z");
       const repository = new GrantsAuthzReadRepository(

@@ -272,6 +272,12 @@ Feature: In-place authorization data migration
     Then the rollback is recorded and applied before the call returns
     And permission checks in "acme" consult the legacy path within the gate's cache window
 
+  @unit
+  Scenario: An operator retries a rollback whose effect did not fully apply
+    Given a finalized organization whose rollback effect failed partway
+    When the operator rolls it back again
+    Then the enforcement flip is re-applied and the ledger records one rollback
+
   @integration
   Scenario: Cutover imports the legacy facts that only exist outside bindings
     Given "acme" has a member whose only admin fact is a legacy organization ADMIN row

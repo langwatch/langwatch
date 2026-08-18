@@ -7,6 +7,7 @@
  * (platform/app/src/server/app-layer/authz/repositories/authz-migration.prisma.repository.ts).
  */
 import type { TeamUserRole } from "@langwatch/authz";
+import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 
 /** One legacy TeamUser row, in the vocabulary bindings use: the legacy
  *  `assignedRoleId` column IS the binding's `customRoleId`. */
@@ -201,14 +202,16 @@ export interface AuthzCutoverRepository
   extends Pick<AuthzGenesisRepository, "findGrantHeadIds"> {
   /**
    * The stored status of each named migration for one tenant — `null` for a
-   * migration that has never run it. The cutover's prerequisite is that the
-   * backfill and the genesis import both finalized: it imports what is left
-   * over, and there is nothing to be left over from until they are done.
+   * migration that has never run it (`TenantMigrationStatus`'s own docblock:
+   * "pending" is the absence of a record, not a stored value). The cutover's
+   * prerequisite is that the backfill and the genesis import both finalized:
+   * it imports what is left over, and there is nothing to be left over from
+   * until they are done.
    */
   findMigrationTenantStatuses(args: {
     tenantId: string;
     migrationNames: readonly string[];
-  }): Promise<Record<string, string | null>>;
+  }): Promise<Record<string, TenantMigrationStatus | null>>;
 
   findShareLinkRows(args: {
     organizationId: string;
@@ -244,8 +247,11 @@ export interface AuthzCutoverRepository
     seeds: readonly ResourceGrantUsageSeed[];
   }): Promise<void>;
 
-  /** Every scope the decision-parity proof decides over. */
-  findOrganizationTeamAndProjectIds(args: {
+  /** Every scope the decision-parity proof decides over - the same read and
+   *  the same shape the backfill's parity sweep uses
+   *  (`AuthzMigrationRepository.findOrganizationScopeInventory`), named once
+   *  rather than aliased per migration. */
+  findOrganizationScopeInventory(args: {
     organizationId: string;
   }): Promise<OrganizationScopeInventory>;
   /** Every principal the decision-parity proof decides for. */

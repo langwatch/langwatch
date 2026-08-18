@@ -87,8 +87,14 @@ export {
   grantFactToCompatShareLink,
   grantFactToRow,
   grantRowToFact,
+  PRINCIPAL_TO_DB,
+  RESOURCE_KIND_TO_DB,
   roleFactToRow,
   roleRowToFact,
+  SHARE_LINK_PERMISSION,
+  SHARE_VISIBILITY_BY_PRINCIPAL,
+  SHARE_VISIBILITY_BY_PRINCIPAL_DB,
+  shareVisibilityAudience,
 } from "./ledger/projection-mapping";
 export type {
   CompatBindingRowShape,
@@ -98,6 +104,7 @@ export type {
   GrantRowShape,
   GrantScopeTypeDb,
   RoleRowShape,
+  ShareLinkAudience,
 } from "./ledger/projection-mapping";
 // Grant identity derivation is deliberately NOT re-exported here: it imports
 // `node:crypto`, and this root entry is browser-evaluable by construction

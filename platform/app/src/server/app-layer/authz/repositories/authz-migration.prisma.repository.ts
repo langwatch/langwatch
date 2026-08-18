@@ -17,7 +17,9 @@ import type {
   ShareLinkFactRow,
   TeamBindingWrite,
 } from "@langwatch/authz-server";
+import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { queryCutoverOnEngine } from "../cutover-gate";
 
 /**
  * ADR-092 stage B - storage for the in-place TeamUser backfill, the genesis
@@ -251,12 +253,22 @@ export class PrismaAuthzMigrationRepository
   }: {
     tenantId: string;
     migrationNames: readonly string[];
-  }): Promise<Record<string, string | null>> {
+  }): Promise<Record<string, TenantMigrationStatus | null>> {
     const rows = await this.prisma.systemMigrationTenantState.findMany({
       where: { tenantId, migrationName: { in: [...migrationNames] } },
       select: { migrationName: true, status: true },
     });
-    const stored = new Map(rows.map((row) => [row.migrationName, row.status]));
+    // `status` is a plain Prisma string column (no DB enum) - wider than the
+    // union the port is pinned to, same reasoning as ledger-write-gate.ts's
+    // own read of this table. The cast is on this map's values, not on the
+    // port's declared type, so a rename of the union still catches every
+    // caller.
+    const stored = new Map(
+      rows.map((row) => [
+        row.migrationName,
+        row.status as TenantMigrationStatus,
+      ]),
+    );
     // Every asked-for name is answered, so the caller reads "never ran" as
     // the null it is rather than as a missing key.
     return Object.fromEntries(
@@ -441,14 +453,6 @@ export class PrismaAuthzMigrationRepository
     }));
   }
 
-  async findOrganizationTeamAndProjectIds({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<OrganizationScopeInventory> {
-    return this.findOrganizationScopeInventory({ organizationId });
-  }
-
   async findOrganizationMemberIds({
     organizationId,
   }: {
@@ -475,15 +479,15 @@ export class PrismaAuthzMigrationRepository
     return rows.map((row) => row.id);
   }
 
+  /** The same query the request-path gate's own cache miss runs
+   *  (cutover-gate.ts's `queryCutoverOnEngine`) - one predicate, so the
+   *  migration awaiting its own flip and the gate serving it can never
+   *  drift onto different answers. */
   async findCutoverOnEngine({
     organizationId,
   }: {
     organizationId: string;
   }): Promise<boolean> {
-    const row = await this.prisma.authzCutoverProjection.findUnique({
-      where: { organizationId },
-      select: { onEngine: true },
-    });
-    return row?.onEngine === true;
+    return queryCutoverOnEngine({ prisma: this.prisma, organizationId });
   }
 }

@@ -132,7 +132,7 @@ import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 import { createAnalyticsService } from "./analytics";
 import { LegacyAnalyticsBackendClickHouseRepository } from "./analytics/repositories/legacy-analytics-backend.clickhouse.repository";
 import { App, getApp, globalForApp, initializeApp } from "./app";
-import { grantsLedgerWriter } from "./authz/ledger";
+import { GrantsLedgerWriter, grantsLedgerWriter } from "./authz/ledger";
 import { PrismaAuthzAuditTrailRepository } from "./authz/repositories/authz-audit-trail.prisma.repository";
 import { PrismaAuthzGrantsProjectionRepository } from "./authz/repositories/authz-grants-projection.prisma.repository";
 import { EmailSuppressionService } from "./automations/emailSuppression.service";
@@ -2292,12 +2292,17 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       metering: new StorageMeterService({ resolveClickHouseClient: null }),
     },
     share: new ShareService(
-      // Same wrapper as the real preset, so a test organization that has been
-      // cut over exercises the ledger path rather than a shape only tests see.
+      // The same repository the real preset wires, so a test organization
+      // that has been cut over exercises the ledger path rather than a shape
+      // only tests see. The writer is built over `testPrisma` explicitly
+      // (rather than `grantsLedgerWriter()`, which always reaches for the
+      // app's Prisma singleton) - today the two are the same client
+      // (`testPrisma = globalPrisma`, presets.ts above), but a test preset
+      // should say what it depends on rather than rely on that coincidence.
       new LedgerShareRepository({
         legacy: new PrismaShareRepository(testPrisma),
         prisma: testPrisma,
-        writer: () => grantsLedgerWriter(),
+        writer: () => new GrantsLedgerWriter(testPrisma),
       }),
       testPinnedTraceService,
       {

@@ -101,11 +101,18 @@ export interface AuthzReadRepository extends ScopeLineageRepository {
    * ShareLink rows for the presented tokens against the given resource
    * links. Implementations MUST filter by token possession in the query -
    * returning unpresented rows would reopen the trace-id-guessing hole.
+   *
+   * `organizationId` is OPTIONAL: a caller who has already resolved the
+   * project's lineage (deciding, say, which head to route to) may hand it
+   * over so an implementation that would otherwise re-resolve it from the
+   * project can skip that second read. A caller with no lineage of its own
+   * omits it and an implementation that needs one resolves it itself.
    */
   findShareLinks(args: {
     projectId: string;
     tokens: readonly string[];
     links: ReadonlyArray<{ kind: ShareableResourceKind; id: string }>;
+    organizationId?: string;
   }): Promise<ShareLinkRow[]>;
 
   /**

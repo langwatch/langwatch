@@ -6,6 +6,7 @@
  *
  * Server-only - this graph reaches Prisma, Redis and the EE audit writer.
  */
+import { adminEmailList } from "@ee/admin/isAdmin";
 import { auditLog } from "@ee/audit-log/auditLog";
 import { AuthzCollectorService } from "@langwatch/authz-server";
 import {
@@ -309,9 +310,11 @@ export function registeredMigrations(): SystemMigration[] {
           cohort: process.env.AUTHZ_CUTOVER_COHORT,
           tenantId,
         }),
-      // The same list the live platform-admin check parses, read per pass
-      // rather than captured, so widening it needs no restart.
-      adminEmails: () => (process.env.ADMIN_EMAILS ?? "").split(","),
+      // The live platform-admin check's own parse (`adminEmailList`), read
+      // per pass rather than captured, so widening ADMIN_EMAILS needs no
+      // restart and the cutover import can never see a different admitted
+      // set than `isAdmin()` does.
+      adminEmails: adminEmailList,
       now: () => Date.now(),
     }),
   ];

@@ -1,17 +1,17 @@
 /**
- * The per-organization cache in ./legacy-fallback-gate.ts never revisits an
- * entry once written, so without a bound an org queried once and never
- * again would hold its entry for the life of the pod. This covers the
- * bound: once the map is full, writing a new entry evicts rather than
- * growing past `MAX_CACHE_ENTRIES`.
+ * The per-organization cache behind ./legacy-fallback-gate.ts never revisits
+ * an entry once written, so without a bound an org queried once and never
+ * again would hold its entry for the life of the pod. This covers the bound
+ * through the gate that uses it: once the map is full, writing a new entry
+ * evicts rather than growing past `MAX_CACHE_ENTRIES`.
  */
 import { describe, expect, it } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
   legacyTeamFallbackDisabled,
-  MAX_CACHE_ENTRIES,
   resetLegacyFallbackGateForTesting,
 } from "../legacy-fallback-gate";
+import { MAX_CACHE_ENTRIES } from "../per-organization-cached-gate";
 
 function fakePrisma(): {
   prisma: Pick<PrismaClient, "systemMigrationTenantState">;

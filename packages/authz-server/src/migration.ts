@@ -11,6 +11,7 @@
 export { GRANTS_CUTOVER_MIGRATION_NAME } from "./cutover.name";
 export {
   GrantsCutoverMigration,
+  normalizedAdminEmails,
   PLATFORM_AUTHZ_TENANT_ID,
 } from "./cutover.migration";
 export type {
