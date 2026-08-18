@@ -1,13 +1,13 @@
 /**
  * @vitest-environment node
  *
- * Router-level tests for the governed SQL feature switch: one flag, checked
+ * Router-level tests for the LangWatchQL feature switch: one flag, checked
  * server-side, that darkens the whole surface. `availability` answers false —
  * which is what hides the navigation and the page — and `schema`/`query`
  * refuse outright with the named code, so a caller who skips the availability
  * question gets the same answer.
  *
- * Spec: specs/analytics/governed-sql-workbench.feature
+ * Spec: specs/analytics/lwql-workbench.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -26,7 +26,7 @@ const {
     truncated: false,
     diagnostics: [],
   }),
-  /** Whether this deployment has a governed identity to run queries as. */
+  /** Whether this deployment has a LangWatchQL identity to run queries as. */
   deployment: { provisioned: true },
 }));
 
@@ -42,12 +42,12 @@ vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock("~/server/analytics/governed-sql", async (importOriginal) => {
+vi.mock("~/server/analytics/lwql", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("~/server/analytics/governed-sql")>();
+    await importOriginal<typeof import("~/server/analytics/lwql")>();
   return {
     ...actual,
-    getGovernedSqlService: () => ({
+    getLangWatchQLService: () => ({
       available: deployment.provisioned,
       describeSchema: mockDescribeSchema,
       execute: mockExecute,
@@ -74,7 +74,7 @@ vi.mock("../../utils", async (importOriginal) => {
   };
 });
 
-import { governedSqlRouter } from "../analytics/governedSql";
+import { lwqlRouter } from "../analytics/lwql";
 
 const mockPrismaClient = {
   project: {
@@ -97,7 +97,7 @@ function createTestCaller() {
     organizationRole: undefined,
   } as any;
 
-  return governedSqlRouter.createCaller(ctx);
+  return lwqlRouter.createCaller(ctx);
 }
 
 /**
@@ -112,7 +112,7 @@ function runQuery(
   return caller.query(input);
 }
 
-describe("the governed SQL router's feature switch", () => {
+describe("the LangWatchQL router's feature switch", () => {
   let caller: ReturnType<typeof createTestCaller>;
 
   beforeEach(() => {
@@ -162,7 +162,7 @@ describe("the governed SQL router's feature switch", () => {
         caller.schema({ projectId: "proj_test_123" }),
       ).rejects.toMatchObject({
         code: "FORBIDDEN",
-        cause: { code: "governed_sql_not_enabled" },
+        cause: { code: "lwql_not_enabled" },
       });
       expect(mockDescribeSchema).not.toHaveBeenCalled();
     });
@@ -173,7 +173,7 @@ describe("the governed SQL router's feature switch", () => {
         runQuery(caller, { projectId: "proj_test_123", sql: "SELECT 1" }),
       ).rejects.toMatchObject({
         code: "FORBIDDEN",
-        cause: { code: "governed_sql_not_enabled" },
+        cause: { code: "lwql_not_enabled" },
       });
       expect(mockExecute).not.toHaveBeenCalled();
       // The switch itself resolves the project's organization, so the only
@@ -193,7 +193,7 @@ describe("the governed SQL router's feature switch", () => {
       // can only come on if the router resolved and passed the right one.
       mockFeatureFlagIsEnabled.mockImplementation(
         async (flag: string, context: { organizationId?: string }) =>
-          flag === "release_governed_sql_workbench" &&
+          flag === "release_lwql_workbench" &&
           context.organizationId === "org_test_123",
       );
     });
@@ -221,7 +221,7 @@ describe("the governed SQL router's feature switch", () => {
       deployment.provisioned = false;
     });
 
-    /** @scenario "The workbench is unreachable while governed SQL is not provisioned" */
+    /** @scenario "The workbench is unreachable while LangWatchQL is not provisioned" */
     it("answers unavailable, naming provisioning rather than the switch", async () => {
       await expect(
         caller.availability({ projectId: "proj_test_123" }),

@@ -20,7 +20,7 @@
  * a form binds to, so nothing is lost by deciding it one layer down.
  *
  * @see ~/server/analytics/saved-workbench-charts — the service and its schema
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { z } from "zod";

@@ -1,5 +1,5 @@
 /**
- * The governed analytics SQL endpoints, driven through the real HTTP app.
+ * The LangWatchQL analytics SQL endpoints, driven through the real HTTP app.
  *
  * Every request here goes through the shipped Hono app — auth middleware, RBAC,
  * validator, service, executor — against a ClickHouse 25.10 container carrying
@@ -24,8 +24,8 @@
  *  - Two tenants throughout, both seeded, so an isolation assertion has
  *    something to fail on.
  *
- * @see specs/analytics/governed-sql-api.feature
- * @see ~/server/analytics/governed-sql — the service under test
+ * @see specs/analytics/lwql-api.feature
+ * @see ~/server/analytics/lwql — the service under test
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -34,30 +34,30 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
 import {
-  createGovernedSqlExecutor,
-  GovernedSqlService,
-  governedTenantCapability,
-  setGovernedSqlService,
-} from "~/server/analytics/governed-sql";
+  createLangWatchQLExecutor,
+  LangWatchQLService,
+  lwqlTenantCapability,
+  setLangWatchQLService,
+} from "~/server/analytics/lwql";
 import {
-  type GovernedClickHouseHarness,
-  type GovernedPostgresHarness,
+  type LangWatchQLClickHouseHarness,
+  type LangWatchQLPostgresHarness,
   mapPostgresIntoClickHouse,
   postgresTenantSeedStatements,
   selectRows,
   selectScalar,
-  startGovernedClickHouse,
-  startGovernedPostgres,
-} from "~/server/analytics/governed-sql/__tests__/governedClickHouseHarness";
-import { GOVERNED_VIEW_CATALOG } from "~/server/analytics/governed-sql/catalog/governedViews";
+  startLangWatchQLClickHouse,
+  startLangWatchQLPostgres,
+} from "~/server/analytics/lwql/__tests__/lwqlClickHouseHarness";
+import { LWQL_VIEW_CATALOG } from "~/server/analytics/lwql/catalog/lwqlViews";
 import {
-  type GovernedViewDefinition,
+  type LangWatchQLViewDefinition,
   isPostgresResident,
-} from "~/server/analytics/governed-sql/catalog/types";
+} from "~/server/analytics/lwql/catalog/types";
 import {
-  governedViewSetupStatements,
-  SHIPPED_GOVERNED_DEDUP,
-} from "~/server/analytics/governed-sql/views";
+  lwqlViewSetupStatements,
+  SHIPPED_LWQL_DEDUP,
+} from "~/server/analytics/lwql/views";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -141,7 +141,7 @@ function traceRow({
 }
 
 /**
- * Seeds one tenant across every governed dataset.
+ * Seeds one tenant across every LangWatchQL dataset.
  *
  * Written here rather than borrowed from the proof harness because the tenant
  * ids that matter to this suite are real project ids, and the harness seeds its
@@ -391,9 +391,9 @@ async function seedTenant({
   });
 }
 
-describe("given the governed analytics SQL REST endpoints", () => {
-  let harness: GovernedClickHouseHarness;
-  let postgres: GovernedPostgresHarness;
+describe("given the LangWatchQL analytics SQL REST endpoints", () => {
+  let harness: LangWatchQLClickHouseHarness;
+  let postgres: LangWatchQLPostgresHarness;
   let organization: Organization;
   let team: Team;
   /** Fully permitted: the platform default policy captures every category. */
@@ -467,9 +467,9 @@ describe("given the governed analytics SQL REST endpoints", () => {
    * later case ran against.
    */
   const restoreShippedService = () => {
-    setGovernedSqlService(
-      new GovernedSqlService({
-        executor: createGovernedSqlExecutor({
+    setLangWatchQLService(
+      new LangWatchQLService({
+        executor: createLangWatchQLExecutor({
           ...harness.restrictedConnection(),
           database,
           tenantSetting: harness.names.tenantSetting,
@@ -491,10 +491,10 @@ describe("given the governed analytics SQL REST endpoints", () => {
   /**
    * The same, for a dataset's source table, with the database taken from the
    * catalog rather than assumed: a PostgreSQL-engine table sits beside the
-   * governed views, not with the migrated fact tables.
+   * LangWatchQL views, not with the migrated fact tables.
    */
   const adminSourceRowCount = async (
-    view: GovernedViewDefinition,
+    view: LangWatchQLViewDefinition,
     tenantId: string,
   ) => {
     const [row] = await selectRows<{ value: string }>(
@@ -510,12 +510,12 @@ describe("given the governed analytics SQL REST endpoints", () => {
     // default. The suite runs with it on via the flag's own env override —
     // the same lever a deployment uses — and the flag-off cases below unset
     // it for exactly one request.
-    process.env.RELEASE_GOVERNED_SQL_WORKBENCH = "1";
+    process.env.RELEASE_LWQL_WORKBENCH = "1";
 
-    // The catalog spans both residences; the governed views over the
+    // The catalog spans both residences; the LangWatchQL views over the
     // PostgreSQL-resident half read engine tables that must exist first.
-    postgres = await startGovernedPostgres();
-    harness = await startGovernedClickHouse({
+    postgres = await startLangWatchQLPostgres();
+    harness = await startLangWatchQLClickHouse({
       suite: "restapi",
       facts: "migrated",
     });
@@ -523,10 +523,10 @@ describe("given the governed analytics SQL REST endpoints", () => {
     facts = harness.factDatabase;
     await mapPostgresIntoClickHouse({ harness, postgres });
     await harness.applyAsAdmin(
-      governedViewSetupStatements({
+      lwqlViewSetupStatements({
         names: harness.names,
         sourceDatabase: facts,
-        dedup: SHIPPED_GOVERNED_DEDUP,
+        dedup: SHIPPED_LWQL_DEDUP,
       }),
     );
 
@@ -544,12 +544,12 @@ describe("given the governed analytics SQL REST endpoints", () => {
     });
 
     organization = await prisma.organization.create({
-      data: { name: "Governed SQL Org", slug: `governed-sql-${nanoid()}` },
+      data: { name: "LangWatchQL Org", slug: `lwql-${nanoid()}` },
     });
     team = await prisma.team.create({
       data: {
-        name: "Governed SQL Team",
-        slug: `governed-sql-${nanoid()}`,
+        name: "LangWatchQL Team",
+        slug: `lwql-${nanoid()}`,
         organizationId: organization.id,
       },
     });
@@ -594,7 +594,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
       table: `${database}.${harness.names.keyMapTable}`,
       format: "JSONEachRow",
       values: [openProject, gatedProject].map((project) => ({
-        KeyHash: governedTenantCapability({ secret: project.governedSqlKey }),
+        KeyHash: lwqlTenantCapability({ secret: project.lwqlKey }),
         TenantId: project.id,
       })),
     });
@@ -605,7 +605,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
         database: facts,
         tenantId: project.id,
       });
-      // The PostgreSQL-resident half, under the same project ids: a governed
+      // The PostgreSQL-resident half, under the same project ids: a LangWatchQL
       // view a caller can name but has no rows in would make every "reads its
       // own tenant's rows" case below vacuous for that dataset.
       for (const statement of postgresTenantSeedStatements({
@@ -616,9 +616,9 @@ describe("given the governed analytics SQL REST endpoints", () => {
       }
     }
 
-    setGovernedSqlService(
-      new GovernedSqlService({
-        executor: createGovernedSqlExecutor({
+    setLangWatchQLService(
+      new LangWatchQLService({
+        executor: createLangWatchQLExecutor({
           ...harness.restrictedConnection(),
           database,
           tenantSetting: harness.names.tenantSetting,
@@ -629,8 +629,8 @@ describe("given the governed analytics SQL REST endpoints", () => {
   }, 600_000);
 
   afterAll(async () => {
-    delete process.env.RELEASE_GOVERNED_SQL_WORKBENCH;
-    setGovernedSqlService(null);
+    delete process.env.RELEASE_LWQL_WORKBENCH;
+    setLangWatchQLService(null);
     // Guarded on the identifier each statement actually uses: `team` gates
     // everything keyed by teamId (and the policy created after it), while
     // `organization.delete` gets its own guard so a team-creation failure
@@ -650,14 +650,14 @@ describe("given the governed analytics SQL REST endpoints", () => {
     await postgres?.stop();
   });
 
-  describe("when the governed SQL feature switch is off for the project", () => {
+  describe("when the LangWatchQL feature switch is off for the project", () => {
     /** Runs one request with the switch off, whatever else the suite set. */
     const withFlagOff = async <T>(request: () => Promise<T>): Promise<T> => {
-      process.env.RELEASE_GOVERNED_SQL_WORKBENCH = "0";
+      process.env.RELEASE_LWQL_WORKBENCH = "0";
       try {
         return await request();
       } finally {
-        process.env.RELEASE_GOVERNED_SQL_WORKBENCH = "1";
+        process.env.RELEASE_LWQL_WORKBENCH = "1";
       }
     };
 
@@ -668,7 +668,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
       );
       const body = (await response.json()) as Record<string, any>;
       expect(response.status).toBe(403);
-      expect(body.error.code).toBe("governed_sql_not_enabled");
+      expect(body.error.code).toBe("lwql_not_enabled");
     });
 
     /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
@@ -680,7 +680,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
       );
       const body = (await response.json()) as Record<string, any>;
       expect(response.status).toBe(403);
-      expect(body.error.code).toBe("governed_sql_not_enabled");
+      expect(body.error.code).toBe("lwql_not_enabled");
     });
   });
 
@@ -697,7 +697,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
     ): Promise<T> => {
       const store = getFeatureFlagStore();
       await store.setRules(
-        "release_governed_sql_workbench",
+        "release_lwql_workbench",
         [{ match: { organizationId }, enabled: true }],
         null,
       );
@@ -705,16 +705,16 @@ describe("given the governed analytics SQL REST endpoints", () => {
       // dev .env force-enables this flag, and force-enable wins before the
       // store — leaving it in place turns both of these tests vacuous.
       const forceEnable = process.env.FEATURE_FLAG_FORCE_ENABLE;
-      delete process.env.RELEASE_GOVERNED_SQL_WORKBENCH;
+      delete process.env.RELEASE_LWQL_WORKBENCH;
       delete process.env.FEATURE_FLAG_FORCE_ENABLE;
       try {
         return await request();
       } finally {
-        process.env.RELEASE_GOVERNED_SQL_WORKBENCH = "1";
+        process.env.RELEASE_LWQL_WORKBENCH = "1";
         if (forceEnable !== undefined) {
           process.env.FEATURE_FLAG_FORCE_ENABLE = forceEnable;
         }
-        await store.clear("release_governed_sql_workbench", null);
+        await store.clear("release_lwql_workbench", null);
       }
     };
 
@@ -739,7 +739,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
       );
       const body = (await response.json()) as Record<string, any>;
       expect(response.status).toBe(403);
-      expect(body.error.code).toBe("governed_sql_not_enabled");
+      expect(body.error.code).toBe("lwql_not_enabled");
     });
   });
 
@@ -811,9 +811,9 @@ describe("given the governed analytics SQL REST endpoints", () => {
       expect(body.diagnostics).toEqual([]);
     });
 
-    /** @scenario "A governed view returns only the calling tenant's rows" */
-    it("reads every governed view, seeing exactly its own tenant's rows", async () => {
-      for (const view of GOVERNED_VIEW_CATALOG) {
+    /** @scenario "A LangWatchQL view returns only the calling tenant's rows" */
+    it("reads every LangWatchQL view, seeing exactly its own tenant's rows", async () => {
+      for (const view of LWQL_VIEW_CATALOG) {
         const expected = await adminSourceRowCount(view, openProject.id);
         expect(
           expected,
@@ -831,7 +831,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
       }
     });
 
-    /** @scenario "A governed view returns one row per logical record, the latest version" */
+    /** @scenario "A LangWatchQL view returns one row per logical record, the latest version" */
     it("collapses a twice-written trace to its newer version", async () => {
       const traceId = `${openProject.id}-${DEDUP.suffix}`;
       const versions = await selectRows<{ SpanCount: number }>(
@@ -855,7 +855,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
       ).toBe(DEDUP.latestSpanCount);
     });
 
-    it("resolves an unqualified dataset name to the governed database", async () => {
+    it("resolves an unqualified dataset name to the LangWatchQL database", async () => {
       const body = await run(
         openProject,
         "SELECT count() AS value FROM traces",
@@ -960,7 +960,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
       const body = (await response.json()) as Record<string, any>;
 
       expect(response.status).toBe(400);
-      expect(body.error.code).toBe("governed_sql_reserved_parameter_supplied");
+      expect(body.error.code).toBe("lwql_reserved_parameter_supplied");
     });
 
     /** @scenario "A statement with no period parameters runs, and says so" */
@@ -977,7 +977,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
   });
 
   describe("when two tenants have rows", () => {
-    /** @scenario "A governed view returns only the calling tenant's rows" */
+    /** @scenario "A LangWatchQL view returns only the calling tenant's rows" */
     it("gives each caller its own tenant and never the other's", async () => {
       for (const [caller, other] of [
         [openProject, gatedProject],
@@ -1033,7 +1033,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
         `SELECT count() FROM ${database}.traces ` +
           `SETTINGS ${harness.names.tenantSetting} = 'anything'`,
       );
-      expect(body.error.code).toBe("governed_sql_not_permitted");
+      expect(body.error.code).toBe("lwql_not_permitted");
       expect(
         body.error.meta.violations.map((violation: any) => violation.code),
       ).toContain("SETTINGS_CLAUSE");
@@ -1072,14 +1072,14 @@ describe("given the governed analytics SQL REST endpoints", () => {
         openProject,
         `SELECT count() FROM ${facts}.trace_summaries`,
       );
-      expect(body.error.code).toBe("governed_sql_not_permitted");
+      expect(body.error.code).toBe("lwql_not_permitted");
       expect(
         body.error.meta.violations.map((violation: any) => violation.code),
       ).toContain("TABLE_NOT_ALLOWED");
     });
   });
 
-  describe("when the query reaches for something outside the governed schema", () => {
+  describe("when the query reaches for something outside the LangWatchQL schema", () => {
     /** @scenario "External and table-function access is blocked by AST policy before reaching the database" */
     it("rejects every table function by AST policy, before the database sees it", async () => {
       for (const sql of [
@@ -1093,7 +1093,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
         const body = await refuse(openProject, sql);
         // The coded refusal is itself the evidence: a rejection by the database
         // arrives as a translated or unknown failure, never as this code.
-        expect(body.error.code, sql).toBe("governed_sql_not_permitted");
+        expect(body.error.code, sql).toBe("lwql_not_permitted");
         expect(
           body.error.meta.violations.map((violation: any) => violation.code),
           sql,
@@ -1109,7 +1109,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
         "SELECT * FROM information_schema.tables",
       ]) {
         const body = await refuse(openProject, sql);
-        expect(body.error.code, sql).toBe("governed_sql_not_permitted");
+        expect(body.error.code, sql).toBe("lwql_not_permitted");
         expect(
           body.error.meta.violations.map((violation: any) => violation.code),
           sql,
@@ -1125,7 +1125,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
         [`SELECT 1; SELECT 2`, "MULTIPLE_STATEMENTS"],
       ] as const) {
         const body = await refuse(openProject, sql);
-        expect(body.error.code, sql).toBe("governed_sql_not_permitted");
+        expect(body.error.code, sql).toBe("lwql_not_permitted");
         expect(
           body.error.meta.violations.map((violation: any) => violation.code),
           sql,
@@ -1135,7 +1135,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
 
     it("reports unparseable text as its own failure, not as a policy refusal", async () => {
       const body = await refuse(openProject, "SELECT FROM WHERE )(");
-      expect(body.error.code).toBe("governed_sql_unparseable");
+      expect(body.error.code).toBe("lwql_unparseable");
       expect(body.error.meta.violations[0].code).toBe("PARSE_FAILED");
     });
   });
@@ -1156,7 +1156,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
 
       for (const sql of positions(database)) {
         const body = await refuse(gatedProject, sql);
-        expect(body.error.code, sql).toBe("governed_sql_not_permitted");
+        expect(body.error.code, sql).toBe("lwql_not_permitted");
         expect(
           body.error.meta.violations.map((violation: any) => violation.code),
           sql,
@@ -1198,7 +1198,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
 
       expect(permitted.database).toBe(database);
       expect(permitted.datasets.map((dataset: any) => dataset.name)).toEqual(
-        GOVERNED_VIEW_CATALOG.map((view) => `${database}.${view.name}`),
+        LWQL_VIEW_CATALOG.map((view) => `${database}.${view.name}`),
       );
 
       const columnOf = (schema: any, dataset: string, column: string) =>
@@ -1250,7 +1250,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
       expect(response.status).toBe(404);
     });
 
-    /** @scenario "Authenticated client discovers its governed schema scoped to its own permissions" */
+    /** @scenario "Authenticated client discovers its LangWatchQL schema scoped to its own permissions" */
     it("describes every dataset it publishes, down to what its numbers are measured in", async () => {
       for (const project of [openProject, gatedProject]) {
         const schema = await readSchema(project);
@@ -1298,9 +1298,9 @@ describe("given the governed analytics SQL REST endpoints", () => {
      * what the scenario claims. The endpoint, the auth path and the permission
      * derivation under test are the shipped ones.
      */
-    /** @scenario "Authenticated client discovers its governed schema scoped to its own permissions" */
+    /** @scenario "Authenticated client discovers its LangWatchQL schema scoped to its own permissions" */
     it("leaves out a dataset the caller's permissions do not reach", async () => {
-      const transcripts: GovernedViewDefinition = {
+      const transcripts: LangWatchQLViewDefinition = {
         name: "transcripts",
         sourceTable: "raw_transcripts",
         description: "Everything said in a conversation, verbatim.",
@@ -1321,15 +1321,15 @@ describe("given the governed analytics SQL REST endpoints", () => {
         ],
       };
 
-      setGovernedSqlService(
-        new GovernedSqlService({
-          executor: createGovernedSqlExecutor({
+      setLangWatchQLService(
+        new LangWatchQLService({
+          executor: createLangWatchQLExecutor({
             ...harness.restrictedConnection(),
             database,
             tenantSetting: harness.names.tenantSetting,
           }),
           database,
-          views: [...GOVERNED_VIEW_CATALOG, transcripts],
+          views: [...LWQL_VIEW_CATALOG, transcripts],
         }),
       );
       try {
@@ -1358,7 +1358,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
      */
     /** @scenario "A dataset withheld from a caller cannot be named in a query" */
     it("refuses a query naming a dataset the caller's permissions withhold, and answers it for one who holds them", async () => {
-      const transcripts: GovernedViewDefinition = {
+      const transcripts: LangWatchQLViewDefinition = {
         name: "transcripts",
         // Pointed at a table the migrations really created, so the permitted
         // caller's query below reaches the database rather than failing on a
@@ -1392,19 +1392,19 @@ describe("given the governed analytics SQL REST endpoints", () => {
           },
         ],
       };
-      const views = [...GOVERNED_VIEW_CATALOG, transcripts];
+      const views = [...LWQL_VIEW_CATALOG, transcripts];
 
       await harness.applyAsAdmin(
-        governedViewSetupStatements({
+        lwqlViewSetupStatements({
           names: harness.names,
           sourceDatabase: facts,
           views: [transcripts],
-          dedup: SHIPPED_GOVERNED_DEDUP,
+          dedup: SHIPPED_LWQL_DEDUP,
         }),
       );
-      setGovernedSqlService(
-        new GovernedSqlService({
-          executor: createGovernedSqlExecutor({
+      setLangWatchQLService(
+        new LangWatchQLService({
+          executor: createLangWatchQLExecutor({
             ...harness.restrictedConnection(),
             database,
             tenantSetting: harness.names.tenantSetting,
@@ -1417,7 +1417,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
         const sql = `SELECT count() AS value FROM ${database}.transcripts`;
 
         const refused = await refuse(gatedProject, sql);
-        expect(refused.error.code).toBe("governed_sql_not_permitted");
+        expect(refused.error.code).toBe("lwql_not_permitted");
         expect(
           refused.error.meta.violations.map((violation: any) => violation.code),
         ).toContain("TABLE_NOT_ALLOWED");
@@ -1435,7 +1435,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
     });
 
     /**
-     * Whether the fail-closed derivation in `governedGatedColumns` — which
+     * Whether the fail-closed derivation in `lwqlGatedColumns` — which
      * withholds unless a permission is explicitly `true` — can be exercised end
      * to end, settled here rather than re-argued.
      *
@@ -1449,7 +1449,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
      * check survives this suite. The `=== true` form is still the correct one,
      * because the fields are optional and the service takes `Protections` from
      * callers that are not this route — and that is where the unit suite pins
-     * it (`catalog/__tests__/governedViewCatalog.unit.test.ts`).
+     * it (`catalog/__tests__/lwqlViewCatalog.unit.test.ts`).
      *
      * The two cases below are the guard on that reasoning: the shape claim, and
      * the resolver outage the claim leans on.
@@ -1548,7 +1548,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
       });
       const body = (await response.json()) as any;
       expect(response.status).toBe(400);
-      expect(body.error.code).toBe("governed_sql_parameter_missing");
+      expect(body.error.code).toBe("lwql_parameter_missing");
       expect(body.error.meta.parameters).toEqual(["floor"]);
     });
   });
@@ -1571,9 +1571,9 @@ describe("given the governed analytics SQL REST endpoints", () => {
       expect(full.rows.length).toBeGreaterThan(2);
       expect(full.truncated).toBe(false);
 
-      setGovernedSqlService(
-        new GovernedSqlService({
-          executor: createGovernedSqlExecutor({
+      setLangWatchQLService(
+        new LangWatchQLService({
+          executor: createLangWatchQLExecutor({
             ...harness.restrictedConnection(),
             database,
             tenantSetting: harness.names.tenantSetting,
@@ -1634,7 +1634,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
         `SELECT ${call(harness.names.tenantSetting)} AS value FROM ${database}.traces`,
       );
 
-      expect(body.error.code).toBe("governed_sql_not_permitted");
+      expect(body.error.code).toBe("lwql_not_permitted");
       expect(
         body.error.meta.violations.map((violation: any) => violation.code),
       ).toEqual(["FUNCTION_NOT_ALLOWED"]);
@@ -1672,8 +1672,8 @@ describe("given the governed analytics SQL REST endpoints", () => {
       // Every request below is made as the gated project, so the *open*
       // project is the other tenant, and its very existence is one of the
       // things an error must not disclose.
-      const capability = governedTenantCapability({
-        secret: gatedProject.governedSqlKey,
+      const capability = lwqlTenantCapability({
+        secret: gatedProject.lwqlKey,
       });
 
       // Control, one layer down: the session facts asserted absent below are
@@ -1732,8 +1732,8 @@ describe("given the governed analytics SQL REST endpoints", () => {
         harness.names.keyMapTable,
         openProject.id,
         openProject.apiKey,
-        openProject.governedSqlKey,
-        ...GOVERNED_VIEW_CATALOG.map((view) => view.sourceTable),
+        openProject.lwqlKey,
+        ...LWQL_VIEW_CATALOG.map((view) => view.sourceTable),
         facts,
         ...relayed,
       ];

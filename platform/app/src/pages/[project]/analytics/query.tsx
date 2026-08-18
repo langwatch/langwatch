@@ -1,13 +1,13 @@
 /**
- * Custom query — the governed SQL workbench.
+ * Custom query — the LangWatchQL workbench.
  *
  * Two gates, both server-answered. The permission guard decides whether this
  * member may be here at all; the availability query decides whether the
- * deployment can run a governed query. Neither can be flipped from the browser,
+ * deployment can run a LangWatchQL query. Neither can be flipped from the browser,
  * which is what keeps the surface off a deployment that has no restricted
  * identity to run a customer's SQL as.
  *
- * @see specs/analytics/governed-sql-workbench.feature
+ * @see specs/analytics/lwql-workbench.feature
  */
 
 import { Badge, Box, Spinner } from "@chakra-ui/react";
@@ -15,17 +15,17 @@ import { Badge, Box, Spinner } from "@chakra-ui/react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { GovernedSqlWorkbench } from "~/features/analytics-query/components/GovernedSqlWorkbench";
+import { LangWatchQLWorkbench } from "~/features/analytics-query/components/LangWatchQLWorkbench";
 import {
-  governedSqlNotEnabledPayload,
-  governedSqlUnavailablePayload,
-} from "~/features/analytics-query/logic/governedSqlFailure";
+  lwqlNotEnabledPayload,
+  lwqlUnavailablePayload,
+} from "~/features/analytics-query/logic/lwqlFailure";
 import { HandledErrorState } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 
 type AvailabilityReason =
-  RouterOutputs["analytics"]["governedSql"]["availability"]["reason"];
+  RouterOutputs["analytics"]["lwql"]["availability"]["reason"];
 
 /**
  * The backend's own unavailable state, worded by the error registry rather
@@ -48,8 +48,8 @@ function AvailabilityFallback({
 
   const unavailableState =
     reason === "disabled"
-      ? governedSqlNotEnabledPayload()
-      : governedSqlUnavailablePayload();
+      ? lwqlNotEnabledPayload()
+      : lwqlUnavailablePayload();
 
   return <HandledErrorState error={unavailableState} fullHeight={false} />;
 }
@@ -58,7 +58,7 @@ export function CustomQueryPage() {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
 
-  const availability = api.analytics.governedSql.availability.useQuery(
+  const availability = api.analytics.lwql.availability.useQuery(
     { projectId },
     {
       enabled: projectId.length > 0,
@@ -81,7 +81,7 @@ export function CustomQueryPage() {
           variant="outline"
           title="Every statement is validated, scoped to this project, and row- and byte-limited by the server"
         >
-          Governed · project-scoped
+          LangWatchQL · project-scoped
         </Badge>
       </PageLayout.Header>
 
@@ -104,7 +104,7 @@ export function CustomQueryPage() {
             the pane calls the carried-over result "Current", and "run again"
             would submit the previous project's statement against the new one.
           */}
-          <GovernedSqlWorkbench key={projectId} projectId={projectId} />
+          <LangWatchQLWorkbench key={projectId} projectId={projectId} />
         </Box>
       ) : (
         <AvailabilityFallback

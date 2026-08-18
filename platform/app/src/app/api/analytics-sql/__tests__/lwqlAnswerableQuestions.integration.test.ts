@@ -1,5 +1,5 @@
 /**
- * The questions the governed analytics SQL API exists to answer, each asked
+ * The questions the LangWatchQL analytics SQL API exists to answer, each asked
  * through the public endpoint against a seed whose answer is known before the
  * query runs.
  *
@@ -30,8 +30,8 @@
  * which rounding convention ClickHouse picked, and the case would be pinning
  * the implementation rather than the answer.
  *
- * @see specs/analytics/governed-sql-api.feature
- * @see ~/server/analytics/governed-sql — the service under test
+ * @see specs/analytics/lwql-api.feature
+ * @see ~/server/analytics/lwql — the service under test
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -40,23 +40,23 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
 import {
-  createGovernedSqlExecutor,
-  GovernedSqlService,
-  governedTenantCapability,
-  setGovernedSqlService,
-} from "~/server/analytics/governed-sql";
+  createLangWatchQLExecutor,
+  LangWatchQLService,
+  lwqlTenantCapability,
+  setLangWatchQLService,
+} from "~/server/analytics/lwql";
 import {
-  type GovernedClickHouseHarness,
-  type GovernedPostgresHarness,
+  type LangWatchQLClickHouseHarness,
+  type LangWatchQLPostgresHarness,
   mapPostgresIntoClickHouse,
   postgresTenantSeedStatements,
-  startGovernedClickHouse,
-  startGovernedPostgres,
-} from "~/server/analytics/governed-sql/__tests__/governedClickHouseHarness";
+  startLangWatchQLClickHouse,
+  startLangWatchQLPostgres,
+} from "~/server/analytics/lwql/__tests__/lwqlClickHouseHarness";
 import {
-  governedViewSetupStatements,
-  SHIPPED_GOVERNED_DEDUP,
-} from "~/server/analytics/governed-sql/views";
+  lwqlViewSetupStatements,
+  SHIPPED_LWQL_DEDUP,
+} from "~/server/analytics/lwql/views";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
@@ -692,9 +692,9 @@ async function seedTenant({
 
 // ---------------------------------------------------------------------------
 
-describe("given the governed analytics SQL API and a seed with known answers", () => {
-  let harness: GovernedClickHouseHarness;
-  let postgres: GovernedPostgresHarness;
+describe("given the LangWatchQL analytics SQL API and a seed with known answers", () => {
+  let harness: LangWatchQLClickHouseHarness;
+  let postgres: LangWatchQLPostgresHarness;
   let organization: Organization;
   let team: Team;
   /** The authenticated tenant. Every asserted number is this project's. */
@@ -705,8 +705,8 @@ describe("given the governed analytics SQL API and a seed with known answers", (
   let facts: string;
 
   const shippedService = () =>
-    new GovernedSqlService({
-      executor: createGovernedSqlExecutor({
+    new LangWatchQLService({
+      executor: createLangWatchQLExecutor({
         ...harness.restrictedConnection(),
         database,
         tenantSetting: harness.names.tenantSetting,
@@ -763,12 +763,12 @@ describe("given the governed analytics SQL API and a seed with known answers", (
   beforeAll(async () => {
     // The surface ships behind the experimental feature switch, off by
     // default; the suite runs with it on via the flag's own env override.
-    process.env.RELEASE_GOVERNED_SQL_WORKBENCH = "1";
+    process.env.RELEASE_LWQL_WORKBENCH = "1";
     // Three of the questions below are answered from PostgreSQL-resident
-    // datasets, and every governed view over that half reads an engine table
+    // datasets, and every LangWatchQL view over that half reads an engine table
     // that has to exist before the view can be created.
-    postgres = await startGovernedPostgres();
-    harness = await startGovernedClickHouse({
+    postgres = await startLangWatchQLPostgres();
+    harness = await startLangWatchQLClickHouse({
       suite: "questions",
       facts: "migrated",
     });
@@ -776,10 +776,10 @@ describe("given the governed analytics SQL API and a seed with known answers", (
     facts = harness.factDatabase;
     await mapPostgresIntoClickHouse({ harness, postgres });
     await harness.applyAsAdmin(
-      governedViewSetupStatements({
+      lwqlViewSetupStatements({
         names: harness.names,
         sourceDatabase: facts,
-        dedup: SHIPPED_GOVERNED_DEDUP,
+        dedup: SHIPPED_LWQL_DEDUP,
       }),
     );
 
@@ -797,12 +797,12 @@ describe("given the governed analytics SQL API and a seed with known answers", (
     });
 
     organization = await prisma.organization.create({
-      data: { name: "Governed SQL Questions", slug: `governed-q-${nanoid()}` },
+      data: { name: "LangWatchQL Questions", slug: `lwql-q-${nanoid()}` },
     });
     team = await prisma.team.create({
       data: {
-        name: "Governed SQL Questions",
-        slug: `governed-q-${nanoid()}`,
+        name: "LangWatchQL Questions",
+        slug: `lwql-q-${nanoid()}`,
         organizationId: organization.id,
       },
     });
@@ -825,7 +825,7 @@ describe("given the governed analytics SQL API and a seed with known answers", (
       table: `${database}.${harness.names.keyMapTable}`,
       format: "JSONEachRow",
       values: [asking, other].map((project) => ({
-        KeyHash: governedTenantCapability({ secret: project.governedSqlKey }),
+        KeyHash: lwqlTenantCapability({ secret: project.lwqlKey }),
         TenantId: project.id,
       })),
     });
@@ -865,12 +865,12 @@ describe("given the governed analytics SQL API and a seed with known answers", (
       }
     }
 
-    setGovernedSqlService(shippedService());
+    setLangWatchQLService(shippedService());
   }, 600_000);
 
   afterAll(async () => {
-    delete process.env.RELEASE_GOVERNED_SQL_WORKBENCH;
-    setGovernedSqlService(null);
+    delete process.env.RELEASE_LWQL_WORKBENCH;
+    setLangWatchQLService(null);
     // Guarded on the identifier each statement actually uses: `team` gates
     // everything keyed by teamId, while `organization.delete` gets its own
     // guard so a team-creation failure never leaves the organization behind
@@ -1484,9 +1484,9 @@ describe("given the governed analytics SQL API and a seed with known answers", (
       // Half an hour into the newest seeded bucket. Injected rather than waited
       // for: the claim is about the relationship between the result and the
       // instant, and a wall clock would make it true only once.
-      setGovernedSqlService(
-        new GovernedSqlService({
-          executor: createGovernedSqlExecutor({
+      setLangWatchQLService(
+        new LangWatchQLService({
+          executor: createLangWatchQLExecutor({
             ...harness.restrictedConnection(),
             database,
             tenantSetting: harness.names.tenantSetting,
@@ -1507,7 +1507,7 @@ describe("given the governed analytics SQL API and a seed with known answers", (
           newestPeriodStart: `${DAY.unfinishedPeriod}T12:00:00.000Z`,
         });
       } finally {
-        setGovernedSqlService(shippedService());
+        setLangWatchQLService(shippedService());
       }
 
       // The same query once that period has closed: the seed and the SQL are

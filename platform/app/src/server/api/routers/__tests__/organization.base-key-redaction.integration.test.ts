@@ -62,10 +62,10 @@ const projectApiKeyFor = async (
   projectId: string,
 ) => (await projectInPayload(caller, projectId)).apiKey;
 
-const projectGovernedSqlKeyFor = async (
+const projectLangWatchQLKeyFor = async (
   caller: ReturnType<typeof callerFor>,
   projectId: string,
-) => (await projectInPayload(caller, projectId)).governedSqlKey;
+) => (await projectInPayload(caller, projectId)).lwqlKey;
 
 describe("Feature: base key in the organizations payload", () => {
   let organizationId: string;
@@ -73,7 +73,7 @@ describe("Feature: base key in the organizations payload", () => {
   let projectId: string;
   let baseApiKey: string;
   /** Database-minted, so the control below is the real stored value. */
-  let storedGovernedSqlKey: string;
+  let storedLangWatchQLKey: string;
 
   let updaterCaller: ReturnType<typeof callerFor>;
   let viewerCaller: ReturnType<typeof callerFor>;
@@ -174,7 +174,7 @@ describe("Feature: base key in the organizations payload", () => {
       },
     });
     projectId = project.id;
-    storedGovernedSqlKey = project.governedSqlKey;
+    storedLangWatchQLKey = project.lwqlKey;
 
     const updaterId = await makeUser("updater", TeamUserRole.MEMBER);
     const viewerId = await makeUser("viewer", TeamUserRole.VIEWER);
@@ -217,24 +217,24 @@ describe("Feature: base key in the organizations payload", () => {
   });
 
   /**
-   * The governed SQL key is a control-plane secret, not a credential any client
-   * surface renders: it is the input to the tenant capability the governed
+   * The LangWatchQL key is a control-plane secret, not a credential any client
+   * surface renders: it is the input to the tenant capability the LangWatchQL
    * analytics API presents to ClickHouse. So unlike the base key it is withheld
    * from *everyone*, and the caller who CAN change the project is the case that
    * matters — a redaction gated on permission would hand it to them.
    */
-  describe("given the governed SQL key on the project", () => {
+  describe("given the LangWatchQL key on the project", () => {
     it.each([
       ["a caller who can change the project", () => updaterCaller],
       ["a caller who can only view the project", () => viewerCaller],
     ])("withholds it from the payload for %s", async (_label, caller) => {
-      const governedSqlKey = await projectGovernedSqlKeyFor(
+      const lwqlKey = await projectLangWatchQLKeyFor(
         caller(),
         projectId,
       );
 
-      expect(governedSqlKey).toBe("");
-      expect(governedSqlKey).not.toBe(storedGovernedSqlKey);
+      expect(lwqlKey).toBe("");
+      expect(lwqlKey).not.toBe(storedLangWatchQLKey);
     });
 
     /**
@@ -242,7 +242,7 @@ describe("Feature: base key in the organizations payload", () => {
      * satisfied by a column that was never populated.
      */
     it("has a stored value to withhold", () => {
-      expect(storedGovernedSqlKey.length).toBeGreaterThan(0);
+      expect(storedLangWatchQLKey.length).toBeGreaterThan(0);
     });
   });
 });

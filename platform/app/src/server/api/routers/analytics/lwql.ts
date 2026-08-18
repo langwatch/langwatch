@@ -1,5 +1,5 @@
 /**
- * Governed analytics SQL — the session-authenticated router the workbench calls.
+ * LangWatchQL analytics SQL — the session-authenticated router the workbench calls.
  *
  * The REST endpoints in `~/app/api/analytics-sql` serve API keys; this serves a
  * signed-in member looking at the Custom query page. Same service, same policy,
@@ -16,19 +16,19 @@
  * it — refusing something the service would allow, or worse, allowing something
  * it would refuse and teaching a caller the wrong rule.
  *
- * @see ~/server/analytics/governed-sql — the service and everything under it
- * @see specs/analytics/governed-sql-workbench.feature
+ * @see ~/server/analytics/lwql — the service and everything under it
+ * @see specs/analytics/lwql-workbench.feature
  */
 
 import { NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
 
 import {
-  getGovernedSqlService,
-  MAX_GOVERNED_SQL_LENGTH,
-} from "~/server/analytics/governed-sql";
-import { governedSqlEnabled } from "~/server/analytics/governed-sql/access";
-import { governedSqlTimeWindowSchema } from "~/server/analytics/governed-sql/timeWindowSchema";
+  getLangWatchQLService,
+  MAX_LWQL_LENGTH,
+} from "~/server/analytics/lwql";
+import { lwqlEnabled } from "~/server/analytics/lwql/access";
+import { lwqlTimeWindowSchema } from "~/server/analytics/lwql/timeWindowSchema";
 
 import { checkProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
@@ -54,24 +54,24 @@ const projectScopeSchema = z.object({ projectId: z.string() });
  * Which gate closed, when one did.
  *
  * `disabled` is the project's own switch being off, which its administrator can
- * change; `unprovisioned` is a deployment with no governed identity to run as,
+ * change; `unprovisioned` is a deployment with no LangWatchQL identity to run as,
  * which they cannot. They read as different refusals, so the page has to be
  * able to tell them apart.
  */
-export type GovernedSqlUnavailableReason = "disabled" | "unprovisioned";
+export type LangWatchQLUnavailableReason = "disabled" | "unprovisioned";
 
-export interface GovernedSqlAvailability {
+export interface LangWatchQLAvailability {
   /** What the navigation entry and the page gate on. */
   readonly available: boolean;
   /** Absent when available. */
-  readonly reason?: GovernedSqlUnavailableReason;
+  readonly reason?: LangWatchQLUnavailableReason;
 }
 
 /**
- * Whether the governed query path is switched on and provisioned.
+ * Whether the LangWatchQL query path is switched on and provisioned.
  *
  * Separate from `schema` because the schema is answerable without an executor
- * (it is the catalog), so a deployment with no governed identity would describe
+ * (it is the catalog), so a deployment with no LangWatchQL identity would describe
  * a surface it cannot run. The navigation gates on this, never on the schema.
  *
  * The one procedure that reads the switch rather than being gated by it: its
@@ -86,26 +86,26 @@ export interface GovernedSqlAvailability {
 const availability = protectedProcedure
   .input(projectScopeSchema)
   .use(checkProjectPermission("analytics:view"))
-  .query(async ({ ctx, input }): Promise<GovernedSqlAvailability> => {
-    const enabled = await governedSqlEnabled({
+  .query(async ({ ctx, input }): Promise<LangWatchQLAvailability> => {
+    const enabled = await lwqlEnabled({
       prisma: ctx.prisma,
       projectId: input.projectId,
     });
     if (!enabled) return { available: false, reason: "disabled" };
 
-    if (!getGovernedSqlService().available) {
+    if (!getLangWatchQLService().available) {
       return { available: false, reason: "unprovisioned" };
     }
     return { available: true };
   });
 
-/** The governed datasets and columns this member's permissions unlock. */
+/** The LangWatchQL datasets and columns this member's permissions unlock. */
 const schema = protectedProcedure
   .input(projectScopeSchema)
   .use(checkProjectPermission("analytics:view"))
   .use(enforceWorkbenchEnabled)
   .query(async ({ ctx, input }) => {
-    return getGovernedSqlService().describeSchema({
+    return getLangWatchQLService().describeSchema({
       protections: await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
       }),
@@ -126,26 +126,26 @@ const query = protectedProcedure
     projectScopeSchema.extend({
       // Deliberately not `.trim()`: the statement the database runs must be the
       // one that was submitted.
-      sql: z.string().min(1).max(MAX_GOVERNED_SQL_LENGTH),
+      sql: z.string().min(1).max(MAX_LWQL_LENGTH),
       parameters: z.record(z.string(), parameterValueSchema).optional(),
-      timeWindow: governedSqlTimeWindowSchema.optional(),
+      timeWindow: lwqlTimeWindowSchema.optional(),
     }),
   )
   .use(checkProjectPermission("analytics:view"))
   .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
-    // The project's governed SQL secret is hashed into the tenant capability
+    // The project's LangWatchQL secret is hashed into the tenant capability
     // the query runs under. It is read server-side and never leaves this
     // function — no field of it appears in the response.
     const project = await ctx.prisma.project.findUnique({
       where: { id: input.projectId },
-      select: { id: true, governedSqlKey: true },
+      select: { id: true, lwqlKey: true },
     });
     if (!project) {
       throw new NotFoundError("project_not_found", "Project", input.projectId);
     }
 
-    return getGovernedSqlService().execute({
+    return getLangWatchQLService().execute({
       project,
       protections: await getUserProtectionsForProject(ctx, {
         projectId: project.id,
@@ -156,7 +156,7 @@ const query = protectedProcedure
     });
   });
 
-export const governedSqlRouter = createTRPCRouter({
+export const lwqlRouter = createTRPCRouter({
   availability,
   schema,
   query,
