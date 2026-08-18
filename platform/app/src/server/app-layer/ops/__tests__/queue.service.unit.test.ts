@@ -59,6 +59,14 @@ function createMockRepo(
     replayAllFromDlq: vi
       .fn()
       .mockResolvedValue({ replayedCount: 0, jobsReplayed: 0 }),
+    redriveManyFromDlq: vi
+      .fn()
+      .mockResolvedValue({ redrivenCount: 0, jobsRedriven: 0 }),
+    discardManyFromDlq: vi.fn().mockResolvedValue({
+      discardedCount: 0,
+      jobsDiscarded: 0,
+      lastErrors: [],
+    }),
     canaryRedrive: vi
       .fn()
       .mockResolvedValue({ redrivenCount: 0, groupIds: [] }),
@@ -82,6 +90,100 @@ function createMockRepo(
 }
 
 describe("QueueService", () => {
+  describe("dead-letter recovery audit", () => {
+    /** @scenario Discarding a DLQ group removes it and remembers the act */
+    it("records the queue, the groups and the job count on a discard", async () => {
+      const repo = createMockRepo({
+        discardManyFromDlq: vi.fn().mockResolvedValue({
+          discardedCount: 2,
+          jobsDiscarded: 5,
+          lastErrors: ["TimeoutError: upstream did not answer"],
+        }),
+      });
+      const append = vi.fn().mockResolvedValue(undefined);
+      const service = new QueueService({ repo, audit: { append } });
+
+      const result = await service.discardManyFromDlq({
+        queueName: "queue-a",
+        groupIds: ["g1", "g2"],
+        requestedBy: "user_1",
+      });
+
+      expect(result).toEqual({ discardedCount: 2, jobsDiscarded: 5 });
+      expect(append).toHaveBeenCalledWith({
+        actorUserId: "user_1",
+        action: "queue_discard_dlq_groups",
+        queueName: "queue-a",
+        metadata: {
+          groupIds: ["g1", "g2"],
+          requestedGroups: 2,
+          // The shape of the failure, not its text.
+          lastErrorTypes: ["TimeoutError"],
+          discardedCount: 2,
+          jobsDiscarded: 5,
+        },
+      });
+    });
+
+    it("keeps arbitrary job error text out of the durable audit row", async () => {
+      const repo = createMockRepo({
+        discardManyFromDlq: vi.fn().mockResolvedValue({
+          discardedCount: 1,
+          jobsDiscarded: 1,
+          lastErrors: [
+            "failed for user alice@example.com on card 4111",
+            // Leading with the address: an error's first words are no safer
+            // than its last, which a "keep the first few words" reduction
+            // would have missed.
+            "bob@example.com could not be charged",
+          ],
+        }),
+      });
+      const append = vi.fn().mockResolvedValue(undefined);
+      const service = new QueueService({ repo, audit: { append } });
+
+      await service.discardManyFromDlq({
+        queueName: "queue-a",
+        groupIds: ["g1"],
+        requestedBy: "user_1",
+      });
+
+      const recorded = JSON.stringify(append.mock.calls[0]![0].metadata);
+      expect(recorded).not.toContain("alice@example.com");
+      expect(recorded).not.toContain("bob@example.com");
+      expect(recorded).not.toContain("4111");
+      expect(recorded).toContain("untyped_error");
+    });
+
+    it("audits a redrive with what moved and skips the audit when nothing did", async () => {
+      const repo = createMockRepo({
+        redriveManyFromDlq: vi
+          .fn()
+          .mockResolvedValueOnce({ redrivenCount: 1, jobsRedriven: 3 })
+          .mockResolvedValueOnce({ redrivenCount: 0, jobsRedriven: 0 }),
+      });
+      const append = vi.fn().mockResolvedValue(undefined);
+      const service = new QueueService({ repo, audit: { append } });
+
+      await service.redriveManyFromDlq({
+        queueName: "queue-a",
+        groupIds: ["g1"],
+        requestedBy: "user_1",
+      });
+      expect(append).toHaveBeenCalledWith(
+        expect.objectContaining({ action: "queue_redrive_dlq_groups" }),
+      );
+
+      append.mockClear();
+      await service.redriveManyFromDlq({
+        queueName: "queue-a",
+        groupIds: ["g-gone"],
+        requestedBy: "user_1",
+      });
+      expect(append).not.toHaveBeenCalled();
+    });
+  });
+
   describe("getGroups()", () => {
     const groups = Array.from({ length: 25 }, (_, i) =>
       createGroup({ groupId: `g${i}` }),
@@ -103,7 +205,7 @@ describe("QueueService", () => {
         const repo = createMockRepo({
           scanQueues: vi.fn().mockResolvedValue([queue]),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.getGroups({
           queueName: "q1",
@@ -123,7 +225,7 @@ describe("QueueService", () => {
         const repo = createMockRepo({
           scanQueues: vi.fn().mockResolvedValue([queue]),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.getGroups({
           queueName: "q1",
@@ -141,7 +243,7 @@ describe("QueueService", () => {
         const repo = createMockRepo({
           scanQueues: vi.fn().mockResolvedValue([queue]),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.getGroups({
           queueName: "q1",
@@ -159,7 +261,7 @@ describe("QueueService", () => {
         const repo = createMockRepo({
           scanQueues: vi.fn().mockResolvedValue([]),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.getGroups({
           queueName: "missing",
@@ -191,7 +293,7 @@ describe("QueueService", () => {
         const repo = createMockRepo({
           scanQueues: vi.fn().mockResolvedValue([queue]),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.getGroupDetail({
           queueName: "q1",
@@ -218,7 +320,7 @@ describe("QueueService", () => {
         const repo = createMockRepo({
           scanQueues: vi.fn().mockResolvedValue([queue]),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.getGroupDetail({
           queueName: "q1",
@@ -234,7 +336,7 @@ describe("QueueService", () => {
         const repo = createMockRepo({
           scanQueues: vi.fn().mockResolvedValue([]),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.getGroupDetail({
           queueName: "missing",
@@ -276,7 +378,7 @@ describe("QueueService", () => {
             .mockResolvedValueOnce(dlq1)
             .mockResolvedValueOnce(dlq2),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.getAllDlqGroups();
 
@@ -301,7 +403,7 @@ describe("QueueService", () => {
             },
           ]),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.getAllDlqGroups();
 
@@ -334,7 +436,7 @@ describe("QueueService", () => {
           discoverQueueNames: vi.fn().mockResolvedValue(["q:gq"]),
           listDlqGroups: vi.fn().mockResolvedValue(dlq),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.getAllDlqGroups();
 
@@ -350,7 +452,7 @@ describe("QueueService", () => {
         const repo = createMockRepo({
           unblockGroup: vi.fn().mockResolvedValue({ wasBlocked: true }),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.unblockGroup({
           queueName: "q1",
@@ -370,7 +472,7 @@ describe("QueueService", () => {
         const repo = createMockRepo({
           unblockGroup: vi.fn().mockResolvedValue({ wasBlocked: false }),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.unblockGroup({
           queueName: "q1",
@@ -388,7 +490,7 @@ describe("QueueService", () => {
         const repo = createMockRepo({
           drainGroup: vi.fn().mockResolvedValue({ jobsRemoved: 5 }),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.drainGroup({
           queueName: "q1",
@@ -410,7 +512,7 @@ describe("QueueService", () => {
         const repo = createMockRepo({
           moveToDlq: vi.fn().mockResolvedValue({ jobsMoved: 3 }),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.moveToDlq({
           queueName: "q1",
@@ -432,7 +534,7 @@ describe("QueueService", () => {
         const repo = createMockRepo({
           unblockAll: vi.fn().mockResolvedValue({ unblockedCount: 7 }),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.unblockAll({ queueName: "q1" });
 
@@ -451,7 +553,7 @@ describe("QueueService", () => {
             groupIds: ["g1", "g2", "g3"],
           }),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.canaryRedrive({
           queueName: "q1",
@@ -480,7 +582,7 @@ describe("QueueService", () => {
             .fn()
             .mockResolvedValue({ unblockedCount: 2, groupIds: ["g1", "g2"] }),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.canaryUnblock({
           queueName: "q1",
@@ -501,7 +603,7 @@ describe("QueueService", () => {
       /** @scenario Pausing a tenant halts dispatch for that tenant only */
       it("delegates to the repository with tenantId", async () => {
         const repo = createMockRepo();
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         await service.pauseTenant({ queueName: "q1", tenantId: "project_X" });
 
@@ -516,7 +618,7 @@ describe("QueueService", () => {
       /** @scenario Unpausing a tenant resumes dispatch immediately */
       it("delegates to the repository (which signals the dispatcher)", async () => {
         const repo = createMockRepo();
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         await service.unpauseTenant({ queueName: "q1", tenantId: "project_X" });
 
@@ -534,7 +636,7 @@ describe("QueueService", () => {
             .fn()
             .mockResolvedValue(["project_A", "project_B"]),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.listPausedTenants({ queueName: "q1" });
 
@@ -550,7 +652,7 @@ describe("QueueService", () => {
             .fn()
             .mockResolvedValue({ groupsDrained: 1234, jobsDrained: 5678 }),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.drainTenant({
           queueName: "q1",
@@ -575,7 +677,7 @@ describe("QueueService", () => {
             .fn()
             .mockResolvedValue({ groupsDrained: 3, jobsDrained: 12 }),
         });
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         const result = await service.drainTenant({
           queueName: "q1",
@@ -588,7 +690,7 @@ describe("QueueService", () => {
       /** @scenario drainTenant supports an optional groupIdContains substring filter */
       it("forwards groupIdContains substring filter to the repository", async () => {
         const repo = createMockRepo();
-        const service = new QueueService(repo);
+        const service = new QueueService({ repo });
 
         await service.drainTenant({
           queueName: "q1",

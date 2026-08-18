@@ -24,7 +24,7 @@ import {
 } from "react-router";
 
 // Route patterns for resolving pathname (Next.js-style)
-// This lets router.pathname return "/[project]/messages" instead of "/my-project/messages"
+// This lets router.pathname return "/[project]/traces" instead of "/my-project/traces"
 const ROUTE_PATTERNS = [
   "/auth/signin",
   "/auth/signup",
@@ -66,6 +66,8 @@ const ROUTE_PATTERNS = [
   // context and breaks the personal nav).
   "/me",
   "/me/configure",
+  "/me/sessions",
+  "/me/pull-requests",
   "/cli/auth",
   "/governance",
   "/:project/messages/:trace/:openTab/:span",
@@ -95,6 +97,10 @@ const ROUTE_PATTERNS = [
   "/:project/evaluations/:id/edit",
   "/:project/evaluations",
   "/:project/online-evaluations",
+  // Their personal-scope twins are listed above, because ":project" captures
+  // "me" and would otherwise resolve /me/sessions to /[project]/sessions.
+  "/:project/sessions",
+  "/:project/pull-requests",
   "/:project/experiments/workbench/:slug",
   "/:project/experiments/workbench",
   "/:project/experiments/:experiment",
@@ -252,7 +258,7 @@ export function buildUrl(
 
   // Resolve Next.js-style [param] and [[...param]] in pathname using query values.
   // Components do router.push({ pathname: router.pathname, query: {...} }) where
-  // router.pathname is "/[project]/messages". We need to replace [project] with
+  // router.pathname is "/[project]/traces". We need to replace [project] with
   // the actual value from query before navigating.
   const resolvedKeys = new Set<string>();
   if (query && pathname.includes("[")) {

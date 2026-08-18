@@ -13,9 +13,12 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { scanTestSourceForUnsafeDeleteMany } from "../teardownScan";
+import { parseSourceText, parseSourceTexts } from "../tsAst";
 
 function scan(sourceText: string) {
-  return scanTestSourceForUnsafeDeleteMany("virtual.test.ts", sourceText);
+  return scanTestSourceForUnsafeDeleteMany(
+    parseSourceText({ fileName: "virtual.test.ts", sourceText }),
+  );
 }
 
 /** platform/app/, from src/test-utils/__tests__/. */
@@ -57,15 +60,30 @@ function collectTestFiles(directory: string): string[] {
   return collected;
 }
 
-/** Offender lines for one file, empty when it has nothing to answer for. */
-function offendersIn(file: string): string[] {
-  const sourceText = readFileSync(file, "utf8");
-  if (!sourceText.includes("deleteMany")) return [];
-  return scanTestSourceForUnsafeDeleteMany(file, sourceText).map(
-    (violation) =>
-      `${relative(REPO_ROOT, file)}:${violation.line} ` +
-      `${violation.model}.deleteMany filtered by "${violation.variable}": ` +
-      violation.reason,
+/**
+ * Offender lines for every file worth parsing, in one exchange with the
+ * compiler. Parsing file by file costs a round trip each, which over a whole
+ * tree is the difference between seconds and not finishing.
+ */
+function offendersIn(files: string[]): string[] {
+  const candidates = files
+    .map((file) => ({ file, sourceText: readFileSync(file, "utf8") }))
+    .filter(({ sourceText }) => sourceText.includes("deleteMany"));
+
+  const parsed = parseSourceTexts({
+    sources: candidates.map(({ file, sourceText }) => ({
+      fileName: file,
+      sourceText,
+    })),
+  });
+
+  return parsed.flatMap(({ fileName, source }) =>
+    scanTestSourceForUnsafeDeleteMany(source).map(
+      (violation) =>
+        `${relative(REPO_ROOT, fileName)}:${violation.line} ` +
+        `${violation.model}.deleteMany filtered by "${violation.variable}": ` +
+        violation.reason,
+    ),
   );
 }
 
@@ -85,7 +103,7 @@ function scanTestRoots(): {
     // names it. Letting readdirSync throw buries that under an ENOENT stack.
     const files = existsSync(directory) ? collectTestFiles(directory) : [];
     filesPerRoot[root] = files.length;
-    offenders.push(...files.flatMap(offendersIn));
+    offenders.push(...offendersIn(files));
   }
   return { filesPerRoot, offenders };
 }

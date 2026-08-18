@@ -89,7 +89,7 @@ function toLogRecordRow({
     OccurredAt: new Date(record.occurredAt),
     AcceptedAt: new Date(record.acceptedAt),
     DedupVersion: dedupVersion(record.acceptedAt),
-    // Claude's kind-marked rows once expired after a day, because a reactor
+    // Claude's kind-marked rows once expired after a day, because a subscriber
     // copied them into spans. That converter is gone: these rows ARE the
     // Terminal transcript's content now, so they live at trace retention
     // like every other log.
@@ -155,7 +155,7 @@ export class CanonicalLogRecordClickHouseRepository
           clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
         });
       } catch (error) {
-        logger.error(
+        logger.warn(
           {
             tenantId,
             recordCount: tenantRecords.length,

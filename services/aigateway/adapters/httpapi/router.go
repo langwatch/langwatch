@@ -479,6 +479,11 @@ func transcriptionsHandler(deps RouterDeps) http.HandlerFunc {
 // doesn't translate body shape — the upstream response is proxied
 // back verbatim. Streaming paths get raw SSE chunks (upstream already
 // emits `event:`/`data:` framing).
+//
+// The handler states its own vendor through domain.GeminiSurface(). The
+// model id comes from the URL path and so carries no provider prefix; left
+// to the credential chain, a key with no Google credential forwarded the
+// body to whichever vendor came first.
 func geminiPassthroughHandler(deps RouterDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		bundle, ok := requireBundle(w, r, deps.Logger)
@@ -509,6 +514,7 @@ func geminiPassthroughHandler(deps RouterDeps) http.HandlerFunc {
 			RawQuery: r.URL.RawQuery,
 			Headers:  forwardedPassthroughHeaders(r.Header),
 			Stream:   isStream,
+			Surface:  domain.GeminiSurface(),
 		}
 
 		if isStream {
@@ -1208,6 +1214,7 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrInvalidAPIKey, http.StatusUnauthorized)
 	herr.RegisterStatus(domain.ErrKeyRevoked, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrKeyDisabled, http.StatusForbidden)
+	herr.RegisterStatus(domain.ErrKeyExpired, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrRateLimited, http.StatusTooManyRequests)
 	herr.RegisterStatus(domain.ErrBudgetExceeded, http.StatusPaymentRequired)
 	herr.RegisterStatus(domain.ErrGuardrailBlocked, http.StatusForbidden)

@@ -139,6 +139,41 @@ export class SchedulerOpsService {
     );
   }
 
+  /**
+   * The schedules that are switched off, with the fleet total.
+   *
+   * The dashboard's "Switched off" panel asks the question directly rather
+   * than reading a page of `listScheduledJobs` and filtering it: that read
+   * orders `active DESC`, so the inactive rows are exactly the ones its limit
+   * drops, and the panel would report zero paused schedules on any fleet
+   * larger than the page while looking like it had checked.
+   */
+  async listPausedSchedules({
+    limit = 50,
+  }: {
+    limit?: number;
+  }): Promise<{ schedules: OpsScheduledJob[]; total: number }> {
+    const { rows, total } = await this.repo.listPausedForOps({
+      limit: Math.min(Math.max(limit, 1), 200),
+    });
+
+    const names = this.resolveProjectNames
+      ? await this.resolveProjectNames([
+          ...new Set(rows.map((row) => row.projectId)),
+        ]).catch(() => new Map<string, string>())
+      : new Map<string, string>();
+
+    return {
+      total,
+      schedules: rows.map((row) =>
+        toOpsScheduledJob({
+          row,
+          projectName: names.get(row.projectId) ?? null,
+        }),
+      ),
+    };
+  }
+
   /** Recent operator actions, newest first. Empty when nothing is recorded. */
   async listRecentActions({
     limit = 20,

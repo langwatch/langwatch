@@ -31,6 +31,15 @@ const (
 	AttrGenAIUsageInputChars   = "gen_ai.usage.input_chars"
 	AttrGenAIUsageAudioSeconds = "gen_ai.usage.audio_seconds"
 
+	// Audio token counts, which audio-native models bill several times above
+	// text: OpenAI charges $32 per million audio input tokens against $4 for
+	// text on gpt-realtime. Both are DISJOINT from gen_ai.usage.input_tokens
+	// and gen_ai.usage.output_tokens, the same exclusive convention the cache
+	// buckets above use, so the cost pipeline prices each token once and a
+	// trace costs what the budget was charged.
+	AttrGenAIUsageInputAudioTokens  = "gen_ai.usage.input_audio_tokens"
+	AttrGenAIUsageOutputAudioTokens = "gen_ai.usage.output_audio_tokens"
+
 	// AttrLabels carries the VK's tags; the trace pipeline ingests this
 	// exact key into metadata.labels (otel.traces.ts), which the Trace
 	// Explorer filters as "Label".

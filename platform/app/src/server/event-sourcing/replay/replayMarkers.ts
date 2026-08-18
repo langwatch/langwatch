@@ -120,7 +120,7 @@ export async function unmarkBatch({
  * was staged — but never active — during the replay pause is not drained by
  * `waitForActiveJobs`; after unpause it runs, and without the boundary it would
  * re-process events at/before the cutoff and double-write records replay just
- * rebuilt (and re-fire map reactors). The done-marker keeps the live checker
+ * rebuilt (and re-fire map subscribers). The done-marker keeps the live checker
  * skipping those events while still letting genuinely newer events through.
  *
  * The boundary lives in its own short-TTL key rather than in the cutoff hash so

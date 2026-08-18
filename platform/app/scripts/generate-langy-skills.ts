@@ -198,7 +198,9 @@ if (isMain) {
     process.exit(0);
   }
   const skills = deriveSkills(REPO_ROOT);
-  fs.writeFileSync(OUT, JSON.stringify(skills, null, 2) + "\n");
+  // Tab indentation matches the biome formatter, so a regenerated file
+  // never trips the format gate.
+  fs.writeFileSync(OUT, JSON.stringify(skills, null, "\t") + "\n");
   const counts = skills.reduce<Record<string, number>>((acc, s) => {
     acc[s.category] = (acc[s.category] ?? 0) + 1;
     return acc;

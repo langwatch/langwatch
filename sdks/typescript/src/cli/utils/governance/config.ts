@@ -55,22 +55,51 @@ export interface GovernanceConfig {
   };
 
   /**
-   * Personal ingest keys (the project-scoped ingest-only ApiKey
-   * `sk-lw-<...>` shape minted by `/api/auth/cli/governance/ingestion-key`),
-   * keyed by the tool's source_type slug (`claude_code` / `codex` /
-   * `gemini` / `opencode`). One key per source so different wrapped
-   * tools surface as their own ingestion source in /me + /messages.
+   * Personal ingest keys (write-only ingest ApiKeys in the
+   * `ik-lw-{lookupId}_{secret}` shape minted by
+   * `/api/auth/cli/governance/ingestion-key`), keyed by the tool's
+   * source_type slug (`claude_code` / `codex` / `gemini` / `opencode`).
+   * One key per source so different wrapped tools surface as their own
+   * ingestion source in /me + /traces.
    *
    * When the right key is present for a wrapped tool, the
    * `langwatch <tool>` wrapper injects the standard OTEL_*_EXPORTER
    * env vars pointing at the OTLP endpoint with this key as the
    * Authorization bearer (reusing the cache instead of re-minting).
    *
+   * A secret that does not parse as an `ik-lw-` token is treated as
+   * user-pinned: the wrapper uses it as-is and never probes, re-mints,
+   * or overwrites it. Prefer `langwatch instrument <tool> --key` for
+   * that case; it stores the key under `tool_project_keys` instead.
+   *
    * Unset until the wrapper's first auto-mint for that tool.
    */
   default_personal_ingest_keys?: Record<
     string,
     { id?: string; secret?: string; prefix?: string }
+  >;
+
+  /**
+   * Per-tool project scope. Written by `langwatch instrument <tool>
+   * --project/--key` and `langwatch <tool> --project`; removed by
+   * `--personal`, and by `langwatch logout`, which drops the whole config
+   * file along with the wiring it describes. While an entry exists the
+   * tool's telemetry wiring uses
+   * this ingest key and endpoint, and the personal ingest-key path for
+   * the tool is not consulted or rewritten. `project_id` / `project_slug`
+   * are absent when the key was pasted (`--key`) rather than minted.
+   * `endpoint` overrides the config's control plane for this tool only
+   * (set by `instrument --endpoint`, e.g. a headless machine
+   * instrumented against another instance).
+   */
+  tool_project_keys?: Record<
+    string,
+    {
+      secret: string;
+      project_id?: string;
+      project_slug?: string;
+      endpoint?: string;
+    }
   >;
 
   /**
@@ -110,10 +139,10 @@ export interface GovernanceConfig {
    *                  the AI Gateway via base-URL swap (full server-
    *                  side I/O + cost capture, no client OTel).
    *   "ingestion" — Path B: enable the tool's native OTel exporter
-   *                  pointed at /api/otel + mint the user's personal
-   *                  ingest key (sk-lw-*). For codex this also writes
-   *                  the [otel] block to ~/.codex/config.toml
-   *                  automatically.
+   *                  pointed at /api/otel with the tool's ingest
+   *                  credential (project pin or personal `ik-lw-` key).
+   *                  For codex this also writes the [otel] block to
+   *                  ~/.codex/config.toml automatically.
    *   "ask"       — re-prompt on the next `langwatch <tool>`. The
    *                  default when this key is absent.
    *
@@ -147,12 +176,11 @@ export interface GovernanceConfig {
   daemon?: "on" | "off";
 
   /**
-   * Most-recent signed `request_increase_url` returned by the
-   * gateway in a 402 budget_exceeded payload — cached so
-   * `langwatch request-increase` opens the exact URL the gateway
-   * produced (with HMAC'd user/limit/spent params).
+   * The agent last chosen by `langwatch agent dev`, keyed by the project
+   * directory (absolute path) the command ran in, so the next run in the
+   * same folder skips the picker. `--agent` always overrides.
    */
-  last_request_increase_url?: string;
+  agent_dev_agents?: Record<string, string>;
 }
 
 function defaults(): GovernanceConfig {
@@ -234,6 +262,19 @@ export function loadConfig(): GovernanceConfig {
       !isCanonicalVkSecret(cfg.default_personal_vk.secret)
     ) {
       delete cfg.default_personal_vk;
+    }
+    // Same reasoning for a hand-edited project pin. `secret` is the one
+    // required field on the entry, and the doc above invites people to paste
+    // keys here, so an entry that carries a project name and no secret is a
+    // realistic edit. Kept, it would hand `Bearer undefined` to every reader
+    // that trusts the type; dropped, the tool falls back to the personal path
+    // and `instrument --project` writes a working pin again.
+    if (cfg.tool_project_keys) {
+      cfg.tool_project_keys = Object.fromEntries(
+        Object.entries(cfg.tool_project_keys).filter(
+          ([, pin]) => typeof pin?.secret === "string" && pin.secret !== "",
+        ),
+      );
     }
     return cfg;
   } catch (err) {

@@ -18,7 +18,7 @@
  *   - opencode → the session context plugin file in the plugins directory
  *   - gemini / opencode → a scoped shell function under the tool's marker
  *                pair in the shell rc
- *   - the global gateway export block in the shell rc (init-shell / legacy)
+ *   - the global gateway export block in the shell rc (legacy installs)
  *
  * Shell rc files are scanned for ALL supported shells (zsh/bash/fish), not
  * just $SHELL, so a block written to ~/.zshrc is still found from a bash

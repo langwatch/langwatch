@@ -199,6 +199,11 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
             cache_read_input_tokens: row.tokensCacheRead,
             cache_creation_input_tokens: row.tokensCacheWrite,
             reasoning_tokens: row.tokensReasoning,
+            cache_creation_1h_tokens: 0,
+            input_audio_tokens: 0,
+            output_audio_tokens: 0,
+            input_chars: 0,
+            audio_ms: 0,
           },
           rateVersion: row.rateVersion,
           // Overrides set the display string; derive the integer so both

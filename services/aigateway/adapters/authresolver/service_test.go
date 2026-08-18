@@ -628,6 +628,7 @@ func TestRefreshBackground_AuthRejection_EvictsEntry(t *testing.T) {
 
 // --- Classifier ---------------------------------------------------------------
 
+// @scenario "An expired key is rejected with its own error code"
 func TestClassifyRefreshError(t *testing.T) {
 	cases := []struct {
 		name string
@@ -639,6 +640,14 @@ func TestClassifyRefreshError(t *testing.T) {
 		{"ErrKeyRevoked direct", domain.ErrKeyRevoked, classAuthRejection},
 		{"ErrInvalidAPIKey via herr", herr.New(context.Background(), domain.ErrInvalidAPIKey, nil), classAuthRejection},
 		{"ErrKeyRevoked via herr", herr.New(context.Background(), domain.ErrKeyRevoked, nil), classAuthRejection},
+		// A disabled or an expired key is a decision about the key, not a
+		// failure to reach the control plane. Serving either stale would
+		// keep a suspended tenant, or a key past its date, running for the
+		// length of the stale window.
+		{"ErrKeyDisabled direct", domain.ErrKeyDisabled, classAuthRejection},
+		{"ErrKeyDisabled via herr", herr.New(context.Background(), domain.ErrKeyDisabled, nil), classAuthRejection},
+		{"ErrKeyExpired direct", domain.ErrKeyExpired, classAuthRejection},
+		{"ErrKeyExpired via herr", herr.New(context.Background(), domain.ErrKeyExpired, nil), classAuthRejection},
 		{"ErrAuthUpstream", herr.New(context.Background(), domain.ErrAuthUpstream, nil), classTransportFailure},
 		{"raw network error", &net.OpError{Op: "dial", Err: errors.New("connection refused")}, classTransportFailure},
 		{"context deadline exceeded", context.DeadlineExceeded, classTransportFailure},

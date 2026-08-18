@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import type { LocalPromptConfig } from "~/experiments-v3/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
-import { FieldMappingSchema } from "~/server/scenarios/execution/types";
+import { FieldMappingSchema } from "~/server/scenarios/field-mapping";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 import { datasetColumnTypeSchema } from "../../server/datasets/types";
@@ -619,6 +619,18 @@ export const httpComponentSchema = baseComponentSchema.extend({
   timeoutMs: z.number().positive().optional(),
   /** Maps agent input field identifiers to scenario data sources or static values. */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  /**
+   * Present while `langwatch agent dev` points this agent at a local tunnel:
+   * `previousUrl` is what the CLI restores on exit, `connectedAt` when the
+   * session started. Set and removed by the CLI; the platform reads it to
+   * show the local-tunnel badge and to name tunnel failures.
+   */
+  devTunnel: z
+    .object({
+      previousUrl: z.string().optional(),
+      connectedAt: z.string().optional(),
+    })
+    .optional(),
 });
 
 /**

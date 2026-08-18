@@ -21,12 +21,12 @@
     "@ai-sdk/openai": "^3.0.41",
     "@langwatch/scenario": "^0.4.12",
     "@types/mdast": "^4.0.4",
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.2.0",
     "chalk": "^5.6.2",
     "dotenv": "^17.2.2",
     "node-pty": "^1.0.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.0.0",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.0"
   }
 }

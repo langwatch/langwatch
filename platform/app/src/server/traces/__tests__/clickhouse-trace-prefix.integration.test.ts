@@ -100,9 +100,11 @@ beforeAll(async () => {
   getClickHouseClientForProject.mockResolvedValue(ch);
 
   const { prisma } = await import("~/server/db");
-  service = new ClickHouseTraceService(
-    prisma as ConstructorParameters<typeof ClickHouseTraceService>[0],
-  );
+  service = new ClickHouseTraceService({
+    prisma: prisma as ConstructorParameters<
+      typeof ClickHouseTraceService
+    >[0]["prisma"],
+  });
 }, 60_000);
 
 afterAll(async () => {

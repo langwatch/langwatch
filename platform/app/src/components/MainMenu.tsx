@@ -1,5 +1,15 @@
 import { Box, VStack } from "@chakra-ui/react";
-import { Activity, Anvil, Flag, History, Shield, Workflow } from "lucide-react";
+import {
+  Activity,
+  Anvil,
+  DatabaseZap,
+  Flag,
+  GitPullRequest,
+  History,
+  Shield,
+  SquareTerminal,
+  Workflow,
+} from "lucide-react";
 import React, { useState } from "react";
 import type { Project } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
@@ -10,8 +20,11 @@ import { usePublicEnv } from "../hooks/usePublicEnv";
 import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
 import { projectRoutes } from "../utils/routes";
-import { useTableView } from "./messages/HeaderButtons";
 import { CollapsibleMenuGroup } from "./sidebar/CollapsibleMenuGroup";
+import {
+  CODING_AGENT_LINK_WINDOW_DAYS,
+  withinDays,
+} from "./sidebar/codingAgentActivity";
 import { GovernSection } from "./sidebar/GovernSection";
 import {
   isExperimentsActivePath,
@@ -36,7 +49,7 @@ export const MainMenu = React.memo(function MainMenu({
   isCompact = false,
 }: MainMenuProps) {
   const router = useRouter();
-  const { project, hasPermission, isPublicRoute } =
+  const { project, organization, hasPermission, isPublicRoute } =
     useOrganizationTeamProject();
   const [isHovered, setIsHovered] = useState(false);
 
@@ -44,6 +57,35 @@ export const MainMenu = React.memo(function MainMenu({
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
   );
+
+  // Coding-agent destinations are grown by the project rather than configured.
+  // Each one needs its own recent signal, so a project that records sessions
+  // but has no pull request linked yet gets Sessions alone, and both go away
+  // again once their signal falls out of the window.
+  const { enabled: codingAgentPagesEnabled } = useFeatureFlag(
+    "release_ui_ai_governance_enabled",
+    {
+      organizationId: organization?.id,
+      enabled: !!organization?.id,
+    },
+  );
+  const canSeeCodingAgentActivity =
+    codingAgentPagesEnabled && hasPermission("traces:view");
+  const now = new Date();
+  const showSessionsLink =
+    canSeeCodingAgentActivity &&
+    withinDays({
+      at: project?.lastCodingAgentSessionAt,
+      days: CODING_AGENT_LINK_WINDOW_DAYS,
+      now,
+    });
+  const showPullRequestsLink =
+    canSeeCodingAgentActivity &&
+    withinDays({
+      at: project?.lastCodingAgentPullRequestAt,
+      days: CODING_AGENT_LINK_WINDOW_DAYS,
+      now,
+    });
 
   // In compact mode, show expanded view on hover
   const showExpanded = !isCompact || isHovered;
@@ -133,15 +175,6 @@ export const MainMenu = React.memo(function MainMenu({
                 showLabel={showExpanded}
               />
               <PageMenuLink
-                path={projectRoutes.messages.path}
-                icon={featureIcons.traces.icon}
-                label={projectRoutes.messages.title}
-                project={project}
-                isActive={router.pathname.includes("/messages")}
-                showLabel={showExpanded}
-                legacy
-              />
-              <PageMenuLink
                 path={projectRoutes.online_evaluations.path}
                 icon={featureIcons.online_evaluations.icon}
                 label="Online Evals"
@@ -149,6 +182,26 @@ export const MainMenu = React.memo(function MainMenu({
                 isActive={isOnlineEvaluationsActivePath(router.pathname)}
                 showLabel={showExpanded}
               />
+              {showSessionsLink && (
+                <PageMenuLink
+                  path={projectRoutes.coding_agent_sessions.path}
+                  icon={SquareTerminal}
+                  label={projectRoutes.coding_agent_sessions.title}
+                  project={project}
+                  isActive={router.pathname === "/[project]/sessions"}
+                  showLabel={showExpanded}
+                />
+              )}
+              {showPullRequestsLink && (
+                <PageMenuLink
+                  path={projectRoutes.coding_agent_pull_requests.path}
+                  icon={GitPullRequest}
+                  label={projectRoutes.coding_agent_pull_requests.title}
+                  project={project}
+                  isActive={router.pathname === "/[project]/pull-requests"}
+                  showLabel={showExpanded}
+                />
+              )}
             </SidebarSection>
 
             <SidebarSection
@@ -400,6 +453,13 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         isActive={router.pathname.startsWith("/ops/feature-flags")}
         showLabel={showExpanded}
       />
+      <SideMenuLink
+        icon={DatabaseZap}
+        label="Migrations"
+        href="/ops/migrations"
+        isActive={router.pathname.startsWith("/ops/migrations")}
+        showLabel={showExpanded}
+      />
       {isAdminUser && (
         <SideMenuLink
           icon={Shield}
@@ -440,21 +500,13 @@ const PageMenuLink = ({
   legacy,
   legacyLabel,
 }: PageMenuLinkProps) => {
-  const { isTableView } = useTableView();
-
-  const viewModeQuery = path.includes("/messages")
-    ? isTableView
-      ? "?view=table"
-      : "?view=list"
-    : "";
-
   const destination = projectScopedDestination({ path, label, project });
 
   return (
     <SideMenuLink
       icon={icon}
       label={label}
-      href={destination.href && destination.href + viewModeQuery}
+      href={destination.href}
       unavailableReason={destination.unavailableReason}
       isActive={isActive}
       badgeNumber={badgeNumber}

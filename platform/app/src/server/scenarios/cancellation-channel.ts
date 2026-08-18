@@ -1,9 +1,9 @@
 /**
  * Redis pub/sub channel for distributed job cancellation.
  *
- * The cancellation broadcast reactor publishes to this channel when a
- * cancel_requested event is processed. Worker pods subscribe and kill
- * matching child processes.
+ * The simulationRunExecution process manager publishes to this channel (via
+ * its outbox cancel intent) when a cancel_requested event is processed.
+ * Worker pods subscribe and kill matching child processes.
  *
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
@@ -19,7 +19,8 @@ export const CANCELLATION_CHANNEL = "scenario:cancel";
 export interface CancellationMessage {
   projectId: string;
   scenarioRunId: string;
-  batchRunId: string;
+  /** Optional: the process-manager cancel intent does not carry it. */
+  batchRunId?: string;
 }
 
 /** Minimal publisher interface (subset of ioredis). */
@@ -40,9 +41,9 @@ export interface CancellationSubscriber {
 /**
  * Publish a cancellation message to the Redis channel.
  *
- * Called by the cancellationBroadcast reactor when a cancel_requested
- * event is processed. All worker pods subscribed to the channel receive
- * this message and check if they own the scenario.
+ * Called by the simulationRunExecution process manager's cancel intent when
+ * a cancel_requested event is processed. All worker pods subscribed to the
+ * channel receive this message and check if they own the scenario.
  */
 export async function publishCancellation({
   publisher,

@@ -35,6 +35,13 @@ export const ScenarioInfraErrorCode = {
   ExecutionTimeout: "scenario_execution_timeout",
   /** The runner process itself couldn't boot (a broken build or deployment). */
   RunnerUnavailable: "scenario_runner_unavailable",
+  /**
+   * The target agent points at a `langwatch agent dev` tunnel whose session
+   * seems to have ended. Same code as the app-level handled error
+   * (`AgentDevTunnelUnreachableError`) so the two surfaces name the failure
+   * identically.
+   */
+  AgentDevTunnelUnreachable: "agent_dev_tunnel_unreachable",
   /** Anything else that failed at the infrastructure level. */
   Infra: "scenario_infra_error",
 } as const;
@@ -116,6 +123,10 @@ const NOISE_LINE_PATTERNS = [
   /^-\s*[/\\]\S*$/,
   /^[/\\][^\s]*$/,
   /^Node\.js\s+v?\d/i,
+  // Markup: an upstream's HTML error page (a gateway's 502 body, Cloudflare's
+  // tunnel page) travels inside adapter errors, and none of it is a sentence
+  // a user should read as the failure reason.
+  /^<[!/a-zA-Z]/,
 ] as const;
 
 /** True when a line is pure runtime noise rather than a human explanation. */
@@ -209,9 +220,19 @@ function findMeaningfulLine(text: string): string | undefined {
 }
 
 /**
+ * Where an HTML error document starts inside an otherwise-prose line. The
+ * HTTP adapter appends the upstream's response body after its own prose
+ * (`HTTP 502: … (request-id: …): <body>`), so a gateway's HTML error page
+ * lands mid-line. Only the unambiguous document openers match — a bare `<`
+ * also appears in legitimate prose like `expected <value>`.
+ */
+const HTML_DOCUMENT_MARKER = /<!doctype\s+html|<html[\s>]/i;
+
+/**
  * Collapse a raw error blob (often a multi-line child-process dump) into a
  * single concise line: strip the "Child process exited with code N:" wrapper
- * and any runtime noise, keep the first meaningful line, and cap the length.
+ * and any runtime noise, keep the first meaningful line, drop an inline HTML
+ * error document, and cap the length.
  *
  * Returns undefined when nothing but noise is left, so the caller falls back to
  * a generic sentence instead of surfacing a stack frame.
@@ -222,9 +243,61 @@ function summarize(raw: string): string | undefined {
     .trim();
   const meaningful = findMeaningfulLine(withoutWrapper);
   if (!meaningful || exposesInternals(meaningful)) return undefined;
-  const collapsed = meaningful.replace(/\s+/g, " ").trim();
+  let collapsed = meaningful.replace(/\s+/g, " ").trim();
+  const markupStart = collapsed.search(HTML_DOCUMENT_MARKER);
+  if (markupStart >= 0) {
+    // The prose before the document (status, URL, request id) is all the
+    // customer's own data and stays; the page itself never reads as a reason.
+    collapsed = collapsed.slice(0, markupStart).trimEnd();
+  }
+  if (collapsed.length === 0) return undefined;
   if (collapsed.length <= MAX_GENERIC_MESSAGE_LENGTH) return collapsed;
   return `${collapsed.slice(0, MAX_GENERIC_MESSAGE_LENGTH - 1).trimEnd()}…`;
+}
+
+/** Markers of a connection that failed outright (refused / DNS / reset / undici fetch). */
+const NETWORK_UNREACHABLE_NEEDLES = [
+  "ECONNREFUSED",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "ECONNRESET",
+  "fetch failed",
+  "network error",
+] as const;
+
+/**
+ * What a Cloudflare quick tunnel returns once its local `cloudflared` process
+ * has ended: the edge still resolves the hostname but answers HTTP 530 with
+ * Cloudflare's "error code: 1033" (tunnel error) body.
+ */
+const TUNNEL_GONE_NEEDLES = ["HTTP 530", "error code: 1033"] as const;
+
+/**
+ * True when the raw text carries BOTH Cloudflare markers. Requiring both is
+ * what makes the signal unambiguous: an origin can answer 530 for its own
+ * reasons, and "1033" can appear in an ordinary payload, but only the
+ * Cloudflare edge answers 530 with the 1033 tunnel-error body.
+ */
+function isTunnelGoneFailure(text: string): boolean {
+  return TUNNEL_GONE_NEEDLES.every((needle) => contains(text, needle));
+}
+
+/**
+ * True when a raw run failure is transport-level: the connection itself
+ * failed (or the tunnel edge reported its origin gone) rather than the target
+ * rejecting the request. This is the gate for naming a failure a dead dev
+ * tunnel: the caller supplies the "target has a devTunnel" fact, this module
+ * supplies the "the failure looks like the tunnel is gone" half.
+ */
+export function isTransportLevelScenarioFailure(
+  raw: string | undefined,
+): boolean {
+  const text = (raw ?? "").trim();
+  if (text.length === 0) return false;
+  return (
+    NETWORK_UNREACHABLE_NEEDLES.some((needle) => contains(text, needle)) ||
+    isTunnelGoneFailure(text)
+  );
 }
 
 interface ClassificationRule {
@@ -377,15 +450,25 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
     }),
   },
   {
+    // A Cloudflare quick tunnel whose local `cloudflared` process ended: the
+    // edge answers HTTP 530 with the "error code: 1033" body. Named here,
+    // without any devTunnel config lookup, so failures the scenario SDK
+    // records itself (which never pass through the failure handler) still
+    // read as a dead tunnel instead of a generic error carrying raw HTML.
+    needles: ["HTTP 530"],
+    alsoRequires: isTunnelGoneFailure,
+    build: () => ({
+      code: ScenarioInfraErrorCode.AgentDevTunnelUnreachable,
+      message:
+        "The agent points at a local development tunnel that is no longer " +
+        "responding. The `langwatch agent dev` session that created it has " +
+        "probably ended.",
+      hint: "Run `langwatch agent dev` again on the machine that started the tunnel, or restore the agent's URL in its settings.",
+    }),
+  },
+  {
     // Network unreachable (connection refused / DNS / reset / undici fetch).
-    needles: [
-      "ECONNREFUSED",
-      "ENOTFOUND",
-      "EAI_AGAIN",
-      "ECONNRESET",
-      "fetch failed",
-      "network error",
-    ],
+    needles: [...NETWORK_UNREACHABLE_NEEDLES],
     build: () => ({
       code: ScenarioInfraErrorCode.PlatformUnreachable,
       message: "Couldn't reach the endpoint while running the simulation.",
@@ -530,6 +613,8 @@ export function scenarioErrorTitle(code: ScenarioInfraErrorCode): string {
       return "Simulation timed out";
     case ScenarioInfraErrorCode.RunnerUnavailable:
       return "Simulation runner unavailable";
+    case ScenarioInfraErrorCode.AgentDevTunnelUnreachable:
+      return "Local tunnel not responding";
     case ScenarioInfraErrorCode.Infra:
       return "Simulation failed";
     default: {

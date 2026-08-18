@@ -529,7 +529,7 @@ export function AutomationDrawer({
 
   // Build the example TemplateContext the preview pane (and autocomplete)
   // render against. Static-ish — only depends on the project identity, so the
-  // example URLs come out plausible (`/<slug>/messages/<trace>`). Pulled
+  // example URLs come out plausible (`/<slug>/traces/<trace>`). Pulled
   // directly from the shared templating module — no more parallel client copy.
   const exampleContext = useMemo(
     () =>

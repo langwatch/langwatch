@@ -83,6 +83,7 @@ import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 import {
 	buildScopedToolFunction,
 	type DetectedShell,
+	assertCodexTurnHarvest,
 	persistBlockToRc,
 	rcHasLangwatchBlock,
 	rcPath,
@@ -174,6 +175,19 @@ export async function resolveLiveIngestionKey({
 	const cached = cfg.default_personal_ingest_keys?.[sourceType];
 	if (cached?.secret) {
 		const cachedLookupId = extractLookupIdFromToken(cached.secret);
+		if (cachedLookupId === undefined) {
+			// Not a personal `ik-lw-` token: the user placed this credential
+			// here by hand (a project `sk-lw-` key, a legacy shape). It cannot
+			// be matched against the personal key listing, so probing it would
+			// always read "revoked" and re-mint over the user's explicit
+			// choice. Pinned: use as-is, never probe, never overwrite.
+			return {
+				token: cached.secret,
+				prefix: cached.prefix,
+				endpoint: otlpEndpointFor(cfg.control_plane_url),
+				minted: false,
+			};
+		}
 		let cacheIsLive = true; // assume live; falsified when server confirms otherwise
 		try {
 			const liveKeys = await listIngestionKeys(cfg);
@@ -210,6 +224,52 @@ export async function resolveLiveIngestionKey({
 		endpoint: r.endpoint,
 		minted: true,
 	};
+}
+
+export interface IngestionCredentialResolution extends IngestionKeyResolution {
+	/** Where the credential is scoped: the personal workspace or a pinned project. */
+	scope: "personal" | "project";
+	/** Slug (preferred) or id of the pinned project; unset for pasted keys. */
+	projectLabel?: string;
+}
+
+/**
+ * Resolve the ingest credential for a tool: the project pin when one
+ * exists (`tool_project_keys[tool]`, written by `--project` / `instrument`),
+ * else the personal path via `resolveLiveIngestionKey`.
+ *
+ * A pinned credential is used verbatim with no server round trip: it may
+ * belong to a project the device session cannot list (or the device may
+ * have no session at all), and revocation surfaces on the ingest side.
+ * Re-running `langwatch instrument <tool> --project ...` replaces it.
+ */
+export async function resolveIngestionCredential({
+	cfg,
+	tool,
+	sourceType,
+	allowOfflineFallback = true,
+}: {
+	cfg: GovernanceConfig;
+	tool: string;
+	sourceType: string;
+	allowOfflineFallback?: boolean;
+}): Promise<IngestionCredentialResolution> {
+	const pinned = cfg.tool_project_keys?.[tool];
+	if (pinned?.secret) {
+		return {
+			token: pinned.secret,
+			endpoint: otlpEndpointFor(pinned.endpoint ?? cfg.control_plane_url),
+			minted: false,
+			scope: "project",
+			projectLabel: pinned.project_slug ?? pinned.project_id,
+		};
+	}
+	const personal = await resolveLiveIngestionKey({
+		cfg,
+		sourceType,
+		allowOfflineFallback,
+	});
+	return { ...personal, scope: "personal" };
 }
 
 /**
@@ -305,10 +365,14 @@ export function refreshCodexOtelBlockTo({
 }): string | null {
 	if (!codexHasOtelBlock(defaultCodexConfigPath())) return null;
 	const result = writeCodexOtelBlock({
-		endpoint: codexTraceEndpoint(endpoint),
+		baseEndpoint: endpoint,
 		ingestionToken: token,
 		environment,
 	});
+	// The exporters carry no conversation; the harvest recovers it, so a
+	// refresh that keeps the exporters healthy heals the harvest wiring too
+	// (idempotent and quiet while the notify block is already in place).
+	assertCodexTurnHarvest();
 	if (result.action === "unchanged") return null;
 	return `codex [otel] block (${displayCodexConfigPath()})`;
 }
@@ -505,12 +569,25 @@ export async function refreshTelemetryWiringForLogin(
 
 	for (const [tool, sourceType] of Object.entries(SOURCE_TYPE_BY_TOOL)) {
 		try {
-			if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) continue;
+			if (cfg.tool_project_keys?.[tool]?.secret) {
+				// Project-pinned wiring is deliberate scope, not stale personal
+				// wiring; a new login never re-points it at the personal path.
+				continue;
+			}
 			if (!resolvePlatformToolPolicy(tool, cfg.tool_policies).allowOtelDirect) {
 				// The new org forbids direct OTLP for this tool; the wrapper
 				// surfaces that on the next run rather than login guessing.
 				continue;
 			}
+			// codex's notify hook is what recovers the conversation, and it does
+			// not depend on the exporter endpoint. A config already pointing at
+			// this login skips the refresh below, so a device whose [otel] block
+			// predates the hook would never be given one. Idempotent and quiet
+			// when the hook is already in place.
+			if (tool === "codex" && codexHasOtelBlock(defaultCodexConfigPath())) {
+				assertCodexTurnHarvest();
+			}
+			if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) continue;
 			// allowOfflineFallback: false - see resolveLiveIngestionKey's doc.
 			// This caller only gets here because the persisted endpoint
 			// already differs from the new login, so a network hiccup must

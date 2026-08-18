@@ -28,6 +28,7 @@
  *     (single trace store, reserved namespaces)
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 
 import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
@@ -263,6 +264,139 @@ function startOfUtcDay(ms: number): number {
     0,
     0,
   );
+}
+
+/**
+ * The usage numbers carried on a stored pulled OCSF row's
+ * `metadata.extension`.
+ *
+ * Parsed rather than cast because the extension object is only partly ours.
+ * `mapToOcsfRow` writes these three fields and then spreads the adapter's
+ * `extra` over them, and `extra` is typed `z.record(z.unknown())` — so an
+ * adapter can land a string, an object, or nothing at all where a number
+ * belongs. A bare `Number(...)` turns each of those into `NaN` and puts it on
+ * the dashboard. Each field catches independently so one bad value does not
+ * zero the other two, and the object catches so a non-object extension is a 0
+ * rather than a throw.
+ *
+ * Deliberately NOT `.nonnegative()`. This reads the stored OCSF row, which is
+ * the audit record, and a view of an audit record must not quietly disagree
+ * with it: the generic HTTP and S3 pollers resolve `cost_usd` from a
+ * customer-configured JSONPath and carry a credit or adjustment line through
+ * verbatim, so a negative here is a figure someone actually reported, not
+ * corruption. Rendering it as 0 would hide money that the row plainly
+ * contains. Only unrepresentable values — `NaN`, `Infinity`, a string, an
+ * object — collapse to 0, because those have no figure to show.
+ */
+const ZERO_PULLED_USAGE = { cost_usd: 0, tokens_input: 0, tokens_output: 0 };
+
+const pulledUsageExtensionSchema = z
+  .object({
+    cost_usd: z.coerce.number().finite().catch(0),
+    tokens_input: z.coerce.number().finite().catch(0),
+    tokens_output: z.coerce.number().finite().catch(0),
+  })
+  .catch(ZERO_PULLED_USAGE);
+
+function pulledUsageFromRawOcsf(rawPayload: string): {
+  costUsd: number;
+  tokensInput: number;
+  tokensOutput: number;
+} {
+  let extension: unknown;
+  try {
+    extension = (
+      JSON.parse(rawPayload) as { metadata?: { extension?: unknown } }
+    )?.metadata?.extension;
+  } catch {
+    extension = null;
+  }
+  const usage = pulledUsageExtensionSchema.parse(extension ?? {});
+  return {
+    costUsd: usage.cost_usd,
+    tokensInput: usage.tokens_input,
+    tokensOutput: usage.tokens_output,
+  };
+}
+
+/** One `(sourceId, count)` pair from any of the per-source count queries. */
+type SourceEventCountRow = { sourceId: string; c: string };
+
+/** The 24h/7d/30d counters plus newest timestamp one table contributes. */
+type WindowCountRow = {
+  c24: number | string;
+  c7: number | string;
+  c30: number | string;
+  lastMs: string | null;
+};
+
+/** Window bounds shared by the three per-source health count queries. */
+type WindowCountArgs = {
+  ch: ClickHouseClient;
+  tenantId: string;
+  sourceId: string;
+  since24h: number;
+  since7d: number;
+  since30d: number;
+};
+
+type PushedEventRow = {
+  eventId: string;
+  eventType: string;
+  actor: string;
+  target: string | null;
+  costUsd: number | string;
+  tokensInput: number | string;
+  tokensOutput: number | string;
+  occurredMs: string;
+  createdMs: string;
+};
+
+type PulledEventRow = {
+  eventId: string;
+  eventType: string;
+  actorUserId: string;
+  actorEmail: string;
+  actorEnduserId: string;
+  action: string;
+  target: string;
+  occurredMs: string;
+  createdMs: string;
+  rawPayload: string;
+};
+
+function toPushedEvent(row: PushedEventRow): ActivityEventDetailRow {
+  return {
+    eventId: row.eventId,
+    eventType: row.eventType ?? "",
+    actor: row.actor ?? "",
+    action: "trace.recorded",
+    target: row.target ?? "",
+    costUsd: Number(row.costUsd ?? 0),
+    tokensInput: Number(row.tokensInput ?? 0),
+    tokensOutput: Number(row.tokensOutput ?? 0),
+    eventTimestampIso: new Date(Number(row.occurredMs)).toISOString(),
+    ingestedAtIso: new Date(Number(row.createdMs)).toISOString(),
+    rawPayload: "",
+  };
+}
+
+function toPulledEvent(row: PulledEventRow): ActivityEventDetailRow {
+  return {
+    eventId: row.eventId,
+    eventType: row.eventType ?? "",
+    actor: row.actorEmail || row.actorUserId || row.actorEnduserId || "",
+    action: row.action ?? "",
+    target: row.target ?? "",
+    ...pulledUsageFromRawOcsf(row.rawPayload),
+    eventTimestampIso: new Date(Number(row.occurredMs)).toISOString(),
+    ingestedAtIso: new Date(Number(row.createdMs)).toISOString(),
+    rawPayload: row.rawPayload,
+  };
+}
+
+function emptySourceHealthMetrics(): SourceHealthMetrics {
+  return { events24h: 0, events7d: 0, events30d: 0, lastSuccessIso: null };
 }
 
 function emptyDenseBuckets(
@@ -1063,7 +1197,7 @@ export class ActivityMonitorService {
   }
 
   /**
-   * Recent anomaly alerts produced by the anomaly-detection reactor.
+   * Recent anomaly alerts produced by the anomaly-detection subscriber.
    * Read-only snapshot of `prisma.anomalyAlert` rows for the org,
    * sorted by detectedAt DESC. Returns `[]` for orgs with no alerts
    * - callers render the empty-state in the dashboard.
@@ -1101,6 +1235,111 @@ export class ActivityMonitorService {
     }));
   }
 
+  /**
+   * The three tables a source's events can land in are counted separately and
+   * summed by the caller: pushed traces, pushed logs, and pulled OCSF rows.
+   * Splitting them keeps each query readable and lets them run concurrently.
+   */
+  private async countTracedEventsBySource(args: {
+    ch: ClickHouseClient;
+    tenantId: string;
+    sourceIds: string[];
+    since: number;
+  }): Promise<SourceEventCountRow[]> {
+    const result = await args.ch.query({
+      query: `
+        SELECT ts.Attributes[{sourceKey:String}] AS sourceId, toString(count()) AS c
+        FROM trace_summaries ts
+        WHERE ts.TenantId = {tenantId:String}
+          AND ts.OccurredAt >= fromUnixTimestamp64Milli({since:UInt64})
+          AND ts.Attributes[{originKey:String}] = {originValue:String}
+          AND ts.Attributes[{sourceKey:String}] IN ({sourceIds:Array(String)})
+          AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM trace_summaries
+            WHERE TenantId = {tenantId:String}
+              AND OccurredAt >= fromUnixTimestamp64Milli({since:UInt64})
+            GROUP BY TenantId, TraceId
+          )
+        GROUP BY sourceId
+      `,
+      query_params: {
+        tenantId: args.tenantId,
+        since: args.since,
+        originKey: ATTR_ORIGIN_KIND,
+        originValue: ORIGIN_KIND_VALUE,
+        sourceKey: ATTR_INGESTION_SOURCE_ID,
+        sourceIds: args.sourceIds,
+      },
+      format: "JSONEachRow",
+    });
+    return (await result.json()) as SourceEventCountRow[];
+  }
+
+  private async countLoggedEventsBySource(args: {
+    ch: ClickHouseClient;
+    tenantId: string;
+    sourceIds: string[];
+    since: number;
+  }): Promise<SourceEventCountRow[]> {
+    const result = await args.ch.query({
+      query: `
+        SELECT lr.Attributes[{sourceKey:String}] AS sourceId, toString(count()) AS c
+        FROM stored_log_records lr
+        WHERE lr.TenantId = {tenantId:String}
+          AND lr.TimeUnixMs >= fromUnixTimestamp64Milli({since:UInt64})
+          AND lr.Attributes[{originKey:String}] = {originValue:String}
+          AND lr.Attributes[{sourceKey:String}] IN ({sourceIds:Array(String)})
+        GROUP BY sourceId
+      `,
+      query_params: {
+        tenantId: args.tenantId,
+        since: args.since,
+        originKey: ATTR_ORIGIN_KIND,
+        originValue: ORIGIN_KIND_VALUE,
+        sourceKey: ATTR_INGESTION_SOURCE_ID,
+        sourceIds: args.sourceIds,
+      },
+      format: "JSONEachRow",
+    });
+    return (await result.json()) as SourceEventCountRow[];
+  }
+
+  private async countPulledEventsBySource(args: {
+    ch: ClickHouseClient;
+    tenantId: string;
+    sourceIds: string[];
+    since: number;
+  }): Promise<SourceEventCountRow[]> {
+    const result = await args.ch.query({
+      query: `
+        SELECT SourceId AS sourceId, toString(count()) AS c
+        FROM governance_ocsf_events
+        WHERE TenantId = {tenantId:String}
+          AND startsWith(TraceId, 'pull:')
+          AND EventTime >= fromUnixTimestamp64Milli({since:UInt64})
+          AND SourceId IN ({sourceIds:Array(String)})
+          AND (TenantId, EventId, LastUpdatedAt) IN (
+            SELECT TenantId, EventId, max(LastUpdatedAt)
+            FROM governance_ocsf_events
+            WHERE TenantId = {tenantId:String}
+              AND startsWith(TraceId, 'pull:')
+              AND EventTime >= fromUnixTimestamp64Milli({since:UInt64})
+              AND SourceId IN ({sourceIds:Array(String)})
+            GROUP BY TenantId, EventId
+          )
+        GROUP BY sourceId
+      `,
+      query_params: {
+        tenantId: args.tenantId,
+        since: args.since,
+        sourceIds: args.sourceIds,
+      },
+      format: "JSONEachRow",
+    });
+    return (await result.json()) as SourceEventCountRow[];
+  }
+
   async ingestionSourcesHealth(input: {
     organizationId: string;
   }): Promise<IngestionSourceHealthRow[]> {
@@ -1117,66 +1356,18 @@ export class ActivityMonitorService {
 
     const eventsBySource = new Map<string, number>();
     if (ch && govProjectId) {
-      const sourceIds = sources.map((s) => s.id);
-      const since = Date.now() - 24 * 60 * 60 * 1000;
-      const [traceCounts, logCounts] = await Promise.all([
-        ch.query({
-          query: `
-            SELECT ts.Attributes[{sourceKey:String}] AS sourceId, toString(count()) AS c
-            FROM trace_summaries ts
-            WHERE ts.TenantId = {tenantId:String}
-              AND ts.OccurredAt >= fromUnixTimestamp64Milli({since:UInt64})
-              AND ts.Attributes[{originKey:String}] = {originValue:String}
-              AND ts.Attributes[{sourceKey:String}] IN ({sourceIds:Array(String)})
-              AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
-                SELECT TenantId, TraceId, max(UpdatedAt)
-                FROM trace_summaries
-                WHERE TenantId = {tenantId:String}
-                  AND OccurredAt >= fromUnixTimestamp64Milli({since:UInt64})
-                GROUP BY TenantId, TraceId
-              )
-            GROUP BY sourceId
-          `,
-          query_params: {
-            tenantId: govProjectId,
-            since,
-            originKey: ATTR_ORIGIN_KIND,
-            originValue: ORIGIN_KIND_VALUE,
-            sourceKey: ATTR_INGESTION_SOURCE_ID,
-            sourceIds,
-          },
-          format: "JSONEachRow",
-        }),
-        ch.query({
-          query: `
-            SELECT lr.Attributes[{sourceKey:String}] AS sourceId, toString(count()) AS c
-            FROM stored_log_records lr
-            WHERE lr.TenantId = {tenantId:String}
-              AND lr.TimeUnixMs >= fromUnixTimestamp64Milli({since:UInt64})
-              AND lr.Attributes[{originKey:String}] = {originValue:String}
-              AND lr.Attributes[{sourceKey:String}] IN ({sourceIds:Array(String)})
-            GROUP BY sourceId
-          `,
-          query_params: {
-            tenantId: govProjectId,
-            since,
-            originKey: ATTR_ORIGIN_KIND,
-            originValue: ORIGIN_KIND_VALUE,
-            sourceKey: ATTR_INGESTION_SOURCE_ID,
-            sourceIds,
-          },
-          format: "JSONEachRow",
-        }),
+      const args = {
+        ch,
+        tenantId: govProjectId,
+        sourceIds: sources.map((s) => s.id),
+        since: Date.now() - 24 * 60 * 60 * 1000,
+      };
+      const counts = await Promise.all([
+        this.countTracedEventsBySource(args),
+        this.countLoggedEventsBySource(args),
+        this.countPulledEventsBySource(args),
       ]);
-      const traceRows = (await traceCounts.json()) as Array<{
-        sourceId: string;
-        c: string;
-      }>;
-      const logRows = (await logCounts.json()) as Array<{
-        sourceId: string;
-        c: string;
-      }>;
-      for (const row of [...traceRows, ...logRows]) {
+      for (const row of counts.flat()) {
         eventsBySource.set(
           row.sourceId,
           (eventsBySource.get(row.sourceId) ?? 0) + Number(row.c),
@@ -1194,27 +1385,19 @@ export class ActivityMonitorService {
     }));
   }
 
-  async eventsForSource(input: {
-    organizationId: string;
+  /**
+   * The pushed side of one source's event list: traces the gateway folded into
+   * `trace_summaries`. Kept beside {@link pulledEventsForSource} so the two
+   * halves stay readable — the caller runs them concurrently and merges.
+   */
+  private async pushedEventsForSource(args: {
+    ch: ClickHouseClient;
+    tenantId: string;
     sourceId: string;
-    limit?: number;
-    beforeIso?: string;
+    beforeMs: number;
+    limit: number;
   }): Promise<ActivityEventDetailRow[]> {
-    const govProjectId = await this.resolveGovProjectId(input.organizationId);
-    if (!govProjectId) return [];
-
-    const ch = await this.getClickhouse(input.organizationId);
-    if (!ch) return [];
-
-    const limit = input.limit ?? 50;
-    const beforeMs = input.beforeIso
-      ? new Date(input.beforeIso).getTime()
-      : Date.now();
-
-    // Pull recent traces for the source. Webhook log_records are out of
-    // scope for this endpoint (the per-source detail page renders trace
-    // shape; the log shape gets its own viewer in 3b).
-    const result = await ch.query({
+    const result = await args.ch.query({
       query: `
         SELECT
           ts.TraceId AS eventId,
@@ -1241,42 +1424,227 @@ export class ActivityMonitorService {
         LIMIT {limit:UInt32}
       `,
       query_params: {
-        tenantId: govProjectId,
-        beforeMs,
+        tenantId: args.tenantId,
+        beforeMs: args.beforeMs,
         originKey: ATTR_ORIGIN_KIND,
         originValue: ORIGIN_KIND_VALUE,
         sourceKey: ATTR_INGESTION_SOURCE_ID,
         sourceTypeKey: GOVERNANCE_ATTR.INGESTION_SOURCE_TYPE,
         userKey: ATTR_USER_ID,
-        sourceId: input.sourceId,
-        limit,
+        sourceId: args.sourceId,
+        limit: args.limit,
       },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{
-      eventId: string;
-      eventType: string;
-      actor: string;
-      target: string | null;
-      costUsd: number | string;
-      tokensInput: number | string;
-      tokensOutput: number | string;
-      occurredMs: string;
-      createdMs: string;
-    }>;
-    return rows.map((r) => ({
-      eventId: r.eventId,
-      eventType: r.eventType ?? "",
-      actor: r.actor ?? "",
-      action: "trace.recorded",
-      target: r.target ?? "",
-      costUsd: Number(r.costUsd ?? 0),
-      tokensInput: Number(r.tokensInput ?? 0),
-      tokensOutput: Number(r.tokensOutput ?? 0),
-      eventTimestampIso: new Date(Number(r.occurredMs)).toISOString(),
-      ingestedAtIso: new Date(Number(r.createdMs)).toISOString(),
-      rawPayload: "",
-    }));
+    return ((await result.json()) as PushedEventRow[]).map(toPushedEvent);
+  }
+
+  /**
+   * The pulled side of one source's event list: rows a puller wrote to
+   * `governance_ocsf_events` under the synthetic `pull:` trace id.
+   */
+  private async pulledEventsForSource(args: {
+    ch: ClickHouseClient;
+    tenantId: string;
+    sourceId: string;
+    beforeMs: number;
+    limit: number;
+  }): Promise<ActivityEventDetailRow[]> {
+    const result = await args.ch.query({
+      query: `
+        SELECT
+          EventId AS eventId,
+          SourceType AS eventType,
+          ActorUserId AS actorUserId,
+          ActorEmail AS actorEmail,
+          ActorEnduserId AS actorEnduserId,
+          ActionName AS action,
+          TargetName AS target,
+          toString(toUnixTimestamp64Milli(EventTime)) AS occurredMs,
+          toString(toUnixTimestamp64Milli(CreatedAt)) AS createdMs,
+          RawOcsfJson AS rawPayload
+        FROM governance_ocsf_events
+        WHERE TenantId = {tenantId:String}
+          AND startsWith(TraceId, 'pull:')
+          AND SourceId = {sourceId:String}
+          AND EventTime < fromUnixTimestamp64Milli({beforeMs:UInt64})
+          AND (TenantId, EventId, LastUpdatedAt) IN (
+            SELECT TenantId, EventId, max(LastUpdatedAt)
+            FROM governance_ocsf_events
+            WHERE TenantId = {tenantId:String}
+              AND startsWith(TraceId, 'pull:')
+              AND SourceId = {sourceId:String}
+              AND EventTime < fromUnixTimestamp64Milli({beforeMs:UInt64})
+            GROUP BY TenantId, EventId
+          )
+        ORDER BY EventTime DESC, EventId DESC
+        LIMIT {limit:UInt32}
+      `,
+      query_params: {
+        tenantId: args.tenantId,
+        sourceId: args.sourceId,
+        beforeMs: args.beforeMs,
+        limit: args.limit,
+      },
+      format: "JSONEachRow",
+    });
+    return ((await result.json()) as PulledEventRow[]).map(toPulledEvent);
+  }
+
+  async eventsForSource(input: {
+    organizationId: string;
+    sourceId: string;
+    limit?: number;
+    beforeIso?: string;
+  }): Promise<ActivityEventDetailRow[]> {
+    const govProjectId = await this.resolveGovProjectId(input.organizationId);
+    if (!govProjectId) return [];
+
+    const ch = await this.getClickhouse(input.organizationId);
+    if (!ch) return [];
+
+    const limit = input.limit ?? 50;
+    const args = {
+      ch,
+      tenantId: govProjectId,
+      sourceId: input.sourceId,
+      beforeMs: input.beforeIso
+        ? new Date(input.beforeIso).getTime()
+        : Date.now(),
+      limit,
+    };
+
+    const [pushedEvents, pulledEvents] = await Promise.all([
+      this.pushedEventsForSource(args),
+      this.pulledEventsForSource(args),
+    ]);
+
+    const seen = new Set<string>();
+    return [...pushedEvents, ...pulledEvents]
+      .sort(
+        (a, b) =>
+          new Date(b.eventTimestampIso).getTime() -
+            new Date(a.eventTimestampIso).getTime() ||
+          b.eventId.localeCompare(a.eventId),
+      )
+      .filter((event) => {
+        if (seen.has(event.eventId)) return false;
+        seen.add(event.eventId);
+        return true;
+      })
+      .slice(0, limit);
+  }
+
+  /**
+   * One source's 24h/7d/30d trace counts. Aggregates always return a row, so
+   * `undefined` here means the source contributed nothing at all.
+   */
+  private async tracedEventWindowCounts(
+    args: WindowCountArgs,
+  ): Promise<WindowCountRow | undefined> {
+    const result = await args.ch.query({
+      query: `
+        SELECT
+          countIf(ts.OccurredAt >= fromUnixTimestamp64Milli({since24h:UInt64})) AS c24,
+          countIf(ts.OccurredAt >= fromUnixTimestamp64Milli({since7d:UInt64})) AS c7,
+          count() AS c30,
+          toString(toUnixTimestamp64Milli(max(ts.OccurredAt))) AS lastMs
+        FROM trace_summaries ts
+        WHERE ts.TenantId = {tenantId:String}
+          AND ts.OccurredAt >= fromUnixTimestamp64Milli({since30d:UInt64})
+          AND ts.Attributes[{originKey:String}] = {originValue:String}
+          AND ts.Attributes[{sourceKey:String}] = {sourceId:String}
+          AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM trace_summaries
+            WHERE TenantId = {tenantId:String}
+              AND OccurredAt >= fromUnixTimestamp64Milli({since30d:UInt64})
+            GROUP BY TenantId, TraceId
+          )
+      `,
+      query_params: {
+        tenantId: args.tenantId,
+        since24h: args.since24h,
+        since7d: args.since7d,
+        since30d: args.since30d,
+        originKey: ATTR_ORIGIN_KIND,
+        originValue: ORIGIN_KIND_VALUE,
+        sourceKey: ATTR_INGESTION_SOURCE_ID,
+        sourceId: args.sourceId,
+      },
+      format: "JSONEachRow",
+    });
+    return ((await result.json()) as WindowCountRow[])[0];
+  }
+
+  /** One source's 24h/7d/30d log-record counts. */
+  private async loggedEventWindowCounts(
+    args: WindowCountArgs,
+  ): Promise<WindowCountRow | undefined> {
+    const result = await args.ch.query({
+      query: `
+        SELECT
+          countIf(lr.TimeUnixMs >= fromUnixTimestamp64Milli({since24h:UInt64})) AS c24,
+          countIf(lr.TimeUnixMs >= fromUnixTimestamp64Milli({since7d:UInt64})) AS c7,
+          count() AS c30,
+          toString(toUnixTimestamp64Milli(max(lr.TimeUnixMs))) AS lastMs
+        FROM stored_log_records lr
+        WHERE lr.TenantId = {tenantId:String}
+          AND lr.TimeUnixMs >= fromUnixTimestamp64Milli({since30d:UInt64})
+          AND lr.Attributes[{originKey:String}] = {originValue:String}
+          AND lr.Attributes[{sourceKey:String}] = {sourceId:String}
+      `,
+      query_params: {
+        tenantId: args.tenantId,
+        since24h: args.since24h,
+        since7d: args.since7d,
+        since30d: args.since30d,
+        originKey: ATTR_ORIGIN_KIND,
+        originValue: ORIGIN_KIND_VALUE,
+        sourceKey: ATTR_INGESTION_SOURCE_ID,
+        sourceId: args.sourceId,
+      },
+      format: "JSONEachRow",
+    });
+    return ((await result.json()) as WindowCountRow[])[0];
+  }
+
+  /** One source's 24h/7d/30d pulled-event counts. */
+  private async pulledEventWindowCounts(
+    args: WindowCountArgs,
+  ): Promise<WindowCountRow | undefined> {
+    const result = await args.ch.query({
+      query: `
+        SELECT
+          countIf(EventTime >= fromUnixTimestamp64Milli({since24h:UInt64})) AS c24,
+          countIf(EventTime >= fromUnixTimestamp64Milli({since7d:UInt64})) AS c7,
+          count() AS c30,
+          toString(toUnixTimestamp64Milli(max(EventTime))) AS lastMs
+        FROM governance_ocsf_events
+        WHERE TenantId = {tenantId:String}
+          AND startsWith(TraceId, 'pull:')
+          AND SourceId = {sourceId:String}
+          AND EventTime >= fromUnixTimestamp64Milli({since30d:UInt64})
+          AND (TenantId, EventId, LastUpdatedAt) IN (
+            SELECT TenantId, EventId, max(LastUpdatedAt)
+            FROM governance_ocsf_events
+            WHERE TenantId = {tenantId:String}
+              AND startsWith(TraceId, 'pull:')
+              AND SourceId = {sourceId:String}
+              AND EventTime >= fromUnixTimestamp64Milli({since30d:UInt64})
+            GROUP BY TenantId, EventId
+          )
+      `,
+      query_params: {
+        tenantId: args.tenantId,
+        since24h: args.since24h,
+        since7d: args.since7d,
+        since30d: args.since30d,
+        sourceId: args.sourceId,
+      },
+      format: "JSONEachRow",
+    });
+    return ((await result.json()) as WindowCountRow[])[0];
   }
 
   async sourceHealthMetrics(input: {
@@ -1284,102 +1652,41 @@ export class ActivityMonitorService {
     sourceId: string;
   }): Promise<SourceHealthMetrics> {
     const govProjectId = await this.resolveGovProjectId(input.organizationId);
-    if (!govProjectId) {
-      return { events24h: 0, events7d: 0, events30d: 0, lastSuccessIso: null };
-    }
+    if (!govProjectId) return emptySourceHealthMetrics();
 
     const ch = await this.getClickhouse(input.organizationId);
-    if (!ch) {
-      return { events24h: 0, events7d: 0, events30d: 0, lastSuccessIso: null };
-    }
+    if (!ch) return emptySourceHealthMetrics();
 
     const now = Date.now();
     const day = 24 * 60 * 60 * 1000;
-    const since30d = now - 30 * day;
+    const args: WindowCountArgs = {
+      ch,
+      tenantId: govProjectId,
+      sourceId: input.sourceId,
+      since24h: now - day,
+      since7d: now - 7 * day,
+      since30d: now - 30 * day,
+    };
 
-    const [traceResult, logResult] = await Promise.all([
-      ch.query({
-        query: `
-          SELECT
-            countIf(ts.OccurredAt >= fromUnixTimestamp64Milli({since24h:UInt64})) AS c24,
-            countIf(ts.OccurredAt >= fromUnixTimestamp64Milli({since7d:UInt64})) AS c7,
-            count() AS c30,
-            toString(toUnixTimestamp64Milli(max(ts.OccurredAt))) AS lastMs
-          FROM trace_summaries ts
-          WHERE ts.TenantId = {tenantId:String}
-            AND ts.OccurredAt >= fromUnixTimestamp64Milli({since30d:UInt64})
-            AND ts.Attributes[{originKey:String}] = {originValue:String}
-            AND ts.Attributes[{sourceKey:String}] = {sourceId:String}
-            AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
-              SELECT TenantId, TraceId, max(UpdatedAt)
-              FROM trace_summaries
-              WHERE TenantId = {tenantId:String}
-                AND OccurredAt >= fromUnixTimestamp64Milli({since30d:UInt64})
-              GROUP BY TenantId, TraceId
-            )
-        `,
-        query_params: {
-          tenantId: govProjectId,
-          since24h: now - day,
-          since7d: now - 7 * day,
-          since30d,
-          originKey: ATTR_ORIGIN_KIND,
-          originValue: ORIGIN_KIND_VALUE,
-          sourceKey: ATTR_INGESTION_SOURCE_ID,
-          sourceId: input.sourceId,
-        },
-        format: "JSONEachRow",
-      }),
-      ch.query({
-        query: `
-          SELECT
-            countIf(lr.TimeUnixMs >= fromUnixTimestamp64Milli({since24h:UInt64})) AS c24,
-            countIf(lr.TimeUnixMs >= fromUnixTimestamp64Milli({since7d:UInt64})) AS c7,
-            count() AS c30,
-            toString(toUnixTimestamp64Milli(max(lr.TimeUnixMs))) AS lastMs
-          FROM stored_log_records lr
-          WHERE lr.TenantId = {tenantId:String}
-            AND lr.TimeUnixMs >= fromUnixTimestamp64Milli({since30d:UInt64})
-            AND lr.Attributes[{originKey:String}] = {originValue:String}
-            AND lr.Attributes[{sourceKey:String}] = {sourceId:String}
-        `,
-        query_params: {
-          tenantId: govProjectId,
-          since24h: now - day,
-          since7d: now - 7 * day,
-          since30d,
-          originKey: ATTR_ORIGIN_KIND,
-          originValue: ORIGIN_KIND_VALUE,
-          sourceKey: ATTR_INGESTION_SOURCE_ID,
-          sourceId: input.sourceId,
-        },
-        format: "JSONEachRow",
-      }),
+    const windows = await Promise.all([
+      this.tracedEventWindowCounts(args),
+      this.loggedEventWindowCounts(args),
+      this.pulledEventWindowCounts(args),
     ]);
-    const traceRows = (await traceResult.json()) as Array<{
-      c24: number | string;
-      c7: number | string;
-      c30: number | string;
-      lastMs: string | null;
-    }>;
-    const logRows = (await logResult.json()) as Array<{
-      c24: number | string;
-      c7: number | string;
-      c30: number | string;
-      lastMs: string | null;
-    }>;
-    const t = traceRows[0];
-    const l = logRows[0];
 
-    const events24h = Number(t?.c24 ?? 0) + Number(l?.c24 ?? 0);
-    const events7d = Number(t?.c7 ?? 0) + Number(l?.c7 ?? 0);
-    const events30d = Number(t?.c30 ?? 0) + Number(l?.c30 ?? 0);
+    const total = (pick: (row: WindowCountRow) => number | string) =>
+      windows.reduce((sum, row) => sum + (row ? Number(pick(row) ?? 0) : 0), 0);
 
-    const traceLastMs = t?.lastMs ? Number(t.lastMs) : 0;
-    const logLastMs = l?.lastMs ? Number(l.lastMs) : 0;
-    const lastMs = Math.max(traceLastMs, logLastMs);
-    const lastSuccessIso = lastMs > 0 ? new Date(lastMs).toISOString() : null;
+    const lastMs = Math.max(
+      0,
+      ...windows.map((row) => (row?.lastMs ? Number(row.lastMs) : 0)),
+    );
 
-    return { events24h, events7d, events30d, lastSuccessIso };
+    return {
+      events24h: total((r) => r.c24),
+      events7d: total((r) => r.c7),
+      events30d: total((r) => r.c30),
+      lastSuccessIso: lastMs > 0 ? new Date(lastMs).toISOString() : null,
+    };
   }
 }

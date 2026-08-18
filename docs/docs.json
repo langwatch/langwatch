@@ -74,6 +74,9 @@
             "group": "Agent Simulations",
             "pages": [
               "agent-simulations/introduction",
+              "agent-simulations/connect-your-agent",
+              "agent-simulations/remote-traces",
+              "agent-simulations/local-development",
               "agent-simulations/getting-started",
               "agent-simulations/scenario-parameters",
               "agent-simulations/authenticated-agents",
@@ -457,6 +460,9 @@
             "group": "Tools",
             "pages": [
               "integration/tools/integrations/claude-code",
+              "integration/tools/integrations/openai-codex",
+              "integration/tools/integrations/github-copilot-cli",
+              "integration/tools/integrations/opencode",
               "integration/openclaw"
             ]
           },
@@ -1484,7 +1490,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1786806186",
+      "source": "/ci/cache/busted/1787040935",
       "destination": "/"
     },
     {

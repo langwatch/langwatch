@@ -30,7 +30,11 @@ import {
 } from "./budgetResolution.service";
 import { GatewayCacheRuleService } from "./cacheRule.service";
 import { withTierFallthrough } from "./modelTierFallthrough";
-import { eligibleModelProvidersForVk, traceProjectFor } from "./scopeResolver";
+import {
+  eligibleModelProvidersForVk,
+  scopeReachableModelProvidersForVk,
+  traceProjectFor,
+} from "./scopeResolver";
 import { parseVirtualKeyConfig } from "./virtualKey.config";
 import type { VirtualKeyWithScopes } from "./virtualKey.repository";
 
@@ -71,6 +75,17 @@ export type ProviderSlot = {
   region?: string;
   deployment_map?: Record<string, string>;
   config: Record<string, unknown>;
+};
+
+/**
+ * A ModelProvider row the gateway will not dispatch to, named so a
+ * request-time block can say why. `type` is the provider kind (ModelProvider.provider),
+ * carried alongside the row id because the gateway matches a resolved request
+ * by provider kind and these rows are absent from `providers[]`.
+ */
+export type ProviderExclusionWire = {
+  id: string;
+  type: string;
 };
 
 export type GatewayConfigPayload = {
@@ -120,6 +135,28 @@ export type GatewayConfigPayload = {
    * RoutingPolicy decides.
    */
   routing_mode: "none" | "fallback_all" | "policy";
+  /**
+   * Contract §4.2. Providers a request could resolve to but the gateway will
+   * NOT dispatch to, split by WHY, so a request-time block can name the
+   * reason instead of failing opaque. Each entry is a ModelProvider row id
+   * plus its provider type, the same `{id, type}` shape `providers[]` carries,
+   * because the gateway matches the provider a request resolved to by TYPE and
+   * these rows are absent from `providers[]`.
+   *
+   * routing_excluded_providers: reachable from the key's scope AND inside its
+   * provider access, but dropped by the routing policy (named by
+   * routing_policy_name). access_excluded_providers: reachable from scope but
+   * outside providers_allowed (empty when the key allows all providers). A
+   * provider in neither list and absent from `providers[]` is not reachable
+   * from the key's scope at all.
+   */
+  routing_excluded_providers: ProviderExclusionWire[];
+  access_excluded_providers: ProviderExclusionWire[];
+  /**
+   * Display name of the key's routing policy, used to name the routing-block
+   * reason. Null when the key is not on a routing policy.
+   */
+  routing_policy_name: string | null;
   cache: { mode: "respect" | "force" | "disable"; ttl_s: number };
   // Flat per-project guardrail catalog the VK is allowed to reference.
   // The Go dispatcher looks up entries by id from guardrail_attachments
@@ -205,6 +242,19 @@ export type GatewayConfigPayload = {
   // The gateway stamps them on customer spans as langwatch.labels (Trace
   // Explorer "Label" filter) and matches cache-rule vk_tags against them.
   vk_tags: string[];
+  /**
+   * The date the key stops serving, in unix seconds, and `null` for a key that
+   * never expires. Always present, because the gateway tells an explicit null
+   * ("this key has no date") apart from a field a control plane older than it
+   * never sent ("keep the date you already hold").
+   *
+   * The key's expiry also travels on the auth token as `vk_expires_at`, which
+   * is the mint-time floor. Carrying it here as well is what bounds how long
+   * the gateway can hold an out-of-date value: the ETag moves on every
+   * mutation, so a shortened or extended date reaches the gateway on its next
+   * config revalidation even while the change feed is unavailable.
+   */
+  expires_at: number | null;
 };
 
 export class GatewayConfigMaterialiser {
@@ -212,6 +262,49 @@ export class GatewayConfigMaterialiser {
     private readonly prisma: PrismaClient,
     private readonly chRepo: GatewayBudgetClickHouseRepository | null = null,
   ) {}
+
+  /**
+   * The providers this key dispatches to, plus the three wire fields that let
+   * the gateway name why a resolved provider was not used. An explicit allowlist
+   * narrows dispatch; absence means every scope-reachable provider, now and
+   * later, so the filter runs here rather than being frozen into stored scope
+   * rows. `eligibleProviders` is already routing-policy-applied, so the
+   * scope-reachable set minus dispatch is what the policy dropped, and the
+   * allowlist complement is what provider access dropped.
+   */
+  private async dispatchAndExclusions(
+    vk: VirtualKeyWithScopes,
+    eligibleProviders: ModelProvider[],
+    allowed: string[] | null,
+  ): Promise<{
+    providers: ModelProvider[];
+    exclusions: {
+      routing_excluded_providers: ProviderExclusionWire[];
+      access_excluded_providers: ProviderExclusionWire[];
+      routing_policy_name: string | null;
+    };
+  }> {
+    const providers = allowed
+      ? eligibleProviders.filter((mp) => allowed.includes(mp.id))
+      : eligibleProviders;
+    const scopeReachable = await scopeReachableModelProvidersForVk(
+      this.prisma,
+      vk,
+    );
+    const { routingExcluded, accessExcluded } = providerExclusions({
+      scopeReachable,
+      eligibleProviders,
+      allowed,
+    });
+    return {
+      providers,
+      exclusions: {
+        routing_excluded_providers: routingExcluded.map(providerExclusionWire),
+        access_excluded_providers: accessExcluded.map(providerExclusionWire),
+        routing_policy_name: vk.routingPolicy?.name ?? null,
+      },
+    };
+  }
 
   async materialise(vk: VirtualKeyWithScopes): Promise<GatewayConfigPayload> {
     const eligibleProviders = await eligibleModelProvidersForVk(
@@ -223,14 +316,11 @@ export class GatewayConfigMaterialiser {
     const spendByBudgetId = await this.loadCurrentSpend(vk, budgets);
     const cacheRules = await this.applicableCacheRules(vk.organizationId);
     const config = parseVirtualKeyConfig(vk.config);
-    // An explicit allowlist narrows what the key can reach; absence means
-    // "all current and future providers in scope", which is why the filter
-    // runs here rather than being frozen into stored scope rows.
-    const providers = config.providersAllowed
-      ? eligibleProviders.filter((mp) =>
-          config.providersAllowed!.includes(mp.id),
-        )
-      : eligibleProviders;
+    const { providers, exclusions } = await this.dispatchAndExclusions(
+      vk,
+      eligibleProviders,
+      config.providersAllowed,
+    );
     const policySides = resolvePolicySideOfBundle(vk, config);
     const guardrailSides = await this.resolveGuardrailSideOfBundle(
       vk,
@@ -270,6 +360,7 @@ export class GatewayConfigMaterialiser {
       models_allowed: config.modelsAllowed,
       providers_allowed: config.providersAllowed,
       routing_mode: routingModeToWire(vk.routingMode),
+      ...exclusions,
       cache: { mode: config.cache.mode, ttl_s: config.cache.ttlS },
       guardrails: guardrailSides.guardrails,
       guardrail_attachments: guardrailSides.attachments,
@@ -285,6 +376,7 @@ export class GatewayConfigMaterialiser {
       cache_rules: cacheRules.map(cacheRuleToWire),
       metadata: config.metadata ?? {},
       vk_tags: config.metadata?.tags ?? [],
+      expires_at: expiresAtWire(vk.expiresAt),
     };
   }
 
@@ -742,6 +834,46 @@ function routingModeToWire(
     case "POLICY":
       return "policy";
   }
+}
+
+function providerExclusionWire(mp: ModelProvider): ProviderExclusionWire {
+  return { id: mp.id, type: mp.provider };
+}
+
+/**
+ * The key's expiration date as the gateway reads it: unix SECONDS, and null for
+ * a key that never expires. Seconds because the gateway decodes the field as a
+ * unix timestamp, the same unit the `vk_expires_at` token claim uses;
+ * milliseconds would put the date tens of thousands of years out and lift the
+ * expiry cap off the key.
+ */
+function expiresAtWire(expiresAt: Date | null): number | null {
+  return expiresAt ? Math.floor(expiresAt.getTime() / 1000) : null;
+}
+
+/**
+ * Splits the scope-reachable providers the dispatch chain drops into the two
+ * reasons the gateway names at request time: the routing policy dropped it
+ * (inside provider access, but not dispatchable), or provider access dropped it
+ * (outside the allowlist). A provider that dispatches is in neither list.
+ */
+function providerExclusions({
+  scopeReachable,
+  eligibleProviders,
+  allowed,
+}: {
+  scopeReachable: ModelProvider[];
+  eligibleProviders: ModelProvider[];
+  allowed: string[] | null;
+}): { routingExcluded: ModelProvider[]; accessExcluded: ModelProvider[] } {
+  const dispatchIds = new Set(eligibleProviders.map((mp) => mp.id));
+  const routingExcluded = scopeReachable.filter(
+    (mp) => (!allowed || allowed.includes(mp.id)) && !dispatchIds.has(mp.id),
+  );
+  const accessExcluded = allowed
+    ? scopeReachable.filter((mp) => !allowed.includes(mp.id))
+    : [];
+  return { routingExcluded, accessExcluded };
 }
 
 type BudgetWire = GatewayConfigPayload["budgets"][number];

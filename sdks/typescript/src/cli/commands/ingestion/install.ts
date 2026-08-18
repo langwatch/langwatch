@@ -1,6 +1,7 @@
 import chalk from "chalk";
 
-import { mintIngestionKey } from "@/cli/utils/governance/cli-api";
+import { TOOL_BY_SOURCE_TYPE } from "@/cli/utils/governance/otel-env-block";
+import { resolveIngestionCredential } from "@/cli/utils/governance/telemetry-refresh";
 import {
   type ClaudePluginEnsureAction,
   ensureLangwatchClaudePlugin,
@@ -76,6 +77,10 @@ interface InstallReport {
   endpoint: string;
   ingestion_token: string;
   token_prefix: string;
+  /** Where the telemetry lands: a pinned team project, or the personal one. */
+  scope: "project" | "personal";
+  /** The pinned project's slug or id, when the scope is a project. */
+  destination_project?: string;
   codex_config_action?: "created" | "updated" | "unchanged";
   codex_config_path?: string;
   /**
@@ -151,29 +156,39 @@ async function runInstall(
   tool: SupportedTool,
   options: InstallOptions,
 ): Promise<InstallReport> {
-  // Mint a fresh personal ingest key (sk-lw-*) for this tool's
-  // source_type. The plaintext key is only ever visible at mint
-  // time, so re-running the install command always leaves the user
-  // with a working key written straight into the export block. The
-  // SupportedTool slug doubles as the source_type the mint route
-  // expects (claude_code / codex / gemini / opencode).
-  const { token, prefix, endpoint } = await mintIngestionKey(cfg, tool);
+  // Resolve the ingest key (`ik-lw-` shape) for this tool the same way the
+  // wrappers do, so a tool pinned to a team project keeps that scope instead
+  // of having a personal key written over it. Without the pin it falls back
+  // to the personal key with the reuse-first rules: the cached key is used
+  // while the platform confirms it live; a revoked or missing one mints
+  // fresh. The SupportedTool slug doubles as the source_type the mint route
+  // expects (claude_code / codex / gemini / opencode); the config keys the
+  // pin by CLI tool slug, so read that back off the source type.
+  const { token, prefix, endpoint, minted, scope, projectLabel } =
+    await resolveIngestionCredential({
+      cfg,
+      tool: TOOL_BY_SOURCE_TYPE[tool] ?? tool,
+      sourceType: tool,
+    });
   const envBlock = buildEnvBlock(tool, endpoint, token);
 
-  // Minting revokes the tool's previous key, so the config cache is now stale
-  // and everything reading it (the wrapper's reuse path, the session-context
-  // hook's fallback target) would authenticate with a dead key. Best-effort:
-  // a config we cannot write is not a reason to fail an install that worked.
-  try {
-    saveConfig({
-      ...cfg,
-      default_personal_ingest_keys: {
-        ...(cfg.default_personal_ingest_keys ?? {}),
-        [tool]: { secret: token, prefix },
-      },
-    });
-  } catch {
-    // The env block above is still valid; only the cache went unwritten.
+  // A fresh mint revokes the tool's previous key, so the config cache is now
+  // stale and everything reading it (the wrapper's reuse path, the
+  // session-context hook's fallback target) would authenticate with a dead
+  // key. Best-effort: a config we cannot write is not a reason to fail an
+  // install that worked.
+  if (minted) {
+    try {
+      saveConfig({
+        ...cfg,
+        default_personal_ingest_keys: {
+          ...(cfg.default_personal_ingest_keys ?? {}),
+          [tool]: { secret: token, prefix },
+        },
+      });
+    } catch {
+      // The env block above is still valid; only the cache went unwritten.
+    }
   }
 
   const report: InstallReport = {
@@ -181,18 +196,16 @@ async function runInstall(
     source_type: tool,
     endpoint,
     ingestion_token: token,
-    token_prefix: prefix,
+    token_prefix: prefix ?? token.slice(0, 12),
+    scope,
+    destination_project: projectLabel,
     env_block: envBlock,
   };
 
   if (tool === "codex" && !options.envOnly) {
-    // codex's OTLP/HTTP exporter sends every signal to the configured
-    // endpoint verbatim — it does NOT append `/v1/traces` the way the
-    // OTel SDKs do. Spell the trace-signal suffix out (mirror of the
-    // wrapper-mode.ts behaviour) so the POST lands on the real handler.
     const result = writeCodexOtelBlock(
       {
-        endpoint: `${endpoint}/v1/traces`,
+        baseEndpoint: endpoint,
         ingestionToken: token,
         environment: cfg.organization?.slug ?? "langwatch",
       },

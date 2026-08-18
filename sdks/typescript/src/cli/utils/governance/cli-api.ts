@@ -527,7 +527,7 @@ async function requestREST<T>(
 // Ingestion key minting ------------------------------------------------------
 
 /**
- * Mint a personal-project ingest-only ApiKey (the `sk-lw-<...>` shape)
+ * Mint a personal-project ingest-only ApiKey (the `ik-lw-<...>` shape)
  * for a wrapped tool. Returns the plaintext key (shown once) plus the
  * OTLP endpoint the caller should point the tool's exporter at.
  *
@@ -548,6 +548,56 @@ export async function mintIngestionKey(
     "/api/auth/cli/governance/ingestion-key",
     { ...options, body: { source_type: sourceType }, mutating: true },
   );
+}
+
+/**
+ * Mint an ingest key scoped to a team project (id or slug within the
+ * caller's org). Unlike the personal mint, the server creates an
+ * ADDITIONAL key per device instead of rotating, so several machines can
+ * be instrumented against the same project. Requires the caller to hold
+ * `traces:create` on the target project.
+ */
+export async function mintProjectIngestionKey(
+  cfg: GovernanceConfig,
+  {
+    sourceType,
+    project,
+    deviceLabel,
+  }: { sourceType: string; project: string; deviceLabel?: string },
+  options: CliApiOptions = {},
+): Promise<{
+  token: string;
+  prefix: string;
+  endpoint: string;
+  project: { id: string; slug: string; name: string };
+}> {
+  return requestREST(cfg, "POST", "/api/auth/cli/governance/ingestion-key", {
+    ...options,
+    body: {
+      source_type: sourceType,
+      project,
+      ...(deviceLabel ? { device_label: deviceLabel } : {}),
+    },
+    mutating: true,
+  });
+}
+
+/**
+ * Issue the personal virtual key on demand. Called at the moment a tool
+ * actually resolves to the gateway path with no VK stored; login no
+ * longer auto-issues one, so subscription-only users never create VKs.
+ * The secret is returned exactly once; the caller persists it.
+ */
+export async function issuePersonalVirtualKey(
+  cfg: GovernanceConfig,
+  { deviceLabel }: { deviceLabel?: string } = {},
+  options: CliApiOptions = {},
+): Promise<{ id: string; secret: string; prefix: string }> {
+  return requestREST(cfg, "POST", "/api/auth/cli/virtual-key", {
+    ...options,
+    body: deviceLabel ? { device_label: deviceLabel } : {},
+    mutating: true,
+  });
 }
 
 

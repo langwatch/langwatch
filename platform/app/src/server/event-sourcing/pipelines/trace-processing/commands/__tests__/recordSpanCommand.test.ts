@@ -313,7 +313,7 @@ describe("RecordSpanCommand", () => {
       /** @scenario Reserved causality_depth attribute passes through strip */
       it("preserves langwatch.reserved.causality_depth on the emitted span (loop-prevention contract)", async () => {
         // Regression for the post-2026-05-11 bug: stripReservedAttributes
-        // was nuking the very attribute the evaluationTrigger reactor
+        // was nuking the very attribute the evaluationTrigger subscriber
         // reads to detect loops, silently disabling loop prevention.
         // The fix is a passthrough allowlist; this test pins the
         // attribute name as load-bearing — renaming or removing the

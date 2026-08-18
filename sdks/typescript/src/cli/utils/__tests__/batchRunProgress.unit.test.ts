@@ -31,7 +31,10 @@ const json = (body: unknown, status = 200): Response =>
 		headers: { "content-type": "application/json" },
 	});
 
-const run = (status: string, verdict?: string | null) => ({
+// The real endpoint stamps every run with its batch id; the stub does too,
+// because fetchBatchRuns keeps only the batch's own runs.
+const run = (status: string, verdict?: string | null, batchRunId = "batch_1") => ({
+	batchRunId,
 	status,
 	results: verdict === undefined ? null : { verdict },
 });
@@ -98,6 +101,39 @@ describe("batch run progress", () => {
 			const [requested] = mockFetch.mock.calls[0] as [URL];
 			expect(requested.pathname).toBe("/api/simulation-runs");
 			expect(requested.searchParams.get("batchRunId")).toBe("batch_1");
+		});
+	});
+
+	describe("given a server that answers with the whole project's runs", () => {
+		/** @scenario "Runs from other batches never count toward the wait" */
+		it("keeps only the batch's own runs", async () => {
+			// Deployed servers apply the batchRunId filter only when scenarioSetId
+			// is also present. Left unfiltered, the stale IN_PROGRESS run below
+			// would count as in flight forever and hold the wait open until its
+			// timeout.
+			serveRuns({
+				"": {
+					runs: [
+						run("SUCCESS", "success"),
+						run("IN_PROGRESS", undefined, "batch_stale"),
+						run("FAILED", "failure", "batch_other"),
+					],
+				},
+			});
+
+			const runs = await fetchBatchRuns({
+				endpoint: "https://app.langwatch.test",
+				batchRunId: "batch_1",
+				headers: {},
+			});
+
+			expect(runs).toHaveLength(1);
+			expect(tallyBatchRuns(runs)).toEqual({
+				total: 1,
+				completed: 1,
+				passed: 1,
+				failed: 0,
+			});
 		});
 	});
 

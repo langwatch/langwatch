@@ -203,6 +203,39 @@ future consumer must now decide where it sits — injected dependency, or
 is the pragmatic option for route modules that have no constructor, and
 injection remains the default everywhere a seam exists.
 
+### Where "`redis === null`" is the same answer the singleton gave, and where it is not
+
+The migration's equivalence claim — `getApp().redis` is `null` exactly where the
+old `connection` was `undefined` — holds **for the web and worker processes,
+after boot**. Both build an App before they serve anything, so every consumer
+reached through a request or a job sees the connection the composition root
+made. It does not hold universally, and the difference is worth stating rather
+than leaving to be rediscovered (#6951):
+
+- **A process that never builds an App now has no Redis.** The old module
+  connected at import in any process that imported it, `pnpm run task` and a
+  bare `tsx scripts/*.ts` included; its skip guards only fired at build or test
+  time. `task.ts` deliberately boots no App for most tasks, so in one of those
+  `tryGetApp()?.redis ?? null` answers `null` permanently — not for a moment,
+  but for the life of the process.
+- **A callback firing before boot completes sees `null` too.** The window is
+  narrow and `start.ts` closes it for the web entrypoint by booting the App
+  before it listens, but it is a real state and consumers are written for it.
+
+Neither is a bug on its own, because every consumer of `getApp().redis` already
+branches on absence: Redis has always been optional here. What changes is which
+branch an App-less process takes, so a task or script that genuinely needs Redis
+must now say so — by building an App, or by owning a connection through
+`RedisConnectionService`, the way `migrateObjectStorage` and the dogfood login
+scripts do. The tasks and scripts in the tree were audited against this on
+2026-08-13 and none was silently relying on the old import-time connection.
+
+The two source guards in `redis-ownership.unit.test.ts` are what keep the second
+option honest: they scan the whole of `platform/app` — scripts, end-to-end specs
+and build tooling included, in JavaScript as well as TypeScript — so a script
+that reaches for ioredis directly instead of the client package is a failing
+test rather than a discovery.
+
 ## References
 
 - Spec: `specs/server/redis-client-ownership.feature`

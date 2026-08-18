@@ -203,11 +203,11 @@ export class TraceService {
     const resolveTraceSpansFn = offloadedSpanResolver?.toResolverFn();
     const resolveTraceSpansBatchFn = offloadedSpanResolver?.toBatchResolverFn();
 
-    this.clickHouseService = ClickHouseTraceService.create(
+    this.clickHouseService = ClickHouseTraceService.create({
       prisma,
-      resolveTraceSpansFn,
-      resolveTraceSpansBatchFn,
-    );
+      resolveTraceSpans: resolveTraceSpansFn,
+      resolveTraceSpansBatch: resolveTraceSpansBatchFn,
+    });
     this.evaluationService = EvaluationService.create();
     // Injected store for the read-time Claude Code content enrichment; the
     // default comes LAZILY from the App on first use (see

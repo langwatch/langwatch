@@ -1,6 +1,9 @@
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import type { ProcessRef } from "~/server/event-sourcing/process-manager/processManager.types";
 import type {
+  DeadLetterCount,
+  DeadOutboxMessageView,
+  OutboxAttemptView,
   ProcessInstanceRow,
   ProcessNameCounts,
   ProcessOpsRepository,
@@ -17,6 +20,19 @@ function traceIdFromCarrier(carrier: unknown): string | null {
   if (typeof traceparent !== "string") return null;
   return TRACEPARENT_RE.exec(traceparent)?.[1] ?? null;
 }
+
+/**
+ * How many dead letters one bulk act moves.
+ *
+ * An unbounded UPDATE over this table holds row locks for as long as it takes,
+ * on the highest-volume write path in the system. The cap makes the act
+ * bounded and repeatable instead: the count comes back, the operator sees what
+ * moved, and pressing again takes the next slice.
+ */
+const BULK_RECOVERY_LIMIT = 5_000;
+
+/** How many attempt entries one message's history returns. */
+const ATTEMPT_HISTORY_LIMIT = 200;
 
 /** Escape LIKE wildcards so a search term matches literally. */
 function escapeLike(term: string): string {
@@ -283,6 +299,122 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     };
   }
 
+  /**
+   * Every retired message across the fleet, newest retirement first.
+   *
+   * Ordered by `updatedAt` rather than `createdAt`: a dead row's interesting
+   * moment is when it was RETIRED, and a message that spent 68 hours climbing
+   * the Stripe ladder before dying is days newer than its creation suggests.
+   * An operator opening this mid-incident wants what just broke at the top.
+   */
+  async findDeadMessages(params: {
+    processName?: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{ messages: DeadOutboxMessageView[]; total: number }> {
+    // Raw, like every other fleet-wide read here: the multitenancy guard
+    // rejects a Prisma query on this model without a `projectId`, and a
+    // dead-letter sweep has no single project to name. The `@tenancy` marker
+    // is the same declaration `countByProcessName` makes, and the surface is
+    // ops-gated.
+    const nameFilter = params.processName
+      ? Prisma.sql`AND "processName" = ${params.processName}`
+      : Prisma.empty;
+
+    const [rows, totals] = await Promise.all([
+      this.prisma.$queryRaw<
+        Array<
+          Omit<
+            DeadOutboxMessageView,
+            "nextAttemptAt" | "leasedUntil" | "createdAt" | "updatedAt"
+          > & {
+            nextAttemptAt: Date;
+            leasedUntil: Date | null;
+            createdAt: Date;
+            updatedAt: Date;
+            traceCarrier: unknown;
+          }
+        >
+      >(Prisma.sql`
+        -- @tenancy: cross-tenant ops dead-letter read; the surface is ops-gated
+        SELECT "id", "processName", "projectId", "processKey", "messageKey",
+               "intentType", "status", "attempts", "nextAttemptAt",
+               "leasedUntil", "createdAt", "updatedAt", "sourceEventId",
+               "traceCarrier", "payload"
+        FROM "ProcessManagerOutbox"
+        WHERE "status" = 'dead'
+        ${nameFilter}
+        ORDER BY "updatedAt" DESC, "id" DESC
+        LIMIT ${params.pageSize}
+        OFFSET ${(params.page - 1) * params.pageSize}
+      `),
+      this.prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
+        -- @tenancy: cross-tenant ops dead-letter read; the surface is ops-gated
+        SELECT COUNT(*)::int AS "total"
+        FROM "ProcessManagerOutbox"
+        WHERE "status" = 'dead'
+        ${nameFilter}
+      `),
+    ]);
+
+    return {
+      total: totals[0]?.total ?? 0,
+      messages: rows.map((r) => ({
+        id: r.id,
+        processName: r.processName,
+        projectId: r.projectId,
+        processKey: r.processKey,
+        messageKey: r.messageKey,
+        intentType: r.intentType,
+        status: r.status,
+        attempts: r.attempts,
+        nextAttemptAt: r.nextAttemptAt.getTime(),
+        leasedUntil: r.leasedUntil?.getTime() ?? null,
+        createdAt: r.createdAt.getTime(),
+        updatedAt: r.updatedAt.getTime(),
+        sourceEventId: r.sourceEventId,
+        traceId: traceIdFromCarrier(r.traceCarrier),
+        payload: r.payload,
+      })),
+    };
+  }
+
+  /**
+   * Indexing, deliberately left to ops.
+   *
+   * The reads below scan `status = 'dead'` and sort by `updatedAt`. The
+   * table's only relevant index leads with `status`, which narrows to the
+   * dead rows; the sort over that subset is what is unindexed. That is
+   * acceptable because the dead population is bounded by operator attention
+   * rather than by traffic — a fleet with enough dead messages for this sort
+   * to matter has a far louder problem than the query plan.
+   *
+   * A Prisma migration is the wrong instrument if it ever does matter: a
+   * deploy-time CREATE INDEX takes a SHARE lock on the highest-volume write
+   * path in the system. The schema says as much for the two indexes the
+   * retention sweep wanted, and the answer there is the same one here —
+   * CREATE INDEX CONCURRENTLY, run from the runbook.
+   */
+  async countDeadByProcessName(): Promise<DeadLetterCount[]> {
+    const rows = await this.prisma.$queryRaw<
+      Array<{ processName: string; count: number; oldestUpdatedAt: Date }>
+    >(Prisma.sql`
+      -- @tenancy: cross-tenant ops dead-letter totals; the surface is ops-gated
+      SELECT "processName",
+             COUNT(*)::int AS "count",
+             MIN("updatedAt") AS "oldestUpdatedAt"
+      FROM "ProcessManagerOutbox"
+      WHERE "status" = 'dead'
+      GROUP BY "processName"
+      ORDER BY COUNT(*) DESC
+    `);
+    return rows.map((r) => ({
+      processName: r.processName,
+      count: r.count,
+      oldestUpdatedAt: r.oldestUpdatedAt?.getTime() ?? 0,
+    }));
+  }
+
   async wakeInstanceNow(params: {
     ref: ProcessRef;
     now: number;
@@ -343,6 +475,129 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     });
     if (updated.count === 0) return null;
     return { messageKey: message.messageKey };
+  }
+
+  async discardDeadMessage(params: {
+    ref: ProcessRef;
+    messageId: string;
+    now: number;
+  }): Promise<{ messageKey: string } | null> {
+    const message = await this.prisma.processManagerOutbox.findFirst({
+      where: {
+        id: params.messageId,
+        projectId: params.ref.projectId,
+        processName: params.ref.processName,
+        processKey: params.ref.processKey,
+        status: "dead",
+      },
+      select: { messageKey: true },
+    });
+    if (!message) return null;
+    // A mark, not a delete: the row is retained as its own audit trail.
+    // Guarded on status in the WHERE, same as the redrive: only a dead row
+    // can be discarded, so a racing redrive keeps its win.
+    const updated = await this.prisma.processManagerOutbox.updateMany({
+      where: {
+        id: params.messageId,
+        projectId: params.ref.projectId,
+        status: "dead",
+      },
+      data: {
+        status: "discarded",
+        updatedAt: new Date(params.now),
+      },
+    });
+    if (updated.count === 0) return null;
+    return { messageKey: message.messageKey };
+  }
+
+  async redriveAllDeadMessages(params: {
+    processName?: string;
+    now: number;
+  }): Promise<number> {
+    const now = new Date(params.now);
+    const nameFilter = params.processName
+      ? Prisma.sql`AND "processName" = ${params.processName}`
+      : Prisma.empty;
+    // Raw, like the fleet-wide reads: a dead-letter sweep has no single
+    // project to name for the tenancy guard, and the surface is ops-gated.
+    return await this.prisma.$executeRaw(Prisma.sql`
+      -- @tenancy: cross-tenant ops dead-letter recovery; the surface is ops-gated
+      UPDATE "ProcessManagerOutbox"
+      SET "status" = 'pending',
+          "attempts" = 0,
+          -- Spread over a minute rather than making every message due at the
+          -- same instant: a fleet redrive can release thousands of intents,
+          -- and handing the dispatcher one due batch the size of the whole
+          -- backlog is how a recovery becomes the next incident.
+          "nextAttemptAt" =
+            CAST(${now} AS timestamptz) + (random() * interval '60 seconds'),
+          "leasedUntil" = NULL,
+          "leaseToken" = NULL,
+          "updatedAt" = ${now}
+      -- The status guard is repeated on the UPDATE itself, not left to the
+      -- subquery. The subquery picks ids under one snapshot and the UPDATE
+      -- locks them under another, so a concurrent single-row redrive or
+      -- discard that landed in between would otherwise be clobbered. The
+      -- single-row paths guard the same way for the same reason.
+      WHERE "status" = 'dead'
+        AND "id" IN (
+          SELECT "id" FROM "ProcessManagerOutbox"
+          WHERE "status" = 'dead'
+          ${nameFilter}
+          LIMIT ${BULK_RECOVERY_LIMIT}
+        )
+    `);
+  }
+
+  async discardAllDeadMessages(params: {
+    processName?: string;
+    now: number;
+  }): Promise<number> {
+    const now = new Date(params.now);
+    const nameFilter = params.processName
+      ? Prisma.sql`AND "processName" = ${params.processName}`
+      : Prisma.empty;
+    return await this.prisma.$executeRaw(Prisma.sql`
+      -- @tenancy: cross-tenant ops dead-letter recovery; the surface is ops-gated
+      UPDATE "ProcessManagerOutbox"
+      SET "status" = 'discarded',
+          "updatedAt" = ${now}
+      -- Guarded on the UPDATE too; see redriveAllDeadMessages.
+      WHERE "status" = 'dead'
+        AND "id" IN (
+          SELECT "id" FROM "ProcessManagerOutbox"
+          WHERE "status" = 'dead'
+          ${nameFilter}
+          LIMIT ${BULK_RECOVERY_LIMIT}
+        )
+    `);
+  }
+
+  async findAttempts(params: {
+    outboxId: string;
+    projectId: string;
+  }): Promise<OutboxAttemptView[]> {
+    const rows = await this.prisma.processManagerOutboxAttempt.findMany({
+      where: { outboxId: params.outboxId, projectId: params.projectId },
+      // Chronological, not by attempt number: a redrive resets `attempts`, so
+      // ordering by it would interleave a message's second life with its
+      // first. `id` breaks ties within a millisecond.
+      orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
+      // Bounded: this sits behind a tRPC query an operator can open on any
+      // message, and a message redriven repeatedly accumulates an attempt row
+      // per failure with no ceiling of its own.
+      take: ATTEMPT_HISTORY_LIMIT,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      attempt: r.attempt,
+      occurredAt: r.occurredAt.getTime(),
+      outcome: r.outcome,
+      errorType: r.errorType,
+      errorMessage: r.errorMessage,
+      retryAfterMs: r.retryAfterMs,
+    }));
   }
 
   async releaseLapsedLease(params: {

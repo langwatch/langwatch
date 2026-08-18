@@ -72,6 +72,8 @@ export const gatewayUsageRouter = createTRPCRouter({
         virtualKeyId: z.string(),
         fromDate: z.string().datetime(),
         toDate: z.string().datetime(),
+        /** Narrows the recent-activity list, and nothing else, to one model. */
+        model: z.string().min(1).max(256).optional(),
       }),
     )
     .use(authorizeInResolver)
@@ -100,6 +102,7 @@ export const gatewayUsageRouter = createTRPCRouter({
           fromDate: new Date(input.fromDate),
           toDate: new Date(input.toDate),
         },
+        model: input.model,
       });
     }),
 });

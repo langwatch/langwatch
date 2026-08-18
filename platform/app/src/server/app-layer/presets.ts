@@ -61,7 +61,6 @@ import { OpsExplainService } from "~/server/ops/opsExplain.service";
 import { getPostHogInstance } from "~/server/posthog";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
-import { ClickHouseOrphanedRunFinder } from "~/server/scenarios/orphaned-run-reconciliation.clickhouse";
 import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { getSaaSPlanProvider } from "../../../ee/billing";
@@ -94,6 +93,7 @@ import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 import {
   type AppCommands,
   PipelineRegistry,
+  type ScenarioExecutionPoolHolder,
 } from "../event-sourcing/pipelineRegistry";
 import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
@@ -104,8 +104,9 @@ import {
   NullExperimentIdLookupRepository,
 } from "../event-sourcing/pipelines/experiment-run-processing/repositories";
 import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
-import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
+import { SimulationRunMetricsAppendStore } from "../event-sourcing/pipelines/simulation-processing/projections";
 import {
+  SimulationRunMetricsRepositoryClickHouse,
   SimulationRunStateRepositoryClickHouse,
   SimulationRunStateRepositoryMemory,
 } from "../event-sourcing/pipelines/simulation-processing/repositories";
@@ -246,6 +247,7 @@ import {
   ProcessAuditRepository,
 } from "./ops/process-audit.repository";
 import { QueueService } from "./ops/queue.service";
+import { QueueAuditRepository } from "./ops/queue-audit.repository";
 import { ReplayService } from "./ops/replay.service";
 import { BlobStoreRedisRepository } from "./ops/repositories/blob-store.redis.repository";
 import { NullBlobStoreRepository } from "./ops/repositories/blob-store.repository";
@@ -289,6 +291,7 @@ import { PlanProviderService } from "./subscription/plan-provider";
 import { createSelfHostedPlanProvider } from "./subscription/self-hosted-plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { SuiteRunService } from "./suites/suite-run.service";
+import { startSystemMigrations } from "./system-migrations/boot";
 import { startTopicClusteringBootSeeds } from "./topic-clustering/bootSeeds";
 import { clusterTopicsForProject } from "./topic-clustering/clustering";
 import { NullTopicRepository } from "./topic-clustering/repositories/null-topic.repository";
@@ -337,11 +340,12 @@ import { UsageService } from "./usage/usage.service";
 const redisLogger = createLogger("langwatch:redis");
 
 /**
- * Late-bound handle for the scenario execution reactor.
+ * Late-bound holder for this pod's scenario execution pool, read by the
+ * simulationRunExecution process manager's execute intent.
  * Stored on globalForApp to survive hot-reload in dev (same as the App instance).
  */
-export function getScenarioExecutionHandle(): ScenarioExecutionReactorHandle | null {
-  return (globalForApp as any).__scenarioExecutionHandle ?? null;
+export function getScenarioExecutionPool(): ScenarioExecutionPoolHolder | null {
+  return (globalForApp as any).__scenarioExecutionPool ?? null;
 }
 
 export function initializeWebApp(): App {
@@ -433,6 +437,18 @@ export function initializeDefaultApp(options?: {
     ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
     : new NullSpanStorageRepository();
 
+  // Resolves the per-tenant retention cascade; shared by the DSPy CH repo
+  // (which stamps dspy_steps as a traces-category table), the read floors that
+  // bound `evaluation_runs`, and the data-retention services wired further
+  // below. Constructed here rather than beside those services because the
+  // evaluation-run repository below needs it and is built first — without it
+  // that read floor silently falls back to the platform default, which is the
+  // whole point of making it tenant-aware.
+  const dataRetentionPolicyRepo = new DataRetentionPolicyRepository(prisma);
+  const retentionPolicyCache = new RetentionPolicyCache(
+    dataRetentionPolicyRepo,
+  );
+
   const traceSummary = traced(
     new TraceSummaryService(
       clickhouseEnabled
@@ -445,7 +461,10 @@ export function initializeDefaultApp(options?: {
   const evaluationRuns = traced(
     new EvaluationRunService(
       clickhouseEnabled
-        ? new EvaluationRunClickHouseRepository(resolveClickHouseClient)
+        ? new EvaluationRunClickHouseRepository({
+            resolveClient: resolveClickHouseClient,
+            retentionResolver: retentionPolicyCache,
+          })
         : new NullEvaluationRunRepository(),
     ),
     "EvaluationRunService",
@@ -528,14 +547,6 @@ export function initializeDefaultApp(options?: {
       workflowExecutor: { runEvaluationWorkflow },
     }),
     "EvaluationExecutionService",
-  );
-
-  // Resolves the per-tenant retention cascade; shared by the DSPy CH repo
-  // (which stamps dspy_steps as a traces-category table) and the data-retention
-  // services wired further below.
-  const dataRetentionPolicyRepo = new DataRetentionPolicyRepository(prisma);
-  const retentionPolicyCache = new RetentionPolicyCache(
-    dataRetentionPolicyRepo,
   );
 
   const dspySteps = traced(
@@ -774,6 +785,19 @@ export function initializeDefaultApp(options?: {
     simulationRunState: clickhouseEnabled
       ? new SimulationRunStateRepositoryClickHouse(resolveClickHouseClient)
       : new SimulationRunStateRepositoryMemory(),
+    simulationRunMetricsStore: clickhouseEnabled
+      ? new SimulationRunMetricsAppendStore(
+          new SimulationRunMetricsRepositoryClickHouse(resolveClickHouseClient),
+        )
+      : // No ClickHouse → event sourcing is disabled; the append store is a noop.
+        {
+          append: async () => {
+            /* noop */
+          },
+          bulkAppend: async () => {
+            /* noop */
+          },
+        },
     experimentRunState: clickhouseEnabled
       ? new ExperimentRunStateRepositoryClickHouse(resolveClickHouseClient)
       : new ExperimentRunStateRepositoryMemory(),
@@ -893,7 +917,7 @@ export function initializeDefaultApp(options?: {
         }
       : undefined;
 
-  // Governance's KPI rollup. One instance for the whole App: the reactor
+  // Governance's KPI rollup. One instance for the whole App: the subscriber
   // sync writes through it, the spend-spike anomaly evaluator reads through
   // it — the same repository reference the process manager below takes and
   // `app.governance.kpis` hands out.
@@ -905,7 +929,7 @@ export function initializeDefaultApp(options?: {
     : undefined;
 
   // Governance's OCSF SIEM-export sink. One instance for the whole App: the
-  // reactor sync writes through it, the puller worker and the workspace-view
+  // subscriber sync writes through it, the puller worker and the workspace-view
   // audit trail write through it, and the SIEM export procedure reads
   // through it — the same repository reference the process manager below
   // takes and `app.governance.ocsfEvents` hands out.
@@ -988,6 +1012,16 @@ export function initializeDefaultApp(options?: {
       })
     : undefined;
   scheduler?.start();
+
+  // ADR-092 stage B: the in-place system migrations. Worker-only and
+  // fire-and-forget - one pass per boot, level-triggered, so held and parked
+  // organizations retry on the restart cadence with nobody running anything.
+  // Redis is handed in rather than read back off the App: this composes the
+  // App, so `tryGetApp()` is still null here, and a null handle would make
+  // the lease unacquirable and every pass a silent no-op.
+  const systemMigrations = roleRunsWorkers(config.processRole)
+    ? startSystemMigrations({ redis })
+    : undefined;
 
   // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
   // renders + dispatches on schedule (worker-only, same notify pipeline as
@@ -1122,7 +1156,7 @@ export function initializeDefaultApp(options?: {
       });
   }
 
-  // The coding-agent pipeline's pull-request mapping reactor fires against a
+  // The coding-agent pipeline's pull-request mapping subscriber fires against a
   // service composed further down (it needs the GitHub connection, which needs
   // Redis and Prisma), so the registry is handed the callable proxy now and the
   // real implementation is wired once it exists.
@@ -1176,6 +1210,16 @@ export function initializeDefaultApp(options?: {
     enterprisePipelines: {
       prisma,
       runsWorkers: roleRunsWorkers(config.processRole),
+      // Pulled provider cost shares the gateway debits' ClickHouse gate: it
+      // lands in the same ledger table, so without ClickHouse there is nowhere
+      // for it to go. The pipeline still records every observation on the log.
+      pulledUsageLedger: clickhouseEnabled
+        ? {
+            budgetCHRepository: new GatewayBudgetClickHouseRepository(
+              resolveClickHouseClient,
+            ),
+          }
+        : undefined,
     },
     projects,
     monitors,
@@ -1198,8 +1242,8 @@ export function initializeDefaultApp(options?: {
     governanceOcsfEventsSync,
   });
   const commands = registry.registerAll();
-  (globalForApp as any).__scenarioExecutionHandle =
-    commands.scenarioExecutionHandle;
+  (globalForApp as any).__scenarioExecutionPool =
+    commands.scenarioExecutionPool;
 
   if (roleRunsWorkers(config.processRole)) {
     // One-time background seeds on worker boot (ADR-051): topic-model
@@ -1421,6 +1465,8 @@ export function initializeDefaultApp(options?: {
         })
       ).map((project) => project.id),
     sessions: codingAgentSessions,
+    touchCodingAgentPullRequestSeen: (params) =>
+      projects.touchCodingAgentPullRequestSeen(params),
   });
   requestBranchMapping.resolve((params) =>
     githubPullRequestMapping!.requestBranchMapping(params),
@@ -1543,6 +1589,14 @@ export function initializeDefaultApp(options?: {
       close: () => scheduler.stop(),
     });
   }
+  if (systemMigrations) {
+    // Aborts the pass between tenants; a truncated pass is harmless because
+    // every migration is idempotent and the next boot resumes the sweep.
+    gracefulCloseables.push({
+      name: "system-migrations",
+      close: () => systemMigrations.stop(),
+    });
+  }
   gracefulCloseables.push({
     name: "prisma",
     close: () => prisma.$disconnect(),
@@ -1583,7 +1637,10 @@ export function initializeDefaultApp(options?: {
     : new NullEventExplorerRepository();
 
   const ops = {
-    queues: new QueueService(queueRepo),
+    queues: new QueueService({
+      repo: queueRepo,
+      audit: new QueueAuditRepository(prisma),
+    }),
     scheduler: new SchedulerOpsService({
       repo: new PrismaScheduledJobRepository(prisma),
       audit: new SchedulerAuditRepository(prisma),
@@ -1677,17 +1734,6 @@ export function initializeDefaultApp(options?: {
       instance: new InstanceUsageStatsClickHouseRepository(
         getClickHouseClientForOrganization,
       ),
-    },
-    scenarios: {
-      // Boot-sweep-only: the two orphaned-run reconciliation sweeps read the
-      // shared (cross-tenant) client directly rather than a per-tenant
-      // repository — see clickhouse-queries.md's "boot-time system sweeps"
-      // carve-out. `sharedCh` is the same client `ops.eventExplorer` above
-      // was built from.
-      orphanReconciliation: {
-        client: sharedCh,
-        finder: sharedCh ? new ClickHouseOrphanedRunFinder(sharedCh) : null,
-      },
     },
     governance: {
       ocsfEvents: governanceOcsfEventsRepository,
@@ -2010,9 +2056,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         throw new Error("ClickHouse is not available in the test app");
       }),
     },
-    scenarios: {
-      orphanReconciliation: { client: null, finder: null },
-    },
     governance: {
       ocsfEvents: undefined,
       traceActivity: undefined,
@@ -2117,7 +2160,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     nurturing: undefined,
     usageLimits: UsageLimitService.createNull(),
     ops: {
-      queues: new QueueService(new NullQueueRepository()),
+      queues: new QueueService({ repo: new NullQueueRepository() }),
       scheduler: new SchedulerOpsService({
         repo: new NullScheduledJobRepository(),
       }),
@@ -2218,15 +2261,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       automations: {
         recordTriggerMatch: noop,
       } as AppCommands["automations"],
-      scenarioExecutionHandle: {
-        reactor: {
-          name: "scenarioExecution",
-          options: { runIn: ["worker"] },
-          handle: async () => {
-            /* noop */
-          },
-        },
-        setPool: () => {
+      scenarioExecutionPool: {
+        get: () => null,
+        set: () => {
           /* noop */
         },
       },

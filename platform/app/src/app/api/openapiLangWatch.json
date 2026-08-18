@@ -4464,6 +4464,50 @@
               }
             }
           },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -4559,10 +4603,30 @@
                     "type": "object",
                     "properties": {
                       "start": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
                       },
                       "end": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
                       }
                     },
                     "required": [
@@ -6085,7 +6149,8 @@
                     "maxLength": 200
                   },
                   "definition": {}
-                }
+                },
+                "minProperties": 1
               }
             }
           }
@@ -17129,22 +17194,34 @@
                             "type": "string"
                           },
                           "created_at": {
-                            "type": "string"
+                            "type": "string",
+                            "format": "date-time"
                           },
                           "updated_at": {
-                            "type": "string"
+                            "type": "string",
+                            "format": "date-time"
                           },
                           "last_used_at": {
                             "type": [
                               "string",
                               "null"
-                            ]
+                            ],
+                            "format": "date-time"
                           },
                           "revoked_at": {
                             "type": [
                               "string",
                               "null"
-                            ]
+                            ],
+                            "format": "date-time"
+                          },
+                          "expires_at": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "date-time",
+                            "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                           }
                         },
                         "required": [
@@ -17167,7 +17244,8 @@
                           "created_at",
                           "updated_at",
                           "last_used_at",
-                          "revoked_at"
+                          "revoked_at",
+                          "expires_at"
                         ]
                       }
                     },
@@ -17532,22 +17610,34 @@
                           "type": "string"
                         },
                         "created_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "updated_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "last_used_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "revoked_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
+                        },
+                        "expires_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time",
+                          "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
                       "required": [
@@ -17570,7 +17660,8 @@
                         "created_at",
                         "updated_at",
                         "last_used_at",
-                        "revoked_at"
+                        "revoked_at",
+                        "expires_at"
                       ]
                     },
                     "secret": {
@@ -17889,6 +17980,10 @@
                       "fallback_all",
                       "policy"
                     ]
+                  },
+                  "expires_at": {
+                    "type": "string",
+                    "description": "When the key stops serving. Omit it and the key never expires. A date that has already passed is refused with `virtual_key_expiry_in_past`, rather than writing a key that is dead on arrival."
                   },
                   "budget": {
                     "type": [
@@ -18227,22 +18322,34 @@
                           "type": "string"
                         },
                         "created_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "updated_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "last_used_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "revoked_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
+                        },
+                        "expires_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time",
+                          "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
                       "required": [
@@ -18265,7 +18372,8 @@
                         "created_at",
                         "updated_at",
                         "last_used_at",
-                        "revoked_at"
+                        "revoked_at",
+                        "expires_at"
                       ]
                     }
                   },
@@ -18634,22 +18742,34 @@
                           "type": "string"
                         },
                         "created_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "updated_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "last_used_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "revoked_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
+                        },
+                        "expires_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time",
+                          "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
                       "required": [
@@ -18672,7 +18792,8 @@
                         "created_at",
                         "updated_at",
                         "last_used_at",
-                        "revoked_at"
+                        "revoked_at",
+                        "expires_at"
                       ]
                     }
                   },
@@ -18938,6 +19059,13 @@
                       "fallback_all",
                       "policy"
                     ]
+                  },
+                  "expires_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "When the key stops serving. Omit it and the stored date stays where it is; null clears it, so the key never expires; a date moves it. A key whose date has already passed accepts this edit like any other, which is how an expired key is put back in service without minting a new secret. A date in the past is refused with `virtual_key_expiry_in_past`."
                   },
                   "budget": {
                     "type": [
@@ -19621,22 +19749,34 @@
                           "type": "string"
                         },
                         "created_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "updated_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "last_used_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "revoked_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
+                        },
+                        "expires_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time",
+                          "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
                       "required": [
@@ -19659,7 +19799,8 @@
                         "created_at",
                         "updated_at",
                         "last_used_at",
-                        "revoked_at"
+                        "revoked_at",
+                        "expires_at"
                       ]
                     },
                     "secret": {
@@ -19991,22 +20132,34 @@
                           "type": "string"
                         },
                         "created_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "updated_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "last_used_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "revoked_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
+                        },
+                        "expires_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time",
+                          "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
                       "required": [
@@ -20029,7 +20182,8 @@
                         "created_at",
                         "updated_at",
                         "last_used_at",
-                        "revoked_at"
+                        "revoked_at",
+                        "expires_at"
                       ]
                     }
                   },
@@ -20374,22 +20528,34 @@
                           "type": "string"
                         },
                         "created_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "updated_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "last_used_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "revoked_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
+                        },
+                        "expires_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time",
+                          "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
                       "required": [
@@ -20412,7 +20578,8 @@
                         "created_at",
                         "updated_at",
                         "last_used_at",
-                        "revoked_at"
+                        "revoked_at",
+                        "expires_at"
                       ]
                     }
                   },
@@ -20740,22 +20907,34 @@
                           "type": "string"
                         },
                         "created_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "updated_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "last_used_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "revoked_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
+                        },
+                        "expires_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time",
+                          "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
                       "required": [
@@ -20778,7 +20957,8 @@
                         "created_at",
                         "updated_at",
                         "last_used_at",
-                        "revoked_at"
+                        "revoked_at",
+                        "expires_at"
                       ]
                     }
                   },
@@ -42503,7 +42683,7 @@
           }
         ],
         "summary": "Update a provisioned user",
-        "description": "Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active` (deactivating or reactivating the account), of `userName`, and of `name.givenName` / `name.familyName`, written either as an operation path or as keys inside a value object; and `add`, `replace` or `remove` of the enterprise `costCenter`, which reassigns the member's department. Operations outside that set are accepted and change nothing, so a provider sending its full patch set is never rejected.",
+        "description": "Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active` (deactivating or reactivating the account), of `userName`, and of `name.givenName` / `name.familyName`, written either as an operation path or as keys inside a value object; and `add`, `replace` or `remove` of the enterprise `costCenter`, which reassigns the member's department. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Replace` that Entra ID writes is accepted; any other name, or a missing or non-string one, is rejected with a 400. An understood operation aimed at anything not listed above is accepted and changes nothing.",
         "security": [
           {
             "scim_bearer": []
@@ -43525,7 +43705,7 @@
           }
         ],
         "summary": "Update a provisioned group",
-        "description": "Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of members (named by a value filter on the path, as Entra ID writes it, or in the operation value), `replace` of `displayName`, and `replace` of the whole member list. Operations outside that set are accepted and change nothing.",
+        "description": "Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of members (named by a value filter on the path, as Entra ID writes it, or in the operation value), `replace` of `displayName`, and `replace` of the whole member list. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Add` / `Remove` that Entra ID writes are accepted; any other name, or a missing or non-string one, is rejected with a 400. An `add` or a `remove` aimed at anything other than members is accepted and changes nothing. A `replace` that is not a `displayName` rename is treated as a replacement of the whole member list, so one that carries no members empties the group.",
         "security": [
           {
             "scim_bearer": []

@@ -112,8 +112,15 @@ const LICENSE_COUNTED_PROJECT_MODELS = [
  * working until the sweep PR drops the column).
  */
 type ScopedModelConfig = {
-  /** Where-clause validator. Returns `null` if OK, error message otherwise. */
-  validateWhere: (where: any) => string | null;
+  /**
+   * Where-clause validator. Returns `null` if OK, error message otherwise.
+   *
+   * `action` is the Prisma action being guarded, so a model can hold bulk
+   * writes (`updateMany` / `deleteMany`) to a stricter predicate than reads:
+   * a where clause that is merely a bounded *view* of many tenants is still
+   * an unbounded *edit* of them.
+   */
+  validateWhere: (where: any, action?: string) => string | null;
   /** Data validator for create / createMany. */
   validateCreateData: (data: any) => string | null;
 };
@@ -643,6 +650,50 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
+  // In-place system migration state (@langwatch/system-migrations). Its
+  // tenancy column is `tenantId` - deliberately not an FK, because the runner
+  // is generic over whatever a migration calls a tenant (an organization, for
+  // ADR-092 stage B). Two shapes are legitimately bounded: one tenant's row
+  // (what the runner and the authz fallback gate read), and one migration's
+  // rows across tenants (the platform-scope ops rollup, which is the whole
+  // point of the dashboard). A query naming neither would walk every
+  // migration's every tenant, so it throws.
+  SystemMigrationTenantState: {
+    validateWhere: (where, action) => {
+      // A migration-wide predicate is a legitimate way to READ (the ops
+      // rollup lists one migration across tenants) and never a legitimate
+      // way to WRITE: `deleteMany({ where: { migrationName } })` would drop
+      // every tenant's row at once, and the rows it drops include the
+      // `finalized` latches - silently returning every switched-over
+      // organization to its legacy path. Bulk writes must name a tenant.
+      const bulkWrite = action === "updateMany" || action === "deleteMany";
+      const reason = bulkWrite
+        ? "requires a tenantId in the where clause (a migration-wide bulk write would rewrite every tenant's migration state)"
+        : "requires a migrationName or tenantId in the where clause (compound key included)";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          typeof c.tenantId === "string" ||
+          typeof c.migrationName_tenantId?.tenantId === "string" ||
+          (!bulkWrite && typeof c.migrationName === "string"),
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (
+          typeof d.migrationName !== "string" ||
+          typeof d.tenantId !== "string"
+        ) {
+          return "create requires a migrationName and tenantId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
 };
 
 /**
@@ -731,7 +782,7 @@ const _guardProjectId = ({ params }: { params: GuardParams }) => {
         throw new Error(`The ${action} action on the ${model} model ${err}.`);
       }
     } else {
-      const err = config.validateWhere(params.args?.where);
+      const err = config.validateWhere(params.args?.where, action);
       if (err) {
         throw new Error(`The ${action} action on the ${model} model ${err}.`);
       }

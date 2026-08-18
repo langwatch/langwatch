@@ -36,6 +36,16 @@ type Request struct {
 	Transcription *TranscriptionUpload
 }
 
+// InboundSurface reports the route this request arrived on when that route
+// pins its own providers, and the zero Surface when it does not. Only the
+// raw-forward routes pin.
+func (r *Request) InboundSurface() Surface {
+	if r == nil || r.Type != RequestTypePassthrough {
+		return Surface{}
+	}
+	return r.Passthrough.Surface
+}
+
 // TranscriptionUpload is the normalized content of a /v1/audio/transcriptions
 // multipart form: the audio file plus the OpenAI-wire optional parameters.
 type TranscriptionUpload struct {
@@ -57,6 +67,40 @@ type PassthroughRequest struct {
 	RawQuery string            // Query string without leading "?"
 	Headers  map[string]string // Forwarded client headers (auth already stripped)
 	Stream   bool              // True when the path resolves to a streaming endpoint
+	// Surface is the route this request arrived on, stated by the handler
+	// registered there. A raw-forward route knows its vendor from its own
+	// registration; leaving it to be guessed from the model name is what
+	// sent Gemini-shaped bodies to other vendors.
+	Surface Surface
+}
+
+// Surface is an inbound route the gateway forwards verbatim, and the
+// providers that can answer it. The body and the URL path reach the vendor
+// unchanged on such a route, so the route decides the vendor, not the model
+// name in it.
+//
+// Translated routes carry no Surface. Everything under /v1 is rewritten per
+// provider before it leaves, so any provider can serve those and the model
+// resolver picks.
+type Surface struct {
+	// Name is the route as the caller wrote it, for use in a refusal.
+	Name string
+	// Providers can serve this route's wire format. Order is not priority:
+	// the credential chain keeps its own order.
+	Providers []ProviderID
+}
+
+// GeminiSurface is the /v1beta route: Google's generative-language wire,
+// used by gemini-cli and the @google/genai SDK.
+//
+// Vertex is on the list with Gemini because the same request reaches Google
+// through either. Bifrost's Vertex passthrough rewrites an inbound Google
+// path into the project-and-location form, so a caller who sends the Vertex
+// path shape to /v1beta is served by a Vertex credential. No provider
+// outside these two serves this wire, so no other credential may receive
+// the body.
+func GeminiSurface() Surface {
+	return Surface{Name: "/v1beta", Providers: []ProviderID{ProviderGemini, ProviderVertex}}
 }
 
 // RequestType classifies the inbound endpoint.

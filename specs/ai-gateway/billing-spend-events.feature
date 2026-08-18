@@ -124,6 +124,63 @@ Feature: Billing spend events, one durable record per gateway request
       And no cost field exists anywhere in it
 
     @unit
+    Scenario: The confirm command carries every billable quantity, not only token classes
+      Given a request a provider bills by characters, seconds, or audio tokens
+      When the gateway confirms it
+      Then the payload carries that quantity beside the token classes
+      And audio tokens are stated apart from the text totals they came out of
+      And a text-only request carries the same token counts it always did
+
+    # A provider reports one prompt total that already holds the tokens it
+    # served from its cache. The rating seam prices the cache buckets on top of
+    # the input bucket, so a total shipped whole charges every cached token
+    # twice: once at the input rate and once at its own. On a model whose cache
+    # read costs a tenth of its input, that is eleven times the published rate.
+    # The customer span already states the split; the spend record has to state
+    # the same one or a trace and its bill disagree.
+
+    @unit
+    Scenario: The confirm command states the cached tokens apart from the input it charges at the input rate
+      Given a request whose prompt was mostly served from the provider's cache
+      When the gateway confirms it
+      Then the input token count is the non-cached remainder
+      And the cache-read and cache-write counts travel beside it
+      And a request with no cache activity carries the full prompt as input
+      And the count matches the one the customer span reports
+
+    @unit
+    Scenario: A quantity added to the vocabulary defaults on records written before it
+      Given a confirmation recorded before a quantity existed
+      When it is read back
+      Then the missing quantity reads as zero
+      And the record parses instead of failing
+
+  Rule: A request the catalog cannot price says so
+
+    A zero charge on a request that burned something is a catalog fault, and
+    it looks exactly like a free request on the record. Rating is the only
+    place both faults are visible: the model has no entry at all, or it has
+    an entry that prices none of the quantities the request reported.
+
+    @unit
+    Scenario: A rule that prices none of the reported quantities is reported
+      Given a model whose rate covers a quantity the request did not carry
+      When the request rates at zero
+      Then the model, the rate identity and the quantities it did carry are stated
+
+    @unit
+    Scenario: A model with no entry at all is reported
+      Given a model the catalog does not carry
+      When the request rates at zero
+      Then the miss is stated once, not twice
+
+    @unit
+    Scenario: A request that measured nothing is not a fault
+      Given a request that reported no quantity of any kind
+      When it rates at zero
+      Then nothing is reported, because zero is the right answer
+
+    @unit
     Scenario: The failed payload keeps the full error taxonomy
       When a fail command is serialized
       Then the error class and http status ride verbatim
@@ -261,29 +318,114 @@ Feature: Billing spend events, one durable record per gateway request
       Then gateway spend events are not governed by it
       And the table's own retention is a fixed thirteen month delete
 
-  Rule: Silence settles, and settlement is never the last word
+  # WHY THE OUTCOME REPEATS THE ADMISSION'S ATTRIBUTION. The consumers that
+  # act on an outcome — budget debits, webhook delivery — need to know who the
+  # request belonged to, and only the admission used to say. So each of them
+  # remembered every open admission in a durable row, one per gateway request,
+  # in a table with no retention sweep (process-manager-retention.feature).
+  #
+  # The gateway already holds that attribution when it builds the outcome; it
+  # simply was not repeating it. Repeating it lets both consumers act on the
+  # one event they are handling and keep nothing, which is what makes their
+  # evolutions transient (transient-process-instances.feature).
+  #
+  # ROLLING UPGRADE. The admission declares whether its emitter will repeat
+  # attribution on the outcome, because the decision has to be made when the
+  # admission is handled, before the outcome exists. Admission and outcome
+  # always come from the same pod and the same build, so the pair is
+  # self-consistent and the gateway and control plane may roll in either
+  # order: an older build omits the flag and keeps the durable join.
+
+  Rule: An outcome states the attribution it is billed against
+
+    @unit
+    Scenario: A confirmation carries the attribution its admission carried
+      Given a gateway request admitted against an organization and virtual key
+      When the gateway emits its confirmation
+      Then the confirmation states the same organization, key, end user and trace
+
+    @unit
+    Scenario: A failure carries the attribution its admission carried
+      Given a gateway request admitted against an organization and virtual key
+      When the provider call fails
+      Then the failure states the same organization and end user
+
+    @unit
+    Scenario: The outcome's attribution is the admission's, not a re-derivation
+      Given a request whose end user was resolved at admission
+      When the outcome is built after the body was materialized
+      Then it states the end user the admission stated
 
     @integration
+    Scenario: Ingest joins the control-plane attribution onto outcomes too
+      Given a confirmation naming a virtual key
+      When the spend command batch is ingested
+      Then the confirmation carries the key's principal and the project's team
+
+    @integration
+    Scenario: An outcome from a build that carries no attribution is left alone
+      Given a confirmation emitted without attribution
+      When the spend command batch is ingested
+      Then it is not enriched and the admission's remembered join is used
+
+    # An outcome stashes itself when it states no attribution of its own, and
+    # an admission that declares its outcomes self-describing writes no state
+    # at all. The two conditions are not the same one: the first is about the
+    # OUTCOME's data, the second about the build that sent it. Where they
+    # disagree the admission is still the only place the scopes are known, so
+    # it releases the stash rather than discarding it — dropping it would cost
+    # the debit and strand the row holding it, which is the row this path
+    # exists not to write.
+    @unit
+    Scenario: A self-describing admission still releases an outcome that stashed
+      Given an outcome that stated no attribution and is waiting on its admission
+      When an admission arrives declaring its outcomes carry attribution
+      Then the waiting outcome is released against the admission's scopes
+      And nothing is left waiting on that request
+
+  Rule: Silence settles, and settlement is never the last word
+
+    # The sweeper used to be one process instance per gateway request, each
+    # holding a durable row and a wake armed at admission + grace. The join
+    # those rows performed is already done by the fold, which leaves a request
+    # at `admitted` until an outcome arrives, so "which requests are still
+    # open" is a query rather than a memory. Settlement latency became grace
+    # plus at most one sweep interval.
+
+    @unit
     Scenario: An unconfirmed admission settles when the grace expires
       Given an admitted request whose confirmation never arrives
       When the settlement grace elapses
       Then the sweeper issues settleSpend for that request
 
-    @integration
-    Scenario: A confirmation inside the grace stands the sweeper down
-      Given an admitted request
-      When its confirmation arrives inside the grace
-      Then the armed settlement wake is cleared and nothing settles
+    @unit
+    Scenario: Settlement keeps one process instance for the install, not one per request
+      Given several admissions open past their grace
+      When the sweeper settles them
+      Then exactly one settlement process instance exists
 
-    @integration
-    Scenario: An outcome racing ahead of its admission arms no wake
-      Given a confirmation that arrived before its admission
-      Then the late admission arms no settlement wake
+    @unit
+    Scenario: The sweeper re-arms itself after every wake
+      Given the settlement sweeper has run
+      Then its next sweep is armed from the present
 
-    @integration
-    Scenario: Duplicate wakes cannot double-settle
-      Given a settlement wake that already fired
-      Then a duplicate wake issues no second settle
+    @unit
+    Scenario: One tenant's failed settle does not cost the rest of the sweep
+      Given two admissions open past their grace and the first settle fails
+      When the sweeper runs
+      Then the second admission is still settled
+
+    @unit
+    Scenario: A sweep that finds nothing settles nothing
+      Given no admission is open past its grace
+      When the sweeper runs
+      Then no settle command is sent
+
+    @unit
+    Scenario: A settled request names the organization it belonged to
+      Given an admission the sweeper settles
+      When the settle command is built from the spend record
+      Then it carries the organization, key and end user the fold recorded
 
     @integration
     Scenario: The full settlement sequence: silent admission settles, a late confirmation supersedes
@@ -291,6 +433,52 @@ Feature: Billing spend events, one durable record per gateway request
       When the sweeper settles it and a late confirmation then arrives
       Then the settled row carries unknown cost and needs reconciliation
       And the confirmation replaces it with the rated record and the completed envelope
+
+    # WHAT THE QUERY REPLACED. A cleared wake, a wake never armed, and a
+    # duplicate wake used to be three behaviors of the durable per-request
+    # row. They are now one behavior of the open-admission read: a request
+    # the query no longer selects. The fold writes a version per lifecycle
+    # transition, so a request that resolved still has its superseded
+    # `admitted` version on disk, and a read that saw it would settle a live
+    # request and ship a spurious settled envelope. These are stated against
+    # real ClickHouse because that is the only place the collapse to the
+    # latest version is real.
+
+    @integration
+    Scenario: A confirmation stands the sweeper down
+      Given a request past its grace whose confirmation has arrived
+      When the sweeper reads the open admissions
+      Then the request is not among them, its superseded admission notwithstanding
+
+    @integration
+    Scenario: An admission inside its grace is not open yet
+      Given an admission whose grace has not elapsed
+      When the sweeper reads the open admissions
+      Then the request is not among them
+
+    @integration
+    Scenario: A rewritten admission is offered once, not once per version
+      Given an admission the fold rewrote before any outcome arrived
+      When the sweeper reads the open admissions
+      Then the request is offered exactly once
+
+    @integration
+    Scenario: A request that already reached a terminal status is never swept again
+      Given a request that failed and a request already settled
+      When the sweeper reads the open admissions
+      Then neither is among them
+
+    @integration
+    Scenario: An admission older than the lookback is left where it is
+      Given an admission older than the sweep's lookback
+      When the sweeper reads the open admissions
+      Then the request is not among them
+
+    @integration
+    Scenario: The sweep reads the oldest admissions first, up to its cap
+      Given more open admissions than one sweep may settle
+      When the sweeper reads the open admissions
+      Then it receives the cap's worth, oldest first, and the newest is left for the next sweep
 
   Rule: Replay re-delivers, the consumer's dedup decides
 
@@ -408,3 +596,9 @@ Feature: Billing spend events, one durable record per gateway request
       Given a metadata header that is oversized or not a JSON object
       When the gateway processes the request
       Then the echo is dropped and the request proceeds
+
+    @unit
+    Scenario: The spend record's metadata echo holds to the ingest contract
+      Given a metadata echo that parses as JSON but is not an object
+      When the gateway records the spend
+      Then the echo is dropped and the spend record still ships

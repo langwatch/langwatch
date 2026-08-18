@@ -135,7 +135,7 @@ describe("TriggerService", () => {
     // A scheduled report persists `filters: {}` and no `customGraphId` — the
     // exact shape of a match-everything trace automation. Before ADR-044's
     // `triggerKind` reached this read, every weekly report was a candidate
-    // trace trigger, so the notify reactor enqueued a settle (and the settle
+    // trace trigger, so the notify subscriber enqueued a settle (and the settle
     // dispatcher waved it through, its filter guard being a no-op on empty
     // filters) for EVERY ingested trace: one report => one notification per
     // trace. The report's real firing path is its scheduler calendar entry.

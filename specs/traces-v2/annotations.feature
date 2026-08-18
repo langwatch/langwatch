@@ -176,20 +176,13 @@ Feature: Per-message actions in ConversationView
   # returns the corrected trace. That second write happens inside the two
   # annotation mutations this popover saves through, so every surface that
   # suggests gets it: the per-turn action row here, the rail composer in thread
-  # layout, the legacy trace details page, and the saved-suggestion list under
-  # a message. The storage half is specified in
+  # layout, and the saved-suggestion list under an output. The storage half is
+  # specified in
   # specs/traces-v2/trace-edit-overlay.feature.
 
-  @integration
-  Scenario: The legacy conversation suggests through the same correction popover
-    Given the reviewer is reading a message in the legacy conversation on the trace details page
-    When the reviewer uses the suggest action on it
-    Then the same correction popover opens in suggest mode for that message's trace
-    And it is pre-filled with the message's current output, so the reviewer edits in place
-
-  # The saved-suggestion list under a message is the legacy conversation's own
-  # way of reading corrections back. The v2 conversation shows them beside the
-  # turn instead (specs/traces-v2/annotation-rail.feature).
+  # Reading corrections back where the output is shown, as a plain list rather
+  # than an editor. The v2 conversation shows them beside the turn instead
+  # (specs/traces-v2/annotation-rail.feature).
 
   @integration
   Scenario: Saved suggestions are listed under the output without an editor

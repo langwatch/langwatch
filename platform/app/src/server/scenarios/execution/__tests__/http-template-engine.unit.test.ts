@@ -13,11 +13,14 @@
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
+import type { FieldMapping } from "../../field-mapping";
 import {
   buildTemplateContext,
   renderBodyTemplate,
+  renderHeaderTemplate,
+  renderUrlTemplate,
+  TemplateRenderError,
 } from "../http-template-engine";
-import type { FieldMapping } from "../types";
 
 function inputWith(content: string | unknown[]): AgentInput {
   return {
@@ -254,6 +257,202 @@ describe("run parameters in the template context", () => {
       });
 
       expect(context.params).toBe("the mapping wins");
+    });
+  });
+});
+
+describe("trace variables in the template context", () => {
+  const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
+  const TRACEPARENT = `00-${TRACE_ID}-b7ad6b7169203331-01`;
+
+  describe("given a turn that captured a trace context", () => {
+    /** @scenario "The url and body templates can read the turn's trace id and traceparent" */
+    it("binds traceId and traceparent as plain strings", () => {
+      const context = buildTemplateContext({
+        input: inputWith("hi"),
+        traceContext: { traceId: TRACE_ID, traceparent: TRACEPARENT },
+      });
+
+      expect(context.traceId).toBe(TRACE_ID);
+      expect(context.traceparent).toBe(TRACEPARENT);
+    });
+
+    /** @scenario "The url and body templates can read the turn's trace id and traceparent" */
+    it("renders both into a body template as valid JSON", () => {
+      const body = renderBodyTemplate({
+        template: '{"trace": "{{ traceId }}", "parent": "{{ traceparent }}"}',
+        context: buildTemplateContext({
+          input: inputWith("hi"),
+          traceContext: { traceId: TRACE_ID, traceparent: TRACEPARENT },
+        }),
+      });
+
+      expect(JSON.parse(body)).toEqual({
+        trace: TRACE_ID,
+        parent: TRACEPARENT,
+      });
+    });
+
+    /** @scenario "The url and body templates can read the turn's trace id and traceparent" */
+    it("renders the trace id into a url", () => {
+      const url = renderUrlTemplate({
+        template: "https://api.example.com/chat?trace={{ traceId }}",
+        context: buildTemplateContext({
+          input: inputWith("hi"),
+          traceContext: { traceId: TRACE_ID, traceparent: TRACEPARENT },
+        }),
+      });
+
+      expect(url).toBe(`https://api.example.com/chat?trace=${TRACE_ID}`);
+    });
+  });
+
+  describe("given a data mapping named traceId", () => {
+    it("keeps the mapping, so an existing target is unchanged", () => {
+      const context = buildTemplateContext({
+        input: inputWith("hi"),
+        traceContext: { traceId: TRACE_ID },
+        scenarioMappings: {
+          traceId: { type: "value", value: "the mapping wins" },
+        },
+      });
+
+      expect(context.traceId).toBe("the mapping wins");
+    });
+  });
+
+  describe("given a run parameter named traceId", () => {
+    it("keeps it under params without touching the trace variable", () => {
+      const context = buildTemplateContext({
+        input: inputWith("hi"),
+        parameters: { traceId: "not-the-trace" },
+        traceContext: { traceId: TRACE_ID },
+      });
+
+      expect(context.traceId).toBe(TRACE_ID);
+      expect((context.params as Record<string, unknown>).traceId).toBe(
+        "not-the-trace",
+      );
+    });
+  });
+
+  describe("given a turn with no trace context", () => {
+    it("binds neither name", () => {
+      const context = buildTemplateContext({ input: inputWith("hi") });
+
+      expect("traceId" in context).toBe(false);
+      expect("traceparent" in context).toBe(false);
+    });
+  });
+});
+
+describe("header template rendering", () => {
+  const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
+  const TRACEPARENT = `00-${TRACE_ID}-b7ad6b7169203331-01`;
+
+  describe("given a header value reading a run parameter", () => {
+    /** @scenario "A header value renders run parameters" */
+    it("renders params.NAME into the value", () => {
+      const value = renderHeaderTemplate({
+        template: "tier-{{ params.account_tier }}",
+        context: buildTemplateContext({
+          input: inputWith("hi"),
+          parameters: { account_tier: "platinum" },
+        }),
+        headerKey: "X-Account-Tier",
+      });
+
+      expect(value).toBe("tier-platinum");
+    });
+  });
+
+  describe("given a header value reading the trace variables", () => {
+    /** @scenario "A header value renders the turn's trace id and traceparent" */
+    it("renders the turn's trace id and traceparent", () => {
+      const context = buildTemplateContext({
+        input: inputWith("hi"),
+        traceContext: { traceId: TRACE_ID, traceparent: TRACEPARENT },
+      });
+
+      expect(
+        renderHeaderTemplate({
+          template: "{{ traceId }}",
+          context,
+          headerKey: "X-Trace-Id",
+        }),
+      ).toBe(TRACE_ID);
+      expect(
+        renderHeaderTemplate({
+          template: "{{ traceparent }}",
+          context,
+          headerKey: "X-Parent",
+        }),
+      ).toBe(TRACEPARENT);
+    });
+  });
+
+  describe("given interpolated content that renders a line break", () => {
+    /** @scenario "A rendered header value cannot carry a line break" */
+    it("rejects the value naming the header, instead of passing it to the HTTP client", () => {
+      const render = () =>
+        renderHeaderTemplate({
+          template: "{{ params.note }}",
+          context: buildTemplateContext({
+            input: inputWith("hi"),
+            parameters: { note: "ok\r\nX-Injected: 1" },
+          }),
+          headerKey: "X-Note",
+        });
+
+      expect(render).toThrow(TemplateRenderError);
+      expect(render).toThrow(/header "X-Note"/);
+      expect(render).toThrow(/line break/);
+    });
+  });
+
+  describe("given output that the other engines would encode or escape", () => {
+    it("interpolates it as plain text", () => {
+      const value = renderHeaderTemplate({
+        template: "{{ input }}",
+        context: buildTemplateContext({
+          input: inputWith('he said "hi" & left/right'),
+        }),
+        headerKey: "X-Quote",
+      });
+
+      expect(value).toBe('he said "hi" & left/right');
+    });
+
+    it("keeps the raw filter working, as a no-op", () => {
+      const value = renderHeaderTemplate({
+        template: "{{ input | raw }}",
+        context: buildTemplateContext({ input: inputWith("a/b c") }),
+        headerKey: "X-Raw",
+      });
+
+      expect(value).toBe("a/b c");
+    });
+  });
+
+  describe("when the template is malformed", () => {
+    /** @scenario "A failing header template names the header it came from" */
+    it("throws TemplateRenderError naming the headers field and the header key", () => {
+      let thrown: unknown;
+      try {
+        renderHeaderTemplate({
+          template: "{% if %}",
+          context: buildTemplateContext({ input: inputWith("hi") }),
+          headerKey: "X-Broken",
+        });
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toBeInstanceOf(TemplateRenderError);
+      expect((thrown as TemplateRenderError).field).toBe("headers");
+      expect((thrown as TemplateRenderError).message).toContain(
+        'header "X-Broken"',
+      );
     });
   });
 });

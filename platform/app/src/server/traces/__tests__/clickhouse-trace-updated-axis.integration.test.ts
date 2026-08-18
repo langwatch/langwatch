@@ -162,11 +162,11 @@ beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
   vi.mocked(getClickHouseClientForProject).mockResolvedValue(ch);
-  service = new ClickHouseTraceService(
-    prisma as unknown as ConstructorParameters<
+  service = new ClickHouseTraceService({
+    prisma: prisma as unknown as ConstructorParameters<
       typeof ClickHouseTraceService
-    >[0],
-  );
+    >[0]["prisma"],
+  });
 
   // Each in-window trace has several versions with increasing UpdatedAt — the
   // dedup must collapse them to the latest. An earlier version of B sits BETWEEN

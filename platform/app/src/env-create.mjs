@@ -371,7 +371,7 @@ export function createEnvConfig() {
       ALLOWED_PROXY_HOSTS: z.string().optional(),
       SHOW_OPS_IN_MAIN_SIDEBAR: z.string().optional(),
       // Post-2026-05-11 loop-prevention kill-switch. Set to "1" to
-      // bypass the reactor depth check; emergency rollback only.
+      // bypass the subscriber depth check; emergency rollback only.
       LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD: z.string().optional(),
       // Post-2026-05-11 tenant soft-cap: max in-flight event-sourcing
       // groups per tenant in the DISPATCH_LUA scheduler.

@@ -51,6 +51,7 @@ import { app as userAvatarApp } from "../app/api/user-avatar/[[...route]]/app";
 import { app as webhookPlatformApp } from "../app/api/webhooks/[[...route]]/app";
 import { app as workflowsCrudApp } from "../app/api/workflows/[[...route]]/app";
 import { app as annotationsApp } from "./routes/annotations";
+import { app as apiDiscoveryApp } from "./routes/api-discovery";
 import { app as authApp } from "./routes/auth";
 import { app as authCliApp } from "./routes/auth-cli";
 import { app as bugReportsApp } from "./routes/bug-reports";
@@ -76,6 +77,7 @@ import { app as opsApp } from "./routes/ops";
 import { app as otelApp } from "./routes/otel";
 import { app as otelPathAliasApp } from "./routes/otel-path-aliases";
 import { app as playgroundApp } from "./routes/playground";
+import { app as rootDiscoveryApp } from "./routes/root-discovery";
 import { app as rumApp } from "./routes/rum";
 import { app as scenarioGenerateApp } from "./routes/scenario-generate";
 import { app as sseApp } from "./routes/sse";
@@ -148,6 +150,13 @@ export function createApiRouter() {
   // and cannot be shadowed by a sibling that later grows a parameterised
   // segment at the root of that namespace.
   api.route("/", gatewayOpenApiApp); // /api/gateway/v1/openapi.json
+  // The same document at the two locations a caller tries first, plus the RPC
+  // catalogue and /llms.txt. Two apps because the route-coverage gate only
+  // reads files declaring an `/api` basePath — see api-discovery.ts. The
+  // root-level pair only arrives here at all because start.ts consults
+  // `isRootDiscoveryPath`; without that they meet the SPA fallback.
+  api.route("/", apiDiscoveryApp); // /api/openapi.json, /api/rpc.discover
+  api.route("/", rootDiscoveryApp); // /.well-known/openapi, /llms.txt
   api.route("/", gatewayPlatformApp);
   api.route("/", governanceApp);
   api.route("/", graphsApp);

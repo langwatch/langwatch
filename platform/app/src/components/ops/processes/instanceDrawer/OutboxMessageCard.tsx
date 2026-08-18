@@ -18,13 +18,20 @@ import {
 
 const NO_PINNED_KEYS: ReadonlySet<string> = new Set();
 
+/** Exhaustive by type, so the next status has to declare its own colour. */
+const STATUS_PALETTES: Record<ProcessOutboxMessageView["status"], string> = {
+  pending: "blue",
+  dispatched: "green",
+  dead: "red",
+  discarded: "gray",
+};
+
 function StatusBadge({
   status,
 }: {
   status: ProcessOutboxMessageView["status"];
 }) {
-  const palette =
-    status === "dead" ? "red" : status === "dispatched" ? "green" : "blue";
+  const palette = STATUS_PALETTES[status];
   return (
     <Badge size="xs" colorPalette={palette} variant="subtle">
       {status}
@@ -82,6 +89,7 @@ function MessageMetaRow({
   traceHref,
   canManage,
   onRedrive,
+  onDiscard,
   onReleaseLease,
   actionPending,
 }: {
@@ -91,6 +99,7 @@ function MessageMetaRow({
   traceHref: string | null;
   canManage: boolean;
   onRedrive?: (messageId: string) => void;
+  onDiscard?: (message: { id: string; intentType: string }) => void;
   onReleaseLease?: (messageId: string) => void;
   actionPending?: boolean;
 }) {
@@ -129,6 +138,20 @@ function MessageMetaRow({
           Redrive
         </Button>
       )}
+      {canManage && message.status === "dead" && onDiscard && (
+        <Button
+          size="2xs"
+          variant="outline"
+          colorPalette="red"
+          loading={actionPending}
+          title="A mark, not a delete: the row is kept as the audit record and the message is never sent."
+          onClick={() =>
+            onDiscard({ id: message.id, intentType: message.intentType })
+          }
+        >
+          Discard
+        </Button>
+      )}
       {canManage && leaseLapsed && onReleaseLease && (
         <Button
           size="2xs"
@@ -158,6 +181,7 @@ export function OutboxMessageCard({
   grafana,
   canManage,
   onRedrive,
+  onDiscard,
   onReleaseLease,
   actionPending,
 }: {
@@ -166,6 +190,7 @@ export function OutboxMessageCard({
   grafana?: GrafanaDeepLinkConfig | null;
   canManage: boolean;
   onRedrive?: (messageId: string) => void;
+  onDiscard?: (message: { id: string; intentType: string }) => void;
   onReleaseLease?: (messageId: string) => void;
   actionPending?: boolean;
 }) {
@@ -195,6 +220,7 @@ export function OutboxMessageCard({
           traceHref={traceHref}
           canManage={canManage}
           onRedrive={onRedrive}
+          onDiscard={onDiscard}
           onReleaseLease={onReleaseLease}
           actionPending={actionPending}
         />
