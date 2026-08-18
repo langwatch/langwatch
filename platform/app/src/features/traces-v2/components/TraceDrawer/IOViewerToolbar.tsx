@@ -35,6 +35,12 @@ import type { ViewFormat } from "./useIOViewerState";
  */
 const OVERFLOW_TRIGGER_RESERVE_PX = 26;
 
+/**
+ * The shape every toolbar action wears: icon, label, and the row's height.
+ *
+ * It stops the click from travelling, because the panel header behind it
+ * toggles the panel collapsed.
+ */
 const ActionButton = forwardRef<
   HTMLButtonElement,
   {
@@ -60,6 +66,10 @@ const ActionButton = forwardRef<
   );
 });
 
+/**
+ * Opens this span in the prompt playground. A real anchor, so the browser's
+ * own gestures for a new tab or window still work on it.
+ */
 function PlaygroundButton({ href }: { href: string }) {
   return (
     <Button
@@ -84,6 +94,7 @@ function PlaygroundButton({ href }: { href: string }) {
   );
 }
 
+/** Opens the annotation composer in `suggest` mode against this field. */
 function SuggestCorrectionButton({
   traceId,
   output,
@@ -110,6 +121,10 @@ function SuggestCorrectionButton({
   );
 }
 
+/**
+ * Turns the translated view on and off. The label is the whole state: what it
+ * offers next while idle, and what it is doing while the request is out.
+ */
 function TranslateButton({
   isActive,
   isLoading,
@@ -136,6 +151,10 @@ function TranslateButton({
   );
 }
 
+/**
+ * Copies what the panel currently displays, and says so with a check for a
+ * moment. Icon only: it is the last control in the row and needs no width.
+ */
 function CopyButton({ text }: { text: string }) {
   const { copied, copy } = useCopyToClipboard();
 

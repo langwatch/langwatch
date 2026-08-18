@@ -168,6 +168,31 @@ function renderViewer(over: Partial<React.ComponentProps<typeof IOViewer>>) {
 const formatTrigger = () =>
   screen.getByRole("button", { name: "Input view format" });
 
+/**
+ * The row `useOverflowVisibility` measures, resolved from the slots it measures
+ * rather than by walking a fixed number of parents.
+ *
+ * The slots are its direct children, so asserting that pins the element down.
+ * A walk that quietly landed on an ancestor instead would make "this is inside
+ * the measured row" true of anything on the panel, and the tests below would
+ * pass whatever the toolbar rendered.
+ */
+function measuredRow(): HTMLElement {
+  const slots = [
+    ...document.querySelectorAll<HTMLElement>("[data-overflow-id]"),
+  ];
+  const row = slots[0]?.parentElement;
+  // Throws rather than asserts, so the check travels with the helper instead
+  // of being repeated in every caller. Either way the test fails, and it must:
+  // a row resolved from the wrong element would make the callers vacuous.
+  if (!row || !slots.every((slot) => slot.parentElement === row)) {
+    throw new Error(
+      `expected the ${slots.length} action slot(s) to share one parent, which is the row the hook measures`,
+    );
+  }
+  return row;
+}
+
 describe("given an input panel with JSON content", () => {
   describe("when the user opens the format selector", () => {
     /** @scenario "One selector holds the view formats" */
@@ -197,14 +222,11 @@ describe("given an input panel in the drawer", () => {
 
     const selector = formatTrigger();
     const label = screen.getByText("Input");
-    const measuredRow = document
-      .querySelector("[data-overflow-id]")
-      ?.closest("div")?.parentElement;
 
     // That row right-aligns its contents with a leading spacer, so sitting
     // inside it is what puts the selector on the right rather than beside the
     // label.
-    expect(measuredRow?.contains(selector)).toBe(true);
+    expect(measuredRow().contains(selector)).toBe(true);
     expect(label.parentElement?.contains(selector)).toBe(false);
     // First of the group: a longer format name then grows leftwards instead of
     // pushing the actions around.
@@ -336,12 +358,8 @@ describe("given a toolbar too narrow for all action buttons", () => {
     const menuTrigger = await screen.findByRole("button", {
       name: "More actions",
     });
-    const measuredRow = document
-      .querySelector("[data-overflow-id]")
-      ?.closest("div")?.parentElement;
 
-    expect(measuredRow).not.toBeNull();
-    expect(measuredRow?.contains(menuTrigger)).toBe(true);
+    expect(measuredRow().contains(menuTrigger)).toBe(true);
   });
 });
 

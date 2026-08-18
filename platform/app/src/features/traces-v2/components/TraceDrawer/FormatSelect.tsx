@@ -52,6 +52,7 @@ interface FormatSelectProps<Value extends string> {
   ariaLabel?: string;
 }
 
+/** Accepts the string shorthand, which is an option with nothing but a value. */
 function normalizeOption<Value extends string>(
   option: Option<Value>,
 ): FormatOption<Value> {
@@ -61,6 +62,7 @@ function normalizeOption<Value extends string>(
 /** Initialisms keep their casing; everything else reads as a word. */
 const VALUE_LABELS: Record<string, string> = { json: "JSON" };
 
+/** The words an option reads as, on the pill and in the menu. */
 function optionLabel(option: FormatOption<string>): string {
   if (option.label) return option.label;
   const mapped = VALUE_LABELS[option.value];

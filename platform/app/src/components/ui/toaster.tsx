@@ -60,6 +60,10 @@ const STATUS = {
 
 type ToastStatus = keyof typeof STATUS;
 
+/**
+ * A toast is created with no type at all, or with one this shell does not
+ * paint. Both read as information.
+ */
 const statusOf = (type: string | undefined): ToastStatus =>
   type && type in STATUS ? (type as ToastStatus) : "info";
 
@@ -90,6 +94,11 @@ export const toastActionColor = (type: string | undefined) => {
   return onPanelOnly(status, STATUS[status].action);
 };
 
+/**
+ * The status, said once, in a small glyph on the title's line. A loading toast
+ * spins instead, since it reports something still running rather than an
+ * outcome.
+ */
 function StatusIcon({ status }: { status: ToastStatus }) {
   const { fg } = STATUS[status];
   const size = 15;
