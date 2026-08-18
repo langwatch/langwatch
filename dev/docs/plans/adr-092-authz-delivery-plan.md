@@ -63,6 +63,10 @@ Grant                              -- NEW table, born in PR 1; RoleBinding
                     | project | anyone          -- last two: resource tier only
   principalId       null for anyone
   roleKey           admin | member | viewer | lite-member | custom:<id>
+  legacyRole        an IMPORTED custom binding's original role column, which
+                    roleKey cannot express and the legacy resolver still
+                    reads (empty custom role falls back to it); null on
+                    everything ledger-born, retired at cutover
   scopeType         ORGANIZATION | TEAM | PROJECT | RESOURCE | PLATFORM
   scopeId
   -- resource-tier columns (null elsewhere):
@@ -348,8 +352,12 @@ PR 1's remainder, all delivered 2026-08-17:
    passes unchanged.
 2. Runner lifecycle transitions witnessed as `migration_tenant_state_changed`
    facts via a decorating state repository (synchronous write stays the
-   latch); the projection re-applies them under a monotonic `updatedAt`
-   guard, so replay rebuilds an empty table and can never regress a live one.
+   latch); the projection re-applies them under a monotonic BUSINESS-time
+   guard — a new `occurredAt` column both writers stamp — so replay rebuilds
+   an empty table and can never regress a live one. Guarding on `updatedAt`
+   instead inverted the replay: the row a replay created carried
+   `updatedAt = now`, every later fact in the same stream then failed the
+   guard, and the table converged to the oldest status in the stream.
 3. `enforceGrantRevocation` on the projection repository — the one
    sanctioned direct write, caller arrives in PR 2. Breaker is doctrine
    (ADR-007), no processor.

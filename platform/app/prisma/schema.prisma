@@ -2425,6 +2425,13 @@ model Grant {
   principalId   String? // null only for ANYONE (resource tier)
 
   roleKey String? // admin | member | viewer | lite-member | custom:<id>; null on RESOURCE rows
+  // The `role` column an IMPORTED binding carried alongside a custom:<id>
+  // roleKey, which cannot express it. The legacy resolver still reads it (a
+  // custom role with an empty permission list falls back to the row's own
+  // role), so the compat head has to reproduce it - and this column is what
+  // lets a projection reloaded from these rows reconstruct the fact rather
+  // than a lossy copy. Null on everything ledger-born; retired at cutover.
+  legacyRole String? // ADMIN | MEMBER | VIEWER | CUSTOM
   source  String // which writer emitted the fact: grants-service | scim | invite | backfill-b | genesis-import | read-through-mint
 
   scopeType GrantScopeType
@@ -2445,15 +2452,17 @@ model Grant {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
 
-  // The principal-scan index below is PARTIAL in the database - it carries a
-  // `WHERE "scopeType" <> 'RESOURCE'` the migration SQL spells out, because
-  // Prisma has no partial indexes. Applied while the table is empty rather
-  // than deferred to the engine read path: unbounded share-link volume would
-  // otherwise have to be indexed once and then rebuilt out.
+  // The collector's principal scan is served by
+  // "Grant_organizationId_principalType_principalId_idx", a PARTIAL index
+  // (`WHERE "scopeType" <> 'RESOURCE'`) defined in migration
+  // 20260817160000_grants_ledger_projections. Prisma has no partial indexes,
+  // so - exactly as RoleBinding's six partial uniques do - it is NOT declared
+  // here: an `@@index` for it would make the next `prisma migrate dev` drop
+  // the partiality and rebuild it over every share-link row, which is the one
+  // thing the WHERE clause exists to avoid.
   //
   // The same migration adds "Grant_resource_terms_check", a both-or-neither
   // CHECK over (token, permission) that Prisma also cannot express.
-  @@index([organizationId, principalType, principalId])
   @@index([organizationId, scopeType, scopeId])
 }
 
@@ -4082,6 +4091,14 @@ model SystemMigrationTenantState {
   tenantId      String
   status        String
   report        Json?
+  // BUSINESS time of the transition this row holds - stamped by whoever
+  // wrote it, never by the database. `updatedAt` is wall-clock and moves for
+  // reasons that are not transitions, so it cannot order a transition against
+  // a replayed one: a row created by a replay carries `updatedAt = now` and
+  // would then reject every LATER fact in the same replay. The grants-ledger
+  // projection guards its writes on this column instead
+  // (authz-grants-projection.prisma.repository.ts).
+  occurredAt    DateTime @default(now())
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt
 

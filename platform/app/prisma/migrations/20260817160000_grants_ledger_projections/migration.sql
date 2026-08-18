@@ -29,6 +29,11 @@ CREATE TABLE "Grant" (
     "principalType" "GrantPrincipalType" NOT NULL,
     "principalId" TEXT,
     "roleKey" TEXT,
+    -- The `role` column an IMPORTED binding carried alongside a custom:<id>
+    -- roleKey. The legacy resolver falls back to it when the custom role's
+    -- permission list is empty, so the compat head must reproduce it, and a
+    -- projection reloaded from this table must be able to reconstruct it.
+    "legacyRole" TEXT,
     "source" TEXT NOT NULL,
     "scopeType" "GrantScopeType" NOT NULL,
     "scopeId" TEXT NOT NULL,
@@ -118,4 +123,25 @@ CREATE INDEX "Role_organizationId_idx" ON "Role"("organizationId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Role_organizationId_name_key" ON "Role"("organizationId", "name");
+
+-- AlterTable
+-- Business time for a per-(migration, tenant) lifecycle transition. The row
+-- already had `updatedAt`, but that is wall clock: it moves when the row is
+-- touched, not when the transition happened, so it cannot order a folded
+-- transition against a directly written one. Concretely, a replay onto an
+-- empty table creates the first row with `updatedAt = now`, and every LATER
+-- fact in the same replay then fails an `updatedAt <= occurredAt` guard - the
+-- table converges to the OLDEST status in the stream. Guarding on business
+-- time instead makes a replay converge to the newest, while a live direct
+-- write (stamped with the writer's own clock) still outranks any replayed
+-- fact from the past.
+--
+-- Defaulted to CURRENT_TIMESTAMP so existing rows adopt backfill time: newer
+-- than every historical fact, which is the safe direction - a replay can
+-- never regress a row that is already live.
+--
+-- To roll back, uncomment and run manually:
+--
+--   ALTER TABLE "SystemMigrationTenantState" DROP COLUMN "occurredAt";
+ALTER TABLE "SystemMigrationTenantState" ADD COLUMN "occurredAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
