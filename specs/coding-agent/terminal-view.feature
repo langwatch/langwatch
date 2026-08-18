@@ -143,6 +143,19 @@ Rule: The terminal reads back the whole session
     When the notes are derived before the previous turn is loaded
     Then no note claims the crossing happened at the first loaded call
 
+  # A turn that made no model call adds no note of its own, but completing the
+  # history lets a note appear at a call further down, below the reader. The
+  # screen follows the row the reader is on, so what arrives above them moves
+  # the screen and what appears below them does not.
+
+  @integration
+  Scenario: A note the completed history adds below the reader moves nothing above it
+    Given the loaded transcript starts mid-session with its context already grown
+    And the earlier turn that lands made no model call of its own
+    When the earlier turn is loaded above the reader
+    Then the row the reader is on stays exactly where it was
+    And the screen moves by what arrived above it and nothing else
+
   @integration
   Scenario: Reaching the first turn shows the session start
     Given the terminal has walked back to the session's first turn
@@ -199,8 +212,18 @@ Rule: The terminal reads back the whole session
     When the reader reads the bottom bar
     Then the bar reports no token total
 
+  # Some agents report their economics and no conversation content. The screen
+  # says so, and says the totals are real, so the bar counts them from the whole
+  # loaded window rather than standing on a line that is not there.
+
   @integration
-  Scenario: A reader without cost:view still reads the session's tokens
+  Scenario: The footer counts a transcript that renders nothing
+    Given a session whose telemetry carries economics and no content
+    When the reader reads the bottom bar
+    Then the cost and tokens cover every call of the loaded window
+
+  @integration
+  Scenario: A reader who may not see cost still reads the session's tokens
     Given the session's earlier turns carry tokens but no cost
     When the reader reads the bottom bar
     Then the bar reports the token total
@@ -217,7 +240,7 @@ Rule: The terminal reads back the whole session
   # be able to add the same total up one turn at a time from the turn list.
 
   @unit
-  Scenario: A viewer without cost:view reads no per-turn spend
+  Scenario: A reader who may not see cost reads no per-turn spend
     Given a session whose turns are listed by the conversation read
     And the reader may not see cost
     When a turn of the session is listed

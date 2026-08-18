@@ -138,7 +138,7 @@ function deriveStatus({
   hasSession,
   conversationId,
   turnCount,
-  turnListLoading,
+  isTurnListLoading,
   phase,
   earlierCount,
 }: {
@@ -146,12 +146,12 @@ function deriveStatus({
   conversationId: string | null;
   turnCount: number;
   /** The session's turn list read is still in flight. */
-  turnListLoading: boolean;
+  isTurnListLoading: boolean;
   phase: Ledger["phase"];
   earlierCount: number;
 }): ScrollbackStatus {
   if (!hasSession) {
-    if (conversationId && turnListLoading) return "pending";
+    if (conversationId && isTurnListLoading) return "pending";
     return conversationId && turnCount >= CONVERSATION_TURN_CAP
       ? "unavailable"
       : "hidden";
@@ -424,7 +424,7 @@ export function useSessionScrollback({
   openedTranscript,
   openedToolSpans,
 }: SessionScrollbackInput): SessionScrollback {
-  const { turns, isLoading: turnListLoading } = useConversationContext(
+  const { turns, isLoading: isTurnListLoading } = useConversationContext(
     conversationId,
     traceId,
   );
@@ -443,7 +443,7 @@ export function useSessionScrollback({
     hasSession,
     conversationId,
     turnCount: turns.length,
-    turnListLoading,
+    isTurnListLoading,
     phase: current.phase,
     earlierCount,
   });

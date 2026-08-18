@@ -777,10 +777,13 @@ export function redactV2Content<
  * Carries the turn's totals so the terminal's bottom bar can count the
  * session's turns above its loaded window without reading their transcripts.
  */
-export function toConversationContextTurn(
-  t: TraceListItem,
-  protections: V2Protections,
-) {
+export function toConversationContextTurn({
+  trace: t,
+  protections,
+}: {
+  trace: TraceListItem;
+  protections: V2Protections;
+}) {
   const {
     input,
     output,
@@ -1356,7 +1359,7 @@ export const tracesV2Router = createTRPCRouter({
         ),
       });
       const turns = page.items.map((t) =>
-        toConversationContextTurn(t, protections),
+        toConversationContextTurn({ trace: t, protections }),
       );
       // Position/previous/next are derived client-side from the active
       // traceId so the cache key doesn't churn on J/K navigation.

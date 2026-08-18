@@ -362,7 +362,7 @@ describe("useSessionScrollback", () => {
     });
 
     describe("when the reader may not see cost", () => {
-      /** @scenario "A reader without cost:view still reads the session's tokens" */
+      /** @scenario "A reader who may not see cost still reads the session's tokens" */
       it("keeps the token total and reports no cost", () => {
         conversation.turns = [
           {

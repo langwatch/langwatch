@@ -200,11 +200,15 @@ function markersForModelCall({
   return { markers, band: { label: band.label, known: true } };
 }
 
-function buildContextMarkers(
-  entries: TranscriptEntry[],
-  visibleIndices: readonly number[],
-  { historyComplete }: { historyComplete: boolean },
-): Map<number, ContextMarker[]> {
+function buildContextMarkers({
+  entries,
+  visibleIndices,
+  historyComplete,
+}: {
+  entries: TranscriptEntry[];
+  visibleIndices: readonly number[];
+  historyComplete: boolean;
+}): Map<number, ContextMarker[]> {
   const visibleSet = new Set(visibleIndices);
   const rebuildsByAtMs = new Map(
     findCacheRebuilds(entries).map((rebuild) => [rebuild.atMs, rebuild]),
@@ -242,11 +246,15 @@ function buildContextMarkers(
  * entry that does render, exactly as {@link buildContextMarkers} does with its
  * pending notes.
  */
-function forwardDividersToVisible(
-  turnDividers: ReadonlyMap<number, TurnDivider> | undefined,
-  entries: TranscriptEntry[],
-  visibleIndices: readonly number[],
-): Map<number, TurnDivider> | null {
+function forwardDividersToVisible({
+  turnDividers,
+  entries,
+  visibleIndices,
+}: {
+  turnDividers: ReadonlyMap<number, TurnDivider> | undefined;
+  entries: TranscriptEntry[];
+  visibleIndices: readonly number[];
+}): Map<number, TurnDivider> | null {
   if (!turnDividers || turnDividers.size === 0) return null;
 
   const visibleSet = new Set(visibleIndices);
@@ -262,6 +270,31 @@ function forwardDividersToVisible(
   });
 
   return forwarded;
+}
+
+/**
+ * A row the screen holds still across a commit, and where it sat under the top
+ * edge. Following it is what keeps the reader's eyes on the same line while
+ * history stacks up above them.
+ *
+ * Held by the row's own key rather than its index, since a prepend shifts every
+ * index down by the number of entries that arrived. A view drawn without
+ * `rowKeys` has no stable row identity and takes no anchor at all.
+ */
+interface ScrollAnchor {
+  rowKey: string;
+  offsetFromTop: number;
+}
+
+/** The row carrying this key, wherever its index moved to. */
+function findRow(
+  rows: ReadonlyMap<number, HTMLDivElement>,
+  rowKey: string,
+): HTMLDivElement | undefined {
+  for (const node of rows.values()) {
+    if (node.dataset.rowKey === rowKey) return node;
+  }
+  return undefined;
 }
 
 /**
@@ -356,7 +389,7 @@ export const TerminalView = memo(function TerminalView({
   sessionStartAtMs,
 }: TerminalViewProps) {
   const timeline = useMemo(
-    () => buildEntryTimeline(entries, { startAtMs: sessionStartAtMs }),
+    () => buildEntryTimeline({ entries, startAtMs: sessionStartAtMs }),
     [entries, sessionStartAtMs],
   );
 
@@ -380,11 +413,11 @@ export const TerminalView = memo(function TerminalView({
     scrollbackStatus === "hidden" ||
     scrollbackStatus === "start";
   const contextMarkers = useMemo(
-    () => buildContextMarkers(entries, visibleIndices, { historyComplete }),
+    () => buildContextMarkers({ entries, visibleIndices, historyComplete }),
     [entries, visibleIndices, historyComplete],
   );
   const dividersAtVisibleIndex = useMemo(
-    () => forwardDividersToVisible(turnDividers, entries, visibleIndices),
+    () => forwardDividersToVisible({ turnDividers, entries, visibleIndices }),
     [turnDividers, entries, visibleIndices],
   );
 
@@ -418,6 +451,38 @@ export const TerminalView = memo(function TerminalView({
     if (scrollbackStatus === "available") onLoadEarlier?.();
   }, [scrollbackStatus, onLoadEarlier]);
 
+  // The row the reader is on, and how far it sat below the top of the screen.
+  const anchorRef = useRef<ScrollAnchor | null>(null);
+  const rememberAnchor = useCallback(
+    ({ el, fullIndex }: { el: HTMLDivElement; fullIndex: number }) => {
+      const node = rowRefs.current.get(fullIndex);
+      const rowKey = node?.dataset.rowKey;
+      anchorRef.current =
+        node && rowKey
+          ? { rowKey, offsetFromTop: node.offsetTop - el.scrollTop }
+          : null;
+    },
+    [],
+  );
+
+  // Put the reader back on the row they were on. What arrived ABOVE it moved
+  // its offset, so following the row moves the screen by exactly that; what
+  // arrived BELOW it left the offset alone, so following the row ignores it.
+  // The screen's own height delta cannot tell the two apart and would move the
+  // reader by both, which is what a completed history does when it lets the
+  // walk draw a context note further down the transcript.
+  const restoreAnchor = useCallback((el: HTMLDivElement) => {
+    const anchor = anchorRef.current;
+    const node = anchor ? findRow(rowRefs.current, anchor.rowKey) : undefined;
+    if (anchor && node) {
+      el.scrollTop = node.offsetTop - anchor.offsetFromTop;
+      return;
+    }
+    // No row to follow: the reader has not taken the screen over yet, so what
+    // arrived is above them by definition.
+    el.scrollTop += el.scrollHeight - lastScrollHeightRef.current;
+  }, []);
+
   const syncToScroll = useCallback(() => {
     const el = screenRef.current;
     if (!el) return;
@@ -431,14 +496,14 @@ export const TerminalView = memo(function TerminalView({
     // turn never visibly loads in front of them.
     if (scrollTop < preloadThresholdPx(el)) requestEarlierTurn();
 
-    setTrackedFullIndex(
-      trackedIndexAt({
-        rows: rowRefs.current,
-        visibleIndices,
-        viewportBottom,
-      }),
-    );
-  }, [visibleIndices, requestEarlierTurn]);
+    const tracked = trackedIndexAt({
+      rows: rowRefs.current,
+      visibleIndices,
+      viewportBottom,
+    });
+    setTrackedFullIndex(tracked);
+    rememberAnchor({ el, fullIndex: tracked });
+  }, [visibleIndices, requestEarlierTurn, rememberAnchor]);
 
   // The reader scrolling is the reader taking control of the position: from
   // here on the view never jumps them to the end on its own.
@@ -471,10 +536,10 @@ export const TerminalView = memo(function TerminalView({
     const el = screenRef.current;
     if (!el) return;
     if (prepended || (statusChanged && nextFirst === previousFirst)) {
-      el.scrollTop += el.scrollHeight - lastScrollHeightRef.current;
+      restoreAnchor(el);
     }
     lastScrollHeightRef.current = el.scrollHeight;
-  }, [entries, scrollbackStatus]);
+  }, [entries, scrollbackStatus, restoreAnchor]);
 
   // Opening a session lands at its latest line, the way a terminal sits at
   // its prompt. Runs after the correction above, so during the initial fill
@@ -548,10 +613,16 @@ export const TerminalView = memo(function TerminalView({
     setTrackedFullIndex(lastVisibleFullIndex);
   }, [lastVisibleFullIndex]);
 
-  const point = timeline[trackedFullIndex];
+  // Where the bottom bar counts to. Normally the beat the reader is on; when
+  // the transcript renders nothing at all (an agent that reported economics
+  // and no content), there is no row to stand on and the bar counts the whole
+  // loaded window, which is what the message on screen calls real.
+  const barIndex =
+    visibleIndices.length === 0 ? entries.length - 1 : trackedFullIndex;
+  const point = timeline[barIndex];
   const modelAtScroll = useMemo(
-    () => modelAt(entries, trackedFullIndex) ?? banner?.model ?? null,
-    [entries, trackedFullIndex, banner?.model],
+    () => modelAt({ entries, fullIndex: barIndex }) ?? banner?.model ?? null,
+    [entries, barIndex, banner?.model],
   );
   // An agent that reported usage but no content has entries and no beats to
   // walk, which read as "step 1/0" while standing on nothing.
@@ -628,6 +699,9 @@ export const TerminalView = memo(function TerminalView({
                   />
                 ))}
                 <Box
+                  // The row's identity, which the scroll anchor follows across
+                  // a prepend that moves every index down.
+                  data-row-key={rowKeys?.[fullIndex]}
                   ref={(node: HTMLDivElement | null) =>
                     setRowRef(fullIndex, node)
                   }
@@ -648,14 +722,14 @@ export const TerminalView = memo(function TerminalView({
       <StatusLine
         stepCount={visibleIndices.length}
         currentStep={trackedStep}
-        tokens={sessionTotal(
-          earlierTotals?.tokens,
-          point?.cumulativeTokens ?? 0,
-        )}
-        costUsd={sessionTotal(
-          earlierTotals?.costUsd,
-          point?.cumulativeCostUsd ?? 0,
-        )}
+        tokens={sessionTotal({
+          earlier: earlierTotals?.tokens,
+          loaded: point?.cumulativeTokens ?? 0,
+        })}
+        costUsd={sessionTotal({
+          earlier: earlierTotals?.costUsd,
+          loaded: point?.cumulativeCostUsd ?? 0,
+        })}
         elapsedMs={point?.elapsedMs ?? 0}
         model={modelAtScroll}
         sessionName={sessionName}
@@ -674,16 +748,25 @@ export const TerminalView = memo(function TerminalView({
  * be stated and the bar drops the stat rather than reporting a sum that is
  * short by the turns it could not read.
  */
-function sessionTotal(
-  earlier: number | null | undefined,
-  loaded: number,
-): number | null {
+function sessionTotal({
+  earlier,
+  loaded,
+}: {
+  earlier: number | null | undefined;
+  loaded: number;
+}): number | null {
   if (earlier === null) return null;
   return (earlier ?? 0) + loaded;
 }
 
 /** The nearest model in effect at or before `fullIndex` — sessions mostly use one. */
-function modelAt(entries: TranscriptEntry[], fullIndex: number): string | null {
+function modelAt({
+  entries,
+  fullIndex,
+}: {
+  entries: TranscriptEntry[];
+  fullIndex: number;
+}): string | null {
   for (let i = fullIndex; i >= 0; i--) {
     const entry = entries[i];
     if (entry?.kind === "model_call" && entry.model) return entry.model;

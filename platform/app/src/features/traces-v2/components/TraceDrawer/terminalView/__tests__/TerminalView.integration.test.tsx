@@ -15,7 +15,31 @@ import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-tra
 import type { TurnDivider } from "../sessionScrollback";
 import { TerminalView } from "../TerminalView";
 
+/** How tall a laid-out row is, so a test can say what moved in whole rows. */
+const ROW_HEIGHT = 150;
+
+/**
+ * jsdom lays nothing out: every element reports `offsetTop` zero, so the view
+ * has no row to follow across a commit. Stack the screen's rows the way a
+ * browser would, by reading each element's place among its siblings at a fixed
+ * row height. Off by default, since the rest of the file drives the screen's
+ * height by hand and expects no layout at all.
+ */
+let rowsAreLaidOut = false;
+Object.defineProperty(HTMLElement.prototype, "offsetTop", {
+  configurable: true,
+  get(this: HTMLElement) {
+    if (!rowsAreLaidOut) return 0;
+    const siblings = this.parentElement?.children;
+    if (!siblings) return 0;
+    return Array.prototype.indexOf.call(siblings, this) * ROW_HEIGHT;
+  },
+});
+
 afterEach(cleanup);
+afterEach(() => {
+  rowsAreLaidOut = false;
+});
 
 const entries: TranscriptEntry[] = [
   {
@@ -380,12 +404,18 @@ describe("TerminalView", () => {
       /** @scenario "Scrolling up past the top loads the previous turn" */
       it("moves the screen by exactly what arrived, so the row stays under their eyes", () => {
         const view = renderScrollback();
-        fakeBox(view.screenEl, { scrollHeight: 1000 });
+        layOutRows(view.screenEl);
         scrollTo(view.screenEl, 0);
+        const before = offsetUnderTopEdge(view.screenEl, "bump the version");
 
         prependEarlierTurn(view, { scrollHeight: 1800 });
 
-        expect(view.screenEl.scrollTop).toBe(800);
+        expect(offsetUnderTopEdge(view.screenEl, "bump the version")).toBe(
+          before,
+        );
+        // Two entries and the turn divider arrived above the reader, and the
+        // screen moved by exactly those three rows.
+        expect(view.screenEl.scrollTop).toBe(3 * ROW_HEIGHT);
       });
 
       it("shows the previous turn's entries above a divider naming the turn", () => {
@@ -403,13 +433,16 @@ describe("TerminalView", () => {
       it("leaves a turn too short to overflow where it was instead of following the tail", () => {
         const view = renderScrollback();
         // Content shorter than the viewport: the reader is at the bottom of
-        // this turn simply by being on it.
-        fakeBox(view.screenEl, { scrollHeight: 100 });
+        // this turn simply by being on it, which is what arms the tail.
+        layOutRows(view.screenEl, { clientHeight: 1_000 });
         scrollTo(view.screenEl, 0);
+        const before = offsetUnderTopEdge(view.screenEl, "bump the version");
 
-        prependEarlierTurn(view, { scrollHeight: 500 });
+        prependEarlierTurn(view, { scrollHeight: 7 * ROW_HEIGHT });
 
-        expect(view.screenEl.scrollTop).toBe(400);
+        expect(offsetUnderTopEdge(view.screenEl, "bump the version")).toBe(
+          before,
+        );
       });
 
       it("keeps a row's expanded state with the row it belongs to", async () => {
@@ -749,8 +782,30 @@ describe("TerminalView", () => {
       });
     });
 
+    describe("when the transcript is nothing but model calls", () => {
+      /** @scenario "The footer counts a transcript that renders nothing" */
+      it("counts the whole loaded window, since there is no row to stand on", () => {
+        renderView({
+          entries: ECONOMICS_ONLY_TURN,
+          rowKeys: ["turn-5#0", "turn-5#1"],
+          earlierTotals: { tokens: 1_000, costUsd: 1.0 },
+          sessionStartAtMs: 500,
+          scrollback: {
+            status: "available",
+            earlierCount: 5,
+            onLoadEarlier: vi.fn(),
+          },
+        });
+
+        // The screen says the totals below are real, so they count the two
+        // calls on it: 1,000 + 175 tokens above and on it, $1.00 + $0.06.
+        expect(screen.getByText("1.2K tokens")).toBeInTheDocument();
+        expect(screen.getByText("$1.06")).toBeInTheDocument();
+      });
+    });
+
     describe("when the reader may not see cost", () => {
-      /** @scenario "A reader without cost:view still reads the session's tokens" */
+      /** @scenario "A reader who may not see cost still reads the session's tokens" */
       it("counts the session's tokens and states no cost", () => {
         renderView({
           earlierTotals: { tokens: 1_000, costUsd: null },
@@ -827,6 +882,57 @@ describe("TerminalView", () => {
         expect(
           screen.queryByText("Context growing: 60.0K tokens"),
         ).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the earlier turn that lands made no model call of its own", () => {
+      /** @scenario "A note the completed history adds below the reader moves nothing above it" */
+      it("holds the reader's row still while the note appears below them", () => {
+        const view = renderScrollback({
+          entries: GROWN_LATE_OPENED_TURN,
+          rowKeys: GROWN_LATE_OPENED_KEYS,
+          scrollback: {
+            status: "available",
+            earlierCount: 1,
+            onLoadEarlier: vi.fn(),
+          },
+        });
+        layOutRows(view.screenEl);
+        scrollTo(view.screenEl, 0);
+        const before = offsetUnderTopEdge(view.screenEl, "bump the version");
+        expect(screen.queryByText(/Context growing/)).not.toBeInTheDocument();
+
+        // The oldest turn lands and the history is complete, so the walk can
+        // finally name the band. The turn it landed carries no call, so the
+        // note belongs to the call further down: it appears BELOW the reader.
+        act(() => {
+          fakeBox(view.screenEl, { scrollHeight: 1_050 });
+          view.rerender({
+            entries: [...TEXT_ONLY_EARLIER_TURN, ...GROWN_LATE_OPENED_TURN],
+            rowKeys: [...TEXT_ONLY_EARLIER_KEYS, ...GROWN_LATE_OPENED_KEYS],
+            turnDividers: new Map([
+              [
+                TEXT_ONLY_EARLIER_TURN.length,
+                { turnNumber: 5, turnCount: 5, atMs: 5000 },
+              ],
+            ]),
+            scrollback: {
+              status: "start",
+              earlierCount: 0,
+              onLoadEarlier: vi.fn(),
+            },
+          });
+        });
+
+        expect(
+          screen.getByText("Context growing: 60.0K tokens"),
+        ).toBeInTheDocument();
+        expect(offsetUnderTopEdge(view.screenEl, "bump the version")).toBe(
+          before,
+        );
+        // Two entries and the turn divider arrived above the reader. The note
+        // below them is not part of that, and does not move the screen.
+        expect(view.screenEl.scrollTop).toBe(3 * ROW_HEIGHT);
       });
     });
   });
@@ -999,6 +1105,76 @@ const GROWN_OPENED_TURN: TranscriptEntry[] = [
   },
 ];
 
+/**
+ * An opened turn whose grown call sits BELOW its first line, so the note the
+ * completed history lets the walk draw lands below a reader at the top.
+ */
+const GROWN_LATE_OPENED_TURN: TranscriptEntry[] = [
+  { kind: "user_prompt", atMs: 5000, text: "bump the version", chars: 16 },
+  {
+    kind: "model_call",
+    atMs: 5100,
+    model: "claude-opus-4",
+    tokens: 300,
+    costUsd: 0.1,
+    durationMs: 400,
+    spanId: "llm-5100",
+    inputTokens: 200,
+    outputTokens: 100,
+    cacheReadTokens: 59_000,
+    cacheCreationTokens: 1_000,
+  },
+  {
+    kind: "assistant_message",
+    atMs: 5200,
+    text: "Context is big.",
+    model: "claude-opus-4",
+  },
+];
+const GROWN_LATE_OPENED_KEYS = ["turn-5#0", "turn-5#1", "turn-5#2"];
+
+/** An agent that reported economics and no content: nothing renders at all. */
+const ECONOMICS_ONLY_TURN: TranscriptEntry[] = [
+  {
+    kind: "model_call",
+    atMs: 5000,
+    model: "claude-opus-4",
+    tokens: 100,
+    costUsd: 0.04,
+    durationMs: 400,
+    spanId: "llm-5000",
+    inputTokens: 80,
+    outputTokens: 20,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+  },
+  {
+    kind: "model_call",
+    atMs: 5100,
+    model: "claude-opus-4",
+    tokens: 75,
+    costUsd: 0.02,
+    durationMs: 400,
+    spanId: "llm-5100",
+    inputTokens: 60,
+    outputTokens: 15,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+  },
+];
+
+/** The session's oldest turn, which never made a model call of its own. */
+const TEXT_ONLY_EARLIER_TURN: TranscriptEntry[] = [
+  { kind: "user_prompt", atMs: 4000, text: "check git status", chars: 16 },
+  {
+    kind: "assistant_message",
+    atMs: 4100,
+    text: "On branch main.",
+    model: "claude-opus-4",
+  },
+];
+const TEXT_ONLY_EARLIER_KEYS = ["turn-4#0", "turn-4#1"];
+
 /** The turn before it, whose context had already crossed into the band. */
 const GROWN_EARLIER_TURN: TranscriptEntry[] = [
   {
@@ -1071,6 +1247,23 @@ function renderScrollback(props: ViewProps = {}) {
     screenEl: screen.getByTestId("terminal-screen"),
     rerender: (extra: ViewProps) => view.rerender(tree(extra)),
   };
+}
+
+/** Lay the screen out for this test, and report its height from the rows. */
+function layOutRows(
+  screenEl: HTMLElement,
+  { clientHeight }: { clientHeight?: number } = {},
+) {
+  rowsAreLaidOut = true;
+  const rowCount = screenEl.firstElementChild?.children.length ?? 0;
+  fakeBox(screenEl, { scrollHeight: rowCount * ROW_HEIGHT, clientHeight });
+}
+
+/** Where a row sits under the top edge of the screen right now. */
+function offsetUnderTopEdge(screenEl: HTMLElement, text: string): number {
+  const row = screen.getByText(text).closest("[data-row-key]");
+  if (!row) throw new Error(`no row carrying "${text}"`);
+  return (row as HTMLElement).offsetTop - screenEl.scrollTop;
 }
 
 /** The earlier turn landing above the reader, height and all, in one commit. */

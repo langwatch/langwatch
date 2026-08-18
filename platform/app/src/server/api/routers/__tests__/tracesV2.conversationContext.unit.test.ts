@@ -50,14 +50,20 @@ describe("toConversationContextTurn", () => {
     describe("when the viewer holds cost:view", () => {
       /** @scenario "The turn list carries each turn's cost and tokens" */
       it("carries the turn's total tokens and total cost", () => {
-        const turn = toConversationContextTurn(listItem(), seeEverything);
+        const turn = toConversationContextTurn({
+          trace: listItem(),
+          protections: seeEverything,
+        });
 
         expect(turn.totalTokens).toBe(1_234);
         expect(turn.totalCost).toBe(0.42);
       });
 
       it("keeps the turn's identity and content", () => {
-        const turn = toConversationContextTurn(listItem(), seeEverything);
+        const turn = toConversationContextTurn({
+          trace: listItem(),
+          protections: seeEverything,
+        });
 
         expect(turn.traceId).toBe("trace-1");
         expect(turn.timestamp).toBe(1_000);
@@ -68,12 +74,15 @@ describe("toConversationContextTurn", () => {
     });
 
     describe("when the viewer does not hold cost:view", () => {
-      /** @scenario "A viewer without cost:view reads no per-turn spend" */
+      /** @scenario "A reader who may not see cost reads no per-turn spend" */
       it("nulls the turn's cost and keeps its tokens", () => {
-        const turn = toConversationContextTurn(listItem(), {
-          canSeeCosts: false,
-          canSeeCapturedInput: true,
-          canSeeCapturedOutput: true,
+        const turn = toConversationContextTurn({
+          trace: listItem(),
+          protections: {
+            canSeeCosts: false,
+            canSeeCapturedInput: true,
+            canSeeCapturedOutput: true,
+          },
         });
 
         expect(turn.totalCost).toBeNull();
@@ -81,11 +90,14 @@ describe("toConversationContextTurn", () => {
         expect(turn.input).toBe("bump the version");
       });
 
-      /** @scenario "A viewer without cost:view reads no per-turn spend" */
+      /** @scenario "A reader who may not see cost reads no per-turn spend" */
       it("nulls the turn's cost when the permission is simply absent", () => {
-        const turn = toConversationContextTurn(listItem(), {
-          canSeeCapturedInput: true,
-          canSeeCapturedOutput: true,
+        const turn = toConversationContextTurn({
+          trace: listItem(),
+          protections: {
+            canSeeCapturedInput: true,
+            canSeeCapturedOutput: true,
+          },
         });
 
         expect(turn.totalCost).toBeNull();
@@ -96,12 +108,15 @@ describe("toConversationContextTurn", () => {
   describe("given the viewer may not see captured content", () => {
     describe("when the viewer still holds cost:view", () => {
       it("nulls the content but still carries the totals", () => {
-        const turn = toConversationContextTurn(listItem(), {
-          canSeeCosts: true,
-          canSeeCapturedInput: false,
-          canSeeCapturedOutput: false,
-          capturedInputVisibleTo: "Admins",
-          capturedOutputVisibleTo: "Admins",
+        const turn = toConversationContextTurn({
+          trace: listItem(),
+          protections: {
+            canSeeCosts: true,
+            canSeeCapturedInput: false,
+            canSeeCapturedOutput: false,
+            capturedInputVisibleTo: "Admins",
+            capturedOutputVisibleTo: "Admins",
+          },
         });
 
         expect(turn.input).toBeNull();

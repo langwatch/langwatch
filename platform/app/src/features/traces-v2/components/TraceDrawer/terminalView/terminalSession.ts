@@ -18,19 +18,18 @@ export interface TimelinePoint {
   elapsedMs: number;
 }
 
-export function buildEntryTimeline(
-  entries: TranscriptEntry[],
-  {
-    startAtMs,
-  }: {
-    /**
-     * Where elapsed time is measured from. The session's first turn when the
-     * view knows it, so the clock reads the same wherever the loaded window
-     * starts; the first loaded entry otherwise.
-     */
-    startAtMs?: number | null;
-  } = {},
-): TimelinePoint[] {
+export function buildEntryTimeline({
+  entries,
+  startAtMs,
+}: {
+  entries: TranscriptEntry[];
+  /**
+   * Where elapsed time is measured from. The session's first turn when the
+   * view knows it, so the clock reads the same wherever the loaded window
+   * starts; the first loaded entry otherwise.
+   */
+  startAtMs?: number | null;
+}): TimelinePoint[] {
   const startMs = startAtMs ?? entries[0]?.atMs;
   let cumulativeTokens = 0;
   let cumulativeCostUsd = 0;
