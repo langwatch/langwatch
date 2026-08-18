@@ -223,3 +223,66 @@ describe("createTokenProvider", () => {
     expect(downstreamError).not.toContain(SECRET);
   });
 });
+
+describe("given the token endpoint refuses the credentials", () => {
+  describe("when the refusal carries a client status", () => {
+    /** @scenario "A token-endpoint refusal is raised as TokenAcquisitionError" */
+    it("translates it, and keeps the refusal body out of the error", async () => {
+      // A real invalid_client body: Azure quotes the request back at us, so
+      // anything that forwards this verbatim is a secret-shaped log entry.
+      responseQueue = [
+        {
+          status: 401,
+          body: {
+            error: "invalid_client",
+            error_description: `AADSTS7000215: Invalid client secret ${SECRET}`,
+          },
+        },
+      ];
+
+      const { createTokenProvider, TokenAcquisitionError } =
+        await loadProvider();
+      const provider = createTokenProvider({
+        credentials: CREDENTIALS,
+        scope: SCOPE,
+        deadlineAtMs: Date.now() + 10_000,
+        tokenEndpoint,
+      });
+
+      const failure = await provider
+        .getToken()
+        .catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(TokenAcquisitionError);
+      expect((failure as Error).message).toContain("401");
+      expect((failure as Error).message).not.toContain(SECRET);
+      expect((failure as Error).message).not.toContain("AADSTS7000215");
+    });
+  });
+
+  describe("when the failure is not the endpoint refusing us", () => {
+    /** @scenario "A token-endpoint refusal is raised as TokenAcquisitionError" */
+    it("leaves an exhausted 5xx as it was, so the caller can still tell them apart", async () => {
+      responseQueue = Array.from({ length: 8 }, () => ({
+        status: 503,
+        body: { error: "temporarily_unavailable" },
+      }));
+
+      const { createTokenProvider, TokenAcquisitionError } =
+        await loadProvider();
+      const provider = createTokenProvider({
+        credentials: CREDENTIALS,
+        scope: SCOPE,
+        deadlineAtMs: Date.now() + 10_000,
+        tokenEndpoint,
+      });
+
+      const failure = await provider
+        .getToken()
+        .catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(Error);
+      expect(failure).not.toBeInstanceOf(TokenAcquisitionError);
+    });
+  });
+});

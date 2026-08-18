@@ -20,7 +20,7 @@
  * Spec: specs/ai-governance/puller-framework/microsoft-365-audit.feature
  */
 
-import { fetchWithRetry } from "./httpRetry";
+import { fetchWithRetry, HttpResponseError } from "./httpRetry";
 
 /**
  * Refresh this far ahead of stated expiry. A token that expires while a
@@ -112,6 +112,23 @@ export function createTokenProvider({
       body,
       signal,
       deadlineAtMs,
+    }).catch((error: unknown) => {
+      // A client status is the endpoint refusing us — a wrong secret, a wrong
+      // tenant, a scope we were not granted. Carry the status only: the
+      // request that produced this had the client secret in its form body,
+      // and HttpResponseError keeps the response body, which is exactly what
+      // TokenAcquisitionError is documented never to carry.
+      //
+      // Everything else stays as it is: deadline, abort, transport failure
+      // and exhausted 5xx retries are not the endpoint refusing us, and
+      // flattening them into one type would lose the distinction a caller
+      // needs to decide whether retrying is worth anything.
+      if (error instanceof HttpResponseError && error.status < 500) {
+        throw new TokenAcquisitionError(
+          `the token endpoint answered ${error.status}`,
+        );
+      }
+      throw error;
     });
 
     let parsed: TokenResponse;
