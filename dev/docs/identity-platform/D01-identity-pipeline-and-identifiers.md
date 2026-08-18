@@ -32,7 +32,7 @@ provider         widened: credential | email | passkey | google | github |
   - **Domain-significant writes** (account create/delete, verification consumed, passkey add/remove, MFA enroll/disable, user create) become identity **commands**. The handler runs guards (vetoing *before* any row exists — better-auth surfaces the refusal through its own protocol flow), derives deterministic ids, appends the events to CH (**waited**); the apply then consumes those events on the calling path and writes the lifecycle/projection columns — command → event → projection, never a hand-written upsert in the handler — while the protocol values ride only on the command and land through the **credentials repository** (row-truth); the row is returned to better-auth. Read-your-writes holds; the queue fold re-applies the same events later and converges because applies are idempotent (the grants-ledger dispatch discipline, ADR-092 §13).
   - **High-churn protocol writes** (session rows, OAuth token refresh) stay row-truth repository writes with no events (R12) — `SessionRepository` for session rows, the credentials repository for token columns — declared in a per-(model, operation) **routing table** in this module. Nothing is implicitly captured or implicitly passed through — an unrouted write is a startup error.
   - A thin endpoint-hook plugin stamps ceremony context (flow, actor, request metadata) onto request-scoped storage so the adapter knows why a row is written (epic Open Q16 for non-request writes).
-- **Column-truth rule** (ADR-1, enforced by lint/review):
+- **Column-truth rule** (ADR-101, enforced by lint/review):
   - *Value/secret* columns (`password`, `access_token`, `refresh_token`, `id_token`, `providerAccountId`, the raw identifier value) — row-truth: written through the credentials repository from command payloads, **excluded from replay**, deleted on erasure.
   - *Lifecycle* columns (`state`, `connectionId`, `verifiedAt`, `attachedAt`, `detachedAt`) — event-truth: the log is the record, replay rebuilds them.
   - Nobody hand-edits either kind; nobody emits identity events outside command handlers.
@@ -162,8 +162,8 @@ row-truth, better-auth protocol bookkeeping (adapter routing table: direct write
 # Research
 
 - Framework: `platform/app/src/server/event-sourcing/` — doctrine ADRs 007 (pipeline model), 015 (replay coordination), 022 (event log source of truth), 049 (PG projections), 052 (PM substrate + content boundary), 066 (fold contract). `specs/event-sourcing/pipeline-model.feature` is the doctrine anchor.
-- **Corpus-audit finding this deliverable resolves:** ADR-022:24 ("`event_log` is the single durable source of truth") + ADR-015:41 ("replay's writes always win… canonical state from all events") assume single-ownership rows. The column-truth rule is a carve-out: ADR-1 must amend 022/015 and the replay tooling must gain per-pipeline column scoping, or a naive replay clobbers handler-written value columns.
-- Payload-content precedent: ADR-052:74,212 (content boundary — identity deviates deliberately for emails; R11/ADR-1 pin it); ADR-029 §4 (purge tractability).
+- **Corpus-audit finding this deliverable resolves:** ADR-022:24 ("`event_log` is the single durable source of truth") + ADR-015:41 ("replay's writes always win… canonical state from all events") assume single-ownership rows. The column-truth rule is a carve-out: ADR-101 must amend 022/015 and the replay tooling must gain per-pipeline column scoping, or a naive replay clobbers handler-written value columns.
+- Payload-content precedent: ADR-052:74,212 (content boundary — identity deviates deliberately for emails; R11/ADR-101 pin it); ADR-029 §4 (purge tractability).
 - `specs/auth/signup-does-not-strand-an-account.feature` — anti-dead-end anchor this model generalizes.
 
 # Technical Plan
@@ -188,4 +188,4 @@ row-truth, better-auth protocol bookkeeping (adapter routing table: direct write
 
 # Open Questions
 
-- None specific to D01. (Replay tooling's per-pipeline column scoping is an ADR-1 implementation detail, not a product question.)
+- None specific to D01. (Replay tooling's per-pipeline column scoping is an ADR-101 implementation detail, not a product question.)
