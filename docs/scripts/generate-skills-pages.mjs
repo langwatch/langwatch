@@ -1,7 +1,8 @@
-// Generates the skill accordion markup inside docs/skills pages, between
+// Generates the skill accordion markup inside docs pages, between
 // {/* lw-generated:<section>:start */} and {/* lw-generated:<section>:end */}
 // markers, from docs/skills/skills-pages-manifest.json plus the compiled
-// prompts in skills/_compiled/.
+// prompts in skills/_compiled/. Manifest keys are docs-root-relative paths,
+// so any docs page can carry a generated section.
 //
 // The markup is plain lowercase HTML elements on purpose: Mintlify only
 // server-renders page content, never components imported from snippets, and
@@ -26,8 +27,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const docsRoot = path.resolve(__dirname, "..");
 const repoRoot = path.resolve(docsRoot, "..");
 const compiledDir = path.join(repoRoot, "skills", "_compiled");
-const pagesDir = path.join(docsRoot, "skills");
-const manifest = JSON.parse(fs.readFileSync(path.join(pagesDir, "skills-pages-manifest.json"), "utf8"));
+const manifest = JSON.parse(
+  fs.readFileSync(path.join(docsRoot, "skills", "skills-pages-manifest.json"), "utf8")
+);
 
 // Escape text that lands in JSX text position so MDX cannot reinterpret it
 // as markup, expressions, or markdown emphasis.
@@ -174,7 +176,7 @@ function renderAccordion(entry) {
 
 let failed = false;
 for (const [pageFile, sections] of Object.entries(manifest)) {
-  const pagePath = path.join(pagesDir, pageFile);
+  const pagePath = path.join(docsRoot, pageFile);
   let content = fs.readFileSync(pagePath, "utf8");
   for (const [sectionId, entries] of Object.entries(sections)) {
     const start = `{/* lw-generated:${sectionId}:start */}`;
@@ -190,6 +192,6 @@ for (const [pageFile, sections] of Object.entries(manifest)) {
     content = content.slice(0, startIdx + start.length) + "\n\n" + generated + "\n\n" + content.slice(endIdx);
   }
   fs.writeFileSync(pagePath, content);
-  console.log(`Generated skill accordions in docs/skills/${pageFile}`);
+  console.log(`Generated skill accordions in docs/${pageFile}`);
 }
 if (failed) process.exit(1);
