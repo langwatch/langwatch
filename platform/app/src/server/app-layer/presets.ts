@@ -698,7 +698,7 @@ export function initializeDefaultApp(options?: {
   };
   const triggerTemplates = {
     testFire: (input: Parameters<typeof testFireTrigger>[1]) =>
-      testFireTrigger(triggerTemplateDeps, input),
+      testFireTrigger({ deps: triggerTemplateDeps, input }),
   };
   const tokenizer = new TokenizerService(
     config.disableTokenization
@@ -2020,7 +2020,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       };
       return {
         testFire: (input: Parameters<typeof testFireTrigger>[1]) =>
-          testFireTrigger(testDeps, input),
+          testFireTrigger({ deps: testDeps, input }),
       };
     })(),
     simulations: {

@@ -259,7 +259,7 @@ describe("setTriggerActiveCommand()", () => {
         json: async () => makeTrigger({ active: false }),
       });
 
-      await setTriggerActiveCommand("trigger_abc", { active: false });
+      await setTriggerActiveCommand({ id: "trigger_abc", active: false });
 
       expect(mockFetch).toHaveBeenCalledWith(
         "http://localhost:5560/api/triggers/trigger_abc/disable",
@@ -275,7 +275,7 @@ describe("setTriggerActiveCommand()", () => {
         json: async () => makeTrigger({ active: true }),
       });
 
-      await setTriggerActiveCommand("trigger_abc", { active: true });
+      await setTriggerActiveCommand({ id: "trigger_abc", active: true });
 
       expect(mockFetch).toHaveBeenCalledWith(
         "http://localhost:5560/api/triggers/trigger_abc/enable",

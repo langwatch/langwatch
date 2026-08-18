@@ -288,6 +288,9 @@ describe("dispatchScheduledReport", () => {
             schedule: { cron: "0 9 * * 1", timezone: "UTC" },
             slackDelivery: "bot",
             slackBotToken: "enc(xoxb-live)",
+            // Whitespace, not absent: an omitted field is falsy on its own,
+            // so only this pins the `.trim()` the guard is written around.
+            slackChannelId: "   ",
           },
         }),
       );

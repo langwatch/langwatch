@@ -103,10 +103,13 @@ describe("a builder condition on a custom attribute", () => {
  * every such key is rejected, never silently saved.
  */
 describe("attributeFieldRoundTrips", () => {
-  const attributeCondition = (
-    key: string,
-    overrides: Partial<Condition> = {},
-  ): Condition => ({
+  const attributeCondition = ({
+    key,
+    overrides = {},
+  }: {
+    key: string;
+    overrides?: Partial<Condition>;
+  }): Condition => ({
     id: "c0",
     field: `trace.attribute.${key}`,
     operator: "is",
@@ -141,65 +144,69 @@ describe("attributeFieldRoundTrips", () => {
 
     it("is true for a key typed but no value yet", () => {
       expect(
-        attributeFieldRoundTrips(attributeCondition("user_id", { value: "" })),
+        attributeFieldRoundTrips(
+          attributeCondition({ key: "user_id", overrides: { value: "" } }),
+        ),
       ).toBe(true);
     });
   });
 
   describe("given a key that is safe to save", () => {
     it("round-trips for a plain identifier", () => {
-      expect(attributeFieldRoundTrips(attributeCondition("user_id"))).toBe(
-        true,
-      );
+      expect(
+        attributeFieldRoundTrips(attributeCondition({ key: "user_id" })),
+      ).toBe(true);
     });
 
     it("round-trips for a hyphenated identifier", () => {
-      expect(attributeFieldRoundTrips(attributeCondition("user-id"))).toBe(
-        true,
-      );
+      expect(
+        attributeFieldRoundTrips(attributeCondition({ key: "user-id" })),
+      ).toBe(true);
     });
   });
 
   describe("given a key that would change what the filter matches", () => {
     /** @scenario "An attribute key that would change the meaning of the filter is rejected" */
     it("rejects a key with an internal space — it would split into two unrelated clauses", () => {
-      expect(attributeFieldRoundTrips(attributeCondition("foo bar"))).toBe(
-        false,
-      );
+      expect(
+        attributeFieldRoundTrips(attributeCondition({ key: "foo bar" })),
+      ).toBe(false);
     });
 
     it("rejects a key that is only whitespace — it fails to parse at all", () => {
-      expect(attributeFieldRoundTrips(attributeCondition(" "))).toBe(false);
+      expect(attributeFieldRoundTrips(attributeCondition({ key: " " }))).toBe(
+        false,
+      );
     });
 
     it("rejects a key with leading whitespace", () => {
-      expect(attributeFieldRoundTrips(attributeCondition(" user_id"))).toBe(
-        false,
-      );
+      expect(
+        attributeFieldRoundTrips(attributeCondition({ key: " user_id" })),
+      ).toBe(false);
     });
 
     it("rejects a key with trailing whitespace", () => {
-      expect(attributeFieldRoundTrips(attributeCondition("user_id "))).toBe(
-        false,
-      );
+      expect(
+        attributeFieldRoundTrips(attributeCondition({ key: "user_id " })),
+      ).toBe(false);
     });
 
     it("rejects a key containing a colon", () => {
-      expect(attributeFieldRoundTrips(attributeCondition("user:id"))).toBe(
-        false,
-      );
+      expect(
+        attributeFieldRoundTrips(attributeCondition({ key: "user:id" })),
+      ).toBe(false);
     });
 
     it("rejects a key containing a quote", () => {
-      expect(attributeFieldRoundTrips(attributeCondition('user"id'))).toBe(
-        false,
-      );
+      expect(
+        attributeFieldRoundTrips(attributeCondition({ key: 'user"id' })),
+      ).toBe(false);
     });
   });
 
   describe("given the composed row is never handed to onChange", () => {
     it("a row with an unsafe key never appears in the serialised query", () => {
-      const bad = attributeCondition("foo bar");
+      const bad = attributeCondition({ key: "foo bar" });
       const good = {
         id: "c1",
         field: "status",

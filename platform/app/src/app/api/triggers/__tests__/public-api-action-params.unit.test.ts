@@ -21,11 +21,18 @@ describe("Feature: the API expresses the automations the dashboard expresses", (
         PUBLIC_API_ACTION_PARAMS_SCHEMAS,
       )) {
         const channel = SERVER_PROVIDERS[action as TriggerAction];
+        // Named before it is dereferenced: without this the first failure is
+        // a TypeError on `.shared`, which buries the mismatch the next
+        // assertion (and the test below) would have reported plainly.
+        expect(
+          channel,
+          `${action} is published by the API but this server offers no such channel`,
+        ).toBeDefined();
         expect(
           [...deliveryFieldNames(published)].sort(),
           `the ${action} delivery configuration the API publishes`,
         ).toEqual(
-          [...deliveryFieldNames(channel.shared.actionParamsSchema)].sort(),
+          [...deliveryFieldNames(channel!.shared.actionParamsSchema)].sort(),
         );
       }
     });

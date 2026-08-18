@@ -9,7 +9,7 @@
  * file-size ceiling. Same page, same fixture project (`listPages.fixture.ts`).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -128,10 +128,14 @@ describe("given a Slack automation on the unified table", () => {
       // #6244: this cell used to show "Webhook" with an empty tooltip for
       // every Slack row, including bot deliveries that never carry a
       // webhook at all.
-      expect(
-        screen.getByText("Slack app · channel C0999999"),
-      ).toBeInTheDocument();
-      expect(screen.queryByText("Webhook")).toBeNull();
+      const cell = screen.getByText("Slack app · channel C0999999");
+      expect(cell).toBeInTheDocument();
+      // Scoped to this row: the fixture is shared with the other list-page
+      // suite, so a document-wide query would start failing the day it gains
+      // a plain webhook automation — for a reason unrelated to this cell.
+      const row = cell.closest("tr");
+      expect(row).not.toBeNull();
+      expect(within(row!).queryByText("Webhook")).toBeNull();
     });
   });
 

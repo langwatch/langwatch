@@ -291,8 +291,10 @@ function incidentRow(fire: TriggerFire): FireRow {
     dot: "green.solid",
     label: "Resolved",
     detail: `${formatTimeAgo(firedAt.getTime())} · lasted ${formatDurationBetween(
-      firedAt,
-      resolvedAt,
+      {
+        from: firedAt,
+        to: resolvedAt,
+      },
     )}`,
     detailColor: "fg.muted",
   };
@@ -319,19 +321,26 @@ function groupFiresByLabel(
  * abbreviated — a saved pixel is not worth a guess. Sub-minute incidents show
  * seconds so a fast recovery doesn't read as "lasted 0 minutes".
  */
-export function formatDurationBetween(from: Date, to: Date): string {
+export function formatDurationBetween({
+  from,
+  to,
+}: {
+  from: Date;
+  to: Date;
+}): string {
   const minutes = differenceInMinutes(to, from);
   if (minutes < 1) {
-    return plural(Math.max(differenceInSeconds(to, from), 1), "second");
+    const seconds = Math.max(differenceInSeconds(to, from), 1);
+    return plural({ count: seconds, unit: "second" });
   }
-  if (minutes < 60) return plural(minutes, "minute");
+  if (minutes < 60) return plural({ count: minutes, unit: "minute" });
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
   return rest > 0
-    ? `${plural(hours, "hour")} ${plural(rest, "minute")}`
-    : plural(hours, "hour");
+    ? `${plural({ count: hours, unit: "hour" })} ${plural({ count: rest, unit: "minute" })}`
+    : plural({ count: hours, unit: "hour" });
 }
 
-function plural(count: number, unit: string): string {
+function plural({ count, unit }: { count: number; unit: string }): string {
   return `${count} ${count === 1 ? unit : `${unit}s`}`;
 }

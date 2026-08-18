@@ -279,6 +279,11 @@ describe("per-series filters and percentage mode", () => {
           EVALUATED.length;
 
         expect(numberAt(rows[0], filtered.alias)).toBe(EVALUATED_WITH_ERROR);
+        // EVALUATED.length, not TRACES_TOTAL: the evaluations series joins
+        // `evaluation_runs` with an inner join (buildJoinClause), which drops
+        // unevaluated traces before any series aggregates. So the "unfiltered"
+        // series is unfiltered within the evaluated set, and reading short of
+        // the window's trace count is the join working, not a bug to chase.
         expect(numberAt(rows[0], unfiltered.alias)).toBe(EVALUATED.length);
         expect(
           numberAt(rows[0], "0__evaluations_evaluation_score__avg"),

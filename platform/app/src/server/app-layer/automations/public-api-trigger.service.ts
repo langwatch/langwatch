@@ -86,6 +86,8 @@ const RULE_FIELD_NAMES: Record<"graphAlert" | "report", Set<string>> = {
   report: new Set(Object.keys(reportActionParamsSchema.shape)),
 };
 
+const logger = createLogger("langwatch:automations:public-api-trigger");
+
 /**
  * What the public API is allowed to write, and on what terms.
  *
@@ -108,8 +110,6 @@ const RULE_FIELD_NAMES: Record<"graphAlert" | "report", Set<string>> = {
  *    are three different rows: an alert owns its graph's alert slot and a
  *    report owns a calendar entry. Converting one is a create and a delete.
  */
-const logger = createLogger("langwatch:automations:public-api-trigger");
-
 export class PublicApiTriggerService {
   constructor(
     private readonly triggers: TriggerService,

@@ -17,7 +17,7 @@ const build = (
 const idsOf = (rows: ReturnType<typeof build>): SlackBlockKitTemplateId[] =>
   rows.map((row) => row.option.id);
 
-const rowFor = (rows: ReturnType<typeof build>, id: string) =>
+const rowFor = ({ rows, id }: { rows: ReturnType<typeof build>; id: string }) =>
   rows.find((row) => row.option.id === id);
 
 describe("buildLayoutRows", () => {
@@ -26,17 +26,25 @@ describe("buildLayoutRows", () => {
       const perTrace = build({ cadence: "immediate" });
       const digest = build({ cadence: "digest" });
 
-      expect(rowFor(perTrace, "trace_alert_compact")).toBeDefined();
-      expect(rowFor(perTrace, "digest_compact")).toBeUndefined();
-      expect(rowFor(digest, "digest_compact")).toBeDefined();
-      expect(rowFor(digest, "trace_alert_compact")).toBeUndefined();
+      expect(
+        rowFor({ rows: perTrace, id: "trace_alert_compact" }),
+      ).toBeDefined();
+      expect(rowFor({ rows: perTrace, id: "digest_compact" })).toBeUndefined();
+      expect(rowFor({ rows: digest, id: "digest_compact" })).toBeDefined();
+      expect(
+        rowFor({ rows: digest, id: "trace_alert_compact" }),
+      ).toBeUndefined();
     });
 
     it("badges the default layout", () => {
       const rows = build({ defaultId: "trace_alert_compact" });
 
-      expect(rowFor(rows, "trace_alert_compact")?.isDefault).toBe(true);
-      expect(rowFor(rows, "trace_alert_one_liner")?.isDefault).toBe(false);
+      expect(rowFor({ rows: rows, id: "trace_alert_compact" })?.isDefault).toBe(
+        true,
+      );
+      expect(
+        rowFor({ rows: rows, id: "trace_alert_one_liner" })?.isDefault,
+      ).toBe(false);
     });
 
     /** @scenario "The richer templates are offered only for a bot connection" */
@@ -46,18 +54,31 @@ describe("buildLayoutRows", () => {
 
       // "Eval failure banner" leads with a gated `alert` block; "Compact
       // notice" leads with an allowlisted one.
-      expect(rowFor(onWebhook, "eval_failure_rich")?.isLocked).toBe(true);
-      expect(rowFor(onWebhook, "trace_alert_compact")?.isLocked).toBe(false);
-      expect(rowFor(onBot, "eval_failure_rich")?.isLocked).toBe(false);
+      expect(
+        rowFor({ rows: onWebhook, id: "eval_failure_rich" })?.isLocked,
+      ).toBe(true);
+      expect(
+        rowFor({ rows: onWebhook, id: "trace_alert_compact" })?.isLocked,
+      ).toBe(false);
+      expect(rowFor({ rows: onBot, id: "eval_failure_rich" })?.isLocked).toBe(
+        false,
+      );
     });
 
     it("selects the layout whose source the draft carries, and nothing for a custom one", () => {
-      const oneLiner = rowFor(build(), "trace_alert_one_liner")!.option;
+      const oneLiner = rowFor({
+        rows: build(),
+        id: "trace_alert_one_liner",
+      })!.option;
       const onPreset = build({ currentSource: oneLiner.source });
       const onCustom = build({ currentSource: "{{ hand written }}" });
 
-      expect(rowFor(onPreset, "trace_alert_one_liner")?.isSelected).toBe(true);
-      expect(rowFor(onPreset, "trace_alert_compact")?.isSelected).toBe(false);
+      expect(
+        rowFor({ rows: onPreset, id: "trace_alert_one_liner" })?.isSelected,
+      ).toBe(true);
+      expect(
+        rowFor({ rows: onPreset, id: "trace_alert_compact" })?.isSelected,
+      ).toBe(false);
       expect(onCustom.some((row) => row.isSelected)).toBe(false);
     });
   });

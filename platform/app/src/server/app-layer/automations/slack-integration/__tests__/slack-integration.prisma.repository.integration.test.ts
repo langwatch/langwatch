@@ -100,7 +100,13 @@ describe("Feature: the project's Slack integration", () => {
     }
   });
 
-  const connect = (botTokenEncrypted: string, slackTeamName = "Acme HQ") =>
+  const connect = ({
+    botTokenEncrypted,
+    slackTeamName = "Acme HQ",
+  }: {
+    botTokenEncrypted: string;
+    slackTeamName?: string;
+  }) =>
     repo.upsertForProject({
       projectId: projectId(),
       organizationId: organization!.id,
@@ -113,8 +119,11 @@ describe("Feature: the project's Slack integration", () => {
   describe("when a project is connected twice", () => {
     /** @scenario "Rotating the token needs no automation edits" */
     it("holds one row, carrying the newest token", async () => {
-      await connect("enc(xoxb-old)");
-      await connect("enc(xoxb-new)", "Acme HQ renamed");
+      await connect({ botTokenEncrypted: "enc(xoxb-old)" });
+      await connect({
+        botTokenEncrypted: "enc(xoxb-new)",
+        slackTeamName: "Acme HQ renamed",
+      });
 
       const rows = await prisma.slackIntegration.findMany({
         where: { scopeType: "PROJECT", scopeId: projectId() },
@@ -152,12 +161,12 @@ describe("Feature: the project's Slack integration", () => {
         channelId: "C0999",
       });
 
-      const cleared = await repo.clearOwnSlackToken({
+      const outcome = await repo.clearOwnSlackToken({
         projectId: projectId(),
         triggerId: row.id,
       });
 
-      expect(cleared).toBe("cleared");
+      expect(outcome).toBe("cleared");
       const after = await prisma.trigger.findUniqueOrThrow({
         where: { id: row.id, projectId: projectId() },
       });
@@ -182,7 +191,7 @@ describe("Feature: the project's Slack integration", () => {
 
   describe("when the integration is removed", () => {
     it("leaves the project with none", async () => {
-      await connect("enc(xoxb-live)");
+      await connect({ botTokenEncrypted: "enc(xoxb-live)" });
 
       await repo.deleteForProject({ projectId: projectId() });
 

@@ -39,9 +39,12 @@ const sentBody = () => mockedSend.mock.calls[0]![0].body as string;
 function testFire(
   webhookDestination: NonNullable<TestFireTriggerInput["webhookDestination"]>,
 ) {
-  return testFireTrigger(
-    { baseHost: "https://app.langwatch.ai", notifier: liveTriggerNotifier },
-    {
+  return testFireTrigger({
+    deps: {
+      baseHost: "https://app.langwatch.ai",
+      notifier: liveTriggerNotifier,
+    },
+    input: {
       channel: "webhook",
       trigger: { name: "High latency", alertType: AlertType.WARNING },
       project: { name: "Acme", slug: "acme" },
@@ -50,7 +53,7 @@ function testFire(
       webhook: null,
       webhookDestination,
     },
-  );
+  });
 }
 
 const destination = {

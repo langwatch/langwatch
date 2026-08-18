@@ -44,15 +44,18 @@ const savedTrigger = (actionParams: Record<string, unknown>): Trigger =>
     emailBodyTemplate: null,
   }) as unknown as Trigger;
 
-function makeService(
-  trigger: Trigger,
-  overrides: {
+function makeService({
+  trigger,
+  overrides = {},
+}: {
+  trigger: Trigger;
+  overrides?: {
     resolveSlackToken?: () => Promise<{
       token: string;
       source: "project_integration";
     } | null>;
-  } = {},
-) {
+  };
+}) {
   const testFire = vi.fn(async (_input: PublicApiTestFireInput) => ({
     channel: "slack" as const,
     recipientCount: 0,
@@ -81,12 +84,12 @@ const fire = (service: PublicApiTriggerService) =>
 describe("PublicApiTriggerService.testFire", () => {
   describe("given a Slack automation that delivers by webhook", () => {
     it("fires through its webhook, never the bot API the project's token opens", async () => {
-      const { service, testFire } = makeService(
-        savedTrigger({
+      const { service, testFire } = makeService({
+        trigger: savedTrigger({
           slackDelivery: "webhook",
           slackWebhook: "https://hooks.slack.com/services/T000/B000/xyz",
         }),
-      );
+      });
 
       await fire(service);
 
@@ -100,13 +103,13 @@ describe("PublicApiTriggerService.testFire", () => {
     });
 
     it("fires through its webhook even when it carries a stale bot channel", async () => {
-      const { service, testFire } = makeService(
-        savedTrigger({
+      const { service, testFire } = makeService({
+        trigger: savedTrigger({
           slackDelivery: "webhook",
           slackWebhook: "https://hooks.slack.com/services/T000/B000/xyz",
           slackChannelId: "C0123",
         }),
-      );
+      });
 
       await fire(service);
 
@@ -122,9 +125,12 @@ describe("PublicApiTriggerService.testFire", () => {
 
   describe("given a Slack automation that delivers as the bot", () => {
     it("fires through the Web API with the resolved token and its channel", async () => {
-      const { service, testFire } = makeService(
-        savedTrigger({ slackDelivery: "bot", slackChannelId: "C0123" }),
-      );
+      const { service, testFire } = makeService({
+        trigger: savedTrigger({
+          slackDelivery: "bot",
+          slackChannelId: "C0123",
+        }),
+      });
 
       await fire(service);
 
@@ -137,16 +143,16 @@ describe("PublicApiTriggerService.testFire", () => {
     });
 
     it("refuses when no connection resolves, never falling back to a stored webhook", async () => {
-      const { service, testFire } = makeService(
-        savedTrigger({
+      const { service, testFire } = makeService({
+        trigger: savedTrigger({
           slackDelivery: "bot",
           slackChannelId: "C0123",
           // A webhook left behind by an earlier configuration must not
           // become the test-fire surface for a bot automation.
           slackWebhook: "https://hooks.slack.com/services/T000/B000/stale",
         }),
-        { resolveSlackToken: async () => null },
-      );
+        overrides: { resolveSlackToken: async () => null },
+      });
 
       await expect(fire(service)).rejects.toMatchObject({
         code: "test_fire_unavailable",

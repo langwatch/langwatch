@@ -12,10 +12,13 @@ import { failSpinner } from "../../utils/spinnerError";
  * Resume or pause an automation. A report's schedule follows: pausing retires
  * its calendar entry so it stops claiming its slot, and resuming puts it back.
  */
-export const setTriggerActiveCommand = async (
-  id: string,
-  { active }: { active: boolean },
-): Promise<CommandResult | void> => {
+export const setTriggerActiveCommand = async ({
+  id,
+  active,
+}: {
+  id: string;
+  active: boolean;
+}): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";

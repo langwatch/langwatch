@@ -5,6 +5,8 @@
  * both suites read the same project without sharing mock state.
  */
 
+import { TriggerKind } from "~/generated/prisma/client";
+
 export const graphTrigger = {
   id: "alert-1",
   name: "Cost spike",
@@ -12,7 +14,7 @@ export const graphTrigger = {
   pausedReason: null,
   customGraphId: "graph-1",
   customGraph: { name: "Cost graph" },
-  triggerKind: "TRIGGER",
+  triggerKind: TriggerKind.ALERT,
   action: "SEND_EMAIL",
   actionParams: {
     seriesName: "cost",
@@ -33,7 +35,7 @@ export const scheduleTrigger = {
   pausedReason: null,
   customGraphId: null,
   customGraph: null,
-  triggerKind: "REPORT",
+  triggerKind: TriggerKind.REPORT,
   action: "SEND_EMAIL",
   actionParams: {
     source: { kind: "traceQuery", topN: 5 },
@@ -52,7 +54,7 @@ export const filterTrigger = {
   pausedReason: null,
   customGraphId: null,
   customGraph: null,
-  triggerKind: "TRIGGER",
+  triggerKind: TriggerKind.AUTOMATION,
   action: "SEND_SLACK_MESSAGE",
   actionParams: { slackWebhook: "https://hooks.slack.example/x" },
   checks: [],
@@ -67,7 +69,7 @@ export const botSlackTrigger = {
   pausedReason: null,
   customGraphId: null,
   customGraph: null,
-  triggerKind: "TRIGGER",
+  triggerKind: TriggerKind.AUTOMATION,
   action: "SEND_SLACK_MESSAGE",
   actionParams: { slackDelivery: "bot", slackChannelId: "C0999999" },
   checks: [],

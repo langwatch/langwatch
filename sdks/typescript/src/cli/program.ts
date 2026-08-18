@@ -2855,7 +2855,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
       const { setTriggerActiveCommand: impl } = await import("./commands/triggers/setActive.js");
-      return impl(id, { active: true });
+      return impl({ id, active: true });
     },
   );
 
@@ -2866,7 +2866,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
       const { setTriggerActiveCommand: impl } = await import("./commands/triggers/setActive.js");
-      return impl(id, { active: false });
+      return impl({ id, active: false });
     },
   );
 

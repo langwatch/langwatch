@@ -306,10 +306,13 @@ function buildTestFireContext({
   };
 }
 
-export async function testFireTrigger(
-  deps: TestFireTriggerDeps,
-  input: TestFireTriggerInput,
-): Promise<TestFireResult> {
+export async function testFireTrigger({
+  deps,
+  input,
+}: {
+  deps: TestFireTriggerDeps;
+  input: TestFireTriggerInput;
+}): Promise<TestFireResult> {
   const { channel, trigger, project, draft, recipients, webhook } = input;
   const { sourceKind, context } = buildTestFireContext({
     identity: trigger,

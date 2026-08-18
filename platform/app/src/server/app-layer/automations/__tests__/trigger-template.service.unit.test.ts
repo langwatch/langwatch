@@ -76,7 +76,7 @@ function makeNotifier() {
 function makeService(notifier: TriggerNotifier) {
   const deps = { baseHost: BASE_HOST, notifier };
   return {
-    testFire: (input: TestFireTriggerInput) => testFireTrigger(deps, input),
+    testFire: (input: TestFireTriggerInput) => testFireTrigger({ deps, input }),
   };
 }
 

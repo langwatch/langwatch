@@ -172,20 +172,6 @@ type ReportTriggerRow = NonNullable<
 >;
 type ReportContext = Parameters<typeof renderTriggerSlack>[0]["context"];
 
-/** ADR-093 §5 resolution for a report: the shared resolver when the
- *  composition root wired one, the report's own token alone otherwise. */
-async function resolveReportSlackToken({
-  deps,
-  projectId,
-  slackParams,
-}: {
-  deps: ReportDispatchDeps;
-  projectId: string;
-  slackParams: SlackActionParams;
-}): Promise<ResolvedSlackToken | null> {
-  return deps.resolveSlackToken({ projectId, actionParams: slackParams });
-}
-
 /**
  * The Slack arm of a report delivery. A bot connection posts via the Web API
  * with the gate open (ADR-041); the report's own token wins and the project's
@@ -215,10 +201,11 @@ async function deliverReportSlack({
 }): Promise<boolean> {
   const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
   if (slackDeliveryMethodOf(slackParams) === "bot") {
-    const resolved = await resolveReportSlackToken({
-      deps,
+    // ADR-093 §5 resolution order lives in the shared resolver, which the
+    // composition root always wires.
+    const resolved = await deps.resolveSlackToken({
       projectId,
-      slackParams,
+      actionParams: slackParams,
     });
     const channel = slackParams.slackChannelId?.trim();
     if (!resolved) {
