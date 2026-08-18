@@ -138,7 +138,7 @@
     "@prisma/adapter-pg": "7.9.1",
     "@prisma/client": "7.9.1",
     "@pyroscope/nodejs": "0.6.2",
-    "@react-email/components": "^0.0.42",
+    "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.0.9",
     "@sendgrid/mail": "^8.1.6",
     "@slack/webhook": "^7.1.0",
