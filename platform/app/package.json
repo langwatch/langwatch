@@ -176,7 +176,7 @@
     "marked": "^18.0.5",
     "monacopilot": "^1.2.12",
     "msgpackr": "^2.0.4",
-    "nanoid": "^5.1.16",
+    "nanoid": "^6.0.0",
     "node-fetch-cache": "^5.1.0",
     "nodemailer": "^9.0.3",
     "numeral": "^2.0.6",
