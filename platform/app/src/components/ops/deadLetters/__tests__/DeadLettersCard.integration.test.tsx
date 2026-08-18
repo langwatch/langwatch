@@ -11,6 +11,41 @@ import {
   DeadLettersTable,
 } from "../DeadLettersCard";
 
+// The expanded row's attempt history reads through the tRPC client; the
+// fixtures here stand in for the ops.listOutboxAttempts read.
+const listOutboxAttemptsQuery = vi.fn((_input: unknown) => ({
+  isPending: false,
+  data: [
+    {
+      id: "att_1",
+      attempt: 1,
+      occurredAt: 0,
+      outcome: "retry_scheduled",
+      errorType: "DispatchError",
+      errorMessage: "receiver returned 503",
+      retryAfterMs: null,
+    },
+    {
+      id: "att_2",
+      attempt: 2,
+      occurredAt: 0,
+      outcome: "dead",
+      errorType: "DispatchError",
+      errorMessage: "receiver returned 410",
+      retryAfterMs: null,
+    },
+  ],
+}));
+vi.mock("~/utils/api", () => ({
+  api: {
+    ops: {
+      listOutboxAttempts: {
+        useQuery: (input: unknown) => listOutboxAttemptsQuery(input),
+      },
+    },
+  },
+}));
+
 const NOW = Date.UTC(2026, 7, 17, 12, 0, 0);
 
 /** Repeating-pattern fixtures, not credentials: a realistic ULID or trace id
@@ -107,8 +142,10 @@ describe("DeadLettersCard", () => {
           canManage
           expandedId={null}
           redrivingId={null}
+          discardingId={null}
           onToggle={vi.fn()}
           onRedrive={vi.fn()}
+          onDiscard={vi.fn()}
         />,
       );
 
@@ -131,8 +168,10 @@ describe("DeadLettersCard", () => {
           canManage
           expandedId={null}
           redrivingId={null}
+          discardingId={null}
           onToggle={vi.fn()}
           onRedrive={onRedrive}
+          onDiscard={vi.fn()}
         />,
       );
 
@@ -158,8 +197,10 @@ describe("DeadLettersCard", () => {
           canManage={false}
           expandedId={null}
           redrivingId={null}
+          discardingId={null}
           onToggle={vi.fn()}
           onRedrive={vi.fn()}
+          onDiscard={vi.fn()}
         />,
       );
 
@@ -177,15 +218,84 @@ describe("DeadLettersCard", () => {
           canManage
           expandedId={message.id}
           redrivingId={null}
+          discardingId={null}
           onToggle={vi.fn()}
           onRedrive={vi.fn()}
+          onDiscard={vi.fn()}
         />,
       );
 
-      // The reason a message died is on its span, not on the row, so the
-      // trace id is the operator's route to it.
       expect(screen.getByText(message.traceId!)).toBeTruthy();
       expect(screen.getByText("Payload")).toBeTruthy();
+    });
+
+    /** @scenario A dead letter shows why it died without leaving the page */
+    it("shows the failed attempts oldest first, each with its diagnostic", () => {
+      const message = makeMessage();
+      renderWithChakra(
+        <DeadLettersTable
+          messages={[message]}
+          now={NOW}
+          canManage
+          expandedId={message.id}
+          redrivingId={null}
+          discardingId={null}
+          onToggle={vi.fn()}
+          onRedrive={vi.fn()}
+          onDiscard={vi.fn()}
+        />,
+      );
+
+      expect(listOutboxAttemptsQuery).toHaveBeenCalledWith({
+        outboxId: message.id,
+        projectId: message.projectId,
+      });
+      const first = screen.getByTestId("dead-attempt-1");
+      const second = screen.getByTestId("dead-attempt-2");
+      expect(first.textContent).toContain("receiver returned 503");
+      expect(second.textContent).toContain("receiver returned 410");
+      // Oldest first: the story reads top to bottom.
+      expect(
+        first.compareDocumentPosition(second) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    // Deliberately unbound. What this asserts is that the row offers both
+    // verbs and hands the discard its full ref. That the mark is kept, and
+    // that both substrates use the same verbs, are claims the integration
+    // suite and the vocabulary suite own — binding them here would report
+    // them covered while asserting neither. The binding token is not spelled
+    // out even in prose: the parity scanner matches it anywhere in a comment,
+    // so writing it here would register a binding for a scenario that does
+    // not exist.
+    it("offers Redrive and Discard side by side, and Discard carries the full ref", () => {
+      const onDiscard = vi.fn();
+      const message = makeMessage();
+      renderWithChakra(
+        <DeadLettersTable
+          messages={[message]}
+          now={NOW}
+          canManage
+          expandedId={null}
+          redrivingId={null}
+          discardingId={null}
+          onToggle={vi.fn()}
+          onRedrive={vi.fn()}
+          onDiscard={onDiscard}
+        />,
+      );
+
+      fireEvent.click(
+        screen.getByTestId("dead-discard-process:req_01:deliver:confirmed"),
+      );
+      expect(onDiscard).toHaveBeenCalledWith(
+        expect.objectContaining({
+          processName: "webhookDelivery",
+          projectId: "project_1",
+          processKey: FIXTURE_PROCESS_KEY,
+        }),
+      );
     });
   });
 

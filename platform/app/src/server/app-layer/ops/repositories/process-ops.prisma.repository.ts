@@ -3,6 +3,7 @@ import type { ProcessRef } from "~/server/event-sourcing/process-manager/process
 import type {
   DeadLetterCount,
   DeadOutboxMessageView,
+  OutboxAttemptView,
   ProcessInstanceRow,
   ProcessNameCounts,
   ProcessOpsRepository,
@@ -19,6 +20,19 @@ function traceIdFromCarrier(carrier: unknown): string | null {
   if (typeof traceparent !== "string") return null;
   return TRACEPARENT_RE.exec(traceparent)?.[1] ?? null;
 }
+
+/**
+ * How many dead letters one bulk act moves.
+ *
+ * An unbounded UPDATE over this table holds row locks for as long as it takes,
+ * on the highest-volume write path in the system. The cap makes the act
+ * bounded and repeatable instead: the count comes back, the operator sees what
+ * moved, and pressing again takes the next slice.
+ */
+const BULK_RECOVERY_LIMIT = 5_000;
+
+/** How many attempt entries one message's history returns. */
+const ATTEMPT_HISTORY_LIMIT = 200;
 
 /** Escape LIKE wildcards so a search term matches literally. */
 function escapeLike(term: string): string {
@@ -461,6 +475,129 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     });
     if (updated.count === 0) return null;
     return { messageKey: message.messageKey };
+  }
+
+  async discardDeadMessage(params: {
+    ref: ProcessRef;
+    messageId: string;
+    now: number;
+  }): Promise<{ messageKey: string } | null> {
+    const message = await this.prisma.processManagerOutbox.findFirst({
+      where: {
+        id: params.messageId,
+        projectId: params.ref.projectId,
+        processName: params.ref.processName,
+        processKey: params.ref.processKey,
+        status: "dead",
+      },
+      select: { messageKey: true },
+    });
+    if (!message) return null;
+    // A mark, not a delete: the row is retained as its own audit trail.
+    // Guarded on status in the WHERE, same as the redrive: only a dead row
+    // can be discarded, so a racing redrive keeps its win.
+    const updated = await this.prisma.processManagerOutbox.updateMany({
+      where: {
+        id: params.messageId,
+        projectId: params.ref.projectId,
+        status: "dead",
+      },
+      data: {
+        status: "discarded",
+        updatedAt: new Date(params.now),
+      },
+    });
+    if (updated.count === 0) return null;
+    return { messageKey: message.messageKey };
+  }
+
+  async redriveAllDeadMessages(params: {
+    processName?: string;
+    now: number;
+  }): Promise<number> {
+    const now = new Date(params.now);
+    const nameFilter = params.processName
+      ? Prisma.sql`AND "processName" = ${params.processName}`
+      : Prisma.empty;
+    // Raw, like the fleet-wide reads: a dead-letter sweep has no single
+    // project to name for the tenancy guard, and the surface is ops-gated.
+    return await this.prisma.$executeRaw(Prisma.sql`
+      -- @tenancy: cross-tenant ops dead-letter recovery; the surface is ops-gated
+      UPDATE "ProcessManagerOutbox"
+      SET "status" = 'pending',
+          "attempts" = 0,
+          -- Spread over a minute rather than making every message due at the
+          -- same instant: a fleet redrive can release thousands of intents,
+          -- and handing the dispatcher one due batch the size of the whole
+          -- backlog is how a recovery becomes the next incident.
+          "nextAttemptAt" =
+            CAST(${now} AS timestamptz) + (random() * interval '60 seconds'),
+          "leasedUntil" = NULL,
+          "leaseToken" = NULL,
+          "updatedAt" = ${now}
+      -- The status guard is repeated on the UPDATE itself, not left to the
+      -- subquery. The subquery picks ids under one snapshot and the UPDATE
+      -- locks them under another, so a concurrent single-row redrive or
+      -- discard that landed in between would otherwise be clobbered. The
+      -- single-row paths guard the same way for the same reason.
+      WHERE "status" = 'dead'
+        AND "id" IN (
+          SELECT "id" FROM "ProcessManagerOutbox"
+          WHERE "status" = 'dead'
+          ${nameFilter}
+          LIMIT ${BULK_RECOVERY_LIMIT}
+        )
+    `);
+  }
+
+  async discardAllDeadMessages(params: {
+    processName?: string;
+    now: number;
+  }): Promise<number> {
+    const now = new Date(params.now);
+    const nameFilter = params.processName
+      ? Prisma.sql`AND "processName" = ${params.processName}`
+      : Prisma.empty;
+    return await this.prisma.$executeRaw(Prisma.sql`
+      -- @tenancy: cross-tenant ops dead-letter recovery; the surface is ops-gated
+      UPDATE "ProcessManagerOutbox"
+      SET "status" = 'discarded',
+          "updatedAt" = ${now}
+      -- Guarded on the UPDATE too; see redriveAllDeadMessages.
+      WHERE "status" = 'dead'
+        AND "id" IN (
+          SELECT "id" FROM "ProcessManagerOutbox"
+          WHERE "status" = 'dead'
+          ${nameFilter}
+          LIMIT ${BULK_RECOVERY_LIMIT}
+        )
+    `);
+  }
+
+  async findAttempts(params: {
+    outboxId: string;
+    projectId: string;
+  }): Promise<OutboxAttemptView[]> {
+    const rows = await this.prisma.processManagerOutboxAttempt.findMany({
+      where: { outboxId: params.outboxId, projectId: params.projectId },
+      // Chronological, not by attempt number: a redrive resets `attempts`, so
+      // ordering by it would interleave a message's second life with its
+      // first. `id` breaks ties within a millisecond.
+      orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
+      // Bounded: this sits behind a tRPC query an operator can open on any
+      // message, and a message redriven repeatedly accumulates an attempt row
+      // per failure with no ceiling of its own.
+      take: ATTEMPT_HISTORY_LIMIT,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      attempt: r.attempt,
+      occurredAt: r.occurredAt.getTime(),
+      outcome: r.outcome,
+      errorType: r.errorType,
+      errorMessage: r.errorMessage,
+      retryAfterMs: r.retryAfterMs,
+    }));
   }
 
   async releaseLapsedLease(params: {

@@ -19,14 +19,14 @@ async function main() {
     throw new Error("PROJECT_ID and TRACE_ID required");
   }
 
-  const repo = new EvaluationRunClickHouseRepository(
-    async (tenantId: string) => {
+  const repo = new EvaluationRunClickHouseRepository({
+    resolveClient: async (tenantId: string) => {
       const client = await getClickHouseClientForProject(tenantId);
       if (!client)
         throw new Error(`No ClickHouse client for project ${tenantId}`);
       return client;
     },
-  );
+  });
 
   const now = new Date();
   const samples: Array<{

@@ -2213,6 +2213,8 @@ model Scenario {
   // DEFAULT-role models. See specs/scenarios/scenario-model-selection.feature.
   simulatorModel  String?
   judgeModel      String?
+  maxTurns        Int?
+  minTurns        Int?
   lastUpdatedById String?
   lastUpdatedBy   User?     @relation(fields: [lastUpdatedById], references: [id])
   archivedAt      DateTime?
@@ -3165,7 +3167,7 @@ model AnomalyAlert {
 }
 
 /// Org-scoped catalog of AI tools surfaced on the personal home portal
-/// (/me) and managed by org admins at /settings/governance/tool-catalog.
+/// (/me) and managed by org admins at /governance/tool-catalog.
 ///
 /// Three first-class tile types via `type` discriminator:
 ///   - "coding_assistant" - click expands to setup helper (e.g. `langwatch claude`)
@@ -3666,6 +3668,15 @@ enum ProcessManagerOutboxStatus {
   pending
   dispatched
   dead
+  /// An operator marked this dead message as never-to-be-sent
+  /// (specs/ops/dead-letter-recovery.feature). A mark, not a delete: the row
+  /// is retained as its own audit trail and the dispatcher never leases it.
+  discarded
+}
+
+enum ProcessManagerOutboxAttemptOutcome {
+  retry_scheduled
+  dead
 }
 
 /// Transactional intents emitted by a durable process transition.
@@ -3700,6 +3711,33 @@ model ProcessManagerOutbox {
   // The index is ops-managed instead: built with CREATE INDEX CONCURRENTLY,
   // see dev/docs/runbooks/process-manager-table-purge.md. The sweep works
   // without it on the bounded table it maintains.
+
+  attemptLog ProcessManagerOutboxAttempt[]
+}
+
+/// Why an outbox delivery failed, one row per FAILED attempt
+/// (specs/ops/dead-letter-recovery.feature). Successes write nothing, so the
+/// table grows with trouble, not with traffic. Rows die with their message:
+/// the cascade delete is the retention story, riding the existing sweep.
+model ProcessManagerOutboxAttempt {
+  id           String                             @id @default(nanoid())
+  outboxId     String
+  projectId    String
+  /// 1-based attempt number, as the dispatcher counts it.
+  attempt      Int
+  occurredAt   DateTime                           @db.Timestamptz(3)
+  outcome      ProcessManagerOutboxAttemptOutcome
+  errorType    String
+  /// The safe failure diagnostic the dispatcher already computes for its
+  /// span — never a raw provider body.
+  errorMessage String
+  retryAfterMs Int?
+
+  outbox ProcessManagerOutbox @relation(fields: [outboxId], references: [id], onDelete: Cascade)
+
+  // Also what makes the cascade delete affordable: Postgres does not index
+  // the referencing side of a foreign key on its own.
+  @@index([outboxId, attempt])
 }
 
 /// Per-project topic clustering run status (ADR-051): the rebuildable

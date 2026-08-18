@@ -48,6 +48,14 @@ function createMockRepo(
     replayAllFromDlq: vi
       .fn()
       .mockResolvedValue({ replayedCount: 0, jobsReplayed: 0 }),
+    redriveManyFromDlq: vi
+      .fn()
+      .mockResolvedValue({ redrivenCount: 0, jobsRedriven: 0 }),
+    discardManyFromDlq: vi.fn().mockResolvedValue({
+      discardedCount: 0,
+      jobsDiscarded: 0,
+      lastErrors: [],
+    }),
     canaryRedrive: vi
       .fn()
       .mockResolvedValue({ redrivenCount: 0, groupIds: [] }),

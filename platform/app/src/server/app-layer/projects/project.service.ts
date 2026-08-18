@@ -336,7 +336,7 @@ export class ProjectService {
         projectId: id,
       });
     } catch (error) {
-      logger.warn(
+      logger.error(
         { projectId: id, error },
         "deleteOwnedBy failed during project archive; continuing with archive — orphan bytes may need manual cleanup",
       );

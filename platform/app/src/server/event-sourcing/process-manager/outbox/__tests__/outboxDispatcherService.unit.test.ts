@@ -165,6 +165,115 @@ describe("OutboxDispatcherService", () => {
       });
     });
 
+    describe("when failed deliveries are recorded to the attempt log", () => {
+      /** @scenario Each failed delivery records why it failed */
+      it("appends one entry per failed attempt, oldest first, with the killer marked dead", async () => {
+        // DispatchError's shape: a deliberately-written delivery diagnostic,
+        // which the attempt log preserves verbatim.
+        const transient = Object.assign(new Error("receiver returned 503"), {
+          name: "DispatchError",
+          retryable: true,
+        });
+        const handler = vi.fn().mockRejectedValue(transient);
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 2,
+        });
+
+        await dispatcher.runOnce({ now: T0 + 1 });
+        await dispatcher.runOnce({ now: T0 + 2_000 });
+
+        const attempts = store.findFailedAttempts({
+          processName: pilotRef.processName,
+          projectId: pilotRef.projectId,
+          messageKey: "dispatch:turn_1:1",
+        });
+        expect(attempts.map((a) => a.attempt)).toEqual([1, 2]);
+        expect(attempts[0]?.outcome).toBe("retry_scheduled");
+        expect(attempts[1]?.outcome).toBe("dead");
+        expect(attempts[1]?.errorMessage).toBe("receiver returned 503");
+      });
+
+      it("redacts the diagnostic for an untyped error, which can carry anything", async () => {
+        const handler = vi
+          .fn()
+          .mockRejectedValue(new Error("raw payload: sk-secret"));
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 2,
+        });
+
+        await dispatcher.runOnce({ now: T0 + 1 });
+
+        const attempts = store.findFailedAttempts({
+          processName: pilotRef.processName,
+          projectId: pilotRef.projectId,
+          messageKey: "dispatch:turn_1:1",
+        });
+        expect(attempts[0]?.errorMessage).not.toContain("sk-secret");
+      });
+
+      it("redacts an error that merely claims to be retryable", async () => {
+        // `retryable` alone is not proof of provenance: anything can carry it,
+        // and only our own class stamps the DispatchError name.
+        const impostor = Object.assign(new Error("raw payload: sk-secret"), {
+          retryable: true,
+        });
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": vi.fn().mockRejectedValue(impostor) },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 2,
+        });
+
+        await dispatcher.runOnce({ now: T0 + 1 });
+
+        const attempts = store.findFailedAttempts({
+          processName: pilotRef.processName,
+          projectId: pilotRef.projectId,
+          messageKey: "dispatch:turn_1:1",
+        });
+        expect(attempts[0]?.errorMessage).not.toContain("sk-secret");
+      });
+
+      /** @scenario A recording failure never fails the delivery accounting */
+      it("retries and retires exactly as it would have when the attempt log write throws", async () => {
+        const failingStore = new Proxy(store, {
+          get(target, prop, receiver) {
+            if (prop === "recordFailedAttempt") {
+              return () => Promise.reject(new Error("attempt log down"));
+            }
+            return Reflect.get(target, prop, receiver);
+          },
+        });
+        const handler = vi.fn().mockRejectedValue(new Error("always broken"));
+        const dispatcher = new OutboxDispatcherService({
+          store: failingStore,
+          handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 2,
+        });
+
+        const first = await dispatcher.runOnce({ now: T0 + 1 });
+        expect(first.retried).toEqual(["dispatch:turn_1:1"]);
+        const second = await dispatcher.runOnce({ now: T0 + 2_000 });
+        expect(second.dead).toEqual(["dispatch:turn_1:1"]);
+
+        // The missing attempt entry is the only loss.
+        expect(
+          store.findFailedAttempts({
+            processName: pilotRef.processName,
+            projectId: pilotRef.projectId,
+            messageKey: "dispatch:turn_1:1",
+          }),
+        ).toEqual([]);
+      });
+    });
+
     describe("when the handler throws a terminal error", () => {
       /** @scenario A permanent receiver error retires the batch immediately */
       it("dead-letters on that attempt instead of burning the remaining ladder", async () => {

@@ -9,10 +9,13 @@
  * bare `error` string on the command).
  */
 
+import { AgentDevTunnelUnreachableError } from "./errors";
 import { Verdict } from "./scenario-event.enums";
 import {
   classifyScenarioInfraError,
   encodeScenarioError,
+  isTransportLevelScenarioFailure,
+  ScenarioInfraErrorCode,
 } from "./scenario-infra-error";
 
 export interface ScenarioFailureResults {
@@ -26,6 +29,12 @@ export interface ScenarioFailureResults {
 export function buildFailureResults(params: {
   cancelled: boolean;
   error?: string;
+  /**
+   * True when the failed target is an HTTP agent whose config still carries
+   * the `devTunnel` marker. Only the failure handler can know this: it reads
+   * the agent config, so the other writers leave it unset.
+   */
+  targetHasDevTunnel?: boolean;
 }): ScenarioFailureResults {
   if (params.cancelled) {
     return {
@@ -34,6 +43,28 @@ export function buildFailureResults(params: {
       metCriteria: [],
       unmetCriteria: [],
       error: params.error ?? "Cancelled by user",
+    };
+  }
+
+  // A transport failure on an agent still carrying a `devTunnel` marker is
+  // the exact confusion the marker exists to remove: the developer's
+  // `langwatch agent dev` session ended without restoring the URL. Name it,
+  // rather than reporting a generic unreachable endpoint.
+  if (
+    params.targetHasDevTunnel &&
+    isTransportLevelScenarioFailure(params.error)
+  ) {
+    const handled = new AgentDevTunnelUnreachableError();
+    return {
+      verdict: Verdict.FAILURE,
+      reasoning: handled.message,
+      metCriteria: [],
+      unmetCriteria: [],
+      error: encodeScenarioError({
+        code: ScenarioInfraErrorCode.AgentDevTunnelUnreachable,
+        message: handled.message,
+        hint: "Run `langwatch agent dev` again on the machine that started the tunnel, or restore the agent's URL in its settings.",
+      }),
     };
   }
 

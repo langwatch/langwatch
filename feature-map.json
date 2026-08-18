@@ -556,6 +556,7 @@
                 "agent get",
                 "agent create",
                 "agent run",
+                "agent dev",
                 "agent update",
                 "agent delete"
               ],
@@ -874,7 +875,7 @@
               "docs": "https://langwatch.ai/docs/ai-gateway/virtual-keys.md"
             },
             "platform": {
-              "ui": "/settings/gateway/virtual-keys",
+              "ui": "/gateway/virtual-keys",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -909,7 +910,7 @@
               "docs": "https://langwatch.ai/docs/ai-gateway/budgets.md"
             },
             "platform": {
-              "ui": "/settings/gateway/budgets",
+              "ui": "/gateway/budgets",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -954,7 +955,7 @@
               "docs": null
             },
             "platform": {
-              "ui": "/settings/gateway/webhooks",
+              "ui": "/gateway/webhooks",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -1027,7 +1028,7 @@
               "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
             },
             "platform": {
-              "ui": "/settings/governance",
+              "ui": "/governance",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -1061,7 +1062,7 @@
               "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
             },
             "platform": {
-              "ui": "/settings/governance/ingestion-sources",
+              "ui": "/governance/ingestion-sources",
               "mcp": null,
               "skill": null,
               "docs": null

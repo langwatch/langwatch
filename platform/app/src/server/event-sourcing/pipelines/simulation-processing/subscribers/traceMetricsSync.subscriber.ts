@@ -53,7 +53,7 @@ export function createTraceMetricsSyncSubscriber(
             occurredAt: Date.now(),
           });
         } catch (error) {
-          logger.error(
+          logger.warn(
             { traceId, tenantId, scenarioRunId, error },
             "Failed to dispatch computeRunMetrics for trace, will retry",
           );

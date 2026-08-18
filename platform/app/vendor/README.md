@@ -6,7 +6,7 @@ This directory contains vendored dependencies that are not published to npm.
 
 ### @langwatch/scenario
 
-**File:** `langwatch-scenario-1.1.0.tgz`
+**File:** `langwatch-scenario-1.2.0.tgz`
 
 The scenario testing SDK for LangWatch, vendored as the exact published npm
 artifact so the app pins known bits and can also carry unreleased builds when

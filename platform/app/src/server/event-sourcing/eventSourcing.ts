@@ -349,12 +349,21 @@ export class EventSourcing {
         logger.error({ pipeline: name, error }, "Failed to close pipeline");
       }
     }
-    if (this.projectionRegistry.isInitialized) {
-      await this.projectionRegistry.close();
-    }
     // Close the global queue after all consumers are shut down
     if (this._globalQueue) {
       await this._globalQueue.close();
+    }
+    // AFTER the queue, never before. Closing the registry only releases its
+    // router, and every dispatch that arrives afterwards drops its events with
+    // nothing above it to retry them — `eventSourcingService` catches the
+    // dispatch failure and carries on. While the queue is still draining it is
+    // very much still storing events, so a registry closed first is a registry
+    // discarding real work for the whole length of the drain: all 55 dropped
+    // batches in the 48h to 2026-08-17 landed after their pod's SIGTERM, the
+    // latest 26s into it. Ordering costs nothing here — `QueueManager.close()`
+    // is a no-op for the globally-owned queue.
+    if (this.projectionRegistry.isInitialized) {
+      await this.projectionRegistry.close();
     }
     this.pipelines.clear();
   }

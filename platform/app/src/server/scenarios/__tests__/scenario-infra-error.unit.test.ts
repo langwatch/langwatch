@@ -15,6 +15,7 @@ import {
   decodeScenarioError,
   encodeScenarioError,
   extractScenarioErrorText,
+  isTransportLevelScenarioFailure,
   resolveScenarioError,
   ScenarioInfraErrorCode,
   scenarioErrorTitle,
@@ -88,6 +89,41 @@ describe("classifyScenarioInfraError", () => {
       expect(classifyScenarioInfraError(raw).code).toBe(
         ScenarioInfraErrorCode.PlatformUnreachable,
       );
+    });
+  });
+
+  describe("when the raw error is the tunnel edge's HTTP 530 answer", () => {
+    /** @scenario "A dead tunnel names itself without a devTunnel lookup" */
+    it("classifies the Cloudflare 530 + 1033 pair as the named dev-tunnel error", () => {
+      const envelope = classifyScenarioInfraError(
+        "HTTP 530: error from https://gone.trycloudflare.com " +
+          "(request-id: abc): <html><body>error code: 1033</body></html>",
+      );
+
+      expect(envelope.code).toBe(
+        ScenarioInfraErrorCode.AgentDevTunnelUnreachable,
+      );
+      expect(envelope.message).toBe(
+        "The agent points at a local development tunnel that is no longer " +
+          "responding. The `langwatch agent dev` session that created it has " +
+          "probably ended.",
+      );
+      expect(envelope.hint).toContain("langwatch agent dev");
+    });
+
+    it("does not name a 530 without the 1033 body a dead tunnel", () => {
+      const envelope = classifyScenarioInfraError(
+        "HTTP 530: upstream error from https://my-agent.example.com: site frozen",
+      );
+
+      expect(envelope.code).not.toBe(
+        ScenarioInfraErrorCode.AgentDevTunnelUnreachable,
+      );
+      expect(
+        isTransportLevelScenarioFailure(
+          "HTTP 530: upstream error from https://my-agent.example.com",
+        ),
+      ).toBe(false);
     });
   });
 
@@ -485,6 +521,41 @@ describe("resolveScenarioError", () => {
     expect(resolveScenarioError(encodeScenarioError(envelope))).toEqual(
       envelope,
     );
+  });
+
+  /** @scenario "An SDK-recorded failure classifies the same as a processor-caught one" */
+  it("names a dead tunnel from the SDK's own serialized failure", () => {
+    // The scenario SDK records its own run failures as {name,message,stack}
+    // JSON; those never pass through the failure handler, so the display
+    // resolver is the classification for them.
+    const raw = JSON.stringify({
+      name: "Error",
+      message:
+        "[HttpAgent] HTTP 530: error from https://gone.trycloudflare.com " +
+        "(request-id: abc): <!DOCTYPE html><html>error code: 1033</html>",
+      stack: "Error: ...\n  at HttpAgent.call",
+    });
+
+    const result = resolveScenarioError(raw);
+
+    expect(result.code).toBe(ScenarioInfraErrorCode.AgentDevTunnelUnreachable);
+    expect(result.message).not.toContain("<");
+    expect(result.hint).toContain("langwatch agent dev");
+  });
+
+  it("never renders an upstream's HTML error page as the failure reason", () => {
+    const raw = JSON.stringify({
+      name: "Error",
+      message:
+        "HTTP 502: error from https://my-agent.example.com (request-id: xyz): " +
+        "<!DOCTYPE html>\n<html>\n<head><title>502 Bad Gateway</title></head>\n<body>outage</body>\n</html>",
+      stack: "Error: ...",
+    });
+
+    const result = resolveScenarioError(raw);
+
+    expect(result.message).not.toContain("<html");
+    expect(result.message).not.toContain("DOCTYPE");
   });
 });
 

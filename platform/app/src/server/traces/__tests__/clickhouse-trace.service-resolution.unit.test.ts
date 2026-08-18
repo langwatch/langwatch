@@ -223,10 +223,10 @@ describe("ClickHouseTraceService — eventref resolution seam (ADR-022)", () => 
         it("strips the reserved eventref attr from the returned span", async () => {
           setupGetTracesWithSpansMocks("trace-1", "span-1");
 
-          const service = new ClickHouseTraceService(
-            { project: { findUnique: vi.fn() } } as never,
-            resolveTraceSpansFn,
-          );
+          const service = new ClickHouseTraceService({
+            prisma: { project: { findUnique: vi.fn() } } as never,
+            resolveTraceSpans: resolveTraceSpansFn,
+          });
 
           // Per-call gate (#4888): resolution fires only when resolveBlobs:true.
           const traces = await service.getTracesWithSpans(

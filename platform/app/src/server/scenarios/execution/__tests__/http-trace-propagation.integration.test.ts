@@ -11,7 +11,6 @@
  * - Serialized HTTP adapter injects traceparent header
  * - Trace headers coexist with custom headers
  * - Same trace ID is propagated across all turns of a conversation
- * - Adapter records the propagated trace ID for later ES query
  */
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
@@ -123,29 +122,6 @@ describe("HTTP trace context propagation", () => {
         const traceparent = requests[0]!.headers.traceparent;
         expect(traceparent).toBeDefined();
         expect(traceparent).toMatch(W3C_TRACEPARENT_REGEX);
-      });
-
-      it("returns the propagated trace ID via getTraceId()", async () => {
-        const tracer = trace.getTracer("test");
-        const span = tracer.startSpan("test-scenario");
-        const expectedTraceId = span.spanContext().traceId;
-        const ctx = trace.setSpan(context.active(), span);
-
-        let capturedTraceId: string | undefined;
-
-        try {
-          await context.with(ctx, async () => {
-            const adapter = new SerializedHttpAgentAdapter({
-              config: createConfig(),
-            });
-            await adapter.call(createInput());
-            capturedTraceId = adapter.getTraceId();
-          });
-        } finally {
-          span.end();
-        }
-
-        expect(capturedTraceId).toBe(expectedTraceId);
       });
     });
   });

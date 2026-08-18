@@ -56,10 +56,22 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
+vi.mock("@langwatch/observability/tracing", () => ({
+  injectTraceContextHeaders: vi.fn(
+    ({ headers }: { headers: Record<string, string> }) => ({
+      headers,
+      traceId: undefined,
+    }),
+  ),
+}));
+
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import {
   SerializedCodeAgentAdapter,
   SerializedCodeAgentAdapterError,
 } from "../code-agent.adapter";
+
+const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
 
 // Mock global fetch
 const mockFetch = vi.fn();
@@ -103,6 +115,12 @@ describe("SerializedCodeAgentAdapter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     withActiveSpanCalls.length = 0;
+    // clearAllMocks keeps implementations, so pin the no-active-context
+    // default here; tests that need a trace context override it themselves.
+    mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
+      headers,
+      traceId: undefined,
+    }));
     mockFetch.mockResolvedValue(nlpResponse({ output: "processed: Hello" }));
   });
 
@@ -870,6 +888,88 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
       expect(callBody.payload.workflow.params).toEqual({});
+    });
+  });
+
+  describe("when a turn has an active trace context", () => {
+    const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
+    const TRACEPARENT = `00-${TRACE_ID}-b7ad6b7169203331-01`;
+
+    const injectTraceContext = ({
+      traceId,
+      traceparent,
+    }: {
+      traceId: string;
+      traceparent: string;
+    }) => {
+      mockInjectTraceContextHeaders.mockImplementation(({ headers }) => {
+        headers.traceparent = traceparent;
+        return { headers, traceId };
+      });
+    };
+
+    const sentParams = (call = 0) =>
+      JSON.parse(mockFetch.mock.calls[call]![1].body).payload.workflow.params;
+
+    /** @scenario "A code execution receives the trace context in its params" */
+    it("carries params.trace_id and params.traceparent on the workflow", async () => {
+      injectTraceContext({ traceId: TRACE_ID, traceparent: TRACEPARENT });
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+        parameters: { region: "eu-central" },
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(sentParams()).toEqual({
+        region: "eu-central",
+        trace_id: TRACE_ID,
+        traceparent: TRACEPARENT,
+      });
+    });
+
+    /** @scenario "The trace context wins over a run parameter with the same name" */
+    it("overrides a run parameter named trace_id or traceparent", async () => {
+      injectTraceContext({ traceId: TRACE_ID, traceparent: TRACEPARENT });
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+        parameters: { trace_id: "supplied", traceparent: "supplied" },
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(sentParams()).toEqual({
+        trace_id: TRACE_ID,
+        traceparent: TRACEPARENT,
+      });
+    });
+
+    /** @scenario "A code execution receives the trace context in its params" */
+    it("captures a fresh context on every turn", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      injectTraceContext({ traceId: TRACE_ID, traceparent: TRACEPARENT });
+      await adapter.call(defaultInput);
+
+      const secondTraceId = "1bf7651916cd43dd8448eb211c80319d";
+      const secondTraceparent = `00-${secondTraceId}-b7ad6b7169203331-01`;
+      injectTraceContext({
+        traceId: secondTraceId,
+        traceparent: secondTraceparent,
+      });
+      await adapter.call(defaultInput);
+
+      expect(sentParams(0).trace_id).toBe(TRACE_ID);
+      expect(sentParams(1).trace_id).toBe(secondTraceId);
+      expect(sentParams(1).traceparent).toBe(secondTraceparent);
     });
   });
 });

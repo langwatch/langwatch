@@ -140,26 +140,6 @@ export function preserveSecretRefs(template: string): FencedTemplate {
 }
 
 /**
- * Resolves references in every value of a record, leaving the keys alone:
- * a header name is not a credential.
- */
-export function resolveSecretsInMap({
-  values,
-  secrets,
-}: {
-  values: Record<string, string>;
-  secrets: Record<string, string>;
-}): Record<string, string> {
-  if (Object.keys(secrets).length === 0) return values;
-  return Object.fromEntries(
-    Object.entries(values).map(([key, value]) => [
-      key,
-      resolveSecretRefs({ value, secrets }),
-    ]),
-  );
-}
-
-/**
  * Resolves references in the credential-bearing auth fields, on a copy.
  *
  * `type` and the api-key header *name* are left alone: they are not secrets.
