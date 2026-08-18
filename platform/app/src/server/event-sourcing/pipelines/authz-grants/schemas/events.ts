@@ -61,6 +61,21 @@ export const ledgerPrincipalSchema = z
     },
   );
 
+/**
+ * The `role` column an IMPORTED binding carried, kept alongside a
+ * `custom:<id>` roleKey. `roleKey` cannot express it, and the legacy resolver
+ * still reads it: a custom role with an empty permission list falls back to
+ * the row's own role, so a binding projected as CUSTOM answers `viewer` where
+ * the legacy row answered `admin`. Carried on the EVENT rather than read back
+ * at fold time, so a replay reproduces the same compat row.
+ */
+export const legacyBindingRoleSchema = z.enum([
+  "ADMIN",
+  "MEMBER",
+  "VIEWER",
+  "CUSTOM",
+]);
+
 export const ledgerScopeSchema = z.object({
   type: z.enum(["ORGANIZATION", "TEAM", "PROJECT", "RESOURCE", "PLATFORM"]),
   id: z.string(),
@@ -144,6 +159,7 @@ export const grantAttachedEventSchema = EventSchema.extend({
       roleKey: z.string().nullable(),
       scope: ledgerScopeSchema,
       resource: resourceGrantTermsSchema.optional(),
+      legacyRole: legacyBindingRoleSchema.optional(),
       source: grantEventSourceSchema,
       actor: grantsLedgerActorSchema,
     })

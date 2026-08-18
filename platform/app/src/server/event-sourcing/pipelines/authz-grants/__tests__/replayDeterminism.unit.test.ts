@@ -23,15 +23,12 @@ const ORG = "org_acme";
  * stream reproduces the imperative M1 writer's rows. The whole pure chain
  * runs twice from the same legacy rows - the migration's emission mapping,
  * the attachGrants command handler, the wire schemas, the reducer, the row
- * mappings - and the produced rows must be byte-identical across runs, and
- * equivalent to what the retired imperative writer wrote for the same rows.
+ * mappings - and the produced rows must be byte-identical across runs.
  *
- * "Equivalent", not byte-identical, against the OLD writer: ids are now
- * deterministic grant ids where M1 minted random KSUIDs, and a custom-role
- * binding's `role` column is normalized to CUSTOM where M1 copied the
- * legacy row's role verbatim - the partial unique indexes and the resolver
- * both key custom bindings on `customRoleId`, so neither difference can
- * change a decision.
+ * The one deliberate difference from the retired M1 writer is identity: ids
+ * are derived from event content where M1 minted random KSUIDs. Every column
+ * a decision reads is written the way M1 wrote it, `role` included - which
+ * is what the third block below pins.
  */
 
 const LEGACY_ROWS: LegacyTeamRow[] = [
@@ -190,8 +187,14 @@ describe("grants ledger replay determinism", () => {
     });
   });
 
-  describe("when the rows are compared with the imperative writer's output", () => {
-    it("lands one equivalent compat binding per legacy row", async () => {
+  /**
+   * This block pins the SHAPE of the compat row the chain produces against a
+   * hand-written expectation - it has no copy of the retired M1 writer to
+   * compare against, so it states the shape that writer produced rather than
+   * executing it.
+   */
+  describe("when the compat rows the chain produced are inspected", () => {
+    it("pins one binding per legacy row, carrying that row's own role", async () => {
       const { compatRows } = await replayToRows(await captureEmissions());
 
       expect(compatRows).toHaveLength(LEGACY_ROWS.length);
@@ -205,8 +208,11 @@ describe("grants ledger replay determinism", () => {
           organizationId: ORG,
           scopeType: "TEAM",
           customRoleId: legacy.customRoleId,
-          // Custom rows normalize role to CUSTOM; builtin rows keep theirs.
-          role: legacy.customRoleId === null ? legacy.role : "CUSTOM",
+          // Custom rows keep the legacy row's role too: the resolver falls
+          // back to it whenever the custom role's permission list is empty,
+          // so normalizing it to CUSTOM would answer viewer where the legacy
+          // row answered admin.
+          role: legacy.role,
         });
       }
     });

@@ -113,6 +113,9 @@ function grantEventToFact(event: GrantFamilyEvent): GrantsLedgerEvent {
           roleKey: event.data.roleKey,
           scope: event.data.scope,
           ...(event.data.resource ? { resource: event.data.resource } : {}),
+          ...(event.data.legacyRole
+            ? { legacyRole: event.data.legacyRole }
+            : {}),
           source: event.data.source,
           occurredAtMs: event.occurredAt,
         },

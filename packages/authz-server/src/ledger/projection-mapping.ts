@@ -4,6 +4,7 @@ import type {
   GrantFact,
   LedgerPrincipalType,
   LedgerScopeType,
+  LegacyBindingRole,
   RoleFact,
 } from "./grants-ledger.reducer";
 
@@ -58,6 +59,10 @@ export interface GrantRowShape {
   principalType: GrantPrincipalTypeDb;
   principalId: string | null;
   roleKey: string | null;
+  /** The imported binding's original `role` column — persisted so a
+   *  projection reloaded from these rows reconstructs the fact it came from
+   *  rather than a lossy copy of it. Null on everything ledger-born. */
+  legacyRole: string | null;
   source: string;
   scopeType: GrantScopeTypeDb;
   scopeId: string;
@@ -81,6 +86,7 @@ export function grantFactToRow({
     principalType: PRINCIPAL_TO_DB[grant.principal.type],
     principalId: grant.principal.id,
     roleKey: grant.roleKey,
+    legacyRole: grant.legacyRole ?? null,
     source: grant.source,
     // The ledger and Prisma scope enums share their five value names.
     scopeType: grant.scope.type,
@@ -102,6 +108,9 @@ export function grantRowToFact(row: GrantRowShape): GrantFact {
     principal: { type: PRINCIPAL_FROM_DB[row.principalType], id: row.principalId },
     roleKey: row.roleKey,
     scope: { type: row.scopeType as LedgerScopeType, id: row.scopeId },
+    ...(row.legacyRole != null
+      ? { legacyRole: row.legacyRole as LegacyBindingRole }
+      : {}),
     ...(row.token != null && row.permission != null
       ? {
           resource: {
@@ -183,7 +192,16 @@ export interface CompatBindingRowShape {
  *
  * roleKey → (role, customRoleId), the inverse of
  * `roleKeyForTeamRole` in @langwatch/authz (roles.ts): admin→ADMIN,
- * member→MEMBER, viewer→VIEWER, custom:<id>→(CUSTOM, id).
+ * member→MEMBER, viewer→VIEWER, custom:<id>→(`legacyRole` ?? CUSTOM, id).
+ *
+ * That last arm is not cosmetic. `roleKey` alone cannot say which built-in
+ * role a custom binding ALSO carried, and the legacy resolver reads it: a
+ * custom role with an empty permission list falls through to the row's own
+ * `role`, so writing CUSTOM where the legacy row said ADMIN silently
+ * downgrades the principal to viewer (matchers.ts, `roleKeyForTeamRole`).
+ * Imported facts therefore carry `legacyRole` and the compat row reproduces
+ * it; ledger-born custom grants have no legacy row to preserve and stay
+ * CUSTOM.
  */
 export function grantFactToCompatBinding({
   grant,
@@ -215,7 +233,7 @@ export function grantFactToCompatBinding({
   else if (roleKey === "member") role = "MEMBER";
   else if (roleKey === "viewer") role = "VIEWER";
   else if (roleKey.startsWith("custom:")) {
-    role = "CUSTOM";
+    role = grant.legacyRole ?? "CUSTOM";
     customRoleId = roleKey.slice("custom:".length);
   } else {
     // lite-member (and any future key the enum cannot carry).

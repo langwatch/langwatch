@@ -5,6 +5,7 @@ import {
   grantsLedgerActorSchema,
   ledgerPrincipalSchema,
   ledgerScopeSchema,
+  legacyBindingRoleSchema,
   migrationTenantStatusSchema,
   resourceGrantTermsSchema,
 } from "./events";
@@ -56,6 +57,9 @@ export const attachGrantEntrySchema = z
     roleKey: z.string().nullable(),
     scope: ledgerScopeSchema,
     resource: resourceGrantTermsSchema.optional(),
+    /** Imported bindings only — the legacy `role` column a `custom:<id>`
+     *  roleKey cannot carry (see the schema in events.ts). */
+    legacyRole: legacyBindingRoleSchema.optional(),
     source: grantEventSourceSchema,
     actor: grantsLedgerActorSchema,
     /** Business time of the fact — a backfilled grant carries the legacy

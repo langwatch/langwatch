@@ -91,6 +91,7 @@ export type {
   LedgerPrincipalType,
   LedgerScope,
   LedgerScopeType,
+  LegacyBindingRole,
   ResourceGrantTerms,
   RoleFact,
 } from "./ledger/grants-ledger.reducer";

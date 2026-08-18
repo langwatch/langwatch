@@ -371,6 +371,13 @@ export class TeamUserBackfillMigration implements SystemMigration {
  * roleKey keeps the custom role when one is assigned, since the partial
  * unique indexes make the custom role id the row's identity, not its role
  * column.
+ *
+ * The row's `role` still travels, as `legacyRole`, precisely because roleKey
+ * cannot carry it: the legacy resolver falls back to that column whenever the
+ * custom role's permission list is empty, so dropping it would turn an ADMIN
+ * with an empty custom role into a viewer. It rides the FACT (and so the
+ * event) rather than being read back at fold time, which is what keeps the
+ * replay deterministic.
  */
 function legacyRowToEmission({
   organizationId,
@@ -393,6 +400,7 @@ function legacyRowToEmission({
       row.customRoleId === null
         ? roleKeyForTeamRole(row.role)
         : `custom:${row.customRoleId}`,
+    ...(row.customRoleId === null ? {} : { legacyRole: row.role }),
     scope,
     source: "backfill-b",
     occurredAtMs: row.createdAtMs,

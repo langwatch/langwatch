@@ -43,6 +43,24 @@ describe("grant row mapping", () => {
       }
     });
 
+    it("keeps an imported binding's legacy role, so a reload is not lossy", () => {
+      // load() rebuilds the fold state from these rows. A column the row
+      // shape cannot carry is a fact the projection silently forgets, and
+      // the next store() would then write a compat row the legacy resolver
+      // reads differently.
+      const imported = fact({
+        roleKey: "custom:cr_ops",
+        legacyRole: "ADMIN",
+      });
+      const row = grantFactToRow({ grant: imported, organizationId: ORG });
+      expect(row.legacyRole).toBe("ADMIN");
+      expect(grantRowToFact(row)).toEqual(imported);
+      // Ledger-born grants have no legacy row to preserve.
+      expect(
+        grantFactToRow({ grant: fact(), organizationId: ORG }).legacyRole,
+      ).toBeNull();
+    });
+
     it("uppercases the principal type for the table and lowers it back", () => {
       const row = grantFactToRow({
         grant: fact({ principal: { type: "api_key", id: "key_1" } }),
@@ -102,6 +120,19 @@ describe("compat binding mapping", () => {
         organizationId: ORG,
       });
       expect(row?.role).toBe("CUSTOM");
+      expect(row?.customRoleId).toBe("role_sre");
+    });
+
+    it("writes an imported custom binding's own role, not CUSTOM", () => {
+      // The legacy resolver falls back to this column whenever the custom
+      // role's permission list is empty (matchers.ts). CUSTOM resolves to
+      // viewer there, so normalizing an imported ADMIN row would demote the
+      // principal the moment the custom role listed nothing.
+      const row = grantFactToCompatBinding({
+        grant: fact({ roleKey: "custom:role_sre", legacyRole: "ADMIN" }),
+        organizationId: ORG,
+      });
+      expect(row?.role).toBe("ADMIN");
       expect(row?.customRoleId).toBe("role_sre");
     });
 

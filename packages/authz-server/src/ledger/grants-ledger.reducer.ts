@@ -57,6 +57,10 @@ export interface ResourceGrantTerms {
   maxViews?: number;
 }
 
+/** The legacy `RoleBinding.role` / `TeamUser.role` vocabulary, mirrored so
+ *  the reducer never imports the enum. */
+export type LegacyBindingRole = "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+
 export interface GrantFact {
   grantId: string;
   principal: LedgerPrincipal;
@@ -65,6 +69,21 @@ export interface GrantFact {
   roleKey: string | null;
   scope: LedgerScope;
   resource?: ResourceGrantTerms;
+  /**
+   * The `role` column an IMPORTED binding carried before the ledger owned it.
+   * Set only where `roleKey` is `custom:<id>` and the fact came from a legacy
+   * row, and read only by the compat head.
+   *
+   * A custom binding's roleKey cannot express its role column: `custom:<id>`
+   * says which custom role, not which built-in role the row also carried. The
+   * legacy resolver reads both — a custom role with an EMPTY permission list
+   * falls through to `builtinRoleGrants(roleKeyForTeamRole(row.role))` — so a
+   * compat row normalized to CUSTOM answers `viewer` where the legacy row
+   * answered `admin`. Carrying the original through the FACT (never through a
+   * read at fold time) is what keeps that decision identical and the replay
+   * deterministic.
+   */
+  legacyRole?: LegacyBindingRole;
   source: GrantEventSource;
   /** Business time (backfilled facts carry the legacy row's createdAt). */
   occurredAtMs: number;
