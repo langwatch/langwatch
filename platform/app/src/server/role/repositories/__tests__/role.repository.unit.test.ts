@@ -192,3 +192,78 @@ describe("given a role being redefined", () => {
     });
   });
 });
+
+describe("given an api key's exclusive roles being retired", () => {
+  function retireHarness() {
+    const db = {
+      customRole: {
+        findUnique: vi.fn().mockResolvedValue(null),
+      },
+      roleBinding: {
+        count: vi.fn().mockResolvedValue(0),
+      },
+      teamUser: {
+        count: vi.fn().mockResolvedValue(0),
+      },
+    };
+    const writer = {
+      defineRole: vi.fn().mockResolvedValue(undefined),
+      deleteRole: vi.fn().mockResolvedValue(undefined),
+      revokeBindingsWhere: vi.fn().mockResolvedValue(0),
+    };
+    const repository = new RoleRepository(
+      db as unknown as PrismaClient,
+      writer as unknown as GrantsLedgerWriter,
+    );
+    return { db, writer, repository };
+  }
+
+  describe("when the role is exclusive to the retired key", () => {
+    it("revokes the key's grants first, then deletes the role", async () => {
+      const { db, writer, repository } = retireHarness();
+
+      await repository.deleteExclusiveToApiKey({
+        roleIds: ["role_1"],
+        apiKeyId: "key_1",
+        organizationId: ORG_ID,
+        actor: ACTOR,
+      });
+
+      expect(writer.revokeBindingsWhere).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: ORG_ID,
+          where: { apiKeyId: "key_1", customRoleId: { in: ["role_1"] } },
+        }),
+      );
+      // The exclusivity count must satisfy the tenancy guard: a RoleBinding
+      // query whose only api-key predicate is `{ not: ... }` is refused
+      // without an organizationId, and that refusal 500s the key retirement.
+      expect(db.roleBinding.count).toHaveBeenCalledWith({
+        where: {
+          organizationId: ORG_ID,
+          customRoleId: "role_1",
+          apiKeyId: { not: "key_1" },
+        },
+      });
+      expect(writer.deleteRole).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: ORG_ID, roleId: "role_1" }),
+      );
+    });
+  });
+
+  describe("when another key still holds the role", () => {
+    it("keeps the shared role", async () => {
+      const { db, writer, repository } = retireHarness();
+      db.roleBinding.count.mockResolvedValueOnce(1);
+
+      await repository.deleteExclusiveToApiKey({
+        roleIds: ["role_1"],
+        apiKeyId: "key_1",
+        organizationId: ORG_ID,
+        actor: ACTOR,
+      });
+
+      expect(writer.deleteRole).not.toHaveBeenCalled();
+    });
+  });
+});

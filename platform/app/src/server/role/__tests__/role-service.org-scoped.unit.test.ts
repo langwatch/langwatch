@@ -210,9 +210,7 @@ describe("RoleService org-scoped variants", () => {
         prisma.customRole.findFirst.mockResolvedValue(storedRole);
         // The pre-check sees nothing; the cross-org read inside the delete
         // and the re-read after it find the binding that arrived in between.
-        prisma.roleBinding.count
-          .mockResolvedValueOnce(0)
-          .mockResolvedValue(1);
+        prisma.roleBinding.count.mockResolvedValueOnce(0).mockResolvedValue(1);
         prisma.$queryRaw.mockResolvedValue([{ count: 1n }]);
         prisma.teamUser.count.mockResolvedValue(0);
 

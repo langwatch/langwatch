@@ -11,9 +11,7 @@ describe("GroupRestService.addBinding", () => {
         findGroupOnly: vi.fn().mockResolvedValue({ id: "group_1" }),
         validateScopeInOrganization: vi.fn().mockResolvedValue(true),
         anyScopeIsPersonalTeam: vi.fn().mockResolvedValue(false),
-        createBinding: vi
-          .fn()
-          .mockRejectedValue(new DuplicateBindingError("group_1")),
+        createBinding: vi.fn().mockRejectedValue(new DuplicateBindingError()),
       } as unknown as GroupRepository;
       const service = new GroupRestService({
         repo: repository,

@@ -377,6 +377,11 @@ function legacyBindingToEmission({
       row.customRoleId === null
         ? roleKeyForTeamRole(row.role)
         : `custom:${row.customRoleId}`,
+    // A custom key erases which legacy role column value the row carried, so
+    // the row's `role` travels as `legacyRole` — exactly as the stage-B
+    // backfill does — or the fold's compat upsert rewrites the adopted row's
+    // `role` to CUSTOM while the legacy resolver is still authoritative.
+    ...(row.customRoleId === null ? {} : { legacyRole: row.role }),
     scope: { type: row.scopeType, id: row.scopeId },
     source: "genesis-import",
     occurredAtMs: row.createdAtMs,
@@ -463,10 +468,12 @@ function organizationFacts({
 }
 
 /**
- * Field equality for one binding row. `role` is deliberately absent for
- * custom rows: the fold normalizes a custom binding's role column to CUSTOM,
- * and the partial unique indexes key such a row on its custom role id, so
- * the column is not part of its identity (PR 1's replay proof pinned this).
+ * Field equality for one binding row, every column included. `role` used to
+ * be carved out for custom rows on the grounds that the fold normalizes it
+ * to CUSTOM — but the emission now carries the row's role as `legacyRole`
+ * and the compat upsert reproduces it, so a changed role column is drift
+ * like any other, and the carve-out would have hidden exactly the rewrite
+ * it existed to excuse.
  */
 function bindingDiffs({
   original,
@@ -485,11 +492,7 @@ function bindingDiffs({
     ["customRoleId", original.customRoleId, current.customRoleId],
     ["scopeType", original.scopeType, current.scopeType],
     ["scopeId", original.scopeId, current.scopeId],
-    ...(original.customRoleId === null
-      ? ([["role", original.role, current.role]] as Array<
-          [string, string | null, string | null]
-        >)
-      : []),
+    ["role", original.role, current.role],
   ];
   return compared.flatMap(([field, expected, actual]) =>
     expected === actual

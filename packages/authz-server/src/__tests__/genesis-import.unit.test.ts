@@ -215,8 +215,11 @@ describe("GrantsGenesisImportMigration", () => {
           expect.objectContaining({
             grantId: "rb_2",
             principal: { type: "user", id: "user_robin" },
-            // The custom role IS the row's identity, so it rides in the key.
+            // The custom role IS the row's identity, so it rides in the key —
+            // and the row's role column travels as legacyRole so the compat
+            // upsert reproduces it instead of rewriting it to CUSTOM.
             roleKey: "custom:cr_1",
+            legacyRole: "CUSTOM",
             scope: { type: "PROJECT", id: "proj_chatbot" },
           }),
         ]);
@@ -255,12 +258,13 @@ describe("GrantsGenesisImportMigration", () => {
       });
     });
 
-    describe("when the projection normalizes a custom row's role column", () => {
-      it("finalizes anyway - the column is not that row's identity", async () => {
-        // rb_2 arrives as (MEMBER, cr_1) and the fold normalizes it to
-        // CUSTOM. The partial unique indexes key such a row on its custom
-        // role id, so `role` was never part of its identity and comparing
-        // it would hold every organization with a custom binding forever.
+    describe("when the projection rewrites a custom row's role column", () => {
+      it("holds the organization - the emission carries legacyRole so the column must survive", async () => {
+        // rb_2 arrives as (MEMBER, cr_1). The emission carries the row's
+        // role as `legacyRole` and the compat upsert reproduces it, so a
+        // fold that rewrites the column to CUSTOM is drift like any other:
+        // the legacy resolver is still authoritative and the column is
+        // what it reads.
         repository.bindingRows = repository.bindingRows.map((row) =>
           row.id === "rb_2" ? { ...row, role: "MEMBER" as const } : row,
         );
@@ -270,7 +274,19 @@ describe("GrantsGenesisImportMigration", () => {
 
         const outcome = await migration().migrateTenant({ tenantId: ORG });
 
-        expect(outcome.status).toBe("finalized");
+        expect(outcome.status).toBe("migrated");
+        expect(outcome.report).toMatchObject({
+          kind: "genesis_drift",
+          diffs: [
+            {
+              kind: "binding_changed",
+              id: "rb_2",
+              field: "role",
+              expected: "MEMBER",
+              actual: "CUSTOM",
+            },
+          ],
+        });
       });
     });
 

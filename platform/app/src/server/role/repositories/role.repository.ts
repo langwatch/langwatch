@@ -411,8 +411,15 @@ export class RoleRepository {
 
     for (const roleId of roleIds) {
       const [holders, assignedUsers] = await Promise.all([
+        // organizationId is load-bearing: the tenancy guard refuses a
+        // RoleBinding query whose only api-key predicate is `{ not: ... }`,
+        // and a system_api_key role's bindings live in its own organization.
         this.prisma.roleBinding.count({
-          where: { customRoleId: roleId, apiKeyId: { not: apiKeyId } },
+          where: {
+            organizationId,
+            customRoleId: roleId,
+            apiKeyId: { not: apiKeyId },
+          },
         }),
         this.prisma.teamUser.count({ where: { assignedRoleId: roleId } }),
       ]);

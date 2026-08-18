@@ -9,11 +9,13 @@ Feature: In-place authorization data migration
   # (see dev/docs/plans/adr-092-authz-delivery-plan.md, "The PR map").
   # The migration is IN-PLACE: a runner hosted in the
   # worker process performs the one-time backfill when the system boots.
-  # Nothing here has a customer-facing failure surface by design - every
-  # failure parks the organization on the legacy path, which keeps behaving
-  # exactly as before. That is why this feature declares no error codes: the
-  # only "error path" a customer could ever observe is the absence of any
-  # change at all.
+  # The migration itself has no customer-facing failure surface by design -
+  # every import failure parks the organization on the legacy path, which
+  # keeps behaving exactly as before. One error code exists past the flip:
+  # once an organization's grant writes ride the ledger, a write attempted
+  # while the event-sourcing stack is unavailable refuses with
+  # "authz_ledger_unavailable" (503, platform fault) instead of
+  # half-happening; permission checks are unaffected.
   #
   # Per-organization state machine, one-way:
   #
@@ -468,3 +470,13 @@ Feature: In-place authorization data migration
     When a legacy service key authenticates
     Then the key still resolves
     And the failure is a warning, retried on the key's next use
+
+  # One writer, one refusal: for an organization on ledger writes, a grant
+  # write with no event-sourcing stack refuses rather than half-happening.
+  @unit
+  Scenario: A migrated organization's grant write refuses while the ledger is unavailable
+    Given an organization whose grant writes ride the ledger
+    And the event-sourcing stack is unavailable to the process
+    When a grant write is attempted
+    Then the write is refused with error code "authz_ledger_unavailable"
+    And a retry after the stack returns is not poisoned by the refusal
