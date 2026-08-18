@@ -124,7 +124,7 @@ function IngestionSourceDetailPage() {
     { enabled: !!orgId && !!sourceId, refetchOnWindowFocus: false },
   );
   const eventsQuery = api.activityMonitor.eventsForSource.useQuery(
-    { organizationId: orgId, sourceId: sourceId ?? "", limit: 50 },
+    { organizationId: orgId, sourceId: sourceId ?? "", limit: 20 },
     { enabled: !!orgId && !!sourceId, refetchOnWindowFocus: false },
   );
   const utils = api.useUtils();
