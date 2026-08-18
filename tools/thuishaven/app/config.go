@@ -55,12 +55,13 @@ type Config struct {
 	// terminal is quiet and the full detail lives in Grafana. "" opts out and leaves
 	// the console to .env. Resolved from LW_OBS_CONSOLE_LEVEL.
 	ObservabilityConsoleLevel string
-	// ShouldUsePortless routes a worktree's stack through the portless proxy
-	// (hostname URLs, shared TLS port). PORTLESS=0 disables it: `up` never
-	// starts, trusts, or registers with the proxy, and every service's own
-	// loopback port is served plain over HTTP instead — the documented escape
-	// hatch for a machine where the portless proxy's TLS won't come up.
-	ShouldUsePortless bool
+	// PortlessDisabled is PORTLESS=0: `up` never starts, trusts, or registers
+	// with the portless proxy, and every service's own loopback port is served
+	// plain HTTP instead of routing through the proxy's shared hostname+TLS
+	// port — the documented escape hatch for a machine where the proxy's TLS
+	// won't come up. The zero value is false (portless enabled), matching every
+	// stack provisioned before this knob existed — see domain.Stack.PortlessDisabled.
+	PortlessDisabled bool
 }
 
 // PlanOptions decide which services `up` runs and how.

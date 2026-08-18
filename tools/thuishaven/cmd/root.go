@@ -204,7 +204,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		HeartbeatEvery:          30 * time.Second,
 		DaemonArgv:              selfArgv(trustedRepoRoot(), "daemon"),
 		IsAgent:                 isAgent,
-		ShouldUsePortless:       devEnv("PORTLESS") != "0",
+		PortlessDisabled:        devEnv("PORTLESS") == "0",
 		ShouldManageClickHouse:  devEnv("LANGWATCH_HAVEN_CH") != "0",
 		// Opt-in on purpose: "no stack registered" does not mean nobody is
 		// querying — the documented native test mode (LANGWATCH_TEST_CLICKHOUSE_URL)

@@ -56,7 +56,7 @@ func serviceByName(services []domain.Service, name string) (domain.Service, bool
 // @scenario "PORTLESS=0 bypasses the proxy bootstrap on up"
 func TestPortlessBypassSkipsProxyBootstrap(t *testing.T) {
 	proxy := &recordingProxy{}
-	o := &Orchestrator{cfg: Config{ShouldUsePortless: false}, proxy: proxy}
+	o := &Orchestrator{cfg: Config{PortlessDisabled: true}, proxy: proxy}
 
 	if err := o.ensurePortlessProxy(); err != nil {
 		t.Fatalf("ensurePortlessProxy: %v", err)
@@ -72,7 +72,7 @@ func TestPortlessBypassSkipsProxyBootstrap(t *testing.T) {
 // @scenario "Portless enabled still bootstraps the proxy on up"
 func TestPortlessEnabledStillBootstrapsProxy(t *testing.T) {
 	proxy := &recordingProxy{}
-	o := &Orchestrator{cfg: Config{ShouldUsePortless: true}, proxy: proxy}
+	o := &Orchestrator{cfg: Config{PortlessDisabled: false}, proxy: proxy}
 
 	if err := o.ensurePortlessProxy(); err != nil {
 		t.Fatalf("ensurePortlessProxy: %v", err)
@@ -92,7 +92,7 @@ func TestPortlessBypassProvisionsDirectHTTP(t *testing.T) {
 	sys := &playPortSystem{}
 	proxy := &recordingProxy{}
 	o := &Orchestrator{
-		cfg:   Config{Naming: domain.DefaultNaming(""), ShouldUsePortless: false},
+		cfg:   Config{Naming: domain.DefaultNaming(""), PortlessDisabled: true},
 		store: store, sys: sys, proxy: proxy, log: zap.NewNop(),
 	}
 	p := UpParams{WorktreeDir: "/wt/x", IsLinkedWorktree: true, Branch: "x"}
@@ -133,7 +133,7 @@ func TestPortlessEnabledProvisionsThroughProxy(t *testing.T) {
 	sys := &playPortSystem{}
 	proxy := &recordingProxy{}
 	o := &Orchestrator{
-		cfg:   Config{Naming: domain.DefaultNaming(""), ShouldUsePortless: true},
+		cfg:   Config{Naming: domain.DefaultNaming(""), PortlessDisabled: false},
 		store: store, sys: sys, proxy: proxy, log: zap.NewNop(),
 	}
 	p := UpParams{WorktreeDir: "/wt/x", IsLinkedWorktree: true, Branch: "x"}
@@ -155,5 +155,87 @@ func TestPortlessEnabledProvisionsThroughProxy(t *testing.T) {
 	}
 	if len(proxy.registered) == 0 {
 		t.Error("services must be registered with the proxy when portless is enabled")
+	}
+}
+
+// PORTLESS is a machine/run-level knob (Config), not part of the per-stack
+// Selection reconcileRunningStack otherwise compares — flipping it on an
+// already-running stack must still trigger a restart, or the escape hatch is a
+// no-op for the most likely real journey: a stack is already up under a broken
+// proxy, the operator sets PORTLESS=0, and `haven up` reports "nothing to do".
+//
+// @scenario "A stack provisioned under one PORTLESS setting restarts when the setting flips"
+func TestReconcileDetectsPortlessSettingChange(t *testing.T) {
+	store := &fakeStore{
+		stacks:    []domain.Stack{{Slug: "feat-x", WorktreeDir: "/wt/feat-x", LauncherPID: 42, PortlessDisabled: false}},
+		slugCache: map[string]string{"/wt/feat-x": "feat-x"},
+	}
+	sys := &fakeSystem{alive: map[int]bool{42: true}}
+	o := &Orchestrator{
+		cfg:   Config{Naming: domain.DefaultNaming(""), PortlessDisabled: true},
+		store: store, sys: sys, proxy: &fakeProxy{}, log: zap.NewNop(),
+	}
+	p := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}
+
+	proceed, err := o.reconcileRunningStack(p, PlanOptions{Selection: domain.SelectionFromStack(store.stacks[0])})
+	if err != nil {
+		t.Fatalf("reconcile: %v", err)
+	}
+	if !proceed {
+		t.Error("a PORTLESS setting change must re-provision, not report a no-op")
+	}
+	if len(sys.terminated) != 1 || sys.terminated[0] != 42 {
+		t.Errorf("the old launcher must be terminated, got %v", sys.terminated)
+	}
+}
+
+// @scenario "PORTLESS=0 serves ClickHouse directly over HTTP on its own port"
+func TestPortlessBypassEnsureClickHouseServesDirectHTTP(t *testing.T) {
+	proxy := &recordingProxy{}
+	o := &Orchestrator{
+		cfg:   Config{Naming: domain.DefaultNaming(""), PortlessDisabled: true, ShouldManageClickHouse: true},
+		ch:    &fakeDBServer{},
+		proxy: proxy, log: zap.NewNop(),
+	}
+	st := &domain.Stack{Slug: "x"}
+
+	o.ensureClickHouse(context.Background(), st)
+
+	ch, ok := serviceByName(st.Services, domain.ClickHouseService)
+	if !ok {
+		t.Fatal("no clickhouse service recorded")
+	}
+	wantURL := o.cfg.Naming.URL(domain.ClickHouseService, "x", "http", ch.Port)
+	if ch.URL != wantURL {
+		t.Errorf("clickhouse URL = %q, want %q — plain http on its own port, no shared proxy port", ch.URL, wantURL)
+	}
+	if len(proxy.registered) != 0 {
+		t.Errorf("clickhouse must not be registered with the proxy under PORTLESS=0, got %v", proxy.registered)
+	}
+}
+
+// @scenario "Portless enabled routes ClickHouse through the shared proxy endpoint"
+func TestPortlessEnabledEnsureClickHouseRoutesThroughProxy(t *testing.T) {
+	proxy := &recordingProxy{}
+	o := &Orchestrator{
+		cfg:   Config{Naming: domain.DefaultNaming(""), PortlessDisabled: false, ShouldManageClickHouse: true},
+		ch:    &fakeDBServer{},
+		proxy: proxy, log: zap.NewNop(),
+	}
+	st := &domain.Stack{Slug: "x"}
+
+	o.ensureClickHouse(context.Background(), st)
+
+	ch, ok := serviceByName(st.Services, domain.ClickHouseService)
+	if !ok {
+		t.Fatal("no clickhouse service recorded")
+	}
+	wantScheme, wantPort := proxy.Endpoint()
+	wantURL := o.cfg.Naming.URL(domain.ClickHouseService, "x", wantScheme, wantPort)
+	if ch.URL != wantURL {
+		t.Errorf("clickhouse URL = %q, want %q — the shared proxy endpoint, not its own port", ch.URL, wantURL)
+	}
+	if len(proxy.registered) == 0 {
+		t.Error("clickhouse must be registered with the proxy when portless is enabled")
 	}
 }
