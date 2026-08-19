@@ -1,3 +1,4 @@
+import type { LedgerActor } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
 import { TRPCError } from "@trpc/server";
 import {
@@ -13,7 +14,6 @@ import {
 import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
-  type LedgerActor,
   type LedgerBindingAttach,
   ledgerPrincipal,
 } from "~/server/app-layer/authz/ledger";

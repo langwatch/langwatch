@@ -1,3 +1,4 @@
+import type { LedgerActor } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
 import type {
   Group,
@@ -5,7 +6,6 @@ import type {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import type { LedgerActor } from "~/server/app-layer/authz/ledger";
 import { PersonalWorkspaceNotManagedHereError } from "~/server/app-layer/teams/team.service";
 import type { RoleService } from "~/server/role";
 import { RoleNotAssignableError } from "~/server/role/errors";

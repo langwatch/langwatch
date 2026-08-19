@@ -1,3 +1,4 @@
+import type { LedgerActor } from "@langwatch/authz-server";
 import type {
   Group,
   GroupMembership,
@@ -5,7 +6,6 @@ import type {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import type { LedgerActor } from "~/server/app-layer/authz/ledger";
 
 export interface GroupWithDetails extends Group {
   _count: { members: number };

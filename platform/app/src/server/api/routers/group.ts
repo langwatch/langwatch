@@ -1,3 +1,4 @@
+import type { LedgerActor } from "@langwatch/authz-server";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
@@ -5,7 +6,6 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import type { LedgerActor } from "~/server/app-layer/authz/ledger";
 import { GroupRestService } from "~/server/app-layer/groups/group.service";
 import { PrismaGroupRepository } from "~/server/app-layer/groups/repositories/group.prisma.repository";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";

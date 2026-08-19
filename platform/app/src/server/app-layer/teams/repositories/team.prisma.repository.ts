@@ -1,3 +1,4 @@
+import type { LedgerActor } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
 import {
   type PrismaClient,
@@ -8,7 +9,6 @@ import {
 import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
-  type LedgerActor,
 } from "~/server/app-layer/authz/ledger";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import type {

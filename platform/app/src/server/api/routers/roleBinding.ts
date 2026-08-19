@@ -1,10 +1,10 @@
+import type { LedgerActor } from "@langwatch/authz-server";
 import { z } from "zod";
 import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import type { LedgerActor } from "~/server/app-layer/authz/ledger";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { RoleService } from "~/server/role/role.service";
 import { RoleBindingService } from "~/server/role-bindings/role-binding.service";

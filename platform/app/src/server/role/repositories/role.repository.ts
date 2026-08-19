@@ -1,3 +1,4 @@
+import type { LedgerActor } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import {
@@ -10,7 +11,6 @@ import {
 import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
-  type LedgerActor,
 } from "~/server/app-layer/authz/ledger";
 import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";

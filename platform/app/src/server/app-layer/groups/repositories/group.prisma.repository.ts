@@ -1,3 +1,4 @@
+import type { LedgerActor } from "@langwatch/authz-server";
 import {
   type Group,
   type GroupMembership,
@@ -8,7 +9,6 @@ import {
 import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
-  type LedgerActor,
 } from "~/server/app-layer/authz/ledger";
 import { scopesTouchPersonalTeam } from "~/server/role-bindings/personal-team-scope";
 import type {
