@@ -1072,7 +1072,7 @@ examples = [
     { name = "jupyterlab", specifier = ">=4.6.3" },
     { name = "langchain", specifier = ">=1.0.0,<2.0.0" },
     { name = "langchain-community", specifier = ">=0.4.2,<1.0.0" },
-    { name = "langchain-google-vertexai", specifier = ">=2.0.0,<4.0.0" },
+    { name = "langchain-google-vertexai", specifier = ">=3.2.4,<4.0.0" },
     { name = "langchain-openai", specifier = ">=1.4.3,<2.0.0" },
     { name = "langchain-text-splitters", specifier = ">=1.1.2,<2.0.0" },
     { name = "langgraph", specifier = ">=1.0.0,<2.0.0" },
