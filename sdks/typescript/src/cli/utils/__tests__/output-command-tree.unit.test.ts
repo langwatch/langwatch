@@ -55,6 +55,7 @@ describe("the real command tree", () => {
       ["analytics", "query"],
       ["trigger", "delete"],
       ["secret", "update"],
+      ["suite", "run"],
     ];
 
     it.each(wired)("marks `%s %s` as speaking the output contract", async (group, name) => {
@@ -68,11 +69,12 @@ describe("the real command tree", () => {
 
   describe("when a command still prints its own output", () => {
     // The commands that legitimately still print their own output because a
-    // format-blind port cannot serve them: a raw byte stream, and the two
-    // human-interactive `--wait` polls whose completion has no structured payload.
+    // format-blind port cannot serve them: a raw byte stream, and the
+    // human-interactive `scenario run --wait` poll whose completion has no
+    // structured payload. (`suite run` renders its own result through
+    // `printResult` and is asserted in the wired list above.)
     const unmigrated = [
       ["dataset", "download"],
-      ["suite", "run"],
       ["scenario", "run"],
     ];
 
@@ -128,8 +130,7 @@ describe("the real command tree", () => {
       ["dataset download", "streams raw bytes to a file or stdout"],
       ["trace export", "writes its own jsonl/csv/json, to a file when asked"],
 
-      // Human-interactive `--wait` polls: no structured completion payload.
-      ["suite run", "human-interactive --wait poll"],
+      // Human-interactive `--wait` poll: no structured completion payload.
       ["scenario run", "human-interactive --wait poll"],
 
       // A live session that runs until Ctrl-C: it produces status prose and

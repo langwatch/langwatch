@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SuitesApiError } from "@/client-sdk/services/suites/suites-api.service";
+import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
 vi.mock("@/client-sdk/services/suites/suites-api.service", async (importOriginal) => {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
@@ -337,9 +338,17 @@ describe("duplicateSuiteCommand()", () => {
 
 describe("runSuiteCommand()", () => {
   let mockRun: ReturnType<typeof vi.fn>;
+  // The command resolves its output format from the flags AND the agent-mode
+  // env vars, so a test runner living inside a coding agent (CLAUDECODE set)
+  // must not flip the human-path tests into machine mode.
+  let savedAgentEnv: Record<string, string | undefined> = {};
 
   beforeEach(() => {
     vi.clearAllMocks();
+    savedAgentEnv = Object.fromEntries(
+      AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
+    );
+    for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
     mockRun = vi.fn();
     vi.mocked(SuitesApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
@@ -354,6 +363,27 @@ describe("runSuiteCommand()", () => {
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
   });
+
+  afterEach(() => {
+    for (const name of AGENT_MODE_ENV_VARS) {
+      const value = savedAgentEnv[name];
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+    // The wait paths set the exit code; a leftover value would fail the whole
+    // vitest process at the end of the run.
+    process.exitCode = undefined;
+  });
+
+  /** All JSON documents the command printed on stdout. */
+  const printedDocuments = (): string[] =>
+    vi
+      .mocked(console.log)
+      .mock.calls.map((call) => call[0] as unknown)
+      .filter(
+        (line): line is string =>
+          typeof line === "string" && line.trimStart().startsWith("{"),
+      );
 
   describe("when suite run is scheduled (no wait)", () => {
     it("schedules the run and returns immediately", async () => {
@@ -400,15 +430,162 @@ describe("runSuiteCommand()", () => {
   });
 
   describe("when format is json", () => {
-    it("outputs raw JSON", async () => {
+    /** @scenario "Run a suite with machine-readable output" */
+    it("outputs one JSON document carrying the schedule payload and outcome", async () => {
       const result = makeRunResult();
       mockRun.mockResolvedValue(result);
 
       await runSuiteCommand({ id: "suite_abc123", options: { format: "json" } });
 
-      expect(console.log).toHaveBeenCalledWith(
-        JSON.stringify(result, null, 2),
+      expect(printedDocuments()).toEqual([
+        JSON.stringify({ ...result, outcome: "scheduled" }, null, 2),
+      ]);
+    });
+  });
+
+  describe("when --wait completes under a machine format", () => {
+    /** @scenario "Wait for a suite run with machine-readable output" */
+    it("emits exactly one final document with tallies, per-run results and outcome", async () => {
+      mockRun.mockResolvedValue(makeRunResult());
+      vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+        new Response(
+          JSON.stringify({
+            runs: [
+              { batchRunId: "batch_123", scenarioRunId: "run_1", scenarioId: "scenario_1", status: "SUCCESS", results: { verdict: "success" } },
+              { batchRunId: "batch_123", scenarioRunId: "run_2", scenarioId: "scenario_2", status: "ERROR", results: null },
+            ],
+            hasMore: false,
+          }),
+          { status: 200 },
+        ),
       );
+
+      vi.useFakeTimers();
+      try {
+        const promise = runSuiteCommand({
+          id: "suite_abc123",
+          options: { wait: true, format: "json" },
+        });
+        await vi.advanceTimersByTimeAsync(3000);
+        await promise;
+      } finally {
+        vi.useRealTimers();
+      }
+
+      const documents = printedDocuments();
+      expect(documents).toHaveLength(1);
+      const document = JSON.parse(documents[0]!) as Record<string, unknown>;
+      expect(document.batchRunId).toBe("batch_123");
+      expect(document.setId).toBe("set_456");
+      expect(document.outcome).toBe("failed");
+      expect(document.tallies).toEqual({
+        total: 2,
+        completed: 2,
+        passed: 1,
+        failed: 1,
+      });
+      expect(document.results).toEqual([
+        { scenarioRunId: "run_1", scenarioId: "scenario_1", status: "SUCCESS", verdict: "success" },
+        { scenarioRunId: "run_2", scenarioId: "scenario_2", status: "ERROR", verdict: null },
+      ]);
+      expect(process.exitCode).toBe(1);
+    });
+  });
+
+  describe("when the wait times out under a machine format", () => {
+    /** @scenario "A timed-out wait still emits the machine-readable document" */
+    it("emits the final document with the timeout outcome and exits nonzero", async () => {
+      mockRun.mockResolvedValue(makeRunResult());
+      vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+        new Response(
+          JSON.stringify({
+            runs: [{ batchRunId: "batch_123", status: "IN_PROGRESS" }],
+            hasMore: false,
+          }),
+          { status: 200 },
+        ),
+      );
+
+      vi.useFakeTimers();
+      try {
+        const promise = runSuiteCommand({
+          id: "suite_abc123",
+          options: { wait: true, format: "json" },
+        });
+        await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 3000);
+        await promise;
+      } finally {
+        vi.useRealTimers();
+      }
+
+      const documents = printedDocuments();
+      expect(documents).toHaveLength(1);
+      const document = JSON.parse(documents[0]!) as Record<string, unknown>;
+      expect(document.outcome).toBe("timeout");
+      expect(process.exitCode).toBe(1);
+    });
+  });
+
+  describe("when the status endpoint keeps failing under a machine format", () => {
+    /** @scenario "A dead status endpoint still emits the machine-readable document" */
+    it("emits the final document with the poll failure outcome and exits nonzero", async () => {
+      mockRun.mockResolvedValue(makeRunResult());
+      vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("endpoint down"));
+
+      vi.useFakeTimers();
+      try {
+        const promise = runSuiteCommand({
+          id: "suite_abc123",
+          options: { wait: true, format: "json" },
+        });
+        await vi.advanceTimersByTimeAsync(5 * 3000);
+        await promise;
+      } finally {
+        vi.useRealTimers();
+      }
+
+      const documents = printedDocuments();
+      expect(documents).toHaveLength(1);
+      const document = JSON.parse(documents[0]!) as Record<string, unknown>;
+      expect(document.outcome).toBe("poll_failure");
+      expect(process.exitCode).toBe(1);
+    });
+  });
+
+  describe("when --wait completes in human mode", () => {
+    /** @scenario "Waiting in human mode prints no machine document" */
+    it("prints the human tail and no JSON document", async () => {
+      mockRun.mockResolvedValue(makeRunResult());
+      vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+        new Response(
+          JSON.stringify({
+            runs: [
+              { batchRunId: "batch_123", scenarioRunId: "run_1", scenarioId: "scenario_1", status: "SUCCESS", results: { verdict: "success" } },
+              { batchRunId: "batch_123", scenarioRunId: "run_2", scenarioId: "scenario_2", status: "SUCCESS", results: { verdict: "success" } },
+            ],
+            hasMore: false,
+          }),
+          { status: 200 },
+        ),
+      );
+
+      vi.useFakeTimers();
+      try {
+        const promise = runSuiteCommand({
+          id: "suite_abc123",
+          options: { wait: true },
+        });
+        await vi.advanceTimersByTimeAsync(3000);
+        await promise;
+      } finally {
+        vi.useRealTimers();
+      }
+
+      expect(printedDocuments()).toHaveLength(0);
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("batch_123"),
+      );
+      expect(process.exitCode).not.toBe(1);
     });
   });
 
