@@ -37,11 +37,13 @@ describe("canonicalErrorFor", () => {
       );
 
       expect(status).toBe(503);
-      // A non-HandledError reason serializes to its opaque marker only
-      // (`serializeReason`), so the chain's presence is on the wire while
-      // the internal message is not.
+      // A non-HandledError reason serializes to its opaque marker
+      // (`serializeReason` → `{code: "unknown"}`), which `reasonsOf` puts on
+      // the wire as `{code, message}` with the code standing in for the
+      // absent safe message — the chain's presence survives while the
+      // internal message does not.
       expect(body.error.meta).toMatchObject({
-        reasons: [{ code: "unknown", kind: "unknown" }],
+        reasons: [{ code: "unknown", message: "unknown" }],
       });
       expect(JSON.stringify(body)).not.toContain("ch-internal-host");
     });
