@@ -75,7 +75,7 @@ markers = [
 ]
 
 [dependency-groups]
-dev = ["black>=26.3.1"]
+dev = ["black>=26.5.1"]
 examples = [
     "anthropic>=0.36.0,<0.122.0",
     "chainlit>=2.11.1,<3",
