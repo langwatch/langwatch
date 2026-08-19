@@ -428,7 +428,6 @@ const LEGACY_INERT: string[] = [
   "specs/features/scenario-cli.feature",
   "specs/features/secret-cli.feature",
   "specs/features/simulation-runs-cli.feature",
-  "specs/features/suite-cli.feature",
   "specs/features/suites/collapsible-suite-sidebar.feature",
   "specs/features/suites/footer-to-header-migration.feature",
   "specs/features/suites/inline-add-target-and-scenario-buttons.feature",
