@@ -2474,7 +2474,7 @@ model Grant {
   // four identity columns (token, permission, resourceKind, projectId), tied
   // to scopeType = 'RESOURCE'. Added over two columns in
   // 20260817160000_grants_ledger_projections and widened to four in
-  // 20260818090000_grant_resource_facts, which is where the other two arrive.
+  // 20260818120001_grant_resource_facts, which is where the other two arrive.
   // Prisma cannot express it either.
   @@index([organizationId, scopeType, scopeId])
   // The resource tier's own access shape: the compat/share write paths and
