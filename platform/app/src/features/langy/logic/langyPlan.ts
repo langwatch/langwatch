@@ -3,7 +3,7 @@
  *
  * ── WHY THIS EXISTS ─────────────────────────────────────────────────────────
  * Langy's agent keeps a todo list with the `todowrite` tool for multi-step work
- * (AGENTS.md rule 14). opencode's `todowrite` is a WHOLE-LIST REWRITE per call —
+ * (AGENTS.md, "How you work"). opencode's `todowrite` is a WHOLE-LIST REWRITE per call —
  * `{ todos: [{ content, status }] }`, status ∈ pending | in_progress | completed
  * | cancelled — so the plan already crosses the wire as ordinary tool input and
  * lands durable on the message (each call is a `tool-todowrite` part carrying its

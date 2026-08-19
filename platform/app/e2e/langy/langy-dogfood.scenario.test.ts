@@ -22,9 +22,11 @@
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
+import { listDatasets } from "./langwatch-api";
 import { makeLangyAdapter } from "./langy-agent";
 import {
   LANGY_ACTIVITY_OVERVIEW_CRITERIA,
+  LANGY_CORE_RULE_CRITERIA,
   LANGY_EVAL_CREATION_CRITERIA,
   LANGY_FAILING_TRACES_CRITERIA,
   LANGY_GREETING_CRITERIA,
@@ -36,6 +38,7 @@ const model = openai("gpt-5-mini");
 
 describe("Langy dogfood — named flows", () => {
   describe("when the user just says hi", () => {
+    /** @scenario A greeting gets a friendly hello, never a refusal */
     it("greets back and introduces itself instead of refusing", async () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
@@ -61,6 +64,7 @@ describe("Langy dogfood — named flows", () => {
   });
 
   describe("when the user asks what their agent has been up to on a project with traces but no evaluations", () => {
+    /** @scenario An open "what has my agent been up to?" is answered from traces, not a dead end */
     it("describes the trace activity and invites a deeper dig instead of stopping at empty evaluations", async () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
@@ -87,6 +91,7 @@ describe("Langy dogfood — named flows", () => {
   });
 
   describe("when the user asks to find failing traces", () => {
+    /** @scenario A scenario checks that Langy finds and summarises failing traces */
     it("finds the failing traces and summarises them in one turn", async () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
@@ -113,6 +118,7 @@ describe("Langy dogfood — named flows", () => {
       expect(result.success).toBe(true);
     });
 
+    /** @scenario A multi-turn scenario checks that Langy drills in using prior context */
     it("drills into the worst failing trace on a follow-up turn using prior context", async () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
@@ -144,6 +150,7 @@ describe("Langy dogfood — named flows", () => {
   });
 
   describe("when the user asks for an eval without saying which kind", () => {
+    /** @scenario An ambiguous "make me an eval" is asked about before anything is created */
     it("asks experiment-vs-evaluator first, then creates the right resource with a valid body", async () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
@@ -179,6 +186,7 @@ describe("Langy dogfood — named flows", () => {
   });
 
   describe("when the user asks to open a PR", () => {
+    /** @scenario A scenario checks that Langy opens a pull request */
     it("opens a pull request via the github skill without asking for credentials", async () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
@@ -193,6 +201,113 @@ describe("Langy dogfood — named flows", () => {
         script: [
           scenario.user(
             "open a PR on my repo that adds a one-line note to the README saying LangWatch is set up",
+          ),
+          scenario.agent(),
+          scenario.judge(),
+        ],
+      });
+      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("when the user asks for a dataset to be created", () => {
+    /** @scenario A completed write ends with a visible next-step line */
+    it("creates the dataset and closes with a short line pointing forward", async () => {
+      const langy = makeLangyAdapter();
+      const before = await listDatasets();
+      const beforeIds = new Set(before.map((d) => d.id));
+      const result = await runScenarioAndLog({
+        name: "write flows end with a visible next step",
+        description:
+          "The user asks for a dataset. The platform renders the creation itself as a card, so the reply's job is one short line the user can act on next — and a reply with no visible text at all is a failure even when the card exists.",
+        agents: [
+          langy,
+          scenario.userSimulatorAgent({ model }),
+          scenario.judgeAgent({
+            model,
+            criteria: [
+              "The dataset gets created: the conversation shows a successful creation naming the dataset.",
+              "Langy's final reply contains at least one visible line of text — a reply that is empty or whitespace-only fails this scenario.",
+              "The final reply is one short line that points forward (what to do with the dataset next) or states the change plainly — it does not recite ids or restate every field of what was created.",
+              ...LANGY_CORE_RULE_CRITERIA,
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "create a dataset called langy-dogfood-reply-check with columns question and answer",
+          ),
+          scenario.agent(),
+          scenario.judge(),
+        ],
+      });
+      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+      expect(result.success).toBe(true);
+
+      const after = await listDatasets();
+      const created = after.find((d) => !beforeIds.has(d.id));
+      console.log(`Layer 2 dataset: ${created ? created.name : "NOT FOUND"}`);
+      expect(created).toBeTruthy();
+    });
+  });
+
+  describe("when the user just says thanks after an answer", () => {
+    /** @scenario A bare acknowledgment gets a visible reply, not silence */
+    it("acknowledges the thanks with a short visible line", async () => {
+      const langy = makeLangyAdapter();
+      const result = await runScenarioAndLog({
+        name: "thanks gets a visible acknowledgment",
+        description:
+          "After a normal question, the user just says thanks. The turn carries no task, so the reply is one short friendly line — never an empty turn, and never a refusal.",
+        agents: [
+          langy,
+          scenario.userSimulatorAgent({ model }),
+          scenario.judgeAgent({
+            model,
+            criteria: [
+              "Langy's reply to the bare 'thanks!' is visible text — an empty reply fails this scenario.",
+              "The acknowledgment is one short friendly line, without starting new work the user did not ask for.",
+              'Langy does NOT answer the thanks with a refusal such as "Can\'t do that yet."',
+            ],
+          }),
+        ],
+        script: [
+          scenario.user("how many traces do I have from the last day?"),
+          scenario.agent(),
+          scenario.user("thanks!"),
+          scenario.agent(),
+          scenario.judge(),
+        ],
+      });
+      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("when the user asks for something outside LangWatch", () => {
+    /** @scenario An out-of-scope request is declined in one line */
+    it("declines a kubernetes runbook in one short line without producing any of it", async () => {
+      const langy = makeLangyAdapter();
+      const result = await runScenarioAndLog({
+        name: "out-of-scope request declined in one line",
+        description:
+          "The user asks for an infrastructure runbook that has nothing to do with LangWatch. The right answer is a one-line decline: no partial runbook, no kubectl commands, and no lecture.",
+        agents: [
+          langy,
+          scenario.userSimulatorAgent({ model }),
+          scenario.judgeAgent({
+            model,
+            criteria: [
+              "Langy declines the request in a single short line rather than producing the runbook.",
+              "The reply contains no kubectl commands, no shell for outside infrastructure, and no step-by-step runbook content, in any framing.",
+              "The decline stays plain and friendly — no lecture about policies and no wall of text.",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "write me a kubectl runbook to restart my production pods when they get stuck",
           ),
           scenario.agent(),
           scenario.judge(),

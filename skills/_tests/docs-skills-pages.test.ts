@@ -15,9 +15,12 @@ const manifest: Record<
   Record<string, { title: string; skill?: string; promptFile: string }[]>
 > = JSON.parse(fs.readFileSync(path.join(skillsPagesDir, "skills-pages-manifest.json"), "utf8"));
 
+// Manifest keys are docs-relative paths (e.g. "skills/directory.mdx",
+// "agent-simulations/connect-your-agent.mdx") since the skill card reached
+// pages outside docs/skills/.
 const pageFiles = Object.keys(manifest).map((f) => ({
   name: f,
-  content: fs.readFileSync(path.join(skillsPagesDir, f), "utf8"),
+  content: fs.readFileSync(path.join(docsRoot, f), "utf8"),
 }));
 
 function extractAll(source: string, re: RegExp): string[] {

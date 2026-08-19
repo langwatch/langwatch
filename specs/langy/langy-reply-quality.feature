@@ -1,0 +1,32 @@
+Feature: Langy reply quality
+  Langy's reply matches the question: a finding for a read, one forward-looking
+  line for a write, a friendly line for a greeting, a one-line decline for an
+  out-of-scope ask. A turn never ends with nothing visible: the cards carry the
+  data, the prose carries what only prose can say, and an empty reply reads as
+  a broken product even when every action succeeded.
+
+  Background:
+    Given a project with traces and a working Langy session
+
+  @e2e
+  Scenario: A completed write ends with a visible next-step line
+    When the user asks Langy to create a dataset
+    Then the dataset exists afterwards
+    And the reply contains at least one visible line of text
+    And that line points at what to do next or states the change plainly
+    And the reply does not recite the ids and fields the card already shows
+
+  @e2e
+  Scenario: A bare acknowledgment gets a visible reply, not silence
+    Given Langy answered a question in the previous turn
+    When the user says only "thanks!"
+    Then Langy replies with one short friendly line
+    And the reply is not empty
+    And no new work starts that the user did not ask for
+
+  @e2e
+  Scenario: An out-of-scope request is declined in one line
+    When the user asks for an infrastructure runbook unrelated to LangWatch
+    Then Langy declines in a single short line
+    And no part of the runbook is produced, under any framing
+    And no command for outside infrastructure runs

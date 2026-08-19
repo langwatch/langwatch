@@ -135,15 +135,18 @@ Create reusable criteria for your domain:
 - "Agent includes a disclaimer that this is not legal advice"
 - "Agent suggests consulting a licensed attorney"
 
-## Step 5: Run All Tests and Iterate
+## Step 5: Run All Tests and Improve the Agent
 
 1. Run boundary scenarios first to verify basic compliance
 2. Run red team tests to verify adversarial resilience
-3. If any test fails, strengthen the agent's system prompt or add guardrails
-4. Re-run until all tests pass
+3. When a test fails, find the layer that owns the failure before you edit anything: the agent's tool configuration, its code path, its knowledge content, its prompt, or the test itself. The prompt is the last resort, not the first. If the fix is "the agent must never do X", prefer removing the capability in configuration over writing a rule about it
+4. Fix the class of failure, never the failing conversation. Do not paste the failing transcript into the system prompt: state the one general principle that makes the whole class impossible, then re-run with varied wording to prove the fix is not tied to the exact phrasing that failed
+5. Pair every new boundary rule with a scenario for the nearby legitimate request, so the fix cannot silently turn into over-refusal of what the agent should answer
+6. When all tests pass, refactor under green: merge overlapping prompt rules, delete rules a newer principle already covers, and re-run everything. Track the prompt's size across changes; a compliance prompt that only ever grows is accumulating patches, not protection
 
 ## Common Mistakes
 - Do NOT only test with polite, straightforward questions. Adversarial probing is essential
 - Do NOT skip multi-turn escalation scenarios. Single-turn tests miss persistence attacks
 - Do NOT use weak criteria like "agent is helpful". Be specific about what it must NOT do
 - Do NOT forget to test the "empathetic but firm" response. The agent should show care while maintaining boundaries
+- Do NOT respond to every failing test with another system-prompt rule. A prompt patched once per failure overfits: it passes exactly those tests and degrades the agent everywhere else. See [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent)

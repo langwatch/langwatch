@@ -407,9 +407,9 @@ func TestProvision_WritesCLIOnlyConfig(t *testing.T) {
 	}
 	// No "plugin" key: the external OTel plugin was removed from the worker config
 	// because evaluating its ~2 MB bundle at first-message bootstrap cost 15-25s and
-	// killed turns. Worker telemetry is host-mediated now. The one plugin a worker
-	// runs, the zero-dependency identity file below, loads via opencode's plugin-dir
-	// auto-discovery precisely so the config keeps carrying no plugin specs.
+	// killed turns. Worker telemetry is host-mediated now, and the worker runs no
+	// plugins at all since the build agent's own prompt made the identity plugin
+	// obsolete.
 	if _, present := cfg["plugin"]; present {
 		t.Errorf("config.json must not carry a %q key — the OTel plugin was removed from the worker (got %v)", "plugin", cfg["plugin"])
 	}
@@ -457,14 +457,16 @@ func TestProvision_WritesCLIOnlyConfig(t *testing.T) {
 	}
 }
 
-// Provision must drop the Langy identity plugin into the config dir's plugin/
-// folder, where opencode's plugin auto-discovery picks it up with no config
-// entry. The plugin's system-prompt hook is what renames "You are OpenCode"
-// to "You are Langy" in opencode's stock system prompt; without the file the
-// worker introduces itself under the engine's name. The hook must mutate
-// output.system in place — opencode keeps using the array instance it passed
-// in, so a plugin that reassigns the property changes nothing.
-func TestProvision_WritesLangyIdentityPlugin(t *testing.T) {
+// The build agent — opencode's default, the one every posted turn runs — must
+// carry Langy's own prompt and the role-scoped tool denies. Setting a prompt on
+// the agent is what makes opencode DROP its stock coding-agent prompt instead
+// of appending to it, and a per-agent "deny" removes the tool from the
+// advertised schema (per-agent rules merge after the root "allow" and the last
+// match wins), so this block is the whole minimal-harness mechanism.
+//
+// @scenario "The system prompt is Langy's own, not a coding agent's"
+// @scenario "The worker does not expose tools outside Langy's role"
+func TestProvision_ConfiguresLangyBuildAgent(t *testing.T) {
 	home := t.TempDir()
 	workspace := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(workspace, "skills"), 0o755); err != nil {
@@ -488,34 +490,50 @@ func TestProvision_WritesLangyIdentityPlugin(t *testing.T) {
 		t.Fatalf("Provision: %v", err)
 	}
 
-	pluginPath := filepath.Join(home, ".config", "opencode", "plugin", "langy-identity.js")
-	raw, err := os.ReadFile(pluginPath)
+	raw, err := os.ReadFile(filepath.Join(home, ".config", "opencode", "config.json"))
 	if err != nil {
-		t.Fatalf("identity plugin missing — the worker would introduce itself as OpenCode: %v", err)
+		t.Fatalf("read config.json: %v", err)
 	}
-	src := string(raw)
-	if !strings.Contains(src, `"experimental.chat.system.transform"`) {
-		t.Errorf("identity plugin must register the system-prompt transform hook; got\n%s", src)
+	var cfg struct {
+		Agent struct {
+			Build struct {
+				Prompt     string            `json:"prompt"`
+				Permission map[string]string `json:"permission"`
+			} `json:"build"`
+		} `json:"agent"`
 	}
-	if !strings.Contains(src, `replaceAll("OpenCode", "Langy")`) {
-		t.Errorf("identity plugin must rewrite OpenCode to Langy; got\n%s", src)
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		t.Fatalf("unmarshal config.json: %v", err)
 	}
-	if strings.Contains(src, "output.system =") {
-		t.Errorf("identity plugin must mutate output.system in place, never reassign it (opencode keeps the original array); got\n%s", src)
+
+	prompt := cfg.Agent.Build.Prompt
+	if prompt == "" {
+		t.Fatalf("config.json carries no agent.build.prompt — opencode would fall back to its stock coding-agent prompt")
 	}
-	info, err := os.Stat(pluginPath)
-	if err != nil {
-		t.Fatalf("stat identity plugin: %v", err)
+	if !strings.Contains(prompt, "Langy") || !strings.Contains(prompt, "AGENTS.md") {
+		t.Errorf("agent.build.prompt must carry the Langy persona and point at the AGENTS.md contract; got\n%s", prompt)
 	}
-	if got := info.Mode().Perm(); got != 0o600 {
-		t.Errorf("identity plugin mode = %o, want 0600 (same UID-gated posture as config.json)", got)
+
+	for _, tool := range []string{"webfetch", "task", "question"} {
+		if got := cfg.Agent.Build.Permission[tool]; got != "deny" {
+			t.Errorf("agent.build.permission[%q] = %q, want %q — the tool is outside Langy's role", tool, got, "deny")
+		}
+	}
+	// bash and edit stay OFF the deny list: the CLI, the GitHub skill's repo
+	// work and dataset file preparation run on them (an edit deny would also
+	// remove write and apply_patch).
+	for _, tool := range []string{"bash", "edit"} {
+		if got, present := cfg.Agent.Build.Permission[tool]; present && got == "deny" {
+			t.Errorf("agent.build.permission[%q] = deny — this tool is part of Langy's role", tool)
+		}
 	}
 }
 
-// os.WriteFile applies its mode only when it creates the file. A worker home
-// can be provisioned in place over an earlier run, so an identity plugin left
-// at a wider mode must come out of Provision tightened back to 0600.
-func TestProvision_TightensAPreexistingIdentityPluginMode(t *testing.T) {
+// A worker home re-provisioned in place may still carry the retired identity
+// plugin from an earlier run. opencode auto-loads every plugin/*.js under the
+// config dir, so Provision must remove the leftover, not merely stop writing
+// its own.
+func TestProvision_RemovesRetiredPluginDir(t *testing.T) {
 	home := t.TempDir()
 	workspace := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(workspace, "skills"), 0o755); err != nil {
@@ -526,7 +544,7 @@ func TestProvision_TightensAPreexistingIdentityPluginMode(t *testing.T) {
 		t.Fatalf("mkdir plugin dir: %v", err)
 	}
 	if err := os.WriteFile(pluginPath, []byte("stale"), 0o644); err != nil {
-		t.Fatalf("seed wide-mode plugin: %v", err)
+		t.Fatalf("seed leftover plugin: %v", err)
 	}
 
 	err := NewAgent(0).Provision(ProvisionInput{
@@ -546,12 +564,8 @@ func TestProvision_TightensAPreexistingIdentityPluginMode(t *testing.T) {
 		t.Fatalf("Provision: %v", err)
 	}
 
-	info, err := os.Stat(pluginPath)
-	if err != nil {
-		t.Fatalf("stat identity plugin: %v", err)
-	}
-	if got := info.Mode().Perm(); got != 0o600 {
-		t.Errorf("identity plugin mode = %o, want 0600 even when the file predates this provision", got)
+	if _, err := os.Stat(filepath.Join(home, ".config", "opencode", "plugin")); !os.IsNotExist(err) {
+		t.Errorf("plugin dir survived Provision — a leftover plugin/*.js would still be auto-loaded (stat err: %v)", err)
 	}
 }
 

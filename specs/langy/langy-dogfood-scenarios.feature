@@ -1,4 +1,3 @@
-@unimplemented
 Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
   As the owner of the Langy in-product assistant
   I want Langy exercised by LangWatch's own scenarios and evaluators
@@ -14,29 +13,29 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
   # Named flows from the ask
   # ---------------------------------------------------------------------------
 
-  @integration
+  @e2e
   Scenario: A scenario checks that Langy finds and summarises failing traces
     Given a Langy dogfood scenario for finding failing traces
     When the scenario runs against Langy
     Then Langy reports on the failing traces and explains them in one turn
-    And the judge confirms Langy did not ask a clarifying question
-    And the judge confirms Langy did not offer next actions
+    And the judge confirms the reply is grounded in the retrieved traces
+    And the judge confirms the reply carries no menu of unsolicited offers
 
-  @integration
+  @e2e
   Scenario: A scenario checks that Langy opens a pull request
     Given a Langy dogfood scenario for opening a pull request
     When the scenario runs against Langy
     Then Langy opens a real PR or reports the concrete blocker
     And the judge confirms Langy did not ask for a GitHub token
 
-  @integration
+  @e2e
   Scenario: A multi-turn scenario checks that Langy drills in using prior context
     Given a Langy dogfood scenario that lists failing traces then asks about the worst one
     When the scenario runs against Langy
     Then on the follow-up Langy drills into a trace it already surfaced
     And Langy uses the concrete id from the prior turn rather than re-listing
 
-  @integration
+  @e2e
   Scenario: A greeting gets a friendly hello, never a refusal
     Given a Langy dogfood scenario where the user opens with "hi"
     When the scenario runs against Langy
@@ -45,7 +44,7 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     And the judge confirms Langy did not reply "Can't do that yet." to the greeting
     And a follow-up "who are you?" gets the same friendly treatment, not a refusal
 
-  @integration
+  @e2e
   Scenario: An open "what has my agent been up to?" is answered from traces, not a dead end
     Given a Langy dogfood scenario on a project with traces but no evaluation runs
     When the user asks what their agent has been up to
@@ -53,7 +52,7 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     And Langy does not stop at an empty evaluation metric
     And the reply ends by inviting the user to name what to dig into more deeply
 
-  @integration
+  @e2e
   Scenario: An ambiguous "make me an eval" is asked about before anything is created
     Given a Langy dogfood scenario where the user says only "make me an eval"
     When the scenario runs against Langy
@@ -67,7 +66,7 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
   # The inline card channel rests on prompt rules, so it gets an eval (ADR-060)
   # ---------------------------------------------------------------------------
 
-  @integration
+  @unimplemented
   Scenario: A scenario checks that Langy draws an uncommandable view as a derived card
     Given a Langy dogfood scenario asking to plot two columns of a dataset against each other
     When the scenario runs against Langy
@@ -75,7 +74,7 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     And the judge confirms Langy did not draw an ASCII chart or markdown table in prose
     And the judge confirms Langy did not hand-sum a figure a command computes
 
-  @integration
+  @unimplemented
   Scenario: A scenario checks that Langy asks a user-owned choice as a choices card
     Given a Langy dogfood scenario where a scenario run needs an agent picked from several
     When the scenario runs against Langy
@@ -84,14 +83,18 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     And the judge confirms Langy offered no prose options and invented no id
 
   # ---------------------------------------------------------------------------
-  # The judge rubric is Langy's own rules
+  # The judge rubric grades outcomes, never the prompt restated
   # ---------------------------------------------------------------------------
 
-  @integration
-  Scenario: The judge grades Langy against its absolute rules
-    Given the shared Langy rule-adherence criteria
+  # Enforced by review: langy-rules.ts documents this stance in its module
+  # docblock, and a rubric change that reintroduces prompt-restating criteria
+  # is a review rejection, not a test failure.
+  @unimplemented
+  Scenario: The judge grades user outcomes, not Langy's own rules restated
+    Given the shared Langy judge criteria
     When any Langy dogfood scenario is judged
-    Then the criteria require terseness, acting immediately, and no command narration
+    Then the criteria describe what the user got: a grounded answer, a real side effect, a readable reply
+    And no criterion restates a rule from Langy's prompt, so a prompt refactor that keeps quality passes unchanged
 
   # ---------------------------------------------------------------------------
   # A live-traffic evaluator, created without a platform API key

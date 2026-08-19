@@ -189,6 +189,31 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		// home lives under the user's ~, which opencode flags as external and asks
 		// about on the very first file touch.
 		"permission": "allow",
+		// The build agent (opencode's default; PostMessage never selects another)
+		// gets Langy's own prompt — which REPLACES the stock coding-agent prompt —
+		// and a tool surface scoped to the role. A "deny" here removes the tool
+		// from the advertised schema, not just from execution: per-agent rules
+		// merge after the root "allow" and the last match wins.
+		//   webfetch — Langy reads docs via `langwatch docs`, and fetching
+		//              user-supplied URLs is out of scope by contract;
+		//   task     — no subagents: a subagent would run opencode's stock
+		//              coding-agent prompt, the exact thing this block retires;
+		//   question — an interactive prompt no headless worker can answer
+		//              (Langy asks its one legitimate question kind through the
+		//              choices card instead). bash, read, grep, glob, edit/write,
+		//              skill and todowrite stay: the CLI, the GitHub skill's
+		//              repo work, dataset file preparation, and the plan panel
+		//              all run on them.
+		"agent": map[string]any{
+			"build": map[string]any{
+				"prompt": langyAgentPrompt,
+				"permission": map[string]any{
+					"webfetch": "deny",
+					"task":     "deny",
+					"question": "deny",
+				},
+			},
+		},
 	}
 	// opencode's NATIVE OTel export (traces + logs over standard
 	// OTEL_EXPORTER_OTLP_* env). Bootstraps in ~0s — unlike the removed external
@@ -271,26 +296,13 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		return fmt.Errorf("chown config: %w", err)
 	}
 
-	// The identity plugin (see langyIdentityPluginJS) rides the same config
-	// dir. opencode scans plugin/*.js there at boot, so dropping the file is
-	// the whole wiring.
-	pluginPath := filepath.Join(configDir, langyIdentityPluginFilename)
-	if err := os.MkdirAll(filepath.Dir(pluginPath), 0o700); err != nil {
-		return fmt.Errorf("mkdir plugin dir: %w", err)
-	}
-	if err := in.Runner.Chown(filepath.Dir(pluginPath), in.UID); err != nil {
-		return fmt.Errorf("chown plugin dir: %w", err)
-	}
-	if err := os.WriteFile(pluginPath, []byte(langyIdentityPluginJS), 0o600); err != nil {
-		return fmt.Errorf("write identity plugin: %w", err)
-	}
-	// WriteFile's mode applies only on create; a plugin file surviving from an
-	// earlier provision keeps whatever mode it had, so tighten it explicitly.
-	if err := os.Chmod(pluginPath, 0o600); err != nil {
-		return fmt.Errorf("chmod identity plugin: %w", err)
-	}
-	if err := in.Runner.Chown(pluginPath, in.UID); err != nil {
-		return fmt.Errorf("chown identity plugin: %w", err)
+	// A worker home surviving from an earlier provision may still carry the
+	// retired identity plugin (it rewrote "OpenCode" to "Langy" in opencode's
+	// built-in prompt; the build agent's own prompt made it obsolete). opencode
+	// auto-loads every plugin/*.js under the config dir, so a leftover must be
+	// removed, not ignored.
+	if err := os.RemoveAll(filepath.Join(configDir, "plugin")); err != nil {
+		return fmt.Errorf("remove retired plugin dir: %w", err)
 	}
 
 	// Per-worker AGENTS.md with ${LANGWATCH_ENDPOINT} substituted. The embedded
@@ -412,36 +424,19 @@ const mediatedLLMPlaceholderKey = "langy-mediated"
 // The name has no models.dev catalog entry, so nothing merges over it.
 const gatewayProviderID = "langwatch"
 
-// langyIdentityPluginFilename is where Provision writes the identity plugin,
-// relative to the worker's opencode config dir. opencode auto-discovers every
-// plugin/*.js file under its config directories, so no "plugin" entry is
-// needed in config.json (which stays free of plugin specs; see
-// TestProvision_WritesCLIOnlyConfig).
-const langyIdentityPluginFilename = "plugin/langy-identity.js"
-
-// langyIdentityPluginJS renames the agent's identity in opencode's stock
-// system prompt. opencode selects a per-model default prompt that opens with
-// "You are OpenCode, ..." and offers no config field to rename the agent, but
-// its plugin hook `experimental.chat.system.transform` receives the assembled
-// system prompt before the LLM call. The hook rewrites "OpenCode" to "Langy"
-// IN PLACE (the caller keeps using the same array instance, so reassigning
-// output.system would be lost) and leaves every other byte of whichever
-// default prompt opencode picked untouched. The file has zero imports and no
-// build step, so loading it costs nothing at worker bootstrap, unlike the
-// removed 2 MB external OTel plugin bundle.
-const langyIdentityPluginJS = `// Introduce the agent as Langy in opencode's default system prompt while
-// keeping the rest of the prompt exactly as opencode ships it.
-export default async () => ({
-  "experimental.chat.system.transform": async (_input, output) => {
-    if (!output || !Array.isArray(output.system)) return;
-    for (let i = 0; i < output.system.length; i++) {
-      if (typeof output.system[i] === "string") {
-        output.system[i] = output.system[i].replaceAll("OpenCode", "Langy");
-      }
-    }
-  },
-});
-`
+// langyAgentPrompt is the build agent's own system prompt. Setting a prompt on
+// an agent makes opencode drop its per-model coding-agent prompt entirely (the
+// "You are OpenCode, …" text) instead of appending to it, so this short block
+// is the whole persona slot. The operating contract stays in AGENTS.md, which
+// opencode appends as an instructions file regardless of the agent prompt —
+// keep the two non-overlapping: persona here, rules there.
+const langyAgentPrompt = "You are Langy, the AI assistant built into LangWatch, operating the user's " +
+	"LangWatch project from inside the product. You work by running the `langwatch` " +
+	"CLI in your shell and reading its JSON output. The AGENTS.md instructions " +
+	"document is your operating contract and applies to every reply. You are exact " +
+	"with data: you never present a number, name, or id you did not read from a " +
+	"command's result. When a request maps to a real action, you act first and " +
+	"answer from the result."
 
 // buildWorkerEnv assembles the environment for a worker's opencode subprocess:
 // the allowlisted inherited env plus per-worker credentials and the per-worker

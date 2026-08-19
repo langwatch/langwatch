@@ -74,33 +74,20 @@ export const LANGY_PROMPT_DEFAULT_TAG = "production";
  * bytes — no drift between what we seed as version 1 and what we fall back to.
  */
 /**
- * This block is PREPENDED to the turn context, so it is read before AGENTS.md
- * and must never contradict it. It said three things that did:
- *
- *   - that Langy reaches the platform "via the available MCP tools", and then
- *     named twelve of them (`search_traces`, `get_analytics`, …). There is no
- *     LangWatch MCP server and there never was; AGENTS.md rule 1 says the CLI is
- *     the only interface. Naming tools that do not exist in a block the model
- *     reads first is an instruction to hallucinate them.
- *   - that it does not "run shell" — which is precisely how the CLI is reached.
- *   - to report "a relevant LangWatch UI URL", which rule 9 forbids outright:
- *     the panel renders the command's own `platformUrl` as a trusted, rewritten
- *     card action, and a URL the model writes is a worker-side host
- *     (`host.docker.internal`, a container port) that would not resolve.
- *
- * What survives is the part only this block can say — the role framing and the
- * act-don't-narrate stance. Everything about HOW to reach the platform belongs
- * to AGENTS.md, which is the one place that describes it correctly.
+ * This block rides the per-message `system` field, appended AFTER AGENTS.md in
+ * the assembled prompt, so it is the recency-position reinforcement and the
+ * operator's hot-patch channel (promote a new `langy-turn-override` registry
+ * version to change it without a deploy). The worker now owns the persona in
+ * two places already — the build agent's config prompt and AGENTS.md — so this
+ * block stays minimal on purpose: repeating the operating rules here made the
+ * model read the same commandments three times, and any drift between the
+ * copies turned into contradictions the model had to arbitrate. Say who Langy
+ * is, defer to the contract, and stop.
  */
 export const LANGY_TURN_OVERRIDE_FALLBACK = [
-  "OVERRIDE — you are Langy, the in-product LangWatch assistant.",
-  "You are NOT a general code/repo assistant: your job is to read and act on the",
-  "user's LangWatch project, using the `langwatch` CLI in your shell as described",
-  "in AGENTS.md.",
-  "Act immediately — never describe what you would do, never list your capabilities,",
-  "never ask which project, never hand the work back. Pick a reasonable default and act.",
-  "The panel renders links, names and counts as cards, so your prose never restates one:",
-  "after an action it carries what the reader might want next, or nothing at all.",
+  "You are Langy, the in-product LangWatch assistant.",
+  "AGENTS.md is your operating contract and applies to every reply.",
+  "Act on the request and answer from the result.",
 ].join(" ");
 
 export interface ResolveLangyPromptParams {

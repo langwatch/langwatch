@@ -34,7 +34,7 @@ For a general request such as "test my agent":
 1. Read the agent code, system prompt, tools, and relevant git history.
 2. Identify the behavior most likely to regress.
 3. Create a domain-specific dataset.
-4. Select evaluators that measure the intended behavior.
+4. Select evaluators that measure the intended behavior, or a comparison when the goal is picking a winner between candidates.
 5. Create and run a real experiment.
 6. Interpret the results and recommend concrete improvements.
 
@@ -48,7 +48,7 @@ How to handle:
 
 - Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
-- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it — point to the subscription settings on the platform (license settings instead, if `LANGWATCH_ENDPOINT` is set — self-hosted).
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings if `LANGWATCH_ENDPOINT` is set (self-hosted).
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 ## Prerequisites
@@ -67,19 +67,21 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+
 **Projects and API keys: target a real project, not a personal one.**
 
 LangWatch has two kinds of project:
 
 - **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
-- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only and is easily confused with a real project.
+- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only, and you can mistake it for a real project.
 
 And two ways to authenticate:
 
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env` — most environments already have this provisioned. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 Read the experiment documentation before writing code:
 
@@ -118,7 +120,7 @@ experiment = langwatch.experiment.init("agent-regression")
 for index, row in experiment.loop(dataset.iterrows()):
     response = my_agent(row["input"])
     experiment.evaluate(
-        "ragas/answer_relevancy",
+        "ragas/response_relevancy",
         index=index,
         data={"input": row["input"], "output": response},
         settings={"model": "openai/gpt-5-mini", "max_tokens": 2048},
@@ -142,7 +144,7 @@ const experiment = await langwatch.experiments.init("agent-regression");
 
 await experiment.run(dataset, async ({ item, index }) => {
   const response = await myAgent(item.input);
-  await experiment.evaluate("ragas/answer_relevancy", {
+  await experiment.evaluate("ragas/response_relevancy", {
     index,
     data: { input: item.input, output: response },
     settings: { model: "openai/gpt-5-mini", max_tokens: 2048 },
@@ -150,7 +152,55 @@ await experiment.run(dataset, async ({ item, index }) => {
 });
 ```
 
-Read `langwatch docs evaluations/evaluators/list` before choosing an evaluator. Reuse project evaluators when appropriate. A scoring function is part of the experiment, not the experiment itself.
+Read `langwatch docs evaluations/evaluators/list` before choosing an evaluator, and take the type slug from `langwatch evaluator types --format json`, never from memory. If an evaluation fails with a `validation_error` naming the slug and an `expected` list, correct it from that list and retry once. Reuse project evaluators when appropriate. A scoring function is part of the experiment, not the experiment itself.
+
+## Compare Targets to Pick a Winner
+
+An evaluator answers "does this output pass?". A comparison answers "which of these is better?". For subjective quality, a judge ranking candidates side by side is usually more informative than each one getting an absolute score on its own.
+
+Register one target per candidate inside the loop, then compare the row once. Every target that recorded an output for the row is a candidate, so the candidates are never named twice, and the verdict is recorded against the row, so the results page renders it with no extra logging.
+
+### Python
+
+```python
+for index, row in experiment.loop(dataset.iterrows()):
+    with experiment.target("gpt-5-mini"):
+        experiment.log_response(call_gpt(row["input"]))
+
+    with experiment.target("claude-sonnet-5"):
+        experiment.log_response(call_claude(row["input"]))
+
+    verdict = experiment.compare(index, input=row["input"])
+```
+
+Inside an async loop, await `experiment.acompare(...)`, which takes the same options.
+
+### TypeScript
+
+```typescript
+await experiment.run(dataset, async ({ item, index }) => {
+  await Promise.all([
+    experiment.withTarget("gpt-5-mini", () => callGpt(item.input)),
+    experiment.withTarget("claude-sonnet-5", () => callClaude(item.input)),
+  ]);
+
+  const verdict = await experiment.compare({ index, input: item.input });
+});
+```
+
+Pass `golden` with a known-good answer to judge every candidate against it. Leave it out, which is the default, and the candidates are judged on their own merits.
+
+Read `verdict.status`, and keep its five answers apart:
+
+- `decided`: the judge picked a winner, named in `verdict.winner`.
+- `tie`: the judge compared the candidates and found none better than the rest.
+- `inconclusive`: no winner was established, which with the default second pass over the reversed candidate order means the two passes disagreed.
+- `skipped`: the row had fewer than two outputs, so no judge ran.
+- `error`: the judge failed, so nothing was measured about the candidates at all.
+
+A tie, an inconclusive row and an errored row are three different answers. Reporting any of them as one of the others claims a measurement the run never made.
+
+`prompt` replaces the judge prompt verbatim, with `{input}`, `{golden}` and `{candidates}` placeholders. Leave it unset unless the user asks for their own, because unset is what lets the judge use the prompt matching what each row carries. The remaining judge options are in `langwatch docs evaluations/experiments/sdk`.
 
 ## Run and Verify
 
@@ -174,7 +224,7 @@ After delivering initial results, transition to consultant mode to help the user
 
 **Phase 1: read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits because the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
 
-**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. Show the user what works and create the a-ha moment.
+**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. When a failure needs a change to the agent itself, fix the root cause at the right layer (tools, code, knowledge, then prompt, in that order) and fix the class of failure, never by patching a rule per failing test into the system prompt. Show the user what works.
 
 **Phase 3: go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue. Add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
 
@@ -185,5 +235,6 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - Do not configure production monitoring or guardrails from this skill.
 - Do not call a batch run an online evaluation.
 - Do not use placeholder datasets.
+- Do not report an inconclusive or errored comparison as a tie.
 - Do not guess SDK APIs when the installed documentation is available.
 - Do not stop after writing the experiment. Run it and inspect the real result.

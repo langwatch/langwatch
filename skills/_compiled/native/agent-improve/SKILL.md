@@ -89,6 +89,8 @@ Sanitize before you commit: production traces can carry names, emails, account d
 
 Make the fix on a branch: prompt edits (versioned through the `prompts` skill when prompts are managed in LangWatch), retrieval or tool-code changes, guardrails. The PR description must tell the whole story: observation, hypothesis, evidence links, what changed, and which scenario test proves it. The user reviews and merges; you never push to main.
 
+Before any prompt edit, check the fix is not cheaper at another layer: tool configuration, code path, or knowledge content. When the prompt IS the right layer, fix the class of failure with one general principle, never by pasting the failing conversation or a rule per failing test; then re-run the tests with varied inputs to prove the fix generalizes. After the suite is green, refactor under green: merge overlapping prompt rules, delete rules the new principle covers, and re-run. Report the prompt's size change in the PR the way you would report a bundle size. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
+
 ### Capture production signals with evaluators and monitors
 
 When a hypothesis needs more production data, or a fixed issue must stay fixed, add detection:
@@ -131,3 +133,4 @@ After executing:
 - Do NOT paste raw customer content from traces into committed tests or PR text; link the trace instead
 - Do NOT merge or push anything yourself; changes ship as PRs the user reviews
 - Do NOT create evaluators or monitors for signals no one will act on; every artifact needs an owner and a purpose
+- Do NOT grow the system prompt one rule per fixed failure; a prompt that only ever grows is accumulating patches, and it overfits to the tests it was patched against

@@ -49,7 +49,7 @@ actually run (`gh repo clone`, `git checkout -b`, `git commit`, `git push`,
 `gh pr create`) and renders the live steps card from those, reading the PR's URL
 straight out of `gh pr create`'s output. Just run the steps.
 
-For a bigger change, keep a `todowrite` todo list (see global rule 14). It
+For a bigger change, keep a `todowrite` todo list (see "How you work" in the global instructions). It
 renders live as the user's checklist while you work, so plan it there, not in
 prose.
 
