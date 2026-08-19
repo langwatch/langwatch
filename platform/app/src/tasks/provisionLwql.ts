@@ -3,7 +3,7 @@
  * in full mode, the whole access model plus the PostgreSQL-mapped views), and
  * backfills the key-map table from every project's `lwqlKey`.
  *
- * Runs after `clickhouseMigrate` (migration 00083 creates the key-map table
+ * Runs after `clickhouseMigrate` (migration 00084 creates the key-map table
  * this task writes into) in `start:prepare:db`. A deploy with no `LWQL_*`
  * environment configured is unaffected: {@link lwqlConnectionFromEnv} returns
  * `null` and this task exits immediately. Idempotent every run — every
@@ -12,7 +12,7 @@
  *
  * @see ../server/analytics/lwql/productionProvisioning.ts — the pure
  *   composition this orchestrates
- * @see ../server/clickhouse/migrations/00083_create_lwql_api_key_tenant_map.sql
+ * @see ../server/clickhouse/migrations/00084_create_lwql_api_key_tenant_map.sql
  * @see specs/analytics/lwql-api.feature
  */
 

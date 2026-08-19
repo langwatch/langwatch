@@ -63,7 +63,7 @@ import {
 
 /**
  * Literal, hard-coded match for the table name the SaaS row-filter subqueries
- * already reference (see migration 00083). Not derived from `names.database`
+ * already reference (see migration 00084). Not derived from `names.database`
  * or any env var — infra's filters name this table by this exact string.
  */
 export const LWQL_KEY_MAP_TABLE = "lwql_api_key_tenant_map";
@@ -99,7 +99,7 @@ export function productionLangWatchQLNames({
  *
  * DEFAULT/SaaS mode never provisions this table (see
  * {@link productionClickHouseObjectStatements}'s doc comment below): it is
- * migration 00083's table, created under the app's own ClickHouse database
+ * migration 00084's table, created under the app's own ClickHouse database
  * (`sourceDatabase`, matching goose's `${CLICKHOUSE_DATABASE}`) — the same
  * database infra's row filters already reference. FULL mode instead
  * provisions its own copy via {@link productionClickHouseAccessModelStatements}
@@ -126,7 +126,7 @@ export function lwqlKeyMapTableQualifiedName({
 
 /**
  * DEFAULT/SaaS mode: ClickHouse-native views only, no grants, no policies, no
- * user, no profile, no key-map table (migration 00083 already created it).
+ * user, no profile, no key-map table (migration 00084 already created it).
  */
 export function productionClickHouseObjectStatements({
   names,

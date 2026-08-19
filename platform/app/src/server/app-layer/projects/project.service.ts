@@ -303,7 +303,7 @@ export class ProjectService {
     try {
       const names = productionLangWatchQLNames({ connection });
       // Same mode-aware qualification as the deploy-time task: DEFAULT/SaaS
-      // mode's key-map table is migration 00083's, under the app's own
+      // mode's key-map table is migration 00084's, under the app's own
       // ClickHouse database — not `names.database`. See
       // `lwqlKeyMapTableQualifiedName`'s doc comment.
       const { database: sourceDatabase } = parseConnectionUrl();

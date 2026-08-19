@@ -8,13 +8,13 @@
  *    ships grants/policies against infra's XML-managed identity (DEFAULT) or
  *    silently drops the access model a self-hosted deploy needs (FULL).
  * 2. `lwqlKeyMapTableQualifiedName`'s database split: DEFAULT mode's key-map
- *    table is migration 00083's, under the app's own ClickHouse database
+ *    table is migration 00084's, under the app's own ClickHouse database
  *    (`sourceDatabase`) — not `names.database`. FULL mode's is its own copy,
  *    always under `names.database`. A backfill using the wrong database in
  *    either mode writes rows a query never sees.
  *
  * @see ../productionProvisioning.ts — the composition under test
- * @see ../../clickhouse/migrations/00083_create_lwql_api_key_tenant_map.sql
+ * @see ../../clickhouse/migrations/00084_create_lwql_api_key_tenant_map.sql
  * @see specs/analytics/lwql-api.feature
  */
 
@@ -157,7 +157,7 @@ describe("given productionClickHouseObjectStatements (DEFAULT mode)", () => {
     ["CREATE USER", "a restricted user"],
     [
       LWQL_KEY_MAP_TABLE,
-      "the key-map table (migration 00083 already created it)",
+      "the key-map table (migration 00084 already created it)",
     ],
   ])("never emits a statement containing %s — DEFAULT mode does not provision %s", (needle) => {
     expect(statements.some((s) => s.includes(needle))).toBe(false);
