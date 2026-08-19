@@ -696,6 +696,12 @@ EXEMPT_WORKLOADS=(
   # Runs kubectl against Secrets, so it needs its token and a writable root for
   # kubectl's discovery cache. Only renders on the operator-owned-Secret path.
   "charts/clickhouse/templates/preflight-secrets-job.yaml:clickhouse.preflight.enabled"
+  # Same shape: the upgrade hooks scale the workers Deployment through the
+  # Kubernetes API, so they need their token and a writable root. Only render
+  # in local-filesystem stored-objects mode, which a strict cluster should not
+  # be running anyway — that mode shares one ReadWriteOnce volume between the
+  # app and the workers and is the documented hobby tier. Use app.dataplane.
+  "templates/app/stored-objects-serialize-upgrade.yaml:app.storedObjects.localFilesystem.serializeUpgrades"
 )
 
 # Every emptyDir in the rendered manifest must declare a sizeLimit: they are

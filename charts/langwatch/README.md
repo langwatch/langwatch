@@ -188,12 +188,13 @@ dropped capabilities, `RuntimeDefault` seccomp, no mounted SA token, and
 resource requests/limits on every container.
 
 A default install does **not** clear Pod Security Admission `restricted` on its
-own: three bundled components can't comply. On clusters that enforce it, add
+own: four bundled components can't comply. On clusters that enforce it, add
 `examples/overlays/strict-admission.yaml`, which turns off the upstream
 Prometheus subchart, the Langy assistant (whose manager must run as root to
-give each worker its own UID — never force it non-root), and the ClickHouse
-preflight Job (it runs kubectl, so it needs a token and a writable root), plus
-the custom-metrics gateway HPA. Full details in
+give each worker its own UID — never force it non-root), the ClickHouse
+preflight Job and the stored-objects upgrade hooks (both run kubectl, so they
+need a token and a writable root), plus the custom-metrics gateway HPA. Full
+details in
 [Security → Pod Security](https://docs.langwatch.ai/self-hosting/security#pod-security).
 
 ### Regenerate this table
