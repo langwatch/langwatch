@@ -150,9 +150,30 @@ Feature: Databricks AI/BI Genie puller
       When the puller reads the cost
       Then no question is priced from that answer
       # Which statements the answer left out is exactly what it cannot tell us.
-      # Pricing the ones that arrived would put a confident zero on the rest,
-      # and on a first sweep that zero is permanent: the cursor moves past the
-      # question and later runs only re-read the settling window.
+      # Pricing the ones that arrived would put a confident zero on the rest.
+
+    @integration
+    Scenario: A window whose cost was cut short is asked about again
+      Given a warehouse busy enough to fill the cost query's row limit
+      When the puller reads the cost
+      Then the watermark stays at the start of the period it could not price
+      And that period is read again on the next run
+      # Refusing a partial answer is only half the job. A first sweep reads
+      # thirty days, and later runs re-read only the settling window, so a
+      # watermark that moved past those thirty days would make their zeros the
+      # permanent answer — the same undercount the refusal was meant to prevent,
+      # just spread evenly. The cost is a re-read of a period already recorded,
+      # and re-emitting a question replaces its ledger row rather than adding
+      # one, so the real figure lands as soon as the bill does.
+      #
+      # The window is read a day at a time so that holding it is recoverable
+      # rather than a stall: a day busy enough to be refused does not stop the
+      # twenty-nine that were priced before it from keeping their cost.
+      #
+      # Held only when the answer was CUT SHORT. Billing refusing the question
+      # outright is not held: a narrower question would be refused the same way,
+      # and holding would stall a workspace that never granted the billing
+      # tables, with no way out but turning the feature off.
 
     @integration
     Scenario: Compute the workspace prices in another currency is not converted

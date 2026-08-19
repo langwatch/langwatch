@@ -19,7 +19,9 @@ import {
   allocateWarehouseCost,
   costReadFloorMs,
   GENIE_FREE_USAGE_SKU_MARKER,
+  WAREHOUSE_COST_CHUNK_MS,
   WAREHOUSE_COST_SETTLING_LAG_MS,
+  warehouseCostChunks,
 } from "../databricksWarehouseCost";
 
 /** One billable hour: $6.00 across 3600s of warehouse time. */
@@ -273,5 +275,86 @@ describe("costReadFloorMs", () => {
     expect(WAREHOUSE_COST_SETTLING_LAG_MS).toBeGreaterThanOrEqual(
       60 * 60 * 1000,
     );
+  });
+});
+
+describe("splitting the window into readable pieces", () => {
+  const ONE_HOUR = 60 * 60 * 1000;
+  /** An exact hour boundary, so the arithmetic is readable in the assertions. */
+  const HOUR_START =
+    Math.floor(Date.UTC(2026, 7, 1, 9, 0, 0) / ONE_HOUR) * ONE_HOUR;
+
+  it("covers the whole window with no gap and no overlap", () => {
+    // The gap is the part that would be silent: an hour falling between two
+    // pieces is an hour nothing asks about, and its questions would price at
+    // nothing with every signal saying the read succeeded.
+    const fromMs = HOUR_START;
+    const toMs = HOUR_START + 30 * 24 * ONE_HOUR;
+
+    const chunks = warehouseCostChunks({ fromMs, toMs });
+
+    expect(chunks[0]!.fromMs).toBe(fromMs);
+    expect(chunks.at(-1)!.toMs).toBe(toMs);
+    for (let i = 1; i < chunks.length; i += 1) {
+      expect(chunks[i]!.fromMs).toBe(chunks[i - 1]!.toMs);
+    }
+  });
+
+  it("orders the pieces oldest first", () => {
+    // Load-bearing. The caller stops at the first piece it cannot price and
+    // holds the watermark there, which only describes what was read if the
+    // unpriced remainder is a suffix.
+    const chunks = warehouseCostChunks({
+      fromMs: HOUR_START,
+      toMs: HOUR_START + 5 * 24 * ONE_HOUR,
+    });
+
+    for (let i = 1; i < chunks.length; i += 1) {
+      expect(chunks[i]!.fromMs).toBeGreaterThan(chunks[i - 1]!.fromMs);
+    }
+  });
+
+  it("never splits an hour across two pieces", () => {
+    // The bill is published per hour. A boundary inside an hour would weigh
+    // that hour's queries against a bill the other piece is holding, and price
+    // every one of them at nothing.
+    const chunks = warehouseCostChunks({
+      fromMs: HOUR_START + 37 * 60 * 1000,
+      toMs: HOUR_START + 3 * 24 * ONE_HOUR + 12 * 60 * 1000,
+    });
+
+    for (const chunk of chunks) {
+      expect(chunk.fromMs % ONE_HOUR).toBe(0);
+      expect(chunk.toMs % ONE_HOUR).toBe(0);
+    }
+    // Rounded OUT at both ends, so nothing at the edges is left unasked about.
+    expect(chunks[0]!.fromMs).toBeLessThanOrEqual(HOUR_START + 37 * 60 * 1000);
+    expect(chunks.at(-1)!.toMs).toBeGreaterThanOrEqual(
+      HOUR_START + 3 * 24 * ONE_HOUR + 12 * 60 * 1000,
+    );
+  });
+
+  it("asks about a first sweep in about thirty pieces, not one", () => {
+    // The whole point of the split: one question over thirty days has a single
+    // row cap to trip, and tripping it leaves the entire month unpriced.
+    const chunks = warehouseCostChunks({
+      fromMs: HOUR_START,
+      toMs: HOUR_START + 30 * 24 * ONE_HOUR,
+    });
+
+    expect(chunks).toHaveLength(30);
+    expect(WAREHOUSE_COST_CHUNK_MS).toBe(24 * ONE_HOUR);
+  });
+
+  it("asks nothing about an empty or backwards window", () => {
+    expect(
+      warehouseCostChunks({ fromMs: HOUR_START, toMs: HOUR_START }),
+    ).toEqual([]);
+    expect(
+      warehouseCostChunks({ fromMs: HOUR_START, toMs: HOUR_START - ONE_HOUR }),
+    ).toEqual([]);
+    // A clock or a stored watermark that arrived unreadable. Returning nothing
+    // prices nothing, where looping on NaN would hang the run.
+    expect(warehouseCostChunks({ fromMs: NaN, toMs: HOUR_START })).toEqual([]);
   });
 });

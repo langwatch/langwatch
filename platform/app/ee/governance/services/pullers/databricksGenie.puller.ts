@@ -61,6 +61,7 @@ import {
   allocateWarehouseCost,
   costReadFloorMs,
   GENIE_CLIENT_APPLICATION,
+  warehouseCostChunks,
   warehouseCostRowSchema,
 } from "./databricksWarehouseCost";
 import { PULLED_USAGE_HINT_KEY } from "./pulledUsageRecord";
@@ -223,8 +224,13 @@ const WAREHOUSE_COST_TIMEOUT_MS = 60_000;
  * detail in memory, not a sampling decision. Hitting it means the answer is
  * missing statements we cannot identify, so the read is refused whole rather
  * than used: a partial answer prices some questions and silently leaves the
- * rest at nothing, and on a first sweep those zeroes are permanent, because
- * the cursor moves past them and later runs only re-read the settling window.
+ * rest at nothing.
+ *
+ * The cap applies per DAY, not per window — see `WAREHOUSE_COST_CHUNK_MS`. That
+ * is what keeps a refusal survivable: only the day that tripped it goes
+ * unpriced, the days read before it keep their cost, and the watermark stops
+ * there so the refused day is asked about again rather than being recorded at
+ * zero for good.
  */
 export const WAREHOUSE_COST_ROW_LIMIT = 50_000;
 
@@ -350,13 +356,32 @@ const WAREHOUSE_COST_COLUMNS = [
 ] as const;
 
 /**
+ * What one cost reply turned out to be worth.
+ *
+ * The two refusals are kept apart because the caller can do something about
+ * one of them and nothing about the other. `cut_short` means rows exist that
+ * did not arrive — asking about a smaller window can get them, so the window
+ * is worth holding open and retrying. `failed` means the question was not
+ * answered at all; a smaller window would be refused the same way, and holding
+ * the watermark on it would stall a workspace whose billing tables simply
+ * cannot be read, forever, with no way out but turning the feature off.
+ *
+ * Collapsing the two — which is what a bare `null` did — is what let a busy
+ * first sweep record a month of questions at zero and move on.
+ */
+type WarehouseCostRead =
+  | { outcome: "priced"; costByStatementId: Map<string, string> }
+  | { outcome: "cut_short" }
+  | { outcome: "failed" };
+
+/**
  * Turn one cost reply into per-statement cost, or refuse the whole reply.
  *
- * Every refusal here returns `null`, which the caller reads as "no cost this
- * run" — the questions are still recorded, and a re-read leaves any cost an
- * earlier run worked out alone. Refusing whole is deliberate: a partial answer
- * prices some questions and leaves the rest at nothing, and nothing is
- * indistinguishable from a question that genuinely cost nothing.
+ * A refusal prices nothing from this reply — the questions are still recorded,
+ * and a re-read leaves any cost an earlier run worked out alone. Refusing whole
+ * is deliberate: a partial answer prices some questions and leaves the rest at
+ * nothing, and nothing is indistinguishable from a question that genuinely cost
+ * nothing.
  */
 function readWarehouseCost({
   payload,
@@ -366,7 +391,7 @@ function readWarehouseCost({
   payload: unknown;
   adapter: string;
   warehouseId: string;
-}): Map<string, string> | null {
+}): WarehouseCostRead {
   const statement = warehouseCostResponseSchema.parse(payload);
   const log = { adapter, warehouseId };
 
@@ -379,7 +404,7 @@ function readWarehouseCost({
       },
       "databricks warehouse cost query did not succeed; recording the questions without cost",
     );
-    return null;
+    return { outcome: "failed" };
   }
 
   // No manifest is a refusal, not a pass. The rows are positional and every
@@ -392,7 +417,9 @@ function readWarehouseCost({
       { ...log, expected: WAREHOUSE_COST_COLUMNS, served },
       "databricks warehouse cost query answered with unexpected columns; refusing to price from it",
     );
-    return null;
+    // Not `cut_short`: the answer arrived, it just could not be trusted. A
+    // narrower window would be answered with the same columns.
+    return { outcome: "failed" };
   }
 
   const data = statement.result?.data_array ?? [];
@@ -421,7 +448,7 @@ function readWarehouseCost({
       },
       "databricks warehouse cost answer was cut short; refusing a partial answer",
     );
-    return null;
+    return { outcome: "cut_short" };
   }
 
   let unreadable = 0;
@@ -464,7 +491,7 @@ function readWarehouseCost({
       "some databricks warehouse compute could not be priced; those questions carry no cost",
     );
   }
-  return costByStatementId;
+  return { outcome: "priced", costByStatementId };
 }
 
 /**
@@ -659,6 +686,7 @@ function nextWatermark({
   sweepStartedAtMs,
   complete,
   oldestPendingMs,
+  pricedThroughMs,
 }: {
   previousMs: number;
   sweepStartedAtMs: number;
@@ -670,14 +698,37 @@ function nextWatermark({
    * re-read window without bound.
    */
   oldestPendingMs: number | null;
+  /**
+   * The instant past which this run could not work out what anything cost.
+   *
+   * A second ceiling, and it exists because a question recorded at zero is
+   * indistinguishable from one that genuinely cost nothing. Moving the
+   * watermark past a period whose bill we could have read but did not means no
+   * later run ever looks at it again — later runs re-read only the settling
+   * window — so the zero becomes the permanent answer. Stopping here costs a
+   * re-read of a period already recorded, and re-emitting a message REPLACES
+   * its ledger row, so the correct figure lands the moment the bill does.
+   *
+   * `null` when nothing is owed: the window priced whole, or the billing
+   * question could not be answered at all and holding would stall forever.
+   */
+  pricedThroughMs: number | null;
 }): number {
   if (!complete) return previousMs;
   const swept = sweepStartedAtMs - WATERMARK_LAG_MS;
-  const capped =
+  const pending =
     oldestPendingMs === null ? swept : Math.min(swept, oldestPendingMs - 1);
+  // At, not just short of: `pricedThroughMs` is the END of the last period read
+  // whole, so everything up to and including that instant has its cost.
+  const capped =
+    pricedThroughMs === null ? pending : Math.min(pending, pricedThroughMs);
   // Never backwards. An unsettled message always sits above the previous
   // watermark (it passed that filter to be read at all), so this only guards
   // the arithmetic, but a watermark that could move back would re-read forever.
+  //
+  // It also absorbs the case where NOTHING priced: the cost read starts at or
+  // below the watermark, so its ceiling lands under `previousMs` and the
+  // watermark simply holds.
   return Math.max(previousMs, capped);
 }
 
@@ -1228,10 +1279,11 @@ export class DatabricksGeniePuller
       return { events: [], cursor: options.cursor, errorCount: 1 };
     }
 
-    // After the sweep, not during it: one billing query for the whole run, and
-    // the window it asks about is the window the sweep actually read. Asking
-    // first would either guess that window or ask per space.
-    const costByStatementId = await this.warehouseCost({
+    // After the sweep, not during it: the billing read covers the whole run at
+    // once, and the window it asks about is the window the sweep actually read.
+    // Asking first would either guess that window or ask per space. It is one
+    // read of that window, taken a day at a time — see `warehouseCost`.
+    const { costByStatementId, pricedThroughMs } = await this.warehouseCost({
       config,
       token,
       options,
@@ -1251,7 +1303,17 @@ export class DatabricksGeniePuller
         costEnabled: config.warehouseId !== undefined,
         watermarkMs: cursor.sinceMs,
       }),
-      cursor: encode(nextCursor({ previous: cursor, sweep, sweepStartedAtMs })),
+      cursor: encode(
+        // The cost read is part of what this run knows, so the watermark answers
+        // to it as well as to the sweep. Without that, a window whose bill could
+        // not be read is still recorded, still advanced past, and never revisited.
+        nextCursor({
+          previous: cursor,
+          sweep,
+          sweepStartedAtMs,
+          pricedThroughMs,
+        }),
+      ),
       errorCount: 0,
     };
   }
@@ -2019,7 +2081,7 @@ export class DatabricksGeniePuller
       // Zero at the point the message is built, always. Genie bills nothing per
       // message, and the warehouse compute behind it is not on this API — a
       // source that names a warehouse has that share attached afterwards, once
-      // the run's one billing query has answered. See `withWarehouseCost`.
+      // the run's billing read has answered. See `withWarehouseCost`.
       cost_usd: 0,
       tokens_input: 0,
       tokens_output: 0,
@@ -2059,17 +2121,27 @@ export class DatabricksGeniePuller
     };
   }
 
-  /** One authenticated GET, budgeted and abortable. */
   /**
-   * What each Genie statement in the window cost, or null if it cannot be
-   * worked out.
+   * What each Genie statement in the window cost, and how much of that window
+   * the answer actually covers.
    *
-   * Null rather than throwing, in every failure mode. This runs alongside a
-   * sweep whose job is to record what people asked of the data, and that job
-   * does not depend on this one: a workspace that has not granted the billing
-   * tables, or whose metastore is briefly unavailable, should still get its
-   * activity. The alternative trades the thing that always works for the thing
-   * that sometimes does.
+   * Never throws, in any failure mode. This runs alongside a sweep whose job is
+   * to record what people asked of the data, and that job does not depend on
+   * this one: a workspace that has not granted the billing tables, or whose
+   * metastore is briefly unavailable, should still get its activity. The
+   * alternative trades the thing that always works for the thing that sometimes
+   * does.
+   *
+   * The window is read a day at a time, oldest first, and the walk stops at the
+   * first day it cannot price. `pricedThroughMs` is where it stopped, and the
+   * caller keeps the watermark at or below it so that day is asked about again
+   * next run instead of being written off. A first sweep spans thirty days, and
+   * without that the whole month would be recorded at zero the one time a busy
+   * warehouse tripped the row cap — permanently, because later runs only re-read
+   * the settling window and would never look at those days again.
+   *
+   * `null` means no ceiling is owed: either the whole window priced, or the
+   * question could not be answered at all and re-asking it would not help.
    */
   private async warehouseCost({
     config,
@@ -2085,9 +2157,93 @@ export class DatabricksGeniePuller
     budget: RunBudget;
     fromMs: number;
     toMs: number;
-  }): Promise<Map<string, string> | null> {
+  }): Promise<{
+    costByStatementId: Map<string, string> | null;
+    /** The instant past which cost is not known. `null` owes no ceiling. */
+    pricedThroughMs: number | null;
+  }> {
     const warehouseId = config.warehouseId;
-    if (!warehouseId) return null;
+    if (!warehouseId) return { costByStatementId: null, pricedThroughMs: null };
+
+    const costByStatementId = new Map<string, string>();
+
+    for (const chunk of warehouseCostChunks({ fromMs, toMs })) {
+      // Out of requests with days still unpriced. Those days are not refused,
+      // just unread, so the watermark holds here and the next run starts its
+      // cost read where this one ran out — which is what turns a month-long
+      // backfill into several runs that each make progress.
+      if (budget.exhausted()) {
+        logger.warn(
+          {
+            adapter: this.id,
+            warehouseId,
+            pricedThrough: new Date(chunk.fromMs).toISOString(),
+          },
+          "databricks warehouse cost ran out of run budget; holding the watermark at the last priced day",
+        );
+        return { costByStatementId, pricedThroughMs: chunk.fromMs };
+      }
+
+      const read = await this.warehouseCostChunk({
+        config,
+        token,
+        options,
+        budget,
+        warehouseId,
+        chunk,
+      });
+
+      // Rows exist for this day that did not arrive. Everything older is
+      // already priced and keeps its cost; this day and everything after it
+      // stays inside the next run's window.
+      if (read.outcome === "cut_short") {
+        logger.error(
+          {
+            adapter: this.id,
+            warehouseId,
+            pricedThrough: new Date(chunk.fromMs).toISOString(),
+            chunkTo: new Date(chunk.toMs).toISOString(),
+          },
+          "databricks warehouse cost could not price a day whole; holding the watermark so it is asked again",
+        );
+        return { costByStatementId, pricedThroughMs: chunk.fromMs };
+      }
+
+      // The question itself did not land. Asking about less would not change
+      // that, so no ceiling is owed: the questions are recorded without cost,
+      // exactly as they were before any of this existed, and the source keeps
+      // moving rather than stalling on billing tables it may never read.
+      if (read.outcome === "failed") {
+        return { costByStatementId, pricedThroughMs: null };
+      }
+
+      // A statement is bucketed by the hour it started in and every hour lies
+      // inside exactly one day, so no two chunks can answer for the same one.
+      for (const [statementId, cost] of read.costByStatementId) {
+        costByStatementId.set(statementId, cost);
+      }
+    }
+
+    return { costByStatementId, pricedThroughMs: null };
+  }
+
+  /** One day of the window, priced or refused. */
+  private async warehouseCostChunk({
+    config,
+    token,
+    options,
+    budget,
+    warehouseId,
+    chunk,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+    warehouseId: string;
+    chunk: { fromMs: number; toMs: number };
+  }): Promise<WarehouseCostRead> {
+    const { fromMs, toMs } = chunk;
 
     try {
       const payload = await this.post({
@@ -2151,10 +2307,11 @@ export class DatabricksGeniePuller
         },
         "databricks warehouse cost is unavailable; recording the questions without cost",
       );
-      return null;
+      return { outcome: "failed" };
     }
   }
 
+  /** One authenticated POST, budgeted and abortable. */
   private async post({
     config,
     token,
@@ -2345,10 +2502,13 @@ function nextCursor({
   previous,
   sweep,
   sweepStartedAtMs,
+  pricedThroughMs,
 }: {
   previous: GenieCursor;
   sweep: SweepResult;
   sweepStartedAtMs: number;
+  /** Where cost knowledge ran out this run — see `nextWatermark`. */
+  pricedThroughMs: number | null;
 }): GenieCursor {
   // `sweep.hadGap` is already sweep-scoped — it was seeded from this cursor —
   // so there is nothing to fold here. One name, one meaning, one place it
@@ -2365,6 +2525,7 @@ function nextCursor({
       sweepStartedAtMs,
       complete: sweep.complete && !sweep.hadGap,
       oldestPendingMs: sweep.oldestPendingMs,
+      pricedThroughMs,
     }),
     spaceId: sweep.resumeSpaceId,
     // Meaningless without a space to resume into, so it is cleared with it

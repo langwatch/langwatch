@@ -244,9 +244,15 @@ describe("a source that names a warehouse", () => {
 
     await pull({ warehouseId: WAREHOUSE_ID });
 
-    expect(statementBodies).toHaveLength(1);
+    // A day at a time, so one busy day cannot cost the whole window its price.
+    // Every one of them still has to name the configured warehouse: the claim
+    // here is about which workspace is billed, and chunking multiplied the
+    // number of chances to get that wrong.
+    expect(statementBodies.length).toBeGreaterThan(1);
+    for (const sent of statementBodies) {
+      expect(sent.warehouse_id).toBe(WAREHOUSE_ID);
+    }
     const body = statementBodies[0]!;
-    expect(body.warehouse_id).toBe(WAREHOUSE_ID);
     // Bound as a parameter. Interpolating it into the statement would make the
     // statement a function of stored configuration.
     expect(body.parameters).toEqual(
@@ -500,6 +506,67 @@ describe("a source that names a warehouse", () => {
     const result = await pull({ warehouseId: WAREHOUSE_ID });
 
     expect(hintOf(result).costUsd).toBe("0");
+  });
+
+  /** @scenario "A window whose cost was cut short is asked about again" */
+  it("holds the watermark on the day it could not price", async () => {
+    // A first sweep reads thirty days. Pricing nothing is survivable; pricing
+    // nothing AND moving the watermark past those thirty days is not, because
+    // later runs re-read only the settling window and would never look at them
+    // again. The zero would be the permanent answer to a question that really
+    // was billed.
+    costPlan = {
+      rows: [
+        [
+          STATEMENT_ID,
+          "3600000",
+          "3600000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+      ],
+      nextChunkIndex: 1,
+    };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+    const cursor = JSON.parse(result.cursor!) as { sinceMs: number };
+
+    expect(hintOf(result).costUsd).toBe("0");
+    // Still back at the start of the window, not up at the sweep's clock.
+    expect(cursor.sinceMs).toBeLessThan(Date.now() - 29 * 24 * 60 * 60 * 1000);
+    // And it stopped asking at the first day it could not price, rather than
+    // spending the rest of the run's budget on days it would refuse anyway.
+    expect(statementBodies).toHaveLength(1);
+  });
+
+  /** @scenario "A window whose cost was cut short is asked about again" */
+  it("moves the watermark on when every day priced whole", async () => {
+    // The other half of the claim above: holding is what an unpriced day costs,
+    // not what every run does. A source that could price its window has to make
+    // progress, or the hold would be a stall wearing a correctness argument.
+    costPlan = { rows: [] };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+    const cursor = JSON.parse(result.cursor!) as { sinceMs: number };
+
+    expect(cursor.sinceMs).toBeGreaterThan(Date.now() - 60 * 60 * 1000);
+  });
+
+  /** @scenario "A window whose cost was cut short is asked about again" */
+  it("moves the watermark on when billing refuses the question outright", async () => {
+    // Deliberately NOT held. A cut-short answer proves rows exist that a
+    // narrower question could still reach; a refusal proves nothing, and asking
+    // again would be refused the same way. Holding here would stall a workspace
+    // that never granted the billing tables, forever, with no way out but
+    // turning the feature off — a worse failure than the questions carrying no
+    // cost, which is what they carried before any of this existed.
+    costPlan = { status: 403 };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+    const cursor = JSON.parse(result.cursor!) as { sinceMs: number };
+
+    expect(cursor.sinceMs).toBeGreaterThan(Date.now() - 60 * 60 * 1000);
   });
 
   /** @scenario "Cost that arrives late corrects the record rather than adding one" */

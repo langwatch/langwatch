@@ -57,6 +57,64 @@ import {
  */
 export const WAREHOUSE_COST_SETTLING_LAG_MS = 2 * 60 * 60 * 1000;
 
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * How much of the window one cost request asks about.
+ *
+ * The reply is capped, and a cut-short reply is refused whole, so the SIZE of
+ * the question decides whether a busy warehouse can be priced at all. A first
+ * sweep reads thirty days: asked as one question there is a single cap to trip,
+ * and tripping it leaves every question in the whole month unpriced. Asked a
+ * day at a time it takes a day busy enough to trip the cap on its own, and the
+ * days answered before it keep their cost.
+ *
+ * A day rather than an hour because every chunk spends a request from the run's
+ * budget. Thirty days is thirty requests of the four hundred a run may spend;
+ * hourly would be seven hundred and twenty and could not finish in one run.
+ *
+ * Whole hours either way. The bill is published per hour and the statements are
+ * bucketed per hour, so a boundary inside an hour would separate that hour's
+ * queries from that hour's bill and price every one of them at nothing.
+ */
+export const WAREHOUSE_COST_CHUNK_MS = 24 * ONE_HOUR_MS;
+
+/**
+ * The window as oldest-first pieces, each small enough to stand a chance of
+ * being answered whole.
+ *
+ * Oldest first is the load-bearing part. The caller stops at the first piece it
+ * cannot price and holds the watermark there, so the answered pieces are always
+ * the OLDEST ones and the unpriced remainder is always a suffix — which is
+ * exactly the shape a watermark can describe. Newest-first would answer pieces
+ * scattered through the window and leave holes no single instant could mark.
+ *
+ * Both ends are rounded OUT to whole hours, so no hour is ever split across two
+ * pieces and every hour's statements are weighed against that same hour's bill.
+ */
+export function warehouseCostChunks({
+  fromMs,
+  toMs,
+}: {
+  fromMs: number;
+  toMs: number;
+}): Array<{ fromMs: number; toMs: number }> {
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) return [];
+
+  const start = Math.floor(fromMs / ONE_HOUR_MS) * ONE_HOUR_MS;
+  const end = Math.ceil(toMs / ONE_HOUR_MS) * ONE_HOUR_MS;
+  if (end <= start) return [];
+
+  const chunks: Array<{ fromMs: number; toMs: number }> = [];
+  for (let at = start; at < end; at += WAREHOUSE_COST_CHUNK_MS) {
+    chunks.push({
+      fromMs: at,
+      toMs: Math.min(at + WAREHOUSE_COST_CHUNK_MS, end),
+    });
+  }
+  return chunks;
+}
+
 /**
  * How Genie's own queries identify themselves in `system.query.history`.
  *
