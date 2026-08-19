@@ -131,16 +131,27 @@ function grantEventToFact(event: GrantFamilyEvent): GrantsLedgerEvent {
         occurredAtMs: event.occurredAt,
       };
     case GRANT_REVOKED_EVENT_TYPE:
-      return {
-        kind: "grant_revoked",
-        grantId: event.data.grantId,
-        ...(event.data.reason ? { reason: event.data.reason } : {}),
-        actor: event.data.actor,
-        occurredAtMs: event.occurredAt,
-      };
+      return revokedEventToFact(event);
     default:
       return foreignEventType(event);
   }
+}
+
+/** A revocation names a grant id, an identity selector, or both — the fold
+ *  removes the id AND every grant the selector matches, which is what keeps
+ *  a lagging projection's incomplete id list from leaving access standing. */
+function revokedEventToFact(
+  event: Extract<AuthzGrantsEvent, { type: typeof GRANT_REVOKED_EVENT_TYPE }>,
+): GrantsLedgerEvent {
+  const { grantId, selector, reason, actor } = event.data;
+  return {
+    kind: "grant_revoked",
+    ...(grantId ? { grantId } : {}),
+    ...(selector ? { selector } : {}),
+    ...(reason ? { reason } : {}),
+    actor,
+    occurredAtMs: event.occurredAt,
+  };
 }
 
 type RoleFamilyEvent = Extract<

@@ -1480,10 +1480,11 @@ export const opsRouter = createTRPCRouter({
     }),
 
   /**
-   * The operator rollback: pin a finalized organization back onto its
-   * legacy path. Only `finalized` rolls back; the service refuses anything
-   * else with a handled error. Rolled-back tenants are terminal for the
-   * runner — later passes leave them alone.
+   * The operator rollback: pin a migrated or finalized organization back
+   * onto its legacy path. Only `migrated` or `finalized` rolls back — both
+   * are already live on the ledger; the service refuses anything else with
+   * a handled error. Rolled-back tenants are terminal for the runner —
+   * later passes leave them alone.
    */
   rollBackSystemMigrationTenant: protectedProcedure
     .use(opsManagePermission)

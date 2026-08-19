@@ -56,7 +56,7 @@ import { ModelProviderDisabledError } from "~/server/modelProviders/modelProvide
 import { createWarnThrottle } from "~/server/observability/warnThrottle";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { captureException, toError } from "../../utils/posthogErrorCapture";
-import { checkPermissionV2 } from "../authz/trpc-middleware";
+import { checkPermissionV2 } from "../app-layer/authz/trpc-middleware";
 import type { OpsScope, PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");

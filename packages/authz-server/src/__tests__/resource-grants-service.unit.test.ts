@@ -43,7 +43,6 @@ describe("AuthzService on a resource scope", () => {
 describe("GrantsService and resource scopes", () => {
   const makeService = () =>
     new GrantsService({} as AuthzGrantsRepository, {
-      audit: vi.fn().mockResolvedValue(undefined),
       newBindingId: () => "rb_test",
       bumpEpoch: vi.fn().mockResolvedValue(undefined),
       collectorFor: (reader: AuthzReadRepository) =>
