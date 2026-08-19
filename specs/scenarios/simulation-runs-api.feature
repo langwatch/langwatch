@@ -38,6 +38,19 @@ Feature: Simulation runs list API message truncation
     When the list is served
     Then the page size is reduced to the full-message cap
 
+  @unit
+  Scenario: include=messages stops the page at the batch that would pass the run cap
+    Given the selected batches together hold more runs than the full-message cap
+    When the page is built
+    Then the page ends at the last batch that fits within the cap
+    And the next cursor points at that batch so no run is skipped
+
+  @unit
+  Scenario: A single batch larger than the run cap is still served whole
+    Given the first selected batch alone holds more runs than the full-message cap
+    When the page is built
+    Then every run of that batch is returned
+
   @integration
   Scenario: A batch-scoped list is unchanged by the include parameter
     Given a run in a batch holds more than 6 messages

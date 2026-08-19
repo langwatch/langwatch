@@ -1492,6 +1492,61 @@
           }
         ]
       },
+      "put": {
+        "responses": {},
+        "operationId": "putApiAgentsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Update an agent by its id",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "signature",
+                      "code",
+                      "workflow",
+                      "http"
+                    ]
+                  },
+                  "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "workflowId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
       "delete": {
         "responses": {},
         "operationId": "deleteApiAgentsById",
@@ -45741,13 +45796,16 @@
             }
           },
           "400": {
-            "description": "Missing or invalid scope parameter",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "error": {
+                      "type": "string"
+                    },
+                    "message": {
                       "type": "string"
                     }
                   },
@@ -45798,16 +45856,13 @@
             }
           },
           "422": {
-            "description": "Unprocessable Entity",
+            "description": "Missing or invalid scope parameter",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string"
-                    },
-                    "message": {
                       "type": "string"
                     }
                   },
@@ -46099,13 +46154,13 @@
                       },
                       "maxTurns": {
                         "type": [
-                          "number",
+                          "integer",
                           "null"
                         ]
                       },
                       "minTurns": {
                         "type": [
-                          "number",
+                          "integer",
                           "null"
                         ]
                       },
@@ -46305,13 +46360,13 @@
                     },
                     "maxTurns": {
                       "type": [
-                        "number",
+                        "integer",
                         "null"
                       ]
                     },
                     "minTurns": {
                       "type": [
-                        "number",
+                        "integer",
                         "null"
                       ]
                     },
@@ -46494,7 +46549,7 @@
                       "string",
                       "null"
                     ],
-                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$",
                     "maxLength": 200,
                     "description": "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default."
                   },
@@ -46503,7 +46558,7 @@
                       "string",
                       "null"
                     ],
-                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$",
                     "maxLength": 200,
                     "description": "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default."
                   },
@@ -46621,13 +46676,13 @@
                     },
                     "maxTurns": {
                       "type": [
-                        "number",
+                        "integer",
                         "null"
                       ]
                     },
                     "minTurns": {
                       "type": [
-                        "number",
+                        "integer",
                         "null"
                       ]
                     },
@@ -46856,13 +46911,13 @@
                     },
                     "maxTurns": {
                       "type": [
-                        "number",
+                        "integer",
                         "null"
                       ]
                     },
                     "minTurns": {
                       "type": [
-                        "number",
+                        "integer",
                         "null"
                       ]
                     },
@@ -47073,7 +47128,7 @@
                       "string",
                       "null"
                     ],
-                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$",
                     "maxLength": 200,
                     "description": "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default."
                   },
@@ -47082,7 +47137,7 @@
                       "string",
                       "null"
                     ],
-                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$",
                     "maxLength": 200,
                     "description": "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default."
                   },
@@ -47194,13 +47249,13 @@
                     },
                     "maxTurns": {
                       "type": [
-                        "number",
+                        "integer",
                         "null"
                       ]
                     },
                     "minTurns": {
                       "type": [
-                        "number",
+                        "integer",
                         "null"
                       ]
                     },
@@ -47411,7 +47466,7 @@
                       "string",
                       "null"
                     ],
-                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$",
                     "maxLength": 200,
                     "description": "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default."
                   },
@@ -47420,7 +47475,7 @@
                       "string",
                       "null"
                     ],
-                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$",
                     "maxLength": 200,
                     "description": "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default."
                   },
@@ -49105,11 +49160,11 @@
             "schema": {
               "type": "string",
               "const": "messages",
-              "description": "Pass `messages` to read whole conversations instead of the first few messages of each run. The page size is capped at 20 runs when set."
+              "description": "Pass `messages` to read whole conversations instead of the first few messages of each run. The page size is capped at 20 runs when set, and ends on a batch boundary."
             }
           }
         ],
-        "description": "List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass `include=messages` to read whole conversations, which caps the page at 20 runs. A batch-scoped listing always carries whole conversations.",
+        "description": "List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass `include=messages` to read whole conversations, which caps the page at 20 runs, ending on a batch boundary. A batch-scoped listing always carries whole conversations.",
         "security": [
           {
             "project_api_key": []
@@ -50033,7 +50088,7 @@
                       "string",
                       "null"
                     ],
-                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$",
                     "maxLength": 200,
                     "description": "Model for the simulated user in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default."
                   },
@@ -50042,7 +50097,7 @@
                       "string",
                       "null"
                     ],
-                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$",
                     "maxLength": 200,
                     "description": "Model for the judge in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default."
                   }
@@ -50580,7 +50635,7 @@
                       "string",
                       "null"
                     ],
-                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$",
                     "maxLength": 200,
                     "description": "Model for the simulated user in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default."
                   },
@@ -50589,7 +50644,7 @@
                       "string",
                       "null"
                     ],
-                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$",
                     "maxLength": 200,
                     "description": "Model for the judge in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default."
                   }
@@ -50891,7 +50946,7 @@
                       "string",
                       "null"
                     ],
-                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$",
                     "maxLength": 200,
                     "description": "Model for the simulated user in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default."
                   },
@@ -50900,7 +50955,7 @@
                       "string",
                       "null"
                     ],
-                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$",
                     "maxLength": 200,
                     "description": "Model for the judge in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default."
                   }

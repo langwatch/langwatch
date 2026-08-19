@@ -334,7 +334,7 @@ describe("Feature: Suites REST API", () => {
     });
   });
 
-  describe("run-plan model overrides over REST", () => {
+  describe("given run-plan model overrides over REST", () => {
     describe("when creating with model overrides", () => {
       /** @scenario "Create over REST accepts run-plan model overrides" */
       it("carries the values back on create and on read", async () => {
@@ -408,17 +408,19 @@ describe("Feature: Suites REST API", () => {
   });
 
   describe("PUT /api/suites/:id", () => {
-    /** @scenario "PUT updates a suite the same way PATCH does" */
-    it("updates the suite like PATCH does", async () => {
-      const suite = await createSuite({ name: "Put Me" });
+    describe("when the suite exists", () => {
+      /** @scenario "PUT updates a suite the same way PATCH does" */
+      it("updates the suite like PATCH does", async () => {
+        const suite = await createSuite({ name: "Put Me" });
 
-      const res = await helpers.api.put(`/api/suites/${suite.id}`, {
-        name: "Put Name",
+        const res = await helpers.api.put(`/api/suites/${suite.id}`, {
+          name: "Put Name",
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.name).toBe("Put Name");
       });
-
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.name).toBe("Put Name");
     });
   });
 

@@ -32,8 +32,8 @@ const scenarioResponseSchema = z.object({
   parameters: z.array(scenarioParameterDefinitionSchema),
   simulatorModel: z.string().nullable(),
   judgeModel: z.string().nullable(),
-  maxTurns: z.number().nullable(),
-  minTurns: z.number().nullable(),
+  maxTurns: z.number().int().nullable(),
+  minTurns: z.number().int().nullable(),
 });
 
 const scenarioResponseWithPlatformUrlSchema = scenarioResponseSchema.extend({
@@ -304,14 +304,17 @@ function registerUpdateScenarioRoute(
   secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
 ): void {
   for (const verb of ["put", "patch"] as const) {
-    registerUpdateScenarioVerb(secured, verb);
+    registerUpdateScenarioVerb({ secured, verb });
   }
 }
 
-function registerUpdateScenarioVerb(
-  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
-  verb: "put" | "patch",
-): void {
+function registerUpdateScenarioVerb({
+  secured,
+  verb,
+}: {
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>;
+  verb: "put" | "patch";
+}): void {
   secured.access(requires("scenarios:update"))[verb](
     "/:id",
     describeRoute({

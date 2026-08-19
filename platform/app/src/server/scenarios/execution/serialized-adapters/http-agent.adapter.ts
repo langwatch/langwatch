@@ -71,12 +71,15 @@ export class HttpAgentTransportError extends Error {
   }
 }
 
-/** The host of a request url, or the url itself when it does not parse. */
+/**
+ * The host of a request url. A url that does not parse gets a fixed label:
+ * it can carry a credential in its query, and this text reaches a customer.
+ */
 function hostForMessage(url: string): string {
   try {
     return new URL(url).host;
   } catch {
-    return url;
+    return "configured target";
   }
 }
 

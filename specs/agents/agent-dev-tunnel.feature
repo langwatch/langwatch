@@ -106,6 +106,12 @@ Feature: Agent dev tunnel
     Then a replacement tunnel is provisioned
     And the agent is pointed at the replacement tunnel URL
 
+  Scenario: A probe that never answers does not stop the health monitor
+    Given a dev tunnel session whose tunnel accepts the probe and never answers
+    When the probe passes its own timeout
+    Then the probe counts as a failure
+    And the health monitor keeps running and provisions a replacement tunnel
+
   Scenario: A failed re-provision restores the agent and ends the session
     Given a dev tunnel session whose tunnel stops answering
     When provisioning a replacement tunnel fails

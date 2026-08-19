@@ -75,7 +75,7 @@ const listQuerySchema = z.object({
     .literal("messages")
     .optional()
     .describe(
-      "Pass `messages` to read whole conversations instead of the first few messages of each run. The page size is capped at 20 runs when set.",
+      "Pass `messages` to read whole conversations instead of the first few messages of each run. The page size is capped at 20 runs when set, and ends on a batch boundary.",
     ),
 });
 
@@ -92,7 +92,7 @@ secured.access(requires("scenarios:view")).get(
   "/",
   describeRoute({
     description:
-      "List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass `include=messages` to read whole conversations, which caps the page at 20 runs. A batch-scoped listing always carries whole conversations.",
+      "List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass `include=messages` to read whole conversations, which caps the page at 20 runs, ending on a batch boundary. A batch-scoped listing always carries whole conversations.",
     responses: {
       ...baseResponses,
       200: {
@@ -116,7 +116,7 @@ secured.access(requires("scenarios:view")).get(
     const project = c.get("project");
     const { scenarioSetId, batchRunId, limit, cursor, include } =
       c.req.valid("query");
-    const includeMessages = include === "messages";
+    const shouldIncludeMessages = include === "messages";
     logger.info(
       { projectId: project.id, scenarioSetId, batchRunId },
       "Listing simulation runs",
@@ -158,7 +158,7 @@ secured.access(requires("scenarios:view")).get(
         scenarioSetId,
         limit,
         cursor,
-        includeMessages,
+        shouldIncludeMessages,
       });
 
       return c.json({
@@ -179,7 +179,7 @@ secured.access(requires("scenarios:view")).get(
       projectId: project.id,
       limit,
       cursor,
-      includeMessages,
+      shouldIncludeMessages,
     });
 
     if (!result.changed) {

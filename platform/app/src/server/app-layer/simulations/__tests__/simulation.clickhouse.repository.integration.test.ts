@@ -303,7 +303,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
           projectId: tenantId,
           scenarioSetId,
           limit: 10,
-          includeMessages: true,
+          shouldIncludeMessages: true,
         });
 
         expect(result.runs).toHaveLength(1);

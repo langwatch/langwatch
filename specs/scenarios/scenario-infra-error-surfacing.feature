@@ -88,6 +88,13 @@ Feature: Scenario infrastructure error surfacing and empty-response state
     Then the stored reasoning is the customer-safe sentence for that error
 
   @unit
+  Scenario: A cancelled run stores the inconclusive verdict, not a raw failure verdict
+    Given a finish-run command with the cancelled status whose results carry a failure verdict and a raw error
+    When the run is finished
+    Then the stored verdict is inconclusive
+    And the stored reasoning says the run was cancelled by the user
+
+  @unit
   Scenario: Results a judge wrote are stored untouched
     Given a finish-run command whose results carry a judge verdict with its own reasoning
     When the run is finished

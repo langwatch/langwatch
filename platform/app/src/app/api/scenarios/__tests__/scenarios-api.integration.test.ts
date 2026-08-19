@@ -340,7 +340,7 @@ describe("Scenarios API", () => {
     });
   });
 
-  describe("model overrides and turn limits over REST", () => {
+  describe("given model overrides and turn limits over REST", () => {
     describe("when creating with model overrides and turn limits", () => {
       /** @scenario "Create over REST accepts model overrides and turn limits" */
       it("carries the values back on create and on read", async () => {

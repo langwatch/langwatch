@@ -120,6 +120,13 @@ Feature: HTTP agent error surfacing and per-call diagnostics
     And classifying it yields the unreachable-endpoint code
 
   @unit
+  Scenario: A target url that does not parse is never repeated in the error
+    Given an HTTP agent target whose url does not parse and holds a query credential
+    When the adapter calls it and the transport fails
+    Then the thrown error names a fixed target label instead of the url
+    And the thrown error message holds none of the credential text
+
+  @unit
   Scenario: A transport error never carries a Node stack in its message
     Given an HTTP agent target that fails at the transport level
     When the adapter calls it

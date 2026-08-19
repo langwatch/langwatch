@@ -256,7 +256,7 @@ export const route = secured.access(requires("scenarios:manage")).delete(
           "application/json": { schema: resolver(responseSchemas.archive) },
         },
       },
-      400: {
+      422: {
         description: "Missing or invalid scope parameter",
         content: {
           "application/json": { schema: resolver(responseSchemas.error) },

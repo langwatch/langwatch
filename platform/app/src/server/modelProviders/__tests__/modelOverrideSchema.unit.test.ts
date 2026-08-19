@@ -22,15 +22,35 @@ describe("modelOverrideSchema", () => {
 
   describe("when the value has no provider prefix", () => {
     /** @scenario "A model override that is not a provider-prefixed id is rejected at save time" */
-    it.each(["latest", "gpt-5-mini", "", "/gpt-5-mini", "openai/"])(
-      "rejects %j with a provider/model message",
-      (value) => {
-        const result = modelOverrideSchema.safeParse(value);
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error.issues[0]?.message).toContain("provider/model");
-        }
-      },
-    );
+    it.each([
+      "latest",
+      "gpt-5-mini",
+      "",
+      "/gpt-5-mini",
+      "openai/",
+    ])("rejects %j with a provider/model message", (value) => {
+      const result = modelOverrideSchema.safeParse(value);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0]?.message).toContain("provider/model");
+      }
+    });
+  });
+
+  describe("when a path segment is empty or blank", () => {
+    /** @scenario "A model override that is not a provider-prefixed id is rejected at save time" */
+    it.each([
+      "openai/ ",
+      "openai//gpt-5-mini",
+      "openai/gpt-5-mini\n",
+      "openai/gpt 5 mini",
+      "openrouter/meta-llama/",
+    ])("rejects %j with a provider/model message", (value) => {
+      const result = modelOverrideSchema.safeParse(value);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0]?.message).toContain("provider/model");
+      }
+    });
   });
 });

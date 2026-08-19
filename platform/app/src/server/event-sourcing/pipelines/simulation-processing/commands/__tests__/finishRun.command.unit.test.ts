@@ -290,6 +290,27 @@ describe("FinishRunCommand", () => {
       );
     });
 
+    /** @scenario "A cancelled run stores the inconclusive verdict, not a raw failure verdict" */
+    it("stores the inconclusive verdict for a cancelled run", async () => {
+      const handler = new FinishRunCommand(makeDeps());
+      const events = await handler.handle(
+        makeCommand({
+          status: "CANCELLED",
+          results: {
+            verdict: "failure",
+            metCriteria: [],
+            unmetCriteria: [],
+            error: RAW_TRANSPORT_FAILURE,
+          },
+        }) as any,
+      );
+      const stored = (events[0]!.data as { results?: SimulationResults })
+        .results!;
+
+      expect(stored.verdict).toBe("inconclusive");
+      expect(stored.reasoning).toBe("Cancelled by user");
+    });
+
     /** @scenario "Results a judge wrote are stored untouched" */
     it("leaves results a judge wrote alone", async () => {
       const supplied: SimulationResults = {

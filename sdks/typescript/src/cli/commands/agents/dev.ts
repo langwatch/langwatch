@@ -38,6 +38,14 @@ const HEALTH_INTERVAL_MS = 30_000;
 /** Unhealthy probes in a row before the tunnel is declared dead. */
 const HEALTH_FAILURE_THRESHOLD = 3;
 
+/**
+ * How long one probe may take. A half-open socket at the edge is exactly the
+ * failure the monitor looks for, and it is also the case where `fetch` never
+ * settles. The next check is chained off the current one, so an unbounded
+ * probe would stop the monitor for the rest of the session.
+ */
+const HEALTH_PROBE_TIMEOUT_MS = 10_000;
+
 /** How long a repeated signal waits for the in-flight restore before forcing exit. */
 const FORCE_EXIT_GRACE_MS = 2_000;
 
@@ -68,6 +76,7 @@ export interface AgentDevSession {
 /** Test hooks for `startAgentDevSession`; sessions use the defaults. */
 export interface AgentDevSessionHooks {
   healthIntervalMs?: number;
+  healthProbeTimeoutMs?: number;
 }
 
 function printBanner({
@@ -307,7 +316,12 @@ export async function startAgentDevSession(
   // means the edge cannot reach the tunnel.
   const probeTunnel = async (): Promise<boolean> => {
     try {
-      const response = await fetch(currentTunnelUrl, { method: "GET" });
+      const response = await fetch(currentTunnelUrl, {
+        method: "GET",
+        signal: AbortSignal.timeout(
+          hooks.healthProbeTimeoutMs ?? HEALTH_PROBE_TIMEOUT_MS,
+        ),
+      });
       return response.status !== 530;
     } catch {
       return false;

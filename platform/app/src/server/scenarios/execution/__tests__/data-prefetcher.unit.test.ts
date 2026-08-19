@@ -683,7 +683,13 @@ describe("prefetchScenarioData", () => {
       // that must expand it before litellm params are prepared: providers
       // do not understand "latest" as a model id. The expected concrete
       // model comes from the same registry resolution the picker shows.
-      const expectConcrete = (alias: string, actual: string | undefined) => {
+      const expectConcrete = ({
+        alias,
+        actual,
+      }: {
+        alias: string;
+        actual: string | undefined;
+      }) => {
         const concrete = resolveLatestAlias(alias);
         expect(concrete).not.toBeNull();
         expect(actual).toBe(concrete);
@@ -712,10 +718,10 @@ describe("prefetchScenarioData", () => {
 
         expect(result.success).toBe(true);
         if (result.success) {
-          expectConcrete(
-            "openai/latest",
-            result.data.simulatorModelParams?.model,
-          );
+          expectConcrete({
+            alias: "openai/latest",
+            actual: result.data.simulatorModelParams?.model,
+          });
         }
       });
 
@@ -741,10 +747,10 @@ describe("prefetchScenarioData", () => {
 
         expect(result.success).toBe(true);
         if (result.success) {
-          expectConcrete(
-            "anthropic/latest-mini",
-            result.data.judgeModelParams?.model,
-          );
+          expectConcrete({
+            alias: "anthropic/latest-mini",
+            actual: result.data.judgeModelParams?.model,
+          });
         }
       });
 
@@ -769,10 +775,10 @@ describe("prefetchScenarioData", () => {
 
         expect(result.success).toBe(true);
         if (result.success) {
-          expectConcrete(
-            "openai/latest-mini",
-            result.data.simulatorModelParams?.model,
-          );
+          expectConcrete({
+            alias: "openai/latest-mini",
+            actual: result.data.simulatorModelParams?.model,
+          });
         }
       });
 
@@ -797,7 +803,10 @@ describe("prefetchScenarioData", () => {
 
         expect(result.success).toBe(true);
         if (result.success) {
-          expectConcrete("gemini/latest", result.data.judgeModelParams?.model);
+          expectConcrete({
+            alias: "gemini/latest",
+            actual: result.data.judgeModelParams?.model,
+          });
         }
       });
     });

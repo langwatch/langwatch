@@ -77,7 +77,7 @@ export interface SimulationRepository {
      * page size is capped lower when set, because the heavy message arrays
      * are exactly what the trim protects against.
      */
-    includeMessages?: boolean;
+    shouldIncludeMessages?: boolean;
   }): Promise<{
     runs: ScenarioRunData[];
     nextCursor?: string;
@@ -115,7 +115,7 @@ export interface SimulationRepository {
     startDate?: number;
     endDate?: number;
     sinceTimestamp?: number;
-    includeMessages?: boolean;
+    shouldIncludeMessages?: boolean;
   }): Promise<AllSuitesRunDataResult>;
 
   /**

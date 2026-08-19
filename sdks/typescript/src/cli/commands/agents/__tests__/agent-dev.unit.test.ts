@@ -148,6 +148,9 @@ describe("agent dev session", () => {
 
   afterEach(() => {
     delete process.env.LANGWATCH_CLI_CONFIG;
+    // The health-check tests spy on globalThis.fetch; clearAllMocks would
+    // leave the spy installed for every test that follows.
+    vi.restoreAllMocks();
   });
 
   describe("when the session starts against a local port", () => {
@@ -603,6 +606,31 @@ describe("agent dev session", () => {
       expect(reapplied.url).toBe(`${TUNNEL_URL}/agent`);
       expect(reapplied.devTunnel).toMatchObject({
         previousUrl: "https://staging.example.com/agent",
+      });
+
+      await session.shutdown(0);
+    });
+
+    /** @scenario "A probe that never answers does not stop the health monitor" */
+    it("keeps probing when a probe only ends on its own timeout", async () => {
+      // A half-open socket at the edge never settles the fetch. Without the
+      // probe timeout the monitor stops re-arming and the session runs blind.
+      vi.spyOn(globalThis, "fetch").mockImplementation(
+        ((_input: unknown, init?: { signal?: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => {
+              reject(new Error("probe timed out"));
+            });
+          })) as unknown as typeof fetch,
+      );
+
+      const session = await startAgentDevSession(
+        { port: "8000", agent: "agent_abc123" },
+        { healthIntervalMs: 5, healthProbeTimeoutMs: 10 },
+      );
+
+      await vi.waitFor(() => {
+        expect(quickMock.mock.calls.length).toBeGreaterThanOrEqual(2);
       });
 
       await session.shutdown(0);

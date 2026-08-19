@@ -102,6 +102,10 @@ function classifyUnjudgedResults({
   const classified = buildFailureResults({ cancelled, error });
   return {
     ...results,
+    // A cancelled run never reached a judgement, so a caller-supplied
+    // "failure" is not a verdict anyone decided. The other classifications
+    // keep the caller's verdict, which already says the run did not pass.
+    verdict: cancelled ? classified.verdict : results.verdict,
     reasoning: classified.reasoning,
     error: classified.error,
   };

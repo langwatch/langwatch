@@ -249,6 +249,24 @@ describe("SerializedHttpAgentAdapter", () => {
       expect(error.cause).toBe(raw);
     });
 
+    /** @scenario "A target url that does not parse is never repeated in the error" */
+    it("labels a url that does not parse instead of repeating it", async () => {
+      mockSsrfSafeFetch.mockRejectedValue(new Error("fetch failed"));
+      const adapter = new SerializedHttpAgentAdapter({
+        config: {
+          ...defaultConfig,
+          url: "not a url?token=super-secret-value",
+        },
+      });
+
+      const thrown = (await adapter
+        .call(defaultInput)
+        .catch((e: unknown) => e)) as Error;
+
+      expect(thrown.message).toContain("configured target");
+      expect(thrown.message).not.toContain("super-secret-value");
+    });
+
     /** @scenario "A transport error keeps the underlying failure text for classification" */
     it("keeps the underlying failure text so the classifier still sees it", async () => {
       const adapter = rejectTransportWith(
