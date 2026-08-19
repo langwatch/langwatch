@@ -217,6 +217,7 @@ async function streamTurnText({
   let buf = "";
   let assistantText = "";
   let streamError: string | null = null;
+  let sawTerminal = false;
 
   const handleFrame = (rawFrame: string) => {
     for (const line of rawFrame.split("\n")) {
@@ -255,8 +256,9 @@ async function streamTurnText({
               : `Langy stream error (raw: ${JSON.stringify(entry)})`;
         }
       }
-      // "end" (turn finished) / "complete" (SSE stream finished) / "connected"
-      // / "status" carry no assistant text — nothing further to accumulate.
+      if (entry.type === "end") sawTerminal = true;
+      // "complete" (SSE stream finished) / "connected" / "status" carry no
+      // assistant text — nothing further to accumulate.
     }
   };
 
@@ -275,7 +277,26 @@ async function streamTurnText({
   if (buf.trim()) handleFrame(buf);
 
   if (streamError) throw new Error(`Langy turn error: ${streamError}`);
-  return assistantText || "(no response)";
+  if (assistantText) return assistantText;
+
+  // No text. WHICH no-text this is decides whether a judge should ever see it,
+  // and the two used to be indistinguishable behind a literal "(no response)"
+  // that the judge then graded as a terrible reply.
+  //
+  // Terminal marker present: the turn really did finish silently. That is a
+  // product regression now, because the token buffer emits a fallback line for
+  // any turn that reaches its terminal marker (LANGY_EMPTY_TURN_FALLBACK).
+  //
+  // No terminal marker: the stream closed without the turn ever settling — the
+  // harness never observed a turn, typically because the conversation lock was
+  // still held (the adapter's own retry budget is ~120s) or the machine was
+  // loaded. That is infrastructure, not agent behaviour, so it fails loudly
+  // here rather than being scored as a bad answer.
+  throw new Error(
+    sawTerminal
+      ? "Langy turn ended with a terminal marker but no visible text — the empty-turn fallback did not fire"
+      : "Langy turn produced no text and never settled — the stream closed with no terminal marker (conversation lock still held, or the stack is too loaded to answer); this is an environment failure, not a reply to grade",
+  );
 }
 
 export function makeLangyAdapter(): AgentAdapter & {

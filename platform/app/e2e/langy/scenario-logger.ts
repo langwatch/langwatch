@@ -45,17 +45,21 @@ export async function runScenarioAndLog(
   config: RunConfig,
   browserQAOptions?: BrowserQAOptions,
 ): Promise<Result> {
-  // langy_worker_stopped is the platform's own "worker died mid-reply, retry
-  // manually" transient (fault: platform, recovery already exhausted
-  // server-side). The panel offers the user a retry for it; the suite gets one
-  // too. Judge verdicts never come through here — a scenario that FAILS its
-  // criteria returns normally and is not retried.
+  // Two transients get one retry, both infrastructure rather than agent
+  // behaviour: langy_worker_stopped (the worker died mid-reply, server-side
+  // recovery already exhausted — the panel offers the user a retry too), and a
+  // turn that never settled because the conversation lock was still held or the
+  // machine was too loaded to answer inside the adapter's retry budget.
+  // Judge verdicts never come through here — a scenario that FAILS its criteria
+  // returns normally and is not retried.
+  const transient = ["langy_worker_stopped", "never settled"];
   let result: Result;
   try {
     result = await scenario.run(config);
   } catch (error) {
-    if (!String(error).includes("langy_worker_stopped")) throw error;
-    console.log("[scenario] worker died mid-reply; retrying scenario once");
+    const message = String(error);
+    if (!transient.some((marker) => message.includes(marker))) throw error;
+    console.log(`[scenario] transient infrastructure failure, retrying once`);
     result = await scenario.run(config);
   }
   const testName =
