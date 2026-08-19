@@ -253,6 +253,19 @@ describe("a source whose run has no time left to read billing", () => {
 });
 
 describe("a source that names a warehouse", () => {
+  /** @scenario "The billing query only ever runs on the configured workspace" */
+  it("sends the billing query to the workspace address on the source", async () => {
+    costPlan = { rows: [] };
+
+    await pull({ warehouseId: WAREHOUSE_ID });
+
+    // The only server in this test is the one at the source's workspace URL,
+    // so a statement landing here landed at the address on the source. What
+    // makes the assertion bite is the converse: the puller holds no other
+    // address to send it to, and the fake would have answered nothing else.
+    expect(statementBodies.length).toBeGreaterThan(0);
+  });
+
   /** @scenario "The compute behind a question is charged to the person who asked" */
   it("carries the question's share of the warehouse bill", async () => {
     costPlan = {
@@ -277,6 +290,66 @@ describe("a source that names a warehouse", () => {
     expect(hintOf(result).costStatus).toBe("estimate");
     // And still attributed to the person who asked.
     expect(result.events[0]?.actor).toBe("dana@acme.test");
+  });
+
+  /** @scenario "A priced question carries the numbers its share was worked out from" */
+  it("carries the hour's bill and executed time beside the cost", async () => {
+    costPlan = {
+      rows: [
+        [
+          STATEMENT_ID,
+          "1800000",
+          "3600000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+      ],
+    };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+
+    // The share's raw ingredients, so "$3 for half an hour's execution" can be
+    // read off the record itself. Raw and never a percentage: the executed-time
+    // sum is unclamped over concurrent statements, and an auto-stopping
+    // warehouse makes a clock-hour denominator lie.
+    expect(result.events[0]?.extra?.warehouseHour).toEqual({
+      totalExecutionMs: "3600000",
+      billableUsd: "6",
+    });
+    // Beside the hint, never in it: derived values in the hint would enter the
+    // restatement key and a correction would mint a second ledger record.
+    expect(hintOf(result)).not.toHaveProperty("warehouseHour");
+  });
+
+  /** @scenario "A question is still priced after the provider renames its client label" */
+  it("asks for statements by space id, not only by the client label", async () => {
+    costPlan = { rows: [] };
+
+    await pull({ warehouseId: WAREHOUSE_ID });
+
+    // The fixture cannot execute SQL, so what these pin is the question asked:
+    // Databricks evaluates the union, and each half alone is a cliff — the
+    // label is a display string the provider can rename at will.
+    const sql = String(statementBodies[0]!.statement);
+    expect(sql).toContain("w.genie_space_id IS NOT NULL");
+    expect(sql).toContain("OR w.client_application = :genie_app");
+  });
+
+  /** @scenario "A question is still priced when its history row names no space" */
+  it("asks for statements by client label even when a row names no space", async () => {
+    costPlan = { rows: [] };
+
+    await pull({ warehouseId: WAREHOUSE_ID });
+
+    // The other half of the union: a runtime that stops populating the space
+    // id must not silently drop the cost the label half still finds. OR, not
+    // AND — a row missing either mark still prices on the other.
+    const sql = String(statementBodies[0]!.statement);
+    expect(sql).toContain("w.client_application = :genie_app");
+    expect(sql).toMatch(
+      /WHERE \(w\.genie_space_id IS NOT NULL OR w\.client_application = :genie_app\)/,
+    );
   });
 
   /**
@@ -633,6 +706,63 @@ describe("a source that names a warehouse", () => {
     // Same period, not a window that moved on past it.
     expect(askedAboutAgain).toBe(askedAboutFirst);
     // And the question that was recorded at zero now carries its real share.
+    expect(hintOf(second).costUsd).toBe("6");
+  });
+
+  /**
+   * @scenario "A question seen before its bill has landed is asked about again,
+   * however far back it sits"
+   */
+  it("holds the watermark for a question seen but not billed yet, past the settling window", async () => {
+    // The defect this whole change exists to stop. The billing query SUCCEEDS
+    // and answers about the statement — the LEFT JOIN keeps it — but its hour
+    // has no billing row yet, so the SKU comes back null. The old inner join
+    // dropped it, the chunk read as fully priced, the watermark jumped to the
+    // sweep's clock, and the fixed settling re-read never reached back to it
+    // again: a permanent zero for a question that really was billed.
+    //
+    // A null SKU in the last column is exactly what the LEFT JOIN produces for
+    // an unbilled hour.
+    costPlan = {
+      rows: [[STATEMENT_ID, "3600000", "3600000", null, null, null]],
+    };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+    const cursor = JSON.parse(result.cursor!) as { sinceMs: number };
+
+    // Recorded at zero for now — its bill does not exist yet to price from.
+    expect(hintOf(result).costUsd).toBe("0");
+    // But the watermark held at the start of the swept window, NOT at the
+    // sweep's clock. This is the assertion the old code failed: a seen-but-
+    // unbilled statement thirty days back would have been passed over for good.
+    expect(cursor.sinceMs).toBeLessThan(Date.now() - 29 * 24 * 60 * 60 * 1000);
+
+    // The other half: resuming from that held cursor, once the bill lands, the
+    // same question is asked about again and now carries its real share.
+    costPlan = {
+      rows: [
+        [
+          STATEMENT_ID,
+          "3600000",
+          "3600000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+      ],
+    };
+
+    const second = await new DatabricksGeniePuller().runOnce(
+      { cursor: result.cursor, credentials: { token: "dapi-fixture" } },
+      {
+        adapter: DATABRICKS_GENIE_ADAPTER_ID,
+        workspaceUrl: baseUrl,
+        spaceIds: [],
+        schedule: "*/15 * * * *",
+        warehouseId: WAREHOUSE_ID,
+      },
+    );
+
     expect(hintOf(second).costUsd).toBe("6");
   });
 

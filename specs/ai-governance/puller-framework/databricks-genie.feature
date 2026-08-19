@@ -346,12 +346,81 @@ Feature: Databricks AI/BI Genie puller
       # at the record makes a busy workspace report nothing at all.
 
     @unit
+    Scenario: A question seen before its bill has landed is held, not zeroed
+      Given a question whose hour has no billing row yet
+      When the puller allocates warehouse cost
+      Then the question is neither priced nor skipped
+      And the puller holds its place to ask again later
+      # Billing lags query history by hours. A missing row is a bill in
+      # flight, not a free question — recording $0 now would overwrite real
+      # spend the moment it lands, because a re-read that already answered
+      # cannot answer again.
+
+    @unit
+    Scenario: A statement that priced on any line is not held for an unbilled one
+      Given a statement with one billed line and one line not yet billed
+      When the puller allocates warehouse cost
+      Then the statement carries the billed line's cost
+      And it is not held waiting on the unbilled one
+      # The priced line wins. Holding an already-priced statement would stall
+      # the watermark on every hour where two SKUs bill at different speeds.
+
+    @unit
     Scenario: The billing query only ever runs on the configured workspace
       Given a Genie source that names a warehouse
       When the puller asks for billing
       Then the question is sent to the workspace address on the source
       # Same secret, same reasoning as every other call this adapter makes: the
       # address on the source decides where the token goes.
+
+    @unit
+    Scenario: A question is still priced after the provider renames its client label
+      Given a Genie statement whose history row names its Genie space
+      But the row's client label is not the one the puller knows
+      When the puller asks for billing
+      Then the statement is still counted as Genie work
+      # The label is a display string the provider can rename or localize at
+      # will; the space id is structural. Either one alone is a cliff — gating
+      # on the union means no single provider change can silently shrink the
+      # set of statements we price to zero.
+
+    @unit
+    Scenario: A question is still priced when its history row names no space
+      Given a Genie statement whose history row carries the known client label
+      But names no Genie space
+      When the puller asks for billing
+      Then the statement is still counted as Genie work
+      # The other half of the union: a runtime that stops populating the space
+      # id must not silently drop cost we capture today.
+
+    @integration
+    Scenario: A priced question carries the numbers its share was worked out from
+      Given a warehouse billed for an hour in which questions ran for a small
+        fraction of it
+      When the puller records a question from that hour
+      Then the record carries the hour's bill and the hour's total executed time
+      And it claims no busy percentage
+      # An hourly bill charges for being awake, so a lone question on a mostly
+      # idle warehouse absorbs the idle time. The share is correct — it never
+      # exceeds the real bill — but "$4 for a 5-second question" needs its
+      # ingredients on the record to read as anything but a bug. RAW
+      # ingredients, deliberately: a busy RATIO was designed and refuted —
+      # executed time sums over concurrent statements (two parallel full-hour
+      # queries read as 200% busy), and a serverless warehouse that auto-stops
+      # mid-hour makes a clock-hour denominator invert the story (two minutes
+      # flat-out reads as 97% idle when the billed idle was zero). True
+      # utilization needs billed uptime, which no table the puller reads
+      # carries — so the record says what was measured and claims nothing more.
+
+    @unit
+    Scenario: The hour's context never changes which record a correction lands on
+      Given a question priced with one hour context
+      And a later re-read of the same hour computes a different one
+      When the correction is recorded
+      Then it replaces the earlier record rather than adding one
+      # The context is derived, so late-arriving statements change it. Derived
+      # values stay out of the record's identity: keyed, a correction would
+      # mint a new record and the ledger would count the question twice.
 
   @integration
   Scenario: Identity resolves to the directory's object id when it has one

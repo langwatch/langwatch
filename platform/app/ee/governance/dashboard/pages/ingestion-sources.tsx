@@ -1609,14 +1609,9 @@ function buildDatabricksGeniePullConfig(
 ): Record<string, unknown> | null {
   const p = c.parserConfig;
   const workspaceUrl = (p.workspaceUrl ?? "").trim().replace(/\/+$/, "");
-  const token = (p.credentialsToken ?? "").trim();
-  const clientId = (p.credentialsClientId ?? "").trim();
-  const clientSecret = (p.credentialsClientSecret ?? "").trim();
+  const credentials = genieCredentialsFrom(p);
   const warehouseId = (p.warehouseId ?? "").trim();
-  // Either way of signing in will do, but half of the service principal pair
-  // is not one of them — accepting it would save a source that cannot run.
-  const hasClientCredentials = Boolean(clientId && clientSecret);
-  if (!workspaceUrl || (!token && !hasClientCredentials)) return null;
+  if (!workspaceUrl || !credentials) return null;
 
   return {
     adapter: "databricks_genie",
@@ -1635,13 +1630,31 @@ function buildDatabricksGeniePullConfig(
     // "do not price these questions", and an empty string is a warehouse id it
     // would then ask the workspace about.
     ...(warehouseId ? { warehouseId } : {}),
-    // Only what was actually given: an empty string is not a credential, and
-    // sending one would make the adapter prefer a token that does not exist.
-    credentials: {
-      ...(token ? { token } : {}),
-      ...(hasClientCredentials ? { clientId, clientSecret } : {}),
-    },
+    credentials,
   };
+}
+
+/**
+ * The credential subtree for a Genie source, holding only what was actually
+ * given: an empty string is not a credential, and sending one would make the
+ * adapter prefer a token that does not exist. Null when neither way of
+ * signing in is complete — half of the service principal pair is not one,
+ * and accepting it would save a source that cannot run.
+ */
+function genieCredentialsFrom(
+  p: Record<string, string>,
+): Record<string, string> | null {
+  const token = (p.credentialsToken ?? "").trim();
+  const clientId = (p.credentialsClientId ?? "").trim();
+  const clientSecret = (p.credentialsClientSecret ?? "").trim();
+
+  const credentials: Record<string, string> = {};
+  if (token) credentials.token = token;
+  if (clientId && clientSecret) {
+    credentials.clientId = clientId;
+    credentials.clientSecret = clientSecret;
+  }
+  return Object.keys(credentials).length > 0 ? credentials : null;
 }
 
 function ParserConfigFields({

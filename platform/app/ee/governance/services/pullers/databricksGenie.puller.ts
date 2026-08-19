@@ -62,6 +62,7 @@ import {
   costReadFloorMs,
   GENIE_CLIENT_APPLICATION,
   WAREHOUSE_COST_MAX_HOLD_MS,
+  type WarehousePricedStatement,
   warehouseCostChunks,
   warehouseCostPieces,
   warehouseCostRowSchema,
@@ -343,6 +344,11 @@ WITH windowed AS (
   SELECT
     statement_id,
     client_application,
+    -- Projected for the final WHERE only — the outer scope sees the CTE's
+    -- output, not the base table. \`hour_total\` deliberately ignores it: the
+    -- share's denominator is the WHOLE warehouse, so the CTE must keep every
+    -- statement and the Genie filter must wait until after the totals.
+    query_source.genie_space_id AS genie_space_id,
     execution_duration_ms,
     compute.warehouse_id AS warehouse_id,
     date_trunc('HOUR', start_time) AS usage_hour
@@ -402,9 +408,23 @@ SELECT
 FROM windowed w
 JOIN hour_total t
   ON t.usage_hour = w.usage_hour AND t.warehouse_id = w.warehouse_id
-JOIN priced pr
+-- LEFT, not inner, and that is the whole fix for the zero-cost stall. An inner
+-- join drops any Genie statement whose hour is not in \`system.billing.usage\`
+-- yet, and that table lands minutes to days behind the question. Dropped, a
+-- not-yet-billed statement is indistinguishable from a genuinely free one: both
+-- are simply absent, the chunk reads as fully priced, the watermark moves past
+-- them, and the fixed settling re-read never reaches back far enough to correct
+-- them — a permanent zero. Kept, a not-yet-billed statement returns with a null
+-- \`sku_name\`, which the allocator reads as "seen but unbilled" and holds the
+-- watermark for until its bill lands (or the max hold expires).
+LEFT JOIN priced pr
   ON pr.usage_hour = w.usage_hour AND pr.warehouse_id = w.warehouse_id
-WHERE w.client_application = :genie_app
+-- A union, because each half alone is a cliff. The label is a display string
+-- the provider can rename or localize at will; the space id is structural but
+-- observed on 103/103 Genie statements over 60 days, not documented as
+-- guaranteed. Either change alone silently shrinks the priced set to zero —
+-- together, both have to break at once.
+WHERE (w.genie_space_id IS NOT NULL OR w.client_application = :genie_app)
 LIMIT ${WAREHOUSE_COST_ROW_LIMIT}
 `;
 
@@ -479,7 +499,17 @@ const WAREHOUSE_COST_COLUMNS = [
  * first sweep record a month of questions at zero and move on.
  */
 type WarehouseCostRead =
-  | { outcome: "priced"; costByStatementId: Map<string, string> }
+  | {
+      outcome: "priced";
+      costByStatementId: Map<string, WarehousePricedStatement>;
+      /**
+       * At least one statement in this window was seen but has no billing row
+       * yet — its cost has not settled. The window priced, but not wholly, so
+       * the watermark must hold here rather than move past the unbilled
+       * statement and record it at zero for good.
+       */
+      owed: boolean;
+    }
   /** More rows exist than arrived. A smaller question would carry them. */
   | { outcome: "cut_short" }
   /**
@@ -538,10 +568,10 @@ function unpricedFloor(chunk: { fromMs: number }): number {
 
 /** Fold one chunk's priced statements into the sweep's running total. */
 function mergeWarehouseCost(
-  into: Map<string, string>,
-  from: Map<string, string>,
+  into: Map<string, WarehousePricedStatement>,
+  from: Map<string, WarehousePricedStatement>,
 ): void {
-  for (const [statementId, cost] of from) into.set(statementId, cost);
+  for (const [statementId, priced] of from) into.set(statementId, priced);
 }
 
 /**
@@ -693,7 +723,10 @@ function readWarehouseCost({
       hourTotalMs: columns[2],
       hourBillableUsd: columns[3] ?? null,
       currencyCode: columns[4] ?? null,
-      skuName: columns[5] ?? "",
+      // Null is meaningful now, not an empty-string fallback: the LEFT JOIN
+      // returns a null SKU for a statement whose hour has no billing row yet,
+      // and the allocator reads that as "seen but unbilled".
+      skuName: columns[5] ?? null,
     });
     if (!parsed.success) {
       unreadable += 1;
@@ -711,7 +744,7 @@ function readWarehouseCost({
     );
   }
 
-  const { costByStatementId, skipped } = allocateWarehouseCost({ rows });
+  const { costByStatementId, skipped, owed } = allocateWarehouseCost({ rows });
   if (skipped.length > 0) {
     logger.warn(
       {
@@ -725,7 +758,13 @@ function readWarehouseCost({
       "some databricks warehouse compute could not be priced; those questions carry no cost",
     );
   }
-  return { outcome: "priced", costByStatementId };
+  if (owed.size > 0) {
+    logger.info(
+      { ...log, owed: owed.size },
+      "some databricks questions were seen but not billed yet; holding the watermark until their cost settles",
+    );
+  }
+  return { outcome: "priced", costByStatementId, owed: owed.size > 0 };
 }
 
 /**
@@ -2449,14 +2488,14 @@ export class DatabricksGeniePuller
     fromMs: number;
     toMs: number;
   }): Promise<{
-    costByStatementId: Map<string, string> | null;
+    costByStatementId: Map<string, WarehousePricedStatement> | null;
     /** The instant past which cost is not known. `null` owes no ceiling. */
     pricedThroughMs: number | null;
   }> {
     const warehouseId = config.warehouseId;
     if (!warehouseId) return { costByStatementId: null, pricedThroughMs: null };
 
-    const costByStatementId = new Map<string, string>();
+    const costByStatementId = new Map<string, WarehousePricedStatement>();
 
     for (const chunk of warehouseCostChunks({ fromMs, toMs })) {
       const outcome = await this.priceWarehouseCostChunk({
@@ -2496,7 +2535,7 @@ export class DatabricksGeniePuller
     budget: RunBudget;
     warehouseId: string;
     chunk: { fromMs: number; toMs: number };
-    costByStatementId: Map<string, string>;
+    costByStatementId: Map<string, WarehousePricedStatement>;
   }): Promise<
     { done: true; pricedThroughMs: number | null } | { done: false }
   > {
@@ -2546,6 +2585,16 @@ export class DatabricksGeniePuller
       // A statement is bucketed by the hour it started in and every hour lies
       // inside exactly one chunk, so no two chunks answer for the same one.
       mergeWarehouseCost(costByStatementId, read.costByStatementId);
+      // Priced, but not wholly: a statement here was seen and has no bill yet.
+      // Hold the watermark at the chunk's start so the whole chunk is re-read
+      // once billing lands, rather than moving past the unbilled statement and
+      // recording it at zero for good. The statements that did price keep the
+      // cost merged above; a re-read simply replaces their ledger rows with the
+      // same figure. The hold is bounded by `WAREHOUSE_COST_MAX_HOLD_MS`, so a
+      // statement that is never billed stops holding the source after that.
+      if (read.owed) {
+        return { done: true, pricedThroughMs: unpricedFloor(chunk) };
+      }
       return { done: false };
     }
 
@@ -2596,7 +2645,7 @@ export class DatabricksGeniePuller
     warehouseId: string;
     chunk: { fromMs: number; toMs: number };
     read: WarehouseCostRead;
-    costByStatementId: Map<string, string>;
+    costByStatementId: Map<string, WarehousePricedStatement>;
   }): Promise<
     { done: true; pricedThroughMs: number | null } | { done: false }
   > {
@@ -2613,35 +2662,25 @@ export class DatabricksGeniePuller
       "databricks warehouse cost could not price a period whole; asking about smaller pieces of it",
     );
 
-    let refused: { fromMs: number; toMs: number } | null =
-      pieces.length === 0 ? chunk : null;
+    const walked =
+      pieces.length === 0
+        ? chunk
+        : await this.walkWarehouseCostPieces({
+            config,
+            token,
+            options,
+            budget,
+            warehouseId,
+            pieces,
+            costByStatementId,
+          });
 
-    for (const piece of pieces) {
-      if (budget.exhaustedWithin(WAREHOUSE_COST_TIMEOUT_MS)) {
-        refused = piece;
-        break;
-      }
-
-      const pieceRead = await this.warehouseCostChunk({
-        config,
-        token,
-        options,
-        budget,
-        warehouseId,
-        chunk: piece,
-      });
-
-      // A refusal to a piece is still a refusal to the question, and it is the
-      // same one whichever size it was asked at.
-      if (pieceRead.outcome === "failed") {
-        return { done: true, pricedThroughMs: null };
-      }
-      if (pieceRead.outcome !== "priced") {
-        refused = piece;
-        break;
-      }
-      mergeWarehouseCost(costByStatementId, pieceRead.costByStatementId);
+    // A refusal to a piece is still a refusal to the question, and it is the
+    // same one whichever size it was asked at.
+    if (walked === "failed") {
+      return { done: true, pricedThroughMs: null };
     }
+    const refused = walked;
 
     if (refused) {
       logger.error(
@@ -2657,6 +2696,62 @@ export class DatabricksGeniePuller
     }
 
     return { done: false };
+  }
+
+  /**
+   * The pieces in order: each that prices whole is merged, and the first that
+   * cannot be — refused, still owing a bill, or outrunning the run's budget —
+   * is returned as where the watermark holds. `"failed"` ends the whole sweep;
+   * `null` says every piece priced.
+   */
+  private async walkWarehouseCostPieces({
+    config,
+    token,
+    options,
+    budget,
+    warehouseId,
+    pieces,
+    costByStatementId,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+    warehouseId: string;
+    pieces: { fromMs: number; toMs: number }[];
+    costByStatementId: Map<string, WarehousePricedStatement>;
+  }): Promise<{ fromMs: number; toMs: number } | "failed" | null> {
+    for (const piece of pieces) {
+      if (budget.exhaustedWithin(WAREHOUSE_COST_TIMEOUT_MS)) {
+        return piece;
+      }
+
+      const pieceRead = await this.warehouseCostChunk({
+        config,
+        token,
+        options,
+        budget,
+        warehouseId,
+        chunk: piece,
+      });
+
+      if (pieceRead.outcome === "failed") {
+        return "failed";
+      }
+      if (pieceRead.outcome !== "priced") {
+        return piece;
+      }
+      // Priced, but a statement in this piece has no bill yet. Hold at the
+      // piece, exactly as a refusal to it would: the pieces before it kept
+      // their cost and are never re-asked, and this one is re-read once its
+      // billing settles. Merging the piece first would be overwritten by that
+      // re-read, so it is left for the re-read to price whole.
+      if (pieceRead.owed) {
+        return piece;
+      }
+      mergeWarehouseCost(costByStatementId, pieceRead.costByStatementId);
+    }
+    return null;
   }
 
   /** One chunk of the window, priced or refused. */
@@ -2758,6 +2853,7 @@ export class DatabricksGeniePuller
           elapsedMs: Date.now() - askedAtMs,
           statements:
             read.outcome === "priced" ? read.costByStatementId.size : 0,
+          owed: read.outcome === "priced" ? read.owed : false,
         },
         "databricks warehouse cost question answered",
       );
@@ -2911,7 +3007,7 @@ function withWarehouseCost({
   watermarkMs,
 }: {
   events: NormalizedPullEvent[];
-  costByStatementId: Map<string, string> | null;
+  costByStatementId: Map<string, WarehousePricedStatement> | null;
   costEnabled: boolean;
   /** The watermark this run started from: anything at or below it is a re-read. */
   watermarkMs: number;
@@ -2930,7 +3026,7 @@ function withCost({
   watermarkMs,
 }: {
   event: NormalizedPullEvent;
-  costByStatementId: Map<string, string> | null;
+  costByStatementId: Map<string, WarehousePricedStatement> | null;
   watermarkMs: number;
 }): NormalizedPullEvent {
   const extra = event.extra;
@@ -2940,19 +3036,32 @@ function withCost({
   if (typeof hint !== "object" || hint === null) return event;
 
   const statementId = extra.statementId;
-  const costUsd =
+  const priced =
     typeof statementId === "string" && statementId !== ""
       ? costByStatementId?.get(statementId)
       : undefined;
 
-  if (costUsd !== undefined) {
+  if (priced !== undefined) {
     return {
       ...event,
       // The audit row's own float field, which ADR-088 keeps for continuity and
       // does not price from. The ledger reads `costUsd` below, as a string, so
       // the number a customer reconciles never sees a float.
-      cost_usd: Number(costUsd),
-      extra: { ...extra, [PULLED_USAGE_HINT_KEY]: { ...hint, costUsd } },
+      cost_usd: Number(priced.costUsd),
+      extra: {
+        ...extra,
+        // The share's raw ingredients, for the human reading the record: an
+        // hourly bill charges for being awake, so a lone question on a quiet
+        // warehouse absorbs the idle time and its correct cost looks absurd
+        // without them. Display-only and OUTSIDE the hint below — derived
+        // values in the hint would enter the restatement key and mint a new
+        // ledger record per correction (ADR-088 Decision 5).
+        warehouseHour: {
+          totalExecutionMs: priced.hourTotalExecutionMs,
+          billableUsd: priced.hourBillableUsd,
+        },
+        [PULLED_USAGE_HINT_KEY]: { ...hint, costUsd: priced.costUsd },
+      },
     };
   }
 

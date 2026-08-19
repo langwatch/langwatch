@@ -236,7 +236,13 @@ export const warehouseCostRowSchema = z.object({
   /** Null when the workspace publishes no USD price for the hour's SKU. */
   hourBillableUsd: z.string().nullable(),
   currencyCode: z.string().nullable(),
-  skuName: z.string(),
+  /**
+   * Null when the statement's hour has no billing row yet — the LEFT JOIN in
+   * the cost query kept the statement but found nothing in `system.billing.usage`
+   * to price it against. A present SKU means the hour was billed; a null one
+   * means "seen but unbilled", which is a hold, not a zero.
+   */
+  skuName: z.string().nullable(),
 });
 
 export type WarehouseCostRow = z.infer<typeof warehouseCostRowSchema>;
@@ -254,15 +260,56 @@ export type WarehouseCostSkip = {
   reason: WarehouseCostSkipReason;
 };
 
+/**
+ * One priced statement: its share of the bill, and the two numbers the share
+ * was worked out from.
+ *
+ * The ingredients travel with the cost because the share alone reads as
+ * nonsense on an idle warehouse — "$4 for a five-second question" is correct
+ * and looks broken. They are deliberately RAW: an earlier design shipped
+ * `hourTotalExecutionMs / 3_600_000` as a "busy fraction", and it was refuted
+ * on both ends — the sum is unclamped over concurrent statements (two parallel
+ * full-hour queries read as 200%), and on a serverless warehouse that
+ * auto-stops mid-hour the clock-hour denominator inverts the story (two
+ * minutes of flat-out work reads as 97% idle when the billed idle was zero).
+ * A true utilization needs billed uptime, which no table this token reads
+ * carries. So the record says what was measured and claims nothing more.
+ */
+export type WarehousePricedStatement = {
+  /** The statement's share of its hour's bill, as an exact decimal USD string. */
+  costUsd: string;
+  /**
+   * Executed milliseconds across ALL statements on the warehouse that hour —
+   * the share's denominator. A sum, not a utilization: concurrency can carry
+   * it past one hour of wall clock.
+   */
+  hourTotalExecutionMs: string;
+  /**
+   * The hour's bill across the lines this statement priced on, as an exact
+   * decimal USD string — the share's other ingredient, so
+   * `costUsd ≈ hourBillableUsd × executionMs / hourTotalExecutionMs` holds on
+   * the record itself.
+   */
+  hourBillableUsd: string;
+};
+
 export type WarehouseCostAllocation = {
-  /** Statement id → cost as an exact decimal USD string. */
-  costByStatementId: Map<string, string>;
+  /** Statement id → its share of the bill and the numbers behind it. */
+  costByStatementId: Map<string, WarehousePricedStatement>;
   /**
    * Rows that were deliberately not priced. Reported rather than dropped: a
    * question with no cost and a question whose cost could not be worked out
    * look identical on the record, and only one of them is a problem.
    */
   skipped: WarehouseCostSkip[];
+  /**
+   * Statements seen in the window whose hour has no billing row yet, and which
+   * did not also price on another line. Not a skip and not a zero: their cost
+   * has not settled, so the caller holds the watermark for them rather than
+   * moving past and recording them at zero. Distinct from `no_published_price`,
+   * which is a billing row that names no USD rate — a genuine, permanent gap.
+   */
+  owed: Set<string>;
 };
 
 /** Whole milliseconds, or null when the workspace sent something else. */
@@ -281,7 +328,18 @@ function wholeMs(value: string): bigint | null {
  */
 function shareOf(
   row: WarehouseCostRow,
-): { nanoUsd: bigint } | { reason: WarehouseCostSkipReason } | "free" {
+):
+  | { nanoUsd: bigint; hourNanoUsd: bigint }
+  | { reason: WarehouseCostSkipReason }
+  | "free"
+  | "owed" {
+  // No billing row for this statement's hour yet. Checked first, before every
+  // other branch: a null SKU is not a free line and not an unreadable one, it
+  // is a bill that has not landed. Reading it as anything else — or letting
+  // `.includes` run on a null — is the zero-cost stall this branch exists to
+  // stop.
+  if (row.skuName === null) return "owed";
+
   // Genie's own line is free today. Pricing it would invent spend for the one
   // thing Databricks is explicit about not charging for.
   if (row.skuName.includes(GENIE_FREE_USAGE_SKU_MARKER)) return "free";
@@ -311,8 +369,42 @@ function shareOf(
 
   // Integer division truncates, so the shares of an hour sum to at most that
   // hour's bill. Erring downward is the only direction that cannot overstate
-  // what the customer was charged.
-  return { nanoUsd: (hourNanoUsd * executionMs) / totalMs };
+  // what the customer was charged. The hour's own bill rides along so the
+  // record can carry the share's ingredients, not just its result.
+  return {
+    nanoUsd: (hourNanoUsd * executionMs) / totalMs,
+    hourNanoUsd,
+  };
+}
+
+/** A statement's running totals while its hour's lines are being folded in. */
+type PricedTotals = {
+  costNanoUsd: bigint;
+  hourNanoUsd: bigint;
+  hourTotalExecutionMs: string;
+};
+
+/** Fold one priced line into its statement's running totals. */
+function foldPricedLine(
+  into: Map<string, PricedTotals>,
+  row: WarehouseCostRow,
+  share: { nanoUsd: bigint; hourNanoUsd: bigint },
+): void {
+  const entry = into.get(row.statementId);
+  if (entry) {
+    entry.costNanoUsd += share.nanoUsd;
+    // Several lines are several PARTS of one hour's bill, so the hour's
+    // billable figure sums the same way the cost does.
+    entry.hourNanoUsd += share.hourNanoUsd;
+    return;
+  }
+  into.set(row.statementId, {
+    costNanoUsd: share.nanoUsd,
+    hourNanoUsd: share.hourNanoUsd,
+    // A statement lives in exactly one hour (bucketed by start_time), so
+    // every one of its lines names the same total.
+    hourTotalExecutionMs: row.hourTotalMs,
+  });
 }
 
 /**
@@ -327,35 +419,49 @@ export function allocateWarehouseCost({
 }: {
   rows: WarehouseCostRow[];
 }): WarehouseCostAllocation {
-  const nanoByStatementId = new Map<string, bigint>();
+  const nanoByStatementId = new Map<string, PricedTotals>();
   const skipped: WarehouseCostSkip[] = [];
+  const owed = new Set<string>();
 
   for (const row of rows) {
     const share = shareOf(row);
     if (share === "free") continue;
+    if (share === "owed") {
+      owed.add(row.statementId);
+      continue;
+    }
 
     if ("reason" in share) {
       skipped.push({
         statementId: row.statementId,
-        skuName: row.skuName,
+        // A skipped row always has a real SKU — the null-SKU case returns
+        // "owed" above and never reaches here. The fallback only satisfies the
+        // narrower type.
+        skuName: row.skuName ?? "",
         currencyCode: row.currencyCode,
         reason: share.reason,
       });
       continue;
     }
 
-    nanoByStatementId.set(
-      row.statementId,
-      (nanoByStatementId.get(row.statementId) ?? 0n) + share.nanoUsd,
-    );
+    foldPricedLine(nanoByStatementId, row, share);
   }
 
-  const costByStatementId = new Map<string, string>();
-  for (const [statementId, nano] of nanoByStatementId) {
-    costByStatementId.set(statementId, nanoUsdToDecimalString(nano));
+  const costByStatementId = new Map<string, WarehousePricedStatement>();
+  for (const [statementId, entry] of nanoByStatementId) {
+    costByStatementId.set(statementId, {
+      costUsd: nanoUsdToDecimalString(entry.costNanoUsd),
+      hourTotalExecutionMs: entry.hourTotalExecutionMs,
+      hourBillableUsd: nanoUsdToDecimalString(entry.hourNanoUsd),
+    });
   }
 
-  return { costByStatementId, skipped };
+  // A statement that priced on any line is priced, even if another of its lines
+  // had not been billed yet. Only statements with no priced line at all are
+  // owed.
+  for (const statementId of costByStatementId.keys()) owed.delete(statementId);
+
+  return { costByStatementId, skipped, owed };
 }
 
 /**

@@ -2222,6 +2222,7 @@ describe("given a source that signs in with a service principal", () => {
       });
     }, 120_000);
 
+    /** @scenario "A source given a client id and secret signs in for itself" */
     it("asks the workspace for a token with the client id and secret", () => {
       expect(fixture.oauthBasic).toEqual(["sp-client-id:sp-client-secret"]);
     });
@@ -2230,6 +2231,7 @@ describe("given a source that signs in with a service principal", () => {
       expect(outcome.eventCount).toBeGreaterThan(0);
     });
 
+    /** @scenario "Signing in happens once a run, not once a request" */
     it("signs in once a run, not once a request", () => {
       // The sweep reads several pages across several spaces; a token minted
       // per request would multiply this by the whole walk.
@@ -2259,6 +2261,7 @@ describe("given a source holding a pasted token", () => {
     await fixture.close();
   });
 
+  /** @scenario "A pasted token is still honoured" */
   it("does not ask the workspace for a token", async () => {
     const seeded = await seedSource({
       slug: `pasted-${ns}`,
@@ -2278,6 +2281,7 @@ describe("given a source holding a pasted token", () => {
     }
   }, 120_000);
 
+  /** @scenario "A pasted token wins over a client secret" */
   it("prefers a pasted token over a client secret", async () => {
     // Someone pasting a token into a source that already had a secret is
     // rotating by hand, usually because the secret stopped working.
@@ -2344,6 +2348,7 @@ describe("given a source that cannot sign in", () => {
     return { error, elapsedMs };
   }
 
+  /** @scenario "A source with no way to sign in says so" */
   it("fails naming what it needs when given neither a token nor a secret", async () => {
     const { error } = await runWith({ slug: "none", credentials: {} });
     expect(error).not.toBeNull();
@@ -2351,6 +2356,7 @@ describe("given a source that cannot sign in", () => {
     expect(error?.message).toMatch(/client/i);
   }, 120_000);
 
+  /** @scenario "Credentials the workspace rejects fail the run rather than emptying it" */
   it("fails the run when the workspace refuses the credentials", async () => {
     // A refused sign-in that returned no records would look identical to a
     // workspace where nobody asked Genie anything.
@@ -2363,6 +2369,7 @@ describe("given a source that cannot sign in", () => {
     expect(error?.message).toMatch(/sign|token|auth/i);
   }, 120_000);
 
+  /** @scenario "A refused sign-in does not put the secret in the reason" */
   it("does not put the client secret in the reason", async () => {
     const { error } = await runWith({
       slug: "leak",
@@ -2378,6 +2385,7 @@ describe("given a source that cannot sign in", () => {
     ).not.toContain("super-secret-value");
   }, 120_000);
 
+  /** @scenario "A sign-in answered with no token fails the run" */
   it("fails when the sign-in is answered without a token", async () => {
     // A proxy answering 200 with something that is not a token must not be
     // carried forward as one and re-surface later as a permissions problem.
@@ -2389,6 +2397,7 @@ describe("given a source that cannot sign in", () => {
     expect(error).not.toBeNull();
   }, 120_000);
 
+  /** @scenario "A sign-in that hangs does not consume the whole run" */
   it("abandons a hanging sign-in well before the run's own deadline", async () => {
     // The job has five minutes for everything. A sign-in with no bound of its
     // own would spend all of it and report nothing.

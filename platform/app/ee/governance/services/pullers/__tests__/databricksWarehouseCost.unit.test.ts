@@ -41,7 +41,7 @@ function row({
   hourTotalMs: string;
   hourBillableUsd?: string | null;
   currencyCode?: string | null;
-  skuName?: string;
+  skuName?: string | null;
 }) {
   return {
     statementId,
@@ -67,7 +67,7 @@ describe("allocateWarehouseCost", () => {
     });
 
     // The only query in the hour, so the whole hour's bill.
-    expect(costByStatementId.get("stmt-1")).toBe("6");
+    expect(costByStatementId.get("stmt-1")?.costUsd).toBe("6");
   });
 
   /** @scenario "An hour's compute is split across the questions that used it" */
@@ -87,12 +87,12 @@ describe("allocateWarehouseCost", () => {
       ],
     });
 
-    expect(costByStatementId.get("long")).toBe("4");
-    expect(costByStatementId.get("short")).toBe("2");
+    expect(costByStatementId.get("long")?.costUsd).toBe("4");
+    expect(costByStatementId.get("short")?.costUsd).toBe("2");
     // And together no more than the hour that was actually billed.
     expect(
-      Number(costByStatementId.get("long")) +
-        Number(costByStatementId.get("short")),
+      Number(costByStatementId.get("long")?.costUsd) +
+        Number(costByStatementId.get("short")?.costUsd),
     ).toBeLessThanOrEqual(6);
   });
 
@@ -116,8 +116,8 @@ describe("allocateWarehouseCost", () => {
     });
 
     const total =
-      Number(costByStatementId.get("genie-1")) +
-      Number(costByStatementId.get("genie-2"));
+      Number(costByStatementId.get("genie-1")?.costUsd) +
+      Number(costByStatementId.get("genie-2")?.costUsd);
     expect(total).toBeCloseTo(3, 9);
     expect(total).toBeLessThanOrEqual(3);
   });
@@ -136,7 +136,7 @@ describe("allocateWarehouseCost", () => {
 
     // 6 USD * 1/3_600_000 = 0.000001666… USD. Rounded to a cent this is zero,
     // and a busy workspace of these would report nothing at all.
-    const allocated = costByStatementId.get("tiny");
+    const allocated = costByStatementId.get("tiny")?.costUsd;
     expect(allocated).toBe("0.000001666");
     expect(Number(allocated)).toBeGreaterThan(0);
   });
@@ -162,7 +162,7 @@ describe("allocateWarehouseCost", () => {
 
   /** @scenario "Compute the workspace has no published price for is not guessed" */
   it("records nothing for compute with no published price", () => {
-    const { costByStatementId, skipped } = allocateWarehouseCost({
+    const { costByStatementId, skipped, owed } = allocateWarehouseCost({
       rows: [
         row({
           statementId: "unpriced",
@@ -177,6 +177,61 @@ describe("allocateWarehouseCost", () => {
     expect(costByStatementId.has("unpriced")).toBe(false);
     expect(skipped[0]?.reason).toBe("no_published_price");
     expect(skipped[0]?.skuName).toBe(BILLABLE_SKU);
+    // A published billing row with no USD rate is a permanent gap, not a bill
+    // still on its way. It is skipped, never held.
+    expect(owed.has("unpriced")).toBe(false);
+  });
+
+  /** @scenario "A question seen before its bill has landed is held, not zeroed" */
+  it("holds a question whose hour has no billing row yet", () => {
+    // The LEFT JOIN in the cost query keeps the statement and returns a null
+    // SKU when `system.billing.usage` has nothing for its hour. That is a bill
+    // in flight, not a free question — so it is owed, never priced and never
+    // skipped, and the caller holds the watermark for it.
+    const { costByStatementId, skipped, owed } = allocateWarehouseCost({
+      rows: [
+        row({
+          statementId: "unbilled",
+          executionDurationMs: "1000",
+          hourTotalMs: "1000",
+          hourBillableUsd: null,
+          currencyCode: null,
+          skuName: null,
+        }),
+      ],
+    });
+
+    expect(owed.has("unbilled")).toBe(true);
+    expect(costByStatementId.has("unbilled")).toBe(false);
+    expect(skipped).toHaveLength(0);
+  });
+
+  /** @scenario "A statement that priced on any line is not held for an unbilled one" */
+  it("prices a statement even when one of its lines has not been billed yet", () => {
+    const { costByStatementId, owed } = allocateWarehouseCost({
+      rows: [
+        row({
+          statementId: "stmt-1",
+          executionDurationMs: "3600000",
+          hourTotalMs: "3600000",
+          hourBillableUsd: "6.00",
+          skuName: BILLABLE_SKU,
+        }),
+        // A second line for the same statement that has not been billed yet.
+        // The priced line wins: the statement has a cost, so it is not owed.
+        row({
+          statementId: "stmt-1",
+          executionDurationMs: "3600000",
+          hourTotalMs: "3600000",
+          hourBillableUsd: null,
+          currencyCode: null,
+          skuName: null,
+        }),
+      ],
+    });
+
+    expect(costByStatementId.get("stmt-1")?.costUsd).toBe("6");
+    expect(owed.has("stmt-1")).toBe(false);
   });
 
   /** @scenario "Genie's own free usage is never charged" */
@@ -235,7 +290,7 @@ describe("allocateWarehouseCost", () => {
       ],
     });
 
-    expect(costByStatementId.get("stmt-1")).toBe("6");
+    expect(costByStatementId.get("stmt-1")?.costUsd).toBe("6");
   });
 });
 
