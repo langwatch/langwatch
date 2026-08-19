@@ -44,8 +44,8 @@ import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/p
 import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing/stores/rehydrationWindow";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
-  LangyConversationNotFoundError,
   LangyConversationIdUnadoptableError,
+  LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
 } from "./errors";
 import {
