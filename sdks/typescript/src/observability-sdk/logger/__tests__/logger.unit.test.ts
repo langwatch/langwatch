@@ -16,6 +16,19 @@ vi.mock("@opentelemetry/api-logs", () => ({
   }),
 }));
 
+describe("LangWatchLoggerInternal enabled()", () => {
+  it("delegates enabled state to the wrapped logger", () => {
+    const wrappedLogger = {
+      emit: vi.fn(),
+      enabled: vi.fn().mockReturnValue(true),
+    };
+    const logger = createLangWatchLogger(wrappedLogger as any);
+
+    expect(logger.enabled()).toBe(true);
+    expect(wrappedLogger.enabled).toHaveBeenCalledWith(undefined);
+  });
+});
+
 
 
 describe("LangWatch Logger", () => {
@@ -95,8 +108,13 @@ describe("LangWatch Logger", () => {
     });
 
     it("uses NoOp logger when no provider is set", () => {
-      // Reset to use NoOp logger
-      createNoopLogger();
+      // An earlier test in this suite calls `setLangWatchLoggerProvider`, which
+      // mutates module-level state that `resetObservabilitySdkConfig` doesn't
+      // touch. Reset it explicitly here so this test actually exercises the
+      // NoOp path instead of a leftover custom provider.
+      setLangWatchLoggerProvider({
+        getLogger: () => createNoopLogger(),
+      });
 
       const logger = getLangWatchLogger("test-logger");
 
