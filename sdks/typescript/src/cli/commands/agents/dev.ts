@@ -41,6 +41,12 @@ const HEALTH_FAILURE_THRESHOLD = 3;
 /** How long a repeated signal waits for the in-flight restore before forcing exit. */
 const FORCE_EXIT_GRACE_MS = 2_000;
 
+/**
+ * The keep-alive tick. Long enough to cost nothing, short enough to stay well
+ * inside the platform limit on a timer delay.
+ */
+const KEEP_ALIVE_INTERVAL_MS = 60_000;
+
 export interface AgentDevOptions {
   port?: string;
   url?: string;
@@ -402,6 +408,15 @@ export const agentDevCommand = async (
 ): Promise<void> => {
   const session = await startAgentDevSession(options);
 
+  // A session is event-driven, and with `--tunnel-url` there is neither a
+  // tunnel child process nor a local auth proxy to hold the event loop open —
+  // the health monitor's timer is unref'd on purpose so it can never wedge a
+  // shutdown. Without a ref'd handle the process ran out of work right after
+  // printing the banner and exited, leaving the agent pointing at the caller's
+  // tunnel with the real URL still stashed under devTunnel. Hold the loop for
+  // exactly as long as the session runs.
+  const keepAlive = setInterval(() => undefined, KEEP_ALIVE_INTERVAL_MS);
+
   let shutdownRequested = false;
   const onSignal = (): void => {
     if (!shutdownRequested) {
@@ -431,5 +446,6 @@ export const agentDevCommand = async (
   process.once("unhandledRejection", onCrash);
 
   const code = await session.done;
+  clearInterval(keepAlive);
   process.exit(code);
 };

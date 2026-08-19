@@ -118,6 +118,12 @@ Feature: Agent dev tunnel
     Then the session warns that the tunnel stopped answering
     And no replacement tunnel is provisioned
 
+  Scenario: A bring-your-own tunnel session stays up instead of exiting at once
+    Given a dev tunnel session running over a caller-supplied tunnel URL
+    When the session has repointed the agent and printed its banner
+    Then the command keeps running until a signal ends it
+    And the agent URL is restored to the previous URL when it does
+
   Scenario: A stale stash from a crashed session is restored before a new tunnel
     Given an agent still carrying a dead tunnel URL from a crashed session
     When a new dev tunnel session starts

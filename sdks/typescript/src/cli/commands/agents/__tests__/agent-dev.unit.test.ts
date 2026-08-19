@@ -435,6 +435,57 @@ describe("agent dev session", () => {
     });
   });
 
+  describe("when the session runs over a caller-supplied tunnel URL", () => {
+    /** @scenario "A bring-your-own tunnel session stays up instead of exiting at once" */
+    it("keeps the event loop alive until a signal ends the session", async () => {
+      await withDetachedProcessListeners(async () => {
+        // A caller-supplied tunnel starts neither a tunnel child process nor
+        // the local auth proxy, and the health monitor's timer is unref'd, so
+        // the command's own keep-alive is all that stands between the banner
+        // and an immediate exit that would strand the agent on the tunnel URL.
+        // `getActiveResourcesInfo` lists only what keeps the event loop alive,
+        // which is exactly that question. Comparing the count across the
+        // shutdown, rather than against a count taken before the command
+        // started, keeps the test's own timers out of the difference.
+        const countRefdTimers = (): number =>
+          process
+            .getActiveResourcesInfo()
+            .filter((resource) => resource === "Timeout").length;
+
+        const outcome = agentDevCommand({
+          port: "8000",
+          agent: "agent_abc123",
+          tunnelUrl: "https://my-own-tunnel.example.com",
+        }).catch((error: unknown) => error);
+
+        // The write-back is the last await inside the session start, so one
+        // macrotask turn past it puts the command's own body on the stack.
+        await vi.waitFor(() => expect(mockUpdate).toHaveBeenCalled());
+        await new Promise((resolve) => setImmediate(resolve));
+        const whileRunning = countRefdTimers();
+
+        const written = (
+          mockUpdate.mock.calls[0] as [
+            string,
+            { config: Record<string, unknown> },
+          ]
+        )[1].config;
+        mockGet.mockResolvedValue(makeAgent({ config: written }));
+        process.emit("SIGINT");
+
+        expect(await outcome).toBeInstanceOf(ProcessExitError);
+        expect(whileRunning).toBeGreaterThan(countRefdTimers());
+        const restored = (
+          mockUpdate.mock.calls[1] as [
+            string,
+            { config: Record<string, unknown> },
+          ]
+        )[1].config;
+        expect(restored.url).toBe("https://staging.example.com/agent");
+      });
+    });
+  });
+
   describe("when the terminal sends a hangup signal", () => {
     /** @scenario "A hangup signal restores the previous URL like an interrupt" */
     it("restores the agent and exits cleanly", async () => {
