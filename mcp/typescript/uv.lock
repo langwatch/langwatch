@@ -1030,7 +1030,7 @@ dev = [{ name = "black", specifier = ">=26.3.1" }]
 examples = [
     { name = "anthropic", specifier = ">=0.36.0,<0.122.0" },
     { name = "chainlit", specifier = ">=2.11.1,<3" },
-    { name = "cloudpickle", specifier = ">=3.1.1" },
+    { name = "cloudpickle", specifier = ">=3.1.2" },
     { name = "dspy-ai", specifier = ">=3.0.3,<4" },
     { name = "faiss-cpu", specifier = ">=1.8.0,<2.0.0" },
     { name = "fastapi", specifier = ">=0.115.12" },
