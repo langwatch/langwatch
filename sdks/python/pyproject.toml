@@ -38,7 +38,7 @@ dependencies = [
     "deprecated>=1.2.18",
     "python-liquid>=2.2.0",
     "pydantic>=2",
-    "attrs>=24",
+    "attrs>=26.1.0",
     "pksuid>=1.1.2",
     "pyyaml>=6.0.2",
     # Progress bars for experiment loop()/aloop(); pure-python and tiny, so a
