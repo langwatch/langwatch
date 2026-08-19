@@ -20,6 +20,7 @@ describe("Scenarios API", () => {
   let helpers: {
     api: {
       put: (path: string, body: unknown) => Response | Promise<Response>;
+      patch: (path: string, body: unknown) => Response | Promise<Response>;
       post: (path: string, body: unknown) => Response | Promise<Response>;
       get: (path: string) => Response | Promise<Response>;
       delete: (path: string) => Response | Promise<Response>;
@@ -71,6 +72,12 @@ describe("Scenarios API", () => {
         put: (path: string, body: unknown) =>
           app.request(path, {
             method: "PUT",
+            headers: createAuthHeaders(testApiKey),
+            body: JSON.stringify(body),
+          }),
+        patch: (path: string, body: unknown) =>
+          app.request(path, {
+            method: "PATCH",
             headers: createAuthHeaders(testApiKey),
             body: JSON.stringify(body),
           }),
@@ -329,6 +336,114 @@ describe("Scenarios API", () => {
         expect(res.status).toBe(404);
         const body = await res.json();
         expect(body).toHaveProperty("error");
+      });
+    });
+  });
+
+  describe("given model overrides and turn limits over REST", () => {
+    describe("when creating with model overrides and turn limits", () => {
+      /** @scenario "Create over REST accepts model overrides and turn limits" */
+      it("carries the values back on create and on read", async () => {
+        const res = await helpers.api.post("/api/scenarios", {
+          name: "Overrides Scenario",
+          situation: "User asks for a refund",
+          simulatorModel: "openai/gpt-5-mini",
+          judgeModel: "openai/gpt-5-mini",
+          maxTurns: 8,
+          minTurns: 2,
+        });
+
+        expect(res.status).toBe(201);
+        const created = await res.json();
+        expect(created).toMatchObject({
+          simulatorModel: "openai/gpt-5-mini",
+          judgeModel: "openai/gpt-5-mini",
+          maxTurns: 8,
+          minTurns: 2,
+        });
+
+        const readRes = await helpers.api.get(`/api/scenarios/${created.id}`);
+        expect(readRes.status).toBe(200);
+        const read = await readRes.json();
+        expect(read).toMatchObject({
+          simulatorModel: "openai/gpt-5-mini",
+          judgeModel: "openai/gpt-5-mini",
+          maxTurns: 8,
+          minTurns: 2,
+        });
+      });
+    });
+
+    describe("when updating an override to null", () => {
+      /** @scenario "Update over REST clears a model override with null" */
+      it("clears the stored override", async () => {
+        const createRes = await helpers.api.post("/api/scenarios", {
+          name: "Clear Override Scenario",
+          situation: "User asks for help",
+          simulatorModel: "openai/gpt-5-mini",
+        });
+        const created = await createRes.json();
+
+        const updateRes = await helpers.api.put(
+          `/api/scenarios/${created.id}`,
+          { simulatorModel: null },
+        );
+        expect(updateRes.status).toBe(200);
+        const updated = await updateRes.json();
+        expect(updated.simulatorModel).toBeNull();
+
+        const readRes = await helpers.api.get(`/api/scenarios/${created.id}`);
+        const read = await readRes.json();
+        expect(read.simulatorModel).toBeNull();
+      });
+    });
+
+    describe("when the override has no provider prefix", () => {
+      /** @scenario "REST rejects a model override with no provider prefix" */
+      it("rejects the create with a validation error", async () => {
+        const res = await helpers.api.post("/api/scenarios", {
+          name: "Bad Model Scenario",
+          situation: "User asks for help",
+          simulatorModel: "latest",
+        });
+
+        expect(res.status).toBe(422);
+      });
+    });
+  });
+
+  describe("PATCH /api/scenarios/:id", () => {
+    describe("when the scenario exists", () => {
+      /** @scenario "PATCH updates a scenario the same way PUT does" */
+      it("updates the scenario like PUT does", async () => {
+        const scenario = await prisma.scenario.create({
+          data: {
+            projectId: testProjectId,
+            name: "Patch Me",
+            situation: "Original situation",
+            criteria: [],
+            labels: [],
+          },
+        });
+
+        const res = await helpers.api.patch(`/api/scenarios/${scenario.id}`, {
+          name: "Patched Name",
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.name).toBe("Patched Name");
+        expect(body.situation).toBe("Original situation");
+      });
+    });
+
+    describe("when the scenario does not exist", () => {
+      it("returns 404", async () => {
+        const res = await helpers.api.patch("/api/scenarios/nonexistent-id", {
+          name: "New Name",
+        });
+
+        expect(res.status).toBe(404);
       });
     });
   });

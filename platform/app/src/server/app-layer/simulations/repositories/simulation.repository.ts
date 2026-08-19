@@ -72,6 +72,12 @@ export interface SimulationRepository {
     cursor?: string;
     startDate?: number;
     endDate?: number;
+    /**
+     * Reads whole conversations instead of the trimmed list projection. The
+     * page size is capped lower when set, because the heavy message arrays
+     * are exactly what the trim protects against.
+     */
+    shouldIncludeMessages?: boolean;
   }): Promise<{
     runs: ScenarioRunData[];
     nextCursor?: string;
@@ -109,6 +115,7 @@ export interface SimulationRepository {
     startDate?: number;
     endDate?: number;
     sinceTimestamp?: number;
+    shouldIncludeMessages?: boolean;
   }): Promise<AllSuitesRunDataResult>;
 
   /**

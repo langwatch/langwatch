@@ -10,6 +10,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { resolveLatestAlias } from "~/server/modelProviders/latestAliases";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import {
   type AgentFetcher,
@@ -674,6 +675,139 @@ describe("prefetchScenarioData", () => {
             );
           }
         });
+      });
+    });
+
+    describe("given a model override that is a latest alias", () => {
+      // The alias is stored verbatim, so the prefetcher is the boundary
+      // that must expand it before litellm params are prepared: providers
+      // do not understand "latest" as a model id. The expected concrete
+      // model comes from the same registry resolution the picker shows.
+      const expectConcrete = ({
+        alias,
+        actual,
+      }: {
+        alias: string;
+        actual: string | undefined;
+      }) => {
+        const concrete = resolveLatestAlias(alias);
+        expect(concrete).not.toBeNull();
+        expect(actual).toBe(concrete);
+        expect(actual).not.toBe(alias);
+      };
+
+      /** @scenario "A latest alias on the scenario simulator model expands to a concrete model at run time" */
+      it("expands a scenario simulator alias before preparing params", async () => {
+        const deps = createMockDeps({
+          scenarioFetcher: {
+            getById: vi.fn().mockResolvedValue({
+              ...defaultScenario,
+              simulatorModel: "openai/latest",
+              judgeModel: null,
+            }),
+          },
+          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+          modelParamsProvider: echoingProvider(),
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: httpTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expectConcrete({
+            alias: "openai/latest",
+            actual: result.data.simulatorModelParams?.model,
+          });
+        }
+      });
+
+      /** @scenario "A latest alias on the scenario judge model expands to a concrete model at run time" */
+      it("expands a scenario judge alias before preparing params", async () => {
+        const deps = createMockDeps({
+          scenarioFetcher: {
+            getById: vi.fn().mockResolvedValue({
+              ...defaultScenario,
+              simulatorModel: null,
+              judgeModel: "anthropic/latest-mini",
+            }),
+          },
+          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+          modelParamsProvider: echoingProvider(),
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: httpTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expectConcrete({
+            alias: "anthropic/latest-mini",
+            actual: result.data.judgeModelParams?.model,
+          });
+        }
+      });
+
+      /** @scenario "A latest alias on the run plan simulator model expands to a concrete model at run time" */
+      it("expands a run plan simulator alias before preparing params", async () => {
+        const deps = createMockDeps({
+          suiteConfigFetcher: {
+            getBySetId: vi.fn().mockResolvedValue({
+              simulatorModel: "openai/latest-mini",
+              judgeModel: null,
+            }),
+          },
+          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+          modelParamsProvider: echoingProvider(),
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: httpTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expectConcrete({
+            alias: "openai/latest-mini",
+            actual: result.data.simulatorModelParams?.model,
+          });
+        }
+      });
+
+      /** @scenario "A latest alias on the run plan judge model expands to a concrete model at run time" */
+      it("expands a run plan judge alias before preparing params", async () => {
+        const deps = createMockDeps({
+          suiteConfigFetcher: {
+            getBySetId: vi.fn().mockResolvedValue({
+              simulatorModel: null,
+              judgeModel: "gemini/latest",
+            }),
+          },
+          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+          modelParamsProvider: echoingProvider(),
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: httpTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expectConcrete({
+            alias: "gemini/latest",
+            actual: result.data.judgeModelParams?.model,
+          });
+        }
       });
     });
 

@@ -2694,16 +2694,19 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  suiteCmd
-    .command("run <id>")
-    .description("Execute a suite run — schedules all scenario × target × repeat jobs")
-    .option("--wait", "Wait for the suite run to complete before returning")
-    .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { wait?: boolean; format?: string; param?: string[] }) => {
-      const { runSuiteCommand: impl } = await import("./commands/suites/run.js");
-      await impl({ id, options });
-    });
+  rendersOwnResult(
+    suiteCmd
+      .command("run <id>")
+      .description("Execute a suite run: schedules all scenario × target × repeat jobs")
+      .option("--wait", "Wait for the suite run to complete before returning")
+      .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+  ).action(async (id: string, _options: unknown, command: Command) => {
+    const { runSuiteCommand: impl } = await import("./commands/suites/run.js");
+    // Merged globals: a root-position `--output` only lands on the ROOT
+    // command, so the leaf's own opts would silently drop it.
+    await impl({ id, options: command.optsWithGlobals() });
+  });
 
   emitsResult(
     suiteCmd

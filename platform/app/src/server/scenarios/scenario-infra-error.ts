@@ -263,6 +263,12 @@ const NETWORK_UNREACHABLE_NEEDLES = [
   "ECONNRESET",
   "fetch failed",
   "network error",
+  // Name resolution, in the two shapes it reaches us: Node prefixes every
+  // resolver failure with the syscall, and curl-style clients print prose
+  // instead of an errno. Both mean the same thing as ENOTFOUND, which only
+  // covers one of the errno values a resolver can return.
+  "getaddrinfo",
+  "could not resolve hostname",
 ] as const;
 
 /**
@@ -469,13 +475,28 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
   {
     // Network unreachable (connection refused / DNS / reset / undici fetch).
     needles: [...NETWORK_UNREACHABLE_NEEDLES],
-    build: () => ({
-      code: ScenarioInfraErrorCode.PlatformUnreachable,
-      message: "Couldn't reach the endpoint while running the simulation.",
-      hint: "Check that the target service is running and reachable from LangWatch.",
-    }),
+    build: (text) => {
+      const host = targetHostFromTransportError(text);
+      return {
+        code: ScenarioInfraErrorCode.PlatformUnreachable,
+        message: host
+          ? `Couldn't reach the agent target ${host} while running the simulation.`
+          : "Couldn't reach the endpoint while running the simulation.",
+        hint: "Check that the target service is running and reachable from LangWatch.",
+      };
+    },
   },
 ];
+
+/**
+ * The target host named by an HTTP agent transport error, when the raw text
+ * is one. Knowing which target failed is most of what makes the message
+ * actionable, so it is carried through to the customer-facing copy; anything
+ * else classifies without a host and keeps the generic sentence.
+ */
+function targetHostFromTransportError(text: string): string | undefined {
+  return /HTTP agent target (\S+) could not be reached/.exec(text)?.[1];
+}
 
 /**
  * Classify a raw scenario-runner error string into a handled error envelope.

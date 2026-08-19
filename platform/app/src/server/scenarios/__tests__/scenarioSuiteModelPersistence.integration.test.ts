@@ -8,6 +8,7 @@
  * provides Postgres.
  *
  * @see specs/scenarios/scenario-model-selection.feature
+ * @see specs/scenarios/simulation-run-model-resolution.feature
  * @see specs/suites/suite-model-selection.feature
  */
 import { nanoid } from "nanoid";
@@ -88,6 +89,47 @@ describe("Scenario / run-plan model persistence (real DB)", () => {
         });
         expect(reread?.simulatorModel).toBe("openai/gpt-5-mini");
         expect(reread?.judgeModel).toBe("openai/gpt-5-nano");
+      });
+    });
+  });
+
+  describe("given a latest alias as the model override", () => {
+    describe("when a scenario and a run plan are saved with it", () => {
+      /** @scenario "A latest alias is stored verbatim on the scenario and the run plan" */
+      it("stores the alias string verbatim, not a concrete model", async () => {
+        const service = ScenarioService.create(prisma);
+        const scenario = await service.create({
+          projectId,
+          name: `Alias Scenario ${ns}`,
+          situation: "User asks for help",
+          criteria: ["Agent helps"],
+          labels: [],
+        });
+        await service.update(scenario.id, projectId, {
+          simulatorModel: "openai/latest",
+        });
+
+        const repo = new SuiteRepository(prisma);
+        const suite = await repo.create({
+          projectId,
+          name: `Alias plan ${ns}`,
+          slug: `alias-plan-${ns}`,
+          scenarioIds: [],
+          targets: [],
+          repeatCount: 1,
+          labels: [],
+          judgeModel: "anthropic/latest-mini",
+        });
+
+        const scenarioReread = await prisma.scenario.findFirst({
+          where: { id: scenario.id, projectId },
+        });
+        expect(scenarioReread?.simulatorModel).toBe("openai/latest");
+
+        const suiteReread = await prisma.simulationSuite.findFirst({
+          where: { id: suite.id, projectId },
+        });
+        expect(suiteReread?.judgeModel).toBe("anthropic/latest-mini");
       });
     });
   });

@@ -1082,6 +1082,7 @@
               "api-reference/scenarios/create-scenarios",
               "api-reference/scenarios/get-scenarios",
               "api-reference/scenarios/update-scenarios",
+              "api-reference/scenarios/patch-update-scenarios",
               "api-reference/scenarios/delete-scenarios"
             ]
           },
@@ -1111,6 +1112,7 @@
               "api-reference/suites/create-suites",
               "api-reference/suites/get-suites",
               "api-reference/suites/update-suites",
+              "api-reference/suites/put-update-suites",
               "api-reference/suites/action-duplicate",
               "api-reference/suites/action-run",
               "api-reference/suites/delete-suites"
@@ -1124,6 +1126,7 @@
               "api-reference/agents/create-agents",
               "api-reference/agents/get-agents",
               "api-reference/agents/update-agents",
+              "api-reference/agents/put-update-agents",
               "api-reference/agents/delete-agents"
             ]
           },

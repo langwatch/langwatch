@@ -92,6 +92,48 @@ describe("classifyScenarioInfraError", () => {
     });
   });
 
+  describe("when the raw error is a name-resolution failure", () => {
+    /** @scenario "A DNS resolution failure becomes an unreachable-endpoint error" */
+    /** @scenario "A hostname that could not be resolved becomes an unreachable-endpoint error" */
+    it.each([
+      // A resolver failure that is not one of the errno codes already listed:
+      // the getaddrinfo prefix is the part every form of it shares.
+      "getaddrinfo EAI_FAIL agent.internal",
+      "Error: getaddrinfo failed",
+      // What curl and several HTTP clients print instead of an errno.
+      "Could not resolve hostname agent.example.com",
+      "could not resolve hostname",
+    ])("classifies %s as platform unreachable", (raw) => {
+      expect(classifyScenarioInfraError(raw).code).toBe(
+        ScenarioInfraErrorCode.PlatformUnreachable,
+      );
+    });
+  });
+
+  describe("when the raw error names the HTTP agent target it could not reach", () => {
+    /** @scenario "An unreachable target names itself in the customer-facing message" */
+    it("carries the target host into the customer-facing message", () => {
+      const envelope = classifyScenarioInfraError(
+        "HTTP agent target agent.example.com could not be reached: " +
+          "getaddrinfo ENOTFOUND agent.example.com",
+      );
+
+      expect(envelope.code).toBe(ScenarioInfraErrorCode.PlatformUnreachable);
+      expect(envelope.message).toContain("agent.example.com");
+      expect(envelope.message).not.toContain("getaddrinfo");
+    });
+
+    /** @scenario "An unreachable endpoint with no named target keeps the generic message" */
+    it("keeps the generic sentence when no target is named", () => {
+      const envelope = classifyScenarioInfraError("TypeError: fetch failed");
+
+      expect(envelope.code).toBe(ScenarioInfraErrorCode.PlatformUnreachable);
+      expect(envelope.message).toBe(
+        "Couldn't reach the endpoint while running the simulation.",
+      );
+    });
+  });
+
   describe("when the raw error is the tunnel edge's HTTP 530 answer", () => {
     /** @scenario "A dead tunnel names itself without a devTunnel lookup" */
     it("classifies the Cloudflare 530 + 1033 pair as the named dev-tunnel error", () => {

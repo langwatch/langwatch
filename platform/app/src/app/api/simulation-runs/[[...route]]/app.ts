@@ -36,6 +36,12 @@ const scenarioRunResponseSchema = z.object({
       content: z.string(),
     }),
   ),
+  messagesTruncated: z
+    .boolean()
+    .optional()
+    .describe(
+      "True when `messages` holds only the first few messages of a longer conversation. Pass `include=messages` to read them all.",
+    ),
   timestamp: z.number(),
   updatedAt: z.number(),
   durationInMs: z.number(),
@@ -65,6 +71,12 @@ const listQuerySchema = z.object({
   batchRunId: z.string().optional(),
   limit: z.coerce.number().int().positive().max(100).optional().default(20),
   cursor: z.string().optional(),
+  include: z
+    .literal("messages")
+    .optional()
+    .describe(
+      "Pass `messages` to read whole conversations instead of the first few messages of each run. The page size is capped at 20 runs when set, and ends on a batch boundary.",
+    ),
 });
 
 const batchQuerySchema = z.object({
@@ -80,7 +92,7 @@ secured.access(requires("scenarios:view")).get(
   "/",
   describeRoute({
     description:
-      "List simulation runs, optionally filtered by scenarioSetId or batchRunId",
+      "List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass `include=messages` to read whole conversations, which caps the page at 20 runs, ending on a batch boundary. A batch-scoped listing always carries whole conversations.",
     responses: {
       ...baseResponses,
       200: {
@@ -102,7 +114,9 @@ secured.access(requires("scenarios:view")).get(
   zValidator("query", listQuerySchema),
   async (c) => {
     const project = c.get("project");
-    const { scenarioSetId, batchRunId, limit, cursor } = c.req.valid("query");
+    const { scenarioSetId, batchRunId, limit, cursor, include } =
+      c.req.valid("query");
+    const shouldIncludeMessages = include === "messages";
     logger.info(
       { projectId: project.id, scenarioSetId, batchRunId },
       "Listing simulation runs",
@@ -144,6 +158,7 @@ secured.access(requires("scenarios:view")).get(
         scenarioSetId,
         limit,
         cursor,
+        shouldIncludeMessages,
       });
 
       return c.json({
@@ -164,6 +179,7 @@ secured.access(requires("scenarios:view")).get(
       projectId: project.id,
       limit,
       cursor,
+      shouldIncludeMessages,
     });
 
     if (!result.changed) {

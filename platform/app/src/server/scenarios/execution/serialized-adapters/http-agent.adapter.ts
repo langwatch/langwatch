@@ -44,6 +44,67 @@ function previewResponseBody(body: string): string {
 }
 
 /**
+ * A call that never reached the target: DNS did not resolve, the connection
+ * was refused or reset, or the request timed out at the socket. This is not
+ * the target rejecting the request — a non-2xx answer keeps its own error —
+ * and what fetch throws for it reads as a Node crash ("TypeError: fetch
+ * failed") rather than a reason a customer can act on.
+ *
+ * The message names the host and the failure kind, and ends with the
+ * underlying text so the infra-error classifier still recognises the
+ * ECONNREFUSED / getaddrinfo markers it keys on. The raw error rides on
+ * `cause`, so the log and any debugger keep everything.
+ */
+export class HttpAgentTransportError extends Error {
+  constructor({
+    host,
+    reason,
+    cause,
+  }: {
+    host: string;
+    reason: string;
+    cause: unknown;
+  }) {
+    super(`HTTP agent target ${host} could not be reached: ${reason}`);
+    this.name = "HttpAgentTransportError";
+    this.cause = cause;
+  }
+}
+
+/**
+ * The host of a request url. A url that does not parse gets a fixed label:
+ * it can carry a credential in its query, and this text reaches a customer.
+ */
+function hostForMessage(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "configured target";
+  }
+}
+
+/**
+ * Flattens an error and its causes into one line of messages.
+ *
+ * undici reports a transport failure as a bare `TypeError: fetch failed`
+ * whose real reason lives on `cause`, so the top message alone classifies as
+ * nothing. Messages only — a stack never enters the text a customer reads.
+ */
+function flattenErrorMessages(error: unknown): string {
+  const parts: string[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current);
+    const message = current.message.trim();
+    if (message.length > 0 && !parts.includes(message)) parts.push(message);
+    current = (current as { cause?: unknown }).cause;
+  }
+  if (parts.length === 0) return String(error);
+  return parts.join(": ");
+}
+
+/**
  * Strip query string before logging. URL templates can interpolate
  * user-supplied secrets (?api_key=…, ?access_token=…) and CloudWatch
  * persists every log line — drop the query so credentials don't leak.
@@ -297,7 +358,11 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
         },
         "http call failed",
       );
-      throw error;
+      throw new HttpAgentTransportError({
+        host: hostForMessage(url),
+        reason: this.scrub(flattenErrorMessages(error)),
+        cause: error,
+      });
     }
 
     const durationMs = Date.now() - startedAt;

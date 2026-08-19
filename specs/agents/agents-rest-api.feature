@@ -85,6 +85,15 @@ Feature: Agent REST API
     When I call PATCH /api/agents/agent_ghost with name "Whatever"
     Then the request fails with 404 Not Found
 
+  # The update is partial under either verb, so a caller reaching for the one
+  # we did not route should not meet a 404 that reads as a missing agent.
+  @integration
+  Scenario: Update an agent with PUT
+    Given an agent with id "agent_abc123" exists
+    When I call PUT /api/agents/agent_abc123 with name "Renamed By Put"
+    Then the agent is updated
+    And the response reflects the updated name
+
   # ── Delete (Archive) Agent ───────────────────────────────────
 
   @integration

@@ -147,9 +147,17 @@ describe("SerializedHttpAgentAdapter secret references", () => {
         new Error("connect failed for https://api.example.com/abcdef"),
       );
 
-      await expect(adapter.call(input)).rejects.toMatchObject({
-        message: "connect failed for https://api.example.com/[redacted]",
-      });
+      const thrown = (await adapter
+        .call(input)
+        .catch((e: unknown) => e)) as Error;
+
+      // The transport wrapper restates the failure, so the assertion is on
+      // what the message carries: the redacted form, and neither secret.
+      expect(thrown.message).toContain(
+        "connect failed for https://api.example.com/[redacted]",
+      );
+      expect(thrown.message).not.toContain("abcdef");
+      expect(thrown.message).not.toContain("abc");
     });
   });
 
@@ -410,9 +418,9 @@ describe("SerializedHttpAgentAdapter secret references", () => {
     });
 
     /** @scenario "Plaintext auth without secret references behaves unchanged" */
-    it("rethrows an upstream failure untouched", async () => {
-      const thrown = new Error("fetch failed");
-      mockSsrfSafeFetch.mockRejectedValue(thrown);
+    it("leaves an upstream failure's own message untouched", async () => {
+      const raw = new Error("fetch failed");
+      mockSsrfSafeFetch.mockRejectedValue(raw);
 
       const adapter = new SerializedHttpAgentAdapter({
         config: config({
@@ -421,8 +429,15 @@ describe("SerializedHttpAgentAdapter secret references", () => {
         }),
       });
 
-      await expect(adapter.call(input)).rejects.toBe(thrown);
-      expect(thrown.message).toBe("fetch failed");
+      const thrown = (await adapter
+        .call(input)
+        .catch((e: unknown) => e)) as Error;
+
+      // With no secrets configured there is nothing to rewrite: the raw error
+      // is carried as the cause, message and all.
+      expect(thrown.cause).toBe(raw);
+      expect(raw.message).toBe("fetch failed");
+      expect(thrown.message).toContain("fetch failed");
     });
   });
 });

@@ -7,6 +7,7 @@ import type { Scenario } from "~/generated/prisma/client";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
+import { modelOverrideSchema } from "~/server/modelProviders/modelOverrideSchema";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import {
   parseScenarioParameterDefinitions,
@@ -29,6 +30,10 @@ const scenarioResponseSchema = z.object({
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
   parameters: z.array(scenarioParameterDefinitionSchema),
+  simulatorModel: z.string().nullable(),
+  judgeModel: z.string().nullable(),
+  maxTurns: z.number().int().nullable(),
+  minTurns: z.number().int().nullable(),
 });
 
 const scenarioResponseWithPlatformUrlSchema = scenarioResponseSchema.extend({
@@ -38,6 +43,15 @@ const scenarioResponseWithPlatformUrlSchema = scenarioResponseSchema.extend({
 const parametersDescription =
   "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME.";
 
+const simulatorModelDescription =
+  "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.";
+const judgeModelDescription =
+  "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.";
+const maxTurnsDescription =
+  "Maximum conversation turns for a run of this scenario. Null uses the default.";
+const minTurnsDescription =
+  "Minimum conversation turns before the judge may end the run. Null uses the default.";
+
 const createScenarioSchema = z.object({
   name: z.string().min(1, "name is required"),
   situation: z.string(),
@@ -46,6 +60,24 @@ const createScenarioSchema = z.object({
   parameters: scenarioParameterDefinitionsSchema
     .optional()
     .describe(parametersDescription),
+  simulatorModel: modelOverrideSchema
+    .nullish()
+    .describe(simulatorModelDescription),
+  judgeModel: modelOverrideSchema.nullish().describe(judgeModelDescription),
+  maxTurns: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .nullish()
+    .describe(maxTurnsDescription),
+  minTurns: z
+    .number()
+    .int()
+    .min(0)
+    .max(100)
+    .nullish()
+    .describe(minTurnsDescription),
 });
 
 const updateScenarioSchema = z.object({
@@ -56,6 +88,24 @@ const updateScenarioSchema = z.object({
   parameters: scenarioParameterDefinitionsSchema
     .optional()
     .describe(parametersDescription),
+  simulatorModel: modelOverrideSchema
+    .nullish()
+    .describe(simulatorModelDescription),
+  judgeModel: modelOverrideSchema.nullish().describe(judgeModelDescription),
+  maxTurns: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .nullish()
+    .describe(maxTurnsDescription),
+  minTurns: z
+    .number()
+    .int()
+    .min(0)
+    .max(100)
+    .nullish()
+    .describe(minTurnsDescription),
 });
 
 function toScenarioResponse(scenario: Scenario) {
@@ -66,6 +116,10 @@ function toScenarioResponse(scenario: Scenario) {
     criteria: scenario.criteria,
     labels: scenario.labels,
     parameters: parseScenarioParameterDefinitions(scenario.parameters),
+    simulatorModel: scenario.simulatorModel,
+    judgeModel: scenario.judgeModel,
+    maxTurns: scenario.maxTurns,
+    minTurns: scenario.minTurns,
   };
 }
 
@@ -216,6 +270,12 @@ function registerCreateScenarioRoute(
         criteria: body.criteria,
         labels: body.labels,
         ...(body.parameters !== undefined && { parameters: body.parameters }),
+        ...(body.simulatorModel !== undefined && {
+          simulatorModel: body.simulatorModel,
+        }),
+        ...(body.judgeModel !== undefined && { judgeModel: body.judgeModel }),
+        ...(body.maxTurns !== undefined && { maxTurns: body.maxTurns }),
+        ...(body.minTurns !== undefined && { minTurns: body.minTurns }),
       });
 
       return c.json(
@@ -235,11 +295,27 @@ function registerCreateScenarioRoute(
   // it, so no existing caller changes.
 }
 
-/** Update a scenario in place. */
+/**
+ * Update a scenario in place. PUT and PATCH register the same handler:
+ * both apply a partial update, so a client using either verb gets the
+ * same behavior instead of a 404 on one of them.
+ */
 function registerUpdateScenarioRoute(
   secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
 ): void {
-  secured.access(requires("scenarios:update")).put(
+  for (const verb of ["put", "patch"] as const) {
+    registerUpdateScenarioVerb({ secured, verb });
+  }
+}
+
+function registerUpdateScenarioVerb({
+  secured,
+  verb,
+}: {
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>;
+  verb: "put" | "patch";
+}): void {
+  secured.access(requires("scenarios:update"))[verb](
     "/:id",
     describeRoute({
       description: "Update an existing scenario",
@@ -284,6 +360,12 @@ function registerUpdateScenarioRoute(
         ...(body.criteria !== undefined && { criteria: body.criteria }),
         ...(body.labels !== undefined && { labels: body.labels }),
         ...(body.parameters !== undefined && { parameters: body.parameters }),
+        ...(body.simulatorModel !== undefined && {
+          simulatorModel: body.simulatorModel,
+        }),
+        ...(body.judgeModel !== undefined && { judgeModel: body.judgeModel }),
+        ...(body.maxTurns !== undefined && { maxTurns: body.maxTurns }),
+        ...(body.minTurns !== undefined && { minTurns: body.minTurns }),
       });
 
       return c.json({

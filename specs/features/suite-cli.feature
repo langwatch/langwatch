@@ -63,6 +63,47 @@ Feature: Suite (Run Plan) CLI Commands
     When I run "langwatch suite run <suite-id> --wait"
     Then the CLI polls until the run completes and shows pass/fail counts
 
+  # Structured output for `suite run`: a machine caller gets exactly one
+  # final JSON document on stdout, whichever way the run ends. Exit codes do
+  # not change: 1 on failures, timeout or a dead status endpoint, 0 otherwise.
+  # Human output stays as it was.
+
+  @unit
+  Scenario: Run a suite with machine-readable output
+    Given my project has a suite with scenarios and active targets
+    When I run "langwatch suite run <suite-id>" asking for JSON output
+    Then exactly one machine-readable document is printed on stdout
+    And it carries the batch run ID, set ID, job count and a scheduled outcome
+
+  @unit
+  Scenario: Wait for a suite run with machine-readable output
+    Given my project has a suite with scenarios and active targets
+    When I run "langwatch suite run <suite-id> --wait" asking for JSON output
+    Then the CLI polls until the run completes
+    And exactly one final document carries the per-scenario results, the tallies and the outcome
+    And the exit code is nonzero when any scenario failed
+
+  @unit
+  Scenario: A timed-out wait still emits the machine-readable document
+    Given a suite run whose jobs never complete
+    When the wait times out
+    Then the final document names the timeout outcome
+    And the exit code is nonzero
+
+  @unit
+  Scenario: A dead status endpoint still emits the machine-readable document
+    Given a suite run whose status endpoint keeps failing
+    When the wait gives up
+    Then the final document names the poll failure outcome
+    And the exit code is nonzero
+
+  @unit
+  Scenario: Waiting in human mode prints no machine document
+    Given my project has a suite with scenarios and active targets
+    When I run "langwatch suite run <suite-id> --wait" with the default output
+    Then the progress and completion lines stay human-readable
+    And no JSON document is printed
+
   Scenario: Delete (archive) a suite
     Given my project has a suite with name "Regression Suite"
     When I run "langwatch suite delete <suite-id>"

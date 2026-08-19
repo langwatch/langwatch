@@ -53,6 +53,10 @@ const makeScenario = (overrides: Partial<ScenarioResponse> = {}): ScenarioRespon
   criteria: ["Responds with a welcome message", "Includes user name in greeting"],
   labels: ["auth", "happy-path"],
   parameters: [],
+  simulatorModel: null,
+  judgeModel: null,
+  maxTurns: null,
+  minTurns: null,
   platformUrl: "https://app.langwatch.ai/proj-1/scenarios/scenario_abc123",
   ...overrides,
 });
