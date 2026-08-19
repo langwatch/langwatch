@@ -272,6 +272,29 @@ function requestedWaitSeconds(c: Context): number | null {
 }
 
 /**
+ * Parse and validate a turn request body. Throws `LangyApiRequestInvalidError`
+ * on malformed JSON, schema mismatch, or `adoptConversationId` without an id
+ * in the path — adoption without a path id is a caller mistake, and the silent
+ * reading (ignore the flag, mint fresh) is exactly the ghost-conversation
+ * failure the flag exists to prevent.
+ */
+async function parseTurnBody(c: Context, conversationId: string | null) {
+  const parsed = turnBodySchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success)
+    throw new LangyApiRequestInvalidError(parsed.error.issues);
+  if (parsed.data.adoptConversationId && !conversationId) {
+    throw new LangyApiRequestInvalidError([
+      {
+        path: ["adoptConversationId"],
+        message:
+          "adoptConversationId requires the conversation id in the path: POST /conversations/:conversationId/messages",
+      },
+    ]);
+  }
+  return parsed.data;
+}
+
+/**
  * Start or continue a turn.
  *
  * Nothing is caught. A domain `HandledError` already carries the status, code
@@ -290,33 +313,16 @@ async function startTurn({
   // Hono's default 404, byte-for-byte what an unmounted path returns.
   if (auth.dark) return c.notFound();
 
-  const parsed = turnBodySchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success)
-    throw new LangyApiRequestInvalidError(parsed.error.issues);
-
-  // Adoption without an id in the path is a caller mistake, and the silent
-  // reading (ignore the flag, mint fresh) is exactly the ghost-conversation
-  // failure the flag exists to prevent — refuse it instead.
-  if (parsed.data.adoptConversationId && !conversationId) {
-    throw new LangyApiRequestInvalidError([
-      {
-        path: ["adoptConversationId"],
-        message:
-          "adoptConversationId requires the conversation id in the path: POST /conversations/:conversationId/messages",
-      },
-    ]);
-  }
+  const body = await parseTurnBody(c, conversationId);
 
   const result = await getApp().langy.turns.startConversationTurn({
     projectId: auth.projectId,
-    idempotencyKey: parsed.data.idempotencyKey,
+    idempotencyKey: body.idempotencyKey,
     session: auth.session,
     requestedConversationId: conversationId,
-    ...(parsed.data.adoptConversationId ? { adoptConversationId: true } : {}),
-    messages: parsed.data.messages as LangyChatMessageInput[],
-    ...(parsed.data.modelOverride
-      ? { modelOverride: parsed.data.modelOverride }
-      : {}),
+    ...(body.adoptConversationId ? { adoptConversationId: true } : {}),
+    messages: body.messages as LangyChatMessageInput[],
+    ...(body.modelOverride ? { modelOverride: body.modelOverride } : {}),
     isRetry: false,
     turnContext: {},
   });

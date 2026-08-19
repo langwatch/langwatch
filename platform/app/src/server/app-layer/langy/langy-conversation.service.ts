@@ -204,6 +204,28 @@ function newConversationId(): string {
  */
 const ADOPTABLE_CONVERSATION_ID = /^[A-Za-z0-9_-]{6,120}$/;
 
+/**
+ * Adopt a caller-chosen id as a NEW conversation, or refuse loudly. The id
+ * becomes an aggregate key, so its shape is gated before anything durable is
+ * written under it. Archived is a refusal, not a resume: adopting would append
+ * fresh events to a closed aggregate.
+ */
+function adoptConversationId(
+  conversationId: string,
+  ownership: "archived" | "missing",
+): { id: string; isNew: boolean } {
+  if (!ADOPTABLE_CONVERSATION_ID.test(conversationId)) {
+    throw new LangyConversationIdUnadoptableError(
+      conversationId,
+      "invalid_shape",
+    );
+  }
+  if (ownership === "archived") {
+    throw new LangyConversationIdUnadoptableError(conversationId, "archived");
+  }
+  return { id: conversationId, isNew: true };
+}
+
 function newMessageId(): string {
   return generate(KSUID_RESOURCES.LANGY_MESSAGE).toString();
 }
@@ -541,41 +563,27 @@ export class LangyConversationService {
     conversationId?: string | null;
     adoptUnknownId?: boolean;
   }): Promise<{ id: string; isNew: boolean }> {
-    if (conversationId) {
-      // Resolve straight from the repo (not the share-aware getById): visibility
-      // of a shared conversation does not grant continuation rights.
-      const ownership = await this.repository.findOwnership({
-        id: conversationId,
-        projectId,
-        userId,
-      });
-      if (ownership === "owned") {
-        return { id: conversationId, isNew: false };
-      }
-      if (ownership === "other") {
-        throw new LangyConversationNotOwnedError(conversationId);
-      }
-      if (adoptUnknownId) {
-        // The id becomes an aggregate key, so gate its shape before anything
-        // durable is written under it. Archived is a refusal, not a resume:
-        // adopting would append fresh events to a closed aggregate.
-        if (!ADOPTABLE_CONVERSATION_ID.test(conversationId)) {
-          throw new LangyConversationIdUnadoptableError(
-            conversationId,
-            "invalid_shape",
-          );
-        }
-        if (ownership === "archived") {
-          throw new LangyConversationIdUnadoptableError(
-            conversationId,
-            "archived",
-          );
-        }
-        return { id: conversationId, isNew: true };
-      }
-      // Archived / never existed: fall through and mint a fresh id — a stale id
-      // is legitimate client state, unlike one owned by another user.
+    if (!conversationId) {
+      return { id: newConversationId(), isNew: true };
     }
+    // Resolve straight from the repo (not the share-aware getById): visibility
+    // of a shared conversation does not grant continuation rights.
+    const ownership = await this.repository.findOwnership({
+      id: conversationId,
+      projectId,
+      userId,
+    });
+    if (ownership === "owned") {
+      return { id: conversationId, isNew: false };
+    }
+    if (ownership === "other") {
+      throw new LangyConversationNotOwnedError(conversationId);
+    }
+    if (adoptUnknownId) {
+      return adoptConversationId(conversationId, ownership);
+    }
+    // Archived / never existed: mint a fresh id — a stale id is legitimate
+    // client state, unlike one owned by another user.
     return { id: newConversationId(), isNew: true };
   }
 
