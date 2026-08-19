@@ -81,12 +81,16 @@ Create a new file `app.ts`:
 import { setupObservability } from "langwatch/observability/node";
 import { getLangWatchTracer } from "langwatch";
 import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
+import { generateText, registerTelemetry } from "ai";
+import { OpenTelemetry } from "@ai-sdk/otel";
 
 // Setup LangWatch Observability (uses LANGWATCH_API_KEY by default)
 setupObservability({
   serviceName: "my-ai-laundry-startup",
 });
+
+// AI SDK 7 emits no spans until an integration is registered
+registerTelemetry(new OpenTelemetry());
 
 // Create a tracer
 const tracer = getLangWatchTracer("laundry-chatbot");
@@ -95,13 +99,12 @@ const tracer = getLangWatchTracer("laundry-chatbot");
 async function askAI(question: string) {
   return await tracer.withActiveSpan("ask-ai", async (span) => {
     // Make the LLM call using Vercel AI SDK
+    // The LangWatch SDK will automatically capture LLM data
+    // input, output, metrics, etc.
     const response = await generateText({
       model: openai("gpt-5-mini"),
       prompt: question,
-      maxTokens: 100,
-      // The LangWatch SDK will automatically capture LLM data
-      // input, output, metrics, etc.
-      experimental_telemetry: { isEnabled: true },
+      maxOutputTokens: 100,
     });
 
     return response.text;
@@ -181,10 +184,10 @@ import { generateText } from "ai";
 async function chatWithAI(userMessage: string) {
   return await tracer.withActiveSpan("chat-with-ai", async (span) => {
     // Make the LLM call
+    // Auto-captures LLM data once registerTelemetry has run at startup
     const response = await generateText({
       model: openai("gpt-5-mini"),
       prompt: userMessage,
-      experimental_telemetry: { isEnabled: true }, // Auto-captures LLM data
     });
 
     return response.text;

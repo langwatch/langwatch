@@ -92,10 +92,10 @@ Only spans created through `lwProvider.getTracer()` go to LangWatch. The global
 provider is untouched.
 
 <Note>
-Auto-instrumentations that emit spans through the global OTel API (like Vercel
-AI SDK's `experimental_telemetry`) send spans to the global provider, not the
-dedicated one. For those, use `lwProvider.getTracer()` directly to create LLM
-spans on the isolated provider.
+Auto-instrumentations that emit spans through the global OTel API (like the
+Vercel AI SDK's `@ai-sdk/otel` integration) send spans to the global provider,
+not the dedicated one. For those, use `lwProvider.getTracer()` directly to
+create LLM spans on the isolated provider.
 </Note>
 
 ## Alternative: Coexistence (TypeScript)
