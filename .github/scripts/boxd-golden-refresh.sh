@@ -8,14 +8,17 @@ set -euo pipefail
 STATUS=/tmp/golden-refresh.status
 trap 'code=$?; if [ "$code" -ne 0 ]; then echo failed > "$STATUS"; fi' EXIT
 
+# no TTY here: pnpm refuses destructive steps without CI=true
+export CI=true
+
 # nvm-installed node is only on the interactive PATH
 NODE_BIN="$(ls -d "$HOME"/.nvm/versions/node/*/bin 2>/dev/null | sort -V | tail -1)"
 export PATH="$NODE_BIN:$HOME/bin:$HOME/go/bin:/usr/local/bin:$PATH"
 
 cd "$HOME/langwatch"
-git fetch origin main
-git checkout -f main
-git reset --hard origin/main
+git fetch -q origin main
+git checkout -qf main
+git reset -q --hard origin/main
 
 cd langwatch
 pnpm install
