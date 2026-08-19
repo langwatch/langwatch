@@ -28,8 +28,36 @@ type CheckEnv struct {
 	CI         string // CI
 }
 
+// CheckMachine carries the machine facts the limit is resolved from.
+type CheckMachine struct {
+	TotalRAMBytes uint64
+	NumCPU        int
+	Pressure      Pressure
+}
+
+// ResolveCheckPressure reads the CHECK_PRESSURE override, falling back to what
+// the machine measured. The override exists for two reasons that are really
+// one: tests need a deterministic level, and an operator who knows better than
+// the heuristic (a machine that is about to get busy, or one whose swap is
+// disabled for a good reason) needs the same lever. A value that is not one of
+// the three level names falls back to the measurement, exactly like a
+// CHECK_SLOTS typo: a misspelling must not change the policy.
+func ResolveCheckPressure(override string, measured Pressure) Pressure {
+	switch strings.ToLower(strings.TrimSpace(override)) {
+	case "green":
+		return Green
+	case "amber":
+		return Amber
+	case "red":
+		return Red
+	default:
+		return measured
+	}
+}
+
 // ResolveCheckSlots resolves how many whole-repo checks may run at once, and
-// names where the answer came from ("CHECK_SLOTS", "CI" or "machine").
+// names where the answer came from ("CHECK_SLOTS", "CI", "machine" or
+// "pressure").
 //
 // An explicit CHECK_SLOTS always wins, including under CI — that is what lets
 // tests exercise the queue on a CI runner. "0" (or off/none/unlimited/false)
@@ -37,7 +65,13 @@ type CheckEnv struct {
 // and a developer machine gets a limit bounded by both memory and cores —
 // tsgo is memory-hungry AND parallel, so the tighter bound is the honest one —
 // never below 1, or the queue would deadlock every run.
-func ResolveCheckSlots(totalRAMBytes uint64, numCPU int, env CheckEnv) (int, string) {
+//
+// A machine already under memory pressure gets one slot, whatever the formula
+// says. The formula assumes an otherwise idle machine, and pressure is the
+// machine reporting that assumption false: its RAM is spoken for, so a second
+// concurrent check is paid for in everyone's swap. Only the derived default
+// narrows — an explicit CHECK_SLOTS is the operator's call either way.
+func ResolveCheckSlots(machine CheckMachine, env CheckEnv) (int, string) {
 	raw := strings.TrimSpace(env.CheckSlots)
 	if raw != "" {
 		switch strings.ToLower(raw) {
@@ -54,8 +88,11 @@ func ResolveCheckSlots(totalRAMBytes uint64, numCPU int, env CheckEnv) (int, str
 	if ci != "" && ci != "0" && ci != "false" {
 		return 0, "CI"
 	}
-	byMemory := int(totalRAMBytes / checkRAMPerRun)
-	byCPU := numCPU / checkCPUsPerRun
+	if machine.Pressure > Green {
+		return 1, "pressure"
+	}
+	byMemory := int(machine.TotalRAMBytes / checkRAMPerRun)
+	byCPU := machine.NumCPU / checkCPUsPerRun
 	return max(1, min(byMemory, byCPU)), "machine"
 }
 
@@ -74,10 +111,38 @@ func ResolveCheckSlots(totalRAMBytes uint64, numCPU int, env CheckEnv) (int, str
 // the price of collecting continuously to miss it. 6 itself is a judgement
 // between measured points and wants a re-measure on an unloaded machine; see
 // ADR-100, which records what the samples do and do not establish.
-func CheckGoMemLimit(totalRAMBytes uint64, existing string) string {
+//
+// A machine under memory pressure gets the floor outright. The ceiling is
+// garbage the runtime has not collected because it was told there was room;
+// on a machine that is already compressing and swapping there is no room, and
+// every gigabyte the ceiling grants is paid by evicting someone else's pages.
+// The floor trades that for the run's own GC time, which is the trade a
+// pressured machine wants: the check pays, not everything else.
+func CheckGoMemLimit(totalRAMBytes uint64, existing string, pressure Pressure) string {
 	if existing != "" {
 		return existing
 	}
+	if pressure > Green {
+		return "3GiB"
+	}
 	gib := int(totalRAMBytes / (2 << 30))
 	return fmt.Sprintf("%dGiB", clampInt(gib, 3, 6))
+}
+
+// CheckGoMaxProcs is the parallelism the queue grants the Go-runtime tools it
+// wraps. On a green machine it grants nothing — an empty string means "do not
+// set it" and the tool uses every core, which is the right spend for one run
+// on an idle machine. Under pressure it halves the cores, never below two:
+// eleven runnable threads on a machine that has to page every allocation in
+// is eleven threads taking page faults, and half of them buys back an
+// interactive machine for a modest wall-clock cost. An operator's explicit
+// GOMAXPROCS always wins, whatever the level.
+func CheckGoMaxProcs(numCPU int, existing string, pressure Pressure) string {
+	if existing != "" {
+		return existing
+	}
+	if pressure == Green {
+		return ""
+	}
+	return strconv.Itoa(max(2, numCPU/2))
 }

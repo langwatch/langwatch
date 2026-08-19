@@ -113,6 +113,11 @@ function startRun(tag: string, options: RunOptions = {}): Run {
     // suite would be testing haven instead (see the delegation tests below,
     // which exercise that path deliberately).
     CHECK_QUEUE_IMPL: "js",
+    // And they pin the pressure level, because the queue measures the real
+    // machine: on a laptop that is genuinely swapping, every derived-limit
+    // assertion would flake red. The pressure tests below force their own
+    // levels the same way.
+    CHECK_PRESSURE: "green",
     ...options.env,
   })) {
     if (value !== undefined) env[key] = value;
@@ -496,6 +501,26 @@ describe("check queue", () => {
       expect(expected).toBeGreaterThanOrEqual(1);
     });
 
+    /** @scenario "Memory pressure narrows the queue to one run" */
+    it("narrows the derived limit to one under pressure", async () => {
+      const result = await startRun("explain", {
+        argv: ["--explain"],
+        env: { CHECK_SLOTS: undefined, CI: undefined, CHECK_PRESSURE: "red" },
+      }).done;
+
+      expect(result.stderr).toContain("slots=1 source=pressure");
+      expect(result.stderr).toContain("pressure=red");
+    });
+
+    it("lets an explicit CHECK_SLOTS win over pressure", async () => {
+      const result = await startRun("explain", {
+        argv: ["--explain"],
+        env: { CHECK_SLOTS: "3", CI: undefined, CHECK_PRESSURE: "red" },
+      }).done;
+
+      expect(result.stderr).toContain("slots=3 source=CHECK_SLOTS");
+    });
+
     /** @scenario "CI does not queue by default" */
     it("does not queue under CI", async () => {
       const explained = await startRun("explain", {
@@ -513,6 +538,111 @@ describe("check queue", () => {
       );
       await Promise.all(runs.map((run) => run.done));
       expect(maxOverlap(readEvents())).toBe(2);
+    });
+  });
+
+  describe("given the machine is under memory pressure", () => {
+    /** Dumps the environment the wrapper hands the command it runs. */
+    function envDumper(): { script: string; out: string } {
+      const out = path.join(scratch, "child-env.json");
+      const script = path.join(scratch, "dump-env.cjs");
+      writeFileSync(
+        script,
+        [
+          'const fs = require("node:fs");',
+          "const [target] = process.argv.slice(2);",
+          "fs.writeFileSync(target, JSON.stringify({",
+          "  GOMEMLIMIT: process.env.GOMEMLIMIT ?? null,",
+          "  GOMAXPROCS: process.env.GOMAXPROCS ?? null,",
+          "}));",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+      return { script, out };
+    }
+
+    /** @scenario "Memory pressure lowers the memory ceiling to the floor" */
+    /** @scenario "Memory pressure halves the compiler's parallelism" */
+    it("hands the command the floor and half the cores", async () => {
+      const { script, out } = envDumper();
+      const result = await startRun("pressured", {
+        argv: ["node", script, out],
+        env: {
+          CHECK_PRESSURE: "red",
+          GOMEMLIMIT: undefined,
+          GOMAXPROCS: undefined,
+        },
+      }).done;
+
+      expect(result.code).toBe(0);
+      const child = JSON.parse(readFileSync(out, "utf8"));
+      expect(child.GOMEMLIMIT).toBe("3GiB");
+      const cpus = os.availableParallelism();
+      expect(child.GOMAXPROCS).toBe(String(Math.max(2, Math.floor(cpus / 2))));
+    });
+
+    it("leaves the parallelism alone on a green machine", async () => {
+      const { script, out } = envDumper();
+      const result = await startRun("green", {
+        argv: ["node", script, out],
+        env: {
+          CHECK_PRESSURE: "green",
+          GOMEMLIMIT: undefined,
+          GOMAXPROCS: undefined,
+        },
+      }).done;
+
+      expect(result.code).toBe(0);
+      const child = JSON.parse(readFileSync(out, "utf8"));
+      expect(child.GOMEMLIMIT).toMatch(/GiB$/);
+      expect(child.GOMEMLIMIT).not.toBe(null);
+      expect(child.GOMAXPROCS).toBe(null);
+    });
+
+    it("lets an operator's explicit settings through unchanged", async () => {
+      const { script, out } = envDumper();
+      const result = await startRun("operator", {
+        argv: ["node", script, out],
+        env: { CHECK_PRESSURE: "red", GOMEMLIMIT: "8GiB", GOMAXPROCS: "9" },
+      }).done;
+
+      expect(result.code).toBe(0);
+      const child = JSON.parse(readFileSync(out, "utf8"));
+      expect(child.GOMEMLIMIT).toBe("8GiB");
+      expect(child.GOMAXPROCS).toBe("9");
+    });
+  });
+
+  describe("given a run is killed from outside the queue", () => {
+    /** @scenario "A run killed from outside is reported as not the queue's doing" */
+    it("says the queue never kills and names the wrong fix", async () => {
+      const result = await startRun("killed", {
+        argv: ["sh", "-c", "kill -KILL $$"],
+      }).done;
+
+      expect(result.code).toBe(137);
+      expect(result.stderr).toContain("killed from outside by SIGKILL");
+      expect(result.stderr).toContain("never kills");
+      expect(result.stderr).toContain("Do not set CHECK_SLOTS=0");
+    });
+
+    it("says nothing about a signal the wrapper itself forwarded", async () => {
+      const run = startRun("interrupted", { holdMs: 5000 });
+      await waitForHolder();
+      run.child.kill("SIGTERM");
+      const result = await run.done;
+
+      expect(result.stderr).not.toContain("killed from outside");
+    });
+
+    it("says nothing about a clean failure", async () => {
+      const result = await startRun("failing", {
+        argv: ["sh", "-c", "exit 7"],
+      }).done;
+
+      expect(result.code).toBe(7);
+      expect(result.stderr).not.toContain("killed from outside");
     });
   });
 

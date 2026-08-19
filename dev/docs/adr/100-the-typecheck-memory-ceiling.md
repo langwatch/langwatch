@@ -68,10 +68,55 @@ above has no wall-clock column.
 A locally built haven binary keeps the old clamp until `make haven install`, so
 the change reaches developers on their next reinstall rather than immediately.
 
+## Amendment: pressure mode (2026-08-19)
+
+The clamp above still assumes an otherwise idle machine. Measured on the same
+18 GiB laptop while it was **not** idle — swap 89% full, compressor holding
+42 GB compressed into 7.7 GB of RAM, `kern.memorystatus_vm_pressure_level` at
+warning — an uncapped cold typecheck footprinted **7.26 GB** peak with a max
+RSS of only 1.9 GB: most of its pages were compressed or swapped in the same
+breath they were allocated, which is the eviction storm the person at the
+keyboard feels. The time split says the same thing: 331 s wall, **80 s user
+against 162 s system** — twice as much kernel time (paging) as compiling. CPU
+never exceeded ~2.8 of 11 cores, so on a pressured machine the constraint is
+memory, and killing the run by hand — which is what people do, and what reads
+back as a mystery exit 137 — was rational.
+
+So the queue now reads the machine's pressure level (ADR-090's
+`ClassifyPressure`: swap fill or compressor occupancy, either alone) at spawn,
+and under amber or red runs every check in its smallest shape:
+
+- `GOMEMLIMIT` resolves to the **floor (3 GiB)** outright. The ceiling is
+  garbage the runtime has not collected because it was told there was room;
+  under pressure there is no room, and every granted gigabyte evicts someone
+  else's pages. The floor trades that for the run's own GC time — the check
+  pays, not the machine.
+- `GOMAXPROCS` is halved (never below two). Eleven runnable threads all
+  taking page faults is what a seized machine feels like; half of them buys
+  back interactivity for a modest wall cost.
+- The machine-derived slot limit narrows to **one**. The formula's per-run
+  budget assumes RAM that a pressured machine does not have.
+
+Explicit `GOMEMLIMIT`, `GOMAXPROCS` and `CHECK_SLOTS` still win, and
+`CHECK_PRESSURE=green|amber|red` forces the level (for tests, and for an
+operator who knows better). A machine the queue cannot read is green: a
+governor that cannot see must not throttle. CI is unaffected — it does not
+queue, and its runners are not pressured.
+
+Validated on the same machine at red: the pressured shape (3 GiB, 5 procs)
+completed the same cold typecheck with the numbers recorded in the PR that
+landed this amendment. There is no swap-only-the-check mechanism to reach for
+instead: macOS offers no per-process swap steering, and `taskpolicy -b`
+(background QoS) was measured starving a typecheck to 0.3–4% CPU for eight
+minutes on a pressured machine, because background priority deprioritizes the
+page-ins it needs to make progress at all.
+
 ## References
 
-- Related ADRs: [ADR-095](095-haven-tsgo-governor.md) (the governor whose
-  `GOMEMLIMIT` policy this amends), [ADR-099](099-typescript-7-is-the-compiler.md)
+- Related ADRs: [ADR-090](090-haven-pressure-governor.md) (the pressure levels
+  and thresholds this reuses), [ADR-095](095-haven-tsgo-governor.md) (the
+  governor whose `GOMEMLIMIT` policy this amends),
+  [ADR-099](099-typescript-7-is-the-compiler.md)
   (the compiler move this was found alongside)
 - Specs: `specs/setup/check-slots.feature`,
   `specs/setup/haven-tsgo-governor.feature`

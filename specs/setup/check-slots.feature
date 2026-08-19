@@ -28,6 +28,7 @@ Feature: Machine-wide slots for whole-repo checks
   #
   # Knobs, all optional:
   #   CHECK_SLOTS=N            how many may run at once (0 disables the gate)
+  #   CHECK_PRESSURE=<level>   force the memory-pressure level (green/amber/red)
   #   CHECK_QUEUE_DIR=<path>   where the shared state lives
   #   CHECK_QUEUE_POLL_MS=N    how often a waiter re-checks
   #   CHECK_QUEUE_HEARTBEAT_MS how often a waiting run repeats itself
@@ -143,6 +144,66 @@ Feature: Machine-wide slots for whole-repo checks
     Given CI is set and CHECK_SLOTS is not
     When a check runs
     Then the gate is off, because a CI runner runs one check at a time anyway
+
+  # --- Memory pressure: the machine says the formula's assumption is false ---
+
+  # The derived limit and the 6 GiB memory ceiling both assume an otherwise
+  # idle machine. A machine that is already compressing and swapping is the
+  # machine saying that assumption is false: its RAM is spoken for, and every
+  # gigabyte a check takes is paid by evicting someone else's pages. Under
+  # pressure the check runs in its smallest shape, so the check pays for the
+  # shortage in its own time instead of everything else paying in swap.
+  # The level and its thresholds are ADR-090's (domain/pressure.go): either
+  # swap fill or compressor occupancy alone can raise it. A machine the queue
+  # cannot read is green, because a governor that cannot see must not throttle.
+
+  @unit
+  Scenario: Memory pressure narrows the queue to one run
+    Given the machine reports amber or red memory pressure
+    And CHECK_SLOTS is not set
+    When the limit is resolved
+    Then it is one, whatever the formula would have said
+    And an explicit CHECK_SLOTS still wins, because it is the operator's call
+
+  @unit
+  Scenario: Memory pressure lowers the memory ceiling to the floor
+    Given the machine reports amber or red memory pressure
+    When a check runs through the queue
+    Then its GOMEMLIMIT is the 3 GiB floor, whatever the machine's size
+    And an operator's explicit GOMEMLIMIT still reaches it unchanged
+
+  @unit
+  Scenario: Memory pressure halves the compiler's parallelism
+    Given the machine reports amber or red memory pressure
+    When a check runs through the queue
+    Then its GOMAXPROCS is half the cores, never below two
+    And a green machine sets no GOMAXPROCS at all
+    And an operator's explicit GOMAXPROCS still wins
+
+  @unit
+  Scenario: A forced pressure level overrides the measurement
+    Given CHECK_PRESSURE is set to green, amber or red
+    When the level is resolved
+    Then the forced level is used instead of measuring the machine
+    And a misspelled level falls back to the measurement, like a CHECK_SLOTS typo
+
+  # --- A killed run must not read as the queue's doing ---
+
+  # Observed in the wild: a whole-tree typecheck ended in a bare exit 137, and
+  # the agent driving it concluded the queue had killed it and re-ran with
+  # CHECK_SLOTS=0, removing the machine-wide serialization for everyone. The
+  # queue never kills runs; a signal death it did not forward is an operator
+  # kill or the OS reclaiming memory, and the wrapper now says so at the
+  # moment it happens, where the next reader of the transcript will see it.
+
+  @unit
+  Scenario: A run killed from outside is reported as not the queue's doing
+    Given a check is running through the queue
+    When the command dies by a signal the wrapper did not forward
+    Then the wrapper says the queue never kills runs and names the likely causes
+    And it says to re-run the same command rather than set CHECK_SLOTS=0
+    And a signal the wrapper itself forwarded, like Ctrl-C, is not reported
+    And a command that fails on its own is not reported
 
   # --- The bin shims: the package scripts are not the only way in ---
 

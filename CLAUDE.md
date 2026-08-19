@@ -210,10 +210,22 @@ and is otherwise transparent (same stdio, same exit code). Queued, it says so on
 stderr, which is what tells you a slow run was waiting rather than hung.
 `CHECK_SLOTS=N` overrides the limit and `CHECK_SLOTS=0` turns the queue off;
 unset, the limit comes from the machine (one per 6 GiB of RAM, capped at one per
-4 cores) and CI does not queue at all. `node dev/scripts/check-queue.mjs
---explain` shows the limit and who currently holds a slot. Don't cap the tools'
+4 cores) and CI does not queue at all. **A machine under memory pressure runs
+checks in their smallest shape**: when swap or the compressor is filling
+(ADR-090 thresholds), the queue narrows the derived limit to one run, drops
+`GOMEMLIMIT` to its 3 GiB floor and halves `GOMAXPROCS`, so the check pays for
+the shortage in its own GC time instead of everything else paying in swap
+(`CHECK_PRESSURE=green|amber|red` forces the level; explicit `GOMEMLIMIT` /
+`GOMAXPROCS` / `CHECK_SLOTS` still win). `node dev/scripts/check-queue.mjs
+--explain` shows the limit, the pressure level and who currently holds a slot.
+Don't cap the tools'
 own threads instead (`RAYON_NUM_THREADS` does work on biome): it spends the same
 CPU over 5x the wall clock. See `specs/setup/check-slots.feature`.
+**A check that dies with exit 137 was killed from outside** — an operator kill
+or macOS reclaiming memory — never by the queue, which kills nothing and now
+says so on stderr when it happens. Re-run the same command through the queue;
+never react with `CHECK_SLOTS=0`, which removes the serialization for every
+worktree and agent on the machine.
 
 **Going around the scripts does not go around the queue.** `platform/app`'s
 `node_modules/.bin/{tsc,tsgo,biome}` are shims installed by
