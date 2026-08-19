@@ -47,7 +47,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-langchain = ["langchain-core>=0.3.0,<2.0.0"]
+langchain = ["langchain-core>=1.5.4,<2.0.0"]
 dspy = ["dspy-ai>=3.3.0,<4"]
 litellm = ["litellm>=1.96.0"]
 dev = ["ruff>=0.16.2"]
