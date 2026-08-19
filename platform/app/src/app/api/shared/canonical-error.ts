@@ -144,9 +144,20 @@ export function canonicalErrorFor(
 }
 
 /**
- * The envelope for a handled error: its own code and status, its meta, and
- * its reason chain. A 5xx is the one case where none of that reaches the
- * caller, because a platform failure's detail is not API copy.
+ * The envelope for a handled error: its own code, status, meta, and reason
+ * chain — at ANY status, including 5xx.
+ *
+ * A HandledError's message is customer-safe by construction (ADR-045: thrown
+ * only when "the cause is both known and user-relevant"), so a platform
+ * failure like `lwql_unavailable` (503) ships its real code and message the
+ * same as a 404 would; collapsing it to the generic body would throw away
+ * the one piece of information ("this deployment doesn't have LangWatchQL
+ * provisioned, retrying won't help") the class exists to carry. Only a
+ * genuinely unhandled error — `HttpError` and the final fallback below, which
+ * carry no such guarantee — stays opaque at 5xx. Mirrors the legacy Hono
+ * handler's `handledErrorResponseBody`
+ * (`src/app/api/middleware/error-handler.ts`), which never special-cased
+ * status for a HandledError either.
  */
 function handledErrorEnvelope(
   error: HandledError,
@@ -156,18 +167,6 @@ function handledErrorEnvelope(
   const status = (
     isValidation ? VALIDATION_ERROR_STATUS : (error.httpStatus ?? 500)
   ) as ContentfulStatusCode;
-
-  if (status >= 500) {
-    return {
-      status,
-      body: apiErrorBody({
-        status,
-        code: FALLBACK_ERROR_CODE,
-        message: INTERNAL_ERROR_MESSAGE,
-        ...traceIds,
-      }),
-    };
-  }
 
   const reasons = reasonsOf(error);
   return {
