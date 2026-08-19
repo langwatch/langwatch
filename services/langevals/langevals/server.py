@@ -27,7 +27,6 @@ from typing import Callable, List, Optional
 from langevals_core.base_evaluator import (
     EvaluationResultSkipped,
     EvaluationResultError,
-    models_env_vars,
 )
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from mangum import Mangum
@@ -89,22 +88,23 @@ def size_thread_pool_for_evaluations() -> None:
         limiter.total_tokens = wanted
 
 
-def model_env_key(env: Optional[dict[str, str]]) -> tuple:
-    """The part of a request's `env` that gets written into `os.environ`.
+def request_env_key(env: Optional[dict[str, str]]) -> tuple:
+    """Everything a request can write into `os.environ`.
 
-    Mirrors the filter in `BaseEvaluator.set_model_envs`: model provider
-    credentials and litellm passthrough variables. Two requests with the same
-    key write the same process environment, so they can run at the same time.
+    `BaseEvaluator.set_model_envs` writes the model provider credentials and
+    the litellm passthrough variables, but it is not the only writer: the
+    custom LLM evaluators and every Ragas evaluator, through `prepare_llm`,
+    copy the whole `env` of the request into `os.environ` while they run. So
+    the whole `env` is what decides which requests write the same process
+    environment. Requests that share this key write identical values and can
+    run at the same time. Any difference keeps them in separate generations,
+    whether or not the variable belongs to a provider this service knows,
+    because credentials for Bedrock and other providers reach litellm through
+    variables that no allowlist here covers.
     """
     if not env:
         return ()
-    return tuple(
-        sorted(
-            (key, value)
-            for key, value in env.items()
-            if key in models_env_vars or key.startswith("X_LITELLM_")
-        )
-    )
+    return tuple(sorted(env.items()))
 
 
 class EvaluationQueueTimeout(Exception):
@@ -280,12 +280,13 @@ def create_evaluator_routes(evaluator_cls):
         # evaluation never blocks the event loop and /healthcheck stays
         # responsive under load.
         try:
-            with evaluation_gate.admit(model_env_key(req.env)):
+            with evaluation_gate.admit(request_env_key(req.env)):
                 if module_name == "ragas":
                     nest_asyncio_if_running_loop()
                 # Constructing the evaluator writes the request env into
-                # os.environ (set_model_envs). Everything admitted together
-                # carries the same key, so concurrent writes are identical.
+                # os.environ (set_model_envs), and some evaluators write the
+                # whole env again while they run. Everything admitted
+                # together carries the same env, so the writes are identical.
                 evaluator = evaluator_cls(settings=(req.settings or {}), env=req.env)  # type: ignore
                 return evaluator.evaluate_batch(
                     req.data,

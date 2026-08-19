@@ -229,6 +229,43 @@ async def test_different_env_evaluations_never_overlap(slow_exact_match):
 
 
 @pytest.mark.anyio
+async def test_different_credentials_outside_the_provider_lists_never_overlap(
+    slow_exact_match,
+):
+    """A variable no provider list covers still separates two requests.
+
+    `set_model_envs` is not the only writer of the process environment: the
+    custom LLM evaluators and every Ragas evaluator copy the whole request
+    env into `os.environ` while they run. Bedrock credentials travel that
+    way, so two tenants that differ only in an AWS variable would overwrite
+    each other if the gate let them share a generation.
+    """
+    transport = httpx.ASGITransport(app=server.app)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", timeout=120
+    ) as client:
+        responses = await asyncio.gather(
+            *(
+                client.post(
+                    "/langevals/exact_match/evaluate",
+                    json=evaluation_request(
+                        {
+                            "AWS_ACCESS_KEY_ID": f"{tenant}-id",
+                            "AWS_SECRET_ACCESS_KEY": f"{tenant}-secret",
+                        }
+                    ),
+                )
+                for tenant in ("tenant-a", "tenant-b")
+            )
+        )
+
+    assert all(r.status_code == 200 for r in responses)
+    assert len(slow_exact_match) == 2
+    first, second = sorted(slow_exact_match, key=lambda o: o["started"])
+    assert second["started"] >= first["finished"]
+
+
+@pytest.mark.anyio
 async def test_environment_is_restored_after_the_burst(slow_exact_match):
     expected_env = dict(os.environ)
     transport = httpx.ASGITransport(app=server.app)
@@ -444,11 +481,20 @@ def test_a_repeating_environment_cannot_hold_the_queue_front():
     assert gate.waiting_evaluations == 0
 
 
-def test_model_env_key_ignores_non_model_vars():
-    assert server.model_env_key(None) == ()
-    assert server.model_env_key({"NOT_A_MODEL_VAR": "x"}) == ()
+def test_the_env_key_separates_requests_by_every_variable():
+    assert server.request_env_key(None) == ()
+    assert server.request_env_key({}) == ()
     same = {"OPENAI_API_KEY": "k", "AZURE_API_KEY": "a"}
-    assert server.model_env_key(same) == server.model_env_key(dict(reversed(same.items())))
-    assert server.model_env_key({"OPENAI_API_KEY": "k"}) != server.model_env_key(
+    assert server.request_env_key(same) == server.request_env_key(
+        dict(reversed(same.items()))
+    )
+    assert server.request_env_key({"OPENAI_API_KEY": "k"}) != server.request_env_key(
         {"OPENAI_API_KEY": "other"}
     )
+    # A credential no provider list here covers still changes the key. Bedrock
+    # reaches litellm through AWS variables, and the evaluators that copy the
+    # whole env would otherwise overwrite each other while both run.
+    assert server.request_env_key({"AWS_SECRET_ACCESS_KEY": "a"}) != ()
+    assert server.request_env_key(
+        {"AWS_SECRET_ACCESS_KEY": "a"}
+    ) != server.request_env_key({"AWS_SECRET_ACCESS_KEY": "b"})
