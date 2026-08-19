@@ -250,7 +250,7 @@ Feature: Unified authorization engine
   # append is accepted, a revocation applies the deny effect synchronously
   # on the calling path, without waiting for the queued fold. Redis never
   # gates it, so the guarantee below must hold with Redis stopped entirely.
-  @integration @unimplemented
+  @integration
   Scenario: A revocation holds before the revoke call returns, with Redis stopped
     Given user "alice" has role "member" bound at project "chatbot"
     And Redis is unavailable

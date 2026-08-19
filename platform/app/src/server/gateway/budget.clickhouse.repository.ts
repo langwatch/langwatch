@@ -838,7 +838,7 @@ export class GatewayBudgetClickHouseRepository {
       const seen = existing.get(pulledRequestId(row.restatementKey));
       if (!seen) return true;
       return !(
-        Number(seen.AmountNanoUSD) === row.amountNanoUsd &&
+        BigInt(seen.AmountNanoUSD ?? 0) === BigInt(row.amountNanoUsd) &&
         Number(seen.TokensInput) === row.tokensInput &&
         Number(seen.TokensOutput) === row.tokensOutput &&
         Number(seen.TokensCacheRead) === row.tokensCacheRead &&

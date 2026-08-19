@@ -124,6 +124,31 @@ describe("grants ledger reducer", () => {
       });
     });
 
+    describe("when an adopted binding's role is reassigned", () => {
+      /** @scenario "A role change clears the pre-migration legacy role" */
+      it("drops the imported legacyRole rather than carrying it onto the new role", () => {
+        const imported = grantFact({
+          roleKey: "custom:cr_ops",
+          legacyRole: "ADMIN",
+        });
+        const state = apply([
+          { kind: "grant_attached", grant: imported, actor: ACTOR },
+          {
+            kind: "grant_role_changed",
+            grantId: imported.grantId,
+            from: "custom:cr_ops",
+            to: "custom:cr_sre",
+            actor: ACTOR,
+            occurredAtMs: 2,
+          },
+        ]);
+        expect(state.grants[imported.grantId]?.roleKey).toBe("custom:cr_sre");
+        expect(state.grants[imported.grantId]).not.toHaveProperty(
+          "legacyRole",
+        );
+      });
+    });
+
     describe("when the grant is revoked", () => {
       const state = apply([
         ...attached,
@@ -198,6 +223,151 @@ describe("grants ledger reducer", () => {
 
       it("leaves other principals' grants alone", () => {
         expect(state.grants[survivor.grantId]).toEqual(survivor);
+      });
+    });
+
+    describe("when the offboarding names only the grants the projection had seen", () => {
+      /** The writer resolves `revokedGrantIds` from the compat projection,
+       *  which lags a fold behind the ledger. */
+      const unseen = grantFact({
+        scope: { type: "PROJECT", id: "proj_late" },
+        grantId: "grant_appended_but_not_yet_folded",
+      });
+
+      it("sweeps the grant the id list never mentioned", () => {
+        const state = apply([
+          { kind: "grant_attached", grant: team, actor: ACTOR },
+          { kind: "grant_attached", grant: unseen, actor: ACTOR },
+          { kind: "grant_attached", grant: survivor, actor: ACTOR },
+          {
+            kind: "member_offboarded",
+            userId: "user_alice",
+            revokedGrantIds: [team.grantId],
+            actor: ACTOR,
+            occurredAtMs: 9,
+          },
+        ]);
+
+        expect(state.grants[unseen.grantId]).toBeUndefined();
+        expect(state.grants[team.grantId]).toBeUndefined();
+        expect(state.grants[survivor.grantId]).toEqual(survivor);
+      });
+
+      it("folds to the same state on a replay of the stream", () => {
+        const stream: GrantsLedgerEvent[] = [
+          { kind: "grant_attached", grant: team, actor: ACTOR },
+          { kind: "grant_attached", grant: unseen, actor: ACTOR },
+          {
+            kind: "member_offboarded",
+            userId: "user_alice",
+            revokedGrantIds: [team.grantId],
+            actor: ACTOR,
+            occurredAtMs: 9,
+          },
+        ];
+        const firstFold = apply(stream);
+        const replayFold = apply(stream);
+
+        expect(replayFold).toEqual(firstFold);
+      });
+
+      it("keeps a grant attached after the offboarding, which is a re-onboarding", () => {
+        const rehired = grantFact({ grantId: "grant_rehired" });
+        const state = apply([
+          { kind: "grant_attached", grant: team, actor: ACTOR },
+          {
+            kind: "member_offboarded",
+            userId: "user_alice",
+            revokedGrantIds: [team.grantId],
+            actor: ACTOR,
+            occurredAtMs: 9,
+          },
+          { kind: "grant_attached", grant: rehired, actor: ACTOR },
+        ]);
+
+        expect(state.grants[rehired.grantId]).toEqual(rehired);
+      });
+    });
+  });
+
+  describe("given a revocation that named an identity rather than ids", () => {
+    const seen = grantFact({ grantId: "grant_seen" });
+    const unseen = grantFact({ grantId: "grant_unseen" });
+    const otherScope = grantFact({
+      grantId: "grant_other_scope",
+      scope: { type: "PROJECT", id: "proj_chatbot" },
+    });
+    const otherPrincipal = grantFact({
+      grantId: "grant_other_principal",
+      principal: { type: "user", id: "user_bob" },
+    });
+
+    const attached: GrantsLedgerEvent[] = [
+      { kind: "grant_attached", grant: seen, actor: ACTOR },
+      { kind: "grant_attached", grant: unseen, actor: ACTOR },
+      { kind: "grant_attached", grant: otherScope, actor: ACTOR },
+      { kind: "grant_attached", grant: otherPrincipal, actor: ACTOR },
+    ];
+
+    describe("when the selector names a principal at one scope", () => {
+      const state = apply([
+        ...attached,
+        {
+          kind: "grant_revoked",
+          grantId: seen.grantId,
+          selector: {
+            principal: { type: "user", id: "user_alice" },
+            scope: { type: "TEAM", id: "team_client_a" },
+          },
+          actor: ACTOR,
+          occurredAtMs: 9,
+        },
+      ]);
+
+      it("removes the grant the lagging projection never listed", () => {
+        expect(state.grants[unseen.grantId]).toBeUndefined();
+        expect(state.grants[seen.grantId]).toBeUndefined();
+      });
+
+      it("leaves the same principal's other scopes and other principals alone", () => {
+        expect(state.grants[otherScope.grantId]).toEqual(otherScope);
+        expect(state.grants[otherPrincipal.grantId]).toEqual(otherPrincipal);
+      });
+    });
+
+    describe("when the selector names a principal at every scope", () => {
+      it("removes every grant that principal holds", () => {
+        const state = apply([
+          ...attached,
+          {
+            kind: "grant_revoked",
+            selector: { principal: { type: "user", id: "user_alice" } },
+            actor: ACTOR,
+            occurredAtMs: 9,
+          },
+        ]);
+
+        expect(state.grants[seen.grantId]).toBeUndefined();
+        expect(state.grants[unseen.grantId]).toBeUndefined();
+        expect(state.grants[otherScope.grantId]).toBeUndefined();
+        expect(state.grants[otherPrincipal.grantId]).toEqual(otherPrincipal);
+      });
+    });
+
+    describe("when the revocation carries no selector", () => {
+      it("removes the named id alone, as it always did", () => {
+        const state = apply([
+          ...attached,
+          {
+            kind: "grant_revoked",
+            grantId: seen.grantId,
+            actor: ACTOR,
+            occurredAtMs: 9,
+          },
+        ]);
+
+        expect(state.grants[seen.grantId]).toBeUndefined();
+        expect(state.grants[unseen.grantId]).toEqual(unseen);
       });
     });
   });

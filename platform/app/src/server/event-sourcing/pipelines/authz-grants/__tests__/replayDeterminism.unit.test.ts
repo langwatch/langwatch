@@ -90,6 +90,11 @@ async function captureEmissions(): Promise<BackfillGrantEmission[]> {
         });
       }
     },
+    // The backfill defines no roles — it only binds users to teams — but the
+    // emitter is one interface, so the stub implements all of it.
+    defineRoles: async () => undefined,
+    revokeGrants: async () => undefined,
+    deleteRole: async () => undefined,
     proveMigrationParity: async () => undefined,
   };
   const migration = new TeamUserBackfillMigration({

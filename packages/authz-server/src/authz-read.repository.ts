@@ -2,7 +2,7 @@
  * ADR-092 — the read port. This package holds the authorization POLICIES
  * (what a snapshot means); the app holds the QUERIES, as a Prisma
  * repository implementing this interface
- * (platform/app/src/server/authz/repositories/authz-read.prisma.repository.ts).
+ * (platform/app/src/server/app-layer/authz/repositories/authz-read.prisma.repository.ts).
  * Methods return stored facts - no policy - and follow the repository
  * naming convention (findX, never getX).
  */

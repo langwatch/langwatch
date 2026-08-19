@@ -34,7 +34,15 @@ function createMockLogger() {
 // (which stores the equivalent under `_tracerOptions`). Read whichever is
 // present so this doesn't re-break on the next OTel internal reshuffle.
 function getInternalTracerConfig(provider: any): any {
-  return provider._tracerOptions ?? getInternalTracerConfig(provider);
+  const config = provider?._tracerOptions ?? provider?._config;
+  if (config === undefined) {
+    throw new Error(
+      "Tracer provider exposes neither `_tracerOptions` (sdk-trace) nor " +
+        "`_config` (sdk-trace-base). OTel moved this private field again — " +
+        "find its new name and add it here.",
+    );
+  }
+  return config;
 }
 
 describe('setupObservability Integration - Configuration Options', () => {

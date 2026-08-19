@@ -44,6 +44,17 @@ vi.mock("~/server/rbac/role-binding-resolver", async (importOriginal) => {
   };
 });
 
+// The key's grants and its private role are ledger commands now.
+vi.mock("~/server/app-layer/authz/ledger", () => ({
+  grantsLedgerWriter: () => ({
+    attachBindings: vi.fn().mockResolvedValue({ attached: [], duplicates: [] }),
+    revokeBindings: vi.fn(),
+    revokeBindingsWhere: vi.fn().mockResolvedValue(0),
+    defineRole: vi.fn(),
+    deleteRole: vi.fn(),
+  }),
+}));
+
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
@@ -100,42 +111,28 @@ function makePrisma({
     orgMemberships: [{ role: organizationRole }],
     groupMemberships: groupIds.map((groupId) => ({ groupId })),
   });
-  const tx = {
-    apiKey: {
-      create: vi.fn().mockResolvedValue({ id: "ak_1", name: "k" }),
-      update: vi.fn(),
-      findUnique: vi.fn(),
-    },
-    roleBinding: {
-      createMany: vi.fn().mockResolvedValue({ count: 1 }),
-      deleteMany: vi.fn(),
-      count: roleBindingCountFn,
-    },
-    customRole: {
-      create: vi.fn().mockResolvedValue({ id: "cr_1" }),
-      update: vi.fn(),
-      findFirst: vi.fn().mockResolvedValue(null),
-      findUnique: vi.fn().mockResolvedValue(null),
-      deleteMany: vi.fn(),
-    },
-    teamUser: { findFirst: teamUserFindFirst },
-    // The ceiling runs INSIDE the transaction, so every table it reads has to
-    // exist on the tx client, not just the outer one.
-    user: { findFirst: userFindFirst },
-    // The personal-workspace guard resolves TEAM and PROJECT scopes on the tx
-    // client; null means none of the scopes reach a personal workspace.
-    team: { findFirst: vi.fn().mockResolvedValue(null) },
-    project: { findFirst: vi.fn().mockResolvedValue(null) },
-  };
-
   return {
     prisma: {
-      $transaction: vi.fn((fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
+      apiKey: {
+        create: vi.fn().mockResolvedValue({ id: "ak_1", name: "k" }),
+        update: vi.fn(),
+        findUnique: vi.fn(),
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      customRole: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        findUnique: vi.fn().mockResolvedValue(null),
+      },
       organizationUser: {
         findFirst: vi.fn().mockResolvedValue({ userId: USER_ID }),
       },
       project: {
-        findFirst: vi.fn().mockResolvedValue(projectWithTeam),
+        // The personal-workspace guard asks the same table a different
+        // question (it names an `OR` over the personal flags); none of these
+        // scopes is a personal workspace, so that question answers null.
+        findFirst: vi.fn(async ({ where }: { where?: { OR?: unknown } }) =>
+          where?.OR ? null : projectWithTeam,
+        ),
         findUnique: vi.fn().mockResolvedValue(projectWithTeam),
       },
       team: {
@@ -153,7 +150,6 @@ function makePrisma({
       teamUser: { findFirst: teamUserFindFirst },
       // Membership and group ids in one round trip — see `resolveLegacyCeiling`.
       user: { findFirst: userFindFirst },
-      apiKey: { findMany: vi.fn().mockResolvedValue([]) },
     } as any,
     teamUserFindFirst,
     roleBindingCountFn,
