@@ -762,16 +762,13 @@ describe("given the saved workbench chart REST endpoints", () => {
         const response = await call({ path, auth: asProject(openProject) });
         const body = (await response.json()) as Body;
         expect(response.status, path).toBe(500);
-        // `saved_workbench_chart_definition_invalid` is a 5xx `platform`
-        // fault, and a HandledError's message is customer-safe by construction
-        // (ADR-045), so the canonical envelope ships its real code at 500
-        // rather than collapsing it to the generic `internal_error` body —
-        // `type` still names the status class. Asserted rather than skipped
-        // because the alternative outcome this rules out is a 200 carrying
-        // the raw row.
-        expect(body.error.code, path).toBe(
-          "saved_workbench_chart_definition_invalid",
-        );
+        // Handled 5xx bodies are collapsed to the opaque `internal_error`
+        // shape by the canonical envelope — a 5xx is the platform's fault,
+        // so the body carries nothing for the caller to act on beyond trace
+        // ids; the coded detail lives in the server logs. Asserted rather
+        // than skipped because the alternative outcome this rules out is a
+        // 200 carrying the raw row.
+        expect(body.error.code, path).toBe("internal_error");
         expect(body.error.type, path).toBe("internal_error");
         expect(
           JSON.stringify(body),
