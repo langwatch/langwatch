@@ -14,7 +14,9 @@ Feature: Product sidebars in the new navigation modes
   The column is wider than the current chrome's and its type is one step
   smaller, which is what lets the longer page names hold one line. The
   size is a property of the sidebar, not of the menu components, so the
-  current chrome keeps its own size unchanged.
+  current chrome keeps its own size unchanged. The pages scroll inside
+  the column, and the scrollbar sits against the content panel with no
+  gap.
 
   @integration
   Scenario: Quick Search sits first and opens the command bar
@@ -84,3 +86,8 @@ Feature: Product sidebars in the new navigation modes
   Scenario: A rule separates the bottom block from the pages above it
     Given a product sidebar in a new navigation mode
     Then a rule runs above the bottom block
+
+  @integration
+  Scenario: Opening a page by its address reveals its sidebar entry
+    Given I open a product page by its address
+    Then the sidebar brings that page's entry into view

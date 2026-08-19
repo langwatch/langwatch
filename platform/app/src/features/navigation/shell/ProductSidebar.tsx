@@ -3,8 +3,8 @@ import { ArrowLeft, ExternalLink, Search } from "lucide-react";
 import { useState } from "react";
 import { MainMenuSections } from "~/components/MainMenu";
 import { PersonalSidebarLinks } from "~/components/PersonalSidebar";
+import { SidebarSection } from "~/components/sidebar/SidebarSection";
 import { SideMenuItem, SideMenuLink } from "~/components/sidebar/SideMenuLink";
-import { SideMenuSectionLabel } from "~/components/sidebar/SideMenuSectionLabel";
 import { SupportMenu } from "~/components/sidebar/SupportMenu";
 import { SideMenuDensityProvider } from "~/components/sidebar/sideMenuDensity";
 import { ThemeToggle } from "~/components/sidebar/ThemeToggle";
@@ -175,17 +175,12 @@ function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
   return (
     <>
       {groups.map((group) => (
-        <VStack key={group.label} width="full" gap={0.5} align="start">
-          {showExpanded && (
-            <Box
-              color="gray.500"
-              paddingX={2}
-              paddingTop={2.5}
-              paddingBottom={0.5}
-            >
-              <SideMenuSectionLabel label={group.label} />
-            </Box>
-          )}
+        <SidebarSection
+          key={group.id}
+          id={group.id}
+          label={group.label}
+          showExpanded={showExpanded}
+        >
           {group.items.map((item) => (
             <SideMenuLink
               key={item.href}
@@ -216,7 +211,7 @@ function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
               }
             />
           ))}
-        </VStack>
+        </SidebarSection>
       ))}
     </>
   );
@@ -311,7 +306,6 @@ function SidebarContent({
 }) {
   return (
     <VStack
-      paddingX={3}
       paddingTop={2}
       paddingBottom={2}
       gap={0}
@@ -320,8 +314,12 @@ function SidebarContent({
       width={SHELL_SIDEBAR_WIDTH_EXPANDED}
       justifyContent="space-between"
     >
+      {/* The scroll region spans the full column and carries the
+          horizontal inset itself, so its scrollbar runs against the
+          content panel instead of floating a padding away from it. */}
       <VStack
         width="full"
+        paddingX={3}
         gap={0.5}
         align="start"
         flex={1}
@@ -329,7 +327,10 @@ function SidebarContent({
         overflowY="auto"
         overflowX="hidden"
         css={{
-          scrollbarWidth: "thin",
+          // No standard scrollbar-width here: Chromium treats it as an
+          // opt out of the ::-webkit-scrollbar styling below, and the
+          // native bar it falls back to is a wide one with a track.
+          // Firefox takes its default scrollbar instead.
           "&::-webkit-scrollbar": { width: "4px" },
           "&::-webkit-scrollbar-thumb": {
             background: "var(--chakra-colors-border-emphasized)",
@@ -346,10 +347,12 @@ function SidebarContent({
         <ProductSidebarBody surface={surface} showExpanded={showExpanded} />
       </VStack>
 
-      <SidebarBottomBlock
-        showExpanded={showExpanded}
-        shouldIncludeSettingsLink={surface !== "settings"}
-      />
+      <Box width="full" paddingX={3}>
+        <SidebarBottomBlock
+          showExpanded={showExpanded}
+          shouldIncludeSettingsLink={surface !== "settings"}
+        />
+      </Box>
     </VStack>
   );
 }

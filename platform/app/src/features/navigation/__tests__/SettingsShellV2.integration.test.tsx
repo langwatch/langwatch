@@ -17,6 +17,7 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -317,6 +318,27 @@ describe("the settings shell in a new navigation mode", () => {
       expect(pills[0]).toHaveStyle({
         color: "var(--chakra-colors-gray-400)",
       });
+    });
+
+    /** @scenario "The settings groups fold, and start open" */
+    it("opens every group, and folds one away when its heading is pressed", async () => {
+      const user = userEvent.setup();
+      renderSettings();
+
+      expect(screen.getByRole("link", { name: "Members" })).toBeInTheDocument();
+
+      const accessHeading = screen.getByRole("button", {
+        name: "Collapse Access",
+      });
+      expect(accessHeading).toHaveAttribute("aria-expanded", "true");
+
+      await user.click(accessHeading);
+
+      expect(
+        screen.queryByRole("link", { name: "Members" }),
+      ).not.toBeInTheDocument();
+      // Folding one group leaves its neighbours alone.
+      expect(screen.getByRole("link", { name: "General" })).toBeInTheDocument();
     });
 
     /** @scenario "A rule separates the way back from the pages below it" */

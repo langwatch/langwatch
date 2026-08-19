@@ -9,7 +9,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -168,6 +168,9 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  // jsdom has no scrollIntoView; the deep-link test installs one.
+  delete (window.HTMLElement.prototype as { scrollIntoView?: unknown })
+    .scrollIntoView;
 });
 
 describe("the product sidebar", () => {
@@ -250,6 +253,29 @@ describe("the product sidebar", () => {
       expect(screen.getByText("Anomaly Rules")).toBeInTheDocument();
       expect(screen.getByText("Tool Catalog")).toBeInTheDocument();
       expect(screen.getByText("Departments")).toBeInTheDocument();
+    });
+  });
+
+  describe("when a page is opened by its address", () => {
+    /** @scenario "Opening a page by its address reveals its sidebar entry" */
+    it("brings that page's entry into view", async () => {
+      const scrolledInto: HTMLElement[] = [];
+      (
+        window.HTMLElement.prototype as unknown as {
+          scrollIntoView: (options?: ScrollIntoViewOptions) => void;
+        }
+      ).scrollIntoView = function (this: HTMLElement) {
+        scrolledInto.push(this);
+      };
+
+      mockPathname = "/gateway/virtual-keys";
+      renderSidebar("gateway");
+
+      await waitFor(() => {
+        expect(
+          scrolledInto.some((el) => el.textContent?.includes("Virtual Keys")),
+        ).toBe(true);
+      });
     });
   });
 

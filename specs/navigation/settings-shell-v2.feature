@@ -38,6 +38,14 @@ Feature: Settings shell in the new navigation modes
     And the pill is grey with a hairline border, not a coloured one
 
   @integration
+  Scenario: The settings groups fold, and start open
+    Given I open Settings in a new navigation mode
+    Then every settings group is open
+    When I press a group heading
+    Then that group folds away and the other groups stay as they are
+    And my choice is kept for the next time I open Settings
+
+  @integration
   Scenario: A rule separates the way back from the pages below it
     Given I open Settings in a new navigation mode
     Then a rule runs under the way back entry
