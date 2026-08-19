@@ -20,15 +20,17 @@ Feature: In-place authorization data migration
   # Per-organization state machine, one-way:
   #
   #   pending ──► migrated ──► finalized      (parity clean: legacy fallback
-  #     │             ▲            │           no longer consulted)
-  #     │             │            ▼
-  #     │             │        rolled_back    (operator only: back on the
-  #     │             │                        legacy path, and pinned there)
-  #     │             │ diffs recorded, held
-  #     └──► parked ──┘                       (error: retried on a later pass)
+  #     │             │  ▲          │           no longer consulted)
+  #     │             │  │          ▼
+  #     │             └──┼───►  rolled_back   (operator only: back on the
+  #     │                │                     legacy path, and pinned there)
+  #     │                │ diffs recorded, held
+  #     └──► parked ─────┘                    (error: retried on a later pass)
   #
   # "Migrated" holds bindings AND legacy rows; behaviour is unchanged until
-  # "finalized", and finalization requires a decision-level parity proof.
+  # "finalized", and finalization requires a decision-level parity proof. The
+  # operator rollback fires from "migrated" or "finalized" alike - both are
+  # already live on the ledger - never from "parked" or "rolled_back" itself.
 
   Background:
     Given an organization "acme" with a team "support"
@@ -78,6 +80,14 @@ Feature: In-place authorization data migration
     When an operator records "acme" as rolled back
     Then permission checks in "acme" consult the legacy fallback again
     And later passes leave "acme" alone instead of re-finalizing it
+
+  @unit
+  Scenario: An operator rolls a migrated organization back to its legacy path
+    Given "acme" was migrated but held on a parity disagreement, so its
+      grant writes already ride the ledger
+    When an operator records "acme" as rolled back
+    Then "acme"'s grant writes return to the imperative path with no deploy
+    And later passes leave "acme" alone instead of re-migrating it
 
   @unit
   Scenario: The pass keeps its lease while one large organization migrates
