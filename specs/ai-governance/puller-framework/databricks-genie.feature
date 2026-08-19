@@ -154,10 +154,33 @@ Feature: Databricks AI/BI Genie puller
 
     @integration
     Scenario: A window whose cost was cut short is asked about again
-      Given a warehouse busy enough to fill the cost query's row limit
+      Given a cost answer that comes back cut short
       When the puller reads the cost
-      Then the watermark stays at the start of the period it could not price
-      And that period is read again on the next run
+      Then that period is read again on the next run
+      And a question asked on its very first instant is read again too
+      # The second line is not the first one restated. Within the settling
+      # look-back a question is re-read regardless of the watermark, so a
+      # scenario phrased only about the watermark's position is either false or
+      # passes on the defect it exists to catch. The instant that decides it is
+      # the period's first: the two windows are half-open in the same direction,
+      # so a question asked exactly there is inside the unpriced period but
+      # excluded by a watermark standing on it — recorded at zero once, then
+      # never looked at again.
+      #
+      # The watermark is monotonic —
+      # a period below it is already re-read by the settling look-back, and a
+      # watermark that could move backwards would widen the re-read window every
+      # time billing hiccuped, without bound.
+
+    @integration
+    Scenario: A period that can never be priced is eventually given up on
+      # The hold above is a bet that the bill is late. A day with more statements
+      # than one reply can carry is refused identically every run, so the bet
+      # never pays and an unbounded hold pins the source to one instant forever.
+      Given a period the warehouse has refused to price for longer than the hold allows
+      When the puller reads the cost
+      Then the watermark moves on without it
+      And those questions keep the zero they already carry
       # Refusing a partial answer is only half the job. A first sweep reads
       # thirty days, and later runs re-read only the settling window, so a
       # watermark that moved past those thirty days would make their zeros the

@@ -61,6 +61,7 @@ import {
   allocateWarehouseCost,
   costReadFloorMs,
   GENIE_CLIENT_APPLICATION,
+  WAREHOUSE_COST_MAX_HOLD_MS,
   warehouseCostChunks,
   warehouseCostRowSchema,
 } from "./databricksWarehouseCost";
@@ -375,6 +376,28 @@ type WarehouseCostRead =
   | { outcome: "failed" };
 
 /**
+ * The last instant still covered by what this run priced, given that `chunk` is
+ * the first piece it could not.
+ *
+ * One millisecond before the chunk starts, and the millisecond is the whole
+ * point. Both boundaries here are half-open in the same direction and that is
+ * what makes the naive answer wrong: the cost query asks
+ * `start_time >= :from_ts`, so a statement AT `chunk.fromMs` belongs to the
+ * unpriced piece, while message enumeration keeps only `createdMs > sinceMs`,
+ * so a watermark of `chunk.fromMs` drops a question asked at that same instant.
+ * It would be emitted once at zero and then filtered out of every later run —
+ * the exact permanence this ceiling exists to prevent, reintroduced on a
+ * one-millisecond seam.
+ *
+ * Chunks are hour-aligned, so this only bites a question asked exactly on the
+ * hour. That is rare and completely deterministic when it happens, which is the
+ * worst combination to leave in: too rare to notice, permanent when it lands.
+ */
+function unpricedFloor(chunk: { fromMs: number }): number {
+  return chunk.fromMs - 1;
+}
+
+/**
  * Turn one cost reply into per-statement cost, or refuse the whole reply.
  *
  * A refusal prices nothing from this reply — the questions are still recorded,
@@ -655,6 +678,24 @@ const cursorSchema = z.object({
    * stamped it — hence the cursor rather than a local.
    */
   sweepStartedAtMs: z.number().int().positive().nullable().default(null),
+  /**
+   * When the watermark first stopped for a bill it could not read, or null when
+   * it is not stopped for one.
+   *
+   * The age of the hold, not its depth. A hold is a bet that the bill is merely
+   * late, and the bet has to be callable: a day with more statements than one
+   * reply can carry is cut short identically on every future run, and a hold
+   * with no expiry pins the source to that instant forever while the sweep it
+   * repeats grows wider each time. Depth cannot tell those apart — a first
+   * sweep is legitimately thirty days back on its first run — so the instant
+   * the hold BEGAN is what is carried, and it is cleared the moment a run
+   * prices its window whole.
+   *
+   * Same shape as `sweepHadGap` above, and for the same reason: that flag
+   * exists because making the resume point hang back at an unreadable space
+   * bought starvation. This is the billing tables' version of the same trade.
+   */
+  costHeldSinceMs: z.number().int().positive().nullable().default(null),
 });
 type GenieCursor = z.infer<typeof cursorSchema>;
 
@@ -687,6 +728,7 @@ function nextWatermark({
   complete,
   oldestPendingMs,
   pricedThroughMs,
+  holdExpired,
 }: {
   previousMs: number;
   sweepStartedAtMs: number;
@@ -713,6 +755,14 @@ function nextWatermark({
    * question could not be answered at all and holding would stall forever.
    */
   pricedThroughMs: number | null;
+  /**
+   * Whether this hold has gone on long enough to stop being a bet on lateness.
+   *
+   * Decided by the caller from `costHeldSinceMs`, which the cursor carries —
+   * same shape as `sweepHadGap`, and for the same reason: a hold with no way to
+   * expire starves the thing it is protecting.
+   */
+  holdExpired: boolean;
 }): number {
   if (!complete) return previousMs;
   const swept = sweepStartedAtMs - WATERMARK_LAG_MS;
@@ -720,8 +770,15 @@ function nextWatermark({
     oldestPendingMs === null ? swept : Math.min(swept, oldestPendingMs - 1);
   // At, not just short of: `pricedThroughMs` is the END of the last period read
   // whole, so everything up to and including that instant has its cost.
+  //
+  // Only while the hold is still worth honouring. `holdExpired` is decided by
+  // how LONG the watermark has been held, not by how far back it sits: a first
+  // sweep starts thirty days behind and that is not a stall, whereas the same
+  // instant refused for a week running is.
   const capped =
-    pricedThroughMs === null ? pending : Math.min(pending, pricedThroughMs);
+    pricedThroughMs === null || holdExpired
+      ? pending
+      : Math.min(pending, pricedThroughMs);
   // Never backwards. An unsettled message always sits above the previous
   // watermark (it passed that filter to be read at all), so this only guards
   // the arithmetic, but a watermark that could move back would re-read forever.
@@ -792,6 +849,7 @@ function parseCursor(
     spaceSetFingerprint: null,
     sweepOldestPendingMs: null,
     sweepStartedAtMs: null,
+    costHeldSinceMs: null,
   };
 }
 
@@ -1312,6 +1370,7 @@ export class DatabricksGeniePuller
           sweep,
           sweepStartedAtMs,
           pricedThroughMs,
+          nowMs: Date.now(),
         }),
       ),
       errorCount: 0,
@@ -2181,7 +2240,7 @@ export class DatabricksGeniePuller
           },
           "databricks warehouse cost ran out of run budget; holding the watermark at the last priced day",
         );
-        return { costByStatementId, pricedThroughMs: chunk.fromMs };
+        return { costByStatementId, pricedThroughMs: unpricedFloor(chunk) };
       }
 
       const read = await this.warehouseCostChunk({
@@ -2206,7 +2265,7 @@ export class DatabricksGeniePuller
           },
           "databricks warehouse cost could not price a day whole; holding the watermark so it is asked again",
         );
-        return { costByStatementId, pricedThroughMs: chunk.fromMs };
+        return { costByStatementId, pricedThroughMs: unpricedFloor(chunk) };
       }
 
       // The question itself did not land. Asking about less would not change
@@ -2503,17 +2562,30 @@ function nextCursor({
   sweep,
   sweepStartedAtMs,
   pricedThroughMs,
+  nowMs,
 }: {
   previous: GenieCursor;
   sweep: SweepResult;
   sweepStartedAtMs: number;
   /** Where cost knowledge ran out this run — see `nextWatermark`. */
   pricedThroughMs: number | null;
+  /** This run's clock, for ageing the cost hold. */
+  nowMs: number;
 }): GenieCursor {
   // `sweep.hadGap` is already sweep-scoped — it was seeded from this cursor —
   // so there is nothing to fold here. One name, one meaning, one place it
   // accumulates.
   const stillSweeping = sweep.resumeSpaceId !== null;
+
+  // The hold starts the first run that owes a ceiling and survives across runs
+  // that keep owing one; any run that prices its window whole clears it, so a
+  // billing table that recovers costs nothing and the clock does not carry over
+  // to the next thing that goes wrong.
+  const costHeldSinceMs =
+    pricedThroughMs === null ? null : (previous.costHeldSinceMs ?? nowMs);
+  const holdExpired =
+    costHeldSinceMs !== null &&
+    nowMs - costHeldSinceMs > WAREHOUSE_COST_MAX_HOLD_MS;
 
   return {
     // A sweep that walked past something it never read is not whole, no matter
@@ -2526,6 +2598,7 @@ function nextCursor({
       complete: sweep.complete && !sweep.hadGap,
       oldestPendingMs: sweep.oldestPendingMs,
       pricedThroughMs,
+      holdExpired,
     }),
     spaceId: sweep.resumeSpaceId,
     // Meaningless without a space to resume into, so it is cleared with it
@@ -2543,5 +2616,9 @@ function nextCursor({
     // Held only while the sweep is still in flight, so the next run stamps a
     // fresh anchor rather than inheriting a stale one and re-reading forever.
     sweepStartedAtMs: stillSweeping ? sweepStartedAtMs : null,
+    // Cleared once expired as well as once priced: the watermark has already
+    // moved past the period, so leaving the stamp would expire every subsequent
+    // hold on arrival and the retry would never work again.
+    costHeldSinceMs: holdExpired ? null : costHeldSinceMs,
   };
 }

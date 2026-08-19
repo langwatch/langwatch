@@ -80,6 +80,29 @@ const ONE_HOUR_MS = 60 * 60 * 1000;
 export const WAREHOUSE_COST_CHUNK_MS = 24 * ONE_HOUR_MS;
 
 /**
+ * How long the watermark may be held waiting for a bill before it gives up.
+ *
+ * Elapsed time, not distance. A first sweep is thirty days behind on its first
+ * run and that is healthy; the same instant refused for a week running is not,
+ * and only a clock can tell the two apart.
+ *
+ * Holding is worth it when the bill is merely late — the tables settle in hours
+ * (`WAREHOUSE_COST_SETTLING_LAG_MS`), so a week of retries is far more than
+ * lateness ever needs. Past that the problem is not lateness but volume: a day
+ * with more Genie statements than one reply can carry is refused identically on
+ * every future run, and volume does not resolve itself.
+ *
+ * Without this bound that case pins the source to a fixed instant forever. It
+ * never prices the day it is waiting on, and it re-sweeps an ever-widening
+ * window to do it — paying more every run for an answer that cannot arrive.
+ * Giving up costs those days their cost figure, which is what they had before
+ * any of this existed; not giving up costs the source its ability to move at
+ * all. The comment on `warehouseCost` states the priority this follows: a
+ * workspace whose billing cannot be read should still get its activity.
+ */
+export const WAREHOUSE_COST_MAX_HOLD_MS = 7 * 24 * ONE_HOUR_MS;
+
+/**
  * The window as oldest-first pieces, each small enough to stand a chance of
  * being answered whole.
  *

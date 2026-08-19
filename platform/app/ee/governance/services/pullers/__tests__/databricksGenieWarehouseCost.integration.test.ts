@@ -35,7 +35,10 @@ import {
   DatabricksGeniePuller,
   WAREHOUSE_COST_ROW_LIMIT,
 } from "../databricksGenie.puller";
-import { WAREHOUSE_COST_SETTLING_LAG_MS } from "../databricksWarehouseCost";
+import {
+  WAREHOUSE_COST_MAX_HOLD_MS,
+  WAREHOUSE_COST_SETTLING_LAG_MS,
+} from "../databricksWarehouseCost";
 import { PULLED_USAGE_HINT_KEY } from "../pulledUsageRecord";
 
 const SPACE_ID = "space-1";
@@ -60,6 +63,8 @@ let baseUrl: string;
 /** Bodies the fixture was asked to run a statement with, in order. */
 let statementBodies: Record<string, unknown>[];
 let costPlan: CostPlan | null;
+/** Plans that answer the first N cost calls, in order, before `costPlan`. */
+let costPlanQueue: CostPlan[];
 /** Message creation time, moved by tests that care about the read window. */
 let messageCreatedMs: number;
 let messageRanSql: boolean;
@@ -67,6 +72,7 @@ let messageRanSql: boolean;
 beforeEach(async () => {
   statementBodies = [];
   costPlan = null;
+  costPlanQueue = [];
   messageCreatedMs = Date.now() - 60_000;
   messageRanSql = true;
 
@@ -128,17 +134,21 @@ beforeEach(async () => {
         statementBodies.push(
           JSON.parse(raw || "{}") as Record<string, unknown>,
         );
-        if (costPlan?.status) {
-          res.statusCode = costPlan.status;
+        // Queued plans answer one call each, then `costPlan` answers the rest.
+        // Only tests about WHICH day was unpriced need this; the rest set one
+        // plan and mean it for every day.
+        const plan = costPlanQueue.shift() ?? costPlan;
+        if (plan?.status) {
+          res.statusCode = plan.status;
           return send({ message: "permission denied" });
         }
         send({
           statement_id: "fixture",
-          status: { state: costPlan?.state ?? "SUCCEEDED" },
+          status: { state: plan?.state ?? "SUCCEEDED" },
           manifest: {
             schema: {
               columns: (
-                costPlan?.columns ?? [
+                plan?.columns ?? [
                   "statement_id",
                   "execution_duration_ms",
                   "hour_total_ms",
@@ -148,15 +158,15 @@ beforeEach(async () => {
                 ]
               ).map((name) => ({ name })),
             },
-            ...(costPlan?.totalRowCount === undefined
+            ...(plan?.totalRowCount === undefined
               ? {}
-              : { total_row_count: costPlan.totalRowCount }),
+              : { total_row_count: plan.totalRowCount }),
           },
           result: {
-            data_array: costPlan?.rows ?? [],
-            ...(costPlan?.nextChunkIndex === undefined
+            data_array: plan?.rows ?? [],
+            ...(plan?.nextChunkIndex === undefined
               ? {}
-              : { next_chunk_index: costPlan.nextChunkIndex }),
+              : { next_chunk_index: plan.nextChunkIndex }),
           },
         });
       });
@@ -538,6 +548,51 @@ describe("a source that names a warehouse", () => {
     // And it stopped asking at the first day it could not price, rather than
     // spending the rest of the run's budget on days it would refuse anyway.
     expect(statementBodies).toHaveLength(1);
+
+    // The half that holding the watermark exists for, and the half a cursor
+    // assertion alone does not show: the next run, resuming from that cursor,
+    // asks about the same period again — and prices it once billing answers.
+    const refusedFrom = statementBodies[0]!.parameters as Array<{
+      name: string;
+      value: string;
+    }>;
+    const askedAboutFirst = refusedFrom.find(
+      (p) => p.name === "from_ts",
+    )!.value;
+
+    statementBodies.length = 0;
+    costPlan = {
+      rows: [
+        [
+          STATEMENT_ID,
+          "3600000",
+          "3600000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+      ],
+    };
+
+    const second = await new DatabricksGeniePuller().runOnce(
+      { cursor: result.cursor, credentials: { token: "dapi-fixture" } },
+      {
+        adapter: DATABRICKS_GENIE_ADAPTER_ID,
+        workspaceUrl: baseUrl,
+        spaceIds: [],
+        schedule: "*/15 * * * *",
+        warehouseId: WAREHOUSE_ID,
+      },
+    );
+
+    const askedAboutAgain = (
+      statementBodies[0]!.parameters as Array<{ name: string; value: string }>
+    ).find((p) => p.name === "from_ts")!.value;
+
+    // Same period, not a window that moved on past it.
+    expect(askedAboutAgain).toBe(askedAboutFirst);
+    // And the question that was recorded at zero now carries its real share.
+    expect(hintOf(second).costUsd).toBe("6");
   });
 
   /** @scenario "A window whose cost was cut short is asked about again" */
@@ -567,6 +622,113 @@ describe("a source that names a warehouse", () => {
     const cursor = JSON.parse(result.cursor!) as { sinceMs: number };
 
     expect(cursor.sinceMs).toBeGreaterThan(Date.now() - 60 * 60 * 1000);
+  });
+
+  /** @scenario "A window whose cost was cut short is asked about again" */
+  it("keeps a question asked on the unpriced period's first instant", async () => {
+    // The seam between the two half-open windows. Costs are asked for
+    // `start_time >= from`, so a statement AT the unpriced period's start is
+    // inside it; questions are kept for `created > watermark`, so a watermark
+    // sitting exactly on that instant drops the question standing on it. It
+    // would be recorded at zero once and then filtered out of every later run.
+    // Chunks are hour-aligned, so this only reaches a question asked exactly on
+    // the hour — rare, and permanent every time it lands.
+    const oneHourMs = 60 * 60 * 1000;
+    const watermark =
+      Math.floor((Date.now() - 3 * 24 * oneHourMs) / oneHourMs) * oneHourMs;
+    // The second day is the one that cannot be priced, so the ceiling lands
+    // ahead of the old watermark and the seam is actually load-bearing. A
+    // first-day refusal would hold at the old watermark and prove nothing.
+    messageCreatedMs = watermark + 24 * oneHourMs;
+    costPlanQueue = [{ rows: [] }];
+    costPlan = { rows: [], nextChunkIndex: 1 };
+
+    const runFrom = async (cursor: string) =>
+      await new DatabricksGeniePuller().runOnce(
+        { cursor, credentials: { token: "dapi-fixture" } },
+        {
+          adapter: DATABRICKS_GENIE_ADAPTER_ID,
+          workspaceUrl: baseUrl,
+          spaceIds: [],
+          schedule: "*/15 * * * *",
+          warehouseId: WAREHOUSE_ID,
+        },
+      );
+
+    const first = await runFrom(JSON.stringify({ sinceMs: watermark }));
+    expect(first.events).toHaveLength(1);
+    // Behind the question, not level with it. Level is the bug: one millisecond
+    // of overlap is what buys the question another look.
+    const cursor = JSON.parse(first.cursor!) as { sinceMs: number };
+    expect(cursor.sinceMs).toBeLessThan(messageCreatedMs);
+
+    // And the look actually happens, which is the part a cursor comparison
+    // cannot show: the same question comes back, and prices, once billing can
+    // answer for that day.
+    costPlanQueue = [];
+    costPlan = {
+      rows: [
+        [
+          STATEMENT_ID,
+          "3600000",
+          "3600000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+      ],
+    };
+    const second = await runFrom(first.cursor!);
+
+    expect(second.events).toHaveLength(1);
+    expect(second.events[0]?.source_event_id).toBe(
+      first.events[0]?.source_event_id,
+    );
+    expect(hintOf(second).costUsd).toBe("6");
+  });
+
+  /** @scenario "A period that can never be priced is eventually given up on" */
+  it("gives up on a period that is refused for longer than the hold allows", async () => {
+    // A day busier than one reply can carry is cut short identically on every
+    // future run. Held without a bound, the source pins itself to one instant
+    // and re-sweeps a wider window each run to wait for an answer that cannot
+    // come. This is the run after the bet stops paying.
+    costPlan = { rows: [], nextChunkIndex: 1 };
+
+    // A cursor that has been holding for longer than the bet is worth — where
+    // the unbounded version parked itself and never left. Held-since, not
+    // how far back: a first sweep is thirty days behind and perfectly healthy.
+    const stuckSinceMs = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const result = await new DatabricksGeniePuller().runOnce(
+      {
+        cursor: JSON.stringify({
+          sinceMs: stuckSinceMs,
+          costHeldSinceMs:
+            Date.now() - WAREHOUSE_COST_MAX_HOLD_MS - 60 * 60 * 1000,
+        }),
+        credentials: { token: "dapi-fixture" },
+      },
+      {
+        adapter: DATABRICKS_GENIE_ADAPTER_ID,
+        workspaceUrl: baseUrl,
+        spaceIds: [],
+        schedule: "*/15 * * * *",
+        warehouseId: WAREHOUSE_ID,
+      },
+    );
+    const cursor = JSON.parse(result.cursor!) as {
+      sinceMs: number;
+      costHeldSinceMs: number | null;
+    };
+
+    // It moved — the source is no longer pinned to that instant.
+    expect(cursor.sinceMs).toBeGreaterThan(Date.now() - 60 * 60 * 1000);
+    // And the stamp is cleared with it. Left behind, it would expire every
+    // future hold the moment it started and the retry would never work again.
+    expect(cursor.costHeldSinceMs).toBeNull();
+    // The questions in the abandoned period keep the zero they came with,
+    // rather than being dropped or invented.
+    expect(hintOf(result).costUsd).toBe("0");
   });
 
   /** @scenario "Cost that arrives late corrects the record rather than adding one" */
