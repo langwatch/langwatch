@@ -1117,6 +1117,22 @@ class RunBudget {
     if (this.requests >= this.maxRequests) return true;
     return this.deadlineMs !== undefined && Date.now() > this.deadlineMs;
   }
+
+  /**
+   * `exhausted`, asked on behalf of work that cannot be given up once it has
+   * started: true when fewer than `reserveMs` of the deadline remain.
+   *
+   * `exhausted` is the wrong question before a long request. It only answers
+   * once the deadline has ALREADY passed, and by then the worker has killed the
+   * run and thrown away every event the sweep read — the request's own graceful
+   * failure never gets to matter. Declining to start it is what keeps them.
+   */
+  exhaustedWithin(reserveMs: number): boolean {
+    if (this.requests >= this.maxRequests) return true;
+    return (
+      this.deadlineMs !== undefined && Date.now() + reserveMs > this.deadlineMs
+    );
+  }
 }
 
 /**
@@ -2336,18 +2352,27 @@ export class DatabricksGeniePuller
     const costByStatementId = new Map<string, string>();
 
     for (const chunk of warehouseCostChunks({ fromMs, toMs })) {
-      // Out of requests with days still unpriced. Those days are not refused,
-      // just unread, so the watermark holds here and the next run starts its
-      // cost read where this one ran out — which is what turns a month-long
-      // backfill into several runs that each make progress.
-      if (budget.exhausted()) {
+      // Out of requests, or out of the time one more would need, with days
+      // still unpriced. Those days are not refused, just unread, so the
+      // watermark holds here and the next run starts its cost read where this
+      // one ran out — which is what turns a month-long backfill into several
+      // runs that each make progress.
+      //
+      // The time half has to be asked BEFORE the request, against the whole of
+      // `WAREHOUSE_COST_TIMEOUT_MS`. A billing read still in flight when the
+      // worker's deadline lands does not merely go unpriced: the worker kills
+      // the run and discards the questions the sweep had already read, and the
+      // cursor stays where it was, so the next run reads them and stalls in the
+      // same place. Unpriced questions are recoverable; a run killed holding
+      // them is the sweep done for nothing.
+      if (budget.exhaustedWithin(WAREHOUSE_COST_TIMEOUT_MS)) {
         logger.warn(
           {
             adapter: this.id,
             warehouseId,
             pricedThrough: new Date(chunk.fromMs).toISOString(),
           },
-          "databricks warehouse cost ran out of run budget; holding the watermark at the last priced day",
+          "databricks warehouse cost has no room left in this run; holding the watermark at the last priced day",
         );
         return { costByStatementId, pricedThroughMs: unpricedFloor(chunk) };
       }

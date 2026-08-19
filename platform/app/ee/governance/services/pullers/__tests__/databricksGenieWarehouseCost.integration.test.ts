@@ -187,10 +187,20 @@ afterEach(async () => {
   });
 });
 
-async function pull({ warehouseId }: { warehouseId?: string }) {
+async function pull({
+  warehouseId,
+  deadlineMs,
+}: {
+  warehouseId?: string;
+  deadlineMs?: number;
+}) {
   const puller = new DatabricksGeniePuller();
   return await puller.runOnce(
-    { cursor: null, credentials: { token: "dapi-fixture" } },
+    {
+      cursor: null,
+      credentials: { token: "dapi-fixture" },
+      ...(deadlineMs === undefined ? {} : { deadlineMs }),
+    },
     {
       adapter: DATABRICKS_GENIE_ADAPTER_ID,
       workspaceUrl: baseUrl,
@@ -217,6 +227,27 @@ describe("a source with no warehouse", () => {
     expect(hintOf(result).costUsd).toBe("0");
     // The claim that matters: not merely that cost is zero, but that a source
     // which opted out never went near the billing tables.
+    expect(statementBodies).toHaveLength(0);
+  });
+});
+
+describe("a source whose run has no time left to read billing", () => {
+  /** @scenario "A run too short to price keeps the questions it read" */
+  it("keeps every question it swept instead of starting a read the deadline will kill", async () => {
+    // Less headroom than one billing read is allowed to take. The read cannot
+    // finish, and the worker kills the whole run at the deadline — taking the
+    // swept questions with it and leaving the cursor where it was, so the next
+    // run does the same thing again.
+    const result = await pull({
+      warehouseId: WAREHOUSE_ID,
+      deadlineMs: Date.now() + 1_000,
+    });
+
+    // The questions survive, unpriced. That is the whole point: an unpriced
+    // window is asked again next run, a discarded sweep is not.
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0]?.cost_usd).toBe(0);
+    // And it never opened a request it could not have finished.
     expect(statementBodies).toHaveLength(0);
   });
 });

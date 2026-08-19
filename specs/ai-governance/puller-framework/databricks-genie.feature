@@ -255,6 +255,18 @@ Feature: Databricks AI/BI Genie puller
       # sometimes does.
 
     @integration
+    Scenario: A run too short to price keeps the questions it read
+      Given a run with less time left than a billing query is allowed to take
+      When the puller reaches the billing read
+      Then the billing query is never sent
+      And the messages are still recorded
+      And the watermark stays where it was
+      # The worker kills a run that overruns its deadline and discards
+      # everything the sweep read, so the billing query's own graceful failure
+      # never gets to happen. A read that cannot finish in the time left has to
+      # be declined before it starts, not abandoned partway.
+
+    @integration
     Scenario: A fraction of a cent survives the record
       Given a question whose share of compute is a small fraction of a cent
       When the puller records it
