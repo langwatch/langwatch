@@ -8,9 +8,8 @@
  * Feature: specs/ai-governance/cli-wrappers/claude-plugin-install.feature
  */
 
-import { describe, expect, it, vi } from "vitest";
-
 import type * as ChildProcessModule from "node:child_process";
+import { describe, expect, it, vi } from "vitest";
 
 import { installClaudePluginHarness } from "./claude-plugin-test-helpers";
 

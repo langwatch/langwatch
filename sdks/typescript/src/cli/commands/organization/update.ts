@@ -50,7 +50,8 @@ export const updateOrganizationCommand = async (
     action: "update the organization",
     pending: "Updating organization...",
     run: () => new OrganizationApiService().update(input),
-    succeed: (organization) => `Updated organization "${chalk.cyan(organization.name)}"`,
+    succeed: (organization) =>
+      `Updated organization "${chalk.cyan(organization.name)}"`,
     table: (organization) => {
       printFacts([
         ["Name", chalk.cyan(organization.name)],

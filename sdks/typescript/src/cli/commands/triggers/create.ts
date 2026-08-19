@@ -1,14 +1,16 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
-import { buildAuthHeaders } from "@/internal/api/auth";
-
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { resolveCredentials } from "../../utils/apiKey";
+import {
+  commandValidationError,
+  reportCommandError,
+} from "../../utils/errorOutput";
+import { formatFetchError } from "../../utils/formatFetchError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { redactTriggerSecrets } from "./redact";
 
 /**
@@ -27,7 +29,12 @@ export const createTriggerCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const validActions = ["SEND_EMAIL", "ADD_TO_DATASET", "ADD_TO_ANNOTATION_QUEUE", "SEND_SLACK_MESSAGE"];
+  const validActions = [
+    "SEND_EMAIL",
+    "ADD_TO_DATASET",
+    "ADD_TO_ANNOTATION_QUEUE",
+    "SEND_SLACK_MESSAGE",
+  ];
   if (!validActions.includes(options.action)) {
     reportCommandError({
       error: commandValidationError(
@@ -69,11 +76,20 @@ export const createTriggerCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "create trigger" });
+      failSpinner({
+        spinner,
+        error: new Error(message),
+        action: "create trigger",
+      });
       process.exit(1);
     }
 
-    const trigger = await response.json() as { id: string; name: string; action: string; platformUrl?: string };
+    const trigger = (await response.json()) as {
+      id: string;
+      name: string;
+      action: string;
+      platformUrl?: string;
+    };
     spinner.succeed(`Trigger "${trigger.name}" created (${trigger.id})`);
 
     return {
@@ -84,7 +100,9 @@ export const createTriggerCommand = async (
         console.log(`  ${chalk.gray("ID:")}     ${chalk.green(trigger.id)}`);
         console.log(`  ${chalk.gray("Action:")} ${trigger.action}`);
         if (trigger.platformUrl) {
-          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(trigger.platformUrl)}`);
+          console.log(
+            `  ${chalk.bold("View:")}  ${chalk.underline(trigger.platformUrl)}`,
+          );
         }
         console.log();
       },

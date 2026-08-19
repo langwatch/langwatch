@@ -1,15 +1,20 @@
 import chalk from "chalk";
 import { PromptsApiService } from "@/client-sdk/services/prompts";
 import { resolveCredentials } from "../../utils/apiKey";
-import { validateTagName } from "./validation";
-import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
+import {
+  commandValidationError,
+  reportCommandError,
+} from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
+import { validateTagName } from "./validation";
 
 /**
  * Creates a custom tag for the organization.
  * @param name The tag name to create.
  */
-export const tagCreateCommand = async (name: string): Promise<CommandResult | void> => {
+export const tagCreateCommand = async (
+  name: string,
+): Promise<CommandResult | void> => {
   const validationError = validateTagName(name);
   if (validationError) {
     reportCommandError({ error: commandValidationError(validationError) });

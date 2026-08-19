@@ -1,6 +1,6 @@
 import { http } from "msw";
 import { setupServer } from "msw/node";
-import { beforeAll, afterEach, afterAll } from "vitest";
+import { afterAll, afterEach, beforeAll } from "vitest";
 
 export const server = setupServer(
   http.all("*", ({ request: _request }) => {

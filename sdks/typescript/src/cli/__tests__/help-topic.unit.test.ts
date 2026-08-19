@@ -1,9 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { HELP_TOPIC_NAMES, renderAgentHelpTopic } from "../commands/help";
 import { buildProgram } from "../program";
-import {
-  HELP_TOPIC_NAMES,
-  renderAgentHelpTopic,
-} from "../commands/help";
 import { AGENT_MODE_ENV_VARS } from "../utils/output";
 
 // buildProgram() reads the tsup-injected __CLI_VERSION__ build constant —
@@ -52,7 +49,9 @@ describe("`langwatch help` command", () => {
   let stdoutSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    consoleLogSpy = vi
+      .spyOn(console, "log")
+      .mockImplementation(() => undefined);
     consoleErrorSpy = vi
       .spyOn(console, "error")
       .mockImplementation(() => undefined);

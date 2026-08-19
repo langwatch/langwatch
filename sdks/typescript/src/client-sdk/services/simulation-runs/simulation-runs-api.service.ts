@@ -1,13 +1,13 @@
-import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
-import type { InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import type { InternalConfig } from "@/client-sdk/types";
+import {
+  createLangWatchApiClient,
+  type LangwatchApiClient,
+} from "@/internal/api/client";
+import type { paths } from "@/internal/generated/openapi/api-client";
 
 export type SimulationRunsListResponse =
   paths["/api/simulation-runs"]["get"]["responses"]["200"]["content"]["application/json"];
@@ -44,13 +44,19 @@ export class SimulationRunsApiService {
   }
 
   private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: extractStatusFromResponse(error),
+      },
+    });
     throw new SimulationRunsApiError(message, operation, error);
   }
 
-  async getAll(params?: SimulationRunsListParams): Promise<SimulationRunsListResponse> {
+  async getAll(
+    params?: SimulationRunsListParams,
+  ): Promise<SimulationRunsListResponse> {
     const { data, error } = await this.apiClient.GET("/api/simulation-runs", {
       params: { query: params },
     });

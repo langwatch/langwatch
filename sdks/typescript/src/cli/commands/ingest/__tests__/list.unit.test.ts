@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import chalk from "chalk";
+import { describe, expect, it } from "vitest";
 
 import { buildTable, humanRelative } from "../list";
 
@@ -7,7 +7,7 @@ import { buildTable, humanRelative } from "../list";
 // "preserves ANSI codes verbatim" assertion is meaningful.
 chalk.level = 1;
 
-// eslint-disable-next-line no-control-regex -- intentional: stripping ANSI escape codes from chalk output
+// biome-ignore lint/suspicious/noControlCharactersInRegex: intentional: stripping ANSI escape codes from chalk output
 const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 describe("humanRelative", () => {
@@ -87,10 +87,7 @@ describe("buildTable", () => {
     });
 
     it("preserves the ANSI codes verbatim — strip is for measurement only", () => {
-      const out = buildTable([
-        ["NAME"],
-        [chalk.red("err")],
-      ]);
+      const out = buildTable([["NAME"], [chalk.red("err")]]);
       // Raw output should still contain the colour codes; only the
       // padding calculation strips them.
       expect(out).toContain("\x1b[31m");

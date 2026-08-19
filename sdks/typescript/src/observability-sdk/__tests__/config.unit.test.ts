@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { type Logger } from '../../logger';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Logger } from "../../logger";
 
 class MockLogger implements Logger {
   debug = vi.fn();
@@ -8,7 +8,7 @@ class MockLogger implements Logger {
   error = vi.fn();
 }
 
-describe('config.ts', () => {
+describe("config.ts", () => {
   let originalConsoleError: any;
   beforeEach(() => {
     vi.resetModules();
@@ -19,8 +19,8 @@ describe('config.ts', () => {
     console.error = originalConsoleError;
   });
 
-  it('initializeObservabilitySdkConfig sets config any number of times', async () => {
-    const config = await import('../config.js');
+  it("initializeObservabilitySdkConfig sets config any number of times", async () => {
+    const config = await import("../config.js");
     config.resetObservabilitySdkConfig(); // Ensure clean state
 
     const logger = new MockLogger();
@@ -33,8 +33,8 @@ describe('config.ts', () => {
     expect(config.getObservabilitySdkLogger()).toBe(logger2);
   });
 
-  it('getObservabilitySdkLogger works after config is set', async () => {
-    const config = await import('../config.js');
+  it("getObservabilitySdkLogger works after config is set", async () => {
+    const config = await import("../config.js");
     config.resetObservabilitySdkConfig(); // Ensure clean state
 
     const logger = new MockLogger();
@@ -42,25 +42,31 @@ describe('config.ts', () => {
     expect(config.getObservabilitySdkLogger()).toBe(logger);
   });
 
-  it('getObservabilitySdkConfig throws error when not initialized and throwOnUninitialized is true', async () => {
-    const config = await import('../config.js');
+  it("getObservabilitySdkConfig throws error when not initialized and throwOnUninitialized is true", async () => {
+    const config = await import("../config.js");
     config.resetObservabilitySdkConfig(); // Ensure clean state
 
     expect(() => {
       config.getObservabilitySdkConfig({ throwOnUninitialized: true });
-    }).toThrow('Please call setupObservability() before using the Observability SDK');
+    }).toThrow(
+      "Please call setupObservability() before using the Observability SDK",
+    );
   });
 
-  it('getObservabilitySdkConfig returns default when not initialized and throwOnUninitialized is false', async () => {
-    const config = await import('../config.js');
+  it("getObservabilitySdkConfig returns default when not initialized and throwOnUninitialized is false", async () => {
+    const config = await import("../config.js");
     config.resetObservabilitySdkConfig(); // Ensure clean state
 
-    const result = config.getObservabilitySdkConfig({ throwOnUninitialized: false });
-    expect(result.logger).toBeInstanceOf((await import('../../logger/index.js')).NoOpLogger);
+    const result = config.getObservabilitySdkConfig({
+      throwOnUninitialized: false,
+    });
+    expect(result.logger).toBeInstanceOf(
+      (await import("../../logger/index.js")).NoOpLogger,
+    );
   });
 
-  it('getObservabilitySdkConfig returns actual config when initialized', async () => {
-    const config = await import('../config.js');
+  it("getObservabilitySdkConfig returns actual config when initialized", async () => {
+    const config = await import("../config.js");
     config.resetObservabilitySdkConfig(); // Ensure clean state
 
     const logger = new MockLogger();

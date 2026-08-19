@@ -6,11 +6,12 @@
  *
  * Spec: specs/scenarios/scenario-run-parameters.feature
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/client-sdk/services/suites", async (importOriginal) => {
   // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-  const actual = await importOriginal<typeof import("@/client-sdk/services/suites")>();
+  const actual =
+    await importOriginal<typeof import("@/client-sdk/services/suites")>();
   return {
     ...actual,
     SuitesApiService: vi.fn(),

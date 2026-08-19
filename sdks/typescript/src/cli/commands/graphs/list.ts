@@ -1,14 +1,13 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 import type { CommandResult } from "../../utils/output";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 /**
  * Returns the listing rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts). The `table` closure
@@ -35,11 +34,15 @@ export const listGraphsCommand = async (options: {
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "fetch graphs" });
+      failSpinner({
+        spinner,
+        error: new Error(message),
+        action: "fetch graphs",
+      });
       process.exit(1);
     }
 
-    const graphs = await response.json() as Array<{
+    const graphs = (await response.json()) as Array<{
       id: string;
       name: string;
       dashboardId: string | null;
@@ -49,7 +52,9 @@ export const listGraphsCommand = async (options: {
       rowSpan: number;
     }>;
 
-    spinner.succeed(`Found ${graphs.length} graph${graphs.length !== 1 ? "s" : ""}`);
+    spinner.succeed(
+      `Found ${graphs.length} graph${graphs.length !== 1 ? "s" : ""}`,
+    );
 
     return {
       data: graphs,
@@ -58,7 +63,11 @@ export const listGraphsCommand = async (options: {
           console.log();
           console.log(chalk.gray("No graphs found."));
           console.log(chalk.gray("Create one with:"));
-          console.log(chalk.cyan('  langwatch graph create "My Graph" --dashboard-id <id> --graph \'{"type":"line"}\''));
+          console.log(
+            chalk.cyan(
+              '  langwatch graph create "My Graph" --dashboard-id <id> --graph \'{"type":"line"}\'',
+            ),
+          );
           return;
         }
 

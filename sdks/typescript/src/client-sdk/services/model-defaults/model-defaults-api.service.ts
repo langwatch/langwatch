@@ -1,8 +1,8 @@
-import { scopedApiKey } from "@/internal/credentialContext";
-import { resolveEndpoint } from "@/internal/endpoint";
-import { buildAuthHeaders } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { resolveEndpoint } from "@/internal/endpoint";
 
 export type ModelDefaultScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
 
@@ -66,7 +66,8 @@ export class ModelDefaultsApiService {
   private readonly endpoint: string;
 
   constructor(config?: { apiKey?: string; endpoint?: string }) {
-    this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
+    this.apiKey =
+      config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     this.endpoint = resolveEndpoint(config?.endpoint);
   }
 
@@ -126,23 +127,17 @@ export class ModelDefaultsApiService {
   }
 
   async updateConfig(id: string, body: UpdateConfigBody): Promise<void> {
-    await this.request<void>(
-      `/api/model-defaults/${encodeURIComponent(id)}`,
-      {
-        method: "PUT",
-        body: JSON.stringify(body),
-        allowNoContent: true,
-      },
-    );
+    await this.request<void>(`/api/model-defaults/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+      allowNoContent: true,
+    });
   }
 
   async deleteConfig(id: string): Promise<void> {
-    await this.request<void>(
-      `/api/model-defaults/${encodeURIComponent(id)}`,
-      {
-        method: "DELETE",
-        allowNoContent: true,
-      },
-    );
+    await this.request<void>(`/api/model-defaults/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      allowNoContent: true,
+    });
   }
 }

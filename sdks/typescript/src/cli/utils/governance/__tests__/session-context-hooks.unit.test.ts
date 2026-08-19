@@ -43,7 +43,10 @@ const userEntry = {
 const install = ({
   tool = "claude_code",
   filePath,
-}: { tool?: HookedTool; filePath?: string } = {}) =>
+}: {
+  tool?: HookedTool;
+  filePath?: string;
+} = {}) =>
   installSessionContextHooks({ tool, ...(filePath ? { filePath } : {}) });
 
 const has = (tool: HookedTool = "claude_code") =>

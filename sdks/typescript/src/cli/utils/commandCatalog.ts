@@ -140,7 +140,9 @@ const isHidden = (command: Command): boolean =>
   (command as unknown as { _hidden?: boolean })._hidden === true;
 
 const usageArgs = (args: CatalogArg[]): string =>
-  args.map((arg) => (arg.required ? `<${arg.name}>` : `[${arg.name}]`)).join(" ");
+  args
+    .map((arg) => (arg.required ? `<${arg.name}>` : `[${arg.name}]`))
+    .join(" ");
 
 /**
  * The synthetic rendered help a token cost is estimated from — the usage line
@@ -170,7 +172,8 @@ const toEntry = (
   // annotate `trace  # skill: tracing` even though hints/skills are declared
   // per leaf command in the map.
   const skill =
-    declared?.skill ?? children.map((child) => child.skill).find((s) => s !== undefined);
+    declared?.skill ??
+    children.map((child) => child.skill).find((s) => s !== undefined);
 
   const withoutCost: Omit<CatalogEntry, "tokenCost"> = {
     path,
@@ -193,7 +196,10 @@ const toEntry = (
     children,
   };
 
-  return { ...withoutCost, tokenCost: Math.ceil(renderedHelp(withoutCost).length / 4) };
+  return {
+    ...withoutCost,
+    tokenCost: Math.ceil(renderedHelp(withoutCost).length / 4),
+  };
 };
 
 /**
@@ -232,9 +238,13 @@ export const renderHelpTree = (entries: CatalogEntry[]): string => {
     const name = entry.path.split(" ").pop() ?? entry.path;
     const usage = args.length > 0 ? `${name} ${args}` : name;
     lines.push(`${indent}${usage} — ${entry.description}${annotate(entry)}`);
-    entry.children.forEach((child) => visit(child, depth + 1));
+    entry.children.forEach((child) => {
+      visit(child, depth + 1);
+    });
   };
-  entries.forEach((entry) => visit(entry, 1));
+  entries.forEach((entry) => {
+    visit(entry, 1);
+  });
   return lines.join("\n");
 };
 

@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { LocalPromptsService } from "../local-prompts.service";
-import { type FileManager } from "@/cli/utils/fileManager";
-import { mock, type MockProxy } from "vitest-mock-extended";
+import { beforeEach, describe, expect, it } from "vitest";
+import { type MockProxy, mock } from "vitest-mock-extended";
+import type { FileManager } from "@/cli/utils/fileManager";
+import type { Logger } from "@/logger";
 import { localPromptConfigFactory } from "../../../../../__tests__/factories/local-prompt-config.factory";
-import { type Logger } from "@/logger";
+import { LocalPromptsService } from "../local-prompts.service";
 import type { PromptData } from "../types";
 
 describe("LocalPromptsService", () => {
@@ -38,13 +38,15 @@ describe("LocalPromptsService", () => {
 
         const result = await service.get(handle);
 
-        expect(result).toEqual(expect.objectContaining({
-          model: mockPrompt.model,
-          messages: mockPrompt.messages,
-          temperature: mockPrompt.modelParameters?.temperature,
-          maxTokens: mockPrompt.modelParameters?.max_tokens,
-          handle: handle,
-        }));
+        expect(result).toEqual(
+          expect.objectContaining({
+            model: mockPrompt.model,
+            messages: mockPrompt.messages,
+            temperature: mockPrompt.modelParameters?.temperature,
+            maxTokens: mockPrompt.modelParameters?.max_tokens,
+            handle: handle,
+          }),
+        );
 
         expect(mockFileManager.loadLocalPrompt).toHaveBeenCalledWith(filePath);
       });
@@ -72,13 +74,15 @@ describe("LocalPromptsService", () => {
 
         const result = await service.get(handle);
 
-        expect(result).toEqual(expect.objectContaining({
-          model: mockPrompt.model,
-          messages: mockPrompt.messages,
-          temperature: mockPrompt.modelParameters?.temperature,
-          maxTokens: mockPrompt.modelParameters?.max_tokens,
-          handle: handle,
-        }));
+        expect(result).toEqual(
+          expect.objectContaining({
+            model: mockPrompt.model,
+            messages: mockPrompt.messages,
+            temperature: mockPrompt.modelParameters?.temperature,
+            maxTokens: mockPrompt.modelParameters?.max_tokens,
+            handle: handle,
+          }),
+        );
 
         expect(mockFileManager.loadLocalPrompt).toHaveBeenCalledWith(
           "prompts/.materialized/my-handle.prompt.yaml",
@@ -108,13 +112,15 @@ describe("LocalPromptsService", () => {
 
         const result = await service.get(handle);
 
-        expect(result).toEqual(expect.objectContaining({
-          model: mockPrompt.model,
-          messages: mockPrompt.messages,
-          temperature: mockPrompt.modelParameters?.temperature,
-          maxTokens: mockPrompt.modelParameters?.max_tokens,
-          handle: handle,
-        }));
+        expect(result).toEqual(
+          expect.objectContaining({
+            model: mockPrompt.model,
+            messages: mockPrompt.messages,
+            temperature: mockPrompt.modelParameters?.temperature,
+            maxTokens: mockPrompt.modelParameters?.max_tokens,
+            handle: handle,
+          }),
+        );
 
         expect(mockFileManager.loadLocalPrompt).toHaveBeenCalledWith(
           "prompts/.materialized/my-handle.prompt.yaml",

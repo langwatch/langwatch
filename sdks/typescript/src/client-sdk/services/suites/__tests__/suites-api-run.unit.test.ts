@@ -6,7 +6,7 @@
  *
  * Spec: specs/scenarios/scenario-run-parameters.feature
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SuitesApiService } from "../suites-api.service";
 
 const mockFetch = vi.fn();

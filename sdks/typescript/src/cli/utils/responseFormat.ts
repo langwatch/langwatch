@@ -107,7 +107,9 @@ export const normalizeResponseFormat = (
  */
 export const asFlatFields = (
   schema: Record<string, unknown>,
-): { identifier: string; type: Exclude<CliOutputType, "json_schema"> }[] | null => {
+):
+  | { identifier: string; type: Exclude<CliOutputType, "json_schema"> }[]
+  | null => {
   if (schema.type !== "object") return null;
   if (!isPlainObject(schema.properties)) return null;
 

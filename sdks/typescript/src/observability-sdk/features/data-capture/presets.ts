@@ -1,4 +1,4 @@
-import { type DataCaptureMode } from "./types";
+import type { DataCaptureMode } from "./types";
 
 /**
  * Predefined data capture configurations for common use cases.

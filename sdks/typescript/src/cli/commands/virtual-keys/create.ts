@@ -1,11 +1,12 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import {
   type VirtualKeyBudgetInput,
   type VirtualKeyRoutingMode,
   VirtualKeysApiService,
 } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 import {
   buildBudgetFlags,
@@ -14,7 +15,6 @@ import {
   parseScopeArg,
   virtualKeyDetailUrl,
 } from "./_shared";
-import type { CommandResult } from "../../utils/output";
 
 export interface CreateVirtualKeyOptions {
   name: string;
@@ -29,7 +29,6 @@ export interface CreateVirtualKeyOptions {
   budgetBreach?: "block" | "warn";
   providersAllowed?: string;
 }
-
 
 /**
  * Returns the created key rather than printing it: the output port renders it
@@ -57,7 +56,9 @@ export const createVirtualKeyCommand = async (
   try {
     // Omitted scopes are the common reseller path: the server scopes the
     // key to the calling project.
-    scopes = options.scope?.length ? options.scope.map(parseScopeArg) : undefined;
+    scopes = options.scope?.length
+      ? options.scope.map(parseScopeArg)
+      : undefined;
     budget = buildBudgetFlags(options) ?? undefined;
     if (options.routingMode !== undefined) {
       routingMode = parseRoutingModeArg(options.routingMode);
@@ -73,7 +74,9 @@ export const createVirtualKeyCommand = async (
     .filter((p) => p.length > 0);
 
   const service = new VirtualKeysApiService();
-  const spinner = createSpinner(`Creating virtual key "${options.name}"...`).start();
+  const spinner = createSpinner(
+    `Creating virtual key "${options.name}"...`,
+  ).start();
 
   try {
     const { virtual_key, secret } = await service.create({
@@ -85,9 +88,7 @@ export const createVirtualKeyCommand = async (
       routing_policy_id: options.routingPolicy ?? null,
       routing_mode: routingMode,
       budget,
-      ...(providersAllowed?.length
-        ? { config: { providersAllowed } }
-        : {}),
+      ...(providersAllowed?.length ? { config: { providersAllowed } } : {}),
     });
 
     spinner.succeed(`Created virtual key "${chalk.cyan(virtual_key.name)}"`);
@@ -96,23 +97,42 @@ export const createVirtualKeyCommand = async (
       data: { virtual_key, secret },
       table: () => {
         console.log();
-        console.log(chalk.bold.yellow("⚠  Save the secret below NOW. It will not be shown again."));
+        console.log(
+          chalk.bold.yellow(
+            "⚠  Save the secret below NOW. It will not be shown again.",
+          ),
+        );
         console.log();
         console.log(`  ${chalk.green(secret)}`);
         console.log();
-        console.log(chalk.gray("Use it as the API key in OpenAI-compatible clients:"));
-        console.log(chalk.cyan("  export OPENAI_API_KEY=\"" + secret + "\""));
-        console.log(chalk.cyan("  export OPENAI_BASE_URL=\"https://gateway.langwatch.ai/v1\""));
+        console.log(
+          chalk.gray("Use it as the API key in OpenAI-compatible clients:"),
+        );
+        console.log(chalk.cyan('  export OPENAI_API_KEY="' + secret + '"'));
+        console.log(
+          chalk.cyan(
+            '  export OPENAI_BASE_URL="https://gateway.langwatch.ai/v1"',
+          ),
+        );
         console.log();
         console.log(chalk.gray("Virtual key id: ") + virtual_key.id);
-        console.log(chalk.gray("Prefix:         ") + `${virtual_key.display_prefix}...`);
-        console.log(chalk.gray("Scopes:         ") + virtual_key.scopes.map(formatScope).join(", "));
+        console.log(
+          chalk.gray("Prefix:         ") + `${virtual_key.display_prefix}...`,
+        );
+        console.log(
+          chalk.gray("Scopes:         ") +
+            virtual_key.scopes.map(formatScope).join(", "),
+        );
         console.log(chalk.gray("Routing mode:   ") + virtual_key.routing_mode);
         if (virtual_key.routing_policy_id) {
-          console.log(chalk.gray("Routing policy: ") + virtual_key.routing_policy_id);
+          console.log(
+            chalk.gray("Routing policy: ") + virtual_key.routing_policy_id,
+          );
         }
         if (virtual_key.principal_user_id) {
-          console.log(chalk.gray("Principal:      ") + virtual_key.principal_user_id);
+          console.log(
+            chalk.gray("Principal:      ") + virtual_key.principal_user_id,
+          );
         }
         if (budget) {
           console.log(

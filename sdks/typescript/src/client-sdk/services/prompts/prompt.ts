@@ -1,13 +1,23 @@
 import { Liquid } from "liquidjs";
-import { PromptTracingDecorator, tracer } from "./tracing";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
-import { promptDataSchema } from "./schema";
-import { type TemplateVariables, type PromptData, type CorePromptData, type PromptScope } from "./types";
 import { PromptCompilationError, PromptValidationError } from "./errors";
+import { promptDataSchema } from "./schema";
+import { PromptTracingDecorator, tracer } from "./tracing";
+import type {
+  CorePromptData,
+  PromptData,
+  PromptScope,
+  TemplateVariables,
+} from "./types";
 
-// Re-export types and errors for convenience
-export type { TemplateVariables, PromptData, CorePromptData, PromptMetadata } from "./types";
 export { PromptCompilationError, PromptValidationError } from "./errors";
+// Re-export types and errors for convenience
+export type {
+  CorePromptData,
+  PromptData,
+  PromptMetadata,
+  TemplateVariables,
+} from "./types";
 
 // Global Liquid instance - shared across all prompts for efficiency
 const liquid = new Liquid({
@@ -50,7 +60,7 @@ export class Prompt {
     if (!validationResult.success) {
       throw new PromptValidationError(
         "Invalid prompt data provided",
-        validationResult.error
+        validationResult.error,
       );
     }
 
@@ -61,11 +71,12 @@ export class Prompt {
     this.prompt ??= this.extractSystemPrompt();
 
     // Return a proxy that wraps specific methods for tracing
+    // biome-ignore lint/correctness/noConstructorReturn: the proxy substitution is the pattern -- callers must get the instrumented proxy back, not `this`.
     return createTracingProxy(this as Prompt, tracer, PromptTracingDecorator);
   }
 
   private extractSystemPrompt(): string {
-    return this.messages.find(m => m.role === "system")?.content ?? "";
+    return this.messages.find((m) => m.role === "system")?.content ?? "";
   }
 
   /**
@@ -128,7 +139,6 @@ export class Prompt {
     return this._compile(variables, true);
   }
 }
-
 
 /**
  * Represents a compiled prompt that extends Prompt with reference to the original template

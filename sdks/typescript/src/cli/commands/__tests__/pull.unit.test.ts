@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { PromptsConfig, PromptsLock, SyncResult } from "../../types";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PromptsApiService } from "@/client-sdk/services/prompts";
+import type { PromptsConfig, PromptsLock, SyncResult } from "../../types";
 
 // Mock FileManager before importing pull
 vi.mock("../../utils/fileManager", () => ({
@@ -24,7 +24,9 @@ vi.mock("ora", () => ({
 // Mock PromptConverter
 vi.mock("@/cli/utils/promptConverter", () => ({
   PromptConverter: {
-    fromApiToMaterialized: vi.fn().mockReturnValue({ model: "gpt-5-mini", messages: [] }),
+    fromApiToMaterialized: vi
+      .fn()
+      .mockReturnValue({ model: "gpt-5-mini", messages: [] }),
   },
 }));
 
@@ -67,7 +69,13 @@ describe("pullPrompts", () => {
         errors: [],
       };
 
-      await pullPrompts({ config, lock, promptsApiService, result, tag: "production" });
+      await pullPrompts({
+        config,
+        lock,
+        promptsApiService,
+        result,
+        tag: "production",
+      });
 
       expect(mockGet).toHaveBeenCalledWith("my-prompt", { tag: "production" });
     });
@@ -91,7 +99,13 @@ describe("pullPrompts", () => {
         errors: [],
       };
 
-      await pullPrompts({ config, lock, promptsApiService, result, tag: "staging" });
+      await pullPrompts({
+        config,
+        lock,
+        promptsApiService,
+        result,
+        tag: "staging",
+      });
 
       // Should use tag: "staging", not version: "2"
       expect(mockGet).toHaveBeenCalledWith("my-prompt", { tag: "staging" });
@@ -120,7 +134,13 @@ describe("pullPrompts", () => {
         errors: [],
       };
 
-      await pullPrompts({ config, lock, promptsApiService, result, tag: "production" });
+      await pullPrompts({
+        config,
+        lock,
+        promptsApiService,
+        result,
+        tag: "production",
+      });
 
       expect(result.fetched[0]).toMatchObject({
         name: "my-prompt",
@@ -171,10 +191,19 @@ describe("pullPrompts", () => {
         errors: [],
       };
 
-      await pullPrompts({ config, lock, promptsApiService, result, tag: "nonexistent" });
+      await pullPrompts({
+        config,
+        lock,
+        promptsApiService,
+        result,
+        tag: "nonexistent",
+      });
 
       expect(result.errors).toHaveLength(1);
-      expect(result.errors[0]).toMatchObject({ name: "my-prompt", error: "tag not found" });
+      expect(result.errors[0]).toMatchObject({
+        name: "my-prompt",
+        error: "tag not found",
+      });
     });
   });
 });

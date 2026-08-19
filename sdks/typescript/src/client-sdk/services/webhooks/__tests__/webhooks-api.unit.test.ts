@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  WebhooksApiError,
-  WebhooksApiService,
   type EmittedEvent,
   type WebhookDeliveryRecord,
   type WebhookEndpointSummary,
+  WebhooksApiError,
+  WebhooksApiService,
 } from "../webhooks-api.service";
 
 /**
@@ -68,7 +68,10 @@ const eventsPage = (ids: string[], next_cursor: string | null): unknown => ({
   next_cursor,
 });
 
-const deliveriesPage = (ids: string[], next_cursor: string | null): unknown => ({
+const deliveriesPage = (
+  ids: string[],
+  next_cursor: string | null,
+): unknown => ({
   data: ids.map(delivery),
   next_cursor,
 });
@@ -91,7 +94,7 @@ const bodyOf = (call: number): Record<string, unknown> =>
   JSON.parse(initOf(call).body as string) as Record<string, unknown>;
 
 /** Reads an iterator to exhaustion and hands back every row it yielded. */
-const drain = async <T,>(rows: AsyncIterable<T>): Promise<T[]> => {
+const drain = async <T>(rows: AsyncIterable<T>): Promise<T[]> => {
   const collected: T[] = [];
   for await (const row of rows) collected.push(row);
   return collected;

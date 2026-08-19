@@ -1,20 +1,22 @@
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   collectForwardedEnv,
+  type EligibilityInput,
   evaluateEligibility,
   isAutoSpawnEnabled,
   isDaemonDisabledByConfig,
   resolveColorLevel,
   stdinCarriesData,
-  type EligibilityInput,
 } from "../eligibility";
 
-const piped = (overrides: Partial<EligibilityInput> = {}): EligibilityInput => ({
+const piped = (
+  overrides: Partial<EligibilityInput> = {},
+): EligibilityInput => ({
   args: ["trace", "search", "--format", "json"],
   env: {},
   stdoutIsTty: false,
@@ -111,9 +113,10 @@ describe("evaluateEligibility", () => {
       // Served, `readStdin()` would resolve "" on the daemon's immediate EOF —
       // and the SECOND such request would never settle at all, because
       // process.stdin has already emitted `end`.
-      expect(
-        evaluateEligibility(piped({ stdinCarriesData: true })),
-      ).toEqual({ eligible: false, reason: "piped-stdin" });
+      expect(evaluateEligibility(piped({ stdinCarriesData: true }))).toEqual({
+        eligible: false,
+        reason: "piped-stdin",
+      });
     });
 
     it("refuses --stdin even when fd 0 could not be inspected", () => {
@@ -147,7 +150,9 @@ describe("evaluateEligibility", () => {
     /** @scenario "A command asks me a question at a prompt" */
     it("refuses prompt tag delete, which confirms by typing the tag name", () => {
       expect(
-        evaluateEligibility(piped({ args: ["prompt", "tag", "delete", "prod"] })),
+        evaluateEligibility(
+          piped({ args: ["prompt", "tag", "delete", "prod"] }),
+        ),
       ).toEqual({ eligible: false, reason: "denied-command" });
     });
 
@@ -393,7 +398,10 @@ describe("stdinCarriesData", () => {
       // end from waiting for a writer that this test is not going to provide.
       const fifo = path.join(dir, "fifo");
       execFileSync("mkfifo", [fifo]);
-      const fd = fs.openSync(fifo, fs.constants.O_RDONLY | fs.constants.O_NONBLOCK);
+      const fd = fs.openSync(
+        fifo,
+        fs.constants.O_RDONLY | fs.constants.O_NONBLOCK,
+      );
       try {
         expect(stdinCarriesData(fd)).toBe(true);
       } finally {
@@ -459,21 +467,21 @@ describe("isDaemonDisabledByConfig", () => {
   it("disables the daemon when the persisted config says daemon off", () => {
     fs.writeFileSync(configFile, JSON.stringify({ daemon: "off" }));
 
-    expect(
-      isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile }),
-    ).toBe(true);
+    expect(isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile })).toBe(
+      true,
+    );
   });
 
   it("keeps the daemon enabled when the config says on, or the field is absent", () => {
     fs.writeFileSync(configFile, JSON.stringify({ daemon: "on" }));
-    expect(
-      isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile }),
-    ).toBe(false);
+    expect(isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile })).toBe(
+      false,
+    );
 
     fs.writeFileSync(configFile, JSON.stringify({ control_plane_url: "x" }));
-    expect(
-      isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile }),
-    ).toBe(false);
+    expect(isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile })).toBe(
+      false,
+    );
   });
 
   it("keeps the daemon enabled when the config file does not exist", () => {
@@ -487,8 +495,8 @@ describe("isDaemonDisabledByConfig", () => {
   it("keeps the daemon enabled when the config file is corrupt — never breaks a command", () => {
     fs.writeFileSync(configFile, "not json {");
 
-    expect(
-      isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile }),
-    ).toBe(false);
+    expect(isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile })).toBe(
+      false,
+    );
   });
 });

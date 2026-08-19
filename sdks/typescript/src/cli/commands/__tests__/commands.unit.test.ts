@@ -4,9 +4,9 @@
  * plain-text tree rendering.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AGENT_MODE_ENV_VARS } from "../../utils/output";
 import { commandsCommand } from "../commands";
 import { helpTreeCommand } from "../help-tree";
-import { AGENT_MODE_ENV_VARS } from "../../utils/output";
 
 // program.ts reads the tsup-injected __CLI_VERSION__ build constant; under
 // vitest there is no bundler define, so stub it before buildProgram() runs.
@@ -17,7 +17,9 @@ describe("commandsCommand", () => {
   const savedEnv: Record<string, string | undefined> = {};
 
   beforeEach(() => {
-    consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    consoleLogSpy = vi
+      .spyOn(console, "log")
+      .mockImplementation(() => undefined);
     for (const name of AGENT_MODE_ENV_VARS) {
       savedEnv[name] = process.env[name];
       delete process.env[name];
@@ -32,8 +34,7 @@ describe("commandsCommand", () => {
     }
   });
 
-  const logged = (): string =>
-    consoleLogSpy.mock.calls.flat().join("\n");
+  const logged = (): string => consoleLogSpy.mock.calls.flat().join("\n");
 
   it("renders the compact tree as its human form", () => {
     commandsCommand({}).table();
@@ -44,7 +45,9 @@ describe("commandsCommand", () => {
 
   it("returns the nested catalog as its payload", () => {
     const { data } = commandsCommand({});
-    const { commands } = data as { commands: { path: string; children: unknown[] }[] };
+    const { commands } = data as {
+      commands: { path: string; children: unknown[] }[];
+    };
     const trace = commands.find((entry) => entry.path === "trace");
     expect(trace).toBeDefined();
     expect(trace!.children.length).toBeGreaterThan(0);
@@ -68,7 +71,9 @@ describe("commandsCommand", () => {
     expect(paths).toContain("dataset records add");
     expect(paths).toContain("virtual-keys rotate");
 
-    const traceSearch = commands.find((entry) => entry.path === "trace search")!;
+    const traceSearch = commands.find(
+      (entry) => entry.path === "trace search",
+    )!;
     expect(traceSearch.hint).toContain("langwatch trace search");
     expect(traceSearch.skill).toBe("tracing");
     expect(traceSearch.tokenCost).toBeGreaterThan(0);
@@ -81,7 +86,9 @@ describe("helpTreeCommand", () => {
   const savedEnv: Record<string, string | undefined> = {};
 
   beforeEach(() => {
-    consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    consoleLogSpy = vi
+      .spyOn(console, "log")
+      .mockImplementation(() => undefined);
     for (const name of AGENT_MODE_ENV_VARS) {
       savedEnv[name] = process.env[name];
       delete process.env[name];
@@ -96,8 +103,7 @@ describe("helpTreeCommand", () => {
     }
   });
 
-  const logged = (): string =>
-    consoleLogSpy.mock.calls.flat().join("\n");
+  const logged = (): string => consoleLogSpy.mock.calls.flat().join("\n");
 
   it("prints the annotated tree as plain text by default", () => {
     // No explicit format request, so it prints itself and returns nothing for

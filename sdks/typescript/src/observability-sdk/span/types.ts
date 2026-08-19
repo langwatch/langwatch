@@ -1,15 +1,10 @@
-import {
-  type AttributeValue,
-  type Span,
-  type SpanOptions,
-} from "@opentelemetry/api";
-import {
-  type SpanInputOutput,
-  type ChatMessage,
+import type { AttributeValue, Span, SpanOptions } from "@opentelemetry/api";
+import type { Prompt } from "@/client-sdk/services/prompts";
+import type {
+  ChatMessage,
+  SpanInputOutput,
 } from "../../internal/generated/types/tracer";
-import { type Prompt } from "@/client-sdk/services/prompts";
-import { type AddEvaluationParams } from "../evaluation";
-
+import type { AddEvaluationParams } from "../evaluation";
 
 /**
  * Simple chat message type with just role and content
@@ -29,11 +24,10 @@ export const INPUT_OUTPUT_TYPES = [
   "list",
   "json",
   "guardrail_result",
-  "evaluation_result"
+  "evaluation_result",
 ] as const;
 
-export type InputOutputType = typeof INPUT_OUTPUT_TYPES[number];
-
+export type InputOutputType = (typeof INPUT_OUTPUT_TYPES)[number];
 
 export type JsonSerializable =
   | string
@@ -279,7 +273,10 @@ export interface LangWatchSpan extends Span {
    * @param input - Chat messages array (supports both ChatMessage[] and SimpleChatMessage[])
    * @returns this
    */
-  setInput(type: "chat_messages", input: ChatMessage[] | SimpleChatMessage[]): this;
+  setInput(
+    type: "chat_messages",
+    input: ChatMessage[] | SimpleChatMessage[],
+  ): this;
   /**
    * Record the input to the span with explicit type control.
    *
@@ -346,7 +343,10 @@ export interface LangWatchSpan extends Span {
    * @param output - Chat messages array (supports both ChatMessage[] and SimpleChatMessage[])
    * @returns this
    */
-  setOutput(type: "chat_messages", output: ChatMessage[] | SimpleChatMessage[]): this;
+  setOutput(
+    type: "chat_messages",
+    output: ChatMessage[] | SimpleChatMessage[],
+  ): this;
   /**
    * Record the output from the span with explicit type control.
    *

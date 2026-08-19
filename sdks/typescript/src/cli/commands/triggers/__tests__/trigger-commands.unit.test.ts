@@ -1,7 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -12,11 +16,11 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { listTriggersCommand } from "../list";
-import { getTriggerCommand } from "../get";
 import { createTriggerCommand } from "../create";
-import { updateTriggerCommand } from "../update";
 import { deleteTriggerCommand } from "../delete";
+import { getTriggerCommand } from "../get";
+import { listTriggersCommand } from "../list";
+import { updateTriggerCommand } from "../update";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -135,7 +139,9 @@ describe("getTriggerCommand()", () => {
     it("exits with code 1", async () => {
       mockFetch.mockResolvedValue({ ok: false, status: 404 });
 
-      await expect(getTriggerCommand("nonexistent")).rejects.toThrow(ProcessExitError);
+      await expect(getTriggerCommand("nonexistent")).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });

@@ -1,13 +1,13 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import type {
   WebhookDestinationInput,
   WebhookSqsDestinationInput,
 } from "@/client-sdk/services/webhooks/webhooks-api.service";
 import { WebhooksApiService } from "@/client-sdk/services/webhooks/webhooks-api.service";
 import { checkOrgApiKey } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export interface CreateWebhookOptions {
   url?: string;
@@ -76,7 +76,9 @@ export function destinationFromOptions(
     );
   }
   if (!options.url) {
-    throw new Error("Pass --url for an HTTPS endpoint, or --queue-url for an Amazon SQS queue.");
+    throw new Error(
+      "Pass --url for an HTTPS endpoint, or --queue-url for an Amazon SQS queue.",
+    );
   }
   return { destination_kind: "http", url: options.url };
 }
@@ -90,7 +92,10 @@ export const createWebhookCommand = async (
   try {
     const endpoint = await service.create({
       ...destinationFromOptions(options),
-      enabled_events: options.events.split(",").map((e) => e.trim()).filter(Boolean),
+      enabled_events: options.events
+        .split(",")
+        .map((e) => e.trim())
+        .filter(Boolean),
     });
     spinner.succeed(`Created endpoint ${endpoint.id}`);
     return {
@@ -110,10 +115,18 @@ export const createWebhookCommand = async (
           );
           console.log();
         }
-        console.log(chalk.gray("Verify deliveries with the X-LangWatch-Signature header (t=,v1= HMAC-SHA256, 5-minute tolerance)."));
+        console.log(
+          chalk.gray(
+            "Verify deliveries with the X-LangWatch-Signature header (t=,v1= HMAC-SHA256, 5-minute tolerance).",
+          ),
+        );
         if (endpoint.destination_kind === "sqs") {
           // The one thing every queue consumer gets wrong on its first run.
-          console.log(chalk.gray("On a queue, that signature is a MESSAGE ATTRIBUTE: pass MessageAttributeNames: [\"All\"] to ReceiveMessage or you will not see it."));
+          console.log(
+            chalk.gray(
+              'On a queue, that signature is a MESSAGE ATTRIBUTE: pass MessageAttributeNames: ["All"] to ReceiveMessage or you will not see it.',
+            ),
+          );
         }
         console.log();
       },

@@ -1,15 +1,15 @@
-import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { LangWatch } from "../../../dist";
 import {
   runAlwaysFetchPolicy,
   runCacheTtlPolicy,
   runDefaultFetchPolicy,
   runMaterializedOnlyPolicy,
 } from "../../../examples/prompt-management/fetch-policy";
-import { HandleUtil } from "./helpers/handle.util";
-import { TempDirUtil } from "./helpers/temp-dir.util";
-import { type LangWatch } from "../../../dist";
 import { getLangwatchSDK } from "../../helpers/get-sdk";
 import { CliRunner } from "../cli/helpers/cli-runner";
+import { HandleUtil } from "./helpers/handle.util";
+import { TempDirUtil } from "./helpers/temp-dir.util";
 
 /**
  * NOTE: This test leaves prompts in the test DB
@@ -38,7 +38,7 @@ describe("Prompt fetch policies (real API)", () => {
     let calls = 0;
     globalThis.fetch = async (...args) => {
       calls += 1;
-      // @ts-ignore
+      // @ts-expect-error
       return originalFetch(...args);
     };
     try {
@@ -61,9 +61,7 @@ describe("Prompt fetch policies (real API)", () => {
     );
     expect(prompt).toBeTruthy();
     expect(prompt?.handle).toContain("default-policy");
-    expect((prompt)?.prompt ?? "").toContain(
-      "Hello from default policy",
-    );
+    expect(prompt?.prompt ?? "").toContain("Hello from default policy");
     expect(calls).toBeGreaterThan(0);
     await langwatch.prompts.delete(handle);
   }, 60_000);
@@ -77,7 +75,7 @@ describe("Prompt fetch policies (real API)", () => {
     );
     expect(prompt).toBeTruthy();
     expect(prompt?.handle).toContain("always-fetch");
-    expect((prompt)?.prompt ?? "").toContain("Always fetch from API");
+    expect(prompt?.prompt ?? "").toContain("Always fetch from API");
     expect(calls).toBeGreaterThan(0);
     await langwatch.prompts.delete(handle);
   }, 60_000);

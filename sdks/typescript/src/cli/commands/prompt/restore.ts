@@ -1,13 +1,12 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the restored version rather than printing it: the output port renders
@@ -20,11 +19,10 @@ export const promptRestoreCommand = async (
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(
-    `Restoring "${handle}" to version ${versionId}...`
+    `Restoring "${handle}" to version ${versionId}...`,
   ).start();
 
   try {
@@ -36,7 +34,7 @@ export const promptRestoreCommand = async (
           "Content-Type": "application/json",
           ...buildAuthHeaders({ apiKey }),
         },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -56,7 +54,7 @@ export const promptRestoreCommand = async (
     };
 
     spinner.succeed(
-      `Restored "${handle}" — new version v${restored.version} created`
+      `Restored "${handle}" — new version v${restored.version} created`,
     );
 
     return {
@@ -64,10 +62,10 @@ export const promptRestoreCommand = async (
       table: () => {
         console.log();
         console.log(
-          `  ${chalk.gray("New version:")} ${chalk.cyan(`v${restored.version}`)}`
+          `  ${chalk.gray("New version:")} ${chalk.cyan(`v${restored.version}`)}`,
         );
         console.log(
-          `  ${chalk.gray("Message:")}     ${restored.commitMessage ?? chalk.gray("—")}`
+          `  ${chalk.gray("Message:")}     ${restored.commitMessage ?? chalk.gray("—")}`,
         );
         console.log();
       },

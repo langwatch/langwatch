@@ -7,7 +7,7 @@
  *
  * Spec: specs/scenarios/scenario-run-parameters.feature
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   coerceParameterValue,
@@ -83,9 +83,9 @@ describe("parseRunParameterFlags()", () => {
 
   describe("given a value containing an equals sign", () => {
     it("splits on the first one, so the value keeps the rest", () => {
-      expect(
-        parseRunParameterFlags({ pairs: ["query=a=b"] }),
-      ).toEqual({ query: "a=b" });
+      expect(parseRunParameterFlags({ pairs: ["query=a=b"] })).toEqual({
+        query: "a=b",
+      });
     });
   });
 
@@ -112,7 +112,9 @@ describe("parseRunParameterFlags()", () => {
   describe("given the same name twice", () => {
     it("keeps the last value, so an appended override wins", () => {
       expect(
-        parseRunParameterFlags({ pairs: ["region=us-east", "region=eu-central"] }),
+        parseRunParameterFlags({
+          pairs: ["region=us-east", "region=eu-central"],
+        }),
       ).toEqual({ region: "eu-central" });
     });
   });

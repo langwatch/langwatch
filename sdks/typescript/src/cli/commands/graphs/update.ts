@@ -1,14 +1,16 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import type { CommandResult } from "../../utils/output";
-
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { resolveCredentials } from "../../utils/apiKey";
+import {
+  commandValidationError,
+  reportCommandError,
+} from "../../utils/errorOutput";
+import { formatFetchError } from "../../utils/formatFetchError";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 /**
  * Returns the updated graph rather than printing it: the output port renders it
  * in whatever format the caller asked for (utils/output.ts).
@@ -19,7 +21,7 @@ export const updateGraphCommand = async (
     name?: string;
     graph?: string;
     filters?: string;
-  }
+  },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
@@ -33,8 +35,7 @@ export const updateGraphCommand = async (
   }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Updating graph "${id}"...`).start();
 
@@ -59,7 +60,11 @@ export const updateGraphCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "update graph" });
+      failSpinner({
+        spinner,
+        error: new Error(message),
+        action: "update graph",
+      });
       process.exit(1);
     }
 

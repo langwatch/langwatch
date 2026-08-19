@@ -1,7 +1,6 @@
 import chalk from "chalk";
-
-import { TOOL_BY_SOURCE_TYPE } from "@/cli/utils/governance/otel-env-block";
-import { resolveIngestionCredential } from "@/cli/utils/governance/telemetry-refresh";
+import { writeCodexOtelBlock } from "@/cli/utils/codex-config-toml";
+import { reportCommandError } from "@/cli/utils/errorOutput";
 import {
   type ClaudePluginEnsureAction,
   ensureLangwatchClaudePlugin,
@@ -12,14 +11,14 @@ import {
   saveConfig,
 } from "@/cli/utils/governance/config";
 import { installOpencodeSessionContextPlugin } from "@/cli/utils/governance/opencode-plugin";
+import { TOOL_BY_SOURCE_TYPE } from "@/cli/utils/governance/otel-env-block";
 import { installSessionContextHooks } from "@/cli/utils/governance/session-context-hooks";
 import {
   CODEX_TURN_HARVEST_BLOCKED_MESSAGE,
   type CodexTurnHarvestOutcome,
   installCodexTurnHarvest,
 } from "@/cli/utils/governance/shell-rc";
-import { writeCodexOtelBlock } from "@/cli/utils/codex-config-toml";
-import { reportCommandError } from "@/cli/utils/errorOutput";
+import { resolveIngestionCredential } from "@/cli/utils/governance/telemetry-refresh";
 
 /**
  * `langwatch ingest install <tool>` — Path B activation flow.
@@ -44,12 +43,7 @@ import { reportCommandError } from "@/cli/utils/errorOutput";
  * here once we know whether it needs an out-of-band activation step.
  */
 
-const SUPPORTED_TOOLS = [
-  "codex",
-  "claude_code",
-  "gemini",
-  "opencode",
-] as const;
+const SUPPORTED_TOOLS = ["codex", "claude_code", "gemini", "opencode"] as const;
 type SupportedTool = (typeof SUPPORTED_TOOLS)[number];
 
 export interface InstallOptions {
@@ -139,7 +133,10 @@ export async function installCommand(
     }
     renderHumanReport(report);
   } catch (err) {
-    reportCommandError({ error: err, format: options.json ? "json" : undefined });
+    reportCommandError({
+      error: err,
+      format: options.json ? "json" : undefined,
+    });
     process.exit(1);
   }
 }
@@ -239,7 +236,10 @@ async function runInstall(
         plugin.action === "installed" || plugin.action === "already_installed";
     }
 
-    if ((tool === "claude_code" && !isClaudePluginHandlingHooks) || tool === "codex") {
+    if (
+      (tool === "claude_code" && !isClaudePluginHandlingHooks) ||
+      tool === "codex"
+    ) {
       const result = installSessionContextHooks({
         tool,
         filePath: options.hooksPath,
@@ -389,7 +389,8 @@ function renderHumanReport(report: InstallReport): void {
       report.session_hooks_action === "unchanged"
         ? "already up to date"
         : report.session_hooks_action;
-    const what = report.tool === "opencode" ? "session plugin" : "session hooks";
+    const what =
+      report.tool === "opencode" ? "session plugin" : "session hooks";
     process.stdout.write(
       `${chalk.green("✓")} ${report.session_hooks_path} ${what} ${hooksVerb}\n`,
     );

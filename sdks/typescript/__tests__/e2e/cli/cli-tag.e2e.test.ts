@@ -1,26 +1,25 @@
 // @vitest-environment node
 // @vitest-config ./vitest.e2e.config.mts
 
+import { config } from "dotenv";
+import * as fs from "fs";
+import * as path from "path";
 import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
   describe,
   expect,
   it,
-  afterEach,
-  beforeEach,
-  afterAll,
-  beforeAll,
 } from "vitest";
-import * as fs from "fs";
-import * as path from "path";
-
-import { config } from "dotenv";
+import { LangWatch } from "../../../dist";
 import {
-  expectations,
   CliRunner,
+  expectations,
   PROMPT_NAME_PREFIX,
   PromptFileManager,
 } from "./helpers";
-import { LangWatch } from "../../../dist";
 import { ApiHelpers } from "./helpers/api-helpers";
 
 config({ path: ".env.test", override: true });

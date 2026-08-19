@@ -1,5 +1,5 @@
-import { type LangwatchApiClient } from '../internal/api/client';
-import { type Logger } from '../logger';
+import type { LangwatchApiClient } from "../internal/api/client";
+import type { Logger } from "../logger";
 
 export interface InternalConfig {
   langwatchApiClient: LangwatchApiClient;

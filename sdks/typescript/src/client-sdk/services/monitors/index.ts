@@ -1,8 +1,8 @@
 export {
-  MonitorsApiService,
-  MonitorsApiError,
-  type MonitorResponse,
   type CreateMonitorBody,
-  type UpdateMonitorBody,
   type MonitorDeleteResponse,
+  type MonitorResponse,
+  MonitorsApiError,
+  MonitorsApiService,
+  type UpdateMonitorBody,
 } from "./monitors-api.service";

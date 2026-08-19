@@ -10,10 +10,10 @@ import * as net from "node:net";
 
 import { inspectSocketTrust } from "./identity";
 import {
+  type ClientFrame,
   encodeFrame,
   FrameDecoder,
   PROTOCOL_VERSION,
-  type ClientFrame,
   type ServerFrame,
 } from "./protocol";
 
@@ -155,7 +155,10 @@ export async function execViaDaemon(
         settle({ served: true, exitCode: 1 });
         return;
       }
-      settle({ served: false, reason: `connect-failed:${error.code ?? "unknown"}` });
+      settle({
+        served: false,
+        reason: `connect-failed:${error.code ?? "unknown"}`,
+      });
     });
 
     socket.on("close", () => {
@@ -221,7 +224,9 @@ export async function execViaDaemon(
               // A stale daemon from a previous CLI version must not linger:
               // it would keep answering (and refusing) every invocation until
               // its idle timeout, and it is holding credentials.
-              evict: frame.reason === "version-skew" || frame.reason === "protocol-skew",
+              evict:
+                frame.reason === "version-skew" ||
+                frame.reason === "protocol-skew",
             });
             break;
           }
@@ -240,7 +245,10 @@ export async function execViaDaemon(
               settle({ served: true, exitCode: 1 });
               break;
             }
-            settle({ served: false, reason: `daemon-declined:${frame.reason}` });
+            settle({
+              served: false,
+              reason: `daemon-declined:${frame.reason}`,
+            });
             break;
           }
           case "out":

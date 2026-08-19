@@ -225,9 +225,9 @@ describe("hasOpencodeSessionContextPlugin", () => {
     it("reports it present, by its marker", () => {
       installOpencodeSessionContextPlugin();
 
-      expect(fs.readFileSync(pluginPath, "utf8").startsWith(
-        OPENCODE_PLUGIN_MARKER,
-      )).toBe(true);
+      expect(
+        fs.readFileSync(pluginPath, "utf8").startsWith(OPENCODE_PLUGIN_MARKER),
+      ).toBe(true);
       expect(hasOpencodeSessionContextPlugin()).toBe(true);
     });
   });
@@ -308,7 +308,10 @@ describe("the generated plugin module", () => {
 
   describe("when an event carries no session id", () => {
     it.each([
-      ["a session event with empty properties", { type: "session.idle", properties: {} }],
+      [
+        "a session event with empty properties",
+        { type: "session.idle", properties: {} },
+      ],
       ["an event of another kind", { type: "message.updated" }],
       ["an event with no type at all", {}],
     ])("runs nothing for %s", (_label, event) => {

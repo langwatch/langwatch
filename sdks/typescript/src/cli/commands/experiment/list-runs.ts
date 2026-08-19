@@ -1,13 +1,13 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import {
-  ExperimentsApiService,
   type ExperimentRunSummaryEntry,
+  ExperimentsApiService,
 } from "@/client-sdk/services/experiments/experiments-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export interface ListRunsOptions {
   experiment?: string;
@@ -113,7 +113,14 @@ export const experimentListRunsCommand = async (
 
         formatTable({
           data: tableData,
-          headers: ["Run ID", "Status", "Progress", "Started", "Finished", "Result"],
+          headers: [
+            "Run ID",
+            "Status",
+            "Progress",
+            "Started",
+            "Finished",
+            "Result",
+          ],
           colorMap: {
             "Run ID": chalk.cyan,
           },

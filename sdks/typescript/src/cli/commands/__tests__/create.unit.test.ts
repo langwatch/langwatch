@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("fs", () => ({
   existsSync: vi.fn().mockReturnValue(false),
@@ -6,7 +6,13 @@ vi.mock("fs", () => ({
   writeFileSync: vi.fn(),
 }));
 
-vi.mock("../../utils/apiKey", () => ({ resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })) }));
+vi.mock("../../utils/apiKey", () => ({
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
+}));
 vi.mock("../../utils/init", () => ({
   ensureProjectInitialized: vi.fn().mockResolvedValue(undefined),
 }));

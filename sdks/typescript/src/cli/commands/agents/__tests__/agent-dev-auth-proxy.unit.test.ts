@@ -142,7 +142,9 @@ describe("startAuthProxy()", () => {
       });
       expect(response.status).toBe(502);
       const body = (await response.json()) as { error: string };
-      expect(body.error).toBe("Could not reach the local agent behind this tunnel.");
+      expect(body.error).toBe(
+        "Could not reach the local agent behind this tunnel.",
+      );
       // The timeout detail belongs on the terminal, not in a body that
       // travels back through the public tunnel.
       expect(errorLog.join("\n")).toContain("did not answer within");

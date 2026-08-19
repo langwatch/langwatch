@@ -5,14 +5,14 @@
  * Spec: specs/experiments/comparison-sdk.feature
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { ComparisonError } from "../errors";
 import {
   type ComparisonHarness,
-  THREE_OUTPUTS,
   comparisonEvaluations,
   createExperiment,
   runComparison,
+  THREE_OUTPUTS,
   useComparisonHarness,
 } from "./comparison-harness";
 
@@ -35,7 +35,9 @@ describe("Experiment.compare", () => {
         });
 
         expect(
-          harness.judgeRequests[0]!.data.candidates.map((candidate) => candidate.id)
+          harness.judgeRequests[0]!.data.candidates.map(
+            (candidate) => candidate.id,
+          ),
         ).toEqual(["gpt-5-mini", "claude-sonnet-5"]);
         expect(verdict?.candidates).toEqual(["gpt-5-mini", "claude-sonnet-5"]);
       });
@@ -55,7 +57,9 @@ describe("Experiment.compare", () => {
 
         expect(error).toBeInstanceOf(ComparisonError);
         expect((error as ComparisonError).message).toContain("gemini-flash");
-        expect((error as ComparisonError).missingTargets).toEqual(["gemini-flash"]);
+        expect((error as ComparisonError).missingTargets).toEqual([
+          "gemini-flash",
+        ]);
         expect(verdict).toBeUndefined();
         expect(harness.judgeRequests).toHaveLength(0);
       });

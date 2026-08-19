@@ -1,19 +1,19 @@
+import {
+  extractStatusFromResponse,
+  formatApiErrorForOperation,
+} from "@/client-sdk/services/_shared/format-api-error";
+import type { InternalConfig } from "@/client-sdk/types";
+import {
+  createLangWatchApiClient,
+  type LangwatchApiClient,
+} from "@/internal/api/client";
+import { EvaluatorsApiError } from "./errors";
 import type {
   CreateEvaluatorBody,
   DeleteEvaluatorResponse,
   EvaluatorResponse,
   UpdateEvaluatorBody,
 } from "./types";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
-import { type InternalConfig } from "@/client-sdk/types";
-import { EvaluatorsApiError } from "./errors";
-import {
-  extractStatusFromResponse,
-  formatApiErrorForOperation,
-} from "@/client-sdk/services/_shared/format-api-error";
 
 /**
  * Service for retrieving evaluator resources via the LangWatch API.
@@ -28,9 +28,13 @@ export class EvaluatorsApiService {
   }
 
   private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: extractStatusFromResponse(error),
+      },
+    });
     throw new EvaluatorsApiError(message, operation, error);
   }
 
@@ -75,16 +79,15 @@ export class EvaluatorsApiService {
   /**
    * Updates an evaluator by its ID.
    */
-  async update(id: string, params: UpdateEvaluatorBody): Promise<EvaluatorResponse> {
-    const { data, error } = await this.apiClient.PUT(
-      "/api/evaluators/{id}",
-      {
-        params: { path: { id } },
-        body: params,
-      },
-    );
-    if (error)
-      this.handleApiError(`update evaluator with ID "${id}"`, error);
+  async update(
+    id: string,
+    params: UpdateEvaluatorBody,
+  ): Promise<EvaluatorResponse> {
+    const { data, error } = await this.apiClient.PUT("/api/evaluators/{id}", {
+      params: { path: { id } },
+      body: params,
+    });
+    if (error) this.handleApiError(`update evaluator with ID "${id}"`, error);
     return data;
   }
 
@@ -98,8 +101,7 @@ export class EvaluatorsApiService {
         params: { path: { id } },
       },
     );
-    if (error)
-      this.handleApiError(`delete evaluator with ID "${id}"`, error);
+    if (error) this.handleApiError(`delete evaluator with ID "${id}"`, error);
     return data;
   }
 }

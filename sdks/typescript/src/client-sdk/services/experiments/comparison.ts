@@ -12,6 +12,7 @@
  * would both drift and silently disable that adaptation.
  */
 
+import { ComparisonError } from "./errors";
 import type {
   ComparisonOptions,
   ComparisonStatus,
@@ -19,7 +20,6 @@ import type {
   EvaluationStatus,
   RunEvaluatorResponse,
 } from "./types";
-import { ComparisonError } from "./errors";
 
 /** The evaluator behind every comparison, in the workbench and in the SDK. */
 export const COMPARISON_EVALUATOR_SLUG = "langevals/select_best_compare";
@@ -105,7 +105,7 @@ export const buildComparisonSettings = (
     | "swapAndReconcile"
     | "includeMetrics"
     | "temperature"
-  >
+  >,
 ): Record<string, unknown> => {
   const settings: Record<string, unknown> = {};
 
@@ -138,14 +138,14 @@ export const buildComparisonSettings = (
  */
 export const buildComparisonCandidates = (
   names: string[],
-  captured: Map<string, CapturedTargetOutput>
+  captured: Map<string, CapturedTargetOutput>,
 ): ComparisonCandidatePayload[] =>
   names.map((name) => {
     const output = captured.get(name);
     if (!output) {
       throw new ComparisonError(
         `Cannot compare: '${name}' was selected as a candidate but recorded no output.`,
-        [name]
+        [name],
       );
     }
     return {
@@ -226,7 +226,7 @@ export const toComparisonVerdict = ({
  * decisions that can drift apart.
  */
 export const comparisonEntryStatus = (
-  status: ComparisonStatus
+  status: ComparisonStatus,
 ): EvaluationStatus => {
   switch (status) {
     case "decided":
@@ -243,7 +243,9 @@ export const comparisonEntryStatus = (
 /**
  * The label a verdict is recorded under: the winner, "tie", or nothing.
  */
-export const comparisonEntryLabel = (verdict: ComparisonVerdict): string | null => {
+export const comparisonEntryLabel = (
+  verdict: ComparisonVerdict,
+): string | null => {
   if (verdict.status === "decided") return verdict.winner;
   if (verdict.status === "tie") return "tie";
   return null;

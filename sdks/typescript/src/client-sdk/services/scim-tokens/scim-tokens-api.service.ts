@@ -10,8 +10,8 @@
 import { resolveEndpoint } from "@/internal/endpoint";
 import {
   createManagementRequest,
-  resolveManagementToken,
   type ManagementRequest,
+  resolveManagementToken,
 } from "../_shared/management-request";
 
 export interface ScimTokenSummary {
@@ -58,7 +58,9 @@ export class ScimTokensApiService {
     });
   }
 
-  async create(input: { description?: string } = {}): Promise<CreatedScimToken> {
+  async create(
+    input: { description?: string } = {},
+  ): Promise<CreatedScimToken> {
     return this.#request({
       operation: "create SCIM token",
       path: "/api/scim-tokens",

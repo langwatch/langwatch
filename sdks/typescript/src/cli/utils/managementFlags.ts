@@ -20,10 +20,10 @@
 import {
   MANAGEMENT_ROLES,
   MANAGEMENT_SCOPE_TYPES,
-  ORGANIZATION_ROLES,
   type ManagementBindingInput,
   type ManagementRole,
   type ManagementScopeType,
+  ORGANIZATION_ROLES,
   type OrganizationRole,
 } from "@/client-sdk/services/_shared/management-types";
 import type { ListRoleBindingsOptions } from "@/client-sdk/services/role-bindings/role-bindings-api.service";

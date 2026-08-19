@@ -1,8 +1,8 @@
-import { scopedApiKey } from "@/internal/credentialContext";
-import { resolveEndpoint } from "@/internal/endpoint";
-import { buildAuthHeaders } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { resolveEndpoint } from "@/internal/endpoint";
 
 export interface SecretResponse {
   id: string;
@@ -33,7 +33,8 @@ export class SecretsApiService {
   private readonly endpoint: string;
 
   constructor(config?: { apiKey?: string; endpoint?: string }) {
-    this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
+    this.apiKey =
+      config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     this.endpoint = resolveEndpoint(config?.endpoint);
   }
 
@@ -55,7 +56,10 @@ export class SecretsApiService {
       } catch {
         // leave as raw text
       }
-      const message = formatApiErrorMessage({ error: parsed, options: { status: response.status } });
+      const message = formatApiErrorMessage({
+        error: parsed,
+        options: { status: response.status },
+      });
       throwIfHandledError({
         operation: options?.method ?? "GET",
         error: parsed,
@@ -77,7 +81,9 @@ export class SecretsApiService {
   }
 
   async get(id: string): Promise<SecretResponse> {
-    return this.request<SecretResponse>(`/api/secrets/${encodeURIComponent(id)}`);
+    return this.request<SecretResponse>(
+      `/api/secrets/${encodeURIComponent(id)}`,
+    );
   }
 
   async create(body: { name: string; value: string }): Promise<SecretResponse> {
@@ -88,15 +94,21 @@ export class SecretsApiService {
   }
 
   async update(id: string, body: { value: string }): Promise<SecretResponse> {
-    return this.request<SecretResponse>(`/api/secrets/${encodeURIComponent(id)}`, {
-      method: "PUT",
-      body: JSON.stringify(body),
-    });
+    return this.request<SecretResponse>(
+      `/api/secrets/${encodeURIComponent(id)}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(body),
+      },
+    );
   }
 
   async delete(id: string): Promise<SecretDeleteResponse> {
-    return this.request<SecretDeleteResponse>(`/api/secrets/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-    });
+    return this.request<SecretDeleteResponse>(
+      `/api/secrets/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE",
+      },
+    );
   }
 }

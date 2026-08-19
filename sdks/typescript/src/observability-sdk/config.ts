@@ -1,7 +1,7 @@
 import { type Logger, NoOpLogger } from "../logger/index.js";
-import {
-  type DataCaptureMode,
-  type DataCaptureOptions,
+import type {
+  DataCaptureMode,
+  DataCaptureOptions,
 } from "./features/data-capture/types.js";
 import { validateDataCaptureMode } from "./features/data-capture/utils.js";
 
@@ -173,7 +173,6 @@ export function getDataCaptureMode(): DataCaptureMode {
       return config.dataCapture;
     }
 
-
     getObservabilitySdkLogger().warn(
       `Invalid data capture mode: ${config.dataCapture}. Using default: "all"`,
     );
@@ -181,7 +180,11 @@ export function getDataCaptureMode(): DataCaptureMode {
     return "all";
   }
 
-  if (typeof config.dataCapture === "object" && config.dataCapture.mode &&validateDataCaptureMode(config.dataCapture.mode)) {
+  if (
+    typeof config.dataCapture === "object" &&
+    config.dataCapture.mode &&
+    validateDataCaptureMode(config.dataCapture.mode)
+  ) {
     return config.dataCapture.mode;
   }
 

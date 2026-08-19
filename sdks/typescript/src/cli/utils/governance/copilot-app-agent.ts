@@ -14,10 +14,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import {
-  COPILOT_APP_AGENT_LABEL,
-  renderLaunchAgent,
   type AppPlatform,
+  COPILOT_APP_AGENT_LABEL,
   type LaunchAgentSpec,
+  renderLaunchAgent,
 } from "./copilot-app";
 
 export interface AgentIo {
@@ -113,10 +113,7 @@ function registerCommands(
         // silently off — verified against launchd on macOS 15.
         {
           cmd: "launchctl",
-          args: [
-            "bootout",
-            `${launchdGuiDomain()}/${COPILOT_APP_AGENT_LABEL}`,
-          ],
+          args: ["bootout", `${launchdGuiDomain()}/${COPILOT_APP_AGENT_LABEL}`],
           tolerateFailure: true,
         },
         {
@@ -143,7 +140,14 @@ function registerCommands(
       return [
         {
           cmd: "schtasks",
-          args: ["/Create", "/TN", COPILOT_APP_AGENT_LABEL, "/XML", descriptorPath, "/F"],
+          args: [
+            "/Create",
+            "/TN",
+            COPILOT_APP_AGENT_LABEL,
+            "/XML",
+            descriptorPath,
+            "/F",
+          ],
         },
         // /Create only registers for the NEXT logon; start the task now so
         // "connected" is not a promise about a future login.
@@ -167,10 +171,7 @@ function unregisterCommands(platform: AppPlatform): OsCommand[] {
       return [
         {
           cmd: "launchctl",
-          args: [
-            "bootout",
-            `${launchdGuiDomain()}/${COPILOT_APP_AGENT_LABEL}`,
-          ],
+          args: ["bootout", `${launchdGuiDomain()}/${COPILOT_APP_AGENT_LABEL}`],
         },
       ];
     case "linux":
@@ -187,7 +188,10 @@ function unregisterCommands(platform: AppPlatform): OsCommand[] {
       ];
     case "win32":
       return [
-        { cmd: "schtasks", args: ["/Delete", "/TN", COPILOT_APP_AGENT_LABEL, "/F"] },
+        {
+          cmd: "schtasks",
+          args: ["/Delete", "/TN", COPILOT_APP_AGENT_LABEL, "/F"],
+        },
       ];
   }
 }
@@ -240,7 +244,11 @@ export function installCopilotAppAgent(
         for (const file of descriptor.files) {
           io.removeFile(file.path);
         }
-        throw new CopilotAppAgentError("register", `${cmd} ${args.join(" ")}`, err);
+        throw new CopilotAppAgentError(
+          "register",
+          `${cmd} ${args.join(" ")}`,
+          err,
+        );
       }
     }
   }
@@ -277,7 +285,11 @@ export function removeCopilotAppAgent(
       io.run(cmd, args);
     } catch (err) {
       if (registered) {
-        throw new CopilotAppAgentError("unregister", `${cmd} ${args.join(" ")}`, err);
+        throw new CopilotAppAgentError(
+          "unregister",
+          `${cmd} ${args.join(" ")}`,
+          err,
+        );
       }
       // stray-file cleanup: unregister can legitimately fail when the OS
       // never had (or already lost) the registration — keep going so the

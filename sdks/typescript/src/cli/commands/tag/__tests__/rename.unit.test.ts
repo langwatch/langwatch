@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/client-sdk/services/prompts", () => ({
   PromptsApiService: vi.fn(),
@@ -6,11 +6,15 @@ vi.mock("@/client-sdk/services/prompts", () => ({
 }));
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
-import { tagRenameCommand } from "../rename";
 import { PromptsApiService } from "@/client-sdk/services/prompts";
+import { tagRenameCommand } from "../rename";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -24,8 +28,11 @@ describe("tagRenameCommand", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRenameTag = vi.fn();
-    vi.mocked(PromptsApiService).mockImplementation(
-      function () { return ({ renameTag: mockRenameTag }) as unknown as InstanceType<typeof PromptsApiService>; });
+    vi.mocked(PromptsApiService).mockImplementation(function () {
+      return { renameTag: mockRenameTag } as unknown as InstanceType<
+        typeof PromptsApiService
+      >;
+    });
     vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new ProcessExitError(code as number);
     });
@@ -39,7 +46,10 @@ describe("tagRenameCommand", () => {
 
       await tagRenameCommand("canary", "beta");
 
-      expect(mockRenameTag).toHaveBeenCalledWith({ tag: "canary", name: "beta" });
+      expect(mockRenameTag).toHaveBeenCalledWith({
+        tag: "canary",
+        name: "beta",
+      });
     });
 
     it("prints confirmation message", async () => {
@@ -48,25 +58,35 @@ describe("tagRenameCommand", () => {
       const result = await tagRenameCommand("canary", "beta");
       result?.table();
 
-      expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Renamed tag: canary -> beta"));
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("Renamed tag: canary -> beta"),
+      );
     });
   });
 
   describe("when given an invalid new name", () => {
     it("does not call renameTag", async () => {
-      await expect(tagRenameCommand("canary", "INVALID!")).rejects.toThrow(ProcessExitError);
+      await expect(tagRenameCommand("canary", "INVALID!")).rejects.toThrow(
+        ProcessExitError,
+      );
 
       expect(mockRenameTag).not.toHaveBeenCalled();
     });
 
     it("prints an error about invalid tag name format", async () => {
-      await expect(tagRenameCommand("canary", "INVALID!")).rejects.toThrow(ProcessExitError);
+      await expect(tagRenameCommand("canary", "INVALID!")).rejects.toThrow(
+        ProcessExitError,
+      );
 
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining("Invalid tag name"));
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining("Invalid tag name"),
+      );
     });
 
     it("exits with code 1", async () => {
-      await expect(tagRenameCommand("canary", "INVALID!")).rejects.toMatchObject({
+      await expect(
+        tagRenameCommand("canary", "INVALID!"),
+      ).rejects.toMatchObject({
         code: 1,
       });
     });

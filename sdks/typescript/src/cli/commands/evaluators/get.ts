@@ -1,10 +1,10 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import type { EvaluatorResponse } from "@/client-sdk/services/evaluators";
+import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
   const config = evaluator.config as
@@ -18,10 +18,16 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
   console.log(chalk.gray("─".repeat(40)));
 
   console.log(`  ${chalk.gray("ID:")}          ${evaluator.id}`);
-  console.log(`  ${chalk.gray("Slug:")}        ${evaluator.slug ?? chalk.gray("—")}`);
+  console.log(
+    `  ${chalk.gray("Slug:")}        ${evaluator.slug ?? chalk.gray("—")}`,
+  );
   console.log(`  ${chalk.gray("Type:")}        ${chalk.yellow(evaluatorType)}`);
-  console.log(`  ${chalk.gray("Created:")}     ${new Date(evaluator.createdAt).toLocaleString()}`);
-  console.log(`  ${chalk.gray("Updated:")}     ${new Date(evaluator.updatedAt).toLocaleString()}`);
+  console.log(
+    `  ${chalk.gray("Created:")}     ${new Date(evaluator.createdAt).toLocaleString()}`,
+  );
+  console.log(
+    `  ${chalk.gray("Updated:")}     ${new Date(evaluator.updatedAt).toLocaleString()}`,
+  );
 
   if (evaluator.workflowId) {
     console.log(`  ${chalk.gray("Workflow ID:")} ${evaluator.workflowId}`);
@@ -32,7 +38,9 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
     console.log(chalk.bold("  Input Fields:"));
     evaluator.fields.forEach((field) => {
       const optional = field.optional ? chalk.gray(" (optional)") : "";
-      console.log(`    ${chalk.green("•")} ${field.identifier}: ${chalk.gray(field.type)}${optional}`);
+      console.log(
+        `    ${chalk.green("•")} ${field.identifier}: ${chalk.gray(field.type)}${optional}`,
+      );
     });
   }
 
@@ -41,7 +49,9 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
     console.log(chalk.bold("  Output Fields:"));
     evaluator.outputFields.forEach((field) => {
       const optional = field.optional ? chalk.gray(" (optional)") : "";
-      console.log(`    ${chalk.green("•")} ${field.identifier}: ${chalk.gray(field.type)}${optional}`);
+      console.log(
+        `    ${chalk.green("•")} ${field.identifier}: ${chalk.gray(field.type)}${optional}`,
+      );
     });
   }
 
@@ -58,7 +68,9 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
   }
 
   if (evaluator.platformUrl) {
-    console.log(`  ${chalk.bold("View:")}  ${chalk.underline(evaluator.platformUrl)}`);
+    console.log(
+      `  ${chalk.bold("View:")}  ${chalk.underline(evaluator.platformUrl)}`,
+    );
   }
 
   console.log();
@@ -68,7 +80,9 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
  * Returns the evaluator rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts).
  */
-export const getEvaluatorCommand = async (idOrSlug: string): Promise<CommandResult | void> => {
+export const getEvaluatorCommand = async (
+  idOrSlug: string,
+): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new EvaluatorsApiService();

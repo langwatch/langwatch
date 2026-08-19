@@ -15,7 +15,7 @@
  * parsed as JSON. Asserting on program.ts's SOURCE would not do: it would pass
  * against a renderer that emits the wrong document, or none.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../commands/evaluators/list.js", () => ({
   listEvaluatorsCommand: () => {

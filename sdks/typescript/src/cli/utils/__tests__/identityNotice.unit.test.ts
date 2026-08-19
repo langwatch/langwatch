@@ -31,11 +31,15 @@ describe("maybePrintIdentityNotice()", () => {
     errorSpy.mock.calls.map((c: unknown[]) => String(c[0]));
 
   const okFetch = (name: string): typeof fetch =>
-    vi.fn(async () =>
-      new Response(JSON.stringify({ id: "p1", name, slug: "s", isPersonal: false }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
+    vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ id: "p1", name, slug: "s", isPersonal: false }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
     ) as unknown as typeof fetch;
 
   beforeEach(() => {

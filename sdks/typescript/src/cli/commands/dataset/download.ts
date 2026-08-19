@@ -1,9 +1,9 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import type { DatasetRecordResponse } from "@/client-sdk/services/datasets/types";
 import { resolveCredentials } from "../../utils/apiKey";
-import { createDatasetService } from "./service-factory";
+import { createSpinner } from "../../utils/spinner";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /**
  * Escapes a value for inclusion in a CSV field.
@@ -30,7 +30,9 @@ export const toCsv = (records: DatasetRecordResponse[]): string => {
   // Collect all keys from all entries
   const allKeys = new Set<string>();
   records.forEach((record) => {
-    Object.keys(record.entry).forEach((key) => allKeys.add(key));
+    Object.keys(record.entry).forEach((key) => {
+      allKeys.add(key);
+    });
   });
   const headers = Array.from(allKeys);
 

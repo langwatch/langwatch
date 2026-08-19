@@ -36,9 +36,10 @@ function helpOutput(program: Command): string {
 function footerEntries(help: string): string[] {
   const lines = help.split("\n");
   const start = lines.findIndex((l) => l.trim() === "Coding assistants:");
-  expect(start, "the Coding assistants footer section is missing").toBeGreaterThan(
-    -1,
-  );
+  expect(
+    start,
+    "the Coding assistants footer section is missing",
+  ).toBeGreaterThan(-1);
   const entries: string[] = [];
   for (const line of lines.slice(start + 1)) {
     if (line.trim() === "") break;

@@ -21,15 +21,29 @@ const turnContext = (turnId: string, model = "gpt-5.5") => ({
 });
 const userMsg = (text: string) => ({
   type: "response_item",
-  payload: { type: "message", role: "user", content: [{ type: "input_text", text }] },
+  payload: {
+    type: "message",
+    role: "user",
+    content: [{ type: "input_text", text }],
+  },
 });
 const agentMessage = (message: string) => ({
   type: "event_msg",
   payload: { type: "agent_message", message, phase: "final_answer" },
 });
 
-const completedTurn = (traceId: string, turnId: string, user: string, reply: string) =>
-  [taskStarted(traceId, turnId), turnContext(turnId), userMsg(user), agentMessage(reply)]
+const completedTurn = (
+  traceId: string,
+  turnId: string,
+  user: string,
+  reply: string,
+) =>
+  [
+    taskStarted(traceId, turnId),
+    turnContext(turnId),
+    userMsg(user),
+    agentMessage(reply),
+  ]
     .map(line)
     .join("\n");
 
@@ -51,7 +65,9 @@ function recordingFetch() {
   const posted: string[][] = [];
   const fetchImpl = (async (_url: string, init: { body: string }) => {
     const body = JSON.parse(init.body);
-    const spans = body.resourceSpans[0].scopeSpans[0].spans as { traceId: string }[];
+    const spans = body.resourceSpans[0].scopeSpans[0].spans as {
+      traceId: string;
+    }[];
     posted.push(spans.map((s) => s.traceId));
     return { ok: true } as Response;
   }) as unknown as typeof fetch;
@@ -81,7 +97,10 @@ describe("createCodexIOStreamer", () => {
   describe("given a completed turn already in the rollout", () => {
     /** @scenario "A completed turn is streamed mid-session and only its content is posted" */
     it("posts one span for that turn's trace_id", async () => {
-      await writeFile(rolloutFile(), completedTurn("t-one", "t1", "hi", "there"));
+      await writeFile(
+        rolloutFile(),
+        completedTurn("t-one", "t1", "hi", "there"),
+      );
       const { posted, fetchImpl } = recordingFetch();
 
       const emitted = await newStreamer(fetchImpl).harvest(1);
@@ -96,7 +115,11 @@ describe("createCodexIOStreamer", () => {
     it("posts nothing, then streams the turn once the reply is appended", async () => {
       await writeFile(
         rolloutFile(),
-        [line(taskStarted("t-one", "t1")), line(turnContext("t1")), line(userMsg("hi"))].join("\n"),
+        [
+          line(taskStarted("t-one", "t1")),
+          line(turnContext("t1")),
+          line(userMsg("hi")),
+        ].join("\n"),
       );
       const { posted, fetchImpl } = recordingFetch();
       const streamer = newStreamer(fetchImpl);
@@ -114,13 +137,19 @@ describe("createCodexIOStreamer", () => {
   describe("given a turn that has already been streamed", () => {
     /** @scenario "Re-harvesting an already-streamed turn posts nothing" */
     it("posts only the newly-completed turn on a later harvest", async () => {
-      await writeFile(rolloutFile(), completedTurn("t-one", "t1", "hi", "there"));
+      await writeFile(
+        rolloutFile(),
+        completedTurn("t-one", "t1", "hi", "there"),
+      );
       const { posted, fetchImpl } = recordingFetch();
       const streamer = newStreamer(fetchImpl);
 
       await streamer.harvest(1);
       // A second turn completes and is appended to the same append-only rollout.
-      await appendFile(rolloutFile(), `\n${completedTurn("t-two", "t2", "again", "ok")}`);
+      await appendFile(
+        rolloutFile(),
+        `\n${completedTurn("t-two", "t2", "again", "ok")}`,
+      );
 
       const emitted = await streamer.harvest(2);
 

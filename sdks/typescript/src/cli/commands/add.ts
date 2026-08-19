@@ -1,13 +1,13 @@
+import chalk from "chalk";
 import * as fs from "fs";
 import * as path from "path";
-import chalk from "chalk";
-import { createSpinner } from "../utils/spinner";
-import { FileManager } from "../utils/fileManager";
-import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
-import { PromptConverter } from "../utils/promptConverter";
-import { ensureProjectInitialized } from "../utils/init";
-import { resolveCredentials } from "../utils/apiKey";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
+import { resolveCredentials } from "../utils/apiKey";
+import { FileManager } from "../utils/fileManager";
+import { ensureProjectInitialized } from "../utils/init";
+import { PromptConverter } from "../utils/promptConverter";
+import { createSpinner } from "../utils/spinner";
 import { failSpinner } from "../utils/spinnerError";
 
 interface AddOptions {
@@ -160,11 +160,7 @@ export const addCommand = async (
       console.error(chalk.red(`Error: ${error.message}`));
     } else {
       console.error(
-        chalk.red(
-          `Unexpected error: ${
-            formatApiErrorMessage({ error })
-          }`,
-        ),
+        chalk.red(`Unexpected error: ${formatApiErrorMessage({ error })}`),
       );
     }
     process.exit(1);

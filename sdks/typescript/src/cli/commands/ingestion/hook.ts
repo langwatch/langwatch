@@ -42,18 +42,13 @@
  */
 
 import {
+  defaultClaudeSessionRegistryDir,
+  readClaudeSessionName,
+} from "@/cli/utils/governance/claude-session-registry";
+import {
   type GovernanceConfig,
   loadConfig,
 } from "@/cli/utils/governance/config";
-import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
-import { resolveLogsEndpoint } from "@/internal/endpoint";
-
-import {
-  type GitRunner,
-  readSessionContext,
-  runGitCommand,
-} from "./git-context";
-import { parseHookInput, readStdin } from "./hook-input";
 import {
   defaultStateDir,
   pruneStaleState,
@@ -62,16 +57,20 @@ import {
   writeFingerprint,
 } from "@/cli/utils/governance/hook-state";
 import {
-  defaultClaudeSessionRegistryDir,
-  readClaudeSessionName,
-} from "@/cli/utils/governance/claude-session-registry";
-import {
   buildSessionContextLogPayload,
   normalizeSessionName,
   parseOtlpHeaders,
   parseTraceparent,
   sessionContextFingerprint,
 } from "@/cli/utils/governance/session-context";
+import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
+import { resolveLogsEndpoint } from "@/internal/endpoint";
+import {
+  type GitRunner,
+  readSessionContext,
+  runGitCommand,
+} from "./git-context";
+import { parseHookInput, readStdin } from "./hook-input";
 
 /**
  * What each accepted tool argument means: the agent the record declares, plus
@@ -218,7 +217,10 @@ async function runHook({
     spec.sessionIdVar ? env[spec.sessionIdVar] : undefined,
   );
   if (!sessionId) {
-    debug({ message: "no session id in the hook input or the environment", env });
+    debug({
+      message: "no session id in the hook input or the environment",
+      env,
+    });
     return;
   }
   debug({
@@ -377,7 +379,9 @@ async function postSessionContext({
   }
 }
 
-function firstNonEmpty(...values: Array<string | undefined>): string | undefined {
+function firstNonEmpty(
+  ...values: Array<string | undefined>
+): string | undefined {
   for (const value of values) {
     const trimmed = value?.trim();
     if (trimmed) return trimmed;

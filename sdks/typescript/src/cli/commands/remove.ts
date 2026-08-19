@@ -1,10 +1,10 @@
+import chalk from "chalk";
 import * as fs from "fs";
 import * as path from "path";
-import chalk from "chalk";
-import { createSpinner } from "../utils/spinner";
-import { FileManager } from "../utils/fileManager";
-import { PromptsError } from "@/client-sdk/services/prompts";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { PromptsError } from "@/client-sdk/services/prompts";
+import { FileManager } from "../utils/fileManager";
+import { createSpinner } from "../utils/spinner";
 import { failSpinner } from "../utils/spinnerError";
 
 export const removeCommand = async (name: string): Promise<void> => {
@@ -21,14 +21,21 @@ export const removeCommand = async (name: string): Promise<void> => {
 
     // Check if prompt exists in dependencies
     if (!config.prompts[name]) {
-      console.error(chalk.red(`Error: Prompt "${name}" not found in dependencies`));
-      console.log(chalk.gray(`Available prompts: ${Object.keys(config.prompts).join(', ') || 'none'}`));
+      console.error(
+        chalk.red(`Error: Prompt "${name}" not found in dependencies`),
+      );
+      console.log(
+        chalk.gray(
+          `Available prompts: ${Object.keys(config.prompts).join(", ") || "none"}`,
+        ),
+      );
       process.exit(1);
     }
 
     const dependency = config.prompts[name];
-    const isLocalPrompt = (typeof dependency === "string" && dependency.startsWith("file:")) ||
-                         (typeof dependency === "object" && dependency.file);
+    const isLocalPrompt =
+      (typeof dependency === "string" && dependency.startsWith("file:")) ||
+      (typeof dependency === "object" && dependency.file);
 
     const spinner = createSpinner(`Removing ${chalk.cyan(name)}...`).start();
 
@@ -43,7 +50,10 @@ export const removeCommand = async (name: string): Promise<void> => {
           localFilePath = path.resolve(dependency.file);
         } else {
           // Fallback: assume it's in the prompts directory
-          localFilePath = path.join(FileManager.getPromptsDir(), `${name}.prompt.yaml`);
+          localFilePath = path.join(
+            FileManager.getPromptsDir(),
+            `${name}.prompt.yaml`,
+          );
         }
 
         // Delete the local file if it exists
@@ -51,13 +61,21 @@ export const removeCommand = async (name: string): Promise<void> => {
           fs.unlinkSync(localFilePath);
           const relativePath = path.relative(process.cwd(), localFilePath);
           spinner.succeed();
-          console.log(chalk.green(`✓ Removed local file ${chalk.gray(relativePath)}`));
+          console.log(
+            chalk.green(`✓ Removed local file ${chalk.gray(relativePath)}`),
+          );
         } else {
           spinner.succeed();
-          console.log(chalk.yellow(`⚠ Local file not found (already deleted?)`));
+          console.log(
+            chalk.yellow(`⚠ Local file not found (already deleted?)`),
+          );
         }
 
-        console.log(chalk.yellow(`⚠ Note: This prompt may still exist on the server. Visit LangWatch to fully delete it.`));
+        console.log(
+          chalk.yellow(
+            `⚠ Note: This prompt may still exist on the server. Visit LangWatch to fully delete it.`,
+          ),
+        );
       }
 
       // Remove materialized file if it exists
@@ -72,7 +90,10 @@ export const removeCommand = async (name: string): Promise<void> => {
           const rootMaterializedDir = FileManager.getMaterializedDir();
 
           let currentDir = materializedDir;
-          while (currentDir !== rootMaterializedDir && currentDir !== path.dirname(currentDir)) {
+          while (
+            currentDir !== rootMaterializedDir &&
+            currentDir !== path.dirname(currentDir)
+          ) {
             try {
               const entries = fs.readdirSync(currentDir);
               if (entries.length === 0) {
@@ -98,19 +119,21 @@ export const removeCommand = async (name: string): Promise<void> => {
 
       if (!isLocalPrompt) {
         spinner.succeed();
-        console.log(chalk.green(`✓ Removed ${chalk.cyan(name)} from dependencies`));
+        console.log(
+          chalk.green(`✓ Removed ${chalk.cyan(name)} from dependencies`),
+        );
       }
-
     } catch (error) {
       failSpinner({ spinner, error, action: "remove prompt" });
       process.exit(1);
     }
-
   } catch (error) {
     if (error instanceof PromptsError) {
       console.error(chalk.red(`Error: ${error.message}`));
     } else {
-      console.error(chalk.red(`Unexpected error: ${formatApiErrorMessage({ error })}`));
+      console.error(
+        chalk.red(`Unexpected error: ${formatApiErrorMessage({ error })}`),
+      );
     }
     process.exit(1);
   }

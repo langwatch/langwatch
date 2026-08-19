@@ -1,11 +1,11 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import type { DatasetColumnType } from "@/client-sdk/services/datasets/types";
 import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
-import { createDatasetService } from "./service-factory";
+import { createSpinner } from "../../utils/spinner";
 import { parseColumns } from "./create";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /**
  * Updates an existing dataset's name and/or column types.
@@ -29,7 +29,9 @@ export const updateCommand = async (
       columnTypes = parseColumns(options.columns);
     } catch (error) {
       console.error(
-        chalk.red(error instanceof Error ? error.message : "Invalid columns format"),
+        chalk.red(
+          error instanceof Error ? error.message : "Invalid columns format",
+        ),
       );
       process.exit(1);
     }
@@ -59,7 +61,9 @@ export const updateCommand = async (
           console.log(`  ${chalk.bold("Columns:")} ${colStr}`);
         }
         if (dataset.platformUrl) {
-          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(dataset.platformUrl)}`);
+          console.log(
+            `  ${chalk.bold("View:")}  ${chalk.underline(dataset.platformUrl)}`,
+          );
         }
       },
     };

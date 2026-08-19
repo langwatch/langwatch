@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  ExperimentsApiService,
-  ExperimentsApiServiceError,
   type ExperimentListResponse,
   type ExperimentRunsListResponse,
+  ExperimentsApiService,
+  ExperimentsApiServiceError,
 } from "../experiments-api.service";
 
 const mockFetch = vi.fn();
@@ -82,10 +82,7 @@ describe("ExperimentsApiService list endpoints", () => {
       describe("when called", () => {
         it("throws ExperimentsApiServiceError with 'list experiments' operation", async () => {
           mockFetch.mockResolvedValueOnce(
-            jsonResponse(
-              { error: "Missing credentials" },
-              { status: 401 },
-            ),
+            jsonResponse({ error: "Missing credentials" }, { status: 401 }),
           );
 
           const service = new ExperimentsApiService();
@@ -134,10 +131,7 @@ describe("ExperimentsApiService list endpoints", () => {
       describe("when the API returns 404", () => {
         it("throws ExperimentsApiServiceError mentioning the slug", async () => {
           mockFetch.mockResolvedValueOnce(
-            jsonResponse(
-              { error: "Experiment not found" },
-              { status: 404 },
-            ),
+            jsonResponse({ error: "Experiment not found" }, { status: 404 }),
           );
 
           const service = new ExperimentsApiService();
@@ -146,7 +140,9 @@ describe("ExperimentsApiService list endpoints", () => {
             .catch((e) => e);
 
           expect(err).toBeInstanceOf(ExperimentsApiServiceError);
-          expect((err as ExperimentsApiServiceError).operation).toContain("missing");
+          expect((err as ExperimentsApiServiceError).operation).toContain(
+            "missing",
+          );
         });
       });
     });

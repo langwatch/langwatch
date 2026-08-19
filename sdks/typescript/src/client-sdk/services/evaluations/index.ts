@@ -5,16 +5,16 @@
  * against LLM inputs/outputs, separate from batch experiments.
  */
 
-export { EvaluationsFacade } from "./evaluations.facade";
-export type {
-  EvaluationResult,
-  EvaluateOptions,
-  EvaluationStatus,
-  EvaluationCost,
-} from "./types";
 export {
   EvaluationError,
+  EvaluationsApiError,
   EvaluatorCallError,
   EvaluatorNotFoundError,
-  EvaluationsApiError,
 } from "./errors";
+export { EvaluationsFacade } from "./evaluations.facade";
+export type {
+  EvaluateOptions,
+  EvaluationCost,
+  EvaluationResult,
+  EvaluationStatus,
+} from "./types";

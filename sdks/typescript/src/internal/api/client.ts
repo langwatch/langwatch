@@ -1,5 +1,6 @@
 import openApiCreateClient, { type Middleware } from "openapi-fetch";
-import type { paths } from "../generated/openapi/api-client";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { resolveEndpoint } from "@/internal/endpoint";
 import { version } from "../../../package.json";
 import {
   LANGWATCH_SDK_LANGUAGE,
@@ -7,8 +8,7 @@ import {
   LANGWATCH_SDK_RUNTIME,
   LANGWATCH_SDK_VERSION,
 } from "../constants";
-import { resolveEndpoint } from "@/internal/endpoint";
-import { scopedApiKey } from "@/internal/credentialContext";
+import type { paths } from "../generated/openapi/api-client";
 import { buildAuthHeaders } from "./auth";
 import { handledErrorFrom } from "./errors";
 
@@ -61,7 +61,6 @@ const handledErrorMiddleware: Middleware = {
   },
 };
 
-
 /**
  * Creates a new LangWatch API client.
  * @param apiKey - The API key or Personal Access Token used for authentication.
@@ -99,6 +98,5 @@ export const createLangWatchApiClient = (
 
   return client;
 };
-
 
 export type LangwatchApiClient = ReturnType<typeof createLangWatchApiClient>;

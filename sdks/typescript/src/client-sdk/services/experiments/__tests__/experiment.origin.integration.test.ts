@@ -4,15 +4,15 @@
  * parented under the evaluation.iteration span.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { LangWatch } from "@/client-sdk";
+import { context, trace } from "@opentelemetry/api";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import {
+  InMemorySpanExporter,
   NodeTracerProvider,
   SimpleSpanProcessor,
-  InMemorySpanExporter,
 } from "@opentelemetry/sdk-trace-node";
-import { trace, context } from "@opentelemetry/api";
-import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { LangWatch } from "@/client-sdk";
 
 const originalFetch = globalThis.fetch;
 
@@ -82,14 +82,14 @@ describe("Experiment origin and span parenting", () => {
         async ({ index }) => {
           evaluation.log("metric", { index, score: 1.0 });
         },
-        { concurrency: 1 }
+        { concurrency: 1 },
       );
 
       await new Promise((r) => setTimeout(r, 100));
 
       const spans = exporter.getFinishedSpans();
       const iterationSpan = spans.find(
-        (s) => s.name === "evaluation.iteration"
+        (s) => s.name === "evaluation.iteration",
       );
 
       expect(iterationSpan).toBeDefined();
@@ -123,14 +123,14 @@ describe("Experiment origin and span parenting", () => {
             }
           });
         },
-        { concurrency: 1 }
+        { concurrency: 1 },
       );
 
       await new Promise((r) => setTimeout(r, 100));
 
       const spans = exporter.getFinishedSpans();
       const iterationSpan = spans.find(
-        (s) => s.name === "evaluation.iteration"
+        (s) => s.name === "evaluation.iteration",
       );
       const childSpan = spans.find((s) => s.name === "llm.call");
 
@@ -139,12 +139,12 @@ describe("Experiment origin and span parenting", () => {
 
       // Child span shares the same trace_id
       expect(childSpan!.spanContext().traceId).toBe(
-        iterationSpan!.spanContext().traceId
+        iterationSpan!.spanContext().traceId,
       );
 
       // Child span's parent is the iteration span
       expect((childSpan as any).parentSpanContext.spanId).toBe(
-        iterationSpan!.spanContext().spanId
+        iterationSpan!.spanContext().spanId,
       );
     });
   });
@@ -170,14 +170,14 @@ describe("Experiment origin and span parenting", () => {
             return "4";
           });
         },
-        { concurrency: 1 }
+        { concurrency: 1 },
       );
 
       await new Promise((r) => setTimeout(r, 100));
 
       const spans = exporter.getFinishedSpans();
       const targetSpan = spans.find((s) =>
-        s.name.startsWith("evaluation.target.")
+        s.name.startsWith("evaluation.target."),
       );
 
       expect(targetSpan).toBeDefined();
@@ -196,7 +196,7 @@ describe("Experiment origin and span parenting", () => {
       });
 
       const evaluation = await langwatch.experiments.init(
-        "test-target-parenting"
+        "test-target-parenting",
       );
       const tracer = trace.getTracer("langwatch");
 
@@ -214,14 +214,14 @@ describe("Experiment origin and span parenting", () => {
             return "4";
           });
         },
-        { concurrency: 1 }
+        { concurrency: 1 },
       );
 
       await new Promise((r) => setTimeout(r, 100));
 
       const spans = exporter.getFinishedSpans();
       const targetSpan = spans.find((s) =>
-        s.name.startsWith("evaluation.target.")
+        s.name.startsWith("evaluation.target."),
       );
       const childSpan = spans.find((s) => s.name === "llm.call");
 
@@ -229,10 +229,10 @@ describe("Experiment origin and span parenting", () => {
       expect(childSpan).toBeDefined();
 
       expect(childSpan!.spanContext().traceId).toBe(
-        targetSpan!.spanContext().traceId
+        targetSpan!.spanContext().traceId,
       );
       expect((childSpan as any).parentSpanContext.spanId).toBe(
-        targetSpan!.spanContext().spanId
+        targetSpan!.spanContext().spanId,
       );
     });
   });

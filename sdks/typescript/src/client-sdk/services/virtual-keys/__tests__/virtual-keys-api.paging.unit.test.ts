@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  type VirtualKey,
   VirtualKeysApiError,
   VirtualKeysApiService,
-  type VirtualKey,
 } from "../virtual-keys-api.service";
 
 /**
@@ -56,7 +56,7 @@ const queryOf = (call: number): string => {
 };
 
 /** Reads an iterator to exhaustion and hands back every row it yielded. */
-const drain = async <T,>(rows: AsyncIterable<T>): Promise<T[]> => {
+const drain = async <T>(rows: AsyncIterable<T>): Promise<T[]> => {
   const collected: T[] = [];
   for await (const row of rows) collected.push(row);
   return collected;
@@ -79,7 +79,8 @@ describe("VirtualKeysApiService cursor paging", () => {
     else process.env.LANGWATCH_API_KEY = previousApiKey;
     if (previousEndpoint === undefined) delete process.env.LANGWATCH_ENDPOINT;
     else process.env.LANGWATCH_ENDPOINT = previousEndpoint;
-    if (previousProjectId === undefined) delete process.env.LANGWATCH_PROJECT_ID;
+    if (previousProjectId === undefined)
+      delete process.env.LANGWATCH_PROJECT_ID;
     else process.env.LANGWATCH_PROJECT_ID = previousProjectId;
   });
 
@@ -224,7 +225,9 @@ describe("VirtualKeysApiService cursor paging", () => {
 
   describe("listPage()", () => {
     it("takes exactly one page and hands back the cursor for the next", async () => {
-      mockFetch.mockResolvedValueOnce(jsonResponse(page(["a", "b"], "cursor-1")));
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse(page(["a", "b"], "cursor-1")),
+      );
 
       const result = await new VirtualKeysApiService().listPage({ limit: 2 });
 
@@ -259,7 +262,9 @@ describe("VirtualKeysApiService cursor paging", () => {
 
       await new VirtualKeysApiService().listPage({ externalId: "tenant-7" });
 
-      expect(new URLSearchParams(queryOf(0)).get("external_id")).toBe("tenant-7");
+      expect(new URLSearchParams(queryOf(0)).get("external_id")).toBe(
+        "tenant-7",
+      );
     });
 
     it("keeps the filter on EVERY page of an eager walk", async () => {
@@ -282,7 +287,9 @@ describe("VirtualKeysApiService cursor paging", () => {
         .mockResolvedValueOnce(jsonResponse(page(["a"], "cursor-1")))
         .mockResolvedValueOnce(jsonResponse(page(["b"], null)));
 
-      await drain(new VirtualKeysApiService().iterate({ externalId: "tenant-7" }));
+      await drain(
+        new VirtualKeysApiService().iterate({ externalId: "tenant-7" }),
+      );
 
       for (const call of [0, 1]) {
         expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe(

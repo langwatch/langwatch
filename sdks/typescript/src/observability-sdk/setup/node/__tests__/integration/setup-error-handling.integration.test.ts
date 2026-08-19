@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { setupObservability } from '../../setup';
-import { trace } from '@opentelemetry/api';
+import { trace } from "@opentelemetry/api";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { setupObservability } from "../../setup";
 
 // Integration tests for error handling in setupObservability
 
@@ -13,32 +13,35 @@ function createMockLogger() {
   return { error: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn() };
 }
 
-describe('setupObservability Integration - Error Handling', () => {
-  it('logs and return no-op shutdown if NodeSDK init fails', async () => {
+describe("setupObservability Integration - Error Handling", () => {
+  it("logs and return no-op shutdown if NodeSDK init fails", async () => {
     const logger = createMockLogger();
     // Pass an invalid resource to force NodeSDK to throw
     const handle = setupObservability({
-      langwatch: { apiKey: 'test-key' },
+      langwatch: { apiKey: "test-key" },
       debug: { logger },
       resource: 123 as any, // Intentionally invalid
     });
 
     // Check that logger.error was called with a message containing the expected string
-    const errorCalls = logger.error.mock.calls.map(call => call[0]);
-    expect(errorCalls.some(msg => msg.includes('Failed to initialize NodeSDK'))).toBe(true);
-    expect(typeof handle.shutdown).toBe('function');
+    const errorCalls = logger.error.mock.calls.map((call) => call[0]);
+    expect(
+      errorCalls.some((msg) => msg.includes("Failed to initialize NodeSDK")),
+    ).toBe(true);
+    expect(typeof handle.shutdown).toBe("function");
     await expect(handle.shutdown()).resolves.toBeUndefined();
   });
 
-  it('throws if throwOnSetupError is true', () => {
+  it("throws if throwOnSetupError is true", () => {
     const logger = createMockLogger();
     // Pass an invalid resource to force NodeSDK to throw
-    const call = () => setupObservability({
-      langwatch: { apiKey: 'test-key' },
-      debug: { logger },
-      advanced: { throwOnSetupError: true },
-      resource: 123 as any, // Intentionally invalid
-    });
+    const call = () =>
+      setupObservability({
+        langwatch: { apiKey: "test-key" },
+        debug: { logger },
+        advanced: { throwOnSetupError: true },
+        resource: 123 as any, // Intentionally invalid
+      });
     expect(call).toThrow();
   });
 });

@@ -62,9 +62,9 @@ describe("applyDevTunnel()", () => {
       });
 
       expect(config.url).toBe(`${TUNNEL_URL}/agent`);
-      expect(
-        (config.devTunnel as { previousUrl?: string }).previousUrl,
-      ).toBe("https://staging.example.com/agent");
+      expect((config.devTunnel as { previousUrl?: string }).previousUrl).toBe(
+        "https://staging.example.com/agent",
+      );
     });
   });
 

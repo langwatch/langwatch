@@ -20,9 +20,7 @@ export interface CommandsOptions extends RawOutputFlags {
   flat?: boolean;
 }
 
-export const commandsCommand = (
-  options?: CommandsOptions,
-): CommandResult => {
+export const commandsCommand = (options?: CommandsOptions): CommandResult => {
   const catalog = buildCatalog(buildProgram());
   return {
     data: { commands: options?.flat ? flattenCatalog(catalog) : catalog },

@@ -1,11 +1,13 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { WorkflowsApiService } from "@/client-sdk/services/workflows/workflows-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
-export const deleteWorkflowCommand = async (id: string): Promise<CommandResult | void> => {
+export const deleteWorkflowCommand = async (
+  id: string,
+): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new WorkflowsApiService();
@@ -25,7 +27,9 @@ export const deleteWorkflowCommand = async (id: string): Promise<CommandResult |
     process.exit(1);
   }
 
-  const deleteSpinner = createSpinner(`Archiving workflow "${workflowName}"...`).start();
+  const deleteSpinner = createSpinner(
+    `Archiving workflow "${workflowName}"...`,
+  ).start();
   try {
     await service.delete(id);
     deleteSpinner.succeed(`Archived workflow "${chalk.cyan(workflowName)}"`);

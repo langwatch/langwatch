@@ -1,13 +1,13 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
 import {
   commandValidationError,
   reportCommandError,
 } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
-import { createDatasetService } from "./service-factory";
+import { createSpinner } from "../../utils/spinner";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /**
  * Updates a single record in a dataset.
@@ -22,7 +22,11 @@ export const recordsUpdateCommand = async (
   let entry: Record<string, unknown>;
   try {
     const parsed = JSON.parse(options.json);
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
       throw new Error("Expected a JSON object, not an array or primitive.");
     }
     entry = parsed as Record<string, unknown>;
@@ -36,7 +40,9 @@ export const recordsUpdateCommand = async (
   }
 
   const service = createDatasetService();
-  const spinner = createSpinner(`Updating record "${recordId}" in "${slugOrId}"...`).start();
+  const spinner = createSpinner(
+    `Updating record "${recordId}" in "${slugOrId}"...`,
+  ).start();
 
   try {
     const record = await service.updateRecord(slugOrId, recordId, entry);

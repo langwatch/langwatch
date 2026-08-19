@@ -105,7 +105,11 @@ export interface HelloOkFrame {
  */
 export interface HelloErrFrame {
   t: "hello-err";
-  reason: "protocol-skew" | "version-skew" | "identity-mismatch" | "shutting-down";
+  reason:
+    | "protocol-skew"
+    | "version-skew"
+    | "identity-mismatch"
+    | "shutting-down";
   /** The daemon's own CLI version, so the client can log a useful message. */
   cliVersion: string;
 }
@@ -196,8 +200,7 @@ export class FrameDecoder<T extends AnyFrame = AnyFrame> {
   constructor(private readonly maxLineBytes = 64 * 1024 * 1024) {}
 
   push(chunk: Buffer | string): T[] {
-    this.buffer +=
-      typeof chunk === "string" ? chunk : this.utf8.write(chunk);
+    this.buffer += typeof chunk === "string" ? chunk : this.utf8.write(chunk);
     if (this.buffer.length > this.maxLineBytes) {
       this.buffer = "";
       throw new Error("daemon protocol: frame exceeded maximum size");

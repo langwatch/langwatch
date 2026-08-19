@@ -1,15 +1,15 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import {
   SpendEventsApiService,
   type SpendGroupBy,
   type SpendSummaryRow,
 } from "@/client-sdk/services/spend-events/spend-events-api.service";
 import { checkOrgApiKey } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
 import { parseInstantOrNull } from "../../utils/instant";
 import { parseKeyValueFlags } from "../../utils/keyValueFlags";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 const parseInstant = (value: string, flag: string): number => {
   const parsed = parseInstantOrNull(value);
@@ -113,7 +113,6 @@ function oneOf<T extends string>({
   return value as T;
 }
 
-
 export const spendSummaryCommand = async (options: {
   groupBy?: string;
   bucket?: string;
@@ -130,9 +129,13 @@ export const spendSummaryCommand = async (options: {
   limit?: string;
 }): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
-  const groupBy = (options.groupBy ?? "virtual_key")
-    .split(",")
-    .map((part) => oneOf({ value: part.trim(), allowed: GROUP_BY_VALUES, flag: "--group-by" }));
+  const groupBy = (options.groupBy ?? "virtual_key").split(",").map((part) =>
+    oneOf({
+      value: part.trim(),
+      allowed: GROUP_BY_VALUES,
+      flag: "--group-by",
+    }),
+  );
   if (groupBy.length > 2) {
     console.error(chalk.red("--group-by takes at most two dimensions"));
     process.exit(1);

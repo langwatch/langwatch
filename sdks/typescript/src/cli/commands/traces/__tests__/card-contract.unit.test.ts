@@ -8,21 +8,31 @@
  * zod to load and no command needs them at runtime, so they stay out of the hot
  * path and earn their keep as a contract test instead.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+
 import {
   cardKindFor,
   parseCliResult,
-  tracesCardSchema,
-  traceIdOf,
   type TraceSummary,
+  traceIdOf,
+  tracesCardSchema,
 } from "@langwatch/langy/cards";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/client-sdk/services/traces/traces-api.service", async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return { ...actual, TracesApiService: vi.fn() };
-});
+vi.mock(
+  "@/client-sdk/services/traces/traces-api.service",
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return { ...actual, TracesApiService: vi.fn() };
+  },
+);
 
-vi.mock("../../../utils/apiKey", () => ({ resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })) }));
+vi.mock("../../../utils/apiKey", () => ({
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
+}));
 
 vi.mock("ora", () => ({
   default: () => ({
@@ -114,7 +124,9 @@ describe("the CLI's json output against the shared card contract", () => {
           output: document,
         });
 
-        expect(cardKindFor({ resource: "trace", verb: "search" })).toBe("traces");
+        expect(cardKindFor({ resource: "trace", verb: "search" })).toBe(
+          "traces",
+        );
         expect(result).toMatchObject({ ok: true, kind: "traces" });
       });
     });

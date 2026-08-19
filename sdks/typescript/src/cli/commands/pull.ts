@@ -1,17 +1,14 @@
+import chalk from "chalk";
 import * as fs from "fs";
 import * as path from "path";
-import chalk from "chalk";
-import { createSpinner } from "../utils/spinner";
 import { PromptConverter } from "@/cli/utils/promptConverter";
-import {
-  PromptsApiService,
-  PromptsError,
-} from "@/client-sdk/services/prompts";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
 import type { PromptsConfig, PromptsLock, SyncResult } from "../types";
+import { resolveCredentials } from "../utils/apiKey";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
-import { resolveCredentials } from "../utils/apiKey";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { createSpinner } from "../utils/spinner";
 
 /**
  * Core pull logic: fetches remote prompts and materializes them locally.
@@ -30,21 +27,19 @@ export const pullPrompts = async ({
   result: SyncResult;
   tag?: string;
 }): Promise<void> => {
-  const remoteDeps = Object.entries(config.prompts).filter(
-    ([, dependency]) => {
-      if (typeof dependency === "object" && dependency.file) {
-        return false;
-      }
-      if (typeof dependency === "string" && dependency.startsWith("file:")) {
-        return false;
-      }
-      return true;
+  const remoteDeps = Object.entries(config.prompts).filter(([, dependency]) => {
+    if (typeof dependency === "object" && dependency.file) {
+      return false;
     }
-  );
+    if (typeof dependency === "string" && dependency.startsWith("file:")) {
+      return false;
+    }
+    return true;
+  });
 
   if (remoteDeps.length > 0) {
     const fetchSpinner = createSpinner(
-      `Checking ${remoteDeps.length} remote prompts...`
+      `Checking ${remoteDeps.length} remote prompts...`,
     ).start();
 
     for (const [name, dependency] of remoteDeps) {
@@ -52,7 +47,7 @@ export const pullPrompts = async ({
         const versionSpec =
           typeof dependency === "string"
             ? dependency
-            : dependency.version ?? "latest";
+            : (dependency.version ?? "latest");
 
         const displaySpec = tag ?? versionSpec;
 
@@ -74,7 +69,7 @@ export const pullPrompts = async ({
 
             const savedPath = FileManager.saveMaterializedPrompt(
               name,
-              materializedPrompt
+              materializedPrompt,
             );
             const relativePath = path.relative(process.cwd(), savedPath);
             result.fetched.push({
@@ -87,13 +82,13 @@ export const pullPrompts = async ({
               lock,
               name,
               materializedPrompt,
-              savedPath
+              savedPath,
             );
 
             fetchSpinner.text = `Fetched ${chalk.cyan(
-              `${name}@${displaySpec}`
+              `${name}@${displaySpec}`,
             )} ${chalk.gray(`(version ${prompt.version})`)} → ${chalk.gray(
-              relativePath
+              relativePath,
             )}`;
           } else {
             result.unchanged.push(name);
@@ -102,8 +97,7 @@ export const pullPrompts = async ({
           result.errors.push({ name, error: "Prompt not found" });
         }
       } catch (error) {
-        const errorMessage =
-          formatApiErrorMessage({ error });
+        const errorMessage = formatApiErrorMessage({ error });
         result.errors.push({ name, error: errorMessage });
       }
     }
@@ -122,7 +116,7 @@ export const pullPrompts = async ({
         return false;
       }
       return true;
-    })
+    }),
   );
 
   const cleanedFiles =
@@ -152,9 +146,9 @@ const printPullResults = ({
       console.log(
         chalk.green(
           `✓ Pulled ${chalk.cyan(`${name}@${versionSpec}`)} ${chalk.gray(
-            `(version ${version})`
-          )} → ${chalk.gray(displayPath)}`
-        )
+            `(version ${version})`,
+          )} → ${chalk.gray(displayPath)}`,
+        ),
       );
     }
   }
@@ -163,8 +157,8 @@ const printPullResults = ({
     for (const name of result.cleaned) {
       console.log(
         chalk.yellow(
-          `✓ Cleaned ${chalk.cyan(name)} (no longer in dependencies)`
-        )
+          `✓ Cleaned ${chalk.cyan(name)} (no longer in dependencies)`,
+        ),
       );
     }
   }
@@ -192,7 +186,9 @@ const printPullResults = ({
   }
 };
 
-export const pullCommand = async (options?: { tag?: string }): Promise<void> => {
+export const pullCommand = async (options?: {
+  tag?: string;
+}): Promise<void> => {
   console.log("⬇️  Pulling remote prompts...");
 
   const startTime = Date.now();
@@ -215,7 +211,13 @@ export const pullCommand = async (options?: { tag?: string }): Promise<void> => 
       errors: [],
     };
 
-    await pullPrompts({ config, lock, promptsApiService, result, tag: options?.tag });
+    await pullPrompts({
+      config,
+      lock,
+      promptsApiService,
+      result,
+      tag: options?.tag,
+    });
 
     FileManager.savePromptsLock(lock);
 
@@ -230,11 +232,7 @@ export const pullCommand = async (options?: { tag?: string }): Promise<void> => 
       console.error(chalk.red(`Error: ${error.message}`));
     } else {
       console.error(
-        chalk.red(
-          `Unexpected error: ${
-            formatApiErrorMessage({ error })
-          }`
-        )
+        chalk.red(`Unexpected error: ${formatApiErrorMessage({ error })}`),
       );
     }
     process.exit(1);

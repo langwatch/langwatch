@@ -7,18 +7,18 @@
  * argv. The prompt + config-save are injected seams, so no module mock
  * or filesystem touch is needed.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { GovernanceConfig } from "../config";
 import {
+  gatewayChoiceDescription,
+  gatewayChoiceTitle,
+  otlpChoiceDescription,
+  otlpChoiceTitle,
   parseProjectScopeFlags,
   parseToolModeFlag,
-  resolveWrapperPath,
   pathChoiceMessage,
-  gatewayChoiceTitle,
-  gatewayChoiceDescription,
-  otlpChoiceTitle,
-  otlpChoiceDescription,
+  resolveWrapperPath,
 } from "../wrapper-path-choice";
 
 function baseCfg(overrides: Partial<GovernanceConfig> = {}): GovernanceConfig {
@@ -95,7 +95,9 @@ describe("parseToolModeFlag", () => {
   describe("given LANGWATCH_TOOL_MODE env and no flag", () => {
     /** @scenario "LANGWATCH_TOOL_MODE=otlp forces ingestion without a flag" */
     it("reads the override from the env", () => {
-      const out = parseToolModeFlag(["-p", "hi"], { LANGWATCH_TOOL_MODE: "otlp" });
+      const out = parseToolModeFlag(["-p", "hi"], {
+        LANGWATCH_TOOL_MODE: "otlp",
+      });
       expect(out.args).toEqual(["-p", "hi"]);
       expect(out.override).toBe("ingestion");
     });
@@ -185,7 +187,9 @@ describe("resolveWrapperPath", () => {
         // Capturing prompt so we can assert the select offered both paths.
         const prompt = vi.fn(async () => ({
           path: "gateway",
-        })) as unknown as Parameters<typeof resolveWrapperPath>[0]["promptImpl"];
+        })) as unknown as Parameters<
+          typeof resolveWrapperPath
+        >[0]["promptImpl"];
         const cfg = baseCfg();
         const out = await resolveWrapperPath({
           cfg,
@@ -204,7 +208,11 @@ describe("resolveWrapperPath", () => {
         const promptArg = (prompt as unknown as ReturnType<typeof vi.fn>).mock
           .calls[0]![0] as {
           message: string;
-          choices: Array<{ title: string; value: string; description?: string }>;
+          choices: Array<{
+            title: string;
+            value: string;
+            description?: string;
+          }>;
           initial: number;
         };
         expect(promptArg.message).toBe("How should `langwatch claude` run?");
@@ -634,7 +642,9 @@ describe("parseProjectScopeFlags", () => {
 
     it("treats an empty value as no project", () => {
       expect(parseProjectScopeFlags(["--project="]).project).toBeUndefined();
-      expect(parseProjectScopeFlags(["--project", "  "]).project).toBeUndefined();
+      expect(
+        parseProjectScopeFlags(["--project", "  "]).project,
+      ).toBeUndefined();
     });
 
     it("drops a trailing --project with no value instead of eating a flag", () => {

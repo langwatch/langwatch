@@ -120,7 +120,9 @@ function rejectUnauthorized(res: http.ServerResponse): void {
  * Headers for the upstream call: the client's own, minus the ones that
  * describe the hop to this proxy rather than the request itself.
  */
-function forwardableHeaders(req: http.IncomingMessage): http.IncomingHttpHeaders {
+function forwardableHeaders(
+  req: http.IncomingMessage,
+): http.IncomingHttpHeaders {
   const headers = { ...req.headers };
   delete headers.host;
   delete headers[DEV_SECRET_HEADER.toLowerCase()];

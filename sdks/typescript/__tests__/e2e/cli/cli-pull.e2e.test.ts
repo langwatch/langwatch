@@ -1,27 +1,26 @@
 // @vitest-environment node
 // @vitest-config ./vitest.e2e.config.mts
 
+import { config } from "dotenv";
+import * as fs from "fs";
+import * as path from "path";
 import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
   describe,
   expect,
   it,
-  afterEach,
-  beforeEach,
-  afterAll,
-  beforeAll,
 } from "vitest";
-import * as fs from "fs";
-import * as path from "path";
-
-import { config } from "dotenv";
+import { LangWatch } from "../../../dist";
 import {
-  expectations,
   CliRunner,
+  expectations,
   LockFileManager,
   PROMPT_NAME_PREFIX,
   PromptFileManager,
 } from "./helpers";
-import { LangWatch } from "../../../dist";
 import { ApiHelpers } from "./helpers/api-helpers";
 
 config({ path: ".env.test", override: true });
@@ -120,9 +119,7 @@ describe("CLI E2E", () => {
             commitMessage: "Updated for pull test",
             temperature: 0.5,
             model: "gpt-4-turbo",
-            messages: [
-              { role: "system", content: "Updated system message." },
-            ],
+            messages: [{ role: "system", content: "Updated system message." }],
           });
 
           const pull2 = cli.run("prompt pull");
@@ -172,7 +169,8 @@ describe("CLI E2E", () => {
       expectCliResultSuccess(createResult);
 
       const localPromptFileManagement = new PromptFileManager({ cwd: testDir });
-      const filePath = localPromptFileManagement.getPromptFilePath(promptHandle);
+      const filePath =
+        localPromptFileManagement.getPromptFilePath(promptHandle);
       cli.run(`prompt add ${promptHandle} ${filePath}`);
 
       const pullResult = cli.run("prompt pull");

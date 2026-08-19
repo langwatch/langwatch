@@ -22,21 +22,21 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 export interface AppSettingsTarget {
-	/** Tool slug the target belongs to (e.g. "claude"). */
-	tool: string;
-	/** Absolute path to the settings file on disk. */
-	path: string;
-	/** Human-readable path shown in the prompt (`~/.claude/settings.json`). */
-	displayPath: string;
+  /** Tool slug the target belongs to (e.g. "claude"). */
+  tool: string;
+  /** Absolute path to the settings file on disk. */
+  path: string;
+  /** Human-readable path shown in the prompt (`~/.claude/settings.json`). */
+  displayPath: string;
 }
 
 interface TargetSpec {
-	/** Path segments below the user's home dir. */
-	segments: string[];
+  /** Path segments below the user's home dir. */
+  segments: string[];
 }
 
 const TARGETS: Record<string, TargetSpec> = {
-	claude: { segments: [".claude", "settings.json"] },
+  claude: { segments: [".claude", "settings.json"] },
 };
 
 /**
@@ -45,14 +45,14 @@ const TARGETS: Record<string, TargetSpec> = {
  * shell rc path).
  */
 export function appSettingsTargetFor(tool: string): AppSettingsTarget | null {
-	const spec = TARGETS[tool];
-	if (!spec) return null;
-	const home = os.homedir();
-	return {
-		tool,
-		path: path.join(home, ...spec.segments),
-		displayPath: `~/${spec.segments.join("/")}`,
-	};
+  const spec = TARGETS[tool];
+  if (!spec) return null;
+  const home = os.homedir();
+  return {
+    tool,
+    path: path.join(home, ...spec.segments),
+    displayPath: `~/${spec.segments.join("/")}`,
+  };
 }
 
 /**
@@ -64,11 +64,11 @@ export function appSettingsTargetFor(tool: string): AppSettingsTarget | null {
  * read/merge/remove helpers as the user-level target.
  */
 export function claudeProjectSettingsTarget(cwd: string): AppSettingsTarget {
-	return {
-		tool: "claude",
-		path: path.join(cwd, ".claude", "settings.local.json"),
-		displayPath: ".claude/settings.local.json",
-	};
+  return {
+    tool: "claude",
+    path: path.join(cwd, ".claude", "settings.local.json"),
+    displayPath: ".claude/settings.local.json",
+  };
 }
 
 /**
@@ -78,9 +78,9 @@ export function claudeProjectSettingsTarget(cwd: string): AppSettingsTarget {
  * block is langwatch-authored before refreshing it in place.
  */
 export function appEnvValues(
-	target: AppSettingsTarget,
+  target: AppSettingsTarget,
 ): Record<string, string> {
-	return readEnvMap(target.path);
+  return readEnvMap(target.path);
 }
 
 /**
@@ -90,14 +90,14 @@ export function appEnvValues(
  * `langwatch <tool>` doesn't nag).
  */
 export function appEnvHasAllVars(
-	target: AppSettingsTarget,
-	vars: Record<string, string>,
+  target: AppSettingsTarget,
+  vars: Record<string, string>,
 ): boolean {
-	const current = readEnvMap(target.path);
-	for (const [k, v] of Object.entries(vars)) {
-		if (current[k] !== v) return false;
-	}
-	return true;
+  const current = readEnvMap(target.path);
+  for (const [k, v] of Object.entries(vars)) {
+    if (current[k] !== v) return false;
+  }
+  return true;
 }
 
 /**
@@ -106,11 +106,11 @@ export function appEnvHasAllVars(
  * offer for removal.
  */
 export function appEnvHasAnyVar(
-	target: AppSettingsTarget,
-	keys: string[],
+  target: AppSettingsTarget,
+  keys: string[],
 ): boolean {
-	const current = readEnvMap(target.path);
-	return keys.some((k) => k in current);
+  const current = readEnvMap(target.path);
+  return keys.some((k) => k in current);
 }
 
 /**
@@ -123,20 +123,20 @@ export function appEnvHasAnyVar(
  * replacing it. Every caller treats that as best-effort and says so.
  */
 export function installAppEnv(
-	target: AppSettingsTarget,
-	vars: Record<string, string>,
+  target: AppSettingsTarget,
+  vars: Record<string, string>,
 ): void {
-	const settings = readAppSettingsFileForUpdate(target.path);
-	const existingEnv = settings.env;
-	const nextEnv: Record<string, string> = isPlainObject(existingEnv)
-		? { ...(existingEnv as Record<string, string>) }
-		: {};
-	for (const [k, v] of Object.entries(vars)) {
-		nextEnv[k] = v;
-	}
-	settings.env = nextEnv;
+  const settings = readAppSettingsFileForUpdate(target.path);
+  const existingEnv = settings.env;
+  const nextEnv: Record<string, string> = isPlainObject(existingEnv)
+    ? { ...(existingEnv as Record<string, string>) }
+    : {};
+  for (const [k, v] of Object.entries(vars)) {
+    nextEnv[k] = v;
+  }
+  settings.env = nextEnv;
 
-	writeAppSettingsFile({ filePath: target.path, settings });
+  writeAppSettingsFile({ filePath: target.path, settings });
 }
 
 /**
@@ -150,43 +150,43 @@ export function installAppEnv(
  * can't parse.
  */
 export function removeAppEnvVars(
-	target: AppSettingsTarget,
-	keys: string[],
+  target: AppSettingsTarget,
+  keys: string[],
 ): boolean {
-	let raw: string;
-	try {
-		raw = fs.readFileSync(target.path, "utf8");
-	} catch {
-		return false; // ENOENT
-	}
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(raw) as unknown;
-	} catch {
-		return false; // malformed — do not touch
-	}
-	if (!isPlainObject(parsed)) return false;
-	const settings: Record<string, unknown> = { ...parsed };
-	const env = settings.env;
-	if (!isPlainObject(env)) return false;
+  let raw: string;
+  try {
+    raw = fs.readFileSync(target.path, "utf8");
+  } catch {
+    return false; // ENOENT
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    return false; // malformed — do not touch
+  }
+  if (!isPlainObject(parsed)) return false;
+  const settings: Record<string, unknown> = { ...parsed };
+  const env = settings.env;
+  if (!isPlainObject(env)) return false;
 
-	const nextEnv: Record<string, unknown> = { ...env };
-	let removed = false;
-	for (const k of keys) {
-		if (k in nextEnv) {
-			delete nextEnv[k];
-			removed = true;
-		}
-	}
-	if (!removed) return false;
+  const nextEnv: Record<string, unknown> = { ...env };
+  let removed = false;
+  for (const k of keys) {
+    if (k in nextEnv) {
+      delete nextEnv[k];
+      removed = true;
+    }
+  }
+  if (!removed) return false;
 
-	if (Object.keys(nextEnv).length === 0) {
-		delete settings.env;
-	} else {
-		settings.env = nextEnv;
-	}
-	writeAppSettingsFile({ filePath: target.path, settings });
-	return true;
+  if (Object.keys(nextEnv).length === 0) {
+    delete settings.env;
+  } else {
+    settings.env = nextEnv;
+  }
+  writeAppSettingsFile({ filePath: target.path, settings });
+  return true;
 }
 
 /**
@@ -203,26 +203,26 @@ export function removeAppEnvVars(
  * file and must read and write it exactly the way the env block does.
  */
 export function readAppSettingsFileForUpdate(
-	filePath: string,
+  filePath: string,
 ): Record<string, unknown> {
-	let raw: string;
-	try {
-		raw = fs.readFileSync(filePath, "utf8");
-	} catch (err) {
-		if ((err as NodeJS.ErrnoException).code === "ENOENT") return {};
-		throw unmergeable(filePath, (err as Error).message);
-	}
+  let raw: string;
+  try {
+    raw = fs.readFileSync(filePath, "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return {};
+    throw unmergeable(filePath, (err as Error).message);
+  }
 
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(raw) as unknown;
-	} catch {
-		throw unmergeable(filePath, "it is not valid JSON");
-	}
-	if (!isPlainObject(parsed)) {
-		throw unmergeable(filePath, "it does not hold a JSON object");
-	}
-	return { ...parsed };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    throw unmergeable(filePath, "it is not valid JSON");
+  }
+  if (!isPlainObject(parsed)) {
+    throw unmergeable(filePath, "it does not hold a JSON object");
+  }
+  return { ...parsed };
 }
 
 /**
@@ -234,21 +234,21 @@ export function readAppSettingsFileForUpdate(
  * depend on which of us wrote it last.
  */
 export function writeAppSettingsFile({
-	filePath,
-	settings,
+  filePath,
+  settings,
 }: {
-	filePath: string;
-	settings: Record<string, unknown>;
+  filePath: string;
+  settings: Record<string, unknown>;
 }): void {
-	fs.mkdirSync(path.dirname(filePath), { recursive: true });
-	fs.writeFileSync(filePath, `${JSON.stringify(settings, null, 2)}\n`);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(settings, null, 2)}\n`);
 }
 
 function unmergeable(filePath: string, why: string): Error {
-	return new Error(
-		`Can't merge into ${filePath}: ${why}. Fix the file and run this again; ` +
-			`writing over it would lose everything else it holds.`,
-	);
+  return new Error(
+    `Can't merge into ${filePath}: ${why}. Fix the file and run this again; ` +
+      `writing over it would lose everything else it holds.`,
+  );
 }
 
 /**
@@ -257,24 +257,24 @@ function unmergeable(filePath: string, why: string): Error {
  * configured here" for a file nothing can parse.
  */
 export function readAppSettingsFile(filePath: string): Record<string, unknown> {
-	try {
-		return readAppSettingsFileForUpdate(filePath);
-	} catch {
-		return {};
-	}
+  try {
+    return readAppSettingsFileForUpdate(filePath);
+  } catch {
+    return {};
+  }
 }
 
 function readEnvMap(filePath: string): Record<string, string> {
-	const settings = readAppSettingsFile(filePath);
-	const env = settings.env;
-	if (!isPlainObject(env)) return {};
-	const out: Record<string, string> = {};
-	for (const [k, v] of Object.entries(env)) {
-		if (typeof v === "string") out[k] = v;
-	}
-	return out;
+  const settings = readAppSettingsFile(filePath);
+  const env = settings.env;
+  if (!isPlainObject(env)) return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(env)) {
+    if (typeof v === "string") out[k] = v;
+  }
+  return out;
 }
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
-	return v !== null && typeof v === "object" && !Array.isArray(v);
+  return v !== null && typeof v === "object" && !Array.isArray(v);
 }

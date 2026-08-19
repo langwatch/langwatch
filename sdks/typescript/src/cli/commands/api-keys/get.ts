@@ -1,7 +1,12 @@
 import chalk from "chalk";
 import { ApiKeysApiService } from "@/client-sdk/services/api-keys/api-keys-api.service";
 import type { CommandResult } from "../../utils/output";
-import { asDate, orDash, printFacts, runManagement } from "../management/_shared";
+import {
+  asDate,
+  orDash,
+  printFacts,
+  runManagement,
+} from "../management/_shared";
 import { permissionsCell, printBindings } from "./_shared";
 
 /**

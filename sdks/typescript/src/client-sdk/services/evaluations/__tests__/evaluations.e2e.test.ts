@@ -5,9 +5,9 @@
  * (langwatch_nlp) available, plus a valid API key.
  * Set LANGWATCH_ENDPOINT and LANGWATCH_API_KEY environment variables.
  */
-import { describe, expect, it, beforeAll } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { LangWatch } from "@/client-sdk";
-import { EvaluatorNotFoundError, EvaluationsApiError } from "../errors";
+import { EvaluationsApiError, EvaluatorNotFoundError } from "../errors";
 
 describe("Evaluations E2E", () => {
   let langwatch: LangWatch;
@@ -26,7 +26,7 @@ describe("Evaluations E2E", () => {
   beforeAll(async () => {
     if (!apiKey) {
       console.log(
-        "Skipping E2E tests: LANGWATCH_API_KEY environment variable not set"
+        "Skipping E2E tests: LANGWATCH_API_KEY environment variable not set",
       );
       return;
     }
@@ -40,25 +40,26 @@ describe("Evaluations E2E", () => {
     try {
       const probe = await langwatch.evaluations.evaluate(
         "presidio/pii_detection",
-        { data: { input: "hello" } }
+        { data: { input: "hello" } },
       );
       if (probe.status === "error") {
         nlpAvailable = false;
         console.log(
-          "NLP service unavailable (evaluation returned error) — skipping NLP-dependent tests"
+          "NLP service unavailable (evaluation returned error) — skipping NLP-dependent tests",
         );
       }
     } catch {
       nlpAvailable = false;
-      console.log(
-        "NLP service unreachable — skipping NLP-dependent tests"
-      );
+      console.log("NLP service unreachable — skipping NLP-dependent tests");
     }
   });
 
   describe("evaluate()", () => {
     it("runs a basic evaluator successfully", async () => {
-      if (skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service")) return;
+      if (
+        skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service")
+      )
+        return;
 
       const result = await langwatch.evaluations.evaluate(
         "presidio/pii_detection",
@@ -67,7 +68,7 @@ describe("Evaluations E2E", () => {
             input: "Hello, how are you today?",
           },
           name: "E2E PII Detection Test",
-        }
+        },
       );
 
       expect(result.status).toBe("processed");
@@ -75,7 +76,10 @@ describe("Evaluations E2E", () => {
     });
 
     it("runs evaluator as guardrail", async () => {
-      if (skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service")) return;
+      if (
+        skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service")
+      )
+        return;
 
       const result = await langwatch.evaluations.evaluate(
         "presidio/pii_detection",
@@ -85,7 +89,7 @@ describe("Evaluations E2E", () => {
           },
           name: "E2E Guardrail Test",
           asGuardrail: true,
-        }
+        },
       );
 
       expect(result.status).toBe("processed");
@@ -93,7 +97,10 @@ describe("Evaluations E2E", () => {
     });
 
     it("handles custom settings", async () => {
-      if (skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service")) return;
+      if (
+        skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service")
+      )
+        return;
 
       const result = await langwatch.evaluations.evaluate(
         "presidio/pii_detection",
@@ -103,7 +110,7 @@ describe("Evaluations E2E", () => {
           },
           name: "E2E Settings Test",
           settings: {},
-        }
+        },
       );
 
       expect(result.status).toBe("processed");
@@ -135,12 +142,15 @@ describe("Evaluations E2E", () => {
 
       // Should get either API error or evaluator error
       expect(
-        error instanceof EvaluationsApiError || error instanceof Error
+        error instanceof EvaluationsApiError || error instanceof Error,
       ).toBe(true);
     });
 
     it("returns valid result structure for PII detection", async () => {
-      if (skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service")) return;
+      if (
+        skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service")
+      )
+        return;
 
       const result = await langwatch.evaluations.evaluate(
         "presidio/pii_detection",
@@ -150,7 +160,7 @@ describe("Evaluations E2E", () => {
           },
           name: "E2E PII Detection Structure Test",
           asGuardrail: true,
-        }
+        },
       );
 
       expect(result.status).toBe("processed");

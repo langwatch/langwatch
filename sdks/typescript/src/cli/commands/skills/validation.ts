@@ -21,5 +21,8 @@ export const throwValidationError = (
   message: string,
   meta: Record<string, unknown> = {},
 ): never => {
-  throw Object.assign(new Error(message), commandValidationError(message, meta));
+  throw Object.assign(
+    new Error(message),
+    commandValidationError(message, meta),
+  );
 };

@@ -127,6 +127,10 @@ export const withFallbackSuggestions = (
     ...(domain.suggestions?.length
       ? {}
       : { suggestions: fallback.suggestions }),
-    ...(domain.docUrl ? {} : fallback.docUrl ? { docUrl: fallback.docUrl } : {}),
+    ...(domain.docUrl
+      ? {}
+      : fallback.docUrl
+        ? { docUrl: fallback.docUrl }
+        : {}),
   };
 };

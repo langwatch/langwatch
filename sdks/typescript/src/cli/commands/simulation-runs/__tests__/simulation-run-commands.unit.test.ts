@@ -1,7 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -12,8 +16,8 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { listSimulationRunsCommand } from "../list";
 import { getSimulationRunCommand } from "../get";
+import { listSimulationRunsCommand } from "../list";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -140,7 +144,9 @@ describe("listSimulationRunsCommand()", () => {
         text: async () => "Internal Server Error",
       });
 
-      await expect(listSimulationRunsCommand({})).rejects.toThrow(ProcessExitError);
+      await expect(listSimulationRunsCommand({})).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });
@@ -198,7 +204,9 @@ describe("getSimulationRunCommand()", () => {
         text: async () => '{"error":"Not found"}',
       });
 
-      await expect(getSimulationRunCommand("nonexistent")).rejects.toThrow(ProcessExitError);
+      await expect(getSimulationRunCommand("nonexistent")).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 

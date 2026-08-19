@@ -92,7 +92,10 @@ describe("Experiment.compare", () => {
   const attribution = (
     owners: Map<string, number>,
     source: string,
-    entries: { row: number | null | undefined; traceId: string | null | undefined }[]
+    entries: {
+      row: number | null | undefined;
+      traceId: string | null | undefined;
+    }[],
   ): { traced: number; mismatched: Mismatch[] } => {
     const traced = entries.filter((entry) => entry.traceId);
 
@@ -130,7 +133,7 @@ describe("Experiment.compare", () => {
               experiment.withTarget("gpt-5-mini", () => `${item.answer}.`),
               experiment.withTarget(
                 "claude-sonnet-5",
-                () => `The answer is ${item.answer}.`
+                () => `The answer is ${item.answer}.`,
               ),
             ]);
 
@@ -142,7 +145,7 @@ describe("Experiment.compare", () => {
               laterRowsCompared.resolve();
             }
           },
-          { concurrency: CAPITALS.length }
+          { concurrency: CAPITALS.length },
         );
 
         const owners = rowPerTrace();
@@ -157,7 +160,7 @@ describe("Experiment.compare", () => {
           harness.judgeRequests.map((request) => ({
             row: request.data.row_index,
             traceId: request.trace_id,
-          }))
+          })),
         );
         const filed = attribution(
           owners,
@@ -165,7 +168,7 @@ describe("Experiment.compare", () => {
           recorded.map((evaluation) => ({
             row: evaluation.index,
             traceId: evaluation.trace_id,
-          }))
+          })),
         );
 
         // One traced comparison per side, not four. Only the row that runs
@@ -198,13 +201,13 @@ describe("Experiment.compare", () => {
               experiment.withTarget("gpt-5-mini", () => `${item.answer}.`),
               experiment.withTarget(
                 "claude-sonnet-5",
-                () => `The answer is ${item.answer}.`
+                () => `The answer is ${item.answer}.`,
               ),
             ]);
 
             await experiment.compare({ input: item.question });
           },
-          { concurrency: 1 }
+          { concurrency: 1 },
         );
 
         const iterationTraceId = exporter
@@ -214,7 +217,9 @@ describe("Experiment.compare", () => {
 
         expect(iterationTraceId).toBeDefined();
         expect(harness.judgeRequests[0]!.trace_id).toBe(iterationTraceId);
-        expect(comparisonEvaluations(harness)[0]!.trace_id).toBe(iterationTraceId);
+        expect(comparisonEvaluations(harness)[0]!.trace_id).toBe(
+          iterationTraceId,
+        );
       });
     });
 
@@ -226,7 +231,7 @@ describe("Experiment.compare", () => {
         // background caller comparing while rows are in flight.
         const rowsInFlight = deferred();
         const comparedFromOutside = rowsInFlight.promise.then(() =>
-          experiment.compare().catch((error: unknown) => error)
+          experiment.compare().catch((error: unknown) => error),
         );
 
         // Every other row stays open until that caller has its answer, so a
@@ -241,7 +246,7 @@ describe("Experiment.compare", () => {
               experiment.withTarget("gpt-5-mini", () => `${item.answer}.`),
               experiment.withTarget(
                 "claude-sonnet-5",
-                () => `The answer is ${item.answer}.`
+                () => `The answer is ${item.answer}.`,
               ),
             ]);
 
@@ -255,7 +260,7 @@ describe("Experiment.compare", () => {
 
             await experiment.compare({ input: item.question });
           },
-          { concurrency: CAPITALS.length }
+          { concurrency: CAPITALS.length },
         );
 
         expect(outcome).toBeInstanceOf(ComparisonError);

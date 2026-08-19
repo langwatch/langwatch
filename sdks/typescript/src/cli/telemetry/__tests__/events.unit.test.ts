@@ -1,10 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { LoggerProviderConfig } from "@opentelemetry/sdk-logs";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const loggerEmit = vi.fn();
 const forceFlush = vi.fn<() => Promise<void>>();
 const shutdown = vi.fn<() => Promise<void>>();
-const loggerProviderConstructed = vi.fn<(config: LoggerProviderConfig) => void>();
+const loggerProviderConstructed =
+  vi.fn<(config: LoggerProviderConfig) => void>();
 const exporterConstructed = vi.fn<(config: Record<string, unknown>) => void>();
 
 // The OTLP pipeline is mocked so a unit test can assert the thing that matters
@@ -40,20 +41,20 @@ vi.mock("@opentelemetry/exporter-logs-otlp-http", () => ({
   },
 }));
 
-import net from "node:net";
 import { mkdtempSync, rmSync } from "node:fs";
+import net from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import {
+  LANGWATCH_EVENT_ATTRIBUTES as ATTR,
+  LANGWATCH_EVENTS,
+} from "../attributes";
 import {
   areEventsEnabled,
   createCommandEvents,
   redactSecrets,
   resolveTransport,
 } from "../events";
-import {
-  LANGWATCH_EVENT_ATTRIBUTES as ATTR,
-  LANGWATCH_EVENTS,
-} from "../attributes";
 
 const ENABLED_ENV = {
   LANGWATCH_OTEL_EVENTS: "1",
@@ -132,8 +133,17 @@ describe("createCommandEvents()", () => {
         });
 
         events.started("Searching traces…");
-        events.count({ count: 1204, total: 1204, message: "1,204 traces matched" });
-        events.progress({ progress: 0.5, count: 12, total: 25, message: "12 of 25" });
+        events.count({
+          count: 1204,
+          total: 1204,
+          message: "1,204 traces matched",
+        });
+        events.progress({
+          progress: 0.5,
+          count: 12,
+          total: 25,
+          message: "12 of 25",
+        });
         events.completed({ count: 25, total: 1204, message: "Done" });
         await events.flush();
 
@@ -171,7 +181,11 @@ describe("createCommandEvents()", () => {
           env: ENABLED_ENV,
         });
 
-        events.count({ count: 1204, total: 1204, message: "1,204 traces matched" });
+        events.count({
+          count: 1204,
+          total: 1204,
+          message: "1,204 traces matched",
+        });
         await events.flush();
 
         expect(emittedRecords()[0]).toMatchObject({
@@ -261,7 +275,8 @@ describe("createCommandEvents()", () => {
             "service.name": "langwatch-cli",
           });
         } finally {
-          if (previous === undefined) delete process.env.OTEL_RESOURCE_ATTRIBUTES;
+          if (previous === undefined)
+            delete process.env.OTEL_RESOURCE_ATTRIBUTES;
           else process.env.OTEL_RESOURCE_ATTRIBUTES = previous;
         }
       });
@@ -364,14 +379,17 @@ describe("createCommandEvents()", () => {
         });
 
         events.failed({
-          error: Object.assign(new Error("Failed to list datasets: not found"), {
-            status: 404,
-            originalError: {
-              error: "dataset_not_found",
-              message: "Dataset not found: ds_42",
-              id: "ds_42",
+          error: Object.assign(
+            new Error("Failed to list datasets: not found"),
+            {
+              status: 404,
+              originalError: {
+                error: "dataset_not_found",
+                message: "Dataset not found: ds_42",
+                id: "ds_42",
+              },
             },
-          }),
+          ),
         });
         await events.flush();
 
@@ -455,17 +473,24 @@ describe("the IPC transport", () => {
         });
 
         events.started("Searching traces…");
-        events.count({ count: 1204, total: 1204, message: "1,204 traces matched" });
+        events.count({
+          count: 1204,
+          total: 1204,
+          message: "1,204 traces matched",
+        });
         events.completed({ count: 25, total: 1204, message: "Done" });
         await events.flush();
 
         // The socket write is async; give the server a tick to drain it.
         await vi.waitFor(() => expect(received.length).toBe(3));
 
-        const records = received.map((line) => JSON.parse(line) as {
-          event: string;
-          attributes: Record<string, unknown>;
-        });
+        const records = received.map(
+          (line) =>
+            JSON.parse(line) as {
+              event: string;
+              attributes: Record<string, unknown>;
+            },
+        );
 
         expect(records.map((r) => r.event)).toEqual([
           LANGWATCH_EVENTS.started,
@@ -530,7 +555,9 @@ describe("resolveTransport()", () => {
     });
 
     it("needs no flag, because handing over a socket is the ask", () => {
-      expect(resolveTransport({ LANGWATCH_EVENTS_SOCKET: "/tmp/langy.sock" })).toEqual({
+      expect(
+        resolveTransport({ LANGWATCH_EVENTS_SOCKET: "/tmp/langy.sock" }),
+      ).toEqual({
         kind: "ipc",
         path: "/tmp/langy.sock",
       });
@@ -566,9 +593,9 @@ describe("redactSecrets()", () => {
 
   describe("given a message quoting a credential this process never held", () => {
     it("still redacts it on shape alone", () => {
-      expect(redactSecrets("Authorization: Bearer eyJhbGciOiJIUzI1NiJ9", {})).not.toContain(
-        "eyJhbGciOiJIUzI1NiJ9",
-      );
+      expect(
+        redactSecrets("Authorization: Bearer eyJhbGciOiJIUzI1NiJ9", {}),
+      ).not.toContain("eyJhbGciOiJIUzI1NiJ9");
       expect(redactSecrets("used sk-proj-AbCdEfGh12345678", {})).not.toContain(
         "sk-proj-AbCdEfGh12345678",
       );
@@ -577,7 +604,9 @@ describe("redactSecrets()", () => {
 
   describe("given a very long message", () => {
     it("truncates it so a stack trace cannot ride along", () => {
-      expect(redactSecrets("x".repeat(5_000), {}).length).toBeLessThanOrEqual(500);
+      expect(redactSecrets("x".repeat(5_000), {}).length).toBeLessThanOrEqual(
+        500,
+      );
     });
   });
 });
@@ -598,12 +627,20 @@ describe("areEventsEnabled()", () => {
 
   describe("given the flag is absent, empty or falsy", () => {
     it("leaves the channel off", () => {
-      const collector = { OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4318" };
+      const collector = {
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4318",
+      };
 
       expect(areEventsEnabled(collector)).toBe(false);
-      expect(areEventsEnabled({ ...collector, LANGWATCH_OTEL_EVENTS: "" })).toBe(false);
-      expect(areEventsEnabled({ ...collector, LANGWATCH_OTEL_EVENTS: "0" })).toBe(false);
-      expect(areEventsEnabled({ ...collector, LANGWATCH_OTEL_EVENTS: "false" })).toBe(false);
+      expect(
+        areEventsEnabled({ ...collector, LANGWATCH_OTEL_EVENTS: "" }),
+      ).toBe(false);
+      expect(
+        areEventsEnabled({ ...collector, LANGWATCH_OTEL_EVENTS: "0" }),
+      ).toBe(false);
+      expect(
+        areEventsEnabled({ ...collector, LANGWATCH_OTEL_EVENTS: "false" }),
+      ).toBe(false);
     });
   });
 });

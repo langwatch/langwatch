@@ -1,114 +1,175 @@
 import { scopedApiKey } from "@/internal/credentialContext";
-import { PromptsFacade, PromptsApiService } from "./services/prompts";
-export { FetchPolicy, type GetPromptOptions } from "./services/prompts";
-export type {
-  Dataset,
-  DatasetEntry,
-  DatasetMetadata,
-  DatasetColumnType,
-  DatasetListItem,
-  Pagination,
-  PaginatedResponse,
-  GetDatasetOptions,
-  ListDatasetsOptions,
-  ListDatasetsApiResponse,
-  ListRecordsOptions,
-  ListRecordsApiResponse,
-  CreateDatasetOptions,
-  UpdateDatasetOptions,
-  CreateFromUploadResponse,
-  BatchCreateRecordsResponse,
-  DeleteRecordsResponse,
-  UploadResponse,
-  DatasetRecordResponse,
-} from "./services/datasets";
-export { DatasetError, DatasetNotFoundError, DatasetApiError, DatasetValidationError, DatasetPlanLimitError } from "./services/datasets";
-export type {
-  ExperimentRunResult,
-  RunExperimentOptions,
-  RunWithResultsOptions,
-  ExperimentRowResult,
-  ExperimentRunWithResults,
-} from "./services/experiments";
+import { PromptsApiService, PromptsFacade } from "./services/prompts";
+
 export {
-  ExperimentsError,
-  ExperimentNotFoundError,
-  ExperimentTimeoutError,
-  ExperimentRunFailedError,
-  ExperimentsApiError,
-} from "./services/experiments";
-export type { EvaluationResult, EvaluateOptions, EvaluationStatus, EvaluationCost } from "./services/evaluations";
+  AgentsApiError,
+  AgentsApiService,
+} from "./services/agents/agents-api.service";
+export {
+  AnalyticsApiError,
+  AnalyticsApiService,
+} from "./services/analytics/analytics-api.service";
+export {
+  AnnotationsApiError,
+  AnnotationsApiService,
+} from "./services/annotations/annotations-api.service";
+export {
+  DashboardsApiError,
+  DashboardsApiService,
+} from "./services/dashboards/dashboards-api.service";
+export type {
+  BatchCreateRecordsResponse,
+  CreateDatasetOptions,
+  CreateFromUploadResponse,
+  Dataset,
+  DatasetColumnType,
+  DatasetEntry,
+  DatasetListItem,
+  DatasetMetadata,
+  DatasetRecordResponse,
+  DeleteRecordsResponse,
+  GetDatasetOptions,
+  ListDatasetsApiResponse,
+  ListDatasetsOptions,
+  ListRecordsApiResponse,
+  ListRecordsOptions,
+  PaginatedResponse,
+  Pagination,
+  UpdateDatasetOptions,
+  UploadResponse,
+} from "./services/datasets";
+export {
+  DatasetApiError,
+  DatasetError,
+  DatasetNotFoundError,
+  DatasetPlanLimitError,
+  DatasetValidationError,
+} from "./services/datasets";
+export type {
+  EvaluateOptions,
+  EvaluationCost,
+  EvaluationResult,
+  EvaluationStatus,
+} from "./services/evaluations";
 export {
   EvaluationError,
+  EvaluationsApiError,
   EvaluatorCallError,
   EvaluatorNotFoundError,
-  EvaluationsApiError,
 } from "./services/evaluations";
-export { EvaluatorsApiService, EvaluatorsApiError } from "./services/evaluators";
-export { ScenariosApiService, ScenariosApiError } from "./services/scenarios";
-export { SuitesApiService, SuitesApiError } from "./services/suites";
-export { WorkflowsApiService, WorkflowsApiError } from "./services/workflows/workflows-api.service";
-export { AgentsApiService, AgentsApiError } from "./services/agents/agents-api.service";
-export { AnnotationsApiService, AnnotationsApiError } from "./services/annotations/annotations-api.service";
-export { DashboardsApiService, DashboardsApiError } from "./services/dashboards/dashboards-api.service";
-export { ModelProvidersApiService, ModelProvidersApiError } from "./services/model-providers/model-providers-api.service";
-export { AnalyticsApiService, AnalyticsApiError } from "./services/analytics/analytics-api.service";
-export { TriggersApiService, TriggersApiError } from "./services/triggers";
-export { GraphsApiService, GraphsApiError } from "./services/graphs";
-export { SimulationRunsApiService, SimulationRunsApiError } from "./services/simulation-runs";
-export { TracesApiService, TracesApiError } from "./services/traces/traces-api.service";
-export { MonitorsApiService, MonitorsApiError } from "./services/monitors";
-export { SecretsApiService, SecretsApiError } from "./services/secrets";
-export { VirtualKeysApiService, VirtualKeysApiError } from "./services/virtual-keys/virtual-keys-api.service";
-export { GatewayBudgetsApiService, GatewayBudgetsApiError } from "./services/gateway-budgets/gateway-budgets-api.service";
-export { SpendEventsApiService, SpendEventsApiError } from "./services/spend-events/spend-events-api.service";
-export { WebhooksApiService, WebhooksApiError } from "./services/webhooks/webhooks-api.service";
-export { TeamsApiService, TeamsApiError } from "./services/teams/teams-api.service";
+export {
+  EvaluatorsApiError,
+  EvaluatorsApiService,
+} from "./services/evaluators";
 export type {
-  Team,
-  TeamPagination,
-  TeamMember,
-  ListTeamsResponse,
-  ArchivedTeam,
-} from "./services/teams/teams-api.service";
-export { ProjectsApiService, ProjectsApiError } from "./services/projects/projects-api.service";
+  ExperimentRowResult,
+  ExperimentRunResult,
+  ExperimentRunWithResults,
+  RunExperimentOptions,
+  RunWithResultsOptions,
+} from "./services/experiments";
+export {
+  ExperimentNotFoundError,
+  ExperimentRunFailedError,
+  ExperimentsApiError,
+  ExperimentsError,
+  ExperimentTimeoutError,
+} from "./services/experiments";
+export {
+  GatewayBudgetsApiError,
+  GatewayBudgetsApiService,
+} from "./services/gateway-budgets/gateway-budgets-api.service";
+export { GraphsApiError, GraphsApiService } from "./services/graphs";
+export {
+  ModelProvidersApiError,
+  ModelProvidersApiService,
+} from "./services/model-providers/model-providers-api.service";
+export { MonitorsApiError, MonitorsApiService } from "./services/monitors";
 export type {
-  Project,
-  PaginatedProjects,
-  ProjectWithServiceKey,
   ArchivedProject,
   CreateProjectInput,
+  PaginatedProjects,
+  Project,
+  ProjectWithServiceKey,
   UpdateProjectInput,
 } from "./services/projects/projects-api.service";
-import { LocalPromptsService } from "./services/prompts/local-prompts.service";
-import { ExperimentsFacade } from "./services/experiments";
+export {
+  ProjectsApiError,
+  ProjectsApiService,
+} from "./services/projects/projects-api.service";
+export { FetchPolicy, type GetPromptOptions } from "./services/prompts";
+export { ScenariosApiError, ScenariosApiService } from "./services/scenarios";
+export { SecretsApiError, SecretsApiService } from "./services/secrets";
+export {
+  SimulationRunsApiError,
+  SimulationRunsApiService,
+} from "./services/simulation-runs";
+export {
+  SpendEventsApiError,
+  SpendEventsApiService,
+} from "./services/spend-events/spend-events-api.service";
+export { SuitesApiError, SuitesApiService } from "./services/suites";
+export type {
+  ArchivedTeam,
+  ListTeamsResponse,
+  Team,
+  TeamMember,
+  TeamPagination,
+} from "./services/teams/teams-api.service";
+export {
+  TeamsApiError,
+  TeamsApiService,
+} from "./services/teams/teams-api.service";
+export {
+  TracesApiError,
+  TracesApiService,
+} from "./services/traces/traces-api.service";
+export { TriggersApiError, TriggersApiService } from "./services/triggers";
+export {
+  VirtualKeysApiError,
+  VirtualKeysApiService,
+} from "./services/virtual-keys/virtual-keys-api.service";
+export {
+  WebhooksApiError,
+  WebhooksApiService,
+} from "./services/webhooks/webhooks-api.service";
+export {
+  WorkflowsApiError,
+  WorkflowsApiService,
+} from "./services/workflows/workflows-api.service";
+
+import { resolveEndpoint } from "@/internal/endpoint";
+import {
+  createLangWatchApiClient,
+  type LangwatchApiClient,
+} from "../internal/api/client";
+import { type Logger, NoOpLogger } from "../logger";
+import { AgentsApiService } from "./services/agents/agents-api.service";
+import { AnalyticsApiService } from "./services/analytics/analytics-api.service";
+import { AnnotationsApiService } from "./services/annotations/annotations-api.service";
+import { DashboardsApiService } from "./services/dashboards/dashboards-api.service";
 import { DatasetsFacade } from "./services/datasets";
 import { EvaluationsFacade } from "./services/evaluations";
 import { EvaluatorsApiService } from "./services/evaluators";
-import { ScenariosApiService } from "./services/scenarios";
-import { SuitesApiService } from "./services/suites";
-import { WorkflowsApiService } from "./services/workflows/workflows-api.service";
-import { AgentsApiService } from "./services/agents/agents-api.service";
-import { AnnotationsApiService } from "./services/annotations/annotations-api.service";
-import { DashboardsApiService } from "./services/dashboards/dashboards-api.service";
-import { ModelProvidersApiService } from "./services/model-providers/model-providers-api.service";
-import { AnalyticsApiService } from "./services/analytics/analytics-api.service";
-import { TriggersApiService } from "./services/triggers";
-import { GraphsApiService } from "./services/graphs";
-import { SimulationRunsApiService } from "./services/simulation-runs";
-import { MonitorsApiService } from "./services/monitors";
-import { SecretsApiService } from "./services/secrets";
-import { VirtualKeysApiService } from "./services/virtual-keys/virtual-keys-api.service";
+import { ExperimentsFacade } from "./services/experiments";
 import { GatewayBudgetsApiService } from "./services/gateway-budgets/gateway-budgets-api.service";
-import { SpendEventsApiService } from "./services/spend-events/spend-events-api.service";
-import { WebhooksApiService } from "./services/webhooks/webhooks-api.service";
-import { TeamsApiService } from "./services/teams/teams-api.service";
+import { GraphsApiService } from "./services/graphs";
+import { ModelProvidersApiService } from "./services/model-providers/model-providers-api.service";
+import { MonitorsApiService } from "./services/monitors";
 import { ProjectsApiService } from "./services/projects/projects-api.service";
-import { type InternalConfig } from "./types";
-import { createLangWatchApiClient, type LangwatchApiClient } from "../internal/api/client";
-import { type Logger, NoOpLogger } from "../logger";
+import { LocalPromptsService } from "./services/prompts/local-prompts.service";
+import { ScenariosApiService } from "./services/scenarios";
+import { SecretsApiService } from "./services/secrets";
+import { SimulationRunsApiService } from "./services/simulation-runs";
+import { SpendEventsApiService } from "./services/spend-events/spend-events-api.service";
+import { SuitesApiService } from "./services/suites";
+import { TeamsApiService } from "./services/teams/teams-api.service";
 import { TracesFacade } from "./services/traces/facade";
-import { resolveEndpoint } from "@/internal/endpoint";
+import { TriggersApiService } from "./services/triggers";
+import { VirtualKeysApiService } from "./services/virtual-keys/virtual-keys-api.service";
+import { WebhooksApiService } from "./services/webhooks/webhooks-api.service";
+import { WorkflowsApiService } from "./services/workflows/workflows-api.service";
+import type { InternalConfig } from "./types";
 
 export interface LangWatchConstructorOptions {
   apiKey?: string;
@@ -119,7 +180,10 @@ export interface LangWatchConstructorOptions {
 }
 
 export class LangWatch {
-  private readonly config: InternalConfig & { endpoint: string; apiKey: string };
+  private readonly config: InternalConfig & {
+    endpoint: string;
+    apiKey: string;
+  };
 
   readonly prompts: PromptsFacade;
   readonly traces: TracesFacade;
@@ -183,7 +247,8 @@ export class LangWatch {
   #projects?: ProjectsApiService;
 
   constructor(options: LangWatchConstructorOptions = {}) {
-    const apiKey = options.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
+    const apiKey =
+      options.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = resolveEndpoint(options.endpoint);
 
     this.config = this.#createInternalConfig({

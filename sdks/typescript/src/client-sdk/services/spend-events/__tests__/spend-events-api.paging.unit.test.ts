@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  type SpendEvent,
   SpendEventsApiError,
   SpendEventsApiService,
-  type SpendEvent,
   type SpendSummaryRow,
 } from "../spend-events-api.service";
 
@@ -92,7 +92,7 @@ const queryOf = (call: number): string => {
 };
 
 /** Reads an iterator to exhaustion and hands back every row it yielded. */
-const drain = async <T,>(rows: AsyncIterable<T>): Promise<T[]> => {
+const drain = async <T>(rows: AsyncIterable<T>): Promise<T[]> => {
   const collected: T[] = [];
   for await (const row of rows) collected.push(row);
   return collected;
@@ -287,7 +287,9 @@ describe("SpendEventsApiService cursor paging", () => {
     it("keeps walking past a page the server left short", async () => {
       // A short page is not the end of the walk; only a null cursor is.
       mockFetch
-        .mockResolvedValueOnce(jsonResponse(summariesPage(["vk_a"], "cursor-1")))
+        .mockResolvedValueOnce(
+          jsonResponse(summariesPage(["vk_a"], "cursor-1")),
+        )
         .mockResolvedValueOnce(jsonResponse(summariesPage(["vk_b"], null)));
 
       const rows = await drain(

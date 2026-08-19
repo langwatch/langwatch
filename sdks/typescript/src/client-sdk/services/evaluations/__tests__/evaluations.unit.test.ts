@@ -1,12 +1,12 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { EvaluationsFacade } from "../evaluations.facade";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { NoOpLogger } from "@/logger";
 import {
-  EvaluatorNotFoundError,
   EvaluationsApiError,
   EvaluatorCallError,
+  EvaluatorNotFoundError,
 } from "../errors";
+import { EvaluationsFacade } from "../evaluations.facade";
 import type { EvaluateResponse } from "../types";
-import { NoOpLogger } from "@/logger";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -120,7 +120,7 @@ describe("EvaluationsFacade", () => {
             "x-auth-token": "test-api-key",
           }),
           body: expect.any(String),
-        })
+        }),
       );
 
       // Verify body contents
@@ -139,9 +139,11 @@ describe("EvaluationsFacade", () => {
         text: () => Promise.resolve("Not found"),
       });
 
-      const error = await facade.evaluate("non-existent", {
-        data: { input: "test" },
-      }).catch((e) => e);
+      const error = await facade
+        .evaluate("non-existent", {
+          data: { input: "test" },
+        })
+        .catch((e) => e);
 
       expect(error).toBeInstanceOf(EvaluatorNotFoundError);
       expect(error.message).toBe("Evaluator not found: non-existent");
@@ -157,7 +159,7 @@ describe("EvaluationsFacade", () => {
       await expect(
         facade.evaluate("test-evaluator", {
           data: { input: "test" },
-        })
+        }),
       ).rejects.toThrow(EvaluationsApiError);
     });
 
@@ -220,9 +222,11 @@ describe("EvaluationsFacade", () => {
     it("wraps network errors in EvaluatorCallError", async () => {
       mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
-      const error = await facade.evaluate("test-evaluator", {
-        data: { input: "test" },
-      }).catch((e) => e);
+      const error = await facade
+        .evaluate("test-evaluator", {
+          data: { input: "test" },
+        })
+        .catch((e) => e);
 
       expect(error).toBeInstanceOf(EvaluatorCallError);
       expect(error.message).toContain("Network error");

@@ -1,7 +1,7 @@
 import chalk from "chalk";
-import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
-import { getSourceHealth } from "@/cli/utils/governance/cli-api";
 import { reportCommandError } from "@/cli/utils/errorOutput";
+import { getSourceHealth } from "@/cli/utils/governance/cli-api";
+import { isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
 
 /**
  * `langwatch ingest health <sourceId> [--json]`
@@ -27,7 +27,10 @@ export async function ingestHealthCommand(
   try {
     result = await getSourceHealth(cfg, sourceId);
   } catch (err) {
-    reportCommandError({ error: err, format: options.json ? "json" : undefined });
+    reportCommandError({
+      error: err,
+      format: options.json ? "json" : undefined,
+    });
     process.exit(1);
   }
 
@@ -46,7 +49,9 @@ export async function ingestHealthCommand(
   console.log(`Events (30d):  ${health.events30d}`);
   console.log(
     `Last event:    ${
-      health.lastSuccessIso ? humanRelative(new Date(health.lastSuccessIso)) : chalk.gray("—")
+      health.lastSuccessIso
+        ? humanRelative(new Date(health.lastSuccessIso))
+        : chalk.gray("—")
     }`,
   );
 }

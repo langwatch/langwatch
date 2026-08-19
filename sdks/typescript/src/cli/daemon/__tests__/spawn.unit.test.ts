@@ -4,7 +4,7 @@
  * the spawner's full shell env, which would leak one project's variables into
  * every other caller's requests.
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const spawnMock = vi.hoisted(() =>
   vi.fn(
@@ -17,8 +17,8 @@ const spawnMock = vi.hoisted(() =>
 );
 vi.mock("node:child_process", () => ({ spawn: spawnMock }));
 
-import { spawnDaemon } from "../spawn";
 import type { DaemonIdentity } from "../identity";
+import { spawnDaemon } from "../spawn";
 
 const identity: DaemonIdentity = {
   fingerprint: "f".repeat(64),

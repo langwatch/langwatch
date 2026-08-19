@@ -304,9 +304,9 @@ describe("removeBlockFromRc", () => {
   describe("when removing the global gateway block", () => {
     it("removes it via the default markers", () => {
       persistBlockToRc("zsh", "export ANTHROPIC_BASE_URL=http://gw");
-      expect(
-        fs.readFileSync(rcPath("zsh"), "utf8"),
-      ).toContain("# >>> langwatch begin >>>");
+      expect(fs.readFileSync(rcPath("zsh"), "utf8")).toContain(
+        "# >>> langwatch begin >>>",
+      );
 
       const removed = removeBlockFromRc("zsh", GATEWAY_RC_MARKERS);
 

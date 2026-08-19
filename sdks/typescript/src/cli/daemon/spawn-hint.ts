@@ -22,7 +22,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { ensureSocketDir, type DaemonIdentity } from "./identity";
+import { type DaemonIdentity, ensureSocketDir } from "./identity";
 
 /** Misses older than this are forgotten — two calls a week apart are two one-offs. */
 const WINDOW_MS = 60_000;

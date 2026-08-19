@@ -1,13 +1,12 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { redactTriggerSecrets } from "./redact";
 
 /**
@@ -27,17 +26,24 @@ export const getTriggerCommand = async (
   const spinner = createSpinner(`Fetching trigger "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
-      headers: buildAuthHeaders({ apiKey }),
-    });
+    const response = await fetch(
+      `${endpoint}/api/triggers/${encodeURIComponent(id)}`,
+      {
+        headers: buildAuthHeaders({ apiKey }),
+      },
+    );
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: `fetch trigger "${id}"` });
+      failSpinner({
+        spinner,
+        error: new Error(message),
+        action: `fetch trigger "${id}"`,
+      });
       process.exit(1);
     }
 
-    const trigger = await response.json() as {
+    const trigger = (await response.json()) as {
       id: string;
       name: string;
       action: string;
@@ -61,20 +67,34 @@ export const getTriggerCommand = async (
         console.log();
         console.log(chalk.bold("  Trigger Details:"));
         console.log(`    ${chalk.gray("ID:")}      ${chalk.green(trigger.id)}`);
-        console.log(`    ${chalk.gray("Name:")}    ${chalk.cyan(trigger.name)}`);
+        console.log(
+          `    ${chalk.gray("Name:")}    ${chalk.cyan(trigger.name)}`,
+        );
         console.log(`    ${chalk.gray("Action:")}  ${trigger.action}`);
-        console.log(`    ${chalk.gray("Status:")}  ${trigger.active ? chalk.green("active") : chalk.gray("inactive")}`);
-        console.log(`    ${chalk.gray("Alert:")}   ${trigger.alertType ?? chalk.gray("—")}`);
-        console.log(`    ${chalk.gray("Message:")} ${trigger.message ?? chalk.gray("—")}`);
-        console.log(`    ${chalk.gray("Created:")} ${new Date(trigger.createdAt).toLocaleString()}`);
+        console.log(
+          `    ${chalk.gray("Status:")}  ${trigger.active ? chalk.green("active") : chalk.gray("inactive")}`,
+        );
+        console.log(
+          `    ${chalk.gray("Alert:")}   ${trigger.alertType ?? chalk.gray("—")}`,
+        );
+        console.log(
+          `    ${chalk.gray("Message:")} ${trigger.message ?? chalk.gray("—")}`,
+        );
+        console.log(
+          `    ${chalk.gray("Created:")} ${new Date(trigger.createdAt).toLocaleString()}`,
+        );
         if (trigger.platformUrl) {
-          console.log(`    ${chalk.bold("View:")}   ${chalk.underline(trigger.platformUrl)}`);
+          console.log(
+            `    ${chalk.bold("View:")}   ${chalk.underline(trigger.platformUrl)}`,
+          );
         }
 
         if (Object.keys(trigger.filters).length > 0) {
           console.log();
           console.log(chalk.bold("  Filters:"));
-          console.log(`    ${JSON.stringify(trigger.filters, null, 2).split("\n").join("\n    ")}`);
+          console.log(
+            `    ${JSON.stringify(trigger.filters, null, 2).split("\n").join("\n    ")}`,
+          );
         }
 
         console.log();

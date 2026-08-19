@@ -1,10 +1,10 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the updated agent rather than printing it: the output port renders it
@@ -20,7 +20,11 @@ export const updateAgentCommand = async (
   const spinner = createSpinner(`Updating agent "${id}"...`).start();
 
   try {
-    const params: { name?: string; type?: string; config?: Record<string, unknown> } = {};
+    const params: {
+      name?: string;
+      type?: string;
+      config?: Record<string, unknown>;
+    } = {};
     if (options.name !== undefined) params.name = options.name;
     if (options.type !== undefined) params.type = options.type;
     if (options.config !== undefined) {

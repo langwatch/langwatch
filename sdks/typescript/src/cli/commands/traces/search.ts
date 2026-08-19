@@ -1,27 +1,32 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
+import {
+  type CommandEvents,
+  createCommandEvents,
+} from "../../telemetry/events";
 import { resolveCredentials } from "../../utils/apiKey";
-import { formatTable, formatRelativeTime } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
+import { formatRelativeTime, formatTable } from "../../utils/formatting";
 import {
   printResult,
-  resolveOutputOptions,
   type RawOutputFlags,
+  resolveOutputOptions,
 } from "../../utils/output";
-import { createCommandEvents, type CommandEvents } from "../../telemetry/events";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { parseOriginOption } from "./origin-filter";
 
 /** Traces are walked in chunks so the progress bar moves rather than jumping 0 → 1. */
 const PROGRESS_CHUNK = 5;
 
-export const searchTracesCommand = async (options: {
-  query?: string;
-  startDate?: string;
-  endDate?: string;
-  limit?: string;
-  origin?: string;
-} & RawOutputFlags): Promise<void> => {
+export const searchTracesCommand = async (
+  options: {
+    query?: string;
+    startDate?: string;
+    endDate?: string;
+    limit?: string;
+    origin?: string;
+  } & RawOutputFlags,
+): Promise<void> => {
   await resolveCredentials();
 
   const service = new TracesApiService();
@@ -39,9 +44,7 @@ export const searchTracesCommand = async (options: {
     const startDate = options.startDate
       ? new Date(options.startDate).getTime()
       : oneDayAgo;
-    const endDate = options.endDate
-      ? new Date(options.endDate).getTime()
-      : now;
+    const endDate = options.endDate ? new Date(options.endDate).getTime() : now;
     const pageSize = options.limit ? parseInt(options.limit, 10) : 25;
     const originFilter = parseOriginOption(options.origin);
 
@@ -103,7 +106,9 @@ export const searchTracesCommand = async (options: {
       if (traces.length === 0) {
         console.log();
         console.log(chalk.gray("No traces found matching your criteria."));
-        console.log(chalk.gray("Try widening your date range or search query."));
+        console.log(
+          chalk.gray("Try widening your date range or search query."),
+        );
       } else {
         printTable({ events, traces, matched });
       }
@@ -198,14 +203,26 @@ const printTable = ({
 };
 
 function toRow(trace: Record<string, unknown>): Record<string, string> {
-  const traceId = (trace.traceId ?? trace.trace_id ?? trace.id ?? "—") as string;
+  const traceId = (trace.traceId ??
+    trace.trace_id ??
+    trace.id ??
+    "—") as string;
   const rawInput = trace.input ?? trace.ComputedInput ?? "—";
   const rawOutput = trace.output ?? trace.ComputedOutput ?? "—";
-  const input = truncate(typeof rawInput === "string" ? rawInput : JSON.stringify(rawInput), 60);
-  const output = truncate(typeof rawOutput === "string" ? rawOutput : JSON.stringify(rawOutput), 40);
+  const input = truncate(
+    typeof rawInput === "string" ? rawInput : JSON.stringify(rawInput),
+    60,
+  );
+  const output = truncate(
+    typeof rawOutput === "string" ? rawOutput : JSON.stringify(rawOutput),
+    40,
+  );
   const timestamps = trace.timestamps as Record<string, unknown> | undefined;
-  const startedAt = timestamps?.started_at ?? trace.StartedAt ?? trace.startedAt;
-  const timeStr = startedAt ? formatRelativeTime(new Date(startedAt as number).toISOString()) : "—";
+  const startedAt =
+    timestamps?.started_at ?? trace.StartedAt ?? trace.startedAt;
+  const timeStr = startedAt
+    ? formatRelativeTime(new Date(startedAt as number).toISOString())
+    : "—";
 
   return {
     "Trace ID": traceId.substring(0, 20),

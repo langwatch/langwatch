@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { resourceFromAttributes } from "@opentelemetry/resources";
 import { trace } from "@opentelemetry/api";
-import { createAndStartNodeSdk } from "../setup.js";
+import { resourceFromAttributes } from "@opentelemetry/resources";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetObservabilitySdkConfig } from "../../../config.js";
+import { createAndStartNodeSdk } from "../setup.js";
 import type { SetupObservabilityOptions } from "../types.js";
 
 const mocks = vi.hoisted(() => ({
@@ -50,7 +50,12 @@ const createLogger = () => ({
 const startSdk = (advanced?: SetupObservabilityOptions["advanced"]) => {
   const logger = createLogger();
   createAndStartNodeSdk(
-    { serviceName: "svc", langwatch: { apiKey: "test" }, debug: { logger }, advanced },
+    {
+      serviceName: "svc",
+      langwatch: { apiKey: "test" },
+      debug: { logger },
+      advanced,
+    },
     logger,
     resourceFromAttributes({}),
   );
@@ -86,12 +91,17 @@ describe("given the observability SDK owns the process exit handlers", () => {
       event,
       listeners: listenersFor(event),
     }));
-    for (const { event } of borrowedListeners) process.removeAllListeners(event);
+    for (const { event } of borrowedListeners)
+      process.removeAllListeners(event);
 
     // Both are how the process would actually die, so both are stubbed: an unstubbed
     // re-raise would take the test worker down with it.
-    exitSpy = vi.spyOn(process, "exit").mockImplementation((() => void 0) as never);
-    killSpy = vi.spyOn(process, "kill").mockImplementation((() => true) as never);
+    exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation((() => void 0) as never);
+    killSpy = vi
+      .spyOn(process, "kill")
+      .mockImplementation((() => true) as never);
   });
 
   afterEach(() => {

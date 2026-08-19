@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/client-sdk/services/prompts", () => ({
   PromptsApiService: vi.fn(),
@@ -6,11 +6,15 @@ vi.mock("@/client-sdk/services/prompts", () => ({
 }));
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
-import { tagAssignCommand } from "../assign";
 import { PromptsApiService } from "@/client-sdk/services/prompts";
+import { tagAssignCommand } from "../assign";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -26,11 +30,12 @@ describe("tagAssignCommand", () => {
     vi.clearAllMocks();
     mockGet = vi.fn();
     mockAssignTag = vi.fn();
-    vi.mocked(PromptsApiService).mockImplementation(
-      function () { return ({
-          get: mockGet,
-          assignTag: mockAssignTag,
-        }) as unknown as InstanceType<typeof PromptsApiService>; });
+    vi.mocked(PromptsApiService).mockImplementation(function () {
+      return {
+        get: mockGet,
+        assignTag: mockAssignTag,
+      } as unknown as InstanceType<typeof PromptsApiService>;
+    });
     vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new ProcessExitError(code as number);
     });
@@ -102,7 +107,9 @@ describe("tagAssignCommand", () => {
     it("prints an error message", async () => {
       mockGet.mockRejectedValue(new Error("Prompt not found"));
 
-      await expect(tagAssignCommand("nonexistent", "production")).rejects.toThrow();
+      await expect(
+        tagAssignCommand("nonexistent", "production"),
+      ).rejects.toThrow();
 
       // The error propagates, command doesn't silently pass
     });
@@ -111,7 +118,9 @@ describe("tagAssignCommand", () => {
   describe("when --version is not a positive integer", () => {
     it("exits with code 1 without calling the API", async () => {
       await expect(
-        tagAssignCommand("my-prompt", "production", { version: "not-a-number" }),
+        tagAssignCommand("my-prompt", "production", {
+          version: "not-a-number",
+        }),
       ).rejects.toMatchObject({ code: 1 });
 
       expect(mockGet).not.toHaveBeenCalled();

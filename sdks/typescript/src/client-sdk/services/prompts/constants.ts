@@ -1,4 +1,4 @@
-import { type PromptScope as PromptScopeType } from "./types";
+import type { PromptScope as PromptScopeType } from "./types";
 
 export const PromptScope = {
   ORGANIZATION: "ORGANIZATION" as const,

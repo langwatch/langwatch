@@ -1,21 +1,20 @@
-import chalk from "chalk";
 import * as fs from "node:fs";
 import * as os from "node:os";
-
-import { saveConfig } from "@/cli/utils/governance/config";
-import { resolveLiveIngestionKey } from "@/cli/utils/governance/telemetry-refresh";
+import chalk from "chalk";
 import {
+  type GovernanceConfig,
+  isLoggedIn,
+  loadConfig,
+  saveConfig,
+} from "@/cli/utils/governance/config";
+import {
+  type AppPlatform,
   buildCopilotAppEnv,
   findCopilotApp,
-  type AppPlatform,
   type LaunchAgentSpec,
 } from "@/cli/utils/governance/copilot-app";
 import { installCopilotAppAgent } from "@/cli/utils/governance/copilot-app-agent";
-import {
-  isLoggedIn,
-  loadConfig,
-  type GovernanceConfig,
-} from "@/cli/utils/governance/config";
+import { resolveLiveIngestionKey } from "@/cli/utils/governance/telemetry-refresh";
 
 /**
  * `langwatch copilot-app connect` — provisions capture for the standalone

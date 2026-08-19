@@ -1,9 +1,9 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the archival outcome rather than printing it: the output port renders
@@ -16,7 +16,9 @@ export const deleteEvaluatorCommand = async (
 
   const service = new EvaluatorsApiService();
 
-  const resolveSpinner = createSpinner(`Finding evaluator "${idOrSlug}"...`).start();
+  const resolveSpinner = createSpinner(
+    `Finding evaluator "${idOrSlug}"...`,
+  ).start();
 
   let evaluatorId: string;
   let evaluatorName: string;
@@ -34,13 +36,13 @@ export const deleteEvaluatorCommand = async (
     process.exit(1);
   }
 
-  const deleteSpinner = createSpinner(`Archiving evaluator "${evaluatorName}"...`).start();
+  const deleteSpinner = createSpinner(
+    `Archiving evaluator "${evaluatorName}"...`,
+  ).start();
 
   try {
     await service.delete(evaluatorId);
-    deleteSpinner.succeed(
-      `Archived evaluator "${chalk.cyan(evaluatorName)}"`,
-    );
+    deleteSpinner.succeed(`Archived evaluator "${chalk.cyan(evaluatorName)}"`);
   } catch (error) {
     failSpinner({
       spinner: deleteSpinner,

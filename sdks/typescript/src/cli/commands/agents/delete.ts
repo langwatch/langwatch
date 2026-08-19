@@ -1,15 +1,17 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the archival outcome rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
  */
-export const deleteAgentCommand = async (id: string): Promise<CommandResult | void> => {
+export const deleteAgentCommand = async (
+  id: string,
+): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new AgentsApiService();

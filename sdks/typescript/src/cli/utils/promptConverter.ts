@@ -1,9 +1,12 @@
 import type {
+  PromptResponse,
+  UpdatePromptBody,
+} from "@/client-sdk/services/prompts/types";
+import type {
   LocalPromptConfig,
   MaterializedPrompt,
   RuntimeParameters,
 } from "../types";
-import { type PromptResponse, type UpdatePromptBody } from "@/client-sdk/services/prompts/types";
 import {
   type CliOutput,
   type LocalResponseFormat,
@@ -100,10 +103,12 @@ export class PromptConverter {
    * Converts a LocalPromptConfig (loaded from YAML) to the format
    * expected by the API service for upserting.
    */
-  static fromLocalToApiFormat(
-    config: LocalPromptConfig,
-  ): Omit<UpdatePromptBody, "commitMessage"> & { parameters?: RuntimeParameters }
-  {
+  static fromLocalToApiFormat(config: LocalPromptConfig): Omit<
+    UpdatePromptBody,
+    "commitMessage"
+  > & {
+    parameters?: RuntimeParameters;
+  } {
     return {
       model: config.model,
       temperature: config.modelParameters?.temperature,

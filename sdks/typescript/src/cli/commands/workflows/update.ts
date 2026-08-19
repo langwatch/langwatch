@@ -1,14 +1,13 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError } from "../../utils/errorOutput";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import type { CommandResult } from "../../utils/output";
-
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { resolveCredentials } from "../../utils/apiKey";
+import { commandValidationError } from "../../utils/errorOutput";
+import { formatFetchError } from "../../utils/formatFetchError";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 export const updateWorkflowCommand = async (
   id: string,
   options: { name?: string; icon?: string; description?: string },
@@ -51,11 +50,15 @@ export const updateWorkflowCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "update workflow" });
+      failSpinner({
+        spinner,
+        error: new Error(message),
+        action: "update workflow",
+      });
       process.exit(1);
     }
 
-    const workflow = await response.json() as {
+    const workflow = (await response.json()) as {
       id: string;
       name: string;
       icon: string | null;
@@ -68,10 +71,18 @@ export const updateWorkflowCommand = async (
       data: workflow,
       table: () => {
         console.log();
-        console.log(`  ${chalk.gray("ID:")}          ${chalk.green(workflow.id)}`);
-        console.log(`  ${chalk.gray("Name:")}        ${chalk.cyan(workflow.name)}`);
-        console.log(`  ${chalk.gray("Icon:")}        ${workflow.icon ?? chalk.gray("—")}`);
-        console.log(`  ${chalk.gray("Description:")} ${workflow.description ?? chalk.gray("—")}`);
+        console.log(
+          `  ${chalk.gray("ID:")}          ${chalk.green(workflow.id)}`,
+        );
+        console.log(
+          `  ${chalk.gray("Name:")}        ${chalk.cyan(workflow.name)}`,
+        );
+        console.log(
+          `  ${chalk.gray("Icon:")}        ${workflow.icon ?? chalk.gray("—")}`,
+        );
+        console.log(
+          `  ${chalk.gray("Description:")} ${workflow.description ?? chalk.gray("—")}`,
+        );
         console.log();
       },
     };

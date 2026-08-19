@@ -1,10 +1,11 @@
 import * as net from "node:net";
+import { resolve } from "node:path";
 import { URL } from "node:url";
 import * as dotenv from "dotenv";
-import { resolve } from "node:path";
 
 const DEFAULT_ENDPOINT = "http://localhost:5560";
-const DEFAULT_DATABASE_URL = "postgres://prisma:prisma@localhost:5432/mydb?schema=mydb";
+const DEFAULT_DATABASE_URL =
+  "postgres://prisma:prisma@localhost:5432/mydb?schema=mydb";
 
 dotenv.config({
   path: resolve(__dirname, "../../../.env.test"),
@@ -34,16 +35,27 @@ const waitForTcp = async (host: string, port: number, timeoutMs = 30_000) => {
           socket.removeAllListeners();
           socket.destroy();
         };
-        socket.on("connect", () => { cleanup(); resolve(); });
-        socket.on("error", (err) => { cleanup(); reject(err); });
-        socket.setTimeout(5_000, () => { cleanup(); reject(new Error("timeout")); });
+        socket.on("connect", () => {
+          cleanup();
+          resolve();
+        });
+        socket.on("error", (err) => {
+          cleanup();
+          reject(err);
+        });
+        socket.setTimeout(5_000, () => {
+          cleanup();
+          reject(new Error("timeout"));
+        });
       });
       return;
     } catch {
       await sleep(1_000);
     }
   }
-  throw new Error(`Timeout waiting for TCP ${host}:${port} after ${timeoutMs}ms`);
+  throw new Error(
+    `Timeout waiting for TCP ${host}:${port} after ${timeoutMs}ms`,
+  );
 };
 
 /**
@@ -92,7 +104,9 @@ const main = async () => {
   await waitForHttp(endpoint.replace(/\/$/, ""));
 
   const dbUrl = new URL(process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL);
-  console.log(`Waiting for database at ${dbUrl.hostname}:${dbUrl.port || 5432}...`);
+  console.log(
+    `Waiting for database at ${dbUrl.hostname}:${dbUrl.port || 5432}...`,
+  );
   await waitForTcp(dbUrl.hostname, Number(dbUrl.port) || 5432);
 
   console.log("All services reachable, starting tests.");

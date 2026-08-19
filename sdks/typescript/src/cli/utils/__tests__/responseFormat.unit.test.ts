@@ -1,11 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { MaterializedPrompt } from "../../types";
+import { PromptConverter } from "../promptConverter";
 import {
+  type CliOutput,
   outputsToResponseFormat,
   responseFormatToOutputs,
-  type CliOutput,
 } from "../responseFormat";
-import { PromptConverter } from "../promptConverter";
-import type { MaterializedPrompt } from "../../types";
 
 const materialized = (
   overrides: Partial<MaterializedPrompt>,

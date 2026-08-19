@@ -53,8 +53,8 @@
   "scripts": {
     "generate": "pnpm run generate:server-types && pnpm run generate:openapi-types",
     "cli": "node dist/cli/index.js",
-    "prelint": "pnpm run generate",
-    "lint": "eslint .",
+    "lint": "node ../../dev/scripts/check-queue.mjs pnpm exec biome check .",
+    "lint:fix": "node ../../dev/scripts/check-queue.mjs pnpm exec biome check --write .",
     "pretest": "pnpm run generate",
     "test": "vitest",
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'",
@@ -73,7 +73,7 @@
     "generate:server-types": "./copy-types.sh"
   },
   "devDependencies": {
-    "@eslint/js": "^9.32.0",
+    "@biomejs/biome": "2.5.1",
     "@langchain/core": ">=0.3.68 <0.4.0",
     "@langchain/langgraph": ">=0.4.0 <1.0.0",
     "@langchain/openai": ">=0.6.0 <1.0.0",
@@ -89,7 +89,6 @@
     "@vitest/coverage-v8": "^4.1.0",
     "dotenv-cli": "^11.0.0",
     "esbuild": "^0.28.1",
-    "eslint": "^9.32.0",
     "fets": "^0.8.5",
     "fishery": "^2.3.1",
     "langchain": ">=0.3.0 <2.0.0",
@@ -99,7 +98,6 @@
     "openapi-typescript": "7.13.0",
     "tsup": "^8.5.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.38.0",
     "vitest": "^4.1.0",
     "vitest-mock-extended": "^5.1.1",
     "yaml": "^2.8.1"

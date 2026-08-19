@@ -6,14 +6,13 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-
+import type { GovernanceConfig } from "@/cli/utils/governance/config";
+import type { LaunchAgentSpec } from "@/cli/utils/governance/copilot-app";
 import {
-  connectCopilotApp,
-  CopilotAppConnectError,
   type ConnectCopilotAppDeps,
+  CopilotAppConnectError,
+  connectCopilotApp,
 } from "../copilot-app";
-import { type LaunchAgentSpec } from "@/cli/utils/governance/copilot-app";
-import { type GovernanceConfig } from "@/cli/utils/governance/config";
 
 const AGENT_PATH =
   "/Users/dev/Library/LaunchAgents/ai.langwatch.copilot-app.plist";

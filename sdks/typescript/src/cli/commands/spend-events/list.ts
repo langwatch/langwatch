@@ -1,12 +1,11 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { SpendEventsApiService } from "@/client-sdk/services/spend-events/spend-events-api.service";
 import { checkOrgApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
-
 import { parseInstantOrNull } from "../../utils/instant";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 const parsePositiveInt = (value: string, flag: string): number => {
   const parsed = Number(value);
@@ -18,7 +17,9 @@ const parsePositiveInt = (value: string, flag: string): number => {
 const parseInstant = (value: string, flag: string): number => {
   const parsed = parseInstantOrNull(value);
   if (parsed !== null) return parsed;
-  console.error(`Invalid ${flag}: pass an ISO-8601 instant or epoch milliseconds.`);
+  console.error(
+    `Invalid ${flag}: pass an ISO-8601 instant or epoch milliseconds.`,
+  );
   process.exit(1);
 };
 
@@ -61,7 +62,9 @@ export const listSpendEventsCommand = async (options: {
       model: options.model,
       status: options.status,
     });
-    spinner.succeed(`${page.data.length} event${page.data.length !== 1 ? "s" : ""}${page.next_cursor ? " (more available)" : ""}`);
+    spinner.succeed(
+      `${page.data.length} event${page.data.length !== 1 ? "s" : ""}${page.next_cursor ? " (more available)" : ""}`,
+    );
     return {
       data: page,
       table: () => {
@@ -93,7 +96,16 @@ export const listSpendEventsCommand = async (options: {
                   ? chalk.yellow("settled")
                   : chalk.red(e.data.error?.class ?? "error"),
           })),
-          headers: ["Request id", "Occurred at", "Model", "End user", "In/Out", "Cache r/w", "Cost USD", "Status"],
+          headers: [
+            "Request id",
+            "Occurred at",
+            "Model",
+            "End user",
+            "In/Out",
+            "Cache r/w",
+            "Cost USD",
+            "Status",
+          ],
           colorMap: { "Request id": chalk.gray, Model: chalk.cyan },
         });
         if (page.next_cursor) {

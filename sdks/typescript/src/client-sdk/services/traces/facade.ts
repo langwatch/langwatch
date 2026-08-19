@@ -1,6 +1,6 @@
-import { type InternalConfig } from "../../types";
+import type { InternalConfig } from "../../types";
 import { TracesService } from "./service";
-import { type GetTraceParams, type GetTraceResponse } from "./types";
+import type { GetTraceParams, GetTraceResponse } from "./types";
 
 export class TracesFacade {
   readonly #service: TracesService;
@@ -9,7 +9,10 @@ export class TracesFacade {
     this.#service = new TracesService(config);
   }
 
-  async get(traceId: string, params?: GetTraceParams): Promise<GetTraceResponse> {
+  async get(
+    traceId: string,
+    params?: GetTraceParams,
+  ): Promise<GetTraceResponse> {
     return this.#service.get(traceId, params);
   }
 }

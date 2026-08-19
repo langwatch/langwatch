@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  spanTypes,
-  type SpanType,
-  type LangWatchSpanRAGContext,
+  type JsonSerializable,
   type LangWatchSpanMetrics,
   type LangWatchSpanOptions,
-  type JsonSerializable,
+  type LangWatchSpanRAGContext,
+  type SpanType,
+  spanTypes,
 } from "../types";
 
 describe("spanTypes", () => {
@@ -68,7 +68,7 @@ describe("SpanType", () => {
       "unknown",
     ];
 
-    validTypes.forEach(type => {
+    validTypes.forEach((type) => {
       expect(spanTypes).toContain(type);
     });
   });
@@ -100,8 +100,8 @@ describe("JsonSerializable", () => {
       nullValue: null,
       array: [1, 2, 3],
       nested: {
-        key: "value"
-      }
+        key: "value",
+      },
     };
 
     expect(typeof objectValue).toBe("object");
@@ -112,13 +112,13 @@ describe("JsonSerializable", () => {
     const complexValue: JsonSerializable = {
       users: [
         { id: 1, name: "Alice", active: true },
-        { id: 2, name: "Bob", active: false }
+        { id: 2, name: "Bob", active: false },
       ],
       metadata: {
         count: 2,
         tags: ["user", "management"],
-        config: null
-      }
+        config: null,
+      },
     };
 
     expect(typeof complexValue).toBe("object");
@@ -130,7 +130,7 @@ describe("LangWatchSpanRAGContext", () => {
     const ragContext: LangWatchSpanRAGContext = {
       document_id: "doc-123",
       chunk_id: "chunk-456",
-      content: "Relevant passage from the document."
+      content: "Relevant passage from the document.",
     };
 
     expect(ragContext.document_id).toBe("doc-123");
@@ -143,7 +143,7 @@ describe("LangWatchSpanRAGContext", () => {
     const ragContext: LangWatchSpanRAGContext = {
       document_id: "",
       chunk_id: "",
-      content: ""
+      content: "",
     };
 
     expect(ragContext).toHaveProperty("document_id");
@@ -155,7 +155,7 @@ describe("LangWatchSpanRAGContext", () => {
     const ragContext: LangWatchSpanRAGContext = {
       document_id: "document-with-special-chars-123!@#",
       chunk_id: "chunk_with_underscores_456",
-      content: "Multi-line content\nwith special characters: éñüíóá"
+      content: "Multi-line content\nwith special characters: éñüíóá",
     };
 
     expect(typeof ragContext.document_id).toBe("string");
@@ -169,7 +169,7 @@ describe("LangWatchSpanMetrics", () => {
     const metrics: LangWatchSpanMetrics = {
       promptTokens: 100,
       completionTokens: 50,
-      cost: 0.002
+      cost: 0.002,
     };
 
     expect(metrics.promptTokens).toBe(100);
@@ -179,15 +179,15 @@ describe("LangWatchSpanMetrics", () => {
 
   it("accepts partial metrics", () => {
     const metrics1: LangWatchSpanMetrics = {
-      promptTokens: 100
+      promptTokens: 100,
     };
 
     const metrics2: LangWatchSpanMetrics = {
-      cost: 0.001
+      cost: 0.001,
     };
 
     const metrics3: LangWatchSpanMetrics = {
-      completionTokens: 25
+      completionTokens: 25,
     };
 
     expect(metrics1.promptTokens).toBe(100);
@@ -215,7 +215,7 @@ describe("LangWatchSpanMetrics", () => {
     const metrics: LangWatchSpanMetrics = {
       promptTokens: 0,
       completionTokens: 0,
-      cost: 0
+      cost: 0,
     };
 
     expect(metrics.promptTokens).toBe(0);
@@ -227,7 +227,7 @@ describe("LangWatchSpanMetrics", () => {
     const metrics: LangWatchSpanMetrics = {
       promptTokens: 123.45, // Even though typically integers, type allows numbers
       completionTokens: 67.89,
-      cost: 0.00123456
+      cost: 0.00123456,
     };
 
     expect(metrics.promptTokens).toBe(123.45);
@@ -244,8 +244,8 @@ describe("LangWatchSpanOptions", () => {
       startTime: [1234567890, 123456789], // HrTime format
       attributes: {
         "langwatch.span.type": "llm",
-        "gen_ai.request.model": "gpt-4"
-      }
+        "gen_ai.request.model": "gpt-4",
+      },
     };
 
     expect(options.kind).toBe(1);
@@ -258,8 +258,8 @@ describe("LangWatchSpanOptions", () => {
       attributes: {
         "custom.attribute": "value",
         "langwatch.span.type": "chain",
-        "gen_ai.request.model": "claude-3"
-      }
+        "gen_ai.request.model": "claude-3",
+      },
     };
 
     expect(options.attributes).toHaveProperty("custom.attribute");
@@ -275,7 +275,7 @@ describe("LangWatchSpanOptions", () => {
 
   it("accepts undefined attributes", () => {
     const options: LangWatchSpanOptions = {
-      attributes: undefined
+      attributes: undefined,
     };
 
     expect(options.attributes).toBeUndefined();

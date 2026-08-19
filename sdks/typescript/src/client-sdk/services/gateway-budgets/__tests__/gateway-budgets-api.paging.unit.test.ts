@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  type GatewayBudget,
   GatewayBudgetsApiError,
   GatewayBudgetsApiService,
-  type GatewayBudget,
 } from "../gateway-budgets-api.service";
 
 /**
@@ -20,7 +20,10 @@ const jsonResponse = (body: unknown, status = 200): Response =>
     headers: { "content-type": "application/json" },
   });
 
-const budget = (id: string, overrides: Partial<GatewayBudget> = {}): GatewayBudget => ({
+const budget = (
+  id: string,
+  overrides: Partial<GatewayBudget> = {},
+): GatewayBudget => ({
   id,
   organization_id: "org_1",
   scope_type: "project",
@@ -68,7 +71,7 @@ const queryOf = (call: number): string => {
 };
 
 /** Reads an iterator to exhaustion and hands back every row it yielded. */
-const drain = async <T,>(rows: AsyncIterable<T>): Promise<T[]> => {
+const drain = async <T>(rows: AsyncIterable<T>): Promise<T[]> => {
   const collected: T[] = [];
   for await (const row of rows) collected.push(row);
   return collected;
@@ -91,7 +94,8 @@ describe("GatewayBudgetsApiService cursor paging", () => {
     else process.env.LANGWATCH_API_KEY = previousApiKey;
     if (previousEndpoint === undefined) delete process.env.LANGWATCH_ENDPOINT;
     else process.env.LANGWATCH_ENDPOINT = previousEndpoint;
-    if (previousProjectId === undefined) delete process.env.LANGWATCH_PROJECT_ID;
+    if (previousProjectId === undefined)
+      delete process.env.LANGWATCH_PROJECT_ID;
     else process.env.LANGWATCH_PROJECT_ID = previousProjectId;
   });
 
@@ -167,9 +171,9 @@ describe("GatewayBudgetsApiService cursor paging", () => {
         Promise.resolve(jsonResponse(page(["a"], "stuck"))),
       );
 
-      await expect(new GatewayBudgetsApiService().list()).rejects.toBeInstanceOf(
-        GatewayBudgetsApiError,
-      );
+      await expect(
+        new GatewayBudgetsApiService().list(),
+      ).rejects.toBeInstanceOf(GatewayBudgetsApiError);
     });
 
     it("resumes from a caller's cursor and still walks to the end", async () => {
@@ -254,9 +258,13 @@ describe("GatewayBudgetsApiService cursor paging", () => {
 
   describe("listPage()", () => {
     it("takes exactly one page and hands back the cursor for the next", async () => {
-      mockFetch.mockResolvedValueOnce(jsonResponse(page(["a", "b"], "cursor-1")));
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse(page(["a", "b"], "cursor-1")),
+      );
 
-      const result = await new GatewayBudgetsApiService().listPage({ limit: 2 });
+      const result = await new GatewayBudgetsApiService().listPage({
+        limit: 2,
+      });
 
       expect(result.data.map((b) => b.id)).toEqual(["a", "b"]);
       expect(result.next_cursor).toBe("cursor-1");
@@ -314,7 +322,9 @@ describe("GatewayBudgetsApiService cursor paging", () => {
 
       await new GatewayBudgetsApiService().listPage({ externalId: "acct-42" });
 
-      expect(new URLSearchParams(queryOf(0)).get("external_id")).toBe("acct-42");
+      expect(new URLSearchParams(queryOf(0)).get("external_id")).toBe(
+        "acct-42",
+      );
     });
 
     it("keeps the filter on EVERY page of an eager walk", async () => {
@@ -337,7 +347,9 @@ describe("GatewayBudgetsApiService cursor paging", () => {
         .mockResolvedValueOnce(jsonResponse(page(["a"], "cursor-1")))
         .mockResolvedValueOnce(jsonResponse(page(["b"], null)));
 
-      await drain(new GatewayBudgetsApiService().iterate({ externalId: "acct-42" }));
+      await drain(
+        new GatewayBudgetsApiService().iterate({ externalId: "acct-42" }),
+      );
 
       for (const call of [0, 1]) {
         expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe(

@@ -1,5 +1,10 @@
 // @vitest-environment node
 
+import { spawn } from "node:child_process";
+import * as fs from "node:fs";
+import * as http from "node:http";
+import * as os from "node:os";
+import * as path from "node:path";
 /**
  * CLI wrapper e2e suite.
  *
@@ -27,12 +32,15 @@
  *
  * Spec: specs/ai-governance/cli-wrappers/wrap-login-routing.feature
  */
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
-import * as http from "node:http";
-import { spawn } from "node:child_process";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 
 // ─────────────────────────────────────────────────────────────────
 // Harness state
@@ -70,7 +78,10 @@ const TEST_ACCESS_TOKEN = "lw_at_test_phase11";
 // ─────────────────────────────────────────────────────────────────
 // Fake servers
 // ─────────────────────────────────────────────────────────────────
-async function startFakeGateway(): Promise<{ server: http.Server; url: string }> {
+async function startFakeGateway(): Promise<{
+  server: http.Server;
+  url: string;
+}> {
   const server = http.createServer((req, res) => {
     let body = "";
     req.on("data", (chunk) => (body += chunk));
@@ -210,9 +221,9 @@ function writeToolStub(name: string, mode: string): void {
   let body = "#!/bin/bash\nset -e\n";
   if (mode === "echo-env") {
     body +=
-      'for var in ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY OPENAI_BASE_URL OPENAI_API_KEY GOOGLE_GEMINI_BASE_URL GOOGLE_API_KEY GEMINI_API_KEY; do\n' +
+      "for var in ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY OPENAI_BASE_URL OPENAI_API_KEY GOOGLE_GEMINI_BASE_URL GOOGLE_API_KEY GEMINI_API_KEY; do\n" +
       '  printf "%s=%s\\n" "$var" "${!var:-}"\n' +
-      'done\n';
+      "done\n";
   } else if (mode === "post-anthropic") {
     body +=
       'curl -s -X POST -H "Authorization: Bearer ${ANTHROPIC_AUTH_TOKEN}" ' +
@@ -238,11 +249,11 @@ function writeToolStub(name: string, mode: string): void {
     // One arg per line so we can split on newlines and assert exact
     // count + ordering. Exits 0.
     body +=
-      'idx=0\n' +
+      "idx=0\n" +
       'for arg in "$@"; do\n' +
       '  printf "ARG[%d]=%s\\n" "$idx" "$arg"\n' +
-      '  idx=$((idx + 1))\n' +
-      'done\n' +
+      "  idx=$((idx + 1))\n" +
+      "done\n" +
       'printf "ARGC=%d\\n" "$#"\n';
   } else {
     throw new Error(`unknown stub mode: ${mode}`);
@@ -585,30 +596,31 @@ describe("governance CLI wrappers — e2e", () => {
         },
         mustNotInject: ["ANTHROPIC_BASE_URL", "OPENAI_BASE_URL"],
       },
-    ])(
-      "when running `langwatch $tool`",
-      ({ tool, expected, mustNotInject }) => {
-        it(`spawns ${tool} with the documented provider env vars and no unrelated ones`, async () => {
-          writeLoggedInConfig();
-          writeToolStub(tool, "echo-env");
-          const res = await runCli([tool]);
-          expect(res.status).toBe(0);
-          const env = envFromStub(res.stdout ?? "");
-          for (const [k, want] of Object.entries(expected)) {
-            if (want === "url") {
-              expect(env[k]).toBe(gwUrl);
-            } else if (want === "url+v1") {
-              expect(env[k]).toBe(`${gwUrl}/v1`);
-            } else {
-              expect(env[k]).toBe(want);
-            }
+    ])("when running `langwatch $tool`", ({
+      tool,
+      expected,
+      mustNotInject,
+    }) => {
+      it(`spawns ${tool} with the documented provider env vars and no unrelated ones`, async () => {
+        writeLoggedInConfig();
+        writeToolStub(tool, "echo-env");
+        const res = await runCli([tool]);
+        expect(res.status).toBe(0);
+        const env = envFromStub(res.stdout ?? "");
+        for (const [k, want] of Object.entries(expected)) {
+          if (want === "url") {
+            expect(env[k]).toBe(gwUrl);
+          } else if (want === "url+v1") {
+            expect(env[k]).toBe(`${gwUrl}/v1`);
+          } else {
+            expect(env[k]).toBe(want);
           }
-          for (const k of mustNotInject) {
-            expect(env[k] ?? "").toBe("");
-          }
-        });
-      },
-    );
+        }
+        for (const k of mustNotInject) {
+          expect(env[k] ?? "").toBe("");
+        }
+      });
+    });
   });
 
   describe("routing — wrapped tool's HTTP traffic lands at the gateway with the VK", async () => {
@@ -794,29 +806,31 @@ describe("governance CLI wrappers — e2e", () => {
       });
     });
 
-    describe.each(["codex", "cursor", "gemini", "opencode"])(
-      "when the user runs `langwatch %s` with extra args",
-      (tool) => {
-        it("forwards every user arg to the wrapped tool's child process (codex also gets the gateway `--profile` flag prepended)", async () => {
-          writeLoggedInConfig();
-          writeToolStub(tool, "echo-argv");
-          const res = await runCli([tool, "--foo", "bar baz"]);
-          expect(res.status).toBe(0);
-          const parsed = parseArgv(res.stdout ?? "");
-          // codex Path A gateway routing requires a `--profile
-          // langwatch-gateway` prepend so codex 0.134+ honors the
-          // [model_providers.langwatch] block we wrote to
-          // ~/.codex/config.toml. Other tools forward args verbatim.
-          if (tool === "codex") {
-            expect(parsed.argv.slice(-2)).toEqual(["--foo", "bar baz"]);
-            expect(parsed.argv).toContain("--profile");
-            expect(parsed.argv).toContain("langwatch-gateway");
-          } else {
-            expect(parsed.argv).toEqual(["--foo", "bar baz"]);
-          }
-        });
-      },
-    );
+    describe.each([
+      "codex",
+      "cursor",
+      "gemini",
+      "opencode",
+    ])("when the user runs `langwatch %s` with extra args", (tool) => {
+      it("forwards every user arg to the wrapped tool's child process (codex also gets the gateway `--profile` flag prepended)", async () => {
+        writeLoggedInConfig();
+        writeToolStub(tool, "echo-argv");
+        const res = await runCli([tool, "--foo", "bar baz"]);
+        expect(res.status).toBe(0);
+        const parsed = parseArgv(res.stdout ?? "");
+        // codex Path A gateway routing requires a `--profile
+        // langwatch-gateway` prepend so codex 0.134+ honors the
+        // [model_providers.langwatch] block we wrote to
+        // ~/.codex/config.toml. Other tools forward args verbatim.
+        if (tool === "codex") {
+          expect(parsed.argv.slice(-2)).toEqual(["--foo", "bar baz"]);
+          expect(parsed.argv).toContain("--profile");
+          expect(parsed.argv).toContain("langwatch-gateway");
+        } else {
+          expect(parsed.argv).toEqual(["--foo", "bar baz"]);
+        }
+      });
+    });
   });
 
   describe("exit-code propagation", () => {

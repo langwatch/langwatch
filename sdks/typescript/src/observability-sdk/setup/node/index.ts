@@ -3,5 +3,5 @@
  * Provides setupObservability function and related type definitions.
  */
 
-export { setupObservability, ensureSetup } from "./setup";
-export type { SetupObservabilityOptions, ObservabilityHandle } from "./types";
+export { ensureSetup, setupObservability } from "./setup";
+export type { ObservabilityHandle, SetupObservabilityOptions } from "./types";

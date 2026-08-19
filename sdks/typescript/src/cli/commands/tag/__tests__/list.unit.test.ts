@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/client-sdk/services/prompts", () => ({
   PromptsApiService: vi.fn(),
@@ -6,7 +6,11 @@ vi.mock("@/client-sdk/services/prompts", () => ({
 }));
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("../../../utils/formatting", () => ({
@@ -14,9 +18,9 @@ vi.mock("../../../utils/formatting", () => ({
   formatRelativeTime: vi.fn().mockReturnValue("3d ago"),
 }));
 
-import { tagListCommand } from "../list";
 import { PromptsApiService } from "@/client-sdk/services/prompts";
 import { formatTable } from "../../../utils/formatting";
+import { tagListCommand } from "../list";
 
 describe("tagListCommand", () => {
   let mockListTags: ReturnType<typeof vi.fn>;
@@ -24,8 +28,11 @@ describe("tagListCommand", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockListTags = vi.fn();
-    vi.mocked(PromptsApiService).mockImplementation(
-      function () { return ({ listTags: mockListTags }) as unknown as InstanceType<typeof PromptsApiService>; });
+    vi.mocked(PromptsApiService).mockImplementation(function () {
+      return { listTags: mockListTags } as unknown as InstanceType<
+        typeof PromptsApiService
+      >;
+    });
   });
 
   describe("when tags exist", () => {
@@ -57,7 +64,9 @@ describe("tagListCommand", () => {
   describe("when no tags exist", () => {
     it("prints the empty state message", async () => {
       mockListTags.mockResolvedValue([]);
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      const consoleSpy = vi
+        .spyOn(console, "log")
+        .mockImplementation(() => undefined);
 
       const result = await tagListCommand();
       result?.table();

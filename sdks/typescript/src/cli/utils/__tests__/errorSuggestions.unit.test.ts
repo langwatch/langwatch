@@ -4,8 +4,9 @@
  *
  * @see specs/typescript-sdk/cli-management-apis.feature
  */
-import { describe, expect, it } from "vitest";
+
 import type { CliHandledError } from "@langwatch/langy/cards/handled-error";
+import { describe, expect, it } from "vitest";
 import {
   fallbackSuggestionsFor,
   withFallbackSuggestions,
@@ -35,7 +36,9 @@ describe("fallbackSuggestionsFor", () => {
       "network_error",
       "internal_error",
     ]) {
-      expect(fallbackSuggestionsFor(code)?.suggestions.length).toBeGreaterThan(0);
+      expect(fallbackSuggestionsFor(code)?.suggestions.length).toBeGreaterThan(
+        0,
+      );
     }
   });
 
@@ -51,7 +54,9 @@ describe("fallbackSuggestionsFor", () => {
 
 describe("withFallbackSuggestions", () => {
   it("fills suggestions and docUrl when the platform sent neither", () => {
-    const enriched = withFallbackSuggestions(domain({ code: "missing_api_key", kind: "missing_api_key" }));
+    const enriched = withFallbackSuggestions(
+      domain({ code: "missing_api_key", kind: "missing_api_key" }),
+    );
 
     expect(enriched.suggestions).toEqual(
       fallbackSuggestionsFor("missing_api_key")?.suggestions,
@@ -102,7 +107,10 @@ describe("withFallbackSuggestions", () => {
   });
 
   it("returns the error untouched when the table has nothing for the code", () => {
-    const original = domain({ code: "some_unlisted_code", kind: "some_unlisted_code" });
+    const original = domain({
+      code: "some_unlisted_code",
+      kind: "some_unlisted_code",
+    });
 
     expect(withFallbackSuggestions(original)).toBe(original);
   });

@@ -1,4 +1,4 @@
-import { type DataCaptureMode } from "./types";
+import type { DataCaptureMode } from "./types";
 
 /**
  * Validates a data capture mode.

@@ -1,14 +1,14 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import {
   CURSOR_WALK_PAGE_SIZE,
   walkCursorPages,
 } from "@/client-sdk/services/_shared/collect-cursor-pages";
-import {
-  mutationInit,
-  type MutationOptions,
-} from "@/client-sdk/services/_shared/mutation-options";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
+import {
+  type MutationOptions,
+  mutationInit,
+} from "@/client-sdk/services/_shared/mutation-options";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 
 export interface SpendEvent {
@@ -323,7 +323,8 @@ export class SpendEventsApiService {
 
   constructor(config?: { endpoint?: string; apiKey?: string }) {
     this.endpoint = resolveEndpoint(config?.endpoint);
-    this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
+    this.apiKey =
+      config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   }
 
   private async request<T>(
@@ -538,7 +539,8 @@ export class SpendEventsApiService {
     if (options?.window) params.set("window", options.window);
     if (options?.from !== undefined) params.set("from", String(options.from));
     if (options?.to !== undefined) params.set("to", String(options.to));
-    if (options?.virtualKeyId) params.set("virtual_key_id", options.virtualKeyId);
+    if (options?.virtualKeyId)
+      params.set("virtual_key_id", options.virtualKeyId);
     const qs = params.toString() !== "" ? `?${params.toString()}` : "";
     const res = await this.request<{ data: EndUserSpend }>(
       "read end-user spend",

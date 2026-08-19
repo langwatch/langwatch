@@ -1,9 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  normalizeDocsUrl,
-  docsCommand,
-  scenarioDocsCommand,
-} from "../docs";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { docsCommand, normalizeDocsUrl, scenarioDocsCommand } from "../docs";
 
 describe("normalizeDocsUrl()", () => {
   describe("for langwatch docs", () => {
@@ -38,12 +34,12 @@ describe("normalizeDocsUrl()", () => {
 
     /** @scenario docs is forgiving about a redundant docs/ prefix */
     it("does not duplicate the docs/ prefix when included", () => {
-      expect(normalizeDocsUrl("docs/integration/python/guide", "langwatch")).toBe(
-        "https://langwatch.ai/docs/integration/python/guide.md",
-      );
-      expect(normalizeDocsUrl("/docs/integration/python/guide", "langwatch")).toBe(
-        "https://langwatch.ai/docs/integration/python/guide.md",
-      );
+      expect(
+        normalizeDocsUrl("docs/integration/python/guide", "langwatch"),
+      ).toBe("https://langwatch.ai/docs/integration/python/guide.md");
+      expect(
+        normalizeDocsUrl("/docs/integration/python/guide", "langwatch"),
+      ).toBe("https://langwatch.ai/docs/integration/python/guide.md");
     });
 
     /** @scenario docs accepts a full URL ending in .md unchanged */
@@ -84,15 +80,15 @@ describe("normalizeDocsUrl()", () => {
     });
 
     it("inserts .md before query string instead of appending after it", () => {
-      expect(normalizeDocsUrl("integration/python/guide?lang=en", "langwatch")).toBe(
-        "https://langwatch.ai/docs/integration/python/guide.md?lang=en",
-      );
+      expect(
+        normalizeDocsUrl("integration/python/guide?lang=en", "langwatch"),
+      ).toBe("https://langwatch.ai/docs/integration/python/guide.md?lang=en");
     });
 
     it("inserts .md before url fragment instead of appending after it", () => {
-      expect(normalizeDocsUrl("integration/python/guide#install", "langwatch")).toBe(
-        "https://langwatch.ai/docs/integration/python/guide.md#install",
-      );
+      expect(
+        normalizeDocsUrl("integration/python/guide#install", "langwatch"),
+      ).toBe("https://langwatch.ai/docs/integration/python/guide.md#install");
     });
   });
 

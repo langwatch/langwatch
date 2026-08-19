@@ -1,10 +1,10 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import { deriveRunStatus } from "@/client-sdk/services/experiments/run-status";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { resolveRunId } from "./resolve-run";
 
 const statusColor = (status: string) =>
@@ -67,7 +67,9 @@ export const experimentStatusCommand = async (
   await resolveCredentials();
 
   const service = new ExperimentsApiService();
-  const spinner = createSpinner(`Checking status for "${experimentSlug}"...`).start();
+  const spinner = createSpinner(
+    `Checking status for "${experimentSlug}"...`,
+  ).start();
 
   try {
     const runId = await resolveRunId({
@@ -120,32 +122,48 @@ export const experimentStatusCommand = async (
       table: () => {
         console.log();
         console.log(`  ${chalk.gray("Status:")}   ${color(status.status)}`);
-        console.log(`  ${chalk.gray("Progress:")} ${status.progress}/${status.total} cells`);
+        console.log(
+          `  ${chalk.gray("Progress:")} ${status.progress}/${status.total} cells`,
+        );
 
         if (status.startedAt) {
-          console.log(`  ${chalk.gray("Started:")}  ${new Date(status.startedAt).toLocaleString()}`);
+          console.log(
+            `  ${chalk.gray("Started:")}  ${new Date(status.startedAt).toLocaleString()}`,
+          );
         }
         if (status.finishedAt) {
-          console.log(`  ${chalk.gray("Finished:")} ${new Date(status.finishedAt).toLocaleString()}`);
+          console.log(
+            `  ${chalk.gray("Finished:")} ${new Date(status.finishedAt).toLocaleString()}`,
+          );
         }
         if (status.stoppedAt) {
-          console.log(`  ${chalk.gray("Stopped:")}  ${new Date(status.stoppedAt).toLocaleString()}`);
+          console.log(
+            `  ${chalk.gray("Stopped:")}  ${new Date(status.stoppedAt).toLocaleString()}`,
+          );
         }
 
         if (status.summary) {
           console.log();
           console.log(chalk.bold("  Summary:"));
           if (status.summary.completedCells !== undefined) {
-            console.log(`    ${chalk.gray("Completed:")} ${chalk.green(String(status.summary.completedCells))}`);
+            console.log(
+              `    ${chalk.gray("Completed:")} ${chalk.green(String(status.summary.completedCells))}`,
+            );
           }
           if (status.summary.failedCells) {
-            console.log(`    ${chalk.gray("Failed:")}    ${chalk.red(String(status.summary.failedCells))}`);
+            console.log(
+              `    ${chalk.gray("Failed:")}    ${chalk.red(String(status.summary.failedCells))}`,
+            );
           }
           if (status.summary.duration) {
-            console.log(`    ${chalk.gray("Duration:")}  ${(status.summary.duration / 1000).toFixed(1)}s`);
+            console.log(
+              `    ${chalk.gray("Duration:")}  ${(status.summary.duration / 1000).toFixed(1)}s`,
+            );
           }
           if (status.summary.runUrl) {
-            console.log(`    ${chalk.gray("View:")}      ${status.summary.runUrl}`);
+            console.log(
+              `    ${chalk.gray("View:")}      ${status.summary.runUrl}`,
+            );
           }
         }
 

@@ -21,21 +21,25 @@
  * ```
  */
 
-import { trace, SpanStatusCode, context as otelContext } from "@opentelemetry/api";
+import {
+  context as otelContext,
+  SpanStatusCode,
+  trace,
+} from "@opentelemetry/api";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import type { Logger } from "@/logger";
 import { createLangWatchSpan } from "@/observability-sdk/span/implementation";
+import {
+  EvaluationsApiError,
+  EvaluatorCallError,
+  EvaluatorNotFoundError,
+} from "./errors";
 import type {
-  EvaluationResult,
   EvaluateOptions,
   EvaluateRequest,
   EvaluateResponse,
+  EvaluationResult,
 } from "./types";
-import {
-  EvaluatorCallError,
-  EvaluatorNotFoundError,
-  EvaluationsApiError,
-} from "./errors";
-import type { Logger } from "@/logger";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 type EvaluationsFacadeConfig = {
   endpoint: string;
@@ -94,7 +98,7 @@ export class EvaluationsFacade {
    */
   evaluate = async (
     slug: string,
-    options: EvaluateOptions
+    options: EvaluateOptions,
   ): Promise<EvaluationResult> => {
     const { data, name, settings, asGuardrail } = options;
     const spanName = name ?? slug;
@@ -105,9 +109,7 @@ export class EvaluationsFacade {
 
     // Get current trace/span IDs from active context
     const activeSpan = trace.getActiveSpan();
-    const traceId = activeSpan
-      ? activeSpan.spanContext().traceId
-      : undefined;
+    const traceId = activeSpan ? activeSpan.spanContext().traceId : undefined;
     const parentSpanId = activeSpan
       ? activeSpan.spanContext().spanId
       : undefined;
@@ -120,7 +122,7 @@ export class EvaluationsFacade {
           "langwatch.span.type": spanType,
         },
       },
-      otelContext.active()
+      otelContext.active(),
     );
 
     const langwatchSpan = createLangWatchSpan(otelSpan);
@@ -166,7 +168,7 @@ export class EvaluationsFacade {
 
         throw new EvaluationsApiError(
           `Evaluation API returned ${response.status}: ${errorText}`,
-          response.status
+          response.status,
         );
       }
 
@@ -175,11 +177,18 @@ export class EvaluationsFacade {
       // Map response to result
       const result: EvaluationResult = {
         status: responseData.status,
-        ...(responseData.passed !== null && responseData.passed !== undefined && { passed: responseData.passed }),
-        ...(responseData.score !== null && responseData.score !== undefined && { score: responseData.score }),
-        ...(responseData.details !== null && responseData.details !== undefined && { details: responseData.details }),
-        ...(responseData.label !== null && responseData.label !== undefined && { label: responseData.label }),
-        ...(responseData.cost !== null && responseData.cost !== undefined && { cost: responseData.cost }),
+        ...(responseData.passed !== null &&
+          responseData.passed !== undefined && { passed: responseData.passed }),
+        ...(responseData.score !== null &&
+          responseData.score !== undefined && { score: responseData.score }),
+        ...(responseData.details !== null &&
+          responseData.details !== undefined && {
+            details: responseData.details,
+          }),
+        ...(responseData.label !== null &&
+          responseData.label !== undefined && { label: responseData.label }),
+        ...(responseData.cost !== null &&
+          responseData.cost !== undefined && { cost: responseData.cost }),
       };
 
       // Update span with output
@@ -238,7 +247,7 @@ export class EvaluationsFacade {
       // Wrap unknown errors
       throw new EvaluatorCallError(
         slug,
-        error instanceof Error ? error.message : String(error)
+        error instanceof Error ? error.message : String(error),
       );
     } finally {
       // Always end the span

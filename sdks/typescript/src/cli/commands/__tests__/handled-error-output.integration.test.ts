@@ -11,8 +11,9 @@
  * so it guesses — and the whole typed-error chain degrades to "Something went
  * wrong". The assertions below are that contract.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as TracesApiModule from "@/client-sdk/services/traces/traces-api.service";
 
 vi.mock(
@@ -23,7 +24,13 @@ vi.mock(
   },
 );
 
-vi.mock("../../utils/apiKey", () => ({ resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })) }));
+vi.mock("../../utils/apiKey", () => ({
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
+}));
 
 const spinnerFail = vi.fn();
 vi.mock("ora", () => ({
@@ -38,8 +45,8 @@ vi.mock("ora", () => ({
 
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
 import { LangWatchHandledError } from "@/internal/api/errors";
-import { searchTracesCommand } from "../traces/search";
 import { setOutputFormat } from "../../utils/errorOutput";
+import { searchTracesCommand } from "../traces/search";
 
 class ProcessExitError extends Error {
   constructor(public readonly code: number) {

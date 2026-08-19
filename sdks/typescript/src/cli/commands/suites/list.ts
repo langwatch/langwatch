@@ -1,10 +1,10 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { SuitesApiService } from "@/client-sdk/services/suites";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the listing rather than printing it: the output port renders it in
@@ -28,7 +28,9 @@ export const listSuitesCommand = async (): Promise<CommandResult | void> => {
       table: () => {
         if (suites.length === 0) {
           console.log();
-          console.log(chalk.gray("No suites (run plans) found in this project."));
+          console.log(
+            chalk.gray("No suites (run plans) found in this project."),
+          );
           console.log(chalk.gray("Create your first suite with:"));
           console.log(
             chalk.cyan(

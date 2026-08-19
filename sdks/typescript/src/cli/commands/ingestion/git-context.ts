@@ -22,7 +22,10 @@ import {
 const GIT_TIMEOUT_MS = 2_000;
 
 /** Runs one git command in a directory. Trimmed stdout, or null on any failure. */
-export type GitRunner = (args: { args: string[]; cwd: string }) => string | null;
+export type GitRunner = (args: {
+  args: string[];
+  cwd: string;
+}) => string | null;
 
 /** The git identity of `directory`, or null when it is not a repository we can name. */
 export function readSessionContext({

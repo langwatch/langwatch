@@ -1,14 +1,14 @@
 import chalk from "chalk";
 import fs from "fs";
-import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
 import {
   commandValidationError,
   reportCommandError,
 } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
-import { createDatasetService } from "./service-factory";
+import { createSpinner } from "../../utils/spinner";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /**
  * Reads all data from stdin as a string.
@@ -17,7 +17,9 @@ const readStdin = (): Promise<string> => {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     process.stdin.on("data", (chunk: Buffer) => chunks.push(chunk));
-    process.stdin.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
+    process.stdin.on("end", () =>
+      resolve(Buffer.concat(chunks).toString("utf-8")),
+    );
     process.stdin.on("error", reject);
   });
 };
@@ -30,7 +32,9 @@ const readStdin = (): Promise<string> => {
  * @returns Parsed array of record objects
  * @throws Error if the JSON is invalid or not an array
  */
-export const parseRecordsJson = (jsonStr: string): Record<string, unknown>[] => {
+export const parseRecordsJson = (
+  jsonStr: string,
+): Record<string, unknown>[] => {
   let parsed: unknown;
   try {
     parsed = JSON.parse(jsonStr);
@@ -99,7 +103,9 @@ export const recordsAddCommand = async (
   }
 
   const service = createDatasetService();
-  const spinner = createSpinner(`Adding ${entries.length} record${entries.length !== 1 ? "s" : ""} to "${slugOrId}"...`).start();
+  const spinner = createSpinner(
+    `Adding ${entries.length} record${entries.length !== 1 ? "s" : ""} to "${slugOrId}"...`,
+  ).start();
 
   try {
     const result = await service.createRecords(slugOrId, entries);

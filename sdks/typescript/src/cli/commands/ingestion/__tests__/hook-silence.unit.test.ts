@@ -59,7 +59,9 @@ describe("the session context hook's silence", () => {
     });
 
     it("posts nothing when the origin remote names no repository", async () => {
-      await hook.runHook({ git: { "remote get-url origin": "/srv/git/bare.git" } });
+      await hook.runHook({
+        git: { "remote get-url origin": "/srv/git/bare.git" },
+      });
 
       expect(posted).toEqual([]);
     });

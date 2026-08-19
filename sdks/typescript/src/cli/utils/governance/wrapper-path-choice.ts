@@ -42,11 +42,11 @@ import prompts from "prompts";
 import { lwTag } from "./brand";
 import type { GovernanceConfig } from "./config";
 import { saveConfig } from "./config";
-import { copilotSeatBypassSuffix, type WrapperMode } from "./wrapper-mode";
 import {
-  resolvePlatformToolPolicy,
   type PlatformToolPolicyMap,
+  resolvePlatformToolPolicy,
 } from "./platform-tool-policy";
+import { copilotSeatBypassSuffix, type WrapperMode } from "./wrapper-mode";
 
 /** Wrapper-only flag name. */
 const TOOL_MODE_FLAG = "--tool-mode";
@@ -108,7 +108,8 @@ export function parseToolModeFlag(
     out.push(arg);
   }
 
-  const override = flagOverride ?? tokenToMode(env.LANGWATCH_TOOL_MODE) ?? undefined;
+  const override =
+    flagOverride ?? tokenToMode(env.LANGWATCH_TOOL_MODE) ?? undefined;
   return { args: out, override };
 }
 
@@ -258,6 +259,7 @@ export function otlpChoiceTitle(tool: string): string {
   // Own-property check (not `in`) so inherited names like "toString" take
   // the fallback path. hasOwnProperty.call keeps the SDK's pre-ES2022 lib
   // target happy where Object.hasOwn does not typecheck.
+  // biome-ignore lint/suspicious/noPrototypeBuiltins: Object.hasOwn needs es2022 lib; this tsconfig targets es2017, so the prototype call is the compiling form.
   if (Object.prototype.hasOwnProperty.call(OTLP_TITLE_BY_TOOL, tool)) {
     return OTLP_TITLE_BY_TOOL[tool as keyof typeof OTLP_TITLE_BY_TOOL];
   }
@@ -287,7 +289,8 @@ export async function resolveWrapperPath(
     env = process.env,
   } = opts;
   const isTTY =
-    opts.isTTY ?? (Boolean(process.stdin.isTTY) && Boolean(process.stdout.isTTY));
+    opts.isTTY ??
+    (Boolean(process.stdin.isTTY) && Boolean(process.stdout.isTTY));
 
   // 1. Explicit override (flag or env) wins outright - no prompt, no persist.
   if (override) {
@@ -440,8 +443,7 @@ export async function resolveWrapperPath(
   // the user's seat — it must name the shift like every other gateway
   // route (ADR-039 D3), not leave the user to learn it from the pinned
   // branch on run 2.
-  const seatSuffix =
-    chosen === "gateway" ? copilotSeatBypassSuffix(tool) : "";
+  const seatSuffix = chosen === "gateway" ? copilotSeatBypassSuffix(tool) : "";
   writeImpl(
     `${lwTag()} saved. \`${tool}\` will use ${label}. ` +
       `Override with --tool-mode=${chosen === "gateway" ? "otlp" : "gateway"}, ` +

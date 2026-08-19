@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { PromptsApiService } from "../prompts-api.service";
-import { PromptsApiError } from "../errors";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mock } from "vitest-mock-extended";
 import type { InternalConfig } from "@/client-sdk/types";
-import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
 import type { LangwatchApiClient } from "@/internal/api/client";
+import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
+import { PromptsApiError } from "../errors";
+import { PromptsApiService } from "../prompts-api.service";
 
 describe("PromptsApiService.renameTag", () => {
   let service: PromptsApiService;
@@ -37,7 +37,9 @@ describe("PromptsApiService.renameTag", () => {
   describe("when the API returns an error", () => {
     it("throws PromptsApiError", async () => {
       mockPut.mockResolvedValue({ data: undefined, error: "tag not found" });
-      await expect(service.renameTag({ tag: "old-name", name: "new-name" })).rejects.toThrow(PromptsApiError);
+      await expect(
+        service.renameTag({ tag: "old-name", name: "new-name" }),
+      ).rejects.toThrow(PromptsApiError);
     });
   });
 });
@@ -162,7 +164,7 @@ describe("PromptsApiService.sync", () => {
 
 describe("PromptsApiService.handleApiError", () => {
   let service: PromptsApiService;
-  let handleApiError: typeof PromptsApiService.prototype["handleApiError"];
+  let handleApiError: (typeof PromptsApiService.prototype)["handleApiError"];
 
   beforeEach(() => {
     service = new PromptsApiService({
@@ -174,15 +176,17 @@ describe("PromptsApiService.handleApiError", () => {
   });
 
   it("extracts string error", () => {
-    expect(() =>
-      handleApiError("test operation", "simple error")
-    ).toThrow(PromptsApiError);
+    expect(() => handleApiError("test operation", "simple error")).toThrow(
+      PromptsApiError,
+    );
 
     try {
       handleApiError("test operation", "simple error");
     } catch (error) {
       expect(error).toBeInstanceOf(PromptsApiError);
-      expect((error as PromptsApiError).message).toBe("Failed to test operation: simple error");
+      expect((error as PromptsApiError).message).toBe(
+        "Failed to test operation: simple error",
+      );
       expect((error as PromptsApiError).operation).toBe("test operation");
     }
   });
@@ -194,7 +198,9 @@ describe("PromptsApiService.handleApiError", () => {
       handleApiError("test operation", error);
     } catch (e) {
       expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).toBe("Failed to test operation: nested error string");
+      expect((e as PromptsApiError).message).toBe(
+        "Failed to test operation: nested error string",
+      );
     }
   });
 
@@ -205,7 +211,9 @@ describe("PromptsApiService.handleApiError", () => {
       handleApiError("test operation", error);
     } catch (e) {
       expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).toBe("Failed to test operation: nested error message");
+      expect((e as PromptsApiError).message).toBe(
+        "Failed to test operation: nested error message",
+      );
     }
   });
 
@@ -228,7 +236,9 @@ describe("PromptsApiService.handleApiError", () => {
       handleApiError("test operation", error);
     } catch (e) {
       expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).toBe("Failed to test operation: direct error message");
+      expect((e as PromptsApiError).message).toBe(
+        "Failed to test operation: direct error message",
+      );
     }
   });
 
@@ -239,7 +249,9 @@ describe("PromptsApiService.handleApiError", () => {
       handleApiError("test operation", error);
     } catch (e) {
       expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).toBe("Failed to test operation: Unknown error occurred");
+      expect((e as PromptsApiError).message).toBe(
+        "Failed to test operation: Unknown error occurred",
+      );
     }
   });
 
@@ -295,4 +307,3 @@ describe("PromptsApiService.handleApiError", () => {
     }
   });
 });
-

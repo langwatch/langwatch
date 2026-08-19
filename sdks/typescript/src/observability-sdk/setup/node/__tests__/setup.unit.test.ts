@@ -1,19 +1,24 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { setupObservability, createAndStartNodeSdk } from "../setup.js";
 import { resourceFromAttributes } from "@opentelemetry/resources";
-import { resetObservabilitySdkConfig } from "../../../config.js";
-import { shouldCaptureInput, shouldCaptureOutput } from "../../../config.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  resetObservabilitySdkConfig,
+  shouldCaptureInput,
+  shouldCaptureOutput,
+} from "../../../config.js";
 import { DataCapturePresets } from "../../../features/data-capture/presets.js";
+import { createAndStartNodeSdk, setupObservability } from "../setup.js";
 
-const MockLogger = vi.fn().mockImplementation(function () { return ({
-  debug: vi.fn(),
-  info: vi.fn(),
-  error: vi.fn(),
-  warn: vi.fn(),
-}); });
+const MockLogger = vi.fn().mockImplementation(function () {
+  return {
+    debug: vi.fn(),
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+  };
+});
 
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { trace } from "@opentelemetry/api";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 
 // Mocks
 vi.mock("../../utils", () => ({
@@ -22,16 +27,20 @@ vi.mock("../../utils", () => ({
   createMergedResource: vi.fn(() => resourceFromAttributes({})),
 }));
 vi.mock("../../../exporters", () => ({
-  LangWatchTraceExporter: vi.fn().mockImplementation(function () { return ({ shutdown: vi.fn() }); }),
-  LangWatchLogsExporter: vi
-    .fn()
-    .mockImplementation(function () { return ({ shutdown: vi.fn() }); }),
+  LangWatchTraceExporter: vi.fn().mockImplementation(function () {
+    return { shutdown: vi.fn() };
+  }),
+  LangWatchLogsExporter: vi.fn().mockImplementation(function () {
+    return { shutdown: vi.fn() };
+  }),
 }));
 vi.mock("@opentelemetry/sdk-node", () => ({
-  NodeSDK: vi.fn().mockImplementation(function () { return ({
-    start: vi.fn(),
-    shutdown: vi.fn().mockResolvedValue(undefined),
-  }); }),
+  NodeSDK: vi.fn().mockImplementation(function () {
+    return {
+      start: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue(undefined),
+    };
+  }),
 }));
 vi.mock("../../../logger", () => ({
   setLangWatchLoggerProvider: vi.fn(),
@@ -55,7 +64,7 @@ describe("setupObservability", () => {
     const handle = setupObservability({
       langwatch: { apiKey: "test" },
       advanced: { skipOpenTelemetrySetup: true },
-      debug: { logger }
+      debug: { logger },
     });
     expect(logger.debug).toHaveBeenCalledWith("Skipping OpenTelemetry setup");
     expect(typeof handle.shutdown).toBe("function");
@@ -97,10 +106,12 @@ describe("setupObservability", () => {
     const handle = setupObservability({
       langwatch: { apiKey: "test" },
       advanced: { disabled: true },
-      debug: { logger }
+      debug: { logger },
     });
 
-    expect(logger.debug).toHaveBeenCalledWith("Observability disabled via advanced.disabled");
+    expect(logger.debug).toHaveBeenCalledWith(
+      "Observability disabled via advanced.disabled",
+    );
     expect(typeof handle.shutdown).toBe("function");
     await expect(handle.shutdown()).resolves.toBeUndefined();
   });
@@ -119,29 +130,37 @@ describe("langwatch configuration", () => {
 
   it("uses batch processor by default", () => {
     const logger = new MockLogger({});
-    const sdk = createAndStartNodeSdk({
-      langwatch: { apiKey: "test" },
-      debug: { logger }
-    }, logger, resourceFromAttributes({}));
+    const sdk = createAndStartNodeSdk(
+      {
+        langwatch: { apiKey: "test" },
+        debug: { logger },
+      },
+      logger,
+      resourceFromAttributes({}),
+    );
 
     expect(logger.debug).toHaveBeenCalledWith(
-      "Added LangWatch batch SpanProcessor and LogRecordProcessor to SDK"
+      "Added LangWatch batch SpanProcessor and LogRecordProcessor to SDK",
     );
     expect(sdk).toBeDefined();
   });
 
   it("uses batch processor when specified", () => {
     const logger = new MockLogger({});
-    const sdk = createAndStartNodeSdk({
-      langwatch: {
-        apiKey: "test",
-        processorType: "batch"
+    const sdk = createAndStartNodeSdk(
+      {
+        langwatch: {
+          apiKey: "test",
+          processorType: "batch",
+        },
+        debug: { logger },
       },
-      debug: { logger }
-    }, logger, resourceFromAttributes({}));
+      logger,
+      resourceFromAttributes({}),
+    );
 
     expect(logger.debug).toHaveBeenCalledWith(
-      "Added LangWatch batch SpanProcessor and LogRecordProcessor to SDK"
+      "Added LangWatch batch SpanProcessor and LogRecordProcessor to SDK",
     );
     expect(sdk).toBeDefined();
   });
@@ -155,27 +174,37 @@ describe("langwatch configuration", () => {
       forceFlush: vi.fn(),
     };
 
-    const sdk = createAndStartNodeSdk({
-      langwatch: 'disabled',
-      spanProcessors: [fakeProcessor],
-      debug: { logger }
-    }, logger, resourceFromAttributes({}));
+    const sdk = createAndStartNodeSdk(
+      {
+        langwatch: "disabled",
+        spanProcessors: [fakeProcessor],
+        debug: { logger },
+      },
+      logger,
+      resourceFromAttributes({}),
+    );
 
     expect(logger.debug).toHaveBeenCalledWith(
-      "Added user-provided 1 SpanProcessors to SDK"
+      "Added user-provided 1 SpanProcessors to SDK",
     );
     expect(sdk).toBeDefined();
   });
 
   it("warns about misconfiguration when langwatch disabled without alternatives", () => {
     const logger = new MockLogger({});
-    const sdk = createAndStartNodeSdk({
-      langwatch: 'disabled',
-      debug: { logger }
-    }, logger, resourceFromAttributes({}));
+    const sdk = createAndStartNodeSdk(
+      {
+        langwatch: "disabled",
+        debug: { logger },
+      },
+      logger,
+      resourceFromAttributes({}),
+    );
 
     expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining("LangWatch integration is disabled but no custom span processors, trace exporters, or console tracing is configured.")
+      expect.stringContaining(
+        "LangWatch integration is disabled but no custom span processors, trace exporters, or console tracing is configured.",
+      ),
     );
     expect(sdk).toBeDefined();
   });
@@ -183,11 +212,17 @@ describe("langwatch configuration", () => {
   it("throws on misconfiguration when throwOnSetupError is true", () => {
     const logger = new MockLogger({});
 
-    expect(() => createAndStartNodeSdk({
-      langwatch: 'disabled',
-      advanced: { throwOnSetupError: true },
-      debug: { logger }
-    }, logger, resourceFromAttributes({}))).toThrow();
+    expect(() =>
+      createAndStartNodeSdk(
+        {
+          langwatch: "disabled",
+          advanced: { throwOnSetupError: true },
+          debug: { logger },
+        },
+        logger,
+        resourceFromAttributes({}),
+      ),
+    ).toThrow();
   });
 
   it("does not warn when langwatch disabled but alternatives provided", () => {
@@ -199,14 +234,20 @@ describe("langwatch configuration", () => {
       forceFlush: vi.fn(),
     };
 
-    const sdk = createAndStartNodeSdk({
-      langwatch: 'disabled',
-      spanProcessors: [fakeProcessor],
-      debug: { logger }
-    }, logger, resourceFromAttributes({}));
+    const sdk = createAndStartNodeSdk(
+      {
+        langwatch: "disabled",
+        spanProcessors: [fakeProcessor],
+        debug: { logger },
+      },
+      logger,
+      resourceFromAttributes({}),
+    );
 
     expect(logger.error).not.toHaveBeenCalledWith(
-      expect.stringContaining("LangWatch integration is disabled but no custom span processors")
+      expect.stringContaining(
+        "LangWatch integration is disabled but no custom span processors",
+      ),
     );
     expect(sdk).toBeDefined();
   });
@@ -214,16 +255,22 @@ describe("langwatch configuration", () => {
   it("does not warn when langwatch disabled but console tracing enabled", () => {
     const logger = new MockLogger({});
 
-    const sdk = createAndStartNodeSdk({
-      langwatch: 'disabled',
-      debug: {
-        consoleTracing: true,
-        logger
-      }
-    }, logger, resourceFromAttributes({}));
+    const sdk = createAndStartNodeSdk(
+      {
+        langwatch: "disabled",
+        debug: {
+          consoleTracing: true,
+          logger,
+        },
+      },
+      logger,
+      resourceFromAttributes({}),
+    );
 
     expect(logger.error).not.toHaveBeenCalledWith(
-      expect.stringContaining("LangWatch integration is disabled but no custom span processors")
+      expect.stringContaining(
+        "LangWatch integration is disabled but no custom span processors",
+      ),
     );
     expect(sdk).toBeDefined();
   });
@@ -349,7 +396,9 @@ describe("createAndStartNodeSdk", () => {
     const logger = new MockLogger({});
     // Provide a minimal valid OTLPTraceExporter mock
     class FakeExporter extends OTLPTraceExporter {
-      export() { /* */ }
+      export() {
+        /* */
+      }
       shutdown() {
         return Promise.resolve();
       }
@@ -370,7 +419,7 @@ describe("createAndStartNodeSdk", () => {
     const logger = new MockLogger({});
     const options = {
       ...defaultOptions,
-      debug: { consoleTracing: true }
+      debug: { consoleTracing: true },
     };
     const sdk = createAndStartNodeSdk(
       options,
@@ -413,7 +462,7 @@ describe("console logging configuration", () => {
     const logger = new MockLogger({});
     const options = {
       ...defaultOptions,
-      debug: { consoleLogging: true }
+      debug: { consoleLogging: true },
     };
 
     const sdk = createAndStartNodeSdk(
@@ -451,7 +500,7 @@ describe("console logging configuration", () => {
       debug: {
         consoleTracing: true,
         consoleLogging: true,
-      }
+      },
     };
 
     const sdk = createAndStartNodeSdk(
@@ -732,7 +781,7 @@ describe("logger configuration", () => {
   it("passes log level to default logger", () => {
     const options = {
       ...defaultOptions,
-      debug: { logLevel: "debug" as const }
+      debug: { logLevel: "debug" as const },
     };
 
     setupObservability(options);
@@ -822,7 +871,9 @@ describe("error handling in setup", () => {
 
     // Since the setup is actually succeeding now, we need to check for the success message
     expect(logger.debug).toHaveBeenCalledWith(
-      expect.stringContaining("Added LangWatch batch SpanProcessor and LogRecordProcessor to SDK"),
+      expect.stringContaining(
+        "Added LangWatch batch SpanProcessor and LogRecordProcessor to SDK",
+      ),
     );
   });
 
@@ -878,7 +929,10 @@ describe("auto-shutdown signal handlers", () => {
     resetObservabilitySdkConfig();
     processOnCalls = [];
     const originalOn = process.on.bind(process);
-    processOnMock = vi.fn(((event: string, listener: (...args: unknown[]) => void) => {
+    processOnMock = vi.fn(((
+      event: string,
+      listener: (...args: unknown[]) => void,
+    ) => {
       processOnCalls.push(event);
       return originalOn(event, listener);
     }) as typeof process.on);

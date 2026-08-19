@@ -1,18 +1,18 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import {
   CURSOR_WALK_PAGE_SIZE,
   collectCursorPages,
   walkCursorPages,
 } from "@/client-sdk/services/_shared/collect-cursor-pages";
+import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import {
-  idempotentCreateInit,
-  mutationInit,
   type IdempotentCreateOptions,
+  idempotentCreateInit,
   type MutationOptions,
+  mutationInit,
   type ObservedRequestInit,
 } from "@/client-sdk/services/_shared/mutation-options";
-import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 
 export type VirtualKeyScopeType = "organization" | "team" | "project";
@@ -200,9 +200,14 @@ export class VirtualKeysApiService {
   private readonly apiKey: string;
   private readonly projectId: string | undefined;
 
-  constructor(config?: { endpoint?: string; apiKey?: string; projectId?: string }) {
+  constructor(config?: {
+    endpoint?: string;
+    apiKey?: string;
+    projectId?: string;
+  }) {
     this.endpoint = resolveEndpoint(config?.endpoint);
-    this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
+    this.apiKey =
+      config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     this.projectId = config?.projectId ?? process.env.LANGWATCH_PROJECT_ID;
   }
 
@@ -269,7 +274,8 @@ export class VirtualKeysApiService {
     const params = new URLSearchParams();
     if (options?.externalId) params.set("external_id", options.externalId);
     if (options?.cursor) params.set("cursor", options.cursor);
-    if (options?.limit !== undefined) params.set("limit", String(options.limit));
+    if (options?.limit !== undefined)
+      params.set("limit", String(options.limit));
     const query = params.toString() !== "" ? `?${params.toString()}` : "";
     const { data, next_cursor } = await this.request<{
       data: VirtualKey[];
@@ -384,7 +390,11 @@ export class VirtualKeysApiService {
     const { virtual_key } = await this.request<{ virtual_key: VirtualKey }>(
       `update virtual key "${id}"`,
       `/api/gateway/v1/virtual-keys/${encodeURIComponent(id)}`,
-      { method: "PATCH", body: JSON.stringify(input), ...mutationInit(options) },
+      {
+        method: "PATCH",
+        body: JSON.stringify(input),
+        ...mutationInit(options),
+      },
     );
     return virtual_key;
   }

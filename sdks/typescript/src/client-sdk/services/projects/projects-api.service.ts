@@ -1,6 +1,6 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 
 export interface Project {
@@ -68,7 +68,8 @@ export class ProjectsApiService {
 
   constructor(config?: { endpoint?: string; apiKey?: string }) {
     this.endpoint = resolveEndpoint(config?.endpoint);
-    this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
+    this.apiKey =
+      config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   }
 
   private headers(): Record<string, string> {
@@ -78,7 +79,11 @@ export class ProjectsApiService {
     };
   }
 
-  private async request<T>(operation: string, path: string, init?: RequestInit): Promise<T> {
+  private async request<T>(
+    operation: string,
+    path: string,
+    init?: RequestInit,
+  ): Promise<T> {
     const response = await fetch(`${this.endpoint}${path}`, {
       ...init,
       headers: { ...this.headers(), ...(init?.headers ?? {}) },
@@ -106,7 +111,10 @@ export class ProjectsApiService {
     return (await response.json()) as T;
   }
 
-  async list(options?: { page?: number; limit?: number }): Promise<PaginatedProjects> {
+  async list(options?: {
+    page?: number;
+    limit?: number;
+  }): Promise<PaginatedProjects> {
     const params = new URLSearchParams();
     if (options?.page) params.set("page", String(options.page));
     if (options?.limit) params.set("limit", String(options.limit));

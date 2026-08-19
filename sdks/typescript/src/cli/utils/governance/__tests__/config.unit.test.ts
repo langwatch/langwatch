@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  clearConfig,
   configPath,
+  isCanonicalVkSecret,
+  isLoggedIn,
   loadConfig,
   saveConfig,
-  clearConfig,
-  isLoggedIn,
-  isCanonicalVkSecret,
 } from "../config";
 
 const tmpFile = (): string => {
@@ -204,7 +204,11 @@ describe("governance config persistence", () => {
   });
 
   it("clear removes the file (idempotent on missing)", () => {
-    saveConfig({ gateway_url: "x", control_plane_url: "y", access_token: "at" });
+    saveConfig({
+      gateway_url: "x",
+      control_plane_url: "y",
+      access_token: "at",
+    });
     expect(fs.existsSync(p)).toBe(true);
     clearConfig();
     expect(fs.existsSync(p)).toBe(false);

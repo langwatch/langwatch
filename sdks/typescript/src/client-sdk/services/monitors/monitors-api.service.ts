@@ -1,8 +1,8 @@
-import { scopedApiKey } from "@/internal/credentialContext";
-import { resolveEndpoint } from "@/internal/endpoint";
-import { buildAuthHeaders } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { resolveEndpoint } from "@/internal/endpoint";
 
 export interface MonitorResponse {
   id: string;
@@ -64,7 +64,8 @@ export class MonitorsApiService {
   private readonly endpoint: string;
 
   constructor(config?: { apiKey?: string; endpoint?: string }) {
-    this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
+    this.apiKey =
+      config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     this.endpoint = resolveEndpoint(config?.endpoint);
   }
 
@@ -86,7 +87,10 @@ export class MonitorsApiService {
       } catch {
         // leave as raw text
       }
-      const message = formatApiErrorMessage({ error: parsed, options: { status: response.status } });
+      const message = formatApiErrorMessage({
+        error: parsed,
+        options: { status: response.status },
+      });
       throwIfHandledError({
         operation: options?.method ?? "GET",
         error: parsed,
@@ -108,7 +112,9 @@ export class MonitorsApiService {
   }
 
   async get(id: string): Promise<MonitorResponse> {
-    return this.request<MonitorResponse>(`/api/monitors/${encodeURIComponent(id)}`);
+    return this.request<MonitorResponse>(
+      `/api/monitors/${encodeURIComponent(id)}`,
+    );
   }
 
   async create(body: CreateMonitorBody): Promise<MonitorResponse> {
@@ -119,22 +125,31 @@ export class MonitorsApiService {
   }
 
   async update(id: string, body: UpdateMonitorBody): Promise<MonitorResponse> {
-    return this.request<MonitorResponse>(`/api/monitors/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      body: JSON.stringify(body),
-    });
+    return this.request<MonitorResponse>(
+      `/api/monitors/${encodeURIComponent(id)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      },
+    );
   }
 
   async toggle(id: string, enabled: boolean): Promise<MonitorResponse> {
-    return this.request<MonitorResponse>(`/api/monitors/${encodeURIComponent(id)}/toggle`, {
-      method: "POST",
-      body: JSON.stringify({ enabled }),
-    });
+    return this.request<MonitorResponse>(
+      `/api/monitors/${encodeURIComponent(id)}/toggle`,
+      {
+        method: "POST",
+        body: JSON.stringify({ enabled }),
+      },
+    );
   }
 
   async delete(id: string): Promise<MonitorDeleteResponse> {
-    return this.request<MonitorDeleteResponse>(`/api/monitors/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-    });
+    return this.request<MonitorDeleteResponse>(
+      `/api/monitors/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE",
+      },
+    );
   }
 }

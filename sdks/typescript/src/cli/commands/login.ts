@@ -1,23 +1,23 @@
+import chalk from "chalk";
 import * as fs from "fs";
 import * as path from "path";
-import chalk from "chalk";
 import prompts from "prompts";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
-import { rememberProjectName } from "@/cli/utils/identityNotice";
-import {
-  runDeviceFlowLogin,
-  runUnifiedLoginFlow,
-} from "@/cli/utils/governance/login-flow";
 import {
   isLoggedIn,
   loadConfig,
   saveConfig,
 } from "@/cli/utils/governance/config";
 import {
+  runDeviceFlowLogin,
+  runUnifiedLoginFlow,
+} from "@/cli/utils/governance/login-flow";
+import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
+import {
   fetchProjectKeyBySlug,
   SessionApiError,
 } from "@/cli/utils/governance/session-api";
-import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
+import { rememberProjectName } from "@/cli/utils/identityNotice";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { normalizeEndpoint } from "@/internal/endpoint";
 
@@ -57,9 +57,7 @@ function printAgentHintBanner(): void {
     ),
   );
   console.log(
-    chalk.gray(
-      "  --endpoint <URL>           self-hosted instance URL",
-    ),
+    chalk.gray("  --endpoint <URL>           self-hosted instance URL"),
   );
   console.log();
 }
@@ -113,7 +111,9 @@ const updateEnvFile = (
  */
 const failFastHeadlessProjectLogin = (): never => {
   console.error(
-    chalk.red("Error: project login needs a browser, and this terminal has no TTY."),
+    chalk.red(
+      "Error: project login needs a browser, and this terminal has no TTY.",
+    ),
   );
   console.error(chalk.gray("Non-interactive options:"));
   console.error(
@@ -146,7 +146,9 @@ const loginToProjectBySlug = async (slug: string): Promise<void> => {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
     console.error(
-      chalk.red("Error: `--project <slug>` needs a device login to authenticate you."),
+      chalk.red(
+        "Error: `--project <slug>` needs a device login to authenticate you.",
+      ),
     );
     console.error(
       chalk.gray("Run ") +
@@ -161,16 +163,22 @@ const loginToProjectBySlug = async (slug: string): Promise<void> => {
     rememberProjectName(result.api_key, result.project.name);
     const envResult = updateEnvFile(result.api_key);
     console.log(
-      chalk.green(`✓ API key for project ${chalk.bold(result.project.name)} saved to .env`),
+      chalk.green(
+        `✓ API key for project ${chalk.bold(result.project.name)} saved to .env`,
+      ),
     );
     if (envResult.created) {
       console.log(chalk.gray(`  • Created .env file at ${envResult.path}`));
     } else if (envResult.updated) {
-      console.log(chalk.gray(`  • Updated existing API key in ${envResult.path}`));
+      console.log(
+        chalk.gray(`  • Updated existing API key in ${envResult.path}`),
+      );
     } else {
       console.log(chalk.gray(`  • Added API key to ${envResult.path}`));
     }
-    console.log(chalk.gray(`  Project: ${result.project.name} (${result.project.slug})`));
+    console.log(
+      chalk.gray(`  Project: ${result.project.name} (${result.project.slug})`),
+    );
     console.log(chalk.gray(`  Dashboard: ${cfg.control_plane_url}`));
   } catch (error) {
     if (error instanceof SessionApiError) {
@@ -188,16 +196,14 @@ const loginToProjectBySlug = async (slug: string): Promise<void> => {
   }
 };
 
-export const loginCommand = async (
-  options?: {
-    apiKey?: string;
-    device?: boolean;
-    project?: boolean | string;
-    browser?: string;
-    endpoint?: string;
-    token?: string;
-  },
-): Promise<void> => {
+export const loginCommand = async (options?: {
+  apiKey?: string;
+  device?: boolean;
+  project?: boolean | string;
+  browser?: string;
+  endpoint?: string;
+  token?: string;
+}): Promise<void> => {
   try {
     // Honor `--endpoint` flag OR `LANGWATCH_ENDPOINT` env. Persist the
     // resolved value BEFORE the chosen flow runs so subsequent reads
@@ -225,7 +231,11 @@ export const loginCommand = async (
     if (options?.token) {
       const token = options.token.trim();
       if (token.length < 10) {
-        console.error(chalk.red("Error: token seems too short. Please check and try again."));
+        console.error(
+          chalk.red(
+            "Error: token seems too short. Please check and try again.",
+          ),
+        );
         process.exit(1);
       }
       const cfg = loadConfig();
@@ -274,7 +284,11 @@ export const loginCommand = async (
     if (options?.apiKey) {
       const apiKey = options.apiKey.trim();
       if (apiKey.length < 10) {
-        console.error(chalk.red("Error: API key seems too short. Please check and try again."));
+        console.error(
+          chalk.red(
+            "Error: API key seems too short. Please check and try again.",
+          ),
+        );
         process.exit(1);
       }
 
@@ -283,7 +297,9 @@ export const loginCommand = async (
       if (envResult.created) {
         console.log(chalk.gray(`Created .env file at ${envResult.path}`));
       } else if (envResult.updated) {
-        console.log(chalk.gray(`Updated existing API key in ${envResult.path}`));
+        console.log(
+          chalk.gray(`Updated existing API key in ${envResult.path}`),
+        );
       } else {
         console.log(chalk.gray(`Added API key to ${envResult.path}`));
       }
@@ -418,12 +434,14 @@ export const loginCommand = async (
       choices: [
         {
           title: "AI tools / agentic flows",
-          description: "claude, codex, cursor, gemini, opencode - device-flow SSO",
+          description:
+            "claude, codex, cursor, gemini, opencode - device-flow SSO",
           value: "device",
         },
         {
           title: "Project / SDK API key",
-          description: "langwatch eval, sync, prompts, SDK auto-instrumentation - writes .env",
+          description:
+            "langwatch eval, sync, prompts, SDK auto-instrumentation - writes .env",
           value: "api-key",
         },
         {
@@ -455,14 +473,8 @@ export const loginCommand = async (
     return;
   } catch (error) {
     console.error(
-      chalk.red(
-        `Error during login: ${
-          formatApiErrorMessage({ error })
-        }`,
-      ),
+      chalk.red(`Error during login: ${formatApiErrorMessage({ error })}`),
     );
     process.exit(1);
   }
 };
-
-

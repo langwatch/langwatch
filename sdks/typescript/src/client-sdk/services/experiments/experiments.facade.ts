@@ -14,27 +14,27 @@ import {
   ExperimentsApiService,
   toRunStartRequest,
 } from "./experiments-api.service";
-import type { ExperimentInitOptions } from "./types";
+import { mapRunResultsToRows } from "./mapResults";
+import {
+  ExperimentNotFoundError,
+  ExperimentRunFailedError,
+  ExperimentsApiError,
+  ExperimentTimeoutError,
+} from "./platformErrors";
 import type {
   ExperimentRunResult,
+  ExperimentRunSummary,
+  ExperimentRunWithResults,
   RunExperimentOptions,
   RunWithResultsOptions,
-  ExperimentRunWithResults,
-  ExperimentRunSummary,
 } from "./platformTypes";
+import { printSummary } from "./printSummary";
 import {
-  ExperimentsApiError,
-  ExperimentNotFoundError,
-  ExperimentTimeoutError,
-  ExperimentRunFailedError,
-} from "./platformErrors";
-import {
+  fetchResultsWithRetry,
   pollExperimentRun,
   rebaseUrlToEndpoint,
-  fetchResultsWithRetry,
 } from "./run-status";
-import { mapRunResultsToRows } from "./mapResults";
-import { printSummary } from "./printSummary";
+import type { ExperimentInitOptions } from "./types";
 
 const DEFAULT_POLL_INTERVAL = 2000;
 const DEFAULT_TIMEOUT = 600000; // 10 minutes

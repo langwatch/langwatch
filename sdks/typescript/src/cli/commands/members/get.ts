@@ -24,7 +24,10 @@ export const getMemberCommand = async (
         ["Name", orDash(member.user.name)],
         ["Email", orDash(member.user.email)],
         ["Organization role", member.role],
-        ["Status", member.disabled ? chalk.yellow("disabled") : chalk.green("active")],
+        [
+          "Status",
+          member.disabled ? chalk.yellow("disabled") : chalk.green("active"),
+        ],
         ["Teams", String(member.teams.length)],
       ]);
       if (member.teams.length === 0) return;

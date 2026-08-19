@@ -1,4 +1,4 @@
-import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
+import type { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 
 // Resolve which run an experiment subcommand should act on: an explicit
 // --run-id when given, otherwise the latest run for the experiment. The runs

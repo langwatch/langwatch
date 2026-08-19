@@ -1,13 +1,12 @@
-import { scopedApiKey } from "@/internal/credentialContext";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError } from "../../utils/errorOutput";
-import { buildAuthHeaders } from "@/internal/api/auth";
-
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { resolveCredentials } from "../../utils/apiKey";
+import { commandValidationError } from "../../utils/errorOutput";
+import { formatFetchError } from "../../utils/formatFetchError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the updated trigger rather than printing it: the output port renders
@@ -47,22 +46,33 @@ export const updateTriggerCommand = async (
       process.exit(1);
     }
 
-    const response = await fetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
+    const response = await fetch(
+      `${endpoint}/api/triggers/${encodeURIComponent(id)}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...buildAuthHeaders({ apiKey }),
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    });
+    );
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "update trigger" });
+      failSpinner({
+        spinner,
+        error: new Error(message),
+        action: "update trigger",
+      });
       process.exit(1);
     }
 
-    const trigger = await response.json() as { id: string; name: string; active: boolean };
+    const trigger = (await response.json()) as {
+      id: string;
+      name: string;
+      active: boolean;
+    };
     spinner.succeed(`Trigger "${trigger.name}" updated`);
 
     return {

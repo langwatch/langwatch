@@ -26,7 +26,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const sdkRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const sdkRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
 const skillsRoot = path.resolve(sdkRoot, "..", "..", "skills");
 const nativeRoot = path.join(skillsRoot, "_compiled", "native");
 const outPath = path.join(
@@ -45,7 +48,9 @@ function listFeatureSkills() {
     path.join(skillsRoot, "_lib/feature-skills.ts"),
     "utf8",
   );
-  const match = src.match(/export const FEATURE_SKILLS = \[([\s\S]*?)\] as const;/);
+  const match = src.match(
+    /export const FEATURE_SKILLS = \[([\s\S]*?)\] as const;/,
+  );
   if (!match) {
     throw new Error(
       "Could not find `export const FEATURE_SKILLS = [...] as const;` in skills/_lib/feature-skills.ts",

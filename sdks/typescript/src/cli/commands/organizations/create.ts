@@ -40,7 +40,9 @@ export const createOrganizationCommand = async (
     table: (created) => {
       console.log();
       console.log(chalk.gray("Organization id:   ") + created.organization.id);
-      console.log(chalk.gray("Organization slug: ") + created.organization.slug);
+      console.log(
+        chalk.gray("Organization slug: ") + created.organization.slug,
+      );
       console.log(chalk.gray("Default team:      ") + created.team.name);
       console.log();
       console.log(

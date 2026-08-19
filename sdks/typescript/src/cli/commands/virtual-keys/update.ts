@@ -1,12 +1,13 @@
-import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import type * as NodeFs from "node:fs";
+import chalk from "chalk";
 import {
   type VirtualKeyBudgetInput,
   type VirtualKeyRoutingMode,
   VirtualKeysApiService,
 } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 import {
   buildBudgetFlags,
@@ -14,7 +15,6 @@ import {
   parseRoutingModeArg,
   parseScopeArg,
 } from "./_shared";
-import type { CommandResult } from "../../utils/output";
 
 export interface UpdateVirtualKeyOptions {
   name?: string;
@@ -34,13 +34,16 @@ export interface UpdateVirtualKeyOptions {
   configFile?: string;
 }
 
-
-function parseConfig(options: UpdateVirtualKeyOptions): Record<string, unknown> | undefined {
+function parseConfig(
+  options: UpdateVirtualKeyOptions,
+): Record<string, unknown> | undefined {
   if (options.configJson) {
     try {
       return JSON.parse(options.configJson) as Record<string, unknown>;
     } catch (err) {
-      throw new Error(`--config-json is not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
+      throw new Error(
+        `--config-json is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
   if (options.configFile) {
@@ -52,7 +55,9 @@ function parseConfig(options: UpdateVirtualKeyOptions): Record<string, unknown> 
     try {
       return JSON.parse(raw) as Record<string, unknown>;
     } catch (err) {
-      throw new Error(`--config-file is not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
+      throw new Error(
+        `--config-file is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
   return undefined;
@@ -79,7 +84,9 @@ export const updateVirtualKeyCommand = async (
       routingMode = parseRoutingModeArg(options.routingMode);
     }
   } catch (err) {
-    console.error(chalk.red(`Error: ${err instanceof Error ? err.message : String(err)}`));
+    console.error(
+      chalk.red(`Error: ${err instanceof Error ? err.message : String(err)}`),
+    );
     process.exit(1);
   }
 
@@ -128,7 +135,9 @@ export const updateVirtualKeyCommand = async (
         : options.traceProject !== undefined
           ? { trace_project_id: options.traceProject }
           : {}),
-      routing_policy_id: options.clearRoutingPolicy ? null : options.routingPolicy,
+      routing_policy_id: options.clearRoutingPolicy
+        ? null
+        : options.routingPolicy,
       routing_mode: routingMode,
       budget,
       config,
@@ -141,11 +150,22 @@ export const updateVirtualKeyCommand = async (
       table: () => {
         console.log();
         console.log(`${chalk.bold("ID:")}             ${updated.id}`);
-        console.log(`${chalk.bold("Name:")}           ${chalk.cyan(updated.name)}`);
-        if (updated.description) console.log(`${chalk.bold("Description:")}    ${updated.description}`);
-        console.log(`${chalk.bold("Scopes:")}         ${updated.scopes.map(formatScope).join(", ") || chalk.gray("—")}`);
-        console.log(`${chalk.bold("Routing policy:")} ${updated.routing_policy_id ?? chalk.gray("(default)")}`);
-        console.log(`${chalk.bold("Updated:")}        ${new Date(updated.updated_at).toLocaleString()}`);
+        console.log(
+          `${chalk.bold("Name:")}           ${chalk.cyan(updated.name)}`,
+        );
+        if (updated.description)
+          console.log(
+            `${chalk.bold("Description:")}    ${updated.description}`,
+          );
+        console.log(
+          `${chalk.bold("Scopes:")}         ${updated.scopes.map(formatScope).join(", ") || chalk.gray("—")}`,
+        );
+        console.log(
+          `${chalk.bold("Routing policy:")} ${updated.routing_policy_id ?? chalk.gray("(default)")}`,
+        );
+        console.log(
+          `${chalk.bold("Updated:")}        ${new Date(updated.updated_at).toLocaleString()}`,
+        );
         console.log();
         console.log(chalk.gray("Config after update:"));
         console.log(JSON.stringify(updated.config, null, 2));

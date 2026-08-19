@@ -1,14 +1,19 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import type { UpdateScenarioBody } from "@/client-sdk/services/scenarios";
+import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const updateScenarioCommand = async (
   id: string,
-  options: { name?: string; situation?: string; criteria?: string; labels?: string },
+  options: {
+    name?: string;
+    situation?: string;
+    criteria?: string;
+    labels?: string;
+  },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 

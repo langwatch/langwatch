@@ -1,8 +1,9 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
 
-	// A MARKER, NOT A RULESET. The rules live in /platform/app/biome.jsonc and
-	// stay there; this file exists so that one can declare itself nested.
+	// A MARKER, NOT A RULESET. The rules live in each nested project's own
+	// biome.jsonc (/platform/app/biome.jsonc, /sdks/typescript/biome.jsonc);
+	// this file exists so that one of them can declare itself nested.
 	//
 	// Biome 2 makes whatever directory it is invoked from the workspace root --
 	// the built-in defaults, when no config file sits there -- and a config
@@ -18,10 +19,11 @@
 	// `biome check` from the repo root hit it every time.
 	"root": true,
 
-	// Scope is deliberately platform/app and nothing else, so that a run started
-	// from the repo root checks exactly what `pnpm lint` checks.
+	// Scope is deliberately the directories that have their own nested config,
+	// so that a run started from the repo root checks exactly what each
+	// project's own `pnpm lint` checks.
 	//
-	// Without this the rest of the repo -- packages/, sdks/, services/, mcp/,
+	// Without this the rest of the repo -- packages/, services/, mcp/,
 	// tests/ -- would be pulled in under the DEFAULT ruleset, since none of it
 	// has a config of its own: 58 diagnostics in packages/api/src alone, mostly
 	// formatting. That is noise on `check` and damage on `check --write`, which
@@ -30,7 +32,7 @@
 	//
 	// Adding a second config below this one means adding its directory here too.
 	"files": {
-		"includes": ["platform/app/**"]
+		"includes": ["platform/app/**", "sdks/typescript/**"]
 	},
 
 	// Inherited by the nested config, which sets it again for when it is invoked

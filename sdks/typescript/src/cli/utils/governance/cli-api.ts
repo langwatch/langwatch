@@ -16,7 +16,7 @@
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
-import { type GovernanceConfig } from "./config";
+import type { GovernanceConfig } from "./config";
 import type { PlatformToolPolicyMap } from "./platform-tool-policy";
 import {
   canRefreshSession,
@@ -24,10 +24,7 @@ import {
   refreshSessionIfExpired,
   type SessionRefreshDeps,
 } from "./session-refresh";
-import {
-  CLI_SURFACE_HEADER,
-  CLI_SURFACE_VALUE,
-} from "./surface";
+import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "./surface";
 
 export interface IngestionSourceSummary {
   id: string;
@@ -600,7 +597,6 @@ export async function issuePersonalVirtualKey(
   });
 }
 
-
 /**
  * Extracts the 16-char lookupId from an ingestion token.
  * Token format: `ik-lw-{16-char lookupId}_{secret}`.
@@ -645,12 +641,9 @@ export async function adminListIngestionTemplates(
   cfg: GovernanceConfig,
   options: CliApiOptions = {},
 ): Promise<IngestionTemplateRow[]> {
-  const body = await requestREST<{ ingestion_templates: IngestionTemplateRow[] }>(
-    cfg,
-    "GET",
-    "/api/governance/ingestion-templates/admin",
-    options,
-  );
+  const body = await requestREST<{
+    ingestion_templates: IngestionTemplateRow[];
+  }>(cfg, "GET", "/api/governance/ingestion-templates/admin", options);
   return body.ingestion_templates;
 }
 

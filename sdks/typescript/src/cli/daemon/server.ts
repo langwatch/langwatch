@@ -6,7 +6,7 @@
 
 import * as fs from "node:fs";
 import * as net from "node:net";
-
+import { ExecutionWindow, installProcessInterceptors } from "./execution";
 import {
   ensureSocketDir,
   inspectSocketTrust,
@@ -15,15 +15,14 @@ import {
   UntrustedSocketDirError,
 } from "./identity";
 import {
+  type ClientFrame,
   encodeFrame,
   FrameDecoder,
   PROTOCOL_VERSION,
-  type ClientFrame,
   type ServerFrame,
 } from "./protocol";
-import { ExecutionWindow, installProcessInterceptors } from "./execution";
-import { createCommandExecutor, type CommandExecutor } from "./runner";
-import { noopTelemetry, type DaemonTelemetry } from "./telemetry";
+import { type CommandExecutor, createCommandExecutor } from "./runner";
+import { type DaemonTelemetry, noopTelemetry } from "./telemetry";
 
 /** 10 minutes: long enough to span an agent's think-time, short enough to never feel like a leak. */
 export const DEFAULT_IDLE_TIMEOUT_MS = 10 * 60 * 1000;

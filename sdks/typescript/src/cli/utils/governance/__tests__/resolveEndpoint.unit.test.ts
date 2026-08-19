@@ -6,7 +6,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import * as configMod from "../config";
+import type * as configMod from "../config";
 import {
   resolveControlPlaneEndpoint,
   resolveControlPlaneUrl,
@@ -26,10 +26,12 @@ vi.mock("../config", async () => {
 
 const ORIG_ENV = { ...process.env };
 
-const cfgFixture = (overrides: Partial<{
-  control_plane_url: string;
-  gateway_url: string;
-}> = {}): any => ({
+const cfgFixture = (
+  overrides: Partial<{
+    control_plane_url: string;
+    gateway_url: string;
+  }> = {},
+): any => ({
   control_plane_url: "https://config.example.com",
   gateway_url: "https://gw.example.com",
   ...overrides,

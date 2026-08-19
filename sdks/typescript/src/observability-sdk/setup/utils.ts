@@ -1,20 +1,20 @@
+import type { Attributes } from "@opentelemetry/api";
 import {
   defaultResource,
   type Resource,
   resourceFromAttributes,
 } from "@opentelemetry/resources";
-import { type Attributes } from "@opentelemetry/api";
 import * as semconv from "@opentelemetry/semantic-conventions/incubating";
 import {
-  LANGWATCH_SDK_LANGUAGE,
-  LANGWATCH_SDK_VERSION,
   DEFAULT_SERVICE_NAME,
+  LANGWATCH_SDK_LANGUAGE,
   LANGWATCH_SDK_NAME_OBSERVABILITY,
+  LANGWATCH_SDK_VERSION,
 } from "../../internal/constants";
 import {
+  ATTR_LANGWATCH_SDK_LANGUAGE,
   ATTR_LANGWATCH_SDK_NAME,
   ATTR_LANGWATCH_SDK_VERSION,
-  ATTR_LANGWATCH_SDK_LANGUAGE,
 } from "../semconv/attributes";
 
 /**
@@ -84,7 +84,11 @@ export function getConcreteProvider(provider: unknown): unknown {
 
   if (delegate && typeof delegate === "object") {
     const delegateConstructorName = delegate.constructor?.name;
-    if (["NodeTracerProvider", "BasicTracerProvider"].includes(delegateConstructorName)) {
+    if (
+      ["NodeTracerProvider", "BasicTracerProvider"].includes(
+        delegateConstructorName,
+      )
+    ) {
       return delegate;
     }
     if (typeof delegate.addSpanProcessor === "function") {
@@ -104,4 +108,3 @@ export function getConcreteProvider(provider: unknown): unknown {
 export function isConcreteProvider(provider: unknown): boolean {
   return !!getConcreteProvider(provider);
 }
-

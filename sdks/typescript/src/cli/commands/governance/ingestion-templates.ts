@@ -1,5 +1,9 @@
 import chalk from "chalk";
-
+import {
+  commandValidationError,
+  reportCommandError,
+} from "@/cli/utils/errorOutput";
+import type { IngestionTemplateRow } from "@/cli/utils/governance/cli-api";
 import {
   adminListIngestionTemplates,
   archiveIngestionTemplate,
@@ -9,12 +13,6 @@ import {
   updateIngestionTemplateOttlRules,
 } from "@/cli/utils/governance/cli-api";
 import { isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "@/cli/utils/errorOutput";
-
-import type { IngestionTemplateRow } from "@/cli/utils/governance/cli-api";
 
 /**
  * `langwatch governance ingestion-templates <verb>`
@@ -56,7 +54,9 @@ function printTemplate(t: IngestionTemplateRow): void {
       `  id:                 ${t.id}\n` +
       `  source_type:        ${t.source_type}\n` +
       `  scope:              ${
-        t.platform_published ? chalk.cyan("Platform") : chalk.magenta("Org-authored")
+        t.platform_published
+          ? chalk.cyan("Platform")
+          : chalk.magenta("Org-authored")
       }\n` +
       `  enabled:            ${t.enabled ? chalk.green("yes") : chalk.gray("no")}\n` +
       `  credential_schema:  ${t.credential_schema ?? chalk.gray("(none)")}\n`,

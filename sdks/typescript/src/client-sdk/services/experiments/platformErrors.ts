@@ -31,7 +31,9 @@ export class ExperimentTimeoutError extends ExperimentsError {
   readonly total: number;
 
   constructor(runId: string, progress: number, total: number) {
-    super(`Experiment run timed out: ${runId} (${progress}/${total} completed)`);
+    super(
+      `Experiment run timed out: ${runId} (${progress}/${total} completed)`,
+    );
     this.name = "ExperimentTimeoutError";
     this.runId = runId;
     this.progress = progress;

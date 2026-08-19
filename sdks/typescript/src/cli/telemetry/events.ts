@@ -68,7 +68,11 @@ export interface CommandEvents {
     message: string;
   }) => void;
   /** The command succeeded. Duration is measured from `createCommandEvents`. */
-  completed: (args: { count?: number; total?: number; message: string }) => void;
+  completed: (args: {
+    count?: number;
+    total?: number;
+    message: string;
+  }) => void;
   /**
    * The command failed. The error is read back into the platform's own structured
    * failure (kind + status) rather than flattened to prose, and scrubbed of
@@ -190,12 +194,15 @@ const softDelay = (ms: number): Promise<void> =>
  * read command emits a handful of records, not a firehose.
  */
 const createOtlpSink = async (endpoint: string): Promise<EventSink> => {
-  const [{ LoggerProvider, SimpleLogRecordProcessor }, { OTLPLogExporter }, resources] =
-    await Promise.all([
-      import("@opentelemetry/sdk-logs"),
-      import("@opentelemetry/exporter-logs-otlp-http"),
-      import("@opentelemetry/resources"),
-    ]);
+  const [
+    { LoggerProvider, SimpleLogRecordProcessor },
+    { OTLPLogExporter },
+    resources,
+  ] = await Promise.all([
+    import("@opentelemetry/sdk-logs"),
+    import("@opentelemetry/exporter-logs-otlp-http"),
+    import("@opentelemetry/resources"),
+  ]);
 
   // `defaultResource()` does NOT read OTEL_RESOURCE_ATTRIBUTES — it only stamps
   // service.name + telemetry.sdk.*. Only `envDetector` reads it, so it is wired in
@@ -223,12 +230,18 @@ const createOtlpSink = async (endpoint: string): Promise<EventSink> => {
     forceFlushTimeoutMillis: FLUSH_TIMEOUT_MS,
     processors: [
       new SimpleLogRecordProcessor(
-        new OTLPLogExporter({ url: endpoint, timeoutMillis: EXPORT_TIMEOUT_MS }),
+        new OTLPLogExporter({
+          url: endpoint,
+          timeoutMillis: EXPORT_TIMEOUT_MS,
+        }),
       ),
     ],
   });
 
-  const logger = provider.getLogger(LANGWATCH_EVENTS_SCOPE, LANGWATCH_SDK_VERSION);
+  const logger = provider.getLogger(
+    LANGWATCH_EVENTS_SCOPE,
+    LANGWATCH_SDK_VERSION,
+  );
 
   return {
     emit: (record) => {
@@ -249,7 +262,9 @@ const createOtlpSink = async (endpoint: string): Promise<EventSink> => {
   };
 };
 
-const openSink = async (transport: NonNullable<Transport>): Promise<EventSink> =>
+const openSink = async (
+  transport: NonNullable<Transport>,
+): Promise<EventSink> =>
   transport.kind === "ipc"
     ? createIpcSink({ path: transport.path })
     : createOtlpSink(transport.endpoint);
@@ -289,7 +304,10 @@ export const createCommandEvents = ({
   const emit = (
     event: LangWatchEvent,
     attributes: Record<string, string | number | boolean>,
-    { severity = "info", message }: { severity?: "info" | "error"; message: string },
+    {
+      severity = "info",
+      message,
+    }: { severity?: "info" | "error"; message: string },
   ): void => {
     hasEmitted = true;
     queue = queue
@@ -315,7 +333,11 @@ export const createCommandEvents = ({
 
   return {
     started: (message) => {
-      emit(LANGWATCH_EVENTS.started, { [ATTR.message]: truncate(message) }, { message });
+      emit(
+        LANGWATCH_EVENTS.started,
+        { [ATTR.message]: truncate(message) },
+        { message },
+      );
     },
 
     count: ({ count, total, message }) => {

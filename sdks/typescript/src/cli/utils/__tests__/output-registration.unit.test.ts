@@ -4,8 +4,9 @@
  * and `resolveActionOutputOptions` reading the running command's resolved
  * context in the preAction hook.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import { Command } from "commander";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AGENT_MODE_ENV_VARS,
   registerOutputOptions,
@@ -50,9 +51,23 @@ describe("registerOutputOptions", () => {
       });
 
     registerOutputOptions(program);
-    program.parse(["node", "lw", "trace", "list", "--agent", "-o", "yaml", "--jq", ".items[]"]);
+    program.parse([
+      "node",
+      "lw",
+      "trace",
+      "list",
+      "--agent",
+      "-o",
+      "yaml",
+      "--jq",
+      ".items[]",
+    ]);
 
-    expect(captured).toMatchObject({ agent: true, output: "yaml", jq: ".items[]" });
+    expect(captured).toMatchObject({
+      agent: true,
+      output: "yaml",
+      jq: ".items[]",
+    });
   });
 
   it("makes the global flags parse BEFORE a subcommand too", () => {
@@ -110,9 +125,9 @@ describe("registerOutputOptions", () => {
 
     registerOutputOptions(program);
 
-    expect(() =>
-      program.parse(["node", "lw", "status", "-o", "jsn"]),
-    ).toThrow(/Allowed choices are table, json, agents, yaml/);
+    expect(() => program.parse(["node", "lw", "status", "-o", "jsn"])).toThrow(
+      /Allowed choices are table, json, agents, yaml/,
+    );
   });
 
   it("does not constrain a command's own -o (trace export's file path)", () => {
@@ -142,7 +157,11 @@ describe("resolveActionOutputOptions", () => {
     const update = program
       .command("update")
       .requiredOption("--json <json>", "JSON object with updated fields")
-      .option("-f, --format <format>", "Output format: text (default) or json", "text")
+      .option(
+        "-f, --format <format>",
+        "Output format: text (default) or json",
+        "text",
+      )
       .action(() => undefined);
 
     registerOutputOptions(program);

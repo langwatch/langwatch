@@ -1,17 +1,17 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import {
   CURSOR_WALK_PAGE_SIZE,
   walkCursorPages,
 } from "@/client-sdk/services/_shared/collect-cursor-pages";
+import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import {
-  idempotentCreateInit,
-  mutationInit,
   type IdempotentCreateOptions,
+  idempotentCreateInit,
   type MutationOptions,
+  mutationInit,
   type ObservedRequestInit,
 } from "@/client-sdk/services/_shared/mutation-options";
-import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 
 /** Where an endpoint delivers. */
@@ -222,7 +222,8 @@ export class WebhooksApiService {
 
   constructor(config?: { endpoint?: string; apiKey?: string }) {
     this.endpoint = resolveEndpoint(config?.endpoint);
-    this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
+    this.apiKey =
+      config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   }
 
   private async request<T>(
@@ -309,7 +310,11 @@ export class WebhooksApiService {
     const res = await this.request<{ data: WebhookEndpointSummary }>(
       "update webhook endpoint",
       `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}`,
-      { method: "PATCH", body: JSON.stringify(input), ...mutationInit(options) },
+      {
+        method: "PATCH",
+        body: JSON.stringify(input),
+        ...mutationInit(options),
+      },
     );
     return res.data;
   }
@@ -370,7 +375,8 @@ export class WebhooksApiService {
   ): Promise<WebhookDeliveryPage> {
     const params = new URLSearchParams();
     if (options?.cursor) params.set("cursor", options.cursor);
-    if (options?.limit !== undefined) params.set("limit", String(options.limit));
+    if (options?.limit !== undefined)
+      params.set("limit", String(options.limit));
     const qs = params.toString() !== "" ? `?${params.toString()}` : "";
     const { data, next_cursor } = await this.request<{
       data: WebhookDeliveryRecord[];

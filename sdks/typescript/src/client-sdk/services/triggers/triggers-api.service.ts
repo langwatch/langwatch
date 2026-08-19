@@ -1,13 +1,13 @@
-import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
-import type { InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import type { InternalConfig } from "@/client-sdk/types";
+import {
+  createLangWatchApiClient,
+  type LangwatchApiClient,
+} from "@/internal/api/client";
+import type { paths } from "@/internal/generated/openapi/api-client";
 
 export type TriggerResponse = NonNullable<
   paths["/api/triggers"]["get"]["responses"]["200"]["content"]["application/json"]
@@ -43,9 +43,13 @@ export class TriggersApiService {
   }
 
   private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: extractStatusFromResponse(error),
+      },
+    });
     throw new TriggersApiError(message, operation, error);
   }
 
@@ -71,7 +75,10 @@ export class TriggersApiService {
     return data;
   }
 
-  async update(id: string, params: UpdateTriggerBody): Promise<TriggerResponse> {
+  async update(
+    id: string,
+    params: UpdateTriggerBody,
+  ): Promise<TriggerResponse> {
     const { data, error } = await this.apiClient.PATCH("/api/triggers/{id}", {
       params: { path: { id } },
       body: params,

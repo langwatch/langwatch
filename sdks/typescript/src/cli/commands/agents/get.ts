@@ -1,16 +1,18 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the agent rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts). The `table` closure
  * is the human form, byte-identical to what this command printed before.
  */
-export const getAgentCommand = async (id: string): Promise<CommandResult | void> => {
+export const getAgentCommand = async (
+  id: string,
+): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new AgentsApiService();
@@ -28,17 +30,25 @@ export const getAgentCommand = async (id: string): Promise<CommandResult | void>
         console.log(chalk.gray("─".repeat(40)));
         console.log(`  ${chalk.gray("ID:")}      ${agent.id}`);
         console.log(`  ${chalk.gray("Type:")}    ${chalk.yellow(agent.type)}`);
-        console.log(`  ${chalk.gray("Created:")} ${new Date(agent.createdAt).toLocaleString()}`);
-        console.log(`  ${chalk.gray("Updated:")} ${new Date(agent.updatedAt).toLocaleString()}`);
+        console.log(
+          `  ${chalk.gray("Created:")} ${new Date(agent.createdAt).toLocaleString()}`,
+        );
+        console.log(
+          `  ${chalk.gray("Updated:")} ${new Date(agent.updatedAt).toLocaleString()}`,
+        );
 
         if (agent.platformUrl) {
-          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(agent.platformUrl)}`);
+          console.log(
+            `  ${chalk.bold("View:")}  ${chalk.underline(agent.platformUrl)}`,
+          );
         }
 
         if (agent.config && Object.keys(agent.config).length > 0) {
           console.log();
           console.log(chalk.bold("  Config:"));
-          console.log(`    ${JSON.stringify(agent.config, null, 2).split("\n").join("\n    ")}`);
+          console.log(
+            `    ${JSON.stringify(agent.config, null, 2).split("\n").join("\n    ")}`,
+          );
         }
 
         console.log();

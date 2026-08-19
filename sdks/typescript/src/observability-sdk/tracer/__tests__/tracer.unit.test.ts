@@ -1,20 +1,22 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { SpanStatusCode, SpanKind, trace as otelTrace, type SpanOptions } from "@opentelemetry/api";
 import {
-  getLangWatchTracer,
-  getLangWatchTracerFromProvider,
-} from "..";
-import { type LangWatchTracer } from "../types";
-import { type LangWatchSpan } from "../../span";
+  trace as otelTrace,
+  SpanKind,
+  type SpanOptions,
+  SpanStatusCode,
+} from "@opentelemetry/api";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  createDelayedPromise,
+  errorTestUtils,
   MockTracer,
   MockTracerProvider,
-  setupTestEnvironment,
-  createDelayedPromise,
-  testScenarios,
-  errorTestUtils,
   performanceUtils,
+  setupTestEnvironment,
+  testScenarios,
 } from "../../__tests__/test-utils";
+import type { LangWatchSpan } from "../../span";
+import { getLangWatchTracer, getLangWatchTracerFromProvider } from "..";
+import type { LangWatchTracer } from "../types";
 
 describe("tracer.ts", () => {
   let testEnv: ReturnType<typeof setupTestEnvironment>;
@@ -26,7 +28,11 @@ describe("tracer.ts", () => {
     testEnv = setupTestEnvironment();
     mockProvider = new MockTracerProvider();
     // Get the tracer that will actually be used by the LangWatch tracer
-    langwatchTracer = getLangWatchTracerFromProvider(mockProvider, "test-tracer", "1.0.0");
+    langwatchTracer = getLangWatchTracerFromProvider(
+      mockProvider,
+      "test-tracer",
+      "1.0.0",
+    );
     // Get the same tracer instance for our test spies
     mockTracer = mockProvider.getTracerByName("test-tracer", "1.0.0")!;
   });
@@ -44,24 +50,35 @@ describe("tracer.ts", () => {
     });
 
     it("calls provider.getTracer with correct parameters", () => {
-      expect(mockProvider.getTracer).toHaveBeenCalledWith("test-tracer", "1.0.0");
+      expect(mockProvider.getTracer).toHaveBeenCalledWith(
+        "test-tracer",
+        "1.0.0",
+      );
     });
 
     it("handles version parameter correctly", () => {
       getLangWatchTracerFromProvider(mockProvider, "no-version");
-      expect(mockProvider.getTracer).toHaveBeenCalledWith("no-version", undefined);
+      expect(mockProvider.getTracer).toHaveBeenCalledWith(
+        "no-version",
+        undefined,
+      );
     });
   });
 
   describe("getLangWatchTracer", () => {
     it("gets tracer from global provider", () => {
       // Mock the global tracer provider
-      const globalGetTracerSpy = vi.spyOn(otelTrace, 'getTracerProvider').mockReturnValue(mockProvider);
+      const globalGetTracerSpy = vi
+        .spyOn(otelTrace, "getTracerProvider")
+        .mockReturnValue(mockProvider);
 
       const globalTracer = getLangWatchTracer("global-tracer", "2.0.0");
 
       expect(globalGetTracerSpy).toHaveBeenCalled();
-      expect(mockProvider.getTracer).toHaveBeenCalledWith("global-tracer", "2.0.0");
+      expect(mockProvider.getTracer).toHaveBeenCalledWith(
+        "global-tracer",
+        "2.0.0",
+      );
       expect(globalTracer).toBeDefined();
 
       globalGetTracerSpy.mockRestore();
@@ -82,7 +99,7 @@ describe("tracer.ts", () => {
     });
 
     it("passes options and context to underlying tracer", () => {
-      const options = { kind: SpanKind.CLIENT, attributes: { "test": "value" } };
+      const options = { kind: SpanKind.CLIENT, attributes: { test: "value" } };
       const context = {} as any; // Mock context
 
       const span = langwatchTracer.startSpan("test-span", options, context);
@@ -128,7 +145,11 @@ describe("tracer.ts", () => {
       const options = { kind: SpanKind.SERVER };
       const callback = vi.fn(() => "result");
 
-      const result = langwatchTracer.startActiveSpan("active-span", options, callback);
+      const result = langwatchTracer.startActiveSpan(
+        "active-span",
+        options,
+        callback,
+      );
 
       expect(callback).toHaveBeenCalled();
       expect(result).toBe("result");
@@ -142,7 +163,12 @@ describe("tracer.ts", () => {
       const context = {} as any;
       const callback = vi.fn(() => "result");
 
-      const result = langwatchTracer.startActiveSpan("active-span", options, context, callback);
+      const result = langwatchTracer.startActiveSpan(
+        "active-span",
+        options,
+        context,
+        callback,
+      );
 
       expect(callback).toHaveBeenCalled();
       expect(result).toBe("result");
@@ -169,7 +195,9 @@ describe("tracer.ts", () => {
       const result = langwatchTracer.startActiveSpan("async-span", callback);
 
       // startActiveSpan should handle async callbacks
-      expect(result instanceof Promise ? await result : result).toBe("async-result");
+      expect(result instanceof Promise ? await result : result).toBe(
+        "async-result",
+      );
     });
 
     it("propagates errors from callback", () => {
@@ -194,7 +222,10 @@ describe("tracer.ts", () => {
           return "async-success";
         });
 
-        const result = await langwatchTracer.withActiveSpan("managed-span", callback);
+        const result = await langwatchTracer.withActiveSpan(
+          "managed-span",
+          callback,
+        );
 
         expect(callback).toHaveBeenCalled();
         expect(result).toBe("async-success");
@@ -216,7 +247,10 @@ describe("tracer.ts", () => {
           return "async-done";
         });
 
-        const result = await langwatchTracer.withActiveSpan("auto-span", callback);
+        const result = await langwatchTracer.withActiveSpan(
+          "auto-span",
+          callback,
+        );
 
         expect(callback).toHaveBeenCalled();
         expect(result).toBe("async-done");
@@ -255,7 +289,9 @@ describe("tracer.ts", () => {
           throw error;
         });
 
-        await expect(langwatchTracer.withActiveSpan("error-span", callback)).rejects.toThrow(error);
+        await expect(
+          langwatchTracer.withActiveSpan("error-span", callback),
+        ).rejects.toThrow(error);
 
         expect(callback).toHaveBeenCalled();
         expect(spanEnded).toBe(true);
@@ -269,7 +305,9 @@ describe("tracer.ts", () => {
           throw error;
         });
 
-        await expect(langwatchTracer.withActiveSpan("error-span", callback)).rejects.toThrow(error);
+        await expect(
+          langwatchTracer.withActiveSpan("error-span", callback),
+        ).rejects.toThrow(error);
         expect(callback).toHaveBeenCalled();
       });
 
@@ -278,18 +316,23 @@ describe("tracer.ts", () => {
           throw new Error("Null error");
         });
 
-        await expect(langwatchTracer.withActiveSpan("error-span", callback)).rejects.toThrow();
+        await expect(
+          langwatchTracer.withActiveSpan("error-span", callback),
+        ).rejects.toThrow();
         expect(callback).toHaveBeenCalled();
       });
 
       it("handles delayed async callbacks", async () => {
         const callback = vi.fn(async (span: LangWatchSpan) => {
-          await new Promise(resolve => setTimeout(resolve, 10));
+          await new Promise((resolve) => setTimeout(resolve, 10));
           span.setType("llm");
           return "delayed-result";
         });
 
-        const result = await langwatchTracer.withActiveSpan("delayed-span", callback);
+        const result = await langwatchTracer.withActiveSpan(
+          "delayed-span",
+          callback,
+        );
 
         expect(result).toBe("delayed-result");
         expect(callback).toHaveBeenCalled();
@@ -325,7 +368,10 @@ describe("tracer.ts", () => {
           return "sync-done";
         });
 
-        const result = langwatchTracer.withActiveSpan("sync-auto-span", callback);
+        const result = langwatchTracer.withActiveSpan(
+          "sync-auto-span",
+          callback,
+        );
 
         expect(callback).toHaveBeenCalled();
         expect(result).toBe("sync-done");
@@ -364,7 +410,9 @@ describe("tracer.ts", () => {
           throw error;
         });
 
-        expect(() => langwatchTracer.withActiveSpan("sync-error-span", callback)).toThrow(error);
+        expect(() =>
+          langwatchTracer.withActiveSpan("sync-error-span", callback),
+        ).toThrow(error);
 
         expect(callback).toHaveBeenCalled();
         expect(spanEnded).toBe(true);
@@ -378,7 +426,9 @@ describe("tracer.ts", () => {
           throw error;
         });
 
-        expect(() => langwatchTracer.withActiveSpan("sync-error-span", callback)).toThrow(error);
+        expect(() =>
+          langwatchTracer.withActiveSpan("sync-error-span", callback),
+        ).toThrow(error);
         expect(callback).toHaveBeenCalled();
       });
 
@@ -387,7 +437,9 @@ describe("tracer.ts", () => {
           throw new Error("Null error");
         });
 
-        expect(() => langwatchTracer.withActiveSpan("sync-error-span", callback)).toThrow();
+        expect(() =>
+          langwatchTracer.withActiveSpan("sync-error-span", callback),
+        ).toThrow();
         expect(callback).toHaveBeenCalled();
       });
     });
@@ -395,6 +447,7 @@ describe("tracer.ts", () => {
     describe("edge cases and promise-like objects", () => {
       it("handles promise-like objects (thenables)", async () => {
         const thenable = {
+          // biome-ignore lint/suspicious/noThenProperty: this IS a thenable fixture -- the test verifies withActiveSpan detects and awaits it.
           then: vi.fn((onFulfilled: any) => {
             setTimeout(() => onFulfilled("thenable-result"), 5);
             return thenable;
@@ -403,12 +456,15 @@ describe("tracer.ts", () => {
           finally: vi.fn((onFinally: any) => {
             setTimeout(() => onFinally(), 10);
             return thenable;
-          })
+          }),
         };
 
         const callback = vi.fn(() => thenable);
 
-        const result = await (langwatchTracer.withActiveSpan("thenable-span", callback) as any);
+        const result = await (langwatchTracer.withActiveSpan(
+          "thenable-span",
+          callback,
+        ) as any);
 
         expect(result).toBe("thenable-result");
         expect(thenable.then).toHaveBeenCalled();
@@ -420,18 +476,28 @@ describe("tracer.ts", () => {
         const nullCallback = vi.fn(() => null);
         const undefinedCallback = vi.fn(() => undefined);
 
-        const nullResult = langwatchTracer.withActiveSpan("null-span", nullCallback);
-        const undefinedResult = langwatchTracer.withActiveSpan("undefined-span", undefinedCallback);
+        const nullResult = langwatchTracer.withActiveSpan(
+          "null-span",
+          nullCallback,
+        );
+        const undefinedResult = langwatchTracer.withActiveSpan(
+          "undefined-span",
+          undefinedCallback,
+        );
 
         expect(nullResult).toBeNull();
         expect(undefinedResult).toBeUndefined();
       });
 
       it("handles objects with then property that is not a function", () => {
+        // biome-ignore lint/suspicious/noThenProperty: this fixture's whole point is a `then` property that is not callable, exercising the non-thenable fallback path.
         const fakePromise = { then: "not-a-function" };
         const callback = vi.fn(() => fakePromise);
 
-        const result = langwatchTracer.withActiveSpan("fake-promise-span", callback);
+        const result = langwatchTracer.withActiveSpan(
+          "fake-promise-span",
+          callback,
+        );
 
         expect(result).toBe(fakePromise);
       });
@@ -442,14 +508,19 @@ describe("tracer.ts", () => {
           throw rejectionError;
         });
 
-        await expect(langwatchTracer.withActiveSpan("rejection-span", callback)).rejects.toThrow(rejectionError);
+        await expect(
+          langwatchTracer.withActiveSpan("rejection-span", callback),
+        ).rejects.toThrow(rejectionError);
       });
 
       it("handles promise that resolves to another promise", async () => {
         const innerPromise = Promise.resolve("inner-value");
         const callback = vi.fn(async () => innerPromise);
 
-        const result = await langwatchTracer.withActiveSpan("nested-promise-span", callback);
+        const result = await langwatchTracer.withActiveSpan(
+          "nested-promise-span",
+          callback,
+        );
 
         expect(result).toBe("inner-value");
       });
@@ -460,7 +531,11 @@ describe("tracer.ts", () => {
         const options = { kind: SpanKind.PRODUCER };
         const callback = vi.fn(() => "result");
 
-        const result = langwatchTracer.withActiveSpan("with-options", options, callback);
+        const result = langwatchTracer.withActiveSpan(
+          "with-options",
+          options,
+          callback,
+        );
 
         expect(callback).toHaveBeenCalled();
         expect(result).toBe("result");
@@ -472,7 +547,12 @@ describe("tracer.ts", () => {
         const context = {} as any;
         const callback = vi.fn(() => "result");
 
-        const result = langwatchTracer.withActiveSpan("with-context", options, context, callback);
+        const result = langwatchTracer.withActiveSpan(
+          "with-context",
+          options,
+          context,
+          callback,
+        );
 
         expect(callback).toHaveBeenCalled();
         expect(result).toBe("result");
@@ -486,14 +566,16 @@ describe("tracer.ts", () => {
         });
 
         // Should still reject with original error, not recordException error
-        await expect(langwatchTracer.withActiveSpan("exception-span", callback)).rejects.toThrow(originalError);
+        await expect(
+          langwatchTracer.withActiveSpan("exception-span", callback),
+        ).rejects.toThrow(originalError);
 
         expect(callback).toHaveBeenCalled();
       });
     });
   });
 
-    describe("argument normalization", () => {
+  describe("argument normalization", () => {
     it("handles different argument patterns for startActiveSpan", () => {
       // Test all valid argument combinations
       const callback = vi.fn(() => "result");
@@ -505,11 +587,20 @@ describe("tracer.ts", () => {
       expect(result1).toBe("result");
 
       // Pattern 2: name, options, callback
-      const result2 = langwatchTracer.startActiveSpan("span2", options, callback);
+      const result2 = langwatchTracer.startActiveSpan(
+        "span2",
+        options,
+        callback,
+      );
       expect(result2).toBe("result");
 
       // Pattern 3: name, options, context, callback
-      const result3 = langwatchTracer.startActiveSpan("span3", options, context, callback);
+      const result3 = langwatchTracer.startActiveSpan(
+        "span3",
+        options,
+        context,
+        callback,
+      );
       expect(result3).toBe("result");
 
       expect(callback).toHaveBeenCalledTimes(3);
@@ -525,11 +616,20 @@ describe("tracer.ts", () => {
       expect(result1).toBe("result");
 
       // Pattern 2: name, options, callback
-      const result2 = langwatchTracer.withActiveSpan("span2", options, callback);
+      const result2 = langwatchTracer.withActiveSpan(
+        "span2",
+        options,
+        callback,
+      );
       expect(result2).toBe("result");
 
       // Pattern 3: name, options, context, callback
-      const result3 = langwatchTracer.withActiveSpan("span3", options, context, callback);
+      const result3 = langwatchTracer.withActiveSpan(
+        "span3",
+        options,
+        context,
+        callback,
+      );
       expect(result3).toBe("result");
 
       expect(callback).toHaveBeenCalledTimes(3);
@@ -541,7 +641,11 @@ describe("tracer.ts", () => {
       }).toThrow("Expected a span callback as the last argument");
 
       expect(() => {
-        (langwatchTracer as any).startActiveSpan("span-name", {}, "not-a-function");
+        (langwatchTracer as any).startActiveSpan(
+          "span-name",
+          {},
+          "not-a-function",
+        );
       }).toThrow("Expected a span callback as the last argument");
     });
   });
@@ -566,14 +670,19 @@ describe("tracer.ts", () => {
       (customMockTracer as any).customMethod = vi.fn();
 
       const customProvider = new MockTracerProvider();
-      vi.spyOn(customProvider, 'getTracer').mockReturnValue(customMockTracer);
+      vi.spyOn(customProvider, "getTracer").mockReturnValue(customMockTracer);
 
-      const customLangwatchTracer = getLangWatchTracerFromProvider(customProvider, "custom-tracer");
+      const customLangwatchTracer = getLangWatchTracerFromProvider(
+        customProvider,
+        "custom-tracer",
+      );
 
       // Test that custom methods can be called
       if (typeof (customLangwatchTracer as any).customMethod === "function") {
         (customLangwatchTracer as any).customMethod("test");
-        expect((customMockTracer as any).customMethod).toHaveBeenCalledWith("test");
+        expect((customMockTracer as any).customMethod).toHaveBeenCalledWith(
+          "test",
+        );
       }
     });
   });
@@ -581,39 +690,53 @@ describe("tracer.ts", () => {
   describe("withActiveSpan error handling improvements", () => {
     it("handles complex error scenarios with proper cleanup", async () => {
       const mockProvider = new MockTracerProvider();
-      const langwatchTracer = getLangWatchTracerFromProvider(mockProvider, "error-tracer", "1.0.0");
+      const langwatchTracer = getLangWatchTracerFromProvider(
+        mockProvider,
+        "error-tracer",
+        "1.0.0",
+      );
       const mockTracer = mockProvider.getTracerByName("error-tracer", "1.0.0")!;
       const testError = new Error("Complex error scenario");
 
       await errorTestUtils.testErrorPropagation(
-        () => langwatchTracer.withActiveSpan("error-span", async (span) => {
-          span.setType("llm");
-          span.setAttribute("test.before.error", true);
+        () =>
+          langwatchTracer.withActiveSpan("error-span", async (span) => {
+            span.setType("llm");
+            span.setAttribute("test.before.error", true);
 
-          // Simulate some async work before error
-          await createDelayedPromise("work", 5);
+            // Simulate some async work before error
+            await createDelayedPromise("work", 5);
 
-          throw testError;
-        }),
+            throw testError;
+          }),
         testError,
         () => {
           // Verify cleanup occurred
           const span = mockTracer.getSpan("error-span");
           expect(span?.ended).toBe(true);
-        }
+        },
       );
     });
 
     it("handles partial failures in batch operations", async () => {
       const mockProvider = new MockTracerProvider();
-      const langwatchTracer = getLangWatchTracerFromProvider(mockProvider, "batch-tracer", "1.0.0");
+      const langwatchTracer = getLangWatchTracerFromProvider(
+        mockProvider,
+        "batch-tracer",
+        "1.0.0",
+      );
       const mockTracer = mockProvider.getTracerByName("batch-tracer", "1.0.0")!;
       const partialError = new Error("Partial failure");
 
       const operations = [
-        () => langwatchTracer.withActiveSpan("success-1", async () => "success"),
-        () => langwatchTracer.withActiveSpan("failure", async () => { throw partialError; }),
-        () => langwatchTracer.withActiveSpan("success-2", async () => "success"),
+        () =>
+          langwatchTracer.withActiveSpan("success-1", async () => "success"),
+        () =>
+          langwatchTracer.withActiveSpan("failure", async () => {
+            throw partialError;
+          }),
+        () =>
+          langwatchTracer.withActiveSpan("success-2", async () => "success"),
       ];
 
       await errorTestUtils.testPartialFailure(operations, [1], partialError);
@@ -628,7 +751,11 @@ describe("tracer.ts", () => {
   describe("performance and concurrency improvements", () => {
     it("handles high-frequency span creation without performance degradation", async () => {
       const mockProvider = new MockTracerProvider();
-      const langwatchTracer = getLangWatchTracerFromProvider(mockProvider, "perf-tracer", "1.0.0");
+      const langwatchTracer = getLangWatchTracerFromProvider(
+        mockProvider,
+        "perf-tracer",
+        "1.0.0",
+      );
       const mockTracer = mockProvider.getTracerByName("perf-tracer", "1.0.0")!;
 
       const operations = await performanceUtils.createConcurrentOperations(
@@ -639,7 +766,7 @@ describe("tracer.ts", () => {
             return i * 2;
           });
         },
-        100
+        100,
       );
 
       expect(operations).toHaveLength(100);
@@ -650,36 +777,46 @@ describe("tracer.ts", () => {
       // Verify all spans were created and ended properly
       expect(mockTracer.getSpanCount()).toBe(100);
 
-      mockTracer.spans.forEach(span => {
+      mockTracer.spans.forEach((span) => {
         expect(span.ended).toBe(true);
       });
     });
 
     it("handles nested spans with proper parent-child relationships", async () => {
       const mockProvider = new MockTracerProvider();
-      const langwatchTracer = getLangWatchTracerFromProvider(mockProvider, "nested-tracer", "1.0.0");
-      const mockTracer = mockProvider.getTracerByName("nested-tracer", "1.0.0")!;
+      const langwatchTracer = getLangWatchTracerFromProvider(
+        mockProvider,
+        "nested-tracer",
+        "1.0.0",
+      );
+      const mockTracer = mockProvider.getTracerByName(
+        "nested-tracer",
+        "1.0.0",
+      )!;
 
-      const result = await langwatchTracer.withActiveSpan("parent", async (parentSpan) => {
-        parentSpan.setType("workflow");
+      const result = await langwatchTracer.withActiveSpan(
+        "parent",
+        async (parentSpan) => {
+          parentSpan.setType("workflow");
 
-        const childResults = [
-          langwatchTracer.withActiveSpan("child-1", (child) => {
-            child.setType("llm");
-            return "child-1-result";
-          }),
-          langwatchTracer.withActiveSpan("child-2", (child) => {
-            child.setType("tool");
-            return "child-2-result";
-          })
-        ];
+          const childResults = [
+            langwatchTracer.withActiveSpan("child-1", (child) => {
+              child.setType("llm");
+              return "child-1-result";
+            }),
+            langwatchTracer.withActiveSpan("child-2", (child) => {
+              child.setType("tool");
+              return "child-2-result";
+            }),
+          ];
 
-        return { parent: "parent-result", children: childResults };
-      });
+          return { parent: "parent-result", children: childResults };
+        },
+      );
 
       expect(result).toEqual({
         parent: "parent-result",
-        children: ["child-1-result", "child-2-result"]
+        children: ["child-1-result", "child-2-result"],
       });
 
       // Verify span creation
@@ -698,7 +835,11 @@ describe("tracer.ts", () => {
       }).toThrow("Expected a span callback as the last argument");
 
       expect(() => {
-        (langwatchTracer as any).startActiveSpan("span-name", {}, "not-a-function");
+        (langwatchTracer as any).startActiveSpan(
+          "span-name",
+          {},
+          "not-a-function",
+        );
       }).toThrow("Expected a span callback as the last argument");
 
       expect(() => {
@@ -711,11 +852,21 @@ describe("tracer.ts", () => {
 
       // Test with undefined/null contexts
       expect(() => {
-        langwatchTracer.startActiveSpan("test", {}, undefined as any, () => "result");
+        langwatchTracer.startActiveSpan(
+          "test",
+          {},
+          undefined as any,
+          () => "result",
+        );
       }).not.toThrow();
 
       expect(() => {
-        langwatchTracer.withActiveSpan("test", {}, undefined as any, () => "result");
+        langwatchTracer.withActiveSpan(
+          "test",
+          {},
+          undefined as any,
+          () => "result",
+        );
       }).not.toThrow();
     });
   });
@@ -752,11 +903,11 @@ describe("tracer.ts", () => {
             // Simulate minimal async work
             await Promise.resolve();
             return `result-${i}`;
-          })
+          }),
         );
       }
 
-      return Promise.all(operations).then(results => {
+      return Promise.all(operations).then((results) => {
         expect(results).toHaveLength(20);
         results.forEach((result, i) => {
           expect(result).toBe(`result-${i}`);
@@ -770,15 +921,21 @@ describe("tracer.ts", () => {
       const parentCallback = vi.fn(async (parentSpan: LangWatchSpan) => {
         parentSpan.setType("workflow");
 
-        const childResult = langwatchTracer.withActiveSpan("child-operation", (childSpan) => {
-          childSpan.setType("llm");
-          return "child-done";
-        });
+        const childResult = langwatchTracer.withActiveSpan(
+          "child-operation",
+          (childSpan) => {
+            childSpan.setType("llm");
+            return "child-done";
+          },
+        );
 
         return `parent-${childResult}`;
       });
 
-      const result = await langwatchTracer.withActiveSpan("parent-operation", parentCallback);
+      const result = await langwatchTracer.withActiveSpan(
+        "parent-operation",
+        parentCallback,
+      );
 
       expect(result).toBe("parent-child-done");
       expect(parentCallback).toHaveBeenCalled();
@@ -808,7 +965,7 @@ describe("tracer.ts", () => {
           span.setType("llm");
           await createDelayedPromise(`result-${i}`, Math.random() * 10);
           return `result-${i}`;
-        })
+        }),
       );
 
       const results = await Promise.all(promises);
@@ -830,7 +987,7 @@ describe("tracer.ts", () => {
             innerSpan.setType("llm");
             throw outerError;
           });
-        })
+        }),
       ).rejects.toThrow(outerError);
 
       // Verify error was handled
@@ -844,7 +1001,9 @@ describe("tracer.ts", () => {
         langwatchTracer.startSpan("my-span");
 
         const callArgs = mockTracer.startSpan.mock.calls[0];
-        expect(callArgs?.[1]?.attributes?.["langwatch.origin"]).toBe("application");
+        expect(callArgs?.[1]?.attributes?.["langwatch.origin"]).toBe(
+          "application",
+        );
       });
 
       it("injects langwatch.origin = application on startActiveSpan", () => {
@@ -890,7 +1049,9 @@ describe("tracer.ts", () => {
         });
 
         const callArgs = mockTracer.startSpan.mock.calls[0];
-        expect(callArgs?.[1]?.attributes?.["langwatch.origin"]).toBe("evaluation");
+        expect(callArgs?.[1]?.attributes?.["langwatch.origin"]).toBe(
+          "evaluation",
+        );
       });
 
       it("does not override existing origin on startActiveSpan", () => {

@@ -1,8 +1,7 @@
-
 // Utility type to pull out all values of keys on an object, and only allow types which
 
-import { type AttributeValue } from "@opentelemetry/api";
-import { type AnyValue } from "@opentelemetry/api-logs";
+import type { AttributeValue } from "@opentelemetry/api";
+import type { AnyValue } from "@opentelemetry/api-logs";
 import type * as semconvAttributes from "@opentelemetry/semantic-conventions";
 import type * as semconvIncubatingAttributes from "@opentelemetry/semantic-conventions/incubating";
 import type * as langwatchAttributes from "./attributes";
@@ -52,7 +51,9 @@ export type SemConvAttributeKey =
  * };
  * ```
  */
-export type SemConvAttributes = Partial<Record<SemConvAttributeKey, AttributeValue>>;
+export type SemConvAttributes = Partial<
+  Record<SemConvAttributeKey, AttributeValue>
+>;
 
 /**
  * Record type representing log record attributes with semantic convention keys.
@@ -76,4 +77,6 @@ export type SemConvAttributes = Partial<Record<SemConvAttributeKey, AttributeVal
  * };
  * ```
  */
-export type SemConvLogRecordAttributes = Partial<Record<SemConvAttributeKey, AnyValue>>;
+export type SemConvLogRecordAttributes = Partial<
+  Record<SemConvAttributeKey, AnyValue>
+>;

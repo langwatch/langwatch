@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { mapRunResultsToRows } from "../mapResults";
+import { describe, expect, it } from "vitest";
 import type { ExperimentRunResultsResponse } from "../experiments-api.service";
+import { mapRunResultsToRows } from "../mapResults";
 
 const baseResponse = (
   overrides: Partial<ExperimentRunResultsResponse>,

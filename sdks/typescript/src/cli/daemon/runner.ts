@@ -8,10 +8,10 @@
 import { buildProgram } from "../program";
 import {
   ExecutionContext,
-  isDaemonExitSignal,
-  withExecutionContext,
   type ExecutionWindow,
+  isDaemonExitSignal,
   type OutputSink,
+  withExecutionContext,
 } from "./execution";
 import type { DaemonTelemetry } from "./telemetry";
 
@@ -85,7 +85,10 @@ function resolveAbandonGraceMs(): number {
   );
 }
 
-function positiveIntFromEnv(value: string | undefined, fallback: number): number {
+function positiveIntFromEnv(
+  value: string | undefined,
+  fallback: number,
+): number {
   if (value) {
     // A complete positive integer only: parseInt would accept "5000ms" and
     // truncate "1.5", and the documented contract is a millisecond count.

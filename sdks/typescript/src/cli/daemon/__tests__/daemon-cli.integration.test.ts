@@ -10,20 +10,14 @@
  *
  * Requires `pnpm build` (like the other CLI integration tests in this package).
  */
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-} from "vitest";
+
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as http from "node:http";
+import type { AddressInfo } from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AddressInfo } from "node:net";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 const CLI_PATH = path.resolve(__dirname, "../../../../dist/cli/index.js");
 
@@ -82,8 +76,7 @@ const runViaDaemon = (
   args: string[],
   env: Record<string, string> = {},
   cwd: string = workDir,
-): Promise<RunResult> =>
-  run(args, { ...env, LANGWATCH_NO_DAEMON: "0" }, cwd);
+): Promise<RunResult> => run(args, { ...env, LANGWATCH_NO_DAEMON: "0" }, cwd);
 
 const daemonStatus = async (): Promise<{
   running: boolean;
@@ -96,9 +89,7 @@ const daemonStatus = async (): Promise<{
   return JSON.parse(result.stdout) as { running: boolean; served?: number };
 };
 
-const startDaemon = async (
-  env: Record<string, string> = {},
-): Promise<void> => {
+const startDaemon = async (env: Record<string, string> = {}): Promise<void> => {
   await run(["daemon", "start"], { LANGWATCH_NO_DAEMON: "0", ...env });
   // Poll the daemon's own status rather than sleeping: it is up when it answers.
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -190,7 +181,12 @@ describe("the CLI served by a daemon", () => {
         const inProcess = await run(["trace", "search", "--format", "json"]);
 
         await startDaemon();
-        const served = await runViaDaemon(["trace", "search", "--format", "json"]);
+        const served = await runViaDaemon([
+          "trace",
+          "search",
+          "--format",
+          "json",
+        ]);
 
         expect(served.exitCode).toBe(inProcess.exitCode);
         expect(served.stdout).toBe(inProcess.stdout);
@@ -278,7 +274,11 @@ describe("the CLI served by a daemon", () => {
           JSON.stringify({ prompts: {} }),
         );
 
-        const inProcess = await run(["prompt", "list", "--format", "json"], {}, callerDir);
+        const inProcess = await run(
+          ["prompt", "list", "--format", "json"],
+          {},
+          callerDir,
+        );
         const served = await runViaDaemon(
           ["prompt", "list", "--format", "json"],
           {},
@@ -312,9 +312,12 @@ describe("the CLI served by a daemon", () => {
         await startDaemon();
         const before = (await daemonStatus()).served ?? 0;
 
-        const served = await runViaDaemon(["trace", "search", "--format", "json"], {
-          LANGWATCH_API_KEY: "sk-somebody-else",
-        });
+        const served = await runViaDaemon(
+          ["trace", "search", "--format", "json"],
+          {
+            LANGWATCH_API_KEY: "sk-somebody-else",
+          },
+        );
 
         // The command still works — it just ran in its own process.
         expect(served.exitCode).toBe(0);
@@ -339,13 +342,19 @@ describe("the CLI served by a daemon", () => {
   });
 
   describe("given auto-spawn is enabled", () => {
-    const autoSpawn = { LANGWATCH_NO_DAEMON: "0", LANGWATCH_DAEMON_NO_SPAWN: "0" };
+    const autoSpawn = {
+      LANGWATCH_NO_DAEMON: "0",
+      LANGWATCH_DAEMON_NO_SPAWN: "0",
+    };
 
     describe("when a one-off command is run", () => {
       it("does not leave a daemon behind", async () => {
         expect((await daemonStatus()).running).toBe(false);
 
-        const result = await run(["trace", "search", "--format", "json"], autoSpawn);
+        const result = await run(
+          ["trace", "search", "--format", "json"],
+          autoSpawn,
+        );
 
         expect(result.exitCode).toBe(0);
         expect(result.stdout).toContain('"traces": []');
@@ -355,8 +364,14 @@ describe("the CLI served by a daemon", () => {
 
     describe("when the CLI is called repeatedly, as an agent does", () => {
       it("runs each command in-process and leaves a daemon behind for the next one", async () => {
-        const first = await run(["trace", "search", "--format", "json"], autoSpawn);
-        const second = await run(["trace", "search", "--format", "json"], autoSpawn);
+        const first = await run(
+          ["trace", "search", "--format", "json"],
+          autoSpawn,
+        );
+        const second = await run(
+          ["trace", "search", "--format", "json"],
+          autoSpawn,
+        );
 
         // Neither command waited on the spawn — both behaved exactly as today.
         expect(first.exitCode).toBe(0);

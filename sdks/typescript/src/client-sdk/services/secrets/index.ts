@@ -1,6 +1,6 @@
 export {
-  SecretsApiService,
-  SecretsApiError,
-  type SecretResponse,
   type SecretDeleteResponse,
+  type SecretResponse,
+  SecretsApiError,
+  SecretsApiService,
 } from "./secrets-api.service";

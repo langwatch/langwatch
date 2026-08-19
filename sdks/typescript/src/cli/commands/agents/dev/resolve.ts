@@ -6,9 +6,9 @@
 import * as path from "node:path";
 import chalk from "chalk";
 import prompts from "prompts";
-import {
-  type AgentResponse,
-  type AgentsApiService,
+import type {
+  AgentResponse,
+  AgentsApiService,
 } from "@/client-sdk/services/agents/agents-api.service";
 import {
   commandValidationError,
@@ -32,7 +32,9 @@ export function resolveLocalUrl(options: {
   if (options.port) {
     const port = Number(options.port);
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      fail(`--port must be a number between 1 and 65535, got "${options.port}"`);
+      fail(
+        `--port must be a number between 1 and 65535, got "${options.port}"`,
+      );
     }
     return `http://localhost:${port}`;
   }
@@ -150,7 +152,9 @@ function agentFromFlag({
  * nothing is remembered, or when the remembered agent is gone from the
  * project, in which case selection falls through to the picker.
  */
-function agentFromMemory(httpAgents: AgentResponse[]): AgentResponse | undefined {
+function agentFromMemory(
+  httpAgents: AgentResponse[],
+): AgentResponse | undefined {
   const remembered = rememberedAgentForDirectory();
   if (!remembered) return undefined;
 
@@ -166,7 +170,7 @@ function agentFromMemory(httpAgents: AgentResponse[]): AgentResponse | undefined
 }
 
 const CREATE_INSTRUCTIONS =
-  "This project has no HTTP agents. Create one first: langwatch agent create \"My Agent\" --type http --config '{\"url\":\"https://...\"}'";
+  'This project has no HTTP agents. Create one first: langwatch agent create "My Agent" --type http --config \'{"url":"https://..."}\'';
 
 /**
  * The project has no HTTP agents yet: offer to create one on the spot (TTY

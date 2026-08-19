@@ -3,10 +3,8 @@ import {
   type LoggerProvider,
   NoopLoggerProvider,
 } from "@opentelemetry/api-logs";
-import {
-  type LangWatchLogger,
-} from "./types";
 import { LangWatchLoggerInternal } from "./implementation";
+import type { LangWatchLogger } from "./types";
 
 /**
  * The LangWatch-specific global logger provider. It may not be the same as the current
@@ -106,6 +104,6 @@ export function createLangWatchLogger(logger: Logger): LangWatchLogger {
   return new LangWatchLoggerInternal(logger);
 }
 
+export * from "./implementation";
 // Export types and implementation
 export * from "./types";
-export * from "./implementation";

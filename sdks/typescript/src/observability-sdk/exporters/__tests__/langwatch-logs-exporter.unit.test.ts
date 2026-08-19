@@ -1,20 +1,27 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { LangWatchLogsExporter, type LangWatchLogsExporterOptions } from "../langwatch-logs-exporter";
+import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  LANGWATCH_SDK_NAME_OBSERVABILITY as LANGWATCH_SDK_NAME,
   LANGWATCH_SDK_LANGUAGE,
-  LANGWATCH_SDK_VERSION,
+  LANGWATCH_SDK_NAME_OBSERVABILITY as LANGWATCH_SDK_NAME,
   LANGWATCH_SDK_RUNTIME,
+  LANGWATCH_SDK_VERSION,
   LOGS_PATH,
 } from "../../../internal/constants";
-import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
+import {
+  LangWatchLogsExporter,
+  type LangWatchLogsExporterOptions,
+} from "../langwatch-logs-exporter";
 
-const DEFAULT_ENDPOINT = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+const DEFAULT_ENDPOINT =
+  process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
 const DEFAULT_URL = `${DEFAULT_ENDPOINT}${LOGS_PATH}`;
 
 // Mock the OTLP exporter
 vi.mock("@opentelemetry/exporter-logs-otlp-http", () => ({
-  OTLPLogExporter: vi.fn().mockImplementation(function (this: any, config: any) {
+  OTLPLogExporter: vi.fn().mockImplementation(function (
+    this: any,
+    config: any,
+  ) {
     this.config = config;
     this.url = config.url;
     this.headers = config.headers;
@@ -121,7 +128,9 @@ describe("LangWatchLogsExporter", () => {
 
       const exporter = new LangWatchLogsExporter();
 
-      expect((exporter as any).url).toBe("https://app.langwatch.ai/api/otel/v1/logs");
+      expect((exporter as any).url).toBe(
+        "https://app.langwatch.ai/api/otel/v1/logs",
+      );
     });
 
     it("handles missing API key gracefully", () => {
@@ -216,7 +225,7 @@ describe("LangWatchLogsExporter", () => {
             "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME(),
           }),
           url: expect.stringContaining(LOGS_PATH),
-        })
+        }),
       );
     });
   });
@@ -251,7 +260,9 @@ describe("LangWatchLogsExporter", () => {
 
       // URL constructor behavior: new URL("/api/otel/v1/logs", "https://subdomain.example.com:8080/path")
       // results in "https://subdomain.example.com:8080/api/otel/v1/logs" (path gets replaced, not appended)
-      expect((exporter as any).url).toBe(`https://subdomain.example.com:8080${LOGS_PATH}`);
+      expect((exporter as any).url).toBe(
+        `https://subdomain.example.com:8080${LOGS_PATH}`,
+      );
     });
   });
 

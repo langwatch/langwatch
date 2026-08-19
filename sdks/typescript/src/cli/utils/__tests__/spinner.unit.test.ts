@@ -6,9 +6,9 @@
  * lines corrupt what a parser reads. `createSpinner` silences the spinner at
  * the source whenever the running command was invoked with JSON output.
  */
-import { describe, it, expect, afterEach } from "vitest";
-import { createSpinner } from "../spinner";
+import { afterEach, describe, expect, it } from "vitest";
 import { setOutputFormat } from "../errorOutput";
+import { createSpinner } from "../spinner";
 
 afterEach(() => {
   setOutputFormat(undefined);
@@ -53,9 +53,9 @@ describe("given a caller that asked for silence explicitly", () => {
     it("stays silent", () => {
       setOutputFormat(undefined);
 
-      expect(
-        createSpinner({ text: "quiet", isSilent: true }).isSilent,
-      ).toBe(true);
+      expect(createSpinner({ text: "quiet", isSilent: true }).isSilent).toBe(
+        true,
+      );
     });
   });
 });

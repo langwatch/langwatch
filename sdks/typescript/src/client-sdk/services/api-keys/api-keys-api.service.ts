@@ -1,10 +1,10 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import type {
   ManagementRole,
   ManagementScopeType,
 } from "@/client-sdk/services/_shared/management-types";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 
 export interface RoleBinding {
@@ -109,7 +109,8 @@ export class ApiKeysApiService {
 
   constructor(config?: { endpoint?: string; apiKey?: string }) {
     this.endpoint = resolveEndpoint(config?.endpoint);
-    this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
+    this.apiKey =
+      config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   }
 
   private headers(): Record<string, string> {
@@ -119,7 +120,11 @@ export class ApiKeysApiService {
     };
   }
 
-  private async request<T>(operation: string, path: string, init?: RequestInit): Promise<T> {
+  private async request<T>(
+    operation: string,
+    path: string,
+    init?: RequestInit,
+  ): Promise<T> {
     const response = await fetch(`${this.endpoint}${path}`, {
       ...init,
       headers: { ...this.headers(), ...(init?.headers ?? {}) },
@@ -163,11 +168,10 @@ export class ApiKeysApiService {
   }
 
   async create(input: CreateApiKeyInput): Promise<CreatedApiKey> {
-    return this.request<CreatedApiKey>(
-      "create API key",
-      "/api/api-keys",
-      { method: "POST", body: JSON.stringify(input) },
-    );
+    return this.request<CreatedApiKey>("create API key", "/api/api-keys", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   }
 
   async update({

@@ -166,7 +166,9 @@ describe("formatLoginCeremony", () => {
 
     it("omits the budget section when not supplied", () => {
       const lines = formatLoginCeremony(baseInput);
-      expect(lines.find((l) => l.startsWith("Monthly budget:"))).toBeUndefined();
+      expect(
+        lines.find((l) => l.startsWith("Monthly budget:")),
+      ).toBeUndefined();
     });
   });
 

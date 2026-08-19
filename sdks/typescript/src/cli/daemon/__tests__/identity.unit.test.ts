@@ -1,8 +1,8 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   daemonSocketDir,
@@ -142,7 +142,10 @@ describe("daemonSocketDir", () => {
       // one of them died at bind().
       for (let length = 30; length <= 90; length++) {
         process.env.HOME = "/" + "h".repeat(length);
-        const socketPath = path.join(daemonSocketDir(), `${"0".repeat(16)}.sock`);
+        const socketPath = path.join(
+          daemonSocketDir(),
+          `${"0".repeat(16)}.sock`,
+        );
 
         expect(isDaemonSocketPathUsable(socketPath)).toBe(true);
       }
@@ -288,7 +291,9 @@ describe("inspectSocketTrust", () => {
     it("refuses it rather than following it somewhere we did not choose", async () => {
       const elsewhere = path.join(dir, "real.sock");
       listener = net.createServer();
-      await new Promise<void>((resolve) => listener!.listen(elsewhere, resolve));
+      await new Promise<void>((resolve) =>
+        listener!.listen(elsewhere, resolve),
+      );
       secureSocketFile(elsewhere);
       fs.symlinkSync(elsewhere, socketPath);
 

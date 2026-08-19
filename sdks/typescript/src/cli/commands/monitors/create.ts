@@ -1,14 +1,16 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
-import type { CommandResult } from "../../utils/output";
-import { buildAuthHeaders } from "@/internal/api/auth";
-
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { resolveCredentials } from "../../utils/apiKey";
+import {
+  commandValidationError,
+  reportCommandError,
+} from "../../utils/errorOutput";
+import { formatFetchError } from "../../utils/formatFetchError";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 /**
  * Returns the created monitor rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
@@ -22,7 +24,7 @@ export const createMonitorCommand = async (
     evaluatorId?: string;
     level?: string;
     parameters?: string;
-  }
+  },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
@@ -50,8 +52,7 @@ export const createMonitorCommand = async (
   }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Creating monitor "${name}"...`).start();
 
@@ -88,7 +89,11 @@ export const createMonitorCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "create monitor" });
+      failSpinner({
+        spinner,
+        error: new Error(message),
+        action: "create monitor",
+      });
       process.exit(1);
     }
 
@@ -126,7 +131,9 @@ export const createMonitorCommand = async (
       console.log(`  ${chalk.gray("Type:")} ${monitor.checkType}`);
       console.log(`  ${chalk.gray("Mode:")} ${monitor.executionMode}`);
       if (monitor.platformUrl) {
-        console.log(`  ${chalk.bold("View:")}  ${chalk.underline(monitor.platformUrl)}`);
+        console.log(
+          `  ${chalk.bold("View:")}  ${chalk.underline(monitor.platformUrl)}`,
+        );
       }
       console.log();
     },

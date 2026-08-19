@@ -3,7 +3,6 @@ import { config } from "dotenv";
 import { setResolvedApiKey } from "@/internal/credentialContext";
 import { getEndpoint } from "./endpoint";
 import { getOutputFormat, renderErrorAsJson } from "./errorOutput";
-import { maybePrintIdentityNotice } from "./identityNotice";
 import {
   type GovernanceConfig,
   isLoggedIn,
@@ -14,6 +13,7 @@ import {
   fetchPersonalProject,
   SessionApiError,
 } from "./governance/session-api";
+import { maybePrintIdentityNotice } from "./identityNotice";
 
 /**
  * Re-read the caller's .env, applying only the LANGWATCH_* keys.
@@ -282,7 +282,9 @@ function reportMissingCredentials(endpoint: string): never {
       }),
     );
     console.error(
-      chalk.red("Error: you're not logged in, and LANGWATCH_API_KEY is not set."),
+      chalk.red(
+        "Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
+      ),
     );
     process.exit(1);
   }
@@ -326,7 +328,11 @@ export const checkOrgApiKey = (): string => {
   }
 
   console.error(chalk.red("Error: LANGWATCH_API_KEY not found."));
-  console.error(chalk.gray("This command needs an organization-capable API key. Create one at:"));
+  console.error(
+    chalk.gray(
+      "This command needs an organization-capable API key. Create one at:",
+    ),
+  );
   console.error(chalk.cyan(`  ${settingsUrl}`));
   console.error(chalk.gray("Then add it to your .env file:"));
   console.error(chalk.cyan("  echo 'LANGWATCH_API_KEY=<your-key>' >> .env"));

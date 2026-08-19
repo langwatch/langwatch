@@ -1,14 +1,14 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
-  GovernanceCliError,
-  SESSION_EXPIRED_MESSAGE,
   cloneIngestionTemplateFromPlatform,
+  GovernanceCliError,
   getCliBootstrap,
   getEventsForSource,
   getGovernanceStatus,
   getSourceHealth,
   listIngestionSources,
+  SESSION_EXPIRED_MESSAGE,
 } from "../cli-api";
 import type { GovernanceConfig } from "../config";
 import { DeviceFlowError } from "../device-flow";
@@ -135,8 +135,7 @@ describe("cli-api — auth contract", () => {
       const authHeaders: (string | undefined)[] = [];
       const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
         authHeaders.push(
-          (init?.headers as Record<string, string> | undefined)
-            ?.Authorization,
+          (init?.headers as Record<string, string> | undefined)?.Authorization,
         );
         return responses.shift()!;
       }) as unknown as typeof fetch;
@@ -160,8 +159,8 @@ describe("cli-api — auth contract", () => {
 
     it("surfaces the 401 when the refresh token is refused too", async () => {
       const cfg = { ...baseCfg("at_old"), refresh_token: "rt_dead" };
-      const fetchImpl = vi.fn(
-        async () => status(401, { error: "unauthorized" }),
+      const fetchImpl = vi.fn(async () =>
+        status(401, { error: "unauthorized" }),
       ) as unknown as typeof fetch;
 
       await expect(
@@ -318,9 +317,7 @@ describe("cli-api — request shape", () => {
         beforeIso: "2026-04-27T00:00:00.000Z",
       });
       expect(seen[0]!.url).toContain("limit=25");
-      expect(seen[0]!.url).toContain(
-        "before_iso=2026-04-27T00%3A00%3A00.000Z",
-      );
+      expect(seen[0]!.url).toContain("before_iso=2026-04-27T00%3A00%3A00.000Z");
     });
 
     it("omits the query string entirely when neither flag is set", async () => {
@@ -348,7 +345,9 @@ describe("cli-api — request shape", () => {
         },
       ];
       const { fetchImpl } = spyFetch(ok({ events: fixture }));
-      const events = await getEventsForSource(baseCfg(), "src-1", { fetchImpl });
+      const events = await getEventsForSource(baseCfg(), "src-1", {
+        fetchImpl,
+      });
       expect(events).toEqual(fixture);
     });
   });
@@ -413,15 +412,15 @@ describe("cli-api — request shape", () => {
       };
       const { fetchImpl, seen } = spyFetch(ok(fixture));
       const out = await getCliBootstrap(baseCfg(), { fetchImpl });
-      expect(seen[0]!.url).toBe(
-        "http://app.example/api/auth/cli/bootstrap",
-      );
+      expect(seen[0]!.url).toBe("http://app.example/api/auth/cli/bootstrap");
       expect(seen[0]!.authHeader).toBe("Bearer at_x");
       expect(out).toEqual(fixture);
     });
 
     it("returns null on 404 — graceful degrade for older self-hosters without the REST adapter", async () => {
-      const { fetchImpl } = spyFetch(status(404, { error_description: "Not found" }));
+      const { fetchImpl } = spyFetch(
+        status(404, { error_description: "Not found" }),
+      );
       const out = await getCliBootstrap(baseCfg(), { fetchImpl });
       expect(out).toBeNull();
     });

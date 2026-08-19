@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LangWatch } from "@/client-sdk";
 
 const mockFetch = vi.fn();
@@ -6,7 +6,10 @@ vi.stubGlobal("fetch", mockFetch);
 
 const initResponse = (): Response =>
   new Response(
-    JSON.stringify({ slug: "trailing-slash-eval", path: "/acme/experiments/trailing-slash-eval" }),
+    JSON.stringify({
+      slug: "trailing-slash-eval",
+      path: "/acme/experiments/trailing-slash-eval",
+    }),
     { status: 200, headers: { "content-type": "application/json" } },
   );
 
@@ -51,7 +54,9 @@ describe("Experiment.init endpoint handling", () => {
 
         await langwatch.experiments.init("trailing-slash-eval");
 
-        expect(fetchedUrl()).toBe("https://app.langwatch.ai/api/experiment/init");
+        expect(fetchedUrl()).toBe(
+          "https://app.langwatch.ai/api/experiment/init",
+        );
         expect(new URL(fetchedUrl()).pathname).toBe("/api/experiment/init");
       });
     });
@@ -83,7 +88,9 @@ describe("Experiment.init endpoint handling", () => {
 
         await langwatch.experiments.init("trailing-slash-eval");
 
-        expect(fetchedUrl()).toBe("https://app.langwatch.ai/api/experiment/init");
+        expect(fetchedUrl()).toBe(
+          "https://app.langwatch.ai/api/experiment/init",
+        );
       });
     });
   });

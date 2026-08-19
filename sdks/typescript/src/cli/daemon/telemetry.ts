@@ -69,7 +69,11 @@ export interface DaemonLifecycleEvent {
 
 export interface DaemonTelemetry {
   daemonStarted(event: DaemonLifecycleEvent): void;
-  daemonStopping(event: DaemonLifecycleEvent & { reason: "idle" | "stop-requested" | "signal" }): void;
+  daemonStopping(
+    event: DaemonLifecycleEvent & {
+      reason: "idle" | "stop-requested" | "signal";
+    },
+  ): void;
 
   requestStarted(event: DaemonRequestStartedEvent): void;
   /**

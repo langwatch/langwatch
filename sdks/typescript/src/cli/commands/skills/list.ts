@@ -4,13 +4,13 @@
  */
 import * as fs from "node:fs";
 import chalk from "chalk";
-import { printResult, type RawOutputFlags } from "../../utils/output";
 import { formatTable } from "../../utils/formatting";
+import { printResult, type RawOutputFlags } from "../../utils/output";
 import {
   resolveSkillsRoot,
-  skillFilePath,
   SKILLS_BUNDLE,
   SKILLS_BUNDLE_VERSION,
+  skillFilePath,
 } from "./installer";
 
 export interface SkillsListOptions extends RawOutputFlags {
@@ -43,7 +43,9 @@ export const skillsListCommand = async (
           colorMap: { SLUG: chalk.cyan },
         });
         console.log(
-          chalk.gray(`\nInstall root: ${root} (bundle v${SKILLS_BUNDLE_VERSION})`),
+          chalk.gray(
+            `\nInstall root: ${root} (bundle v${SKILLS_BUNDLE_VERSION})`,
+          ),
         );
       },
     },

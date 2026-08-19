@@ -1,15 +1,22 @@
-import { type Logger } from "../../../logger";
-import { type Instrumentation } from "@opentelemetry/instrumentation";
-import { type SpanExporter, type SpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { type ContextManager, type TextMapPropagator, type TracerProvider } from "@opentelemetry/api";
-import { type LogRecordProcessor } from "@opentelemetry/sdk-logs";
-import { type IMetricReader } from "@opentelemetry/sdk-metrics";
-import { type ViewOptions } from "@opentelemetry/sdk-metrics";
-import { type Resource, type ResourceDetector } from "@opentelemetry/resources";
-import { type Sampler, type SpanLimits } from "@opentelemetry/sdk-trace-base";
-import { type IdGenerator } from "@opentelemetry/sdk-trace-base";
-import { type SemConvAttributes } from "../../semconv";
-import { type DataCaptureOptions } from "../../features/data-capture/types";
+import type {
+  ContextManager,
+  TextMapPropagator,
+  TracerProvider,
+} from "@opentelemetry/api";
+import type { Instrumentation } from "@opentelemetry/instrumentation";
+import type { Resource, ResourceDetector } from "@opentelemetry/resources";
+import type { LogRecordProcessor } from "@opentelemetry/sdk-logs";
+import type { IMetricReader, ViewOptions } from "@opentelemetry/sdk-metrics";
+import type {
+  IdGenerator,
+  Sampler,
+  SpanExporter,
+  SpanLimits,
+  SpanProcessor,
+} from "@opentelemetry/sdk-trace-base";
+import type { Logger } from "../../../logger";
+import type { DataCaptureOptions } from "../../features/data-capture/types";
+import type { SemConvAttributes } from "../../semconv";
 
 /**
  * Configuration options for setting up LangWatch observability.

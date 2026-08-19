@@ -9,7 +9,12 @@ import {
 } from "../../utils/errorOutput";
 import { parsePermissionFlags } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
-import { orDash, printFacts, runManagement, withParsedFlags } from "../management/_shared";
+import {
+  orDash,
+  printFacts,
+  runManagement,
+  withParsedFlags,
+} from "../management/_shared";
 
 export interface UpdateRoleOptions {
   name?: string;

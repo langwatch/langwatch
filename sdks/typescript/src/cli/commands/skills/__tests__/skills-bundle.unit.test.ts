@@ -7,10 +7,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  type BundledSkill,
   findSkill,
   SKILLS_BUNDLE,
   SKILLS_BUNDLE_VERSION,
-  type BundledSkill,
 } from "../installer";
 
 const REPO_ROOT = path.join(__dirname, "../../../../../../../");
@@ -87,9 +87,16 @@ describe("the embedded skills bundle", () => {
 
   it("embeds every body fully inlined: frontmatter intact, no MDX imports or JSX left", () => {
     for (const entry of SKILLS_BUNDLE) {
-      expect(entry.body.startsWith("---"), `${entry.slug} frontmatter`).toBe(true);
-      expect(/^import .*\.mdx/m.test(entry.body), `${entry.slug} MDX imports`).toBe(false);
-      expect(/<[A-Z][A-Za-z]* \/>/.test(entry.body), `${entry.slug} JSX`).toBe(false);
+      expect(entry.body.startsWith("---"), `${entry.slug} frontmatter`).toBe(
+        true,
+      );
+      expect(
+        /^import .*\.mdx/m.test(entry.body),
+        `${entry.slug} MDX imports`,
+      ).toBe(false);
+      expect(/<[A-Z][A-Za-z]* \/>/.test(entry.body), `${entry.slug} JSX`).toBe(
+        false,
+      );
       expect(entry.description.length).toBeGreaterThan(0);
     }
   });
@@ -99,9 +106,7 @@ describe("the embedded skills bundle", () => {
     expect(skill("tracing").body).toContain(
       "langwatch docs integration/python/guide",
     );
-    expect(skill("recipes/setup-lw").body).toContain(
-      "LANGWATCH_API_KEY",
-    );
+    expect(skill("recipes/setup-lw").body).toContain("LANGWATCH_API_KEY");
   });
 
   it("carries name, description and user-prompt from the frontmatter", () => {

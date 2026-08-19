@@ -1,8 +1,8 @@
 import chalk from "chalk";
 import fs from "fs";
 import {
-  OrganizationApiService,
   type InviteInput,
+  OrganizationApiService,
 } from "@/client-sdk/services/organization/organization-api.service";
 import {
   commandValidationError,
@@ -29,7 +29,9 @@ const readStdin = (): Promise<string> =>
   new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     process.stdin.on("data", (chunk: Buffer) => chunks.push(chunk));
-    process.stdin.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
+    process.stdin.on("end", () =>
+      resolve(Buffer.concat(chunks).toString("utf-8")),
+    );
     process.stdin.on("error", reject);
   });
 
@@ -44,9 +46,11 @@ const readStdin = (): Promise<string> =>
 const resolveInvites = async (
   options: CreateInvitesOptions,
 ): Promise<InviteInput[]> => {
-  const jsonSources = [options.json, options.file, options.readFromStdin].filter(
-    (source) => source !== undefined && source !== false,
-  );
+  const jsonSources = [
+    options.json,
+    options.file,
+    options.readFromStdin,
+  ].filter((source) => source !== undefined && source !== false);
   if (jsonSources.length > 1) {
     reportCommandError({
       error: commandValidationError(
@@ -96,7 +100,9 @@ export const createInvitesCommand = async (
           Email: invite.email,
           Role: invite.role,
           Teams: String(invite.teams.length),
-          "Email sent": invite.emailNotSent ? chalk.yellow("no") : chalk.green("yes"),
+          "Email sent": invite.emailNotSent
+            ? chalk.yellow("no")
+            : chalk.green("yes"),
           Link: invite.inviteUrl,
         })),
         headers: ["Email", "Role", "Teams", "Email sent", "Link"],

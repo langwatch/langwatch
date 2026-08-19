@@ -1,18 +1,16 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeAll,
-  beforeEach,
-  afterAll,
-  afterEach,
-} from "vitest";
-import { http, HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import {
-  ProjectsApiService,
-} from "../projects-api.service";
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 import { LangWatchHandledError } from "@/internal/api/errors";
+import { ProjectsApiService } from "../projects-api.service";
 
 const TEST_ENDPOINT = "http://localhost:5560";
 
@@ -148,7 +146,9 @@ describe("ProjectsApiService", () => {
       });
 
       it("throws LangWatchHandledError", async () => {
-        await expect(service.get("nonexistent")).rejects.toThrow(LangWatchHandledError);
+        await expect(service.get("nonexistent")).rejects.toThrow(
+          LangWatchHandledError,
+        );
       });
     });
   });
@@ -216,15 +216,15 @@ describe("ProjectsApiService", () => {
       beforeEach(() => {
         server.use(
           http.patch(`${TEST_ENDPOINT}/api/projects/proj_abc123`, () => {
-            return HttpResponse.json(
-              projectFixture({ name: "Updated Name" }),
-            );
+            return HttpResponse.json(projectFixture({ name: "Updated Name" }));
           }),
         );
       });
 
       it("returns the updated project", async () => {
-        const updated = await service.update("proj_abc123", { name: "Updated Name" });
+        const updated = await service.update("proj_abc123", {
+          name: "Updated Name",
+        });
 
         expect(updated.name).toBe("Updated Name");
       });

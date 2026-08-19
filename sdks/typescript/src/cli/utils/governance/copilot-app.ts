@@ -89,7 +89,12 @@ export function copilotAppCandidatePaths(
         env.LOCALAPPDATA ?? path.join(home, "AppData", "Local");
       const programFiles = env.ProgramFiles ?? "C:\\Program Files";
       return [
-        path.join(localAppData, "Programs", "GitHub Copilot", "GitHub Copilot.exe"),
+        path.join(
+          localAppData,
+          "Programs",
+          "GitHub Copilot",
+          "GitHub Copilot.exe",
+        ),
         path.join(programFiles, "GitHub Copilot", "GitHub Copilot.exe"),
       ];
     }
@@ -169,7 +174,9 @@ function windowsAgentDir(home: string): string {
  *               task runs a generated `.cmd` wrapper that `set`s the vars
  *               and then `start`s the app.
  */
-export function renderLaunchAgent(spec: LaunchAgentSpec): LaunchAgentDescriptor {
+export function renderLaunchAgent(
+  spec: LaunchAgentSpec,
+): LaunchAgentDescriptor {
   const entries = Object.entries(spec.env);
   // Descriptor formats are line-oriented (unit files, cmd, plist text): a
   // control character in a value cannot be represented safely in all three,

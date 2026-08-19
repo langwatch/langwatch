@@ -1,8 +1,8 @@
-import { createSpinner } from "../../utils/spinner";
 import { SpendEventsApiService } from "@/client-sdk/services/spend-events/spend-events-api.service";
 import { checkOrgApiKey } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const spendByUserCommand = async (
   endUserId: string,
@@ -26,7 +26,9 @@ export const spendByUserCommand = async (
         console.log(`Window:    ${spend.from} .. ${spend.to}`);
         console.log(`Spend:     $${Number(spend.cost.total_usd).toFixed(6)}`);
         console.log(`Requests:  ${spend.request_count}`);
-        console.log(`Tokens:    in ${spend.usage.input_tokens} / out ${spend.usage.output_tokens} / cache r ${spend.usage.cache_read_input_tokens} w ${spend.usage.cache_creation_input_tokens}`);
+        console.log(
+          `Tokens:    in ${spend.usage.input_tokens} / out ${spend.usage.output_tokens} / cache r ${spend.usage.cache_read_input_tokens} w ${spend.usage.cache_creation_input_tokens}`,
+        );
         console.log();
       },
     };

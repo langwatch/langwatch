@@ -12,21 +12,23 @@ import { StringDecoder } from "node:string_decoder";
 import chalk from "chalk";
 
 import { runWithCredentialHolder } from "@/internal/credentialContext";
-import { AGENT_MODE_ENV_VARS } from "../utils/output";
 import { currentOutputScope, withOutputScope } from "../utils/errorOutput";
+import { AGENT_MODE_ENV_VARS } from "../utils/output";
 
 /** Set membership test for the strip rule in `applyWindow`. */
-const AGENT_MODE_ENV_VAR_SET: ReadonlySet<string> = new Set(AGENT_MODE_ENV_VARS);
+const AGENT_MODE_ENV_VAR_SET: ReadonlySet<string> = new Set(
+  AGENT_MODE_ENV_VARS,
+);
 
 export type OutputStream = "stdout" | "stderr";
 export type OutputSink = (stream: OutputStream, chunk: Buffer) => void;
 
 /** ANSI SGR (colour/style) sequences — everything chalk emits. */
-// eslint-disable-next-line no-control-regex -- matching the ESC control char is the whole point
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching the ESC control char is the whole point
 const SGR_PATTERN = /\u001B\[[0-9;]*m/g;
 
 /** A trailing PARTIAL SGR: ESC, or ESC[ + parameters with no `m` yet. */
-// eslint-disable-next-line no-control-regex -- matching the ESC control char is the whole point
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching the ESC control char is the whole point
 const PARTIAL_SGR_AT_END = /\u001B(?:\[[0-9;]*)?$/;
 
 /**
@@ -108,7 +110,13 @@ export class ExecutionContext {
    * otherwise leak half of it to the caller. A partial left dangling at
    * finalize is never a complete sequence, so nothing visible is lost.
    */
-  private stripSgr({ stream, chunk }: { stream: OutputStream; chunk: Buffer }): Buffer {
+  private stripSgr({
+    stream,
+    chunk,
+  }: {
+    stream: OutputStream;
+    chunk: Buffer;
+  }): Buffer {
     // SGR sequences are pure ASCII, so the held-back partial decodes safely on
     // its own; the chunk goes through the stream's StringDecoder so a
     // multibyte character split across writes is reassembled, not corrupted.
@@ -224,7 +232,9 @@ export function installProcessInterceptors(): () => void {
       // Honour whichever of the two overloads the caller used, or the stream
       // contract (a write callback must always fire) is broken.
       const done =
-        typeof encodingOrCallback === "function" ? encodingOrCallback : callback;
+        typeof encodingOrCallback === "function"
+          ? encodingOrCallback
+          : callback;
       done?.();
       return true;
     }) as typeof realStdoutWrite;
@@ -336,7 +346,10 @@ export class ExecutionWindow {
 
     // Queue behind anyone already waiting, even on a key match — otherwise a
     // steady stream of same-key requests would starve a different-key waiter.
-    if (this.queue.length === 0 && (this.inflight === 0 || this.activeKey === key)) {
+    if (
+      this.queue.length === 0 &&
+      (this.inflight === 0 || this.activeKey === key)
+    ) {
       return this.admit(key, request);
     }
 

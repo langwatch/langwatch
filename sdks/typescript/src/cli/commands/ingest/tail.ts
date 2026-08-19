@@ -1,11 +1,11 @@
 import { setTimeout as wait } from "node:timers/promises";
 import chalk from "chalk";
-import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
-import {
-  getEventsForSource,
-  type ActivityEventDetailRow,
-} from "@/cli/utils/governance/cli-api";
 import { readCommandError, reportCommandError } from "@/cli/utils/errorOutput";
+import {
+  type ActivityEventDetailRow,
+  getEventsForSource,
+} from "@/cli/utils/governance/cli-api";
+import { isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
 
 /**
  * `langwatch ingest tail <sourceId> [--limit N] [--follow] [--json]`
@@ -37,7 +37,10 @@ export async function ingestTailCommand(
   try {
     initial = await getEventsForSource(cfg, sourceId, { limit });
   } catch (err) {
-    reportCommandError({ error: err, format: options.json ? "json" : undefined });
+    reportCommandError({
+      error: err,
+      format: options.json ? "json" : undefined,
+    });
     process.exit(1);
   }
 
@@ -129,8 +132,7 @@ export function pickFreshEvents(
     .filter(
       (e) =>
         e.eventTimestampIso > state.cursorIso ||
-        (e.eventTimestampIso === state.cursorIso &&
-          !state.seen.has(e.eventId)),
+        (e.eventTimestampIso === state.cursorIso && !state.seen.has(e.eventId)),
     )
     .slice()
     .reverse();

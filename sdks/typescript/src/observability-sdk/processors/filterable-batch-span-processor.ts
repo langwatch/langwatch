@@ -11,7 +11,7 @@ import {
   BatchSpanProcessor,
   type ReadableSpan,
   type SpanExporter,
-} from '@opentelemetry/sdk-trace-base';
+} from "@opentelemetry/sdk-trace-base";
 
 /**
  * A rule for excluding spans from export based on their name or instrumentation scope name.
@@ -86,11 +86,13 @@ export class FilterableBatchSpanProcessor extends BatchSpanProcessor {
       switch (true) {
         case matchOperation === "exact_match" && sourceValue === matchValue:
         case matchOperation === "includes" && sourceValue.includes(matchValue):
-        case matchOperation === "starts_with" && sourceValue.startsWith(matchValue):
+        case matchOperation === "starts_with" &&
+          sourceValue.startsWith(matchValue):
         case matchOperation === "ends_with" && sourceValue.endsWith(matchValue):
           return;
 
-        default: break;
+        default:
+          break;
       }
     }
 

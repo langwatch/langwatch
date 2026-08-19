@@ -1,10 +1,10 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { ApiKeysApiService } from "@/client-sdk/services/api-keys/api-keys-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the listing rather than printing it: the output port renders it in
@@ -21,7 +21,9 @@ export const listApiKeysCommand = async (): Promise<CommandResult | void> => {
   try {
     const keys = await service.list();
 
-    spinner.succeed(`Found ${keys.length} API key${keys.length !== 1 ? "s" : ""}`);
+    spinner.succeed(
+      `Found ${keys.length} API key${keys.length !== 1 ? "s" : ""}`,
+    );
 
     return {
       data: keys,
@@ -30,7 +32,9 @@ export const listApiKeysCommand = async (): Promise<CommandResult | void> => {
           console.log();
           console.log(chalk.gray("No API keys found."));
           console.log(chalk.gray("Create one with:"));
-          console.log(chalk.cyan('  langwatch api-keys create --name "my-key"'));
+          console.log(
+            chalk.cyan('  langwatch api-keys create --name "my-key"'),
+          );
           return;
         }
 
@@ -38,7 +42,8 @@ export const listApiKeysCommand = async (): Promise<CommandResult | void> => {
 
         const now = Date.now();
         const tableData = keys.map((k) => {
-          const isExpired = !!k.expiresAt && new Date(k.expiresAt).getTime() <= now;
+          const isExpired =
+            !!k.expiresAt && new Date(k.expiresAt).getTime() <= now;
           const status = k.revokedAt
             ? chalk.red("revoked")
             : isExpired
@@ -50,15 +55,27 @@ export const listApiKeysCommand = async (): Promise<CommandResult | void> => {
             Name: k.name,
             Status: status,
             Bindings: String(k.roleBindings.length),
-            Expires: k.expiresAt ? new Date(k.expiresAt).toLocaleDateString() : chalk.gray("never"),
-            "Last used": k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleDateString() : chalk.gray("—"),
+            Expires: k.expiresAt
+              ? new Date(k.expiresAt).toLocaleDateString()
+              : chalk.gray("never"),
+            "Last used": k.lastUsedAt
+              ? new Date(k.lastUsedAt).toLocaleDateString()
+              : chalk.gray("—"),
             Created: new Date(k.createdAt).toLocaleDateString(),
           };
         });
 
         formatTable({
           data: tableData,
-          headers: ["ID", "Name", "Status", "Bindings", "Expires", "Last used", "Created"],
+          headers: [
+            "ID",
+            "Name",
+            "Status",
+            "Bindings",
+            "Expires",
+            "Last used",
+            "Created",
+          ],
           colorMap: {
             Name: chalk.cyan,
             ID: chalk.gray,

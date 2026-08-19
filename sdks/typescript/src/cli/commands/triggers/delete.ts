@@ -1,12 +1,11 @@
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
 import { scopedApiKey } from "@/internal/credentialContext";
-import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the deletion result rather than printing it: the output port renders
@@ -23,18 +22,25 @@ export const deleteTriggerCommand = async (
   const spinner = createSpinner(`Deleting trigger "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-      headers: buildAuthHeaders({ apiKey }),
-    });
+    const response = await fetch(
+      `${endpoint}/api/triggers/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE",
+        headers: buildAuthHeaders({ apiKey }),
+      },
+    );
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: `delete trigger "${id}"` });
+      failSpinner({
+        spinner,
+        error: new Error(message),
+        action: `delete trigger "${id}"`,
+      });
       process.exit(1);
     }
 
-    const result = await response.json() as { id: string; deleted: boolean };
+    const result = (await response.json()) as { id: string; deleted: boolean };
     spinner.succeed(`Trigger "${id}" deleted`);
 
     return {

@@ -1,14 +1,13 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
-import { buildAuthHeaders } from "@/internal/api/auth";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 /**
  * Returns the listing rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts). The `table` closure
@@ -18,8 +17,7 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner("Fetching monitors...").start();
 
@@ -38,7 +36,11 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "fetch monitors" });
+      failSpinner({
+        spinner,
+        error: new Error(message),
+        action: "fetch monitors",
+      });
       process.exit(1);
     }
 
@@ -52,7 +54,7 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
     }>;
 
     spinner.succeed(
-      `Found ${monitors.length} monitor${monitors.length !== 1 ? "s" : ""}`
+      `Found ${monitors.length} monitor${monitors.length !== 1 ? "s" : ""}`,
     );
   } catch (error) {
     // No explicit `format`: see traces/search.ts — the preAction hook covers
@@ -70,8 +72,8 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
         console.log(chalk.gray("Create one with:"));
         console.log(
           chalk.cyan(
-            '  langwatch monitor create "Toxicity Check" --check-type ragas/toxicity'
-          )
+            '  langwatch monitor create "Toxicity Check" --check-type ragas/toxicity',
+          ),
         );
         return;
       }

@@ -31,8 +31,8 @@ import * as path from "node:path";
 import {
   applyEdits,
   modify,
-  parse as parseJsonc,
   type ParseError,
+  parse as parseJsonc,
 } from "jsonc-parser";
 
 export type VscodePlatform = "darwin" | "linux" | "win32";
@@ -157,7 +157,11 @@ function atomicWrite(filePath: string, content: string): void {
 export function clearVscodeTerminalOtelEnv(
   args: VscodeSettingsArgs,
 ): string | null {
-  const filePath = vscodeUserSettingsPath(args.platform, args.home, args.appData);
+  const filePath = vscodeUserSettingsPath(
+    args.platform,
+    args.home,
+    args.appData,
+  );
   const envKey = vscodeTerminalEnvKey(args.platform);
   if (!filePath || !envKey || args.keys.length === 0) return null;
 
@@ -180,7 +184,11 @@ export function clearVscodeTerminalOtelEnv(
  * (idempotent). An unparseable file is left untouched rather than clobbered.
  */
 export function removeVscodeTerminalOtelEnv(args: VscodeSettingsArgs): boolean {
-  const filePath = vscodeUserSettingsPath(args.platform, args.home, args.appData);
+  const filePath = vscodeUserSettingsPath(
+    args.platform,
+    args.home,
+    args.appData,
+  );
   const envKey = vscodeTerminalEnvKey(args.platform);
   if (!filePath || !envKey) return false;
 
@@ -216,8 +224,14 @@ export function removeVscodeTerminalOtelEnv(args: VscodeSettingsArgs): boolean {
 }
 
 /** Whether VS Code settings already clear any of `keys` in the terminal env. */
-export function vscodeTerminalEnvHasAnyClear(args: VscodeSettingsArgs): boolean {
-  const filePath = vscodeUserSettingsPath(args.platform, args.home, args.appData);
+export function vscodeTerminalEnvHasAnyClear(
+  args: VscodeSettingsArgs,
+): boolean {
+  const filePath = vscodeUserSettingsPath(
+    args.platform,
+    args.home,
+    args.appData,
+  );
   const envKey = vscodeTerminalEnvKey(args.platform);
   if (!filePath || !envKey) return false;
   const settings = parseSettings(readSettingsText(filePath));

@@ -1,10 +1,10 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { SpendEventsApiService } from "@/client-sdk/services/spend-events/spend-events-api.service";
 import { checkOrgApiKey } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
 import { parseInstantOrNull } from "../../utils/instant";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 const parseInstant = (value: string, flag: string): number => {
   const parsed = parseInstantOrNull(value);

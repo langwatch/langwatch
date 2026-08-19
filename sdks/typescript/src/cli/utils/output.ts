@@ -38,8 +38,9 @@
  * contract by `resolveOutputOptions` — one central preprocessor, no
  * per-command edits, no breaking change.
  */
+
+import { type Command, Option } from "commander";
 import type * as yaml from "js-yaml";
-import { Option, type Command } from "commander";
 import { setOutputFormat } from "./outputScope";
 
 /**
@@ -118,9 +119,8 @@ const isTruthyEnvValue = (value: string | undefined): boolean =>
   value !== undefined && value !== "" && value !== "0" && value !== "false";
 
 /** Whether the environment says the caller is an agent. */
-export const isAgentModeEnv = (
-  env: NodeJS.ProcessEnv = process.env,
-): boolean => AGENT_MODE_ENV_VARS.some((name) => isTruthyEnvValue(env[name]));
+export const isAgentModeEnv = (env: NodeJS.ProcessEnv = process.env): boolean =>
+  AGENT_MODE_ENV_VARS.some((name) => isTruthyEnvValue(env[name]));
 
 /**
  * THE central option preprocessor: maps every spelling a caller can use —
@@ -164,7 +164,12 @@ export const resolveOutputOptions = (
     format = "table";
   }
 
-  return { format, ...(fields?.length ? { fields } : {}), ...(raw.jq !== undefined ? { jq: raw.jq } : {}), agent };
+  return {
+    format,
+    ...(fields?.length ? { fields } : {}),
+    ...(raw.jq !== undefined ? { jq: raw.jq } : {}),
+    agent,
+  };
 };
 
 /**
@@ -302,7 +307,9 @@ export const applyJq = (expression: string, data: unknown): unknown => {
     const iterate = head.endsWith("[]");
     const key = iterate ? head.slice(0, -2) : head;
     if (key === "" && !iterate) {
-      throw new Error(`Invalid --jq expression "${expression}": empty segment at "${path}"`);
+      throw new Error(
+        `Invalid --jq expression "${expression}": empty segment at "${path}"`,
+      );
     }
     // `key === ""` reaching here means root-level iteration (`.[]`, `.[].name`):
     // there is no key to validate, and the non-iterating empty segment was
@@ -333,7 +340,9 @@ export const applyJq = (expression: string, data: unknown): unknown => {
     // `["s1","s2","s3"]`, matching `jq '[ .traces[].spans[].id ]'`, not
     // `[["s1","s2"],["s3"]]`. Each nested level has already flattened itself,
     // so exactly one flatten per iterating segment is correct.
-    return tail.some((segment) => segment.endsWith("[]")) ? mapped.flat() : mapped;
+    return tail.some((segment) => segment.endsWith("[]"))
+      ? mapped.flat()
+      : mapped;
   };
 
   return apply(data, segments, "");
@@ -361,12 +370,17 @@ const selectFields = (data: unknown, fields: string[]): unknown => {
     if (item === null || typeof item !== "object" || Array.isArray(item)) {
       return item;
     }
-    return Object.fromEntries(fields.map((field) => [field, valueAt(item, field)]));
+    return Object.fromEntries(
+      fields.map((field) => [field, valueAt(item, field)]),
+    );
   };
   return Array.isArray(data) ? data.map(pick) : pick(data);
 };
 
-const serialize = async (data: unknown, format: OutputFormat): Promise<string> => {
+const serialize = async (
+  data: unknown,
+  format: OutputFormat,
+): Promise<string> => {
   if (format === "json") return JSON.stringify(data, null, 2);
   if (format === "agents") return JSON.stringify(data);
   // js-yaml's dump already ends in "\n"; trim it so console.log adds exactly one.
@@ -460,7 +474,9 @@ const OUTPUT_AWARE_COMMANDS = new WeakSet<Command>();
  */
 export const emitsResult = <Args extends unknown[]>(
   command: Command,
-  handler: (...args: Args) => Promise<CommandResult | void> | CommandResult | void,
+  handler: (
+    ...args: Args
+  ) => Promise<CommandResult | void> | CommandResult | void,
 ): Command => {
   OUTPUT_AWARE_COMMANDS.add(command);
   return command.action(async (...args: unknown[]): Promise<void> => {
@@ -535,7 +551,8 @@ export const assertFormatIsSupported = async (
   actionCommand: Command,
   resolved: ResolvedOutput,
 ): Promise<ResolvedOutput> => {
-  if (resolved.format === "table" || isOutputAware(actionCommand)) return resolved;
+  if (resolved.format === "table" || isOutputAware(actionCommand))
+    return resolved;
 
   // A command that defines its OWN non-hidden `--json` (daemon status, the
   // ingest and governance groups) already emits machine output through that
@@ -582,7 +599,8 @@ export const assertFormatIsSupported = async (
   // owning it proves the command can emit ITS json, not that it can honour
   // every format, and widening it here would undo that.
   const requestedNewContractFlag =
-    (raw.output !== undefined && !ownsOwnOptionFlag(actionCommand, "--output")) ||
+    (raw.output !== undefined &&
+      !ownsOwnOptionFlag(actionCommand, "--output")) ||
     raw.jq !== undefined ||
     raw.json !== undefined;
 
@@ -675,7 +693,8 @@ export const registerOutputOptions = (program: Command): void => {
   }[] = [
     {
       flags: "-o, --output <format>",
-      description: "Output format: table (default), json, agents (compact single-line JSON), or yaml",
+      description:
+        "Output format: table (default), json, agents (compact single-line JSON), or yaml",
       long: "--output",
       short: "-o",
       // Constrained so a typo (`-o jsn`) errors loudly at parse time instead
@@ -691,12 +710,14 @@ export const registerOutputOptions = (program: Command): void => {
     },
     {
       flags: "--jq <expr>",
-      description: "Filter output with a path expression (e.g. .traces[].traceId)",
+      description:
+        "Filter output with a path expression (e.g. .traces[].traceId)",
       long: "--jq",
     },
     {
       flags: "--agent",
-      description: "Agent mode: compact JSON output, no colour, no spinners (auto-detected from agent env vars)",
+      description:
+        "Agent mode: compact JSON output, no colour, no spinners (auto-detected from agent env vars)",
       long: "--agent",
     },
   ];
@@ -704,8 +725,9 @@ export const registerOutputOptions = (program: Command): void => {
   const visit = (command: Command, isRoot: boolean): void => {
     // Commander private API: there is no public accessor for
     // allowUnknownOption — re-check on commander upgrades.
-    const allowsUnknown = (command as unknown as { _allowUnknownOption?: boolean })
-      ._allowUnknownOption === true;
+    const allowsUnknown =
+      (command as unknown as { _allowUnknownOption?: boolean })
+        ._allowUnknownOption === true;
 
     if (!allowsUnknown) {
       for (const option of globals) {
@@ -728,7 +750,9 @@ export const registerOutputOptions = (program: Command): void => {
       }
     }
 
-    command.commands.forEach((child) => visit(child, false));
+    command.commands.forEach((child) => {
+      visit(child, false);
+    });
   };
 
   visit(program, true);

@@ -1,10 +1,10 @@
 export {
-  SuitesApiService,
-  SuitesApiError,
-  type SuiteResponse,
-  type SuiteTarget,
   type CreateSuiteBody,
-  type UpdateSuiteBody,
-  type SuiteRunResult,
+  type SuiteResponse,
   type SuiteRunOptions,
+  type SuiteRunResult,
+  SuitesApiError,
+  SuitesApiService,
+  type SuiteTarget,
+  type UpdateSuiteBody,
 } from "./suites-api.service";

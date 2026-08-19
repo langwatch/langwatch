@@ -23,7 +23,9 @@ import { defineConfig } from "tsup";
  * Spec: specs/ai-governance/agent-plugin/plugin-package.feature
  */
 export default defineConfig({
-  entry: { "plugin/session-context": "src/cli/plugin/session-context-entry.ts" },
+  entry: {
+    "plugin/session-context": "src/cli/plugin/session-context-entry.ts",
+  },
   format: ["esm"],
   platform: "node",
   // Everything, including zod and the workspace packages the SDK normally

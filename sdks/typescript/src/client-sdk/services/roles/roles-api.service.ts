@@ -7,8 +7,8 @@
 import { resolveEndpoint } from "@/internal/endpoint";
 import {
   createManagementRequest,
-  resolveManagementToken,
   type ManagementRequest,
+  resolveManagementToken,
 } from "../_shared/management-request";
 
 export interface CustomRole {

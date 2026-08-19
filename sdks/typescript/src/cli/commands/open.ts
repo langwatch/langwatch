@@ -23,9 +23,7 @@ export const openCommand = async (
 ): Promise<void> => {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
-    console.error(
-      chalk.yellow("Not logged in. Run `langwatch login` first."),
-    );
+    console.error(chalk.yellow("Not logged in. Run `langwatch login` first."));
     process.exit(1);
   }
 

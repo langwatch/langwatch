@@ -17,7 +17,11 @@ import {
   sessionTitleFromPrompt,
 } from "../session-context";
 
-const repository = { host: "github.com", owner: "langwatch", name: "langwatch" };
+const repository = {
+  host: "github.com",
+  owner: "langwatch",
+  name: "langwatch",
+};
 
 describe("parseGitRemoteUrl", () => {
   describe("given the shapes an origin remote actually takes", () => {
@@ -121,15 +125,17 @@ describe("sessionContextFingerprint", () => {
 
   describe("given a session outside any repository", () => {
     it("still names the titles it carries", () => {
-      expect(
-        sessionContextFingerprint({}, { name: "pr-reviewer" }),
-      ).toBe("@#!~pr-reviewer");
+      expect(sessionContextFingerprint({}, { name: "pr-reviewer" })).toBe(
+        "@#!~pr-reviewer",
+      );
     });
   });
 
   describe("given two contexts differing only by branch", () => {
     it("produces different fingerprints", () => {
-      expect(sessionContextFingerprint({ repository, branch: "main" })).not.toBe(
+      expect(
+        sessionContextFingerprint({ repository, branch: "main" }),
+      ).not.toBe(
         sessionContextFingerprint({ repository, branch: "feat/hook" }),
       );
     });
@@ -316,13 +322,17 @@ describe("sessionTitleFromPrompt", () => {
       expect(
         sessionTitleFromPrompt("  Fix   the pricing bug\nStart with tests."),
       ).toBe("Fix the pricing bug");
-      expect(sessionTitleFromPrompt(`${"x".repeat(200)} tail`)).toHaveLength(120);
+      expect(sessionTitleFromPrompt(`${"x".repeat(200)} tail`)).toHaveLength(
+        120,
+      );
     });
   });
 
   describe("given text no one typed", () => {
     it("names nothing from tags or blank text", () => {
-      expect(sessionTitleFromPrompt("<environment_context>\n</environment_context>")).toBeNull();
+      expect(
+        sessionTitleFromPrompt("<environment_context>\n</environment_context>"),
+      ).toBeNull();
       expect(sessionTitleFromPrompt("   \n  ")).toBeNull();
     });
   });

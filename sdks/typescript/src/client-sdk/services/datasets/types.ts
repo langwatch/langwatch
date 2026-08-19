@@ -35,7 +35,9 @@ export type DatasetMetadata = {
 /**
  * A single entry in a dataset.
  */
-export type DatasetEntry<T extends Record<string, unknown> = Record<string, unknown>> = {
+export type DatasetEntry<
+  T extends Record<string, unknown> = Record<string, unknown>,
+> = {
   /** Unique identifier for this entry */
   id: string;
   /** The dataset this entry belongs to */
@@ -53,7 +55,9 @@ export type DatasetEntry<T extends Record<string, unknown> = Record<string, unkn
 /**
  * A dataset containing metadata and entries.
  */
-export type Dataset<T extends Record<string, unknown> = Record<string, unknown>> = DatasetMetadata & {
+export type Dataset<
+  T extends Record<string, unknown> = Record<string, unknown>,
+> = DatasetMetadata & {
   /** Array of dataset entries */
   entries: DatasetEntry<T>[];
 };

@@ -11,8 +11,8 @@
 import * as crypto from "node:crypto";
 import chalk from "chalk";
 import {
-  AgentsApiService,
   type AgentResponse,
+  AgentsApiService,
 } from "@/client-sdk/services/agents/agents-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { createSpinner } from "../../utils/spinner";
@@ -138,7 +138,9 @@ export async function startAgentDevSession(
   if (options.tunnelUrl) {
     tunnelUrl = options.tunnelUrl;
   } else {
-    const spinner = createSpinner("Starting Cloudflare quick tunnel...").start();
+    const spinner = createSpinner(
+      "Starting Cloudflare quick tunnel...",
+    ).start();
     try {
       const started = await startQuickTunnel({ localUrl: tunnelTarget });
       tunnel = started.tunnel;
@@ -178,7 +180,13 @@ export async function startAgentDevSession(
     }
   }
 
-  printBanner({ tunnelUrl, localUrl, agent, previousUrl, updatedUrl: updateUrl });
+  printBanner({
+    tunnelUrl,
+    localUrl,
+    agent,
+    previousUrl,
+    updatedUrl: updateUrl,
+  });
 
   let resolveDone: (code: number) => void;
   const done = new Promise<number>((resolve) => {

@@ -6,7 +6,7 @@
  * source codex offers.
  */
 import { createHash } from "node:crypto";
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
@@ -17,15 +17,15 @@ import {
   parseCodexRollout,
 } from "./codex-rollout";
 import {
+  codexSessionIndexPath,
+  readCodexThreadNames,
+} from "./codex-session-index";
+import {
   defaultStateDir,
   readFingerprint,
   stateFilePath,
   writeFingerprint,
 } from "./hook-state";
-import {
-  codexSessionIndexPath,
-  readCodexThreadNames,
-} from "./codex-session-index";
 import {
   buildSessionContextLogPayload,
   normalizeSessionName,
@@ -37,7 +37,10 @@ import {
 
 /** Deterministic 16-hex span id derived from the turn's trace_id. */
 function ioSpanId(traceId: string): string {
-  return createHash("sha256").update(`${traceId}:langwatch.io`).digest("hex").slice(0, 16);
+  return createHash("sha256")
+    .update(`${traceId}:langwatch.io`)
+    .digest("hex")
+    .slice(0, 16);
 }
 
 function attr(key: string, value: string) {

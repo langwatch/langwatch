@@ -1,5 +1,4 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import {
   type BudgetOnBreach,
   type BudgetWindow,
@@ -7,13 +6,20 @@ import {
   GatewayBudgetsApiService,
 } from "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export interface CreateGatewayBudgetOptions {
   name: string;
   description?: string;
-  scope: "organization" | "team" | "project" | "virtual-key" | "principal" | "group";
+  scope:
+    | "organization"
+    | "team"
+    | "project"
+    | "virtual-key"
+    | "principal"
+    | "group";
   organization?: string;
   team?: string;
   project?: string;
@@ -38,7 +44,9 @@ const ALLOWED_WINDOWS = [
   "manual",
 ] as const satisfies readonly BudgetWindow[];
 
-function buildScope(options: CreateGatewayBudgetOptions): CreateGatewayBudgetScope {
+function buildScope(
+  options: CreateGatewayBudgetOptions,
+): CreateGatewayBudgetScope {
   switch (options.scope) {
     case "organization":
       if (!options.organization) {
@@ -49,18 +57,22 @@ function buildScope(options: CreateGatewayBudgetOptions): CreateGatewayBudgetSco
       if (!options.team) throw new Error("--team <id> required for scope=team");
       return { kind: "team", team_id: options.team };
     case "project":
-      if (!options.project) throw new Error("--project <id> required for scope=project");
+      if (!options.project)
+        throw new Error("--project <id> required for scope=project");
       return { kind: "project", project_id: options.project };
     case "virtual-key":
-      if (!options.virtualKey) throw new Error("--virtual-key <id> required for scope=virtual-key");
+      if (!options.virtualKey)
+        throw new Error("--virtual-key <id> required for scope=virtual-key");
       return { kind: "virtual_key", virtual_key_id: options.virtualKey };
     case "principal":
-      if (!options.principal) throw new Error("--principal <id> required for scope=principal");
+      if (!options.principal)
+        throw new Error("--principal <id> required for scope=principal");
       return { kind: "principal", principal_user_id: options.principal };
     case "group":
       // Per-member allowance: --limit is what EACH member may spend.
       // Requires a deployment with the ClickHouse spend ledger.
-      if (!options.group) throw new Error("--group <id> required for scope=group");
+      if (!options.group)
+        throw new Error("--group <id> required for scope=group");
       return { kind: "group", group_id: options.group };
   }
 }
@@ -88,7 +100,9 @@ export const createGatewayBudgetCommand = async (
   try {
     scope = buildScope(options);
   } catch (err) {
-    console.error(chalk.red(`Error: ${err instanceof Error ? err.message : String(err)}`));
+    console.error(
+      chalk.red(`Error: ${err instanceof Error ? err.message : String(err)}`),
+    );
     process.exit(1);
   }
 
@@ -111,7 +125,9 @@ export const createGatewayBudgetCommand = async (
       provider_key: options.providerKey ?? null,
       // Immutable on the server, so an unset flag must leave the key off the
       // wire entirely rather than send a null the API would have to reject.
-      ...(options.cycleAnchorAt ? { cycle_anchor_at: options.cycleAnchorAt } : {}),
+      ...(options.cycleAnchorAt
+        ? { cycle_anchor_at: options.cycleAnchorAt }
+        : {}),
     });
 
     spinner.succeed(`Created budget "${chalk.cyan(budget.name)}"`);
@@ -122,7 +138,9 @@ export const createGatewayBudgetCommand = async (
         const perMember = budget.scope_type === "group";
         console.log();
         console.log(`${chalk.bold("ID:")}       ${budget.id}`);
-        console.log(`${chalk.bold("Scope:")}    ${budget.scope_type}:${budget.scope_id}`);
+        console.log(
+          `${chalk.bold("Scope:")}    ${budget.scope_type}:${budget.scope_id}`,
+        );
         console.log(`${chalk.bold("Window:")}   ${budget.window}`);
         console.log(
           `${chalk.bold("Limit:")}    $${budget.limit_usd}${perMember ? chalk.gray(` per member (${budget.member_count ?? 0} members)`) : ""}`,
@@ -131,7 +149,9 @@ export const createGatewayBudgetCommand = async (
         if (budget.provider_key) {
           console.log(`${chalk.bold("Provider:")} ${budget.provider_key}`);
         }
-        console.log(`${chalk.bold("Resets:")}   ${new Date(budget.resets_at).toLocaleString()}`);
+        console.log(
+          `${chalk.bold("Resets:")}   ${new Date(budget.resets_at).toLocaleString()}`,
+        );
         if (budget.cycle_anchor_at) {
           // Only anchored budgets have a phase worth showing; calendar
           // aligned ones are already implied by the window.

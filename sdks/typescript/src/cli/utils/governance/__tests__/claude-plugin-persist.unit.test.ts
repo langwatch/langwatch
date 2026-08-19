@@ -19,9 +19,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { GovernanceConfig } from "../config";
 import type * as ConfigModule from "../config";
+import type { GovernanceConfig } from "../config";
 import {
   seedInstalledPlugin as seedInstalledPluginFixture,
   writeClaudeJson,
@@ -90,7 +89,11 @@ const seedInstalledPlugin = (): void =>
 
 const rawHookEntry = {
   hooks: [
-    { type: "command", command: "langwatch ingest hook claude-code", timeout: 10 },
+    {
+      type: "command",
+      command: "langwatch ingest hook claude-code",
+      timeout: 10,
+    },
   ],
 };
 
@@ -107,9 +110,7 @@ const commandsRun = (): string[] =>
   );
 
 /** Runs the offer against a fresh module graph, so the CLI probe runs once. */
-const runOffer = async (
-  config: GovernanceConfig = cfg(),
-): Promise<void> => {
+const runOffer = async (config: GovernanceConfig = cfg()): Promise<void> => {
   vi.resetModules();
   const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
   await maybeOfferIngestionShellRcPersist({

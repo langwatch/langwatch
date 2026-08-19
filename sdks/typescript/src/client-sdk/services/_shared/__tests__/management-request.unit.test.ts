@@ -98,9 +98,9 @@ describe("OrganizationsAdminApiService", () => {
       }).list();
 
       const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect(
-        (init.headers as Record<string, string>).Authorization,
-      ).toBe("Bearer instance-secret");
+      expect((init.headers as Record<string, string>).Authorization).toBe(
+        "Bearer instance-secret",
+      );
     });
   });
 });

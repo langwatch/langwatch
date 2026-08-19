@@ -4,12 +4,8 @@
  * lives in output-context.unit.test.ts; Commander registration in
  * output-registration.unit.test.ts.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  AGENT_MODE_ENV_VARS,
-  applyJq,
-  printResult,
-} from "../output";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AGENT_MODE_ENV_VARS, applyJq, printResult } from "../output";
 
 const DATA = [
   { name: "alpha", id: "1", nested: { score: 0.9 } },
@@ -37,7 +33,12 @@ afterEach(() => {
 });
 
 const printedJson = (): unknown =>
-  JSON.parse(vi.mocked(console.log).mock.calls.map((call) => String(call[0])).join("\n"));
+  JSON.parse(
+    vi
+      .mocked(console.log)
+      .mock.calls.map((call) => String(call[0]))
+      .join("\n"),
+  );
 
 describe("printResult", () => {
   describe("given no output flags", () => {
@@ -69,9 +70,14 @@ describe("printResult", () => {
 
   describe("given -o yaml", () => {
     it("prints YAML", async () => {
-      await printResult({ name: "alpha", tags: ["a", "b"] }, { output: "yaml", table: vi.fn() });
+      await printResult(
+        { name: "alpha", tags: ["a", "b"] },
+        { output: "yaml", table: vi.fn() },
+      );
 
-      expect(console.log).toHaveBeenCalledWith("name: alpha\ntags:\n  - a\n  - b");
+      expect(console.log).toHaveBeenCalledWith(
+        "name: alpha\ntags:\n  - a\n  - b",
+      );
     });
   });
 
@@ -112,7 +118,10 @@ describe("printResult", () => {
     });
 
     it("iterates and selects a field with .items[].name", async () => {
-      await printResult({ items: DATA }, { jq: ".items[].name", table: vi.fn() });
+      await printResult(
+        { items: DATA },
+        { jq: ".items[].name", table: vi.fn() },
+      );
 
       expect(printedJson()).toEqual(["alpha", "beta"]);
     });
@@ -152,9 +161,11 @@ describe("applyJq", () => {
     expect(applyJq(". | length", { a: 1, b: 2 })).toBe(2);
     // Iteration collects first (`.items[].tags` → array of tag arrays), then
     // `| length` sizes the collected result — the subset's documented reading.
-    expect(applyJq(".items[].tags | length", {
-      items: [{ tags: ["a", "b"] }, { tags: [] }],
-    })).toBe(2);
+    expect(
+      applyJq(".items[].tags | length", {
+        items: [{ tags: ["a", "b"] }, { tags: [] }],
+      }),
+    ).toBe(2);
   });
 
   it("throws on unsupported pipes instead of silently printing null", () => {

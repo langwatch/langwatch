@@ -1,19 +1,15 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { z } from "zod";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { clockTime, dayHeading, localDay } from "../../utils/event-clock";
-import {
-  printResult,
-  type RawOutputFlags,
-} from "../../utils/output";
-import { createCommandEvents } from "../../telemetry/events";
-import { buildAuthHeaders } from "@/internal/api/auth";
-
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { createCommandEvents } from "../../telemetry/events";
+import { resolveCredentials } from "../../utils/apiKey";
+import { clockTime, dayHeading, localDay } from "../../utils/event-clock";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { printResult, type RawOutputFlags } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /** Bound the request so a quiet socket cannot hold the CLI open forever. */
 const REQUEST_TIMEOUT_MS = 60_000;

@@ -74,7 +74,9 @@ describe("langwatch report help", () => {
       const help = renderHelp(["report", "--help"]);
       expect(help).toContain("redacted locally");
       expect(help).toContain("provider API keys");
-      expect(help).toContain("email addresses, phone numbers, credit card numbers");
+      expect(help).toContain(
+        "email addresses, phone numbers, credit card numbers",
+      );
       expect(help).toContain(
         "github.com/langwatch/langwatch/blob/main/packages/redaction/src/sessionReport.ts",
       );

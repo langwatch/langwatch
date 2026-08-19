@@ -34,11 +34,15 @@ export const redactTriggerSecrets = <T extends object>(trigger: T): T => {
   return {
     ...trigger,
     actionParams: Object.fromEntries(
-      Object.keys(params as Record<string, unknown>).map((key) => [key, REDACTED]),
+      Object.keys(params as Record<string, unknown>).map((key) => [
+        key,
+        REDACTED,
+      ]),
     ),
   };
 };
 
 /** The list form: redacts every element. */
-export const redactTriggerListSecrets = <T extends object>(triggers: T[]): T[] =>
-  triggers.map(redactTriggerSecrets);
+export const redactTriggerListSecrets = <T extends object>(
+  triggers: T[],
+): T[] => triggers.map(redactTriggerSecrets);

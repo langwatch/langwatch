@@ -1,11 +1,13 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { WebhooksApiService } from "@/client-sdk/services/webhooks/webhooks-api.service";
 import { checkOrgApiKey } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
-export const testWebhookCommand = async (id: string): Promise<CommandResult | void> => {
+export const testWebhookCommand = async (
+  id: string,
+): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
   const service = new WebhooksApiService({ apiKey });
   const spinner = createSpinner("Sending signed test event...").start();
@@ -14,7 +16,9 @@ export const testWebhookCommand = async (id: string): Promise<CommandResult | vo
     if (result.delivered) {
       spinner.succeed(`Receiver answered ${result.response_status}`);
     } else {
-      spinner.warn(`Delivery failed${result.response_status !== null ? ` (HTTP ${result.response_status})` : ""}${result.error ? `: ${result.error}` : ""}`);
+      spinner.warn(
+        `Delivery failed${result.response_status !== null ? ` (HTTP ${result.response_status})` : ""}${result.error ? `: ${result.error}` : ""}`,
+      );
       // Scripts read the exit code; a rejected test delivery is a failure.
       // exitCode (not exit) so the structured payload still prints.
       process.exitCode = 1;

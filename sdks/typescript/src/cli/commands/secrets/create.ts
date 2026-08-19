@@ -1,14 +1,16 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
-import { buildAuthHeaders } from "@/internal/api/auth";
-
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { resolveCredentials } from "../../utils/apiKey";
+import {
+  commandValidationError,
+  reportCommandError,
+} from "../../utils/errorOutput";
+import { formatFetchError } from "../../utils/formatFetchError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the created secret's metadata rather than printing it: the output
@@ -22,7 +24,7 @@ import type { CommandResult } from "../../utils/output";
  */
 export const createSecretCommand = async (
   name: string,
-  options: { value: string }
+  options: { value: string },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
@@ -36,8 +38,7 @@ export const createSecretCommand = async (
   }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Creating secret "${name}"...`).start();
 
@@ -53,7 +54,11 @@ export const createSecretCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "create secret" });
+      failSpinner({
+        spinner,
+        error: new Error(message),
+        action: "create secret",
+      });
       process.exit(1);
     }
 

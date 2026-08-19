@@ -49,9 +49,7 @@ export class LangWatchLogsExporter extends OTLPLogExporter {
   constructor(opts?: LangWatchLogsExporterOptions) {
     const apiKey = opts?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
     const endpoint =
-      opts?.endpoint ??
-      process.env.LANGWATCH_ENDPOINT ??
-      DEFAULT_ENDPOINT;
+      opts?.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT;
 
     const url = new URL(LOGS_PATH, endpoint);
     const otelEndpoint = url.toString();

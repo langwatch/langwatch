@@ -1,14 +1,14 @@
+import chalk from "chalk";
 import * as fs from "fs";
 import * as path from "path";
-import chalk from "chalk";
-import { FileManager } from "../utils/fileManager";
+import { DEFAULT_PROMPT_MODEL } from "../constants";
 import { resolveCredentials } from "../utils/apiKey";
 import {
   commandValidationError,
   reportCommandError,
 } from "../utils/errorOutput";
+import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
-import { DEFAULT_PROMPT_MODEL } from "../constants";
 import type { CommandResult } from "../utils/output";
 
 export const createCommand = async (

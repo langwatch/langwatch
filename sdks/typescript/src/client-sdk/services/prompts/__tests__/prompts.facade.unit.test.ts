@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { PromptsFacade } from "../prompts.facade";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { type MockProxy, mock } from "vitest-mock-extended";
 import type { InternalConfig } from "@/client-sdk/types";
-import { type PromptsApiService } from "../prompts-api.service";
-import { mock, type MockProxy } from "vitest-mock-extended";
-import { type LocalPromptsService } from "../local-prompts.service";
-import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
-import { Prompt } from "../prompt";
 import { localPromptConfigFactory } from "../../../../../__tests__/factories/local-prompt-config.factory";
+import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
+import type { LocalPromptsService } from "../local-prompts.service";
+import { Prompt } from "../prompt";
+import { PromptsFacade } from "../prompts.facade";
+import type { PromptsApiService } from "../prompts-api.service";
 import { FetchPolicy } from "../types";
 
 /**
@@ -16,7 +16,9 @@ import { FetchPolicy } from "../types";
  */
 describe("Prompt Retrieval", () => {
   const testHandle = "test-prompt";
-  const mockLocalPrompt = localPromptConfigFactory.build({ handle: testHandle });
+  const mockLocalPrompt = localPromptConfigFactory.build({
+    handle: testHandle,
+  });
   const mockServerPrompt = promptResponseFactory.build({ handle: testHandle });
 
   let facade: PromptsFacade;
@@ -82,7 +84,10 @@ describe("Prompt Retrieval", () => {
       // When I retrieve the prompt, Then throws error
       await expect(facade.get(ghostHandle)).rejects.toThrow(mockError);
       expect(localPromptsService.get).toHaveBeenCalledWith(ghostHandle);
-      expect(promptsApiService.get).toHaveBeenCalledWith(ghostHandle, undefined);
+      expect(promptsApiService.get).toHaveBeenCalledWith(
+        ghostHandle,
+        undefined,
+      );
     });
   });
 
@@ -134,7 +139,7 @@ describe("Prompt Retrieval", () => {
       // When I retrieve with fetchPolicy MATERIALIZED_ONLY
       // Then does NOT call API and throws error
       await expect(
-        facade.get(testHandle, { fetchPolicy: FetchPolicy.MATERIALIZED_ONLY })
+        facade.get(testHandle, { fetchPolicy: FetchPolicy.MATERIALIZED_ONLY }),
       ).rejects.toThrow();
       expect(promptsApiService.get).not.toHaveBeenCalled();
     });
@@ -257,13 +262,19 @@ describe("Prompt Retrieval", () => {
     describe("when fetching with colon-separated shorthand", () => {
       /** @scenario Shorthand syntax passes through to API without client-side parsing */
       it("passes the full string to the API without parsing", async () => {
-        const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
+        const productionPrompt = promptResponseFactory.build({
+          handle: testHandle,
+          version: 3,
+        });
         localPromptsService.get.mockResolvedValue(null);
         promptsApiService.get.mockResolvedValue(productionPrompt);
 
         const result = await facade.get(`${testHandle}:production`);
 
-        expect(promptsApiService.get).toHaveBeenCalledWith(`${testHandle}:production`, undefined);
+        expect(promptsApiService.get).toHaveBeenCalledWith(
+          `${testHandle}:production`,
+          undefined,
+        );
         expect(result).toEqual(new Prompt(productionPrompt));
       });
     });
@@ -276,8 +287,14 @@ describe("Prompt Retrieval", () => {
     /** @scenario "CACHE_TTL caches versions independently" */
     it("caches versions independently (different versions do not collide)", async () => {
       // Given "my-prompt" version "1" was cached
-      const v1Prompt = promptResponseFactory.build({ handle: testHandle, version: 1 });
-      const v2Prompt = promptResponseFactory.build({ handle: testHandle, version: 2 });
+      const v1Prompt = promptResponseFactory.build({
+        handle: testHandle,
+        version: 1,
+      });
+      const v2Prompt = promptResponseFactory.build({
+        handle: testHandle,
+        version: 2,
+      });
       promptsApiService.get.mockResolvedValueOnce(v1Prompt);
       promptsApiService.get.mockResolvedValueOnce(v2Prompt);
 
@@ -313,7 +330,10 @@ describe("Prompt Retrieval", () => {
     describe("when fetching with a tag using MATERIALIZED_FIRST", () => {
       /** @scenario Fetch prompt by tag via options */
       it("passes tag through to API service when no local prompt exists", async () => {
-        const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
+        const productionPrompt = promptResponseFactory.build({
+          handle: testHandle,
+          version: 3,
+        });
         localPromptsService.get.mockResolvedValue(null);
         promptsApiService.get.mockResolvedValue(productionPrompt);
 
@@ -332,7 +352,10 @@ describe("Prompt Retrieval", () => {
 
     describe("when fetching with a tag using ALWAYS_FETCH", () => {
       it("passes tag through to API service", async () => {
-        const stagingPrompt = promptResponseFactory.build({ handle: testHandle, version: 4 });
+        const stagingPrompt = promptResponseFactory.build({
+          handle: testHandle,
+          version: 4,
+        });
         promptsApiService.get.mockResolvedValue(stagingPrompt);
 
         const result = await facade.get(testHandle, {
@@ -354,7 +377,7 @@ describe("Prompt Retrieval", () => {
       /** @scenario Unassigned tag returns error */
       it("throws an error when API rejects and no local fallback exists", async () => {
         promptsApiService.get.mockRejectedValue(
-          new Error("Invalid tag: must be 'production' or 'staging'")
+          new Error("Invalid tag: must be 'production' or 'staging'"),
         );
         localPromptsService.get.mockResolvedValue(null);
 
@@ -362,8 +385,10 @@ describe("Prompt Retrieval", () => {
           facade.get(testHandle, {
             tag: "production",
             fetchPolicy: FetchPolicy.ALWAYS_FETCH,
-          })
-        ).rejects.toThrow(`Prompt "${testHandle}" not found locally or on server`);
+          }),
+        ).rejects.toThrow(
+          `Prompt "${testHandle}" not found locally or on server`,
+        );
       });
     });
   });
@@ -374,7 +399,10 @@ describe("Prompt Retrieval", () => {
 
     /** @scenario Tag is included in cache key */
     it("returns cached prompt on second call with same tag within TTL", async () => {
-      const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
+      const productionPrompt = promptResponseFactory.build({
+        handle: testHandle,
+        version: 3,
+      });
       promptsApiService.get.mockResolvedValue(productionPrompt);
 
       await facade.get(testHandle, {
@@ -394,7 +422,10 @@ describe("Prompt Retrieval", () => {
     });
 
     it("returns cached untagged prompt on second call within TTL", async () => {
-      const latestPrompt = promptResponseFactory.build({ handle: testHandle, version: 4 });
+      const latestPrompt = promptResponseFactory.build({
+        handle: testHandle,
+        version: 4,
+      });
       promptsApiService.get.mockResolvedValue(latestPrompt);
 
       await facade.get(testHandle, {
@@ -413,8 +444,14 @@ describe("Prompt Retrieval", () => {
 
     /** @scenario Different tags produce different cache entries */
     it("returns different prompts for different tags with CACHE_TTL", async () => {
-      const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
-      const stagingPrompt = promptResponseFactory.build({ handle: testHandle, version: 4 });
+      const productionPrompt = promptResponseFactory.build({
+        handle: testHandle,
+        version: 3,
+      });
+      const stagingPrompt = promptResponseFactory.build({
+        handle: testHandle,
+        version: 4,
+      });
       promptsApiService.get.mockResolvedValueOnce(productionPrompt);
       promptsApiService.get.mockResolvedValueOnce(stagingPrompt);
 
@@ -436,8 +473,14 @@ describe("Prompt Retrieval", () => {
     });
 
     it("returns latest version for untagged request even when tagged version is cached", async () => {
-      const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
-      const latestPrompt = promptResponseFactory.build({ handle: testHandle, version: 4 });
+      const productionPrompt = promptResponseFactory.build({
+        handle: testHandle,
+        version: 3,
+      });
+      const latestPrompt = promptResponseFactory.build({
+        handle: testHandle,
+        version: 4,
+      });
       promptsApiService.get.mockResolvedValueOnce(productionPrompt);
       promptsApiService.get.mockResolvedValueOnce(latestPrompt);
 

@@ -1,7 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -12,11 +16,11 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { listSecretsCommand } from "../list";
-import { getSecretCommand } from "../get";
 import { createSecretCommand } from "../create";
-import { updateSecretCommand } from "../update";
 import { deleteSecretCommand } from "../delete";
+import { getSecretCommand } from "../get";
+import { listSecretsCommand } from "../list";
+import { updateSecretCommand } from "../update";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -58,13 +62,16 @@ describe("listSecretsCommand()", () => {
   it("lists secrets in table format", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => [makeSecret(), makeSecret({ id: "secret_def", name: "DB_PASSWORD" })],
+      json: async () => [
+        makeSecret(),
+        makeSecret({ id: "secret_def", name: "DB_PASSWORD" }),
+      ],
     });
 
     await listSecretsCommand();
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining("/api/secrets"),
-      expect.objectContaining({ headers: expect.any(Object) })
+      expect.objectContaining({ headers: expect.any(Object) }),
     );
   });
 
@@ -84,7 +91,11 @@ describe("listSecretsCommand()", () => {
   });
 
   it("exits on API error", async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 500, text: async () => "Internal" });
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: async () => "Internal",
+    });
     await expect(listSecretsCommand()).rejects.toThrow(ProcessExitError);
   });
 });
@@ -110,13 +121,19 @@ describe("getSecretCommand()", () => {
     await getSecretCommand("secret_abc");
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining("/api/secrets/secret_abc"),
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 
   it("exits when secret not found", async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 404, text: async () => "Not found" });
-    await expect(getSecretCommand("nonexistent")).rejects.toThrow(ProcessExitError);
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => "Not found",
+    });
+    await expect(getSecretCommand("nonexistent")).rejects.toThrow(
+      ProcessExitError,
+    );
   });
 });
 
@@ -144,13 +161,13 @@ describe("createSecretCommand()", () => {
       expect.objectContaining({
         method: "POST",
         body: expect.stringContaining("MY_API_KEY"),
-      })
+      }),
     );
   });
 
   it("rejects invalid name format", async () => {
     await expect(
-      createSecretCommand("invalid-name", { value: "test" })
+      createSecretCommand("invalid-name", { value: "test" }),
     ).rejects.toThrow(ProcessExitError);
   });
 
@@ -161,7 +178,7 @@ describe("createSecretCommand()", () => {
       text: async () => "Already exists",
     });
     await expect(
-      createSecretCommand("MY_KEY", { value: "val" })
+      createSecretCommand("MY_KEY", { value: "val" }),
     ).rejects.toThrow(ProcessExitError);
   });
 });
@@ -190,14 +207,18 @@ describe("updateSecretCommand()", () => {
       expect.objectContaining({
         method: "PUT",
         body: expect.stringContaining("new-value"),
-      })
+      }),
     );
   });
 
   it("exits when secret not found", async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 404, text: async () => "Not found" });
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => "Not found",
+    });
     await expect(
-      updateSecretCommand("bad_id", { value: "val" })
+      updateSecretCommand("bad_id", { value: "val" }),
     ).rejects.toThrow(ProcessExitError);
   });
 });
@@ -223,12 +244,18 @@ describe("deleteSecretCommand()", () => {
     await deleteSecretCommand("secret_abc");
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining("/api/secrets/secret_abc"),
-      expect.objectContaining({ method: "DELETE" })
+      expect.objectContaining({ method: "DELETE" }),
     );
   });
 
   it("exits when secret not found", async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 404, text: async () => "Not found" });
-    await expect(deleteSecretCommand("bad_id")).rejects.toThrow(ProcessExitError);
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => "Not found",
+    });
+    await expect(deleteSecretCommand("bad_id")).rejects.toThrow(
+      ProcessExitError,
+    );
   });
 });

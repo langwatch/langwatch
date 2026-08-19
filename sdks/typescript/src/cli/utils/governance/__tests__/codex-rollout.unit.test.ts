@@ -8,22 +8,59 @@ function rollout(...objs: unknown[]): string {
   return objs.map(line).join("\n");
 }
 
-const taskStarted = (traceId: string, turnId: string, startedAt = 1_780_000_000) =>
-  ({ type: "event_msg", payload: { type: "task_started", turn_id: turnId, trace_id: traceId, started_at: startedAt } });
-const turnContext = (turnId: string, model = "gpt-5.5") =>
-  ({ type: "turn_context", payload: { turn_id: turnId, model } });
-const developerMsg = (text: string) =>
-  ({ type: "response_item", payload: { type: "message", role: "developer", content: [{ type: "input_text", text }] } });
-const userMsg = (text: string) =>
-  ({ type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text }] } });
-const assistantMsg = (text: string) =>
-  ({ type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text }] } });
-const agentMessage = (message: string) =>
-  ({ type: "event_msg", payload: { type: "agent_message", message, phase: "final_answer" } });
-const functionCall = (name: string, args: string, callId: string) =>
-  ({ type: "response_item", payload: { type: "function_call", name, arguments: args, call_id: callId } });
-const functionCallOutput = (callId: string, output: string) =>
-  ({ type: "response_item", payload: { type: "function_call_output", call_id: callId, output } });
+const taskStarted = (
+  traceId: string,
+  turnId: string,
+  startedAt = 1_780_000_000,
+) => ({
+  type: "event_msg",
+  payload: {
+    type: "task_started",
+    turn_id: turnId,
+    trace_id: traceId,
+    started_at: startedAt,
+  },
+});
+const turnContext = (turnId: string, model = "gpt-5.5") => ({
+  type: "turn_context",
+  payload: { turn_id: turnId, model },
+});
+const developerMsg = (text: string) => ({
+  type: "response_item",
+  payload: {
+    type: "message",
+    role: "developer",
+    content: [{ type: "input_text", text }],
+  },
+});
+const userMsg = (text: string) => ({
+  type: "response_item",
+  payload: {
+    type: "message",
+    role: "user",
+    content: [{ type: "input_text", text }],
+  },
+});
+const assistantMsg = (text: string) => ({
+  type: "response_item",
+  payload: {
+    type: "message",
+    role: "assistant",
+    content: [{ type: "output_text", text }],
+  },
+});
+const agentMessage = (message: string) => ({
+  type: "event_msg",
+  payload: { type: "agent_message", message, phase: "final_answer" },
+});
+const functionCall = (name: string, args: string, callId: string) => ({
+  type: "response_item",
+  payload: { type: "function_call", name, arguments: args, call_id: callId },
+});
+const functionCallOutput = (callId: string, output: string) => ({
+  type: "response_item",
+  payload: { type: "function_call_output", call_id: callId, output },
+});
 
 const lastUser = (messages: CodexChatMessage[]) =>
   [...messages].reverse().find((m) => m.role === "user")?.content;
@@ -85,7 +122,9 @@ describe("parseCodexRollout", () => {
         const { turns } = parseCodexRollout(
           rollout(
             taskStarted("abc123", "t1"),
-            userMsg("<environment_context>\n  <cwd>/tmp</cwd>\n</environment_context>"),
+            userMsg(
+              "<environment_context>\n  <cwd>/tmp</cwd>\n</environment_context>",
+            ),
             userMsg("fix the bug"),
             assistantMsg("fixed"),
           ),
@@ -312,7 +351,11 @@ describe("parseCodexRollout", () => {
             // turn; the queued synthetic id must not survive the boundary.
             {
               type: "response_item",
-              payload: { type: "function_call", name: "exec_command", arguments: "{}" },
+              payload: {
+                type: "function_call",
+                name: "exec_command",
+                arguments: "{}",
+              },
             },
             agentMessage("answered one"),
             taskStarted("trace-2", "t2"),
@@ -425,15 +468,20 @@ describe("parseCodexRollout", () => {
   });
 
   describe("given user_message events recording what the user typed", () => {
-    const typed = (message: string) =>
-      ({ type: "event_msg", payload: { type: "user_message", message } });
+    const typed = (message: string) => ({
+      type: "event_msg",
+      payload: { type: "user_message", message },
+    });
 
     describe("when the rollout is parsed", () => {
       /** @scenario "The harvest names the session by the first thing the user asked" */
       it("keeps the first typed prompt on the meta and ignores later ones", () => {
         const { meta } = parseCodexRollout(
           rollout(
-            { type: "session_meta", payload: { id: "019ff127-1111", cwd: "/w" } },
+            {
+              type: "session_meta",
+              payload: { id: "019ff127-1111", cwd: "/w" },
+            },
             typed("fix the pricing bug"),
             taskStarted("abc123", "t1"),
             userMsg("fix the pricing bug"),

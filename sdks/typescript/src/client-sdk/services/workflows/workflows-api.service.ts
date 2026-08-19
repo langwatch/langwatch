@@ -1,25 +1,25 @@
-import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
-import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
-import {
-  pollExperimentRun,
-  rebaseUrlToEndpoint,
-  fetchResultsWithRetry,
-} from "@/client-sdk/services/experiments/run-status";
 import { mapRunResultsToRows } from "@/client-sdk/services/experiments/mapResults";
 import type {
-  RunWithResultsOptions,
   ExperimentRunWithResults,
+  RunWithResultsOptions,
 } from "@/client-sdk/services/experiments/platformTypes";
+import {
+  fetchResultsWithRetry,
+  pollExperimentRun,
+  rebaseUrlToEndpoint,
+} from "@/client-sdk/services/experiments/run-status";
+import type { InternalConfig } from "@/client-sdk/types";
+import {
+  createLangWatchApiClient,
+  type LangwatchApiClient,
+} from "@/internal/api/client";
 import { resolveEndpoint } from "@/internal/endpoint";
+import type { paths } from "@/internal/generated/openapi/api-client";
 
 export type WorkflowResponse = NonNullable<
   paths["/api/workflows"]["get"]["responses"]["200"]["content"]["application/json"]
@@ -83,9 +83,13 @@ export class WorkflowsApiService {
   }
 
   private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: extractStatusFromResponse(error),
+      },
+    });
     throw new WorkflowsApiError(message, operation, error);
   }
 
@@ -174,13 +178,12 @@ export class WorkflowsApiService {
     if (options.parameters !== undefined) body.parameters = options.parameters;
     if (options.rowIndices !== undefined) body.row_indices = options.rowIndices;
 
-    const startResponse = await this.postUndeclaredEndpoint<WorkflowEvaluateResponse>(
-      {
+    const startResponse =
+      await this.postUndeclaredEndpoint<WorkflowEvaluateResponse>({
         path: `/api/workflows/${encodeURIComponent(workflowId)}/evaluate`,
         body,
         operation: `run workflow evaluation for "${workflowId}"`,
-      },
-    );
+      });
 
     const runId = startResponse.run_id;
 
@@ -205,7 +208,9 @@ export class WorkflowsApiService {
     // Rebase the run URL onto the configured endpoint so a self-hosted run does
     // not surface a cloud (app.langwatch.ai) link.
     const rawRunUrl = startResponse.run_url ?? summary.runUrl;
-    const runUrl = rawRunUrl ? rebaseUrlToEndpoint(rawRunUrl, this.endpoint) : "";
+    const runUrl = rawRunUrl
+      ? rebaseUrlToEndpoint(rawRunUrl, this.endpoint)
+      : "";
 
     return {
       runId,

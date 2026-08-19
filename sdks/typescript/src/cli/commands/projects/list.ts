@@ -1,10 +1,10 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { ProjectsApiService } from "@/client-sdk/services/projects/projects-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the listing rather than printing it: the output port renders it in
@@ -22,9 +22,14 @@ export const listProjectsCommand = async (options?: {
   const spinner = createSpinner("Fetching projects...").start();
 
   try {
-    const result = await service.list({ page: options?.page, limit: options?.limit });
+    const result = await service.list({
+      page: options?.page,
+      limit: options?.limit,
+    });
 
-    spinner.succeed(`Found ${result.data.length} project${result.data.length !== 1 ? "s" : ""} (page ${result.pagination.page}/${result.pagination.totalPages})`);
+    spinner.succeed(
+      `Found ${result.data.length} project${result.data.length !== 1 ? "s" : ""} (page ${result.pagination.page}/${result.pagination.totalPages})`,
+    );
 
     return {
       data: result,
@@ -33,7 +38,11 @@ export const listProjectsCommand = async (options?: {
           console.log();
           console.log(chalk.gray("No projects yet."));
           console.log(chalk.gray("Create one with:"));
-          console.log(chalk.cyan('  langwatch projects create --name "my-project" --language python --framework langchain --new-team-name "my-team"'));
+          console.log(
+            chalk.cyan(
+              '  langwatch projects create --name "my-project" --language python --framework langchain --new-team-name "my-team"',
+            ),
+          );
           return;
         }
 

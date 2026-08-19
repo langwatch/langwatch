@@ -1,10 +1,10 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import type { ScenarioResponse } from "@/client-sdk/services/scenarios";
+import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 const formatScenarioDetails = (scenario: ScenarioResponse): void => {
   console.log();
@@ -32,13 +32,17 @@ const formatScenarioDetails = (scenario: ScenarioResponse): void => {
   }
 
   if (scenario.platformUrl) {
-    console.log(`  ${chalk.bold("View:")}  ${chalk.underline(scenario.platformUrl)}`);
+    console.log(
+      `  ${chalk.bold("View:")}  ${chalk.underline(scenario.platformUrl)}`,
+    );
   }
 
   console.log();
 };
 
-export const getScenarioCommand = async (id: string): Promise<CommandResult | void> => {
+export const getScenarioCommand = async (
+  id: string,
+): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new ScenariosApiService();

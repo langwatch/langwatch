@@ -6,7 +6,15 @@
  * reflection via `Object.assign` on an Object.create'd Experiment prototype to populate
  * the cumulative arrays without going through the network.
  */
-import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  vi,
+} from "vitest";
 import { Experiment } from "../experiment";
 import type { BatchEntry, EvaluationResult } from "../types";
 
@@ -55,7 +63,9 @@ describe("Experiment.printSummary", () => {
 
   beforeEach(() => {
     logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    exitSpy = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation((() => undefined) as never);
   });
 
   afterEach(() => {
@@ -110,9 +120,7 @@ describe("Experiment.printSummary", () => {
     /** @scenario printSummary does not exit when exitOnFailure is false even with failures */
     it("prints the failure count but does not exit", () => {
       const exp = buildExperimentFixture({
-        evaluations: [
-          evaluation({ passed: false }),
-        ],
+        evaluations: [evaluation({ passed: false })],
       });
 
       exp.printSummary(false);
@@ -242,7 +250,12 @@ describe("Experiment.printSummary", () => {
       const exp = buildExperimentFixture({
         evaluations: [
           evaluation({ passed: true, cost: 0.0012, target_id: "gpt-4o" }),
-          evaluation({ passed: true, cost: 0.0023, target_id: "gpt-4o", index: 1 }),
+          evaluation({
+            passed: true,
+            cost: 0.0023,
+            target_id: "gpt-4o",
+            index: 1,
+          }),
         ],
       });
 
@@ -260,7 +273,13 @@ describe("Experiment.printSummary", () => {
         evaluations: [evaluation({ passed: true })],
         entries: [
           { index: 0, entry: null, duration: 100, error: null, trace_id: "t1" },
-          { index: 1, entry: null, duration: 0, error: "LLM timed out", trace_id: "t2" },
+          {
+            index: 1,
+            entry: null,
+            duration: 0,
+            error: "LLM timed out",
+            trace_id: "t2",
+          },
         ],
       });
 

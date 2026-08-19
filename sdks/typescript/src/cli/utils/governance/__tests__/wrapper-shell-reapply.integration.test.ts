@@ -21,7 +21,10 @@ import { buildShellReapply } from "../wrapper";
 
 function has(shell: string): boolean {
   try {
-    execFileSync("command", ["-v", shell], { shell: "/bin/bash", stdio: "ignore" });
+    execFileSync("command", ["-v", shell], {
+      shell: "/bin/bash",
+      stdio: "ignore",
+    });
     return true;
   } catch {
     return false;
@@ -30,7 +33,9 @@ function has(shell: string): boolean {
 
 const SHELLS = ["bash", "zsh"].filter(has);
 const TOOLS = ["copilot", "gemini", "opencode"] as const;
-const combos = SHELLS.flatMap((shell) => TOOLS.map((tool) => ({ shell, tool })));
+const combos = SHELLS.flatMap((shell) =>
+  TOOLS.map((tool) => ({ shell, tool })),
+);
 
 describe("buildShellReapply real-shell execution", () => {
   let tmp: string;
@@ -90,28 +95,30 @@ describe("buildShellReapply real-shell execution", () => {
     });
   }
 
-  it.each(combos)(
-    "unset -f drops the persisted $tool function under $shell so the real binary runs with the reapplied env",
-    ({ shell, tool }) => {
-      writeRealBinary(tool);
-      writeShadowFunction(shell, tool);
+  it.each(
+    combos,
+  )("unset -f drops the persisted $tool function under $shell so the real binary runs with the reapplied env", ({
+    shell,
+    tool,
+  }) => {
+    writeRealBinary(tool);
+    writeShadowFunction(shell, tool);
 
-      // control: without the reapply the function shadows the binary — proves
-      // the assertion below is falsifiable, not a no-op.
-      const control = runInShell(shell, tool);
-      expect(control).toContain("FROM_FUNCTION");
+    // control: without the reapply the function shadows the binary — proves
+    // the assertion below is falsifiable, not a no-op.
+    const control = runInShell(shell, tool);
+    expect(control).toContain("FROM_FUNCTION");
 
-      const reapply = buildShellReapply({
-        tool,
-        clears: [],
-        vars: { OTEL_EXPORTER_OTLP_ENDPOINT: "http://lw.example/api/otel" },
-      });
-      const out = runInShell(shell, `${reapply}; ${tool}`);
+    const reapply = buildShellReapply({
+      tool,
+      clears: [],
+      vars: { OTEL_EXPORTER_OTLP_ENDPOINT: "http://lw.example/api/otel" },
+    });
+    const out = runInShell(shell, `${reapply}; ${tool}`);
 
-      // the real binary ran (function neutralized) and saw the reapplied env
-      expect(out).toContain("REAL_BINARY_RAN");
-      expect(out).toContain("OTEL=http://lw.example/api/otel");
-      expect(out).not.toContain("FROM_FUNCTION");
-    },
-  );
+    // the real binary ran (function neutralized) and saw the reapplied env
+    expect(out).toContain("REAL_BINARY_RAN");
+    expect(out).toContain("OTEL=http://lw.example/api/otel");
+    expect(out).not.toContain("FROM_FUNCTION");
+  });
 });

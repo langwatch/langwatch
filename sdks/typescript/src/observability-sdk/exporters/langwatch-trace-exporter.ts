@@ -1,6 +1,7 @@
+import type { ExportResult } from "@opentelemetry/core";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { type ReadableSpan } from "@opentelemetry/sdk-trace-base";
-import { type ExportResult } from '@opentelemetry/core';
+import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
+import { buildAuthHeaders } from "../../internal/api/auth";
 import {
   DEFAULT_ENDPOINT,
   LANGWATCH_SDK_LANGUAGE,
@@ -9,12 +10,11 @@ import {
   LANGWATCH_SDK_VERSION,
   TRACES_PATH,
 } from "../../internal/constants";
-import { buildAuthHeaders } from "../../internal/api/auth";
 import {
-  type TraceFilter,
+  applyFilters,
   type Criteria,
   type Match,
-  applyFilters,
+  type TraceFilter,
 } from "./trace-filters";
 
 /**
@@ -38,7 +38,7 @@ export interface LangWatchTraceExporterOptions {
   filters?: TraceFilter[] | null;
 }
 
-export type { TraceFilter, Criteria, Match };
+export type { Criteria, Match, TraceFilter };
 
 /**
  * LangWatchTraceExporter extends the OpenTelemetry OTLP HTTP trace exporter
@@ -184,9 +184,7 @@ export class LangWatchTraceExporter extends OTLPTraceExporter {
     const apiKey = opts?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
     const projectId = opts?.projectId ?? process.env.LANGWATCH_PROJECT_ID;
     const endpoint =
-      opts?.endpoint ??
-      process.env.LANGWATCH_ENDPOINT ??
-      DEFAULT_ENDPOINT;
+      opts?.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT;
 
     const url = new URL(TRACES_PATH, endpoint);
     const otelEndpoint = url.toString();
@@ -203,7 +201,10 @@ export class LangWatchTraceExporter extends OTLPTraceExporter {
     });
 
     // Handle filters: null or [] = no filtering, undefined = default, array = use provided
-    if (opts?.filters === null || (Array.isArray(opts?.filters) && opts.filters.length === 0)) {
+    if (
+      opts?.filters === null ||
+      (Array.isArray(opts?.filters) && opts.filters.length === 0)
+    ) {
       this.filters = [];
     } else if (Array.isArray(opts?.filters)) {
       this.filters = opts.filters;
@@ -212,7 +213,10 @@ export class LangWatchTraceExporter extends OTLPTraceExporter {
     }
   }
 
-  export(spans: ReadableSpan[], resultCallback: (result: ExportResult) => void): void {
+  export(
+    spans: ReadableSpan[],
+    resultCallback: (result: ExportResult) => void,
+  ): void {
     const filtered = applyFilters(this.filters, spans);
     super.export(filtered, resultCallback);
   }

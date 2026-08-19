@@ -30,31 +30,31 @@ const BEGIN = "# >>> langwatch otel begin >>>";
 const END = "# <<< langwatch otel end <<<";
 
 export interface CodexOtelBlockInputs {
-	/**
-	 * The bare ingestion base, e.g. https://app.langwatch.ai/api/otel. The
-	 * block derives BOTH signal endpoints from it (codex's OTLP config is
-	 * signal-specific and appends no path of its own): /v1/traces for the
-	 * trace exporter and /v1/logs for the events exporter.
-	 */
-	baseEndpoint: string;
-	/** Plaintext personal ingest key (sk-lw-<...>). */
-	ingestionToken: string;
-	/** Logical environment label (e.g. user@org). Lands on resource.deployment.environment.name. */
-	environment?: string;
+  /**
+   * The bare ingestion base, e.g. https://app.langwatch.ai/api/otel. The
+   * block derives BOTH signal endpoints from it (codex's OTLP config is
+   * signal-specific and appends no path of its own): /v1/traces for the
+   * trace exporter and /v1/logs for the events exporter.
+   */
+  baseEndpoint: string;
+  /** Plaintext personal ingest key (sk-lw-<...>). */
+  ingestionToken: string;
+  /** Logical environment label (e.g. user@org). Lands on resource.deployment.environment.name. */
+  environment?: string;
 }
 
 /** Default config.toml path under the user's home directory. */
 export function defaultCodexConfigPath(): string {
-	const codexHome = process.env.CODEX_HOME;
-	if (codexHome) return path.join(codexHome, "config.toml");
-	return path.join(os.homedir(), ".codex", "config.toml");
+  const codexHome = process.env.CODEX_HOME;
+  if (codexHome) return path.join(codexHome, "config.toml");
+  return path.join(os.homedir(), ".codex", "config.toml");
 }
 
 /** Path shown in the persist prompt (`~/.codex/config.toml`). */
 export function displayCodexConfigPath(): string {
-	const codexHome = process.env.CODEX_HOME;
-	if (codexHome) return path.join(codexHome, "config.toml");
-	return "~/.codex/config.toml";
+  const codexHome = process.env.CODEX_HOME;
+  if (codexHome) return path.join(codexHome, "config.toml");
+  return "~/.codex/config.toml";
 }
 
 /**
@@ -64,7 +64,7 @@ export function displayCodexConfigPath(): string {
  * pass the bare ingestion base (e.g. https://app.langwatch.ai/api/otel).
  */
 export function codexTraceEndpoint(baseEndpoint: string): string {
-	return `${normalizeEndpoint(baseEndpoint)}/v1/traces`;
+  return `${normalizeEndpoint(baseEndpoint)}/v1/traces`;
 }
 
 /**
@@ -72,12 +72,12 @@ export function codexTraceEndpoint(baseEndpoint: string): string {
  * to — same reasoning as {@link codexTraceEndpoint}: codex appends nothing.
  */
 export function codexLogsEndpoint(baseEndpoint: string): string {
-	return `${normalizeEndpoint(baseEndpoint)}/v1/logs`;
+  return `${normalizeEndpoint(baseEndpoint)}/v1/logs`;
 }
 
 /** Escape a value for a TOML basic (double-quoted) string. */
 function tomlStr(s: string): string {
-	return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
 /**
@@ -109,53 +109,53 @@ function tomlStr(s: string): string {
  * disk until the user opts in).
  */
 export function buildCodexOtelBlock(
-	inputs: CodexOtelBlockInputs,
-	options: { includeAuthHeader?: boolean } = {},
+  inputs: CodexOtelBlockInputs,
+  options: { includeAuthHeader?: boolean } = {},
 ): string {
-	const env = inputs.environment ?? "langwatch";
-	const includeAuthHeader = options.includeAuthHeader ?? false;
+  const env = inputs.environment ?? "langwatch";
+  const includeAuthHeader = options.includeAuthHeader ?? false;
 
-	const authNote = includeAuthHeader
-		? [
-				`# The Authorization header below carries a write-only ingest key so`,
-				`# a plain 'codex' (without the langwatch wrapper) captures too. The`,
-				`# file is written 0600; remove the marker pair to opt back out.`,
-			]
-		: [
-				`# Authorization header lives in OTEL_EXPORTER_OTLP_HEADERS;`,
-				`# this file persists only the endpoint + environment label.`,
-			];
+  const authNote = includeAuthHeader
+    ? [
+        `# The Authorization header below carries a write-only ingest key so`,
+        `# a plain 'codex' (without the langwatch wrapper) captures too. The`,
+        `# file is written 0600; remove the marker pair to opt back out.`,
+      ]
+    : [
+        `# Authorization header lives in OTEL_EXPORTER_OTLP_HEADERS;`,
+        `# this file persists only the endpoint + environment label.`,
+      ];
 
-	const headerLine = `headers = { "Authorization" = "Bearer ${tomlStr(inputs.ingestionToken)}" }`;
-	const traceExporter = [
-		"[otel.trace_exporter.otlp-http]",
-		`endpoint = "${tomlStr(codexTraceEndpoint(inputs.baseEndpoint))}"`,
-		`protocol = "json"`,
-	];
-	const eventsExporter = [
-		"[otel.exporter.otlp-http]",
-		`endpoint = "${tomlStr(codexLogsEndpoint(inputs.baseEndpoint))}"`,
-		`protocol = "json"`,
-	];
-	if (includeAuthHeader) {
-		traceExporter.push(headerLine);
-		eventsExporter.push(headerLine);
-	}
+  const headerLine = `headers = { "Authorization" = "Bearer ${tomlStr(inputs.ingestionToken)}" }`;
+  const traceExporter = [
+    "[otel.trace_exporter.otlp-http]",
+    `endpoint = "${tomlStr(codexTraceEndpoint(inputs.baseEndpoint))}"`,
+    `protocol = "json"`,
+  ];
+  const eventsExporter = [
+    "[otel.exporter.otlp-http]",
+    `endpoint = "${tomlStr(codexLogsEndpoint(inputs.baseEndpoint))}"`,
+    `protocol = "json"`,
+  ];
+  if (includeAuthHeader) {
+    traceExporter.push(headerLine);
+    eventsExporter.push(headerLine);
+  }
 
-	return [
-		BEGIN,
-		`# Managed by 'langwatch codex'. Re-running the command updates this`,
-		`# block in place; remove the marker pair above and below to opt out.`,
-		...authNote,
-		"[otel]",
-		`environment = "${tomlStr(env)}"`,
-		"",
-		...traceExporter,
-		"",
-		...eventsExporter,
-		END,
-		"",
-	].join("\n");
+  return [
+    BEGIN,
+    `# Managed by 'langwatch codex'. Re-running the command updates this`,
+    `# block in place; remove the marker pair above and below to opt out.`,
+    ...authNote,
+    "[otel]",
+    `environment = "${tomlStr(env)}"`,
+    "",
+    ...traceExporter,
+    "",
+    ...eventsExporter,
+    END,
+    "",
+  ].join("\n");
 }
 
 /**
@@ -165,17 +165,17 @@ export function buildCodexOtelBlock(
  * is installed and (b) let the unconditional setup write preserve it.
  */
 export function codexOtelBlockHasAuthHeader(filePath: string): boolean {
-	let content: string;
-	try {
-		content = fs.readFileSync(filePath, "utf8");
-	} catch {
-		return false;
-	}
-	const begin = content.indexOf(BEGIN);
-	const end = content.indexOf(END);
-	if (begin === -1 || end === -1 || end < begin) return false;
-	const block = content.slice(begin, end);
-	return /^\s*headers\s*=/m.test(block);
+  let content: string;
+  try {
+    content = fs.readFileSync(filePath, "utf8");
+  } catch {
+    return false;
+  }
+  const begin = content.indexOf(BEGIN);
+  const end = content.indexOf(END);
+  if (begin === -1 || end === -1 || end < begin) return false;
+  const block = content.slice(begin, end);
+  return /^\s*headers\s*=/m.test(block);
 }
 
 /**
@@ -185,20 +185,20 @@ export function codexOtelBlockHasAuthHeader(filePath: string): boolean {
  * the current login's endpoint to decide whether the block is stale.
  */
 export function codexOtelBlockEndpoint(
-	filePath: string = defaultCodexConfigPath(),
+  filePath: string = defaultCodexConfigPath(),
 ): string | null {
-	let content: string;
-	try {
-		content = fs.readFileSync(filePath, "utf8");
-	} catch {
-		return null;
-	}
-	const begin = content.indexOf(BEGIN);
-	const end = content.indexOf(END);
-	if (begin === -1 || end === -1 || end < begin) return null;
-	const block = content.slice(begin, end);
-	const match = /^\s*endpoint\s*=\s*"([^"]*)"/m.exec(block);
-	return match?.[1] ?? null;
+  let content: string;
+  try {
+    content = fs.readFileSync(filePath, "utf8");
+  } catch {
+    return null;
+  }
+  const begin = content.indexOf(BEGIN);
+  const end = content.indexOf(END);
+  if (begin === -1 || end === -1 || end < begin) return null;
+  const block = content.slice(begin, end);
+  const match = /^\s*endpoint\s*=\s*"([^"]*)"/m.exec(block);
+  return match?.[1] ?? null;
 }
 
 /**
@@ -208,23 +208,23 @@ export function codexOtelBlockEndpoint(
  * there is no log endpoint to post to rather than a URL to guess.
  */
 export function codexOtelBlockLogsEndpoint(
-	filePath: string = defaultCodexConfigPath(),
+  filePath: string = defaultCodexConfigPath(),
 ): string | null {
-	let content: string;
-	try {
-		content = fs.readFileSync(filePath, "utf8");
-	} catch {
-		return null;
-	}
-	const begin = content.indexOf(BEGIN);
-	const end = content.indexOf(END);
-	if (begin === -1 || end === -1 || end < begin) return null;
-	const block = content.slice(begin, end);
-	for (const match of block.matchAll(/^\s*endpoint\s*=\s*"([^"]*)"/gm)) {
-		const url = match[1];
-		if (url?.endsWith("/v1/logs")) return url;
-	}
-	return null;
+  let content: string;
+  try {
+    content = fs.readFileSync(filePath, "utf8");
+  } catch {
+    return null;
+  }
+  const begin = content.indexOf(BEGIN);
+  const end = content.indexOf(END);
+  if (begin === -1 || end === -1 || end < begin) return null;
+  const block = content.slice(begin, end);
+  for (const match of block.matchAll(/^\s*endpoint\s*=\s*"([^"]*)"/gm)) {
+    const url = match[1];
+    if (url?.endsWith("/v1/logs")) return url;
+  }
+  return null;
 }
 
 /**
@@ -238,20 +238,20 @@ export function codexOtelBlockLogsEndpoint(
  * the harvest posts exactly where codex's own spans went.
  */
 export function codexOtelBlockAuthToken(
-	filePath: string = defaultCodexConfigPath(),
+  filePath: string = defaultCodexConfigPath(),
 ): string | null {
-	let content: string;
-	try {
-		content = fs.readFileSync(filePath, "utf8");
-	} catch {
-		return null;
-	}
-	const begin = content.indexOf(BEGIN);
-	const end = content.indexOf(END);
-	if (begin === -1 || end === -1 || end < begin) return null;
-	const block = content.slice(begin, end);
-	const match = /"Authorization"\s*=\s*"Bearer\s+([^"]+)"/.exec(block);
-	return match?.[1]?.trim() ?? null;
+  let content: string;
+  try {
+    content = fs.readFileSync(filePath, "utf8");
+  } catch {
+    return null;
+  }
+  const begin = content.indexOf(BEGIN);
+  const end = content.indexOf(END);
+  if (begin === -1 || end === -1 || end < begin) return null;
+  const block = content.slice(begin, end);
+  const match = /"Authorization"\s*=\s*"Bearer\s+([^"]+)"/.exec(block);
+  return match?.[1]?.trim() ?? null;
 }
 
 /**
@@ -261,8 +261,8 @@ export function codexOtelBlockAuthToken(
 export type CodexOtelWriteAction = "created" | "updated" | "unchanged";
 
 export interface CodexOtelWriteResult {
-	action: CodexOtelWriteAction;
-	path: string;
+  action: CodexOtelWriteAction;
+  path: string;
 }
 
 /**
@@ -277,43 +277,43 @@ export interface CodexOtelWriteResult {
  *   when the inputs haven't changed → returns 'unchanged'.
  */
 export function writeCodexOtelBlock(
-	inputs: CodexOtelBlockInputs,
-	options: { filePath?: string; persistAuthHeader?: boolean } = {},
+  inputs: CodexOtelBlockInputs,
+  options: { filePath?: string; persistAuthHeader?: boolean } = {},
 ): CodexOtelWriteResult {
-	const filePath = options.filePath ?? defaultCodexConfigPath();
-	// Emit the Authorization header when explicitly asked (the persist
-	// opt-in); otherwise preserve whatever the current block has, so the
-	// unconditional setup write never strips a header a prior persist
-	// installed.
-	const includeAuthHeader =
-		options.persistAuthHeader ?? codexOtelBlockHasAuthHeader(filePath);
-	const block = buildCodexOtelBlock(inputs, { includeAuthHeader });
+  const filePath = options.filePath ?? defaultCodexConfigPath();
+  // Emit the Authorization header when explicitly asked (the persist
+  // opt-in); otherwise preserve whatever the current block has, so the
+  // unconditional setup write never strips a header a prior persist
+  // installed.
+  const includeAuthHeader =
+    options.persistAuthHeader ?? codexOtelBlockHasAuthHeader(filePath);
+  const block = buildCodexOtelBlock(inputs, { includeAuthHeader });
 
-	if (!fs.existsSync(filePath)) {
-		fs.mkdirSync(path.dirname(filePath), { recursive: true });
-		writeFile0600(filePath, block);
-		return { action: "created", path: filePath };
-	}
+  if (!fs.existsSync(filePath)) {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    writeFile0600(filePath, block);
+    return { action: "created", path: filePath };
+  }
 
-	const prior = fs.readFileSync(filePath, "utf8");
-	const re = new RegExp(
-		`${escapeRe(BEGIN)}[\\s\\S]*?${escapeRe(END)}\\n?`,
-		"m",
-	);
-	if (re.test(prior)) {
-		const next = replaceVerbatim(prior, re, block);
-		if (next === prior) return { action: "unchanged", path: filePath };
-		writeFile0600(filePath, next);
-		return { action: "updated", path: filePath };
-	}
+  const prior = fs.readFileSync(filePath, "utf8");
+  const re = new RegExp(
+    `${escapeRe(BEGIN)}[\\s\\S]*?${escapeRe(END)}\\n?`,
+    "m",
+  );
+  if (re.test(prior)) {
+    const next = replaceVerbatim(prior, re, block);
+    if (next === prior) return { action: "unchanged", path: filePath };
+    writeFile0600(filePath, next);
+    return { action: "updated", path: filePath };
+  }
 
-	const sep = prior.endsWith("\n") ? "\n" : "\n\n";
-	writeFile0600(filePath, prior + sep + block);
-	return { action: "updated", path: filePath };
+  const sep = prior.endsWith("\n") ? "\n" : "\n\n";
+  writeFile0600(filePath, prior + sep + block);
+  return { action: "updated", path: filePath };
 }
 
 function escapeRe(s: string): string {
-	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
@@ -327,11 +327,11 @@ function escapeRe(s: string): string {
  * the file. A replacer function is inserted as-is and has no such reading.
  */
 function replaceVerbatim(
-	content: string,
-	re: RegExp,
-	replacement: string,
+  content: string,
+  re: RegExp,
+  replacement: string,
 ): string {
-	return content.replace(re, () => replacement);
+  return content.replace(re, () => replacement);
 }
 
 /**
@@ -345,11 +345,11 @@ function replaceVerbatim(
  * `0600` up front. The final chmod is a belt-and-suspenders safety check.
  */
 function writeFile0600(filePath: string, content: string): void {
-	if (fs.existsSync(filePath)) {
-		fs.chmodSync(filePath, 0o600);
-	}
-	fs.writeFileSync(filePath, content, { mode: 0o600 });
-	fs.chmodSync(filePath, 0o600);
+  if (fs.existsSync(filePath)) {
+    fs.chmodSync(filePath, 0o600);
+  }
+  fs.writeFileSync(filePath, content, { mode: 0o600 });
+  fs.chmodSync(filePath, 0o600);
 }
 
 const NOTIFY_BEGIN = "# >>> langwatch codex notify begin >>>";
@@ -362,7 +362,7 @@ const NOTIFY_END = "# <<< langwatch codex notify end <<<";
  * verbatim in the comment AND re-run via the chain arg in our own block.
  */
 const DISPLACED_NOTE =
-	"# langwatch moved this notify into the block at the top of the file, which still runs it:";
+  "# langwatch moved this notify into the block at the top of the file, which still runs it:";
 
 /**
  * Bracket the displaced assignment so removal restores exactly the lines it
@@ -375,28 +375,28 @@ const DISPLACED_END = "# <<< langwatch displaced notify end <<<";
 
 /** The whole displaced region, capturing the commented-out lines it stores. */
 function displacedRegionRe(): RegExp {
-	return new RegExp(
-		`${escapeRe(DISPLACED_BEGIN)}\\n${escapeRe(DISPLACED_NOTE)}\\n([\\s\\S]*?)\\n${escapeRe(DISPLACED_END)}\\n?`,
-		"m",
-	);
+  return new RegExp(
+    `${escapeRe(DISPLACED_BEGIN)}\\n${escapeRe(DISPLACED_NOTE)}\\n([\\s\\S]*?)\\n${escapeRe(DISPLACED_END)}\\n?`,
+    "m",
+  );
 }
 
 /** Comment out the lines an assignment occupied, bracketed for exact recovery. */
 function buildDisplacedRegion(raw: string): string {
-	return [
-		DISPLACED_BEGIN,
-		DISPLACED_NOTE,
-		...raw.split("\n").map((line) => `# ${line}`),
-		DISPLACED_END,
-	].join("\n");
+  return [
+    DISPLACED_BEGIN,
+    DISPLACED_NOTE,
+    ...raw.split("\n").map((line) => `# ${line}`),
+    DISPLACED_END,
+  ].join("\n");
 }
 
 /** Give the stored lines back exactly as the user wrote them. */
 function uncommentDisplaced(commented: string): string {
-	return commented
-		.split("\n")
-		.map((line) => line.replace(/^[ \t]*# ?/, ""))
-		.join("\n");
+  return commented
+    .split("\n")
+    .map((line) => line.replace(/^[ \t]*# ?/, ""))
+    .join("\n");
 }
 
 /**
@@ -410,24 +410,24 @@ function uncommentDisplaced(commented: string): string {
  * the note left in their file still says we run it.
  */
 function findDisplacedNotify(
-	content: string,
+  content: string,
 ): { start: number; end: number; argv: string[] } | null {
-	const match = displacedRegionRe().exec(content);
-	if (!match) return null;
-	const argv = findNotifyAssignment(uncommentDisplaced(match[1] ?? ""))?.argv;
-	if (!argv?.length) return null;
-	return { start: match.index, end: match.index + match[0].length, argv };
+  const match = displacedRegionRe().exec(content);
+  if (!match) return null;
+  const argv = findNotifyAssignment(uncommentDisplaced(match[1] ?? ""))?.argv;
+  if (!argv?.length) return null;
+  return { start: match.index, end: match.index + match[0].length, argv };
 }
 
 export interface CodexNotifyBlockInputs {
-	/**
-	 * The harvest argv up to but NOT including the trailing `--notify`: program
-	 * first, then args. The flag is appended here rather than by the caller
-	 * because it has to stay last, and that is easy to get wrong from outside.
-	 */
-	command: string[];
-	/** A user-authored notify argv to run after ours, when we displaced one. */
-	chained?: readonly string[] | null;
+  /**
+   * The harvest argv up to but NOT including the trailing `--notify`: program
+   * first, then args. The flag is appended here rather than by the caller
+   * because it has to stay last, and that is easy to get wrong from outside.
+   */
+  command: string[];
+  /** A user-authored notify argv to run after ours, when we displaced one. */
+  chained?: readonly string[] | null;
 }
 
 /**
@@ -438,7 +438,7 @@ export interface CodexNotifyBlockInputs {
 const NOTIFY_PAYLOAD_FLAG = "--notify";
 
 function tomlStringArray(values: readonly string[]): string {
-	return `[${values.map((v) => `"${tomlStr(v)}"`).join(", ")}]`;
+  return `[${values.map((v) => `"${tomlStr(v)}"`).join(", ")}]`;
 }
 
 /**
@@ -454,9 +454,9 @@ function tomlStringArray(values: readonly string[]): string {
  * cue to skip the install rather than write an argv that will never run.
  */
 export function defaultCodexNotifyCommand(): string[] | null {
-	const entry = process.argv[1];
-	if (!entry) return null;
-	return [process.execPath, path.resolve(entry), "ingest", "codex"];
+  const entry = process.argv[1];
+  if (!entry) return null;
+  return [process.execPath, path.resolve(entry), "ingest", "codex"];
 }
 
 /**
@@ -465,11 +465,11 @@ export function defaultCodexNotifyCommand(): string[] | null {
  * install path says so instead of pretending it is wired for good.
  */
 export function codexNotifyCommandIsEphemeral(
-	command: readonly string[],
+  command: readonly string[],
 ): boolean {
-	return command.some(
-		(part) => part.includes("/_npx/") || part.includes("\\_npx\\"),
-	);
+  return command.some(
+    (part) => part.includes("/_npx/") || part.includes("\\_npx\\"),
+  );
 }
 
 /**
@@ -488,27 +488,27 @@ export function codexNotifyCommandIsEphemeral(
  * the final argv, so `--notify` has to be last to receive it as its value.
  */
 export function buildCodexNotifyBlock(inputs: CodexNotifyBlockInputs): string {
-	const chained = inputs.chained?.length
-		? ["--chain", JSON.stringify(inputs.chained)]
-		: [];
-	const argv = [...inputs.command, ...chained, NOTIFY_PAYLOAD_FLAG];
-	return [
-		NOTIFY_BEGIN,
-		"# Managed by 'langwatch'. Codex runs this after every completed turn so",
-		"# the conversation (prompt, tool calls, reply) lands on the same trace",
-		"# codex already reports tokens on. Codex's own telemetry carries none of",
-		"# that content. Remove the marker pair above and below to opt out.",
-		`notify = ${tomlStringArray(argv)}`,
-		NOTIFY_END,
-		"",
-	].join("\n");
+  const chained = inputs.chained?.length
+    ? ["--chain", JSON.stringify(inputs.chained)]
+    : [];
+  const argv = [...inputs.command, ...chained, NOTIFY_PAYLOAD_FLAG];
+  return [
+    NOTIFY_BEGIN,
+    "# Managed by 'langwatch'. Codex runs this after every completed turn so",
+    "# the conversation (prompt, tool calls, reply) lands on the same trace",
+    "# codex already reports tokens on. Codex's own telemetry carries none of",
+    "# that content. Remove the marker pair above and below to opt out.",
+    `notify = ${tomlStringArray(argv)}`,
+    NOTIFY_END,
+    "",
+  ].join("\n");
 }
 
 /** Where a line left the scanner: array nesting, and any open multi-line string. */
 interface ScanState {
-	depth: number;
-	/** The delimiter of the multi-line string still open, null when none is. */
-	openMultiline: '"""' | "'''" | null;
+  depth: number;
+  /** The delimiter of the multi-line string still open, null when none is. */
+  openMultiline: '"""' | "'''" | null;
 }
 
 /**
@@ -526,55 +526,55 @@ interface ScanState {
  * `notify` below it.
  */
 function scanLine(line: string, state: ScanState): ScanState {
-	let next = state.depth;
-	let openMultiline = state.openMultiline;
-	let quote: '"' | "'" | null = null;
-	let escaped = false;
+  let next = state.depth;
+  let openMultiline = state.openMultiline;
+  let quote: '"' | "'" | null = null;
+  let escaped = false;
 
-	for (let i = 0; i < line.length; i++) {
-		const ch = line[i]!;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]!;
 
-		if (openMultiline !== null) {
-			// Basic multi-line strings honour backslash escapes; literal ones do
-			// not, so a lone backslash there cannot hide the terminator.
-			if (escaped) {
-				escaped = false;
-				continue;
-			}
-			if (openMultiline === '"""' && ch === "\\") {
-				escaped = true;
-				continue;
-			}
-			if (line.startsWith(openMultiline, i)) {
-				i += openMultiline.length - 1;
-				openMultiline = null;
-			}
-			continue;
-		}
+    if (openMultiline !== null) {
+      // Basic multi-line strings honour backslash escapes; literal ones do
+      // not, so a lone backslash there cannot hide the terminator.
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (openMultiline === '"""' && ch === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (line.startsWith(openMultiline, i)) {
+        i += openMultiline.length - 1;
+        openMultiline = null;
+      }
+      continue;
+    }
 
-		if (quote !== null) {
-			if (escaped) escaped = false;
-			else if (quote === '"' && ch === "\\") escaped = true;
-			else if (ch === quote) quote = null;
-			continue;
-		}
+    if (quote !== null) {
+      if (escaped) escaped = false;
+      else if (quote === '"' && ch === "\\") escaped = true;
+      else if (ch === quote) quote = null;
+      continue;
+    }
 
-		if (ch === '"' || ch === "'") {
-			const triple = `${ch}${ch}${ch}` as '"""' | "'''";
-			if (line.startsWith(triple, i)) {
-				openMultiline = triple;
-				i += 2;
-			} else {
-				quote = ch;
-			}
-		} else if (ch === "#") break;
-		else if (ch === "[") next++;
-		else if (ch === "]") next--;
-	}
+    if (ch === '"' || ch === "'") {
+      const triple = `${ch}${ch}${ch}` as '"""' | "'''";
+      if (line.startsWith(triple, i)) {
+        openMultiline = triple;
+        i += 2;
+      } else {
+        quote = ch;
+      }
+    } else if (ch === "#") break;
+    else if (ch === "[") next++;
+    else if (ch === "]") next--;
+  }
 
-	// An unterminated single-line string cannot continue onto the next line in
-	// TOML, so only the multi-line state survives the line break.
-	return { depth: next, openMultiline };
+  // An unterminated single-line string cannot continue onto the next line in
+  // TOML, so only the multi-line state survives the line break.
+  return { depth: next, openMultiline };
 }
 
 /**
@@ -583,9 +583,9 @@ function scanLine(line: string, state: ScanState): ScanState {
  * does not, and only the former ends the top level.
  */
 function isTableHeaderLine(line: string): boolean {
-	if (!/^[ \t]*\[/.test(line)) return false;
-	if (/^[ \t]*notify[ \t]*=/.test(line)) return false;
-	return scanLine(line, { depth: 0, openMultiline: null }).depth === 0;
+  if (!/^[ \t]*\[/.test(line)) return false;
+  if (/^[ \t]*notify[ \t]*=/.test(line)) return false;
+  return scanLine(line, { depth: 0, openMultiline: null }).depth === 0;
 }
 
 /**
@@ -593,21 +593,21 @@ function isTableHeaderLine(line: string): boolean {
  * header — the ones TOML binds to no table, which is what codex reads.
  */
 function topLevelNotifyOffsets(content: string): number[] {
-	const found: number[] = [];
-	let state: ScanState = { depth: 0, openMultiline: null };
-	let offset = 0;
-	for (const line of content.split("\n")) {
-		// Inside a multi-line string every line is prose, including one that
-		// happens to read like `[a.table]` or `notify = [...]`.
-		if (state.depth === 0 && state.openMultiline === null) {
-			// Everything past a table header belongs to that table.
-			if (isTableHeaderLine(line)) return found;
-			if (/^[ \t]*notify[ \t]*=[ \t]*\[/.test(line)) found.push(offset);
-		}
-		state = scanLine(line, state);
-		offset += line.length + 1;
-	}
-	return found;
+  const found: number[] = [];
+  let state: ScanState = { depth: 0, openMultiline: null };
+  let offset = 0;
+  for (const line of content.split("\n")) {
+    // Inside a multi-line string every line is prose, including one that
+    // happens to read like `[a.table]` or `notify = [...]`.
+    if (state.depth === 0 && state.openMultiline === null) {
+      // Everything past a table header belongs to that table.
+      if (isTableHeaderLine(line)) return found;
+      if (/^[ \t]*notify[ \t]*=[ \t]*\[/.test(line)) found.push(offset);
+    }
+    state = scanLine(line, state);
+    offset += line.length + 1;
+  }
+  return found;
 }
 
 /**
@@ -622,8 +622,8 @@ function topLevelNotifyOffsets(content: string): number[] {
  * codex parsing its config at all.
  */
 function topLevelNotifyMatch(content: string): { index: number } | null {
-	const [first] = topLevelNotifyOffsets(content);
-	return first === undefined ? null : { index: first };
+  const [first] = topLevelNotifyOffsets(content);
+  return first === undefined ? null : { index: first };
 }
 
 /**
@@ -652,92 +652,92 @@ function topLevelNotifyMatch(content: string): { index: number } | null {
 const TOML_ARRAY_ELEMENT = /"((?:[^"\\]|\\.)*)"|'([^']*)'/g;
 
 interface NotifyAssignment {
-	/** Offset of the assignment's first character. */
-	start: number;
-	/** Offset just past its closing `]`. */
-	end: number;
-	raw: string;
-	argv: string[];
+  /** Offset of the assignment's first character. */
+  start: number;
+  /** Offset just past its closing `]`. */
+  end: number;
+  raw: string;
+  argv: string[];
 }
 
 function findNotifyAssignment(content: string): NotifyAssignment | null {
-	const start = topLevelNotifyMatch(content);
-	if (!start) return null;
-	const openIndex = content.indexOf("[", start.index);
-	let depth = 0;
-	let quote: '"' | "'" | null = null;
-	let escaped = false;
-	// The array's own text, minus its comments. A `#` run holds prose, and its
-	// quotes are not elements: reading them would chain a program the user
-	// deliberately commented out, and a lone apostrophe in the prose would open
-	// a string that never closes, losing the assignment entirely.
-	let elements = "";
-	for (let i = openIndex; i < content.length; i++) {
-		const ch = content[i];
-		if (quote !== null) {
-			// Literal strings have no escape mechanism, so only a basic string's
-			// backslash can hide its closing quote.
-			if (escaped) escaped = false;
-			else if (quote === '"' && ch === "\\") escaped = true;
-			else if (ch === quote) quote = null;
-			elements += ch;
-			continue;
-		}
-		if (ch === "#") {
-			const lineEnd = content.indexOf("\n", i);
-			// A comment with no line after it cannot be followed by the `]` that
-			// would close the array, so the assignment is unterminated.
-			if (lineEnd === -1) return null;
-			elements += "\n";
-			i = lineEnd;
-			continue;
-		}
-		elements += ch;
-		if (ch === '"' || ch === "'") quote = ch;
-		else if (ch === "[") depth++;
-		else if (ch === "]") {
-			depth--;
-			if (depth === 0) {
-				// `raw` stays the verbatim source span: the caller moves exactly
-				// the lines the assignment occupied, comments included.
-				const end = i + 1;
-				const raw = content.slice(start.index, end);
-				const argv = Array.from(elements.matchAll(TOML_ARRAY_ELEMENT)).map(
-					(m) =>
-						m[1] !== undefined ? m[1].replace(/\\(.)/g, "$1") : (m[2] ?? ""),
-				);
-				return { start: start.index, end, raw, argv };
-			}
-		}
-	}
-	return null;
+  const start = topLevelNotifyMatch(content);
+  if (!start) return null;
+  const openIndex = content.indexOf("[", start.index);
+  let depth = 0;
+  let quote: '"' | "'" | null = null;
+  let escaped = false;
+  // The array's own text, minus its comments. A `#` run holds prose, and its
+  // quotes are not elements: reading them would chain a program the user
+  // deliberately commented out, and a lone apostrophe in the prose would open
+  // a string that never closes, losing the assignment entirely.
+  let elements = "";
+  for (let i = openIndex; i < content.length; i++) {
+    const ch = content[i];
+    if (quote !== null) {
+      // Literal strings have no escape mechanism, so only a basic string's
+      // backslash can hide its closing quote.
+      if (escaped) escaped = false;
+      else if (quote === '"' && ch === "\\") escaped = true;
+      else if (ch === quote) quote = null;
+      elements += ch;
+      continue;
+    }
+    if (ch === "#") {
+      const lineEnd = content.indexOf("\n", i);
+      // A comment with no line after it cannot be followed by the `]` that
+      // would close the array, so the assignment is unterminated.
+      if (lineEnd === -1) return null;
+      elements += "\n";
+      i = lineEnd;
+      continue;
+    }
+    elements += ch;
+    if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === "[") depth++;
+    else if (ch === "]") {
+      depth--;
+      if (depth === 0) {
+        // `raw` stays the verbatim source span: the caller moves exactly
+        // the lines the assignment occupied, comments included.
+        const end = i + 1;
+        const raw = content.slice(start.index, end);
+        const argv = Array.from(elements.matchAll(TOML_ARRAY_ELEMENT)).map(
+          (m) =>
+            m[1] !== undefined ? m[1].replace(/\\(.)/g, "$1") : (m[2] ?? ""),
+        );
+        return { start: start.index, end, raw, argv };
+      }
+    }
+  }
+  return null;
 }
 
 /** The argv codex currently runs on turn completion, or null when unset. */
 export function codexNotifyCommand(
-	filePath: string = defaultCodexConfigPath(),
+  filePath: string = defaultCodexConfigPath(),
 ): string[] | null {
-	try {
-		return (
-			findNotifyAssignment(fs.readFileSync(filePath, "utf8"))?.argv ?? null
-		);
-	} catch {
-		return null;
-	}
+  try {
+    return (
+      findNotifyAssignment(fs.readFileSync(filePath, "utf8"))?.argv ?? null
+    );
+  } catch {
+    return null;
+  }
 }
 
 /** Whether config.toml currently carries the langwatch notify block. */
 export function codexHasNotifyBlock(
-	filePath: string = defaultCodexConfigPath(),
+  filePath: string = defaultCodexConfigPath(),
 ): boolean {
-	return fileHasMarker(filePath, NOTIFY_BEGIN);
+  return fileHasMarker(filePath, NOTIFY_BEGIN);
 }
 
 export interface CodexNotifyWriteResult {
-	action: CodexOtelWriteAction;
-	path: string;
-	/** The user's own notify argv we displaced and now chain, when there was one. */
-	chained: string[] | null;
+  action: CodexOtelWriteAction;
+  path: string;
+  /** The user's own notify argv we displaced and now chain, when there was one. */
+  chained: string[] | null;
 }
 
 /**
@@ -756,65 +756,65 @@ export interface CodexNotifyWriteResult {
  * the chain instead of being dropped the second time capture is enabled.
  */
 export function writeCodexNotifyBlock(
-	inputs: CodexNotifyBlockInputs,
-	options: { filePath?: string } = {},
+  inputs: CodexNotifyBlockInputs,
+  options: { filePath?: string } = {},
 ): CodexNotifyWriteResult {
-	const filePath = options.filePath ?? defaultCodexConfigPath();
+  const filePath = options.filePath ?? defaultCodexConfigPath();
 
-	let prior = "";
-	try {
-		prior = fs.readFileSync(filePath, "utf8");
-	} catch {
-		/* absent — treated as empty below */
-	}
+  let prior = "";
+  try {
+    prior = fs.readFileSync(filePath, "utf8");
+  } catch {
+    /* absent — treated as empty below */
+  }
 
-	// Strip our own block first so the search for a foreign notify can't match
-	// the one we wrote last time, and so a block left mid-file by an older
-	// write is re-seated at the top.
-	const withoutOurs =
-		stripMarkerBlock(prior, NOTIFY_BEGIN, NOTIFY_END) ?? prior;
+  // Strip our own block first so the search for a foreign notify can't match
+  // the one we wrote last time, and so a block left mid-file by an older
+  // write is re-seated at the top.
+  const withoutOurs =
+    stripMarkerBlock(prior, NOTIFY_BEGIN, NOTIFY_END) ?? prior;
 
-	const existing = findNotifyAssignment(withoutOurs);
-	// With no live `notify` the user may still have one: an earlier install
-	// already moved it into the displaced region, where it is a comment rather
-	// than a key. That region is the only surviving record of it.
-	const displaced = existing ? null : findDisplacedNotify(withoutOurs);
-	const chained = existing?.argv.length
-		? existing.argv
-		: (displaced?.argv ?? null);
-	// Splice by the offsets the scanner resolved. Searching the file for the
-	// assignment's text would land on the first copy of that spelling, and a
-	// `notify` quoted in a comment or a `"""` block reads the same as the live
-	// one, so the comment would be commented out and the real key left standing.
-	const body = existing
-		? withoutOurs.slice(0, existing.start) +
-			buildDisplacedRegion(existing.raw) +
-			withoutOurs.slice(existing.end)
-		: withoutOurs;
+  const existing = findNotifyAssignment(withoutOurs);
+  // With no live `notify` the user may still have one: an earlier install
+  // already moved it into the displaced region, where it is a comment rather
+  // than a key. That region is the only surviving record of it.
+  const displaced = existing ? null : findDisplacedNotify(withoutOurs);
+  const chained = existing?.argv.length
+    ? existing.argv
+    : (displaced?.argv ?? null);
+  // Splice by the offsets the scanner resolved. Searching the file for the
+  // assignment's text would land on the first copy of that spelling, and a
+  // `notify` quoted in a comment or a `"""` block reads the same as the live
+  // one, so the comment would be commented out and the real key left standing.
+  const body = existing
+    ? withoutOurs.slice(0, existing.start) +
+      buildDisplacedRegion(existing.raw) +
+      withoutOurs.slice(existing.end)
+    : withoutOurs;
 
-	const block = buildCodexNotifyBlock({ ...inputs, chained });
-	const next = body.trim() ? `${block}\n${body.replace(/^\n+/, "")}` : block;
+  const block = buildCodexNotifyBlock({ ...inputs, chained });
+  const next = body.trim() ? `${block}\n${body.replace(/^\n+/, "")}` : block;
 
-	// Last line of defence. Deciding which `notify` is codex's means reading
-	// TOML with a line scanner, and a config shape it reads wrong would leave
-	// two top-level `notify` keys — a duplicate key, which stops codex starting
-	// at all. Refusing to write beats breaking the user's editor on a shape we
-	// did not anticipate; capture stays off and says so.
-	if (topLevelNotifyOffsets(next).length > 1) {
-		throw new Error(
-			`refusing to write ${filePath}: it already defines a top-level 'notify' this merge cannot safely move`,
-		);
-	}
+  // Last line of defence. Deciding which `notify` is codex's means reading
+  // TOML with a line scanner, and a config shape it reads wrong would leave
+  // two top-level `notify` keys — a duplicate key, which stops codex starting
+  // at all. Refusing to write beats breaking the user's editor on a shape we
+  // did not anticipate; capture stays off and says so.
+  if (topLevelNotifyOffsets(next).length > 1) {
+    throw new Error(
+      `refusing to write ${filePath}: it already defines a top-level 'notify' this merge cannot safely move`,
+    );
+  }
 
-	if (next === prior) return { action: "unchanged", path: filePath, chained };
+  if (next === prior) return { action: "unchanged", path: filePath, chained };
 
-	if (!fs.existsSync(filePath)) {
-		fs.mkdirSync(path.dirname(filePath), { recursive: true });
-		writeFile0600(filePath, next);
-		return { action: "created", path: filePath, chained };
-	}
-	writeFile0600(filePath, next);
-	return { action: "updated", path: filePath, chained };
+  if (!fs.existsSync(filePath)) {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    writeFile0600(filePath, next);
+    return { action: "created", path: filePath, chained };
+  }
+  writeFile0600(filePath, next);
+  return { action: "updated", path: filePath, chained };
 }
 
 /**
@@ -822,70 +822,70 @@ export function writeCodexNotifyBlock(
  * commented out when we installed. Returns true when a block was removed.
  */
 export function removeCodexNotifyBlock(
-	filePath: string = defaultCodexConfigPath(),
+  filePath: string = defaultCodexConfigPath(),
 ): boolean {
-	let content: string;
-	try {
-		content = fs.readFileSync(filePath, "utf8");
-	} catch {
-		return false;
-	}
-	const stripped = stripMarkerBlock(content, NOTIFY_BEGIN, NOTIFY_END);
-	if (stripped === null) return false;
-	// Restore only what sits between the displaced markers. Matching "the run of
-	// comment lines after the note" instead would swallow whatever the user had
-	// written below their own notify and uncomment it, turning their prose into
-	// bare TOML that codex then refuses to parse.
-	const restored = stripped.replace(
-		displacedRegionRe(),
-		(_match, commented: string) => `${uncommentDisplaced(commented)}\n`,
-	);
-	fs.writeFileSync(filePath, restored);
-	return true;
+  let content: string;
+  try {
+    content = fs.readFileSync(filePath, "utf8");
+  } catch {
+    return false;
+  }
+  const stripped = stripMarkerBlock(content, NOTIFY_BEGIN, NOTIFY_END);
+  if (stripped === null) return false;
+  // Restore only what sits between the displaced markers. Matching "the run of
+  // comment lines after the note" instead would swallow whatever the user had
+  // written below their own notify and uncomment it, turning their prose into
+  // bare TOML that codex then refuses to parse.
+  const restored = stripped.replace(
+    displacedRegionRe(),
+    (_match, commented: string) => `${uncommentDisplaced(commented)}\n`,
+  );
+  fs.writeFileSync(filePath, restored);
+  return true;
 }
 
 const GW_BEGIN = "# >>> langwatch gateway begin >>>";
 const GW_END = "# <<< langwatch gateway end <<<";
 
 export interface CodexGatewayBlockInputs {
-	/** Gateway base URL, e.g. https://gateway.langwatch.ai */
-	gatewayUrl: string;
-	/**
-	 * Env var name codex should read the API key from. Defaults to
-	 * OPENAI_API_KEY because that's the standard codex env. The
-	 * wrapper still sets OPENAI_API_KEY to the user's VK before
-	 * spawning codex, so this matches the wrapper's env injection
-	 * out of the box.
-	 */
-	envKey?: string;
+  /** Gateway base URL, e.g. https://gateway.langwatch.ai */
+  gatewayUrl: string;
+  /**
+   * Env var name codex should read the API key from. Defaults to
+   * OPENAI_API_KEY because that's the standard codex env. The
+   * wrapper still sets OPENAI_API_KEY to the user's VK before
+   * spawning codex, so this matches the wrapper's env injection
+   * out of the box.
+   */
+  envKey?: string;
 }
 
 export interface CodexGatewayWriteResult {
-	action: CodexOtelWriteAction;
-	/**
-	 * The ~/.codex/config.toml path that received the
-	 * [model_providers.langwatch] block.
-	 */
-	path: string;
-	/**
-	 * The separate ~/.codex/<profile>.config.toml path that received
-	 * the profile body. codex 0.134+ rejects [profiles.X] entries
-	 * inside config.toml when the user passes --profile X, requiring
-	 * a sibling file named <profile>.config.toml.
-	 */
-	profilePath: string;
-	/**
-	 * Result of the profile-file write. Independent of `action` so
-	 * callers can report both writes accurately.
-	 */
-	profileAction: CodexOtelWriteAction;
-	/**
-	 * The profile name codex must be invoked with to actually route
-	 * through the langwatch provider — e.g. `codex --profile
-	 * langwatch-gateway`. Returned so the wrapper doesn't have to
-	 * hardcode the name in two places.
-	 */
-	profile: string;
+  action: CodexOtelWriteAction;
+  /**
+   * The ~/.codex/config.toml path that received the
+   * [model_providers.langwatch] block.
+   */
+  path: string;
+  /**
+   * The separate ~/.codex/<profile>.config.toml path that received
+   * the profile body. codex 0.134+ rejects [profiles.X] entries
+   * inside config.toml when the user passes --profile X, requiring
+   * a sibling file named <profile>.config.toml.
+   */
+  profilePath: string;
+  /**
+   * Result of the profile-file write. Independent of `action` so
+   * callers can report both writes accurately.
+   */
+  profileAction: CodexOtelWriteAction;
+  /**
+   * The profile name codex must be invoked with to actually route
+   * through the langwatch provider — e.g. `codex --profile
+   * langwatch-gateway`. Returned so the wrapper doesn't have to
+   * hardcode the name in two places.
+   */
+  profile: string;
 }
 
 const PROFILE_NAME = "langwatch-gateway";
@@ -903,30 +903,30 @@ const PROFILE_NAME = "langwatch-gateway";
  * body is now written to a sibling file (see buildCodexGatewayProfileFile).
  */
 export function buildCodexGatewayBlock(
-	inputs: CodexGatewayBlockInputs,
+  inputs: CodexGatewayBlockInputs,
 ): string {
-	const envKey = inputs.envKey ?? "OPENAI_API_KEY";
-	const cleanedBase = normalizeEndpoint(inputs.gatewayUrl);
-	const baseUrl = cleanedBase.endsWith("/v1")
-		? cleanedBase
-		: `${cleanedBase}/v1`;
-	return [
-		GW_BEGIN,
-		`# Managed by 'langwatch codex' (Path A wrapper). Re-running the`,
-		`# wrapper updates this block in place; remove the marker pair`,
-		`# above and below to opt back out.`,
-		`# The wrapper spawns codex with --profile ${PROFILE_NAME} so this`,
-		`# provider doesn't change codex's default model_provider.`,
-		`# The matching profile body lives at ~/.codex/${PROFILE_NAME}.config.toml`,
-		`# (codex 0.134+ requires the profile in a separate file).`,
-		`[model_providers.langwatch]`,
-		`name = "OpenAI"`,
-		`base_url = "${baseUrl}"`,
-		`env_key = "${envKey}"`,
-		`wire_api = "responses"`,
-		GW_END,
-		"",
-	].join("\n");
+  const envKey = inputs.envKey ?? "OPENAI_API_KEY";
+  const cleanedBase = normalizeEndpoint(inputs.gatewayUrl);
+  const baseUrl = cleanedBase.endsWith("/v1")
+    ? cleanedBase
+    : `${cleanedBase}/v1`;
+  return [
+    GW_BEGIN,
+    `# Managed by 'langwatch codex' (Path A wrapper). Re-running the`,
+    `# wrapper updates this block in place; remove the marker pair`,
+    `# above and below to opt back out.`,
+    `# The wrapper spawns codex with --profile ${PROFILE_NAME} so this`,
+    `# provider doesn't change codex's default model_provider.`,
+    `# The matching profile body lives at ~/.codex/${PROFILE_NAME}.config.toml`,
+    `# (codex 0.134+ requires the profile in a separate file).`,
+    `[model_providers.langwatch]`,
+    `name = "OpenAI"`,
+    `base_url = "${baseUrl}"`,
+    `env_key = "${envKey}"`,
+    `wire_api = "responses"`,
+    GW_END,
+    "",
+  ].join("\n");
 }
 
 /**
@@ -941,27 +941,27 @@ export function buildCodexGatewayBlock(
  * (a header comment explains this to anyone reading the file).
  */
 export function buildCodexGatewayProfileFile(): string {
-	return [
-		`# Managed by 'langwatch codex' (Path A wrapper).`,
-		`# This file is the body of the '${PROFILE_NAME}' codex profile,`,
-		`# selected at spawn time via 'codex --profile ${PROFILE_NAME}'.`,
-		`# The matching [model_providers.langwatch] entry lives in`,
-		`# ~/.codex/config.toml, bracketed by langwatch marker comments.`,
-		`# Re-running 'langwatch codex' regenerates this file in place;`,
-		`# remove it and the [model_providers.langwatch] block in`,
-		`# config.toml to opt back out.`,
-		`model_provider = "langwatch"`,
-		"",
-	].join("\n");
+  return [
+    `# Managed by 'langwatch codex' (Path A wrapper).`,
+    `# This file is the body of the '${PROFILE_NAME}' codex profile,`,
+    `# selected at spawn time via 'codex --profile ${PROFILE_NAME}'.`,
+    `# The matching [model_providers.langwatch] entry lives in`,
+    `# ~/.codex/config.toml, bracketed by langwatch marker comments.`,
+    `# Re-running 'langwatch codex' regenerates this file in place;`,
+    `# remove it and the [model_providers.langwatch] block in`,
+    `# config.toml to opt back out.`,
+    `model_provider = "langwatch"`,
+    "",
+  ].join("\n");
 }
 
 /** Default path for the sibling profile file. */
 export function defaultCodexProfilePath(
-	profile: string = PROFILE_NAME,
+  profile: string = PROFILE_NAME,
 ): string {
-	const codexHome = process.env.CODEX_HOME;
-	const baseDir = codexHome ?? path.join(os.homedir(), ".codex");
-	return path.join(baseDir, `${profile}.config.toml`);
+  const codexHome = process.env.CODEX_HOME;
+  const baseDir = codexHome ?? path.join(os.homedir(), ".codex");
+  return path.join(baseDir, `${profile}.config.toml`);
 }
 
 /**
@@ -978,62 +978,62 @@ export function defaultCodexProfilePath(
  * owned by langwatch.
  */
 export function writeCodexGatewayBlock(
-	inputs: CodexGatewayBlockInputs,
-	options: { filePath?: string; profilePath?: string } = {},
+  inputs: CodexGatewayBlockInputs,
+  options: { filePath?: string; profilePath?: string } = {},
 ): CodexGatewayWriteResult {
-	const filePath = options.filePath ?? defaultCodexConfigPath();
-	const profilePath = options.profilePath ?? defaultCodexProfilePath();
-	const block = buildCodexGatewayBlock(inputs);
-	const profileBody = buildCodexGatewayProfileFile();
+  const filePath = options.filePath ?? defaultCodexConfigPath();
+  const profilePath = options.profilePath ?? defaultCodexProfilePath();
+  const block = buildCodexGatewayBlock(inputs);
+  const profileBody = buildCodexGatewayProfileFile();
 
-	let action: CodexOtelWriteAction;
-	if (!fs.existsSync(filePath)) {
-		fs.mkdirSync(path.dirname(filePath), { recursive: true });
-		writeFile0600(filePath, block);
-		action = "created";
-	} else {
-		const prior = fs.readFileSync(filePath, "utf8");
-		const re = new RegExp(
-			`${escapeRe(GW_BEGIN)}[\\s\\S]*?${escapeRe(GW_END)}\\n?`,
-			"m",
-		);
-		if (re.test(prior)) {
-			const next = replaceVerbatim(prior, re, block);
-			if (next === prior) {
-				action = "unchanged";
-			} else {
-				writeFile0600(filePath, next);
-				action = "updated";
-			}
-		} else {
-			const sep = prior.endsWith("\n") ? "\n" : "\n\n";
-			writeFile0600(filePath, prior + sep + block);
-			action = "updated";
-		}
-	}
+  let action: CodexOtelWriteAction;
+  if (!fs.existsSync(filePath)) {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    writeFile0600(filePath, block);
+    action = "created";
+  } else {
+    const prior = fs.readFileSync(filePath, "utf8");
+    const re = new RegExp(
+      `${escapeRe(GW_BEGIN)}[\\s\\S]*?${escapeRe(GW_END)}\\n?`,
+      "m",
+    );
+    if (re.test(prior)) {
+      const next = replaceVerbatim(prior, re, block);
+      if (next === prior) {
+        action = "unchanged";
+      } else {
+        writeFile0600(filePath, next);
+        action = "updated";
+      }
+    } else {
+      const sep = prior.endsWith("\n") ? "\n" : "\n\n";
+      writeFile0600(filePath, prior + sep + block);
+      action = "updated";
+    }
+  }
 
-	let profileAction: CodexOtelWriteAction;
-	if (!fs.existsSync(profilePath)) {
-		fs.mkdirSync(path.dirname(profilePath), { recursive: true });
-		writeFile0600(profilePath, profileBody);
-		profileAction = "created";
-	} else {
-		const priorProfile = fs.readFileSync(profilePath, "utf8");
-		if (priorProfile === profileBody) {
-			profileAction = "unchanged";
-		} else {
-			writeFile0600(profilePath, profileBody);
-			profileAction = "updated";
-		}
-	}
+  let profileAction: CodexOtelWriteAction;
+  if (!fs.existsSync(profilePath)) {
+    fs.mkdirSync(path.dirname(profilePath), { recursive: true });
+    writeFile0600(profilePath, profileBody);
+    profileAction = "created";
+  } else {
+    const priorProfile = fs.readFileSync(profilePath, "utf8");
+    if (priorProfile === profileBody) {
+      profileAction = "unchanged";
+    } else {
+      writeFile0600(profilePath, profileBody);
+      profileAction = "updated";
+    }
+  }
 
-	return {
-		action,
-		path: filePath,
-		profilePath,
-		profileAction,
-		profile: PROFILE_NAME,
-	};
+  return {
+    action,
+    path: filePath,
+    profilePath,
+    profileAction,
+    profile: PROFILE_NAME,
+  };
 }
 
 /** Exported so callers + tests can reference the profile name from one place. */
@@ -1047,58 +1047,58 @@ export const CODEX_GATEWAY_PROFILE_NAME = PROFILE_NAME;
  * null when no such block is present.
  */
 function stripMarkerBlock(
-	content: string,
-	begin: string,
-	end: string,
+  content: string,
+  begin: string,
+  end: string,
 ): string | null {
-	const re = new RegExp(
-		`\\n?${escapeRe(begin)}[\\s\\S]*?${escapeRe(end)}\\n?`,
-		"m",
-	);
-	if (!re.test(content)) return null;
-	return content.replace(re, "");
+  const re = new RegExp(
+    `\\n?${escapeRe(begin)}[\\s\\S]*?${escapeRe(end)}\\n?`,
+    "m",
+  );
+  if (!re.test(content)) return null;
+  return content.replace(re, "");
 }
 
 function removeMarkerBlockFromFile(
-	filePath: string,
-	begin: string,
-	end: string,
+  filePath: string,
+  begin: string,
+  end: string,
 ): boolean {
-	let content: string;
-	try {
-		content = fs.readFileSync(filePath, "utf8");
-	} catch {
-		return false; // ENOENT
-	}
-	const next = stripMarkerBlock(content, begin, end);
-	if (next === null) return false;
-	// Plain write preserves the file's existing mode (writeFileSync's `mode`
-	// is ignored on an existing file) — removal strips our block, adding no
-	// secret, so a pre-existing 0600 stays 0600.
-	fs.writeFileSync(filePath, next);
-	return true;
+  let content: string;
+  try {
+    content = fs.readFileSync(filePath, "utf8");
+  } catch {
+    return false; // ENOENT
+  }
+  const next = stripMarkerBlock(content, begin, end);
+  if (next === null) return false;
+  // Plain write preserves the file's existing mode (writeFileSync's `mode`
+  // is ignored on an existing file) — removal strips our block, adding no
+  // secret, so a pre-existing 0600 stays 0600.
+  fs.writeFileSync(filePath, next);
+  return true;
 }
 
 function fileHasMarker(filePath: string, begin: string): boolean {
-	try {
-		return fs.readFileSync(filePath, "utf8").includes(begin);
-	} catch {
-		return false;
-	}
+  try {
+    return fs.readFileSync(filePath, "utf8").includes(begin);
+  } catch {
+    return false;
+  }
 }
 
 /** Whether config.toml currently carries the langwatch `[otel]` block. */
 export function codexHasOtelBlock(
-	filePath: string = defaultCodexConfigPath(),
+  filePath: string = defaultCodexConfigPath(),
 ): boolean {
-	return fileHasMarker(filePath, BEGIN);
+  return fileHasMarker(filePath, BEGIN);
 }
 
 /** Whether config.toml currently carries the langwatch gateway block. */
 export function codexHasGatewayBlock(
-	filePath: string = defaultCodexConfigPath(),
+  filePath: string = defaultCodexConfigPath(),
 ): boolean {
-	return fileHasMarker(filePath, GW_BEGIN);
+  return fileHasMarker(filePath, GW_BEGIN);
 }
 
 /**
@@ -1107,9 +1107,9 @@ export function codexHasGatewayBlock(
  * when a block was removed (idempotent — false when absent).
  */
 export function removeCodexOtelBlock(
-	filePath: string = defaultCodexConfigPath(),
+  filePath: string = defaultCodexConfigPath(),
 ): boolean {
-	return removeMarkerBlockFromFile(filePath, BEGIN, END);
+  return removeMarkerBlockFromFile(filePath, BEGIN, END);
 }
 
 /**
@@ -1117,9 +1117,9 @@ export function removeCodexOtelBlock(
  * config.toml, if present. Returns true when a block was removed.
  */
 export function removeCodexGatewayBlock(
-	filePath: string = defaultCodexConfigPath(),
+  filePath: string = defaultCodexConfigPath(),
 ): boolean {
-	return removeMarkerBlockFromFile(filePath, GW_BEGIN, GW_END);
+  return removeMarkerBlockFromFile(filePath, GW_BEGIN, GW_END);
 }
 
 /**
@@ -1128,11 +1128,11 @@ export function removeCodexGatewayBlock(
  * false when it was already absent).
  */
 export function removeCodexGatewayProfileFile(
-	profilePath: string = defaultCodexProfilePath(),
+  profilePath: string = defaultCodexProfilePath(),
 ): boolean {
-	if (!codexProfileFileIsLangwatchOwned(profilePath)) return false;
-	fs.rmSync(profilePath, { force: true });
-	return true;
+  if (!codexProfileFileIsLangwatchOwned(profilePath)) return false;
+  fs.rmSync(profilePath, { force: true });
+  return true;
 }
 
 /**
@@ -1146,12 +1146,12 @@ export function removeCodexGatewayProfileFile(
  * silently deleted.
  */
 export function codexProfileFileIsLangwatchOwned(
-	profilePath: string = defaultCodexProfilePath(),
+  profilePath: string = defaultCodexProfilePath(),
 ): boolean {
-	try {
-		const content = fs.readFileSync(profilePath, "utf8");
-		return /model_provider\s*=\s*"langwatch"/.test(content);
-	} catch {
-		return false;
-	}
+  try {
+    const content = fs.readFileSync(profilePath, "utf8");
+    return /model_provider\s*=\s*"langwatch"/.test(content);
+  } catch {
+    return false;
+  }
 }

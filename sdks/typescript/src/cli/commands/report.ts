@@ -1,8 +1,6 @@
 import { readFileSync, statSync } from "node:fs";
 import chalk from "chalk";
-import { createCommandEvents } from "../telemetry/events";
-import type { CommandResult } from "../utils/output";
-import { getEndpoint } from "../utils/endpoint";
+import { normalizeEndpoint } from "../../internal/endpoint";
 import {
   collectSensitiveEnvValues,
   REDACTION_AUDIT_URL,
@@ -10,7 +8,9 @@ import {
   redactSessionJsonl,
   truncateJsonlToByteBudget,
 } from "../../internal/generated/redaction/sessionReport";
-import { normalizeEndpoint } from "../../internal/endpoint";
+import { createCommandEvents } from "../telemetry/events";
+import { getEndpoint } from "../utils/endpoint";
+import type { CommandResult } from "../utils/output";
 
 declare const __CLI_VERSION__: string;
 
@@ -47,7 +47,8 @@ export const detectAgent = (
   env: NodeJS.ProcessEnv = process.env,
 ): string | undefined => {
   if (env.CLAUDECODE ?? env.CLAUDE_CODE_ENTRYPOINT) return "claude-code";
-  if (Object.keys(env).some((name) => name.startsWith("CODEX_"))) return "codex";
+  if (Object.keys(env).some((name) => name.startsWith("CODEX_")))
+    return "codex";
   if (env.CURSOR_TRACE_ID ?? env.CURSOR_AGENT) return "cursor";
   if (env.GEMINI_CLI) return "gemini-cli";
   return undefined;
@@ -63,8 +64,8 @@ export const reportCommand = async (
       [
         "This sends a report to the LangWatch team, so the user must approve it first.",
         "",
-        "Ask the user: \"Can I send this issue report (and optionally the session",
-        "transcript) to LangWatch to help them fix it?\" If they agree, re-run with",
+        'Ask the user: "Can I send this issue report (and optionally the session',
+        'transcript) to LangWatch to help them fix it?" If they agree, re-run with',
         "--user-approved. API keys, secrets, emails and phone numbers are redacted",
         `locally before anything is sent; audit the exact rules at ${REDACTION_AUDIT_URL}`,
         "Preview the exact redacted payload first with --dry-run (no approval needed).",
@@ -170,7 +171,9 @@ export const reportCommand = async (
     return {
       data: { dryRun: true, redactedCount, payload },
       table: () => {
-        console.log(chalk.blue("Dry run: this is what would be sent (nothing was sent)"));
+        console.log(
+          chalk.blue("Dry run: this is what would be sent (nothing was sent)"),
+        );
         console.log(
           chalk.gray(
             `Redacted ${redactedCount} sensitive value${redactedCount === 1 ? "" : "s"} locally. Audit the rules: ${REDACTION_AUDIT_URL}`,
@@ -234,11 +237,15 @@ export const reportCommand = async (
       );
       if (sessionTruncated) {
         console.log(
-          chalk.gray("  The transcript was truncated to the most recent activity to fit the upload limit."),
+          chalk.gray(
+            "  The transcript was truncated to the most recent activity to fit the upload limit.",
+          ),
         );
       }
       console.log(
-        chalk.gray("  Thank you! Reports like this directly shape what gets fixed next."),
+        chalk.gray(
+          "  Thank you! Reports like this directly shape what gets fixed next.",
+        ),
       );
     },
   };
