@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import type { ApiKeyWithBindings } from "../api-key.repository";
 import {
@@ -319,7 +320,9 @@ describe("legacy API key read-through mint", () => {
 
 describe("genesisImportMoment()", () => {
   const findUnique = vi.fn();
-  const prisma = { systemMigrationTenantState: { findUnique } };
+  const prisma = {
+    systemMigrationTenantState: { findUnique },
+  } as unknown as Pick<PrismaClient, "systemMigrationTenantState">;
 
   beforeEach(() => {
     findUnique.mockReset();
