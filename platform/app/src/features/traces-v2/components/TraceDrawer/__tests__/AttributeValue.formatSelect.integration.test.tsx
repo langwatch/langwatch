@@ -26,10 +26,13 @@ afterEach(cleanup);
  * text rather than by being the only button, so another control appearing in
  * the row does not break every test here.
  */
-const openValue = async (
-  user: ReturnType<typeof userEvent.setup>,
-  preview: string | RegExp,
-) => {
+const openValue = async ({
+  user,
+  preview,
+}: {
+  user: ReturnType<typeof userEvent.setup>;
+  preview: string | RegExp;
+}) => {
   await user.click(screen.getByRole("button", { name: preview }));
 };
 
@@ -46,7 +49,7 @@ describe("given an attribute holding a chat-shaped value", () => {
       wrapper,
     });
 
-    await openValue(user, /Detected format: chat/);
+    await openValue({ user, preview: /Detected format: chat/ });
 
     const select = await screen.findByRole("button", {
       name: "Attribute value format",
@@ -65,7 +68,7 @@ describe("given an attribute holding a chat-shaped value", () => {
       wrapper,
     });
 
-    await openValue(user, /Detected format: chat/);
+    await openValue({ user, preview: /Detected format: chat/ });
     await user.click(
       await screen.findByRole("button", { name: "Attribute value format" }),
     );
@@ -89,7 +92,7 @@ describe("given an attribute whose value is JSON inside a string", () => {
       { wrapper },
     );
 
-    await openValue(user, /Detected format: json/);
+    await openValue({ user, preview: /Detected format: json/ });
 
     expect(
       await screen.findByRole("button", { name: "Attribute value format" }),
