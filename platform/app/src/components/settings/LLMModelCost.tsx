@@ -257,9 +257,6 @@ function ActionsMenu({
                       title: "Success",
                       description: `LLM model cost deleted successfully`,
                       type: "success",
-                      meta: {
-                        closable: true,
-                      },
                     });
                     void llmModelCosts.refetch();
                   },
@@ -269,9 +266,6 @@ function ActionsMenu({
                       title: "Error",
                       description: "Error deleting LLM model cost",
                       type: "error",
-                      meta: {
-                        closable: true,
-                      },
                     });
                   },
                 },

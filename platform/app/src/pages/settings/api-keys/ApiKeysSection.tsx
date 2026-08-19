@@ -67,7 +67,6 @@ function ProjectKeyActions({
             title: "API key copied to clipboard",
             type: "success",
             duration: 2000,
-            meta: { closable: true },
           });
         }}
       >
@@ -213,7 +212,6 @@ export function ApiKeysSection({
         description: "Select at least one scope for a restricted key.",
         type: "error",
         duration: 5000,
-        meta: { closable: true },
       });
       return;
     }
@@ -228,7 +226,6 @@ export function ApiKeysSection({
           "You have no role bindings in this organization, so there is nothing to grant to a key.",
         type: "error",
         duration: 5000,
-        meta: { closable: true },
       });
       return;
     }
@@ -292,7 +289,6 @@ export function ApiKeysSection({
             title: "API key updated",
             type: "success",
             duration: 3000,
-            meta: { closable: true },
           });
           void queryClient.apiKey.list.invalidate();
         },
@@ -312,7 +308,6 @@ export function ApiKeysSection({
             title: "API key revoked",
             type: "success",
             duration: 3000,
-            meta: { closable: true },
           });
           void queryClient.apiKey.list.invalidate();
         },
@@ -341,7 +336,6 @@ export function ApiKeysSection({
               "The previous key no longer works. Update your integrations.",
             type: "warning",
             duration: 6000,
-            meta: { closable: true },
           });
         },
         onError: (error) => {

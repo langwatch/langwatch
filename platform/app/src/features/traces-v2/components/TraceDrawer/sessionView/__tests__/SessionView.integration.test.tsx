@@ -40,6 +40,7 @@ const REAL_SESSION: CodingAgentSessionRow = {
   gitBranches: ["feat/session-git-context"],
   gitWorktree: "widgets-feat",
   title: "Add git context to the session row",
+  titleSource: "",
   modelCalls: 114,
   toolCalls: 115,
   subAgents: 0,

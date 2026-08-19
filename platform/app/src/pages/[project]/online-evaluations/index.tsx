@@ -107,7 +107,6 @@ function OnlineEvaluationsPage() {
       toaster.create({
         title: "Online evaluation deleted",
         type: "success",
-        meta: { closable: true },
       });
     },
     onError: () => {
@@ -115,7 +114,6 @@ function OnlineEvaluationsPage() {
         title: "Could not delete online evaluation",
         description: "Please try again.",
         type: "error",
-        meta: { closable: true },
       });
     },
   });

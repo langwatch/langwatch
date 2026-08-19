@@ -7,7 +7,7 @@
  * dropped, this goes red when the document is stale — a route annotated,
  * shipped, and never regenerated is published to nobody.
  *
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { describe, expect, it } from "vitest";
@@ -38,7 +38,7 @@ describe("given the generated OpenAPI document", () => {
 
         expect(operation, `${where} is not in the document`).toBeDefined();
         expect(operation.summary, where).toBeTruthy();
-        expect(operation.tags, where).toContain("Analytics / Governed SQL");
+        expect(operation.tags, where).toContain("Analytics / LangWatchQL");
         expect(operation.responses?.[success], where).toBeDefined();
       }
     });

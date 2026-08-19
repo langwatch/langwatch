@@ -8,8 +8,8 @@
  * splits on, so it is the import graph that is pinned here.
  *
  * The claim is containment: within this feature, every module that reaches a
- * Vega package is reachable only through `GovernedSqlChartMode`, which is what
- * `LazyGovernedSqlChartMode` loads on demand and nothing imports directly.
+ * Vega package is reachable only through `LangWatchQLChartMode`, which is what
+ * `LazyLangWatchQLChartMode` loads on demand and nothing imports directly.
  *
  * Node environment on purpose — this reads source, and evaluates none of it.
  */
@@ -27,9 +27,9 @@ const SRC_DIR = resolve(FEATURE_DIR, "../..");
 
 const LAZY_BOUNDARY = join(
   FEATURE_DIR,
-  "components/LazyGovernedSqlChartMode.tsx",
+  "components/LazyLangWatchQLChartMode.tsx",
 );
-const CHART_MODE = join(FEATURE_DIR, "components/GovernedSqlChartMode.tsx");
+const CHART_MODE = join(FEATURE_DIR, "components/LangWatchQLChartMode.tsx");
 
 /** Packages whose presence in a chunk means the Vega runtime is in it. */
 const VEGA_PACKAGE = /^(vega|vega-lite|vega-embed|react-vega)(\/|$)/;
@@ -170,7 +170,7 @@ describe("where the Vega runtime can be reached from", () => {
         expect(boundary.files).not.toContain(CHART_MODE);
         // It is a lazy import, and nothing else would defer anything.
         expect(readFileSync(LAZY_BOUNDARY, "utf8")).toContain(
-          'import("./GovernedSqlChartMode")',
+          'import("./LangWatchQLChartMode")',
         );
       });
     });

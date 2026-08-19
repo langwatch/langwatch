@@ -23,7 +23,12 @@ import {
   writeFingerprint,
 } from "./hook-state";
 import {
+  codexSessionIndexPath,
+  readCodexThreadNames,
+} from "./codex-session-index";
+import {
   buildSessionContextLogPayload,
+  normalizeSessionName,
   parseGitRemoteUrl,
   type SessionContext,
   sessionContextFingerprint,
@@ -222,11 +227,13 @@ export async function harvestCodexThread(args: {
   } catch {
     return 0;
   }
+  const threadNames = await readCodexThreadNames(codexSessionIndexPath(root));
   await postCodexSessionContext({
     meta,
     nowMs: args.nowMs,
     logsEndpoint: args.logsEndpoint,
     token: args.token,
+    threadName: meta?.sessionId ? threadNames.get(meta.sessionId) : null,
     stateDir: args.stateDir,
     fetchImpl: args.fetchImpl,
   });
@@ -369,19 +376,32 @@ export async function postCodexSessionContext(args: {
   nowMs: number;
   logsEndpoint: string | null;
   token: string;
+  /** The session's name from codex's own session index, when it has one. */
+  threadName?: string | null;
   stateDir?: string;
   fetchImpl?: typeof fetch;
 }): Promise<boolean> {
-  const { meta, nowMs, logsEndpoint, token, stateDir, fetchImpl } = args;
+  const { meta, nowMs, logsEndpoint, token, threadName, stateDir, fetchImpl } =
+    args;
   if (!logsEndpoint) return false;
-  if (!meta?.sessionId || !meta.gitRepositoryUrl) return false;
-  const repository = parseGitRemoteUrl(meta.gitRepositoryUrl);
-  if (!repository) return false;
+  if (!meta?.sessionId) return false;
+  const repository = meta.gitRepositoryUrl
+    ? parseGitRemoteUrl(meta.gitRepositoryUrl)
+    : null;
+  const title = meta.firstUserMessage
+    ? sessionTitleFromPrompt(meta.firstUserMessage)
+    : null;
+  const name = normalizeSessionName(threadName);
+  // A codex session appears in the sessions screen only through this
+  // record, so a session outside any repository still posts one as long
+  // as there is a name to carry. With no identity and no name there is
+  // nothing to say.
+  if (!repository && !title && !name) return false;
   const context: SessionContext = {
-    repository,
+    ...(repository ? { repository } : {}),
     ...(meta.gitBranch ? { branch: meta.gitBranch } : {}),
   };
-  const fingerprint = sessionContextFingerprint(context);
+  const fingerprint = sessionContextFingerprint(context, { title, name });
   const stateFile = stateFilePath({
     stateDir: stateDir ?? defaultStateDir(),
     agent: "codex",
@@ -394,11 +414,11 @@ export async function postCodexSessionContext(args: {
     context,
     timeUnixNano: `${nowMs}000000`,
     scopeVersion: LANGWATCH_SDK_VERSION,
-    // Codex generates no session title and withholds prompt text from its
-    // own events, so the transcript's first typed prompt names the session.
-    title: meta.firstUserMessage
-      ? sessionTitleFromPrompt(meta.firstUserMessage)
-      : null,
+    // Codex withholds prompt text from its own events, so the transcript's
+    // first typed prompt titles the session — and codex's OWN name for the
+    // thread, from its session index, outranks it whenever one exists.
+    title,
+    name,
   });
   const doFetch = fetchImpl ?? fetch;
   const controller = new AbortController();
@@ -460,10 +480,12 @@ async function postCodexSessionContexts(args: {
   nowMs: number;
   logsEndpoint: string | null;
   token: string;
+  /** Codex's own name per session id, from its session index. */
+  threadNames?: Map<string, string>;
   stateDir?: string;
   fetchImpl?: typeof fetch;
 }): Promise<void> {
-  const { metas, ...post } = args;
+  const { metas, threadNames, ...post } = args;
   if (metas.length === 0) return;
   let next = 0;
   let outOfBudget = false;
@@ -484,7 +506,13 @@ async function postCodexSessionContexts(args: {
             const meta = metas[next++] ?? null;
             // `postCodexSessionContext` reports failure rather than throwing,
             // and this guard keeps that true for the caller if it ever stops.
-            await postCodexSessionContext({ meta, ...post }).catch(() => false);
+            await postCodexSessionContext({
+              meta,
+              threadName: meta?.sessionId
+                ? threadNames?.get(meta.sessionId)
+                : null,
+              ...post,
+            }).catch(() => false);
           }
         },
       ),
@@ -520,15 +548,17 @@ export async function harvestAndEmitCodexIO(args: {
     stateDir,
     fetchImpl,
   } = args;
+  const root = sessionsRoot ?? defaultCodexSessionsRoot();
   const { turns, metas } = await readRollouts({
     sinceMs,
-    sessionsRoot: sessionsRoot ?? defaultCodexSessionsRoot(),
+    sessionsRoot: root,
   });
   await postCodexSessionContexts({
     metas,
     nowMs,
     logsEndpoint,
     token,
+    threadNames: await readCodexThreadNames(codexSessionIndexPath(root)),
     stateDir,
     fetchImpl,
   });
@@ -565,12 +595,15 @@ export function createCodexIOStreamer(args: {
         sessionsRoot: root,
       });
       // The fingerprint state dedups across ticks (and across the notify
-      // seam), so re-offering every in-window session each tick posts once.
+      // seam), so re-offering every in-window session each tick posts once —
+      // and re-reading the index each tick is what lets a rename land on the
+      // very next turn, as a changed fingerprint.
       await postCodexSessionContexts({
         metas,
         nowMs,
         logsEndpoint: args.logsEndpoint,
         token: args.token,
+        threadNames: await readCodexThreadNames(codexSessionIndexPath(root)),
         stateDir: args.stateDir,
         fetchImpl: args.fetchImpl,
       });

@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -235,6 +236,22 @@ const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
   http_polling: "*/15 * * * *",
 };
 
+/** The three delivery modes the list groups sources under. */
+const MODE_META = {
+  push: {
+    title: "Push (OTLP / webhooks)",
+    blurb: "Upstream pushes events to LangWatch in near-real-time.",
+  },
+  pull: {
+    title: "Pull (admin API polling)",
+    blurb: "LangWatch polls upstream's admin API on a cadence.",
+  },
+  s3: {
+    title: "S3 audit drops",
+    blurb: "LangWatch reads JSONL drops from an S3 bucket.",
+  },
+} as const;
+
 const blankComposer = (): ComposerState => ({
   sourceType: "otel_generic",
   name: "",
@@ -308,10 +325,12 @@ function resolvePullConfig(
 function IngestionSourcesHeader({
   isEnterprise,
   sourceCount,
+  canManage,
   onAdd,
 }: {
   isEnterprise: boolean;
   sourceCount: number;
+  canManage: boolean;
   onAdd: () => void;
 }) {
   return (
@@ -334,24 +353,15 @@ function IngestionSourcesHeader({
         </Text>
       </VStack>
       <Spacer />
-      <VStack align="end" gap={1}>
-        <Button
-          size="sm"
-          colorPalette="blue"
-          disabled={
-            !isEnterprise && sourceCount >= NON_ENTERPRISE_INGESTION_SOURCE_CAP
-          }
-          onClick={onAdd}
-        >
-          <Plus size={14} /> Add source
-        </Button>
-        {!isEnterprise && (
-          <Text fontSize="xs" color="fg.muted">
-            {sourceCount} / {NON_ENTERPRISE_INGESTION_SOURCE_CAP} sources used.
-            Upgrade to Enterprise for unlimited.
-          </Text>
-        )}
-      </VStack>
+      {/* The writes are all `ingestionSources:manage`. A viewer who only
+          reads is not offered a composer the server refuses. */}
+      {canManage && (
+        <AddSourceControl
+          isEnterprise={isEnterprise}
+          sourceCount={sourceCount}
+          onAdd={onAdd}
+        />
+      )}
     </HStack>
   );
 }
@@ -367,24 +377,13 @@ function pendingId(mutation: {
   return mutation.isPending ? (mutation.variables?.id ?? null) : null;
 }
 
-const MODE_COPY: Record<"push" | "pull" | "s3", [string, string]> = {
-  push: [
-    "Push (OTLP / webhooks)",
-    "Upstream pushes events to LangWatch in near-real-time.",
-  ],
-  pull: [
-    "Pull (admin API polling)",
-    "LangWatch polls upstream's admin API on a cadence.",
-  ],
-  s3: ["S3 audit drops", "LangWatch reads JSONL drops from an S3 bucket."],
-};
-
 function SourceModeSection({
   mode,
   sources,
   knowsFleetIsEmpty,
   rotatingId,
   archivingId,
+  canManage,
   onEdit,
   onRotate,
   onArchive,
@@ -394,11 +393,12 @@ function SourceModeSection({
   knowsFleetIsEmpty: boolean;
   rotatingId: string | null;
   archivingId: string | null;
+  canManage: boolean;
   onEdit: (id: string) => void;
   onRotate: (id: string) => void;
   onArchive: (id: string) => void;
 }) {
-  const [title, blurb] = MODE_COPY[mode];
+  const { title, blurb } = MODE_META[mode];
   return (
     <Box
       borderWidth="1px"
@@ -429,6 +429,7 @@ function SourceModeSection({
             source={source}
             isPendingRotate={rotatingId === source.id}
             isPendingArchive={archivingId === source.id}
+            canManage={canManage}
             onEdit={() => onEdit(source.id)}
             onRotate={() => onRotate(source.id)}
             onArchive={() => onArchive(source.id)}
@@ -436,6 +437,82 @@ function SourceModeSection({
         ))}
       </VStack>
     </Box>
+  );
+}
+
+/**
+ * The source list: what the viewer may read, what went wrong when it could
+ * not be read, the three delivery-mode sections, and the note naming the
+ * grant that unlocks the writes.
+ */
+function IngestionSourceList({
+  canRead,
+  canManage,
+  isLoading,
+  error,
+  grouped,
+  rotatingId,
+  archivingId,
+  onEdit,
+  onRotate,
+  onArchive,
+}: {
+  canRead: boolean;
+  canManage: boolean;
+  isLoading: boolean;
+  error: unknown;
+  grouped: Record<"push" | "pull" | "s3", Source[]>;
+  rotatingId: string | null;
+  archivingId: string | null;
+  onEdit: (id: string) => void;
+  onRotate: (id: string) => void;
+  onArchive: (id: string) => void;
+}) {
+  return (
+    <>
+      {!canRead && (
+        <PermissionRequiredNotice
+          permission="ingestionSources:view"
+          detail="The source list stays hidden until then."
+        />
+      )}
+
+      {isLoading && <Spinner size="sm" />}
+
+      {/* The list is the page. Without this the three mode sections below
+          render "No push-mode sources configured." off an empty `?? []`,
+          which tells an admin their entire ingest fleet is gone when all
+          that actually happened was a 403 or a DB blip. */}
+      <HandledErrorAlert
+        error={error}
+        fallbackTitle="Couldn't load ingestion sources"
+      />
+
+      {canRead &&
+        (["push", "pull", "s3"] as const).map((mode) => (
+          <SourceModeSection
+            key={mode}
+            mode={mode}
+            sources={grouped[mode]}
+            // Only claim "none configured" when we actually know: on a load
+            // failure the alert above says what went wrong instead.
+            knowsFleetIsEmpty={!error}
+            rotatingId={rotatingId}
+            archivingId={archivingId}
+            canManage={canManage}
+            onEdit={onEdit}
+            onRotate={onRotate}
+            onArchive={onArchive}
+          />
+        ))}
+
+      {canRead && !canManage && (
+        <PermissionRequiredNotice
+          permission="ingestionSources:manage"
+          detail="You can read the sources. Adding, editing, rotating a secret, and archiving need this grant."
+        />
+      )}
+    </>
   );
 }
 
@@ -557,15 +634,17 @@ function useIngestionSourceMutations({
  * callbacks only — the component owns the markup.
  */
 function useIngestionSourcesPage() {
-  const { organization } = useOrganizationTeamProject({
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
   const { isEnterprise } = useActivePlan();
+  const canRead = hasAnyPermission("ingestionSources:view");
+  const canManage = hasAnyPermission("ingestionSources:manage");
 
   const sourcesQuery = api.ingestionSources.list.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+    { enabled: !!orgId && canRead, refetchOnWindowFocus: false },
   );
   const utils = api.useUtils();
   const refetch = () =>
@@ -595,6 +674,8 @@ function useIngestionSourcesPage() {
   return {
     orgId,
     isEnterprise,
+    canRead,
+    canManage,
     sourcesQuery,
     grouped: useGroupedSources(sourcesQuery.data),
     composing,
@@ -614,6 +695,8 @@ function IngestionSourcesPage() {
   const {
     orgId,
     isEnterprise,
+    canRead,
+    canManage,
     sourcesQuery,
     grouped,
     composing,
@@ -634,6 +717,7 @@ function IngestionSourcesPage() {
         <IngestionSourcesHeader
           isEnterprise={isEnterprise}
           sourceCount={sourcesQuery.data?.length ?? 0}
+          canManage={canManage}
           onAdd={() => {
             setComposer(blankComposer());
             setComposing(true);
@@ -653,36 +737,22 @@ function IngestionSourcesPage() {
           }}
         />
 
-        {sourcesQuery.isLoading && <Spinner size="sm" />}
-
-        {/* The list is the page. Without this the three mode sections below
-            render "No push-mode sources configured." off an empty `?? []`,
-            which tells an admin their entire ingest fleet is gone when all
-            that actually happened was a 403 or a DB blip. */}
-        <HandledErrorAlert
+        <IngestionSourceList
+          canRead={canRead}
+          canManage={canManage}
+          isLoading={sourcesQuery.isLoading}
           error={sourcesQuery.error}
-          fallbackTitle="Couldn't load ingestion sources"
+          grouped={grouped}
+          rotatingId={pendingId(mutations.rotate)}
+          archivingId={pendingId(mutations.archive)}
+          onEdit={setEditingSourceId}
+          onRotate={(id) =>
+            mutations.rotate.mutate({ organizationId: orgId, id })
+          }
+          onArchive={(id) =>
+            mutations.archive.mutate({ organizationId: orgId, id })
+          }
         />
-
-        {(["push", "pull", "s3"] as const).map((mode) => (
-          <SourceModeSection
-            key={mode}
-            mode={mode}
-            sources={grouped[mode]}
-            // Only claim "none configured" when we actually know: on a load
-            // failure the alert above says what went wrong instead.
-            knowsFleetIsEmpty={!sourcesQuery.error}
-            rotatingId={pendingId(mutations.rotate)}
-            archivingId={pendingId(mutations.archive)}
-            onEdit={setEditingSourceId}
-            onRotate={(id) =>
-              mutations.rotate.mutate({ organizationId: orgId, id })
-            }
-            onArchive={(id) =>
-              mutations.archive.mutate({ organizationId: orgId, id })
-            }
-          />
-        ))}
       </VStack>
 
       <SecretModal details={secretModal} onClose={() => setSecretModal(null)} />
@@ -702,6 +772,38 @@ function IngestionSourcesPage() {
   );
 }
 
+/** Mounted only for a viewer holding `ingestionSources:manage`. */
+function AddSourceControl({
+  isEnterprise,
+  sourceCount,
+  onAdd,
+}: {
+  isEnterprise: boolean;
+  sourceCount: number;
+  onAdd: () => void;
+}) {
+  return (
+    <VStack align="end" gap={1}>
+      <Button
+        size="sm"
+        colorPalette="blue"
+        disabled={
+          !isEnterprise && sourceCount >= NON_ENTERPRISE_INGESTION_SOURCE_CAP
+        }
+        onClick={onAdd}
+      >
+        <Plus size={14} /> Add source
+      </Button>
+      {!isEnterprise && (
+        <Text fontSize="xs" color="fg.muted">
+          {sourceCount} / {NON_ENTERPRISE_INGESTION_SOURCE_CAP} sources used.
+          Upgrade to Enterprise for unlimited.
+        </Text>
+      )}
+    </VStack>
+  );
+}
+
 function SourceRow({
   source,
   isPendingRotate,
@@ -709,6 +811,7 @@ function SourceRow({
   onEdit,
   onRotate,
   onArchive,
+  canManage,
 }: {
   source: Source;
   isPendingRotate: boolean;
@@ -716,6 +819,7 @@ function SourceRow({
   onEdit: () => void;
   onRotate: () => void;
   onArchive: () => void;
+  canManage: boolean;
 }) {
   const status =
     STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
@@ -733,7 +837,7 @@ function SourceRow({
       <VStack align="start" gap={0} flex={1} minWidth={0}>
         <HStack gap={2}>
           <Link
-            href={`/settings/governance/ingestion-sources/${source.id}`}
+            href={`/governance/ingestion-sources/${source.id}`}
             color="fg"
             _hover={{ color: "orange.600" }}
           >
@@ -764,33 +868,37 @@ function SourceRow({
           </Text>
         </HStack>
       </VStack>
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={onEdit}
-        title="Edit source - name, description, OTTL statements"
-      >
-        <Pencil size={14} /> Edit
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={onRotate}
-        loading={isPendingRotate}
-        title="Mint a new ingestSecret (24h grace on the old one)"
-      >
-        <RotateCw size={14} /> Rotate secret
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        colorPalette="red"
-        onClick={onArchive}
-        loading={isPendingArchive}
-        title="Archive (preserves history)"
-      >
-        <Trash2 size={14} />
-      </Button>
+      {canManage && (
+        <>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onEdit}
+            title="Edit source - name, description, OTTL statements"
+          >
+            <Pencil size={14} /> Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onRotate}
+            loading={isPendingRotate}
+            title="Mint a new ingestSecret (24h grace on the old one)"
+          >
+            <RotateCw size={14} /> Rotate secret
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            colorPalette="red"
+            onClick={onArchive}
+            loading={isPendingArchive}
+            title="Archive (preserves history)"
+          >
+            <Trash2 size={14} />
+          </Button>
+        </>
+      )}
     </HStack>
   );
 }
@@ -1252,7 +1360,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       key: "startingAt",
       label: "Backfill start (optional)",
       placeholder: "2026-08-01",
-      hint: "The date the first run reads from: `2026-08-01`, or an instant carrying a timezone (`2026-08-01T00:00:00Z`). A time without a timezone is rejected rather than read as yours. Empty = 24 hours back.",
+      hint: "The date the first run reads from: `2026-08-01`, or an instant carrying a timezone (`2026-08-01T00:00:00Z`). A time without a timezone is rejected rather than read as yours. Empty = 3 calendar days back at midnight UTC for cost, 1 calendar day back at midnight UTC for usage.",
     },
   ],
   databricks_genie: [
@@ -1763,6 +1871,365 @@ export function buildParserConfig(c: ComposerState): Record<string, unknown> {
   return out;
 }
 
+/**
+ * Claude Code's monitoring-usage doc requires CLAUDE_CODE_ENABLE_TELEMETRY=1
+ * plus the standard OTEL_*_EXPORTER env vars. We recommend
+ * OTEL_TRACES_EXPORTER=otlp so spans claude-code instruments propagate to
+ * LangWatch and logs/metrics emitted inside those spans get correlated; the
+ * session.id resource attribute is then mapped to gen_ai.conversation.id by
+ * the OpenInference extractor so the UI groups the session as one thread.
+ * Pre-build the shell export block so admins paste once instead of stitching
+ * seven lines off the docs page.
+ *
+ * Plus the four content-unlock knobs (USER_PROMPTS + TOOL_DETAILS +
+ * TOOL_CONTENT + RAW_API_BODIES). Without these, the OTel wire is
+ * metadata-only, tokens, cost, durations and tool sizes-in-bytes, and user
+ * prompt text, assistant response text and tool I/O content are silently
+ * absent. With them on, langwatch.input + langwatch.output lift verbatim from
+ * claude's api_request + api_response_body events. Payload risk is bounded by
+ * claude's 60KB inline cap plus the langwatch receiver content cap.
+ */
+function buildClaudeCodeEnvBlock({
+  details,
+  otlpUrl,
+}: {
+  details: SecretDetails;
+  otlpUrl: string;
+}): string {
+  return [
+    `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
+    `export OTEL_TRACES_EXPORTER=otlp`,
+    `export OTEL_LOGS_EXPORTER=otlp`,
+    `export OTEL_METRICS_EXPORTER=otlp`,
+    `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+    `export OTEL_LOG_USER_PROMPTS=1`,
+    `export OTEL_LOG_TOOL_DETAILS=1`,
+    `export OTEL_LOG_TOOL_CONTENT=1`,
+    `export OTEL_LOG_RAW_API_BODIES=1`,
+    `export OTEL_EXPORTER_OTLP_ENDPOINT="${otlpUrl}"`,
+    `export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${details.secret}"`,
+  ].join("\n");
+}
+
+/**
+ * A copy-paste curl that exercises the full happy path: the body parses, the
+ * attribute parser sees the canonical gen_ai.* + user.email keys, and the KPI
+ * strip moves on the first event. The timestamp is fresh at modal open so the
+ * test event lands inside the 24h health window even if the admin waits a
+ * little before pasting. Null for source types with no push endpoint.
+ */
+function buildTestCurl({
+  details,
+  otlpUrl,
+  webhookUrl,
+  usesPushUrl,
+  usesWebhookUrl,
+}: {
+  details: SecretDetails;
+  otlpUrl: string;
+  webhookUrl: string;
+  usesPushUrl: boolean;
+  usesWebhookUrl: boolean;
+}): string | null {
+  if (usesPushUrl) {
+    const otlpBody = JSON.stringify({
+      resource_spans: [
+        {
+          resource: {
+            attributes: [
+              {
+                key: "service.name",
+                value: { stringValue: details.sourceName },
+              },
+            ],
+          },
+          scope_spans: [
+            {
+              spans: [
+                {
+                  name: "chat.completion",
+                  startTimeUnixNano: `${Date.now()}000000`,
+                  attributes: [
+                    {
+                      key: "gen_ai.usage.input_tokens",
+                      value: { intValue: 120 },
+                    },
+                    {
+                      key: "gen_ai.usage.output_tokens",
+                      value: { intValue: 480 },
+                    },
+                    {
+                      key: "gen_ai.usage.cost_usd",
+                      value: { doubleValue: 0.025 },
+                    },
+                    {
+                      key: "user.email",
+                      value: { stringValue: "you@your.org" },
+                    },
+                    {
+                      key: "gen_ai.request.model",
+                      value: { stringValue: "claude-sonnet-4" },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    return [
+      `curl -X POST '${otlpUrl}' \\`,
+      `  -H 'Authorization: Bearer ${details.secret}' \\`,
+      `  -H 'Content-Type: application/json' \\`,
+      `  -d '${otlpBody}'`,
+    ].join("\n");
+  }
+  if (usesWebhookUrl) {
+    return [
+      `curl -X POST '${webhookUrl}' \\`,
+      `  -H 'Authorization: Bearer ${details.secret}' \\`,
+      `  -H 'Content-Type: application/json' \\`,
+      `  -d '{"event":"test.smoke","actor":"you@your.org"}'`,
+    ].join("\n");
+  }
+  return null;
+}
+
+/** The bearer token itself, shown once. */
+function IngestSecretPanel({
+  secret,
+  copied,
+  onCopy,
+}: {
+  secret: string;
+  copied: boolean;
+  onCopy: (value: string) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={1}>
+      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+        Ingest secret (bearer token)
+      </Text>
+      <HStack gap={2}>
+        <Code
+          flex={1}
+          padding={2}
+          fontSize="xs"
+          whiteSpace="pre-wrap"
+          wordBreak="break-all"
+        >
+          {secret}
+        </Code>
+        <Button size="sm" variant="outline" onClick={() => onCopy(secret)}>
+          <Copy size={14} /> {copied ? "Copied" : "Copy"}
+        </Button>
+      </HStack>
+    </VStack>
+  );
+}
+
+/** Where a webhook-mode source posts its events. */
+function WebhookEndpointPanel({
+  webhookUrl,
+  onCopy,
+}: {
+  webhookUrl: string;
+  onCopy: (value: string) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={1}>
+      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+        Webhook URL (paste into upstream webhook config)
+      </Text>
+      <HStack gap={2}>
+        <Code flex={1} padding={2} fontSize="xs">
+          {webhookUrl}
+        </Code>
+        <Button size="sm" variant="outline" onClick={() => onCopy(webhookUrl)}>
+          <Copy size={14} />
+        </Button>
+      </HStack>
+    </VStack>
+  );
+}
+
+/** The one-shot warning, and how long the old secret keeps working. */
+function SecretGraceNotice() {
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="amber.300"
+      backgroundColor="amber.50"
+      padding={3}
+      borderRadius="sm"
+    >
+      <Text fontSize="xs" color="amber.900">
+        <strong>Important:</strong> the secret above will not be shown again. We
+        retained the prior secret&apos;s hash for a 24h grace window if
+        you&apos;re rotating, so you have time to roll the new value through
+        every upstream client.
+      </Text>
+    </Box>
+  );
+}
+
+/** Where a push-mode source sends its OTLP, and which endpoint is which. */
+function OtlpEndpointPanel({
+  otlpUrl,
+  onCopy,
+}: {
+  otlpUrl: string;
+  onCopy: (value: string) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={1}>
+      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+        OTLP ingestion endpoint (paste into upstream exporter)
+      </Text>
+      <HStack gap={2}>
+        <Code flex={1} padding={2} fontSize="xs">
+          {otlpUrl}
+        </Code>
+        <Button size="sm" variant="outline" onClick={() => onCopy(otlpUrl)}>
+          <Copy size={14} />
+        </Button>
+      </HStack>
+      <Text fontSize="xs" color="fg.muted">
+        Spans push into the LangWatch trace store with this source&apos;s origin
+        tag and become viewable in the trace viewer. If you are sending agent
+        traces from your own LangWatch SDK, use{" "}
+        <Code fontSize="xs">/api/otel/v1/traces</Code> with your project API key
+        - different auth, same trace store. See{" "}
+        <Link
+          href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
+          color="blue.600"
+        >
+          Choosing the right OTel endpoint
+        </Link>
+        .
+      </Text>
+    </VStack>
+  );
+}
+
+/** The paste-once shell block a Claude Code source is configured with. */
+function ClaudeCodeEnvBlockPanel({
+  envBlock,
+  onCopy,
+}: {
+  envBlock: string;
+  onCopy: (value: string) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={1}>
+      <HStack justify="space-between" alignItems="center">
+        <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+          Claude Code shell env block
+        </Text>
+        <Button size="xs" variant="outline" onClick={() => onCopy(envBlock)}>
+          <Copy size={12} /> Copy block
+        </Button>
+      </HStack>
+      <Code
+        padding={3}
+        fontSize="xs"
+        whiteSpace="pre"
+        display="block"
+        overflowX="auto"
+      >
+        {envBlock}
+      </Code>
+      <Text fontSize="xs" color="fg.muted">
+        Paste into your Claude Code shell, then run{" "}
+        <Code fontSize="xs" backgroundColor="transparent">
+          claude
+        </Code>
+        . Claude Code&apos;s SDK appends{" "}
+        <Code fontSize="xs" backgroundColor="transparent">
+          /v1/logs
+        </Code>{" "}
+        and{" "}
+        <Code fontSize="xs" backgroundColor="transparent">
+          /v1/metrics
+        </Code>{" "}
+        itself off the base endpoint. To attribute spend to a specific team or
+        department, also export{" "}
+        <Code fontSize="xs" backgroundColor="transparent">
+          OTEL_RESOURCE_ATTRIBUTES=team.id=…,department=…
+        </Code>{" "}
+        - those land as resource attributes and slot into /governance&apos;s
+        spendByTeam without further config.
+      </Text>
+    </VStack>
+  );
+}
+
+/** The smoke-test curl, and how to read what it returns. */
+function TestCurlPanel({
+  curl,
+  copied,
+  onCopy,
+}: {
+  curl: string;
+  copied: boolean;
+  onCopy: (value: string) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={1}>
+      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+        Test it now - paste this into a terminal
+      </Text>
+      <Box position="relative">
+        <Code
+          display="block"
+          padding={3}
+          fontSize="xs"
+          whiteSpace="pre"
+          overflowX="auto"
+        >
+          {curl}
+        </Code>
+        <Button
+          size="xs"
+          variant="outline"
+          position="absolute"
+          top={2}
+          right={2}
+          onClick={() => onCopy(curl)}
+        >
+          <Copy size={12} /> {copied ? "Copied" : "Copy"}
+        </Button>
+      </Box>
+      <Text fontSize="xs" color="fg.muted">
+        Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on success.
+        If you get <Code fontSize="xs">events: 0</Code> with a hint, the body
+        shape didn&apos;t parse - check the docs.
+      </Text>
+    </VStack>
+  );
+}
+
+/** The endpoints and source-type flags a secret reveal is rendered against. */
+function secretModalTargets(details: SecretDetails | null) {
+  const baseUrl =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://langwatch.invalid";
+  return {
+    otlpUrl: details ? `${baseUrl}/api/ingest/otel/${details.sourceId}` : "",
+    webhookUrl: details
+      ? `${baseUrl}/api/ingest/webhook/${details.sourceId}`
+      : "",
+    usesPushUrl:
+      details?.sourceType === "otel_generic" ||
+      details?.sourceType === "claude_cowork" ||
+      details?.sourceType === "claude_code",
+    usesWebhookUrl: details?.sourceType === "workato",
+    isClaudeCode: details?.sourceType === "claude_code",
+  };
+}
+
 function SecretModal({
   details,
   onClose,
@@ -1771,137 +2238,30 @@ function SecretModal({
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
-  const baseUrl =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : "https://langwatch.invalid";
-  const otlpUrl = details
-    ? `${baseUrl}/api/ingest/otel/${details.sourceId}`
-    : "";
-  const webhookUrl = details
-    ? `${baseUrl}/api/ingest/webhook/${details.sourceId}`
-    : "";
-  const usesPushUrl =
-    details?.sourceType === "otel_generic" ||
-    details?.sourceType === "claude_cowork" ||
-    details?.sourceType === "claude_code";
-  const usesWebhookUrl = details?.sourceType === "workato";
-  const isClaudeCode = details?.sourceType === "claude_code";
+  const { otlpUrl, webhookUrl, usesPushUrl, usesWebhookUrl, isClaudeCode } =
+    secretModalTargets(details);
 
-  // Claude Code's monitoring-usage doc requires CLAUDE_CODE_ENABLE_TELEMETRY=1
-  // plus the standard OTEL_*_EXPORTER env vars. We recommend
-  // OTEL_TRACES_EXPORTER=otlp so spans claude-code instruments propagate to
-  // LangWatch and logs/metrics emitted inside those spans get correlated;
-  // the session.id resource attribute is then mapped to gen_ai.conversation.id
-  // by the OpenInference extractor so the UI groups the session as one thread.
-  // Pre-build the shell export block so admins paste once instead of stitching
-  // seven lines off the docs page.
-  // Plus the four content-unlock knobs (USER_PROMPTS + TOOL_DETAILS +
-  // TOOL_CONTENT + RAW_API_BODIES). Without these, the OTel wire is
-  // metadata-only - tokens, cost, durations, tool sizes-in-bytes -
-  // and user prompt text, assistant response text, and tool I/O
-  // content are silently absent. With them on, langwatch.input +
-  // langwatch.output lift verbatim from claude's api_request +
-  // api_response_body events. Payload risk is bounded by claude's
-  // 60KB inline cap + the langwatch receiver content cap.
-  const claudeCodeEnvBlock = useMemo(() => {
-    if (!isClaudeCode || !details) return "";
-    return [
-      `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
-      `export OTEL_TRACES_EXPORTER=otlp`,
-      `export OTEL_LOGS_EXPORTER=otlp`,
-      `export OTEL_METRICS_EXPORTER=otlp`,
-      `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
-      `export OTEL_LOG_USER_PROMPTS=1`,
-      `export OTEL_LOG_TOOL_DETAILS=1`,
-      `export OTEL_LOG_TOOL_CONTENT=1`,
-      `export OTEL_LOG_RAW_API_BODIES=1`,
-      `export OTEL_EXPORTER_OTLP_ENDPOINT="${otlpUrl}"`,
-      `export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${details.secret}"`,
-    ].join("\n");
-  }, [isClaudeCode, details, otlpUrl]);
+  const claudeCodeEnvBlock = useMemo(
+    () =>
+      isClaudeCode && details
+        ? buildClaudeCodeEnvBlock({ details, otlpUrl })
+        : "",
+    [isClaudeCode, details, otlpUrl],
+  );
 
-  // F-OTEL-3 (Sergey draft): a copy-paste curl that exercises the full
-  // happy path - body parses, attribute parser sees the canonical
-  // gen_ai.* + user.email keys, KPI strip moves on the first event.
-  // Timestamp is fresh at modal open so the test event lands inside
-  // the 24h health window even if the user delays a bit before
-  // pasting.
-  const testCurl = useMemo(() => {
-    if (!details) return null;
-    if (usesPushUrl) {
-      const nowNs = `${Date.now()}000000`;
-      const otlpBody = JSON.stringify({
-        resource_spans: [
-          {
-            resource: {
-              attributes: [
-                {
-                  key: "service.name",
-                  value: { stringValue: details.sourceName },
-                },
-              ],
-            },
-            scope_spans: [
-              {
-                spans: [
-                  {
-                    name: "chat.completion",
-                    startTimeUnixNano: nowNs,
-                    attributes: [
-                      {
-                        key: "gen_ai.usage.input_tokens",
-                        value: { intValue: 120 },
-                      },
-                      {
-                        key: "gen_ai.usage.output_tokens",
-                        value: { intValue: 480 },
-                      },
-                      {
-                        key: "gen_ai.usage.cost_usd",
-                        value: { doubleValue: 0.025 },
-                      },
-                      {
-                        key: "user.email",
-                        value: { stringValue: "you@your.org" },
-                      },
-                      {
-                        key: "gen_ai.request.model",
-                        value: { stringValue: "claude-sonnet-4" },
-                      },
-                    ],
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      });
-      return [
-        `curl -X POST '${otlpUrl}' \\`,
-        `  -H 'Authorization: Bearer ${details.secret}' \\`,
-        `  -H 'Content-Type: application/json' \\`,
-        `  -d '${otlpBody}'`,
-      ].join("\n");
-    }
-    if (usesWebhookUrl) {
-      return [
-        `curl -X POST '${webhookUrl}' \\`,
-        `  -H 'Authorization: Bearer ${details.secret}' \\`,
-        `  -H 'Content-Type: application/json' \\`,
-        `  -d '{"event":"test.smoke","actor":"you@your.org"}'`,
-      ].join("\n");
-    }
-    return null;
-  }, [
-    details?.secret,
-    details?.sourceName,
-    details,
-    otlpUrl,
-    webhookUrl,
-    usesPushUrl,
-    usesWebhookUrl,
-  ]);
+  const testCurl = useMemo(
+    () =>
+      details
+        ? buildTestCurl({
+            details,
+            otlpUrl,
+            webhookUrl,
+            usesPushUrl,
+            usesWebhookUrl,
+          })
+        : null,
+    [details, otlpUrl, webhookUrl, usesPushUrl, usesWebhookUrl],
+  );
 
   if (!details) return null;
 
@@ -1945,181 +2305,31 @@ function SecretModal({
                 </Badge>
               </Text>
             </VStack>
-            <VStack align="stretch" gap={1}>
-              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                Ingest secret (bearer token)
-              </Text>
-              <HStack gap={2}>
-                <Code
-                  flex={1}
-                  padding={2}
-                  fontSize="xs"
-                  whiteSpace="pre-wrap"
-                  wordBreak="break-all"
-                >
-                  {details.secret}
-                </Code>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => copy(details.secret)}
-                >
-                  <Copy size={14} /> {copied ? "Copied" : "Copy"}
-                </Button>
-              </HStack>
-            </VStack>
+            <IngestSecretPanel
+              secret={details.secret}
+              copied={copied}
+              onCopy={copy}
+            />
             {usesPushUrl && (
-              <VStack align="stretch" gap={1}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  OTLP ingestion endpoint (paste into upstream exporter)
-                </Text>
-                <HStack gap={2}>
-                  <Code flex={1} padding={2} fontSize="xs">
-                    {otlpUrl}
-                  </Code>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => copy(otlpUrl)}
-                  >
-                    <Copy size={14} />
-                  </Button>
-                </HStack>
-                <Text fontSize="xs" color="fg.muted">
-                  Spans push into the LangWatch trace store with this
-                  source&apos;s origin tag and become viewable in the trace
-                  viewer. If you are sending agent traces from your own
-                  LangWatch SDK, use{" "}
-                  <Code fontSize="xs">/api/otel/v1/traces</Code> with your
-                  project API key - different auth, same trace store. See{" "}
-                  <Link
-                    href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
-                    color="blue.600"
-                  >
-                    Choosing the right OTel endpoint
-                  </Link>
-                  .
-                </Text>
-              </VStack>
+              <OtlpEndpointPanel otlpUrl={otlpUrl} onCopy={copy} />
             )}
             {usesWebhookUrl && (
-              <VStack align="stretch" gap={1}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Webhook URL (paste into upstream webhook config)
-                </Text>
-                <HStack gap={2}>
-                  <Code flex={1} padding={2} fontSize="xs">
-                    {webhookUrl}
-                  </Code>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => copy(webhookUrl)}
-                  >
-                    <Copy size={14} />
-                  </Button>
-                </HStack>
-              </VStack>
+              <WebhookEndpointPanel webhookUrl={webhookUrl} onCopy={copy} />
             )}
             {isClaudeCode && (
-              <VStack align="stretch" gap={1}>
-                <HStack justify="space-between" alignItems="center">
-                  <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                    Claude Code shell env block
-                  </Text>
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    onClick={() => copy(claudeCodeEnvBlock)}
-                  >
-                    <Copy size={12} /> Copy block
-                  </Button>
-                </HStack>
-                <Code
-                  padding={3}
-                  fontSize="xs"
-                  whiteSpace="pre"
-                  display="block"
-                  overflowX="auto"
-                >
-                  {claudeCodeEnvBlock}
-                </Code>
-                <Text fontSize="xs" color="fg.muted">
-                  Paste into your Claude Code shell, then run{" "}
-                  <Code fontSize="xs" backgroundColor="transparent">
-                    claude
-                  </Code>
-                  . Claude Code&apos;s SDK appends{" "}
-                  <Code fontSize="xs" backgroundColor="transparent">
-                    /v1/logs
-                  </Code>{" "}
-                  and{" "}
-                  <Code fontSize="xs" backgroundColor="transparent">
-                    /v1/metrics
-                  </Code>{" "}
-                  itself off the base endpoint. To attribute spend to a specific
-                  team or department, also export{" "}
-                  <Code fontSize="xs" backgroundColor="transparent">
-                    OTEL_RESOURCE_ATTRIBUTES=team.id=…,department=…
-                  </Code>{" "}
-                  - those land as resource attributes and slot into
-                  /governance&apos;s spendByTeam without further config.
-                </Text>
-              </VStack>
+              <ClaudeCodeEnvBlockPanel
+                envBlock={claudeCodeEnvBlock}
+                onCopy={copy}
+              />
             )}
             {testCurl && (
-              <VStack align="stretch" gap={1}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Test it now - paste this into a terminal
-                </Text>
-                <Box position="relative">
-                  <Code
-                    display="block"
-                    padding={3}
-                    fontSize="xs"
-                    whiteSpace="pre"
-                    overflowX="auto"
-                  >
-                    {testCurl}
-                  </Code>
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    position="absolute"
-                    top={2}
-                    right={2}
-                    onClick={() => copy(testCurl)}
-                  >
-                    <Copy size={12} /> {copied ? "Copied" : "Copy"}
-                  </Button>
-                </Box>
-                <Text fontSize="xs" color="fg.muted">
-                  Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on
-                  success. If you get <Code fontSize="xs">events: 0</Code> with
-                  a hint, the body shape didn&apos;t parse - check the docs.
-                </Text>
-              </VStack>
+              <TestCurlPanel curl={testCurl} copied={copied} onCopy={copy} />
             )}
-            <Box
-              borderWidth="1px"
-              borderColor="amber.300"
-              backgroundColor="amber.50"
-              padding={3}
-              borderRadius="sm"
-            >
-              <Text fontSize="xs" color="amber.900">
-                <strong>Important:</strong> the secret above will not be shown
-                again. We retained the prior secret&apos;s hash for a 24h grace
-                window if you&apos;re rotating, so you have time to roll the new
-                value through every upstream client.
-              </Text>
-            </Box>
+            <SecretGraceNotice />
           </VStack>
         </DialogBody>
         <DialogFooter>
-          <Link
-            href={`/settings/governance/ingestion-sources/${details.sourceId}`}
-          >
+          <Link href={`/governance/ingestion-sources/${details.sourceId}`}>
             <Button variant="outline">View source page →</Button>
           </Link>
           <Button colorPalette="blue" onClick={onClose}>
@@ -2134,7 +2344,7 @@ function SecretModal({
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
 })(
-  withPermissionGuard("organization:manage", {
+  withPermissionGuard("governance:view", {
     bypassOnboardingRedirect: true,
   })(IngestionSourcesPage),
 );

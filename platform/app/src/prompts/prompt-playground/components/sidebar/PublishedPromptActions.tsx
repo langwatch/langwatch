@@ -81,9 +81,6 @@ export function PublishedPromptActions({
           promptHandle,
         )}" has been updated from source.`,
         type: "success",
-        meta: {
-          closable: true,
-        },
       });
     } catch (error) {
       showErrorToast({
@@ -108,9 +105,6 @@ export function PublishedPromptActions({
           promptHandle,
         )}" was duplicated as "${getDisplayHandle(duplicated.handle)}"`,
         type: "success",
-        meta: {
-          closable: true,
-        },
       });
     } catch (error) {
       showErrorToast({ error, fallbackTitle: "Couldn't duplicate the prompt" });

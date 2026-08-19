@@ -1278,6 +1278,10 @@ LangWatch supports the following SCIM group operations:
 | `replace displayName` | Rename the group | Group name updated in LangWatch |
 | `replace members` | Full member replacement | Adds new, removes old members |
 
+A `replace` that carries no member list leaves the group's membership alone — replacing an unrelated attribute never removes anyone. Sending `members` as an empty list is a member list, and does clear the group, as does an explicit `null`.
+
+To clear a group you have to say so, either with an empty list or with an explicit `null`. A missing `members` value, a non-`null` value that is not a list, or a list holding entries without a usable id — no string `value`, or a blank one — says nothing we can act on and is treated as saying nothing about membership rather than as saying "no members" — a malformed payload should not revoke anyone's access. Only the member replacement is left unapplied: any other recognized attribute in the same operation, such as `displayName`, still takes effect. The unapplied part is recorded in the server logs.
+
 ### Supported Filter
 
 Groups can be filtered by `displayName` using a case-insensitive `eq` filter:
@@ -3218,7 +3222,7 @@ Requires `gatewaySpend:manage`. The endpoint must be an active endpoint of your 
 
 ## The ledger UI
 
-**Settings > Gateway > Billing events** (`/settings/gateway/billing-events`) renders the spend ledger: cursor-paged, filterable by virtual key, end user, model, status, and date range, with token classes and cost per row and drill-through to the trace. Delivery health lives one screen over, on each endpoint's deliveries view under **Settings > Webhooks**, so the pair to keep open during an integration bring-up is this ledger beside your endpoint's health strip: if the numbers here match your ledger and the lag there stays near zero, the pipeline works.
+**Settings > Gateway > Billing events** (`/gateway/billing-events`) renders the spend ledger: cursor-paged, filterable by virtual key, end user, model, status, and date range, with token classes and cost per row and drill-through to the trace. Delivery health lives one screen over, on each endpoint's deliveries view under **Settings > Webhooks**, so the pair to keep open during an integration bring-up is this ledger beside your endpoint's health strip: if the numbers here match your ledger and the lag there stays near zero, the pipeline works.
 
 ## Operational notes
 
@@ -12496,7 +12500,7 @@ password, bind it to your existing secret-management workflow.
 
 ## 3. Publish a default RoutingPolicy
 
-In the UI: **Settings → Routing Policies → New policy**, scope =
+In the UI: **Gateway → Routing Policies → New policy**, scope =
 `organization`. Mark it default. Pick the providers from step 2 in
 your preferred fallback order. Optionally add a model allowlist,
 e.g. `claude-3-5-*` and `gpt-4o*`, to keep personal keys out of the
@@ -13699,9 +13703,9 @@ sidebarTitle: Anomaly rules
 
 <Info>**Pairs with:** [AI Gateway → Budgets](/ai-gateway/budgets). Budgets enforce hard spend limits; anomaly rules detect patterns *before* a budget breach (spend-spike, geo-mismatch, off-hours).</Info>
 
-<Note>**Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on `/settings/governance/anomaly-rules` instead of the composer. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
+<Note>**Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on `/governance/anomaly-rules` instead of the composer. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
-Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/settings/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing detector](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
+Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing detector](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
 
 This page documents what the detector evaluates today and what is preview-only, so you don't author rules that look "active" in the list but never fire.
 
@@ -13728,7 +13732,7 @@ If you need detection beyond `spend_spike` today, the recommended shape is one o
 
 ## Writing a working `spend_spike` rule
 
-Open `/settings/governance/anomaly-rules` → click **New anomaly rule**.
+Open `/governance/anomaly-rules` → click **New anomaly rule**.
 
 Fields the detector reads:
 
@@ -13738,7 +13742,7 @@ Fields the detector reads:
 | **Severity** | `warning`, `critical` | Drives the `/governance` KPI breakdown (`anomalyBreakdown.{critical,warning,info}`) and downstream dispatch routing once C3 ships. |
 | **Rule type** | `spend_spike` | Pick exactly this, see coverage table above. |
 | **Scope** | `organization`, `source_type`, `source` | Filters which IngestionSources the rule applies to (see Scope coverage below). |
-| **Scope ID** | (cuid) | Required when scope is `source_type` or `source`. The IngestionSource ID can be copied from `/settings/governance/ingestion-sources/<id>` or the URL of the per-source detail page. |
+| **Scope ID** | (cuid) | Required when scope is `source_type` or `source`. The IngestionSource ID can be copied from `/governance/ingestion-sources/<id>` or the URL of the per-source detail page. |
 | **Threshold config** | (JSON object, see below) | The detector's per-rule-type tuning knobs. |
 | **Destination config** | `{}` (today) | Reserved for future Slack, PagerDuty, SIEM dispatch, see Dispatch coverage below. |
 
@@ -14292,14 +14296,14 @@ $ langwatch login --device
 … opening https://app.langwatch.ai/cli/auth?code=ABCD-EFGH …
 Error: HTTP 409, no_default_routing_policy
        Your organization has no default routing policy published.
-       Ask your admin to publish one at Settings → Routing Policies
-       (/settings/routing-policies), then re-run `langwatch login`.
+       Ask your admin to publish one at Gateway → Routing Policies
+       (/gateway/routing-policies), then re-run `langwatch login`.
 ```
 
 **Admin remediation:**
 
 1. Sign in to the LangWatch web app as an org admin.
-2. Navigate to **Settings → Routing Policies** (`/settings/routing-policies`).
+2. Navigate to **Gateway → Routing Policies** (`/gateway/routing-policies`).
 3. Create at least one routing policy and toggle it to **Default**.
 4. Ask the developer to re-run `langwatch login --device`.
 
@@ -14331,7 +14335,7 @@ Three surfaces, one backend:
 | Surface | Audience | Contract |
 |---------|----------|----------|
 | Web `/governance` admin oversight | Governance admin in a browser | tRPC: `api.governance.setupState`, `api.activityMonitor.*`, `api.ingestionSources.*` |
-| Web `/settings/governance/ingestion-sources/:id` detail | Per-source SRE | tRPC: `api.activityMonitor.eventsForSource`, `api.activityMonitor.sourceHealthMetrics` |
+| Web `/governance/ingestion-sources/:id` detail | Per-source SRE | tRPC: `api.activityMonitor.eventsForSource`, `api.activityMonitor.sourceHealthMetrics` |
 | **CLI `governance status`, `ingest list/health/tail`** | **Terminal-first SRE, on-call** | **REST: `GET /api/auth/cli/governance/*`, Bearer adapter that imports the same service classes the tRPC procedures use, byte-for-byte matching IO** |
 
 The REST endpoints reuse the existing `validateAccessToken()` Bearer helper that's been in production since the device-flow CLI shipped, so opening this surface doesn't introduce a new auth path. Per-account governance entitlement is enforced at the endpoint layer.
@@ -14590,7 +14594,7 @@ LangWatch's RBAC layer (`platform/app/src/server/api/rbac.ts`) is the single sou
 
 **Chrome visibility gates**: `hasPermission('governance:view') && release_ui_ai_governance_enabled` for the Govern sidebar section; `hasPermission('virtualKeys:view') && release_ui_ai_gateway_menu_enabled` for the AI Gateway sidebar section. The feature flags are operator rollout knobs; the permissions are the audience predicate. Two flags preserve pilot flexibility so Gateway and Governance can roll out independently.
 
-**tRPC + REST enforcement**: every governance procedure currently checks `organization:manage` (broad). Granularization to the new dedicated permissions (`governance:manage`, `ingestionSources:manage`, etc.) is a deferred follow-up, existing checks still work; the catalog addition unblocks the gate-side migration.
+**tRPC + REST enforcement**: every governance procedure checks the dedicated permission for its resource. Reads use `<resource>:view` (`governance:view`, `ingestionSources:view`, `anomalyRules:view`, `activityMonitor:view`, `routingPolicies:view`) and writes use `<resource>:manage`. The page guards match the read grant, so the custom-role delegation above reaches the pages and each panel names the grant it still needs.
 
 ### 4. Org-tenancy isolation
 
@@ -14667,16 +14671,15 @@ existing routes:
 
 | Surface | Purpose | Audience | Where it lives |
 |---------|---------|----------|----------------|
-| `/governance` (forthcoming top-level home) | Daily-use **org governance home**: spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing--the-setup-state-signal) below) | Top-level route, org-scoped. Replaces the read-mostly content currently temporarily under `/settings/governance`. |
+| `/governance` | Daily-use **org governance home**: spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing--the-setup-state-signal) below) | Top-level route, org-scoped. |
 | `/me`, `/me/settings` | Daily-use **personal home**: your usage, your budget, your personal VK, your IDE setup snippet. | Any user with a personal VK | Top-level route, principal-scoped. |
 | `/[project]/...` | LLMOps daily-use, traces, evals, datasets, scenarios, workflows. | Project members | Per-project routes. **Unchanged** from current LangWatch. |
-| `/settings/governance/ingestion-sources`, `/settings/governance/anomaly-rules`, `/settings/routing-policies` | Admin-authoring (CRUD), create, rotate, archive sources, write rules, publish routing policies. | Org admins with `organization:manage` | Settings sub-routes, deliberately separate from daily-use surfaces. |
+| `/governance/ingestion-sources`, `/governance/anomaly-rules`, `/gateway/routing-policies` | Admin-authoring (CRUD), create, rotate, archive sources, write rules, publish routing policies. | The governance pages open on `governance:view` and `/gateway/routing-policies` on `routingPolicies:view`. Each write control needs the matching `:manage` grant (`ingestionSources:manage`, `anomalyRules:manage`, `routingPolicies:manage`) and is hidden without it. | Governance sub-routes, deliberately separate from daily-use surfaces. |
 
-This split is the answer to "why is governance overview hidden under
-Settings?", it shouldn't be. The read-mostly daily home is moving
-out to `/governance` (top-level); only the create, rotate, archive
-admin tools stay in Settings, where every other admin authoring
-tool lives.
+The whole governance product sits at the top level, not under Settings.
+The daily home is `/governance`, and the create, rotate and archive tools
+are its own sub-routes. Settings keeps the account and workspace
+administration that every product shares.
 
 ### Persona-based home routing: the setup-state signal
 
@@ -14923,7 +14926,7 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   validation).
 - ✅ **`/me` + `/me/settings`** dashboards (web app, gated behind the
   `release_ui_ai_governance_enabled` flag).
-- ✅ **`/settings/governance`** admin oversight dashboard
+- ✅ **`/governance`** admin oversight dashboard
   (org-admin-only via `organization:manage` permission, plus the
   governance flag). Wired to real `api.activityMonitor.{summary,
   spendByUser, ingestionSourcesHealth, recentAnomalies}` tRPC
@@ -14931,7 +14934,7 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   checklist (publish a RoutingPolicy, connect an IngestionSource),
   data renders live cards + per-user table + source-health strip.
   Read-mostly daily-use surface; admin authoring lives at the
-  `/settings/governance/*` sub-routes.
+  `/governance/*` sub-routes.
 - ✅ **Budget enforcement** (cross-surface, gateway 402 ↔ CLI
   Screen-8 box ↔ web `BudgetExceededBanner` all derive from
   `GatewayBudgetService.check()`).
@@ -14961,7 +14964,7 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   `organization:manage` permission AND
   `api.governance.setupState.governanceActive === true`. Renders
   a "GOVERN · Preview" section between LIBRARY and AI GATEWAY ·
-  Beta with an Eye-icon link to `/settings/governance`. Current
+  Beta with an Eye-icon link to `/governance`. Current
   LLMOps admins with no governance state see no nav change at all.
 
   ![MainMenu showing GOVERN Preview section with Governance entry, only visible when governanceActive=true](https://i.img402.dev/mck1l1ar3g.png)
@@ -14976,7 +14979,7 @@ In flight on the same branch:
 ## Admin oversight on real data
 
 Once a source is `active` and events are flowing, the admin
-oversight dashboard at `/settings/governance` queries
+oversight dashboard at `/governance` queries
 `gateway_activity_events` via the `api.activityMonitor.*` tRPC
 procedures. Empty data renders a setup checklist; data present
 renders live cards + per-user table + source-health strip.
@@ -15340,7 +15343,7 @@ The **departments page** itself only creates, renames, and archives departments,
 
 ### Managing departments
 
-Open the departments page under **Settings → AI Governance → Departments** to:
+Open the departments page under **Governance → Departments** to:
 
 - **Create** a department by name (Engineering, Marketing, ...).
 - **Edit** a department's name.
@@ -15386,8 +15389,9 @@ Every underlying query is tenant-isolated: a department rollup for your org cont
 
 ## Permissions
 
-- Creating, renaming, and archiving departments requires `organization:manage` (granted to ADMIN by default).
-- Assigning people, teams, and projects to a department happens on the respective surfaces under the same admin permission.
+- Reading the department list requires `governance:view`, which is also what opens the page.
+- Creating, renaming, and archiving departments requires `governance:manage` (granted to ADMIN by default). Without it, the page shows the list and hides the write controls.
+- Assigning people, teams, and projects to a department happens on the respective surfaces under the same `governance:manage` permission.
 - Departments never appear in any access-control decision. They are an accounting dimension only.
 
 ## Where to next
@@ -15485,12 +15489,12 @@ After sign-in you'll land on `/governance` (the org governance home, see the [co
 
 ```
 HTTP 409, error: "no_default_routing_policy"
-Ask your admin to publish a default routing policy at Settings → Routing Policies.
+Ask your admin to publish a default routing policy at Gateway → Routing Policies.
 ```
 
 Publish at least one policy *before* opening CLI sign-in to your team:
 
-1. Navigate to **Settings → Routing Policies** (`/settings/routing-policies`).
+1. Navigate to **Gateway → Routing Policies** (`/gateway/routing-policies`).
 2. Click **+ New routing policy**.
 3. Pick a recommended starter shape: "Anthropic primary, OpenAI fallback, prompt caching on" works on day one.
 4. Tick **Mark as default** before saving.
@@ -15503,7 +15507,7 @@ The same chain controls cost, latency, fallback, and prompt caching across every
 
 For a brand-new org, the cheapest first source is `otel_generic`, it's available on the **Apache 2.0** open-core floor (no Enterprise license required) and accepts any OTLP/HTTP push:
 
-1. Navigate to **Settings → AI Governance → Ingestion Sources** (`/settings/governance/ingestion-sources`).
+1. Navigate to **Governance → Ingestion Sources** (`/governance/ingestion-sources`).
 2. Click **+ New source**, pick **Generic OTLP (`otel_generic`)**, and fill the form.
 3. The backend mints a `lw_is_<base64url>` ingest secret and shows it **once** in a one-time-reveal modal, copy it now. The list endpoint never returns it again.
 4. Paste the secret into the upstream platform's OTLP exporter as `Authorization: Bearer lw_is_<secret>`. The receiver endpoint is on the same host as the rest of LangWatch.
@@ -15514,9 +15518,9 @@ If no upstream is ready yet, skip this step. Your gateway itself is an implicit 
 
 ## Step 4: Import the AI Tools Portal starter pack
 
-The [AI Tools Portal](/ai-governance/personal-portal/overview) is the card grid every developer sees on `/me`. A fresh org has an empty catalog; the [admin editor](/ai-governance/personal-portal/admin-catalog) at `/settings/governance/tool-catalog` shows you a one-click **Import starter pack** CTA on first visit:
+The [AI Tools Portal](/ai-governance/personal-portal/overview) is the card grid every developer sees on `/me`. A fresh org has an empty catalog; the [admin editor](/ai-governance/personal-portal/admin-catalog) at `/governance/tool-catalog` shows you a one-click **Import starter pack** CTA on first visit:
 
-1. Navigate to **Settings → AI Governance → Tool catalog** (`/settings/governance/tool-catalog`).
+1. Navigate to **Governance → Tool Catalog** (`/governance/tool-catalog`).
 2. Click **Import starter pack**.
 
 What you get out of the box:
@@ -15566,7 +15570,7 @@ langwatch ingest health <sourceId>
 
 Budgets are the gateway's hard cost gate. With a default routing policy in place, you can attach budgets at four scopes: **organization**, **team**, **project**, and **principal**. Org-wide is the broadest safety net, set this first if your org doesn't yet have per-team budgets dialled in.
 
-1. Navigate to **Gateway → Budgets** under any project (`/<project>/gateway/budgets`).
+1. Navigate to **Gateway → Budgets** (`/gateway/budgets`).
 2. Click **+ New budget**.
 3. Pick **Organization, all AI spend** in the Scope dropdown. The picker also offers Team, Project, and Principal scopes for narrower caps.
 4. Pick a window (`Per calendar month` is the default), a USD limit, and an `On breach` action (`Block` rejects requests at the limit, `Warn` tags responses but keeps serving).
@@ -15582,7 +15586,7 @@ Budgets enforce *at* the limit. [Anomaly rules](/ai-governance/anomaly-rules) de
 
 Write a starter `spend_spike` rule:
 
-1. Navigate to **Settings → AI Governance → Anomaly Rules** (`/settings/governance/anomaly-rules`).
+1. Navigate to **Governance → Anomaly Rules** (`/governance/anomaly-rules`).
 2. Click **+ New anomaly rule**.
 3. Fill in:
    - **Name**: `Daily spend doubles vs last week`
@@ -15614,7 +15618,7 @@ The detector starts evaluating from the next ingest event. When today's 24h spen
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Developer sees `409 no_default_routing_policy` on `langwatch login` | Step 2 skipped or no policy marked default | [Routing Policies](/ai-gateway/governance/routing-policies): pick one, tick **Mark as default**. |
-| `/me` shows "your IT team is still setting things up" empty state | Step 4 skipped | Open `/settings/governance/tool-catalog` → **Import starter pack**. |
+| `/me` shows "your IT team is still setting things up" empty state | Step 4 skipped | Open `/governance/tool-catalog` → **Import starter pack**. |
 | Ingestion source sits at `awaiting_first_event` forever | Source-type doesn't have a wired adapter yet | [Ingestion Sources index → State of each receiver](/ai-governance/ingestion-sources/index#state-of-each-receiver--at-a-glance): three rows are setup-contract-only as of this release. |
 | `/governance` doesn't appear in your sidebar | Org's [setup-state OR-of-flags](/ai-governance/control-plane#persona-based-home-routing--the-setup-state-signal) hasn't tripped yet | Need any 3 of 5: Personal VKs, Routing Policies, Ingestion Sources, Anomaly Rules, Recent activity (30d). After Steps 2–7 above, you'll have 4. |
 | Member colleague got an `Access Restricted` page on `/settings/audit-log` | Working as designed, audit log is admin-only | Either elevate them to `Admin` or grant a custom role with `organization:manage` (delegable via the `CustomRolePermissions` JSON column). |
@@ -15762,17 +15766,17 @@ Your spend, budget, and audit trail still flow normally, the portal grid is a co
 
 ---
 title: /governance dashboard
-description: The daily-use org governance home, spend, anomalies, ingestion-source health, per-user activity. Read-mostly; the admin-authoring CRUD pages still live under /settings/governance/*. Available only after the org's setup-state OR-of-flags trips.
+description: The daily-use org governance home, spend, anomalies, ingestion-source health, per-user activity. Read-mostly; the admin-authoring CRUD pages still live under /governance/*. Available only after the org's setup-state OR-of-flags trips.
 sidebarTitle: /governance dashboard
 ---
 
 The `/governance` route is the **org governance daily home**: the read-mostly oversight dashboard an admin opens to answer *"is the gateway healthy, are we within budget, did anything anomalous happen overnight, are users actually using this?"*. It's the counterpart of `/me` for the admin persona.
 
-It is intentionally distinct from the **admin-authoring** surface at `/settings/governance/*`, see [Control plane → Daily-use vs admin-authoring](/ai-governance/control-plane#daily-use-surfaces-vs-admin-authoring-surfaces) for why the split exists.
+It is intentionally distinct from the **admin-authoring** surface at `/governance/*`, see [Control plane → Daily-use vs admin-authoring](/ai-governance/control-plane#daily-use-surfaces-vs-admin-authoring-surfaces) for why the split exists.
 
 <Info>**Pairs with:** [Control plane & integration tiers](/ai-governance/control-plane) for the surface map, [Anomaly rules](/ai-governance/anomaly-rules) for what populates the anomalies strip, and [Departments](/ai-governance/departments) for how the **Spend by department** card attributes spend across the org.</Info>
 
-<Note>**Visibility**: the `/governance` entry only appears in the main sidebar once the org's setup-state OR-of-flags trips (see [When the entry shows up](#when-the-entry-shows-up) below). A brand-new org sees the **Settings → AI Governance** admin pages instead until they have data flowing.</Note>
+<Note>**Visibility**: the `/governance` entry only appears in the main sidebar once the org's setup-state OR-of-flags trips (see [When the entry shows up](#when-the-entry-shows-up) below). A brand-new org sees the **Governance** admin pages instead until they have data flowing.</Note>
 
 ## What you see
 
@@ -15847,7 +15851,7 @@ The same signal drives:
 
 - The **Govern (Preview)** entry visibility in the main sidebar.
 - The CLI `langwatch governance status` output (mirrors the same booleans).
-- The post-onboarding redirect, when an admin lands on `/`, the persona-2 home picker sends them to `/governance` if active, else to `/settings/governance` to keep configuring.
+- The post-onboarding redirect, when an admin lands on `/`, the persona-2 home picker sends them to `/governance` if active, else to `/governance` to keep configuring.
 
 ## Permissions
 
@@ -15869,7 +15873,7 @@ The dashboard is read-mostly, but every section deep-links into the admin-author
 - Ingestion-source health row → click into the per-source detail page.
 - Anomalies row → click the rule name → opens the [anomaly-rule editor](/ai-governance/anomaly-rules) at that rule.
 
-If the dashboard surfaces something you want to *act* on (rotate a key, edit a rule threshold, archive a source), follow the deep link into the corresponding admin-authoring page under `/settings/governance/*`.
+If the dashboard surfaces something you want to *act* on (rotate a key, edit a rule threshold, archive a source), follow the deep link into the corresponding admin-authoring page under `/governance/*`.
 
 ## Where to next
 
@@ -15897,7 +15901,7 @@ The configuration contract below lets admins pre-stage workspace keys; the match
 
 ## Currently implemented
 
-- **CRUD:** the source can be created via the admin composer at `/settings/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
+- **CRUD:** the source can be created via the admin composer at `/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
 - **Receiver:** none. There is no `/api/ingest/claude-compliance/:id` endpoint and the OTLP, webhook receivers reject `claude_compliance` sources with `400 wrong_endpoint`.
 - **Poller:** none.
 - **Normaliser:** none.
@@ -16004,7 +16008,7 @@ The configuration contract below lets admins pre-stage Azure AD app registration
 
 ## Currently implemented
 
-- **CRUD:** the source can be created via the admin composer at `/settings/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
+- **CRUD:** the source can be created via the admin composer at `/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
 - **Receiver:** none. There is no `POST /api/ingest/copilot/:id` endpoint and the OTLP, webhook receivers reject `copilot_studio` sources with `400 wrong_endpoint`.
 - **Poller:** none.
 - **Normaliser:** none.
@@ -16065,7 +16069,7 @@ sidebarTitle: Ingestion sources
 
 <Info>**Pairs with:** [AI Gateway → Observability](/ai-gateway/observability). The gateway is itself an ingestion source (its spans land in the same trace store); IngestionSources extend that substrate to platforms whose API key path you don't own (Workato, Copilot Studio, OpenAI/Anthropic compliance APIs). Also pairs with [Audit log](/ai-governance/audit-log): S3 audit log feeds (Workato, Copilot Studio, Anthropic Compliance) become OTel-shaped events through this same pipeline, so a single audit log query at `/settings/audit-log` covers in-platform mutations and third-party-tool activity uniformly.</Info>
 
-<Note>**One `otel_generic` source is Apache 2.0 floor; multiple sources and configurable retention require Enterprise.** Self-hosted Apache 2.0 deployments can wire one OTel receiver at the platform default retention window; the additional source types on this page (Workato, S3, Copilot Studio, OpenAI, Anthropic compliance APIs) and [retention policies](/platform/data-retention) ship under the Enterprise license. Non-enterprise organizations see an upgrade card on `/settings/governance/ingestion-sources`. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full split.</Note>
+<Note>**One `otel_generic` source is Apache 2.0 floor; multiple sources and configurable retention require Enterprise.** Self-hosted Apache 2.0 deployments can wire one OTel receiver at the platform default retention window; the additional source types on this page (Workato, S3, Copilot Studio, OpenAI, Anthropic compliance APIs) and [retention policies](/platform/data-retention) ship under the Enterprise license. Non-enterprise organizations see an upgrade card on `/governance/ingestion-sources`. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full split.</Note>
 
 LangWatch governance ingest accepts events from upstream agent and audit-log platforms and lands them in the **same `recorded_spans` + `log_records` tables** that power the rest of LangWatch, distinguished by `langwatch.origin.kind = "ingestion_source"` origin metadata stamped at the receiver edge. Same trace viewer, same compliance + RBAC + retention machinery, surfaced in the [governance dashboard](/ai-governance/control-plane), the per-source detail page, and the [`langwatch ingest tail`](/ai-governance/cli-debug) CLI.
 
@@ -16104,7 +16108,7 @@ Different upstreams emit different event shapes:
 
 Independent of source type, the lifecycle is:
 
-1. Admin opens `/settings/governance/ingestion-sources`, picks a source type, fills the per-type config form (including the [retention class](/ai-gateway/governance/retention)), clicks Create.
+1. Admin opens `/governance/ingestion-sources`, picks a source type, fills the per-type config form (including the [retention class](/ai-gateway/governance/retention)), clicks Create.
 2. Backend mints a `lw_is_<base64url>` ingest secret, hashes it, persists the source with status `awaiting_first_event`. The secret is shown **once** in a one-time-reveal modal, it's never returned by the list/get endpoints again.
 3. Admin pastes the secret + per-source endpoint into the upstream platform (OTLP exporter URL, webhook destination, Azure app secret, S3 bucket policy, etc.).
 4. First event arrives at the receiver → receiver lazy-ensures the hidden Governance Project for the org (if not already), stamps the `langwatch.origin.*` attributes, hands off to the existing trace pipeline. Source status flips to `active` + `lastEventAt` updates.
@@ -16184,7 +16188,7 @@ The configuration contract below lets admins pre-stage IAM trust policies and bu
 
 ## Currently implemented
 
-- **CRUD:** the source can be created via the admin composer at `/settings/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
+- **CRUD:** the source can be created via the admin composer at `/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
 - **Receiver:** none. There is no `/api/ingest/openai-compliance/:id` endpoint and the OTLP, webhook receivers reject `openai_compliance` sources with `400 wrong_endpoint`.
 - **Puller:** none.
 - **Normaliser:** none.
@@ -16327,7 +16331,7 @@ langwatch ingest tail <sourceId> --follow
 langwatch ingest health <sourceId>
 ```
 
-The web equivalent is `/settings/governance/ingestion-sources/<sourceId>`, same data, same poll cadence semantics.
+The web equivalent is `/governance/ingestion-sources/<sourceId>`, same data, same poll cadence semantics.
 
 A successful smoke test produces output like:
 
@@ -16556,7 +16560,7 @@ So the CLI tail row looks like:
 langwatch ingest tail <sourceId> --follow
 ```
 
-Hit a Workato recipe that's connected to the webhook, you should see one event row appear within ~3 s of the recipe completing. The per-source detail page at `/settings/governance/ingestion-sources/<sourceId>` shows the same row; click to expand and inspect `rawPayload` to confirm Workato's envelope shape matches what you expect.
+Hit a Workato recipe that's connected to the webhook, you should see one event row appear within ~3 s of the recipe completing. The per-source detail page at `/governance/ingestion-sources/<sourceId>` shows the same row; click to expand and inspect `rawPayload` to confirm Workato's envelope shape matches what you expect.
 
 If you want to dry-run without a Workato recipe:
 
@@ -16624,7 +16628,7 @@ That's an Ingestion Template:
   Claude Code, Cursor, and Claude cowork all emit OpenTelemetry `gen_ai.*` canonical
   spans natively, so no transform is needed for the common case. **Org admins can clone
   a platform-default template into an org-authored template** and author OTTL via the
-  OttlEditor at `/settings/governance/tool-catalog → Ingestion Templates → Clone to
+  OttlEditor at `/governance/tool-catalog → Ingestion Templates → Clone to
   customise → Edit OTTL`, to adapt a template to their org's upstream-tool quirks (an
   internal IDE wrapper, a custom Cursor build, etc). Platform rows are read-only:
   admins click **Clone to customise** which calls
@@ -16744,7 +16748,7 @@ An `IngestionTemplate` row has:
   because Claude Code, Cursor, and Claude cowork all emit OpenTelemetry `gen_ai.*`
   canonical spans natively, there is nothing to reshape for the common case. **Org
   admins can fork a platform-default template into an org-authored template and author
-  OTTL via the OttlEditor** in `/settings/governance/tool-catalog → Ingestion
+  OTTL via the OttlEditor** in `/governance/tool-catalog → Ingestion
   Templates → Edit OTTL`. Forking lets the admin adapt a template to their org's
   upstream-tool quirks (an internal IDE wrapper, a custom Cursor build, a corporate
   Claude Code variant) without filing a request for a platform change.
@@ -16894,7 +16898,7 @@ Claude Code, Cursor, and Claude cowork to populate `gen_ai.usage.*` correctly pe
 OTel semantic-conventions spec.
 
 **Tier 2, Org-authored templates** (`organizationId NOT NULL`, forked from a tier-1
-template via the OttlEditor at `/settings/governance/tool-catalog → Ingestion
+template via the OttlEditor at `/governance/tool-catalog → Ingestion
 Templates → Edit OTTL`). Admins author OTTL to adapt a template to their org's
 upstream-tool quirks. Trust here rides on **org-admin review at save time**: the
 admin who clicks "Save & validate" is accepting within-org responsibility for the
@@ -16914,7 +16918,7 @@ Cross-org cost integrity is structurally protected on both tiers by the attribut
 re-stamp regardless of OTTL, admin OTTL in org-A cannot misattribute cost to org-B.
 
 A tile flips to green-checked only after the template is verified end to end on a real
-install: an admin publishes it via `/settings/governance/tool-catalog`, a user installs it
+install: an admin publishes it via `/governance/tool-catalog`, a user installs it
 via `/me`, the upstream tool emits a real trace, and the resulting attribution holds up
 under cross-user isolation and forge attempts against both protected lists.
 
@@ -17239,12 +17243,12 @@ What the user controls about their own account lives at `/settings/authenticatio
 
 The page is per-user. There's no admin gate, every member of the org can manage their own credentials here. Admins don't manage other users' sign-in methods from this page; user-account-management is by-design self-service.
 
-Org-level SSO configuration (IdP metadata, SAML cert, SCIM provisioning) is **separate** from this page, it lives at `/settings/governance/scim-provisioning` (admin-only) and the SSO-provider env config in your deployment's helm values, `.env`.
+Org-level SSO configuration (IdP metadata, SAML cert, SCIM provisioning) is **separate** from this page, it lives at `/settings/scim` (admin-only) and the SSO-provider env config in your deployment's helm values, `.env`.
 
 ## Where to next
 
 - **Self-service for me**: [/settings/authentication](#per-user-sign-in-methods-at-settingsauthentication) (this page) and [Devices](/ai-governance/personal-portal/sessions).
-- **Org SSO + SCIM auto-provisioning**: `/settings/governance/scim-provisioning` (admin-only).
+- **Org SSO + SCIM auto-provisioning**: `/settings/scim` (admin-only).
 - **Role catalog**: [Roles & permissions](/ai-governance/roles-and-permissions).
 - **Audit who did what when**: [Audit log](/ai-governance/audit-log).
 
@@ -17376,7 +17380,7 @@ LangWatch is open-core. Some governance surfaces work for every self-hosted depl
 | Surface | License | Notes |
 |---|---|---|
 | [Personal IDE keys](/ai-gateway/governance/personal-keys) | Apache 2.0 | Always available. The Personal Virtual Key + `langwatch login` flow is the open-core floor. |
-| [AI Tools Portal at `/me`](/ai-governance/personal-portal/overview) | Apache 2.0 | Always available. Catalog editor at `/settings/governance/tool-catalog`, three tile classes, admin-curated. |
+| [AI Tools Portal at `/me`](/ai-governance/personal-portal/overview) | Apache 2.0 | Always available. Catalog editor at `/governance/tool-catalog`, three tile classes, admin-curated. |
 | [Routing Policies](/ai-gateway/governance/routing-policies) | Apache 2.0 | Always available. The gateway-side policy chain is core. |
 | [CLI debugging](/ai-governance/cli-debug) | Apache 2.0 | Always available. CLI 409, 401, 403 catalog. |
 | [Ingestion Sources](/ai-governance/ingestion-sources/index) | Enterprise | The `otel_generic` source type at the platform default retention window is available on the Apache 2.0 floor; multiple sources and configurable retention require Enterprise. |
@@ -17463,13 +17467,13 @@ Every span the wrapper produces lands in the developer's own Trace Explorer, wit
 
 ### For an admin
 
-The bird-eye view at `/governance` is the daily home for admin oversight: org-wide spend, top spenders, open anomaly count, ingestion-source health, recent activity. Below it, `/settings/governance/*` is the authoring surface where routing policies, ingestion sources, anomaly rules, the AI Tools Portal catalog, and the audit log all live.
+The bird-eye view at `/governance` is the daily home for admin oversight: org-wide spend, top spenders, open anomaly count, ingestion-source health, recent activity. Below it, `/governance/*` is the authoring surface where routing policies, ingestion sources, anomaly rules, the AI Tools Portal catalog, and the audit log all live.
 
 <Frame caption="The /governance dashboard. KPI summary (org-wide spend, active users, open anomalies), 30-day spend-over-time chart bucketed per team, spend-share-across-teams bar, ingestion-source health, recent activity. Read-mostly oversight, the place admins check before standup.">
   ![Governance bird-eye](/images/ai-governance/post-bypass/06-governance-birdeye.png)
 </Frame>
 
-The Tool Catalog at `/settings/governance/tool-catalog` stocks the developer-facing `/me` portal. Pick a fixed roster of coding assistants and model providers, scope to the org or to specific teams, publish.
+The Tool Catalog at `/governance/tool-catalog` stocks the developer-facing `/me` portal. Pick a fixed roster of coding assistants and model providers, scope to the org or to specific teams, publish.
 
 <Frame caption="Tool Catalog editor. Three tile classes, preset picker, custom icon upload, scope binding, publish lifecycle.">
   ![Tool catalog editor](/images/ai-governance/post-bypass/07-tool-catalog.png)
@@ -17497,7 +17501,7 @@ LangWatch governance is shaped around two people who never need the same screen:
 - **End user**: a developer or analyst who needs a Personal Virtual Key, wants to see their own usage and budget at `/me`, and sometimes switches between Personal, Team, and Project workspaces. They never see the admin surface.
 - **Admin**: an org-level operator who configures ingestion sources, publishes routing policies, defines anomaly rules, and signs off on OCSF and SIEM export. They never see the end-user `/me` chrome.
 
-The persona-aware chrome (single-chip header on `/me`, full sidebar on `/settings/governance/*`) keeps both surfaces clean, so neither has to navigate around the other.
+The persona-aware chrome (single-chip header on `/me`, full sidebar on `/governance/*`) keeps both surfaces clean, so neither has to navigate around the other.
 
 ## Get started
 
@@ -17529,8 +17533,8 @@ sidebarTitle: Admin catalog
 ---
 
 Org admins curate the AI Tools Portal from
-**Settings → AI Governance → Tool catalog**
-(`/settings/governance/tool-catalog`). Anything you publish here lands on
+**Governance → Tool Catalog**
+(`/governance/tool-catalog`). Anything you publish here lands on
 every matching user's `/me` portal grid.
 
 ![Admin catalog editor, section-grouped list of published tiles](/images/ai-governance/portal/admin-catalog-overview.png)
@@ -17783,7 +17787,7 @@ HTTP 422 response with an actionable hint rather than a green key that
 returns 504 on every call.
 
 Ask your admin to bind at least one provider in
-`/settings/governance/routing-policies`. Once a provider is bound,
+`/gateway/routing-policies`. Once a provider is bound,
 retry, issuance will succeed and your key works immediately.
 
 ### When to create a project instead
@@ -17839,7 +17843,7 @@ If your admin hasn't published the catalog yet, you'll see:
 
 This is normal during a brand-new organization's onboarding. Ask your
 admin to import the starter pack at
-`/settings/governance/tool-catalog`.
+`/governance/tool-catalog`.
 
 ## Where to next
 
@@ -17924,7 +17928,7 @@ team entry overrides for users in that team. This is how admins say
 ## Empty state
 
 A fresh organization has an empty catalog. The first admin to visit
-`/settings/governance/tool-catalog` sees a starter-pack import CTA
+`/governance/tool-catalog` sees a starter-pack import CTA
 ([Admin catalog](/ai-governance/personal-portal/admin-catalog#starter-pack)).
 End users on `/me` see a "your IT team is still setting things up"
 message until the admin publishes the catalog.
@@ -17940,7 +17944,7 @@ Two new RBAC permissions gate the portal surfaces:
   This is intentionally broad: the portal is the company's curated AI
   starting point and must work for everyone.
 - `aiTools:manage`, granted to ADMIN by default. Required to access
-  `/settings/governance/tool-catalog` and to run any catalog
+  `/governance/tool-catalog` and to run any catalog
   mutation. Delegable to non-ADMIN roles via the `CustomRolePermissions`
   JSON column.
 
@@ -17950,7 +17954,7 @@ Two new RBAC permissions gate the portal surfaces:
   walks through each tile-class expand UX.
 - **Admin:** [Admin catalog](/ai-governance/personal-portal/admin-catalog)
   walks through the catalog editor at
-  `/settings/governance/tool-catalog`, including starter-pack import,
+  `/governance/tool-catalog`, including starter-pack import,
   scope binding, and per-tile editing.
 - **Developer integrating with the catalog API:** the underlying tRPC
   router is `aiToolsCatalogRouter` (see source, not yet stable for
@@ -18072,8 +18076,7 @@ Recommended values:
 - **Standard enterprises**: 30 days
 - **Open-source, small teams**: 0 (unbounded)
 
-Admins set this at **Settings → Governance → Security policies →
-Maximum session duration**.
+Admins set this at **Governance → Overview → CLI session policy**.
 
 ## What about virtual keys themselves?
 
@@ -18169,7 +18172,7 @@ Override applies after the next sign-in.
 ## Per-org enforcement (admin)
 
 Org admins can enforce a persona-based default on all members of their org
-via the upcoming `/settings/governance/persona-policy` setting (deferred to
+via the upcoming `/governance/persona-policy` setting (deferred to
 a later iteration). Today, the per-user override is the only knob.
 
 ## Related references
@@ -18372,8 +18375,8 @@ auto-discover it; no other glue code needed.
 
 The Copilot Studio reference puller wraps `http_polling` with a
 locked-down config matching Microsoft's documented audit-log API
-shape. Admins enable it at **Settings → Governance → Ingestion
-sources → Add → Microsoft Copilot Studio**, enter their tenant
+shape. Admins enable it at **Governance → Ingestion Sources → Add →
+Microsoft Copilot Studio**, enter their tenant
 credentials, and the framework handles the rest. URL + auth shape are
 fixed (only credentials are admin-editable).
 
@@ -18757,9 +18760,9 @@ An `ik-lw-` write-only ingest key also authenticates the project OTLP endpoint, 
 
 Commit `.claude/settings.json` with the exporter wiring, and keep the bearer token, the `CLAUDE_CODE_ENABLE_TELEMETRY` enable flag and **every content flag** in a gitignored `.claude/settings.local.json`. Telemetry is **off by default**: nothing exports until the enable flag is set, so a fresh clone carrying only the committed `settings.json` sends nothing.
 
-The committed file decides the shape of the export. What that export carries is decided by four flags, and they stay out of the repository so each person turns them on for themselves: `OTEL_LOG_USER_PROMPTS` puts prompt text on the wire, `OTEL_LOG_TOOL_DETAILS` and `OTEL_LOG_TOOL_CONTENT` put the input and output of every tool call on it, and `OTEL_LOG_RAW_API_BODIES` puts the Messages API request and response JSON on it. Inline bodies are truncated at 60 KB (`CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH` raises the limit, `file:<dir>` writes untruncated bodies to disk instead) and extended thinking is redacted.
+The committed file decides the shape of the export. What that export carries is decided by five flags, and they stay out of the repository so each person turns them on for themselves: `OTEL_LOG_USER_PROMPTS` puts prompt text on the wire, `OTEL_LOG_TOOL_DETAILS` and `OTEL_LOG_TOOL_CONTENT` put the input and output of every tool call on it, `OTEL_LOG_RAW_API_BODIES` puts the Messages API request and response JSON on it, and `OTEL_LOG_ASSISTANT_RESPONSES` puts just the assistant's response text on it without the rest of the body. Inline bodies are truncated at 60 KB (`CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH` raises the limit, `file:<dir>` writes untruncated bodies to disk instead) and extended thinking is redacted.
 
-<Warning>Those four flags are what put your session content in LangWatch: prompt text, the input and output of every tool call, including file contents, and the model request and response bodies of every turn. A committed content flag does not switch telemetry on by itself, because Claude Code exports nothing until `CLAUDE_CODE_ENABLE_TELEMETRY` is set. It does not have to be set in the repository for that to happen, though: a managed settings file, a shell export, or a contributor's own `~/.claude/settings.json` can each turn telemetry on, and from that moment a content flag sitting in the committed file applies to everyone who cloned the repo. That is why the recipe keeps all four in each person's own gitignored file.</Warning>
+<Warning>Those five flags are what put your session content in LangWatch: prompt text, the input and output of every tool call, including file contents, the model request and response bodies of every turn, and the assistant's response text on its own. A committed content flag does not switch telemetry on by itself, because Claude Code exports nothing until `CLAUDE_CODE_ENABLE_TELEMETRY` is set. It does not have to be set in the repository for that to happen, though: a managed settings file, a shell export, or a contributor's own `~/.claude/settings.json` can each turn telemetry on, and from that moment a content flag sitting in the committed file applies to everyone who cloned the repo. That is why the recipe keeps all five in each person's own gitignored file.</Warning>
 
 `settings.local.json`'s `env` merges per-key with `settings.json`'s `env`, so the local flags combine with the committed ones rather than replacing them.
 
@@ -18797,6 +18800,7 @@ For self-hosted (`npx @langwatch/server`), replace the endpoint with `http://loc
     "OTEL_LOG_TOOL_DETAILS": "1",
     "OTEL_LOG_TOOL_CONTENT": "1",
     "OTEL_LOG_RAW_API_BODIES": "1",
+    "OTEL_LOG_ASSISTANT_RESPONSES": "1",
     "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer sk-lw-…",
     "OTEL_RESOURCE_ATTRIBUTES": "project.repo=my-repo-name,cost_center=my-team,enduser.id=you@example.com"
   }
@@ -18934,7 +18938,7 @@ Choose by what the artifact is *for*, not what's convenient.
 | Cap spend "for marketing only" | **Team** | Same shape as the org cap, narrower scope. |
 | Cap spend for one engineer | **Principal** | A Personal workspace's owner is the principal, pin a budget there. |
 
-The chrome's [Workspace Switcher](#workspace-switcher) shows you the workspaces you can see; the [admin catalog](/ai-governance/personal-portal/admin-catalog) at `/settings/governance/tool-catalog` controls which ones developers see entries for.
+The chrome's [Workspace Switcher](#workspace-switcher) shows you the workspaces you can see; the [admin catalog](/ai-governance/personal-portal/admin-catalog) at `/governance/tool-catalog` controls which ones developers see entries for.
 
 ## Personal Workspace
 
@@ -19025,7 +19029,7 @@ Budgets are evaluated in scope order, broadest first. A request that would breac
 
 ## How routing policies attach to workspaces
 
-Routing Policies live at `/settings/routing-policies` (org-scoped). One policy is marked `default` and is the policy every Personal VK binds to on first sign-in.
+Routing Policies live at `/gateway/routing-policies` (org-scoped). One policy is marked `default` and is the policy every Personal VK binds to on first sign-in.
 
 Workspace overrides:
 
@@ -30837,6 +30841,8 @@ The setup that `langwatch claude` and `langwatch instrument claude` write turns 
 
 Remove the flags from `~/.claude/settings.json` to keep only the usage numbers: tokens, cost, model, latency, the tool call tree and the subagent tree stay, and the content stops.
 
+`langwatch claude` and `langwatch instrument claude` set `OTEL_LOG_RAW_API_BODIES`, which already carries the assistant's response text along with the rest of the request and response body. If you want the response text on its own, without the full body, add `OTEL_LOG_ASSISTANT_RESPONSES` yourself: the wrapper does not set it for you.
+
 Claude Code shortens each inline body at 60 kilobytes. `CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH` raises that limit. Claude Code always removes extended thinking from the bodies, so LangWatch never receives it.
 
 ## Troubleshooting
@@ -30857,9 +30863,11 @@ Claude Code shortens each inline body at 60 kilobytes. `CLAUDE_CODE_OTEL_CONTENT
   </Accordion>
 
   <Accordion title="The trace has no response">
-    `OTEL_LOG_RAW_API_BODIES` is missing. Claude Code reports the response text of the assistant on its `api_response_body` event only, and that event is off by default.
+    Both `OTEL_LOG_RAW_API_BODIES` and `OTEL_LOG_ASSISTANT_RESPONSES` are missing. Claude Code reports the response text of the assistant on its `api_response_body` event (needs `OTEL_LOG_RAW_API_BODIES=1`, and carries the full request and response JSON) or on its lighter `assistant_response` event (needs `OTEL_LOG_ASSISTANT_RESPONSES=1`, and carries only the response text). Both are off by default. Set `OTEL_LOG_ASSISTANT_RESPONSES=1` if you want the response without the rest of the body.
 
-    Claude Code also reports `api_response_body` for work that is not a conversation, such as an autosuggestion or a session title. LangWatch filters those out, so a title never becomes the output of a trace.
+    Claude Code docs describe `OTEL_LOG_ASSISTANT_RESPONSES` as falling back to the value of `OTEL_LOG_USER_PROMPTS`. Don't rely on that fallback: set it explicitly.
+
+    Claude Code also reports `api_response_body` and `assistant_response` for work that is not a conversation, such as an autosuggestion or a session title. LangWatch filters those out, so a title never becomes the output of a trace.
   </Accordion>
 
   <Accordion title="The telemetry goes to the wrong workspace">
@@ -30881,7 +30889,7 @@ For more failure modes see [CLI debug](/ai-governance/cli-debug).
 
 ## Manual OpenTelemetry setup
 
-Use this when you cannot install the LangWatch command line tool. The variables below are the ones `langwatch instrument claude` writes for you.
+Use this when you cannot install the LangWatch command line tool. The block below mirrors the variables `langwatch instrument claude` writes for you, plus the optional `OTEL_LOG_ASSISTANT_RESPONSES` flag, which the wrapper does not set. Drop that line if you only want what the wrapper gives you.
 
 ### Environment variables
 
@@ -30895,6 +30903,7 @@ export OTEL_LOG_USER_PROMPTS=1
 export OTEL_LOG_TOOL_DETAILS=1
 export OTEL_LOG_TOOL_CONTENT=1
 export OTEL_LOG_RAW_API_BODIES=1
+export OTEL_LOG_ASSISTANT_RESPONSES=1
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
@@ -30907,7 +30916,7 @@ The header takes an ingest key (`ik-lw-…`), which can create traces and nothin
 For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. Claude Code appends `/v1/traces`, `/v1/logs` and `/v1/metrics` on its own. Never write the per-signal path yourself.
 
 <Warning>
-  The four `OTEL_LOG_*` flags put your session content in LangWatch. Read [Content and privacy](#content-and-privacy) before you use them where the content matters.
+  The five `OTEL_LOG_*` flags put your session content in LangWatch. Read [Content and privacy](#content-and-privacy) before you use them where the content matters.
 </Warning>
 
 ### Settings file
@@ -30926,6 +30935,7 @@ Claude Code reads the same variables from the `env` block of `~/.claude/settings
     "OTEL_LOG_TOOL_DETAILS": "1",
     "OTEL_LOG_TOOL_CONTENT": "1",
     "OTEL_LOG_RAW_API_BODIES": "1",
+    "OTEL_LOG_ASSISTANT_RESPONSES": "1",
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "https://app.langwatch.ai/api/otel",
     "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer ik-lw-your-ingest-key",
@@ -37480,7 +37490,7 @@ An endpoint belongs to your **organization** and carries:
 | Signing secret | Shown **once** at creation. Roll it to get a new one. Every delivery is signed with it. |
 | Delivery controls | `max_batch_size`, `max_batch_delay_ms`, `max_in_flight` (bounds below). |
 
-Manage endpoints under **AI Gateway > Webhooks** (`/settings/gateway/webhooks`) or over REST with an organization API key:
+Manage endpoints under **AI Gateway > Webhooks** (`/gateway/webhooks`) or over REST with an organization API key:
 
 ```
 POST   /api/webhooks/v1/endpoints                    webhookEndpoints:manage

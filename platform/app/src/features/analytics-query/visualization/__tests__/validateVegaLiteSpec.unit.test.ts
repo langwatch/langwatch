@@ -6,15 +6,14 @@
  * plain node IS the server-import-safety commitment, not an accident of setup.
  */
 import { describe, expect, it, vi } from "vitest";
-
-import {
-  GOVERNED_FIXTURE_COLUMNS,
-  GOVERNED_FIXTURE_ROW_COUNTS,
-} from "../../__tests__/fixtures/governedDatasetRegistry";
 import {
   schemaInvalidEncodingType,
   unknownSchemaVersion,
 } from "../../__tests__/fixtures/invalid";
+import {
+  LWQL_FIXTURE_COLUMNS,
+  LWQL_FIXTURE_ROW_COUNTS,
+} from "../../__tests__/fixtures/lwqlDatasetRegistry";
 import {
   barOverQueryResult,
   lookupBetweenRegisteredDatasets,
@@ -25,15 +24,15 @@ import {
 } from "../validateVegaLiteSpec";
 import { VEGA_LITE_SCHEMA_URL } from "../vegaLiteSchema";
 import type {
-  GovernedVegaLiteChartProps,
+  LangWatchQLVegaLiteChartProps,
   VegaLiteValidationResult,
   VegaValidationError,
 } from "../visualization.types";
 
-const validate = (spec: unknown, rows = GOVERNED_FIXTURE_ROW_COUNTS) =>
+const validate = (spec: unknown, rows = LWQL_FIXTURE_ROW_COUNTS) =>
   validateVegaLiteSpec({
     spec,
-    columnsByDataset: GOVERNED_FIXTURE_COLUMNS,
+    columnsByDataset: LWQL_FIXTURE_COLUMNS,
     rowCountsByDataset: rows,
   });
 
@@ -189,17 +188,17 @@ describe("validateVegaLiteSpec", () => {
       });
 
       // Type-conformance fixture: this literal only compiles if
-      // GovernedVegaLiteChartProps keeps carrying a dataset per name and its
+      // LangWatchQLVegaLiteChartProps keeps carrying a dataset per name and its
       // columns. There is no runtime assertion to make — nothing in
       // production builds this shape from `props` for a check to exercise.
       it("carries a dataset per name and its columns on the renderer contract", () => {
-        const props: GovernedVegaLiteChartProps = {
+        const props: LangWatchQLVegaLiteChartProps = {
           spec: barOverQueryResult,
           datasets: {
             query_result: [{ model: "a", total: 1 }],
             model_catalog: [{ model: "a", vendor: "OpenAI" }],
           },
-          columnsByDataset: GOVERNED_FIXTURE_COLUMNS,
+          columnsByDataset: LWQL_FIXTURE_COLUMNS,
           ariaLabel: "Total by model",
         };
 

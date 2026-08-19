@@ -7,7 +7,7 @@
  * repository whose tenancy is asserted against an in-memory fake is asserting
  * the fake's `filter`, not the SQL that ships.
  *
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { nanoid } from "nanoid";
@@ -20,7 +20,7 @@ import { prisma } from "~/server/db";
 
 import type { Protections } from "../../../traces/protections";
 import { BUILDER_CHART_KIND, WORKBENCH_SQL_CHART_KIND } from "../../chartKinds";
-import { GovernedSqlService } from "../../governed-sql/governedSql.service";
+import { LangWatchQLService } from "../../lwql/lwql.service";
 import { SavedWorkbenchChartRepository } from "../savedWorkbenchChart.repository";
 import {
   type SavedWorkbenchChart,
@@ -86,7 +86,7 @@ describe("saved workbench charts (integration)", () => {
   beforeAll(async () => {
     service = new SavedWorkbenchChartService({
       repository: new SavedWorkbenchChartRepository(prisma),
-      governedSql: new GovernedSqlService({
+      lwql: new LangWatchQLService({
         executor: null,
         database: "analytics",
       }),

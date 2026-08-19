@@ -38,6 +38,7 @@ export function codingAgentSessionRow(
     gitBranches: [],
     gitWorktree: "",
     title: "",
+    titleSource: "",
 
     modelCalls: 0,
     toolCalls: 0,

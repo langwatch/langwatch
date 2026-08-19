@@ -302,6 +302,10 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   // withholds prompt text from its own telemetry, so the name is derived
   // from the transcript on the device and arrives as this one bounded value.
   "langwatch.session.title",
+  // The session's own name, as the harness itself holds it (claude's --name
+  // and /rename, codex's thread name), mirrored by the capture seams. The
+  // newest name replaces the row's title and outranks the derived titles.
+  "langwatch.session.name",
   "user.id",
   "user.email",
   "user.account_uuid",
@@ -418,6 +422,17 @@ export const SESSION_TITLE_FACT_KEY = "langwatch.session.title";
  */
 export const SESSION_TITLE_FALLBACK_FACT_KEY =
   "langwatch.session.title_fallback";
+
+/**
+ * The fact key the session's own name rides on, lifted from the companion
+ * event's `langwatch.session.name` attribute. The capture seams MIRROR the
+ * name the harness itself holds — claude's `--name` flag and `/rename`
+ * command, codex's thread name — rather than inventing one, so renaming the
+ * session in the harness renames it here. Highest-precedence of the three:
+ * the newest name replaces the row's title in place and neither derived
+ * title may clobber it.
+ */
+export const SESSION_NAME_FACT_KEY = "langwatch.session.name";
 
 /**
  * The literal codex substitutes for prompt text it withholds

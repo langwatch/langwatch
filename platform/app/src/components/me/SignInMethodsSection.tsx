@@ -101,7 +101,6 @@ export function SignInMethodsSection() {
           title: "Failed to link sign-in method",
           description: result.error,
           type: "error",
-          meta: { closable: true },
         });
       }
     })();
@@ -114,7 +113,6 @@ export function SignInMethodsSection() {
       toaster.create({
         title: "Sign-in method removed",
         type: "success",
-        meta: { closable: true },
       });
     } catch (error) {
       showErrorToast({

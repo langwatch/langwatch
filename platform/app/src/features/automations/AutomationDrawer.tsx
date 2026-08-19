@@ -32,7 +32,14 @@ import {
   type TemplateContext,
 } from "@langwatch/automations/templating/templateContext";
 import { Mail, Send } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
@@ -93,6 +100,10 @@ import {
   useDraft,
   useSection,
 } from "./state/selectors";
+import {
+  consumeDraftKeptOnSubFlowReturn,
+  isInAutomationFlow,
+} from "./state/subFlow";
 
 /**
  * Headlines naming the template the server rejected.
@@ -275,8 +286,36 @@ export function AutomationDrawer({
   const pushAttempt = useAutomationStore((s) => s.pushTestAttempt);
   const testHistory = useAutomationStore((s) => s.testHistory);
 
-  // Wipe the singleton store on unmount — next open is a fresh slate.
-  useEffect(() => () => reset(), [reset]);
+  // Wipe the singleton store when the drawer really closes, so the next open
+  // never paints the previous draft. A sub-flow (creating a dataset) unmounts
+  // this drawer the same way closing it does, so the drawer stack decides
+  // which of the two just happened.
+  useEffect(
+    () => () => {
+      if (isInAutomationFlow()) return;
+      reset();
+    },
+    [reset],
+  );
+
+  // Open on a blank draft unless this mount is the return leg of a sub-flow.
+  // The departure above skips its reset, so a sub-flow the user walks away
+  // from (navigating elsewhere while the dataset drawer is open) would leave
+  // that draft in the store and seed the next new automation with it.
+  //
+  // Latched in a ref, and before paint: the return intent is one-shot, and
+  // StrictMode replays this effect in development. A replay that read the
+  // intent a second time would find it spent and blank the draft that just
+  // came back.
+  const decidedOnMountDraft = useRef(false);
+  useLayoutEffect(() => {
+    if (decidedOnMountDraft.current) return;
+    decidedOnMountDraft.current = true;
+    if (consumeDraftKeptOnSubFlowReturn()) return;
+    reset();
+    // Mount only: running this again would wipe the draft being written.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Baseline the close-guard diffs against: the hydrated row on edit, the
   // traces-prefilled (or empty) draft on create. Set once the relevant
@@ -819,7 +858,6 @@ export function AutomationDrawer({
                 : r.channel === "webhook"
                   ? `Your endpoint answered HTTP ${r.httpStatus ?? "2xx"}.`
                   : "Posted to Slack.",
-            meta: { closable: true },
           });
         },
         onError: (err) => {
@@ -905,7 +943,6 @@ export function AutomationDrawer({
           toaster.create({
             title: automationId ? labels.updatedToast : labels.createdToast,
             type: "success",
-            meta: { closable: true },
           });
           void queryClient.automation.getTriggers.invalidate();
           // The dashboard chart card reads its alert state off the graph, not

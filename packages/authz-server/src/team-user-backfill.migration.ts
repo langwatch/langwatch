@@ -1,17 +1,30 @@
 /**
- * ADR-092 stage B, in place (runbook M1): every legacy TeamUser row gains
- * an equivalent TEAM-scoped role binding, and an organization is finalized
- * - its legacy fallback switched off - only when a decision-level parity
- * sweep proves the legacy rows no longer change any answer.
+ * ADR-092 stage B, event-sourced (delivery plan PR 1): every legacy TeamUser
+ * row gains an equivalent TEAM-scoped grant, emitted through the grants
+ * ledger - the projection's compat head is what writes the role-binding
+ * rows the legacy resolver reads. Same position as the imperative M1
+ * writer; the implementation is the ledger.
  *
- * The sweep is collect-once, decide-twice: one CollectedGrants snapshot per
- * member, then the pure engine answers every (permission x scope) pair with
- * the legacy rows present and with them removed. The two runs agreeing on
- * every decision IS the finalization proof. They can disagree honestly -
- * the legacy org-level union quirk grants org-scope permissions a
- * TEAM-scoped binding never will - and such an organization is HELD
- * (`migrated`), behaviour unchanged, with the disagreements in its report.
- * Granting the gap through a real binding heals it on a later pass.
+ * The flow per organization: compute the missing rows (identity as the
+ * database defines it, see `bindingKey`), emit them as batched
+ * `attachGrants` commands with deterministic ids (delivery-plan decision
+ * 23: `backfill-b:<org>:<chunk>`; grant ids derive from content), then WAIT
+ * for the projection to land every expected compat row before proving
+ * parity - a proof swept against rows that are not there yet would hold
+ * every organization for nothing. A projection that never converges parks
+ * the organization; the retry finds the events already appended and only
+ * waits again.
+ *
+ * The sweep is unchanged: collect-once, decide-twice, one CollectedGrants
+ * snapshot per member, the pure engine answering every (permission x scope)
+ * pair with and without the legacy rows. A clean sweep is recorded as a
+ * `migration_parity_proved` fact before the organization finalizes. Honest
+ * disagreements (the legacy org-level union quirk) HOLD the organization
+ * (`migrated`), behaviour unchanged, diffs in its report - no proof fact is
+ * recorded for an unfinished argument.
+ *
+ * The Redis epoch bump stays exactly as before (decision 19): the ledger
+ * cursor is added alongside it, not instead of it.
  *
  * Spec: specs/rbac/in-place-authz-migration.feature.
  */
@@ -20,6 +33,8 @@ import {
   AuthzEngine,
   type AuthzScopeRef,
   type CollectedGrants,
+  roleKeyForTeamRole,
+  type TeamUserRole,
 } from "@langwatch/authz";
 import type {
   SystemMigration,
@@ -29,17 +44,21 @@ import type {
 import type {
   AuthzMigrationRepository,
   LegacyTeamRow,
-  TeamBindingWrite,
 } from "./authz-migration.repository";
 import type { AuthzAuditWriter, AuthzEpochBumper } from "./grants.service";
-
-export const TEAM_USER_BACKFILL_MIGRATION_NAME = "authz-team-user-backfill";
+import { deriveGrantId } from "./ledger/grant-identity";
+import type { GrantFact, GrantsLedgerActor } from "./ledger/grants-ledger.reducer";
+import { TEAM_USER_BACKFILL_MIGRATION_NAME } from "./team-user-backfill.name";
 
 /** The audit trail's actor for writes no human performed. */
 const SYSTEM_ACTOR = "system:authz-migration";
 
 /** Reports stay bounded however many decisions disagree. */
 const MAX_REPORTED_DIFFS = 50;
+
+/** Entries per attachGrants command: one command appends one event batch,
+ *  and a five-figure organization should not ride in a single payload. */
+const ATTACH_CHUNK = 500;
 
 export type ParityDiff = {
   userId: string;
@@ -50,6 +69,30 @@ export type ParityDiff = {
   allowedWithoutLegacy: boolean;
 };
 
+/** A grant the backfill asks the ledger to attach: the fact plus the
+ *  system actor that authored it. */
+export type BackfillGrantEmission = GrantFact & { actor: GrantsLedgerActor };
+
+/**
+ * The migration's door into the grants ledger. The app binds these to the
+ * `authz_grants` pipeline's command senders; the package never sees the
+ * framework. Both are queued sends - convergence is observed through the
+ * repository, not through the return.
+ */
+export type GrantsLedgerEmitter = {
+  attachGrants: (args: {
+    organizationId: string;
+    commandId: string;
+    grants: BackfillGrantEmission[];
+  }) => Promise<void>;
+  proveMigrationParity: (args: {
+    organizationId: string;
+    commandId: string;
+    diffs: string[];
+    occurredAtMs: number;
+  }) => Promise<void>;
+};
+
 export type TeamUserBackfillDeps = {
   repository: AuthzMigrationRepository;
   /** The composed collector's collectGrants, bound in the app runtime. */
@@ -57,10 +100,15 @@ export type TeamUserBackfillDeps = {
     principal: { type: "user"; id: string };
     organizationId: string;
   }) => Promise<CollectedGrants>;
+  ledger: GrantsLedgerEmitter;
   audit: AuthzAuditWriter;
   bumpEpoch: AuthzEpochBumper;
-  newBindingId: () => string;
+  now: () => number;
+  /** How long to wait for the projection's compat rows before parking. */
+  poll?: { intervalMs: number; timeoutMs: number };
 };
+
+const DEFAULT_POLL = { intervalMs: 500, timeoutMs: 120_000 };
 
 export class TeamUserBackfillMigration implements SystemMigration {
   readonly name = TEAM_USER_BACKFILL_MIGRATION_NAME;
@@ -81,14 +129,15 @@ export class TeamUserBackfillMigration implements SystemMigration {
     const legacyRows =
       await this.deps.repository.findLegacyTeamRows({ organizationId });
 
-    const backfilled = await this.backfillMissingBindings({
+    const backfilled = await this.backfillMissingGrants({
       organizationId,
       legacyRows,
-      // A parked attempt may have committed its bindings and died before
-      // bumping the epoch. This pass writes nothing (the rows are already
-      // there, and `createTeamBindings` skips duplicates), so without this
-      // the bump that publishes them would never happen and every cache
-      // would keep serving pre-backfill decisions.
+      signal,
+      // A parked attempt may have appended its events and died before
+      // bumping the epoch. This pass emits nothing new (the projection
+      // already landed the rows), so without this the bump that publishes
+      // them would never happen and every cache would keep serving
+      // pre-backfill decisions.
       shouldRepublishEpoch: previous?.status === "parked",
     });
 
@@ -110,19 +159,30 @@ export class TeamUserBackfillMigration implements SystemMigration {
         },
       };
     }
+    // The clean proof becomes a ledger fact before the organization flips.
+    // Deterministic commandId: a crash between this send and the state
+    // write re-runs the tenant, and the retry's identical events dedupe.
+    await this.deps.ledger.proveMigrationParity({
+      organizationId,
+      commandId: `backfill-b:parity:${organizationId}`,
+      diffs: [],
+      occurredAtMs: this.deps.now(),
+    });
     return {
       status: "finalized",
       report: { kind: "parity_clean", backfilled, usersVerified: userIds.length },
     };
   }
 
-  private async backfillMissingBindings({
+  private async backfillMissingGrants({
     organizationId,
     legacyRows,
+    signal,
     shouldRepublishEpoch,
   }: {
     organizationId: string;
     legacyRows: LegacyTeamRow[];
+    signal?: AbortSignal;
     shouldRepublishEpoch: boolean;
   }): Promise<number> {
     if (legacyRows.length === 0) return 0;
@@ -131,43 +191,83 @@ export class TeamUserBackfillMigration implements SystemMigration {
       organizationId,
     });
     const existingKeys = new Set(existing.map(bindingKey));
-    const missing = legacyRows.filter(
-      (row) => !existingKeys.has(bindingKey(row)),
-    );
+    const missing = legacyRows
+      .filter((row) => !existingKeys.has(bindingKey(row)))
+      // Deterministic order: a retried pass chunks identically, so its
+      // commands carry the same ids and the same idempotency keys.
+      .sort((a, b) => bindingKey(a).localeCompare(bindingKey(b)));
 
-    const writes: TeamBindingWrite[] = missing.map((row) => ({
-      bindingId: this.deps.newBindingId(),
-      organizationId,
-      userId: row.userId,
-      teamId: row.teamId,
-      role: row.role,
-      customRoleId: row.customRoleId,
-    }));
-    const created =
-      writes.length === 0
-        ? 0
-        : await this.deps.repository.createTeamBindings(writes);
-
-    if (created > 0) {
+    if (missing.length > 0) {
+      const emissions = missing.map((row) =>
+        legacyRowToEmission({ organizationId, row }),
+      );
+      for (let i = 0; i < emissions.length; i += ATTACH_CHUNK) {
+        await this.deps.ledger.attachGrants({
+          organizationId,
+          commandId: `backfill-b:${organizationId}:${i / ATTACH_CHUNK}`,
+          grants: emissions.slice(i, i + ATTACH_CHUNK),
+        });
+      }
+      await this.awaitCompatRows({ organizationId, missing, signal });
       await this.deps.audit({
         userId: SYSTEM_ACTOR,
         organizationId,
         action: "authz.migration.team-user-backfill",
         metadata: {
           source: "backfill-b",
-          created,
+          created: missing.length,
           legacyRows: legacyRows.length,
         },
       });
     }
-    // One bump after the batch: every write above becomes visible to caches
-    // and passports together (runbook M7 discipline). Bumping is also how a
-    // resumed attempt publishes bindings its predecessor committed before
-    // dying - cheap, and the alternative is a silently stale fleet.
-    if (created > 0 || shouldRepublishEpoch) {
+    // One bump after the batch has LANDED: every projected row becomes
+    // visible to caches and passports together (runbook M7 discipline).
+    // Bumping is also how a resumed attempt publishes rows its predecessor
+    // appended before dying - cheap, and the alternative is a silently
+    // stale fleet.
+    if (missing.length > 0 || shouldRepublishEpoch) {
       await this.deps.bumpEpoch({ organizationId });
     }
-    return created;
+    return missing.length;
+  }
+
+  /**
+   * Block until the projection's compat head carries every expected row.
+   * The parity sweep reads those rows through the collector, so sweeping
+   * before they land would hold every organization on a phantom diff.
+   * Timing out throws - the tenant parks and the next pass waits again
+   * against events that are already durable.
+   */
+  private async awaitCompatRows({
+    organizationId,
+    missing,
+    signal,
+  }: {
+    organizationId: string;
+    missing: LegacyTeamRow[];
+    signal?: AbortSignal;
+  }): Promise<void> {
+    const poll = this.deps.poll ?? DEFAULT_POLL;
+    const deadline = this.deps.now() + poll.timeoutMs;
+    const wanted = new Set(missing.map(bindingKey));
+    for (;;) {
+      if (signal?.aborted) {
+        throw new Error(
+          "backfill aborted while waiting for the grants projection; tenant parked for retry",
+        );
+      }
+      const rows = await this.deps.repository.findExistingTeamBindings({
+        organizationId,
+      });
+      const present = new Set(rows.map(bindingKey));
+      if ([...wanted].every((key) => present.has(key))) return;
+      if (this.deps.now() >= deadline) {
+        throw new Error(
+          `grants projection did not land ${wanted.size} backfilled row(s) within ${poll.timeoutMs}ms; tenant parked for retry`,
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, poll.intervalMs));
+    }
   }
 
   private async sweepParity({
@@ -266,6 +366,49 @@ export class TeamUserBackfillMigration implements SystemMigration {
 }
 
 /**
+ * A legacy row as the ledger will attach it. Business time is the row's own
+ * createdAt (it is part of the grant's identity - see grant-identity.ts);
+ * roleKey keeps the custom role when one is assigned, since the partial
+ * unique indexes make the custom role id the row's identity, not its role
+ * column.
+ *
+ * The row's `role` still travels, as `legacyRole`, precisely because roleKey
+ * cannot carry it: the legacy resolver falls back to that column whenever the
+ * custom role's permission list is empty, so dropping it would turn an ADMIN
+ * with an empty custom role into a viewer. It rides the FACT (and so the
+ * event) rather than being read back at fold time, which is what keeps the
+ * replay deterministic.
+ */
+function legacyRowToEmission({
+  organizationId,
+  row,
+}: {
+  organizationId: string;
+  row: LegacyTeamRow;
+}): BackfillGrantEmission {
+  const principal = { type: "user" as const, id: row.userId };
+  const scope = { type: "TEAM" as const, id: row.teamId };
+  return {
+    grantId: deriveGrantId({
+      organizationId,
+      principal,
+      scope,
+      occurredAtMs: row.createdAtMs,
+    }),
+    principal,
+    roleKey:
+      row.customRoleId === null
+        ? roleKeyForTeamRole(row.role)
+        : `custom:${row.customRoleId}`,
+    ...(row.customRoleId === null ? {} : { legacyRole: row.role }),
+    scope,
+    source: "backfill-b",
+    occurredAtMs: row.createdAtMs,
+    actor: { type: "system", id: SYSTEM_ACTOR },
+  };
+}
+
+/**
  * Identity as the DATABASE defines it - which is two keys, not one. The
  * partial unique indexes (migration
  * 20260410120000_fix_role_binding_unique_custom_role) key a built-in binding
@@ -273,17 +416,26 @@ export class TeamUserBackfillMigration implements SystemMigration {
  * `role` column is not part of its identity at all.
  *
  * Keying on both would call an existing custom binding "missing" whenever its
- * role happened to differ, and `createMany({ skipDuplicates: true })` would
- * then drop that insert silently - leaving a `created` count that overstates
- * what landed.
+ * role happened to differ, and the emission that followed would attach a
+ * grant for a fact that already has one.
+ *
+ * Built-in rows key on the ROLE KEY, not on the raw enum value, because this
+ * function is asked to compare two populations written in different
+ * vocabularies: legacy rows straight from `TeamUser`, and the compat rows the
+ * projection wrote back. `roleKeyForTeamRole` is lossy — CUSTOM and VIEWER
+ * both map to `viewer` — so a `CUSTOM` row with no custom role projects back
+ * as `VIEWER`. Keyed on the raw enum those two never match: the row is
+ * emitted, its projection is never recognized, and `awaitCompatRows` times
+ * the organization out into `parked` on every pass, forever. Normalizing
+ * both sides through the same mapping is what makes the comparison honest.
  */
 function bindingKey(row: {
   userId: string;
   teamId: string;
-  role: string;
+  role: TeamUserRole;
   customRoleId: string | null;
 }): string {
   return row.customRoleId === null
-    ? `${row.userId}::${row.teamId}::builtin::${row.role}`
+    ? `${row.userId}::${row.teamId}::builtin::${roleKeyForTeamRole(row.role)}`
     : `${row.userId}::${row.teamId}::custom::${row.customRoleId}`;
 }

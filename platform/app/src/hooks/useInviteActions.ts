@@ -111,7 +111,6 @@ export function useInviteActions({
             description,
             type: "success",
             duration: 2000,
-            meta: { closable: true },
           });
           onClose();
           refetchInvites();
@@ -151,7 +150,6 @@ export function useInviteActions({
             description: "An admin will review your invitation request.",
             type: "success",
             duration: 2000,
-            meta: { closable: true },
           });
           onClose();
           refetchInvites();
@@ -259,7 +257,6 @@ export function useInviteActions({
             description: "The invitation has been approved and sent.",
             type: "success",
             duration: 5000,
-            meta: { closable: true },
           });
           refetchInvites();
           invalidateLimits();
@@ -283,7 +280,6 @@ export function useInviteActions({
             description: "The invitation request has been rejected.",
             type: "success",
             duration: 5000,
-            meta: { closable: true },
           });
           refetchInvites();
           invalidateLimits();
@@ -307,7 +303,6 @@ export function useInviteActions({
             description: "The invite has been deleted.",
             type: "success",
             duration: 5000,
-            meta: { closable: true },
           });
           refetchInvites();
           invalidateLimits();

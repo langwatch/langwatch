@@ -109,7 +109,6 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
             title: `Saved version ${version}`,
             type: "success",
             duration: 5000,
-            meta: { closable: true },
           });
           setWorkflow({
             version,
@@ -122,7 +121,6 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
             title: "Error saving version",
             type: "error",
             duration: 5000,
-            meta: { closable: true },
           });
         },
       },

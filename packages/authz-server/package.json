@@ -9,6 +9,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./migration": {
+      "types": "./src/migration.ts",
+      "default": "./src/migration.ts"
     }
   },
   "main": "./src/index.ts",
@@ -22,12 +26,13 @@
   },
   "dependencies": {
     "@langwatch/authz": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/system-migrations": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^24",
+    "@types/node": "^26",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

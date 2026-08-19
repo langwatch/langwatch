@@ -1,5 +1,5 @@
 /**
- * The contract between the governed SQL workbench and its Vega-Lite chart
+ * The contract between the LangWatchQL workbench and its Vega-Lite chart
  * layer: what a renderer is handed, and what validation hands back.
  *
  * This module imports nothing. Every other module under `visualization/`
@@ -8,10 +8,10 @@
  */
 
 /** One dataset the renderer registers with Vega by name. */
-export type GovernedDataset = readonly Record<string, unknown>[];
+export type LangWatchQLDataset = readonly Record<string, unknown>[];
 
-/** A column of a registered dataset, as the governed SQL response describes it. */
-export interface GovernedDatasetColumn {
+/** A column of a registered dataset, as the LangWatchQL response describes it. */
+export interface LangWatchQLDatasetColumn {
   readonly name: string;
   /** The ClickHouse type string the backend returned, carried verbatim. */
   readonly type: string;
@@ -22,10 +22,12 @@ export interface GovernedDatasetColumn {
  * the names a spec is allowed to reference; a spec that names anything else is
  * refused before Vega sees it.
  */
-export interface GovernedVegaLiteChartProps {
+export interface LangWatchQLVegaLiteChartProps {
   spec: unknown;
-  datasets: Readonly<Record<string, GovernedDataset>>;
-  columnsByDataset: Readonly<Record<string, readonly GovernedDatasetColumn[]>>;
+  datasets: Readonly<Record<string, LangWatchQLDataset>>;
+  columnsByDataset: Readonly<
+    Record<string, readonly LangWatchQLDatasetColumn[]>
+  >;
   ariaLabel?: string;
 }
 
@@ -45,7 +47,7 @@ export const VEGA_VALIDATION_ERROR_CODES = [
   "unsupported-schema-version",
   /** The bundled official Vega-Lite v6 JSON Schema refused the spec. */
   "schema-failure",
-  /** A schema-valid spec the governed policy refuses. */
+  /** A schema-valid spec the LangWatchQL policy refuses. */
   "policy-rejection",
   /** A data reference that does not resolve to a registered dataset. */
   "unknown-dataset",
@@ -65,11 +67,11 @@ export type VegaValidationErrorCode =
   (typeof VEGA_VALIDATION_ERROR_CODES)[number];
 
 /**
- * Every governed rule, by stable id. The catalogue in `vegaLitePolicy.ts` maps
+ * Every LangWatchQL rule, by stable id. The catalogue in `vegaLitePolicy.ts` maps
  * each id to its presentation code and a one-line summary, and is keyed by this
  * union so a new rule cannot be added without a catalogue entry.
  */
-export const GOVERNED_VEGA_RULE_IDS = [
+export const LWQL_VEGA_RULE_IDS = [
   "spec.not-json",
   "spec.not-object",
   "spec.unsupported-schema-version",
@@ -103,7 +105,7 @@ export const GOVERNED_VEGA_RULE_IDS = [
   "encoding.empty",
 ] as const;
 
-export type GovernedVegaRuleId = (typeof GOVERNED_VEGA_RULE_IDS)[number];
+export type LangWatchQLVegaRuleId = (typeof LWQL_VEGA_RULE_IDS)[number];
 
 /**
  * A refusal. `path` is an RFC 6901 JSON Pointer into the caller's spec, using
@@ -112,7 +114,7 @@ export type GovernedVegaRuleId = (typeof GOVERNED_VEGA_RULE_IDS)[number];
  */
 export interface VegaValidationError {
   readonly code: VegaValidationErrorCode;
-  readonly rule: GovernedVegaRuleId;
+  readonly rule: LangWatchQLVegaRuleId;
   readonly path: string;
   readonly message: string;
   /** Structured detail a UI renders — limits, registered names, columns. */

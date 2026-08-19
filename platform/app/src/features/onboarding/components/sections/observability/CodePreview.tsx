@@ -143,18 +143,12 @@ export function CodePreview({
         title: "Copied LLM prompt",
         description: "Integration prompt copied to clipboard",
         type: "success",
-        meta: {
-          closable: true,
-        },
       });
     } catch {
       toaster.create({
         title: "Failed to copy",
         description: "Could not copy to clipboard",
         type: "error",
-        meta: {
-          closable: true,
-        },
       });
     }
   }

@@ -4,12 +4,12 @@
  * The schema is the only way a row is ever read, so these are the claims that
  * decide whether a `Json` column can be trusted.
  *
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { describe, expect, it } from "vitest";
 
-import { MAX_GOVERNED_SQL_LENGTH } from "../../governed-sql/sqlText";
+import { MAX_LWQL_LENGTH } from "../../lwql/sqlText";
 import {
   WORKBENCH_CHART_DEFINITION_VERSION,
   workbenchChartDefinitionSchema,
@@ -136,14 +136,14 @@ describe("the saved workbench chart definition", () => {
       it("refuses it as too big, at the ceiling the query endpoints enforce", () => {
         const overLong = workbenchChartDefinitionSchema.safeParse({
           version: WORKBENCH_CHART_DEFINITION_VERSION,
-          sql: "x".repeat(MAX_GOVERNED_SQL_LENGTH + 1),
+          sql: "x".repeat(MAX_LWQL_LENGTH + 1),
         });
 
         expect(overLong.success).toBe(false);
         expect(overLong.error?.issues).toContainEqual(
           expect.objectContaining({
             code: "too_big",
-            maximum: MAX_GOVERNED_SQL_LENGTH,
+            maximum: MAX_LWQL_LENGTH,
             path: ["sql"],
           }),
         );
@@ -153,7 +153,7 @@ describe("the saved workbench chart definition", () => {
         expect(
           workbenchChartDefinitionSchema.safeParse({
             version: WORKBENCH_CHART_DEFINITION_VERSION,
-            sql: "x".repeat(MAX_GOVERNED_SQL_LENGTH),
+            sql: "x".repeat(MAX_LWQL_LENGTH),
           }).success,
         ).toBe(true);
       });

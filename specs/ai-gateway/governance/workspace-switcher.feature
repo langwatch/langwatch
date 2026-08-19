@@ -7,6 +7,12 @@ Feature: AI Gateway Governance — Workspace Switcher (top-left context dropdown
   "show me usage / settings / VKs scoped to that context" without hunting
   through tabs
 
+  This feature describes the legacy chrome, which every device on the legacy
+  navigation mode keeps unchanged. Devices on a new navigation mode render
+  the navigation-v2 shells instead, where the product switcher and the
+  per-product scope controls replace this dropdown
+  (specs/navigation/product-switcher-navigation.feature).
+
   Per gateway.md "screen 6 — workspace switcher problem":
     The dropdown lives top-left in the dashboard layout header. Three groups:
       - 👤 My Workspace (always present, always first)

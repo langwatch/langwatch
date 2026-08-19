@@ -22,17 +22,25 @@ export const SessionsTableHeader: React.FC<{
         sort={sort}
         onSort={onSort}
       />
+      {/* Shrink-to-fit with a floor: the label and timestamp columns grow
+          with their widest cell and never drop below a width that keeps
+          clear air before the next column, and the width they free goes to
+          the Session column, which truncates. */}
       <SortableColumnHeader
         label="Agent"
         column="agent"
         sort={sort}
         onSort={onSort}
+        width="1%"
+        minWidth="150px"
       />
       <SortableColumnHeader
         label="Last update"
         column="lastUpdate"
         sort={sort}
         onSort={onSort}
+        width="1%"
+        minWidth="130px"
       />
       <SortableColumnHeader
         label="Context"

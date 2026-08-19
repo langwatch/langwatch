@@ -106,7 +106,7 @@ export const Resources = {
   //   - aiTools:view → ALL org roles. Portal must work for every member
   //     so they can discover what's available + click through to setup.
   //   - aiTools:manage → org ADMIN only. Catalog editor surface at
-  //     /settings/governance/tool-catalog (CRUD + reorder + enable).
+  //     /governance/tool-catalog (CRUD + reorder + enable).
   AI_TOOLS: "aiTools",
   // Outbound webhook endpoints (the webhook platform). Org-tier only:
   // endpoints are org-anchored, carry signing secrets, and stream every

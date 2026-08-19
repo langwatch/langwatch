@@ -173,9 +173,6 @@ function MembersList({
             description: "The member has been removed from the organization.",
             type: "success",
             duration: 5000,
-            meta: {
-              closable: true,
-            },
           });
           void queryClient.organization.getOrganizationWithMembersAndTheirTeams
             .invalidate()
@@ -196,9 +193,6 @@ function MembersList({
             description: "Please try that again",
             type: "error",
             duration: 5000,
-            meta: {
-              closable: true,
-            },
           });
         },
       },

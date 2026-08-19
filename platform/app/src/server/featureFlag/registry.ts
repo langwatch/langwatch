@@ -171,11 +171,11 @@ export const FEATURE_FLAGS = [
 
   // ----- PRODUCT -----
   {
-    key: "release_governed_sql_workbench",
+    key: "release_lwql_workbench",
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Gates the whole governed SQL surface — the Custom query workbench UI and the analytics.governedSql tRPC endpoints — while it is experimental. Off by default; enable per project or organization via a targeting rule, or globally via the operator store.",
+      "Gates the whole LangWatchQL surface — the Custom query workbench UI and the analytics.lwql tRPC endpoints — while it is experimental. Off by default; enable per project or organization via a targeting rule, or globally via the operator store.",
   },
   {
     key: "release_ui_ai_gateway_menu_enabled",
@@ -183,6 +183,13 @@ export const FEATURE_FLAGS = [
     defaultValue: true,
     description:
       "Surfaces the AI Gateway menu in the project sidebar. Default flipped to on: operators can hide the surface per project via a PostHog rule or operator-store row.",
+  },
+  {
+    key: "release_ui_navigation_v2_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Unlocks the product-scoped navigation shells (spec: specs/navigation/navigation-modes.feature): a per-device mode picker in the avatar menu with legacy, product-switcher and icon-rail values. The flag only unlocks the picker; the device preference decides which shell renders, and flag off or mode legacy keeps the current chrome unchanged. Default off. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_navigation_v2_enabled.",
   },
   // Per-project gate for the transient S3 spool at the ingestion edge
   // (#4215 / ADR-022). ON by default, so a deployment with object storage
@@ -228,7 +235,7 @@ export const FEATURE_FLAGS = [
     // On by default (ADR-038 Decision 7): self-hosted installations get
     // governance (AI-tools device login, /me, admin surfaces, the
     // onboarding intent fork, the org "Primary use" setting) with zero
-    // configuration. SaaS stays PostHog-governed: a per-org off-condition
+    // configuration. SaaS stays PostHog-LangWatchQL: a per-org off-condition
     // (or an operator store row / RELEASE_UI_AI_GOVERNANCE_ENABLED=0)
     // re-arms every gate for that org. This default and the auth-cli
     // device-login fallback are a pinned pair, move them together

@@ -138,7 +138,6 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
           title: `Run plan scheduled (${result.jobCount} jobs)`,
           description: `${parts.join(" and ")} skipped.`,
           type: "warning",
-          meta: { closable: true },
           action: {
             label: "Edit Run Plan",
             onClick: () => {
@@ -152,7 +151,6 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
         toaster.create({
           title: `Run plan scheduled (${result.jobCount} jobs)`,
           type: "success",
-          meta: { closable: true },
           action: optionsRef.current.onViewRun
             ? {
                 label: "View run",

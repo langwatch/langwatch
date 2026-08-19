@@ -26,11 +26,15 @@
 # the branch that introduced these rules, normalizing the base collapsed 77
 # apparent regressions to 1 -- and that 1 was real.
 #
-# KNOWN AND ACCEPTED: a moved or renamed file reads as entirely new, because the
-# base has no counts under its new path. Net-zero churn within one file and rule
-# (delete one long function, add another) also passes. reviewdog still annotates
-# every added line in the job above, so those stay visible on the diff; they are
-# not gated, which is the deliberate trade for not gating the false positives.
+# A moved or renamed file is followed: `git diff --find-renames` supplies the
+# old path, and the base counts recorded there are compared at the new path.
+# Moving a file therefore reports nothing, while moving a file AND growing one
+# of its counts still fails.
+#
+# KNOWN AND ACCEPTED: net-zero churn within one file and rule (delete one long
+# function, add another) passes. reviewdog still annotates every added line in
+# the job above, so those stay visible on the diff; they are not gated, which
+# is the deliberate trade for not gating the false positives.
 #
 # Usage: biome-new-violations.sh <head-rdjson> <base-ref> <path>...
 #   <head-rdjson>  biome --reporter=rdjson output for HEAD, paths relative to
@@ -142,11 +146,38 @@ HEAD_COUNTS="$BASE_TREE/head.counts.json"
 counts "$BASE_RDJSON" > "$BASE_COUNTS"
 counts "$HEAD_RDJSON" > "$HEAD_COUNTS"
 
+# A moved file has no base counts under its new path, so its whole
+# pre-existing backlog reads as this PR's work. Follow the move: read the
+# base counts under the OLD path and compare them at the NEW one. A move
+# with unchanged counts then reports nothing, and a move that also grew a
+# count still fails. Both sides are made app-relative, because the two
+# trees can hold the app at different paths.
+RENAMES_TSV="$BASE_TREE/renames.tsv"
+git diff --name-status --find-renames=50% "$MERGE_BASE" HEAD |
+  awk -F'\t' -v base_app="$BASE_APP/" -v head_app="$HEAD_APP/" '
+    $1 ~ /^R/ && index($2, base_app) == 1 && index($3, head_app) == 1 {
+      print substr($2, length(base_app) + 1) "\t" substr($3, length(head_app) + 1)
+    }
+  ' > "$RENAMES_TSV"
+echo "renames followed: $(wc -l < "$RENAMES_TSV" | tr -d ' ')"
+
+BASE_COUNTS_AT_HEAD_PATHS="$BASE_TREE/base.counts.remapped.json"
+jq -R -s --slurpfile b "$BASE_COUNTS" '
+  ($b[0]) as $B |
+  ( split("\n") | map(select(length > 0) | split("\t"))
+    | map({ key: .[0], value: .[1] }) | from_entries ) as $RENAMED |
+  reduce ($B | to_entries[]) as $entry ({};
+    ($entry.key | split("|")) as $parts |
+    (($RENAMED[$parts[0]] // $parts[0]) + "|" + $parts[1]) as $key |
+    .[$key] = ((.[$key] // 0) + $entry.value)
+  )
+' "$RENAMES_TSV" > "$BASE_COUNTS_AT_HEAD_PATHS"
+
 echo "base diagnostics: $(jq '.diagnostics | length' "$BASE_RDJSON")"
 echo "head diagnostics: $(jq '.diagnostics | length' "$HEAD_RDJSON")"
 
 REGRESSIONS="$BASE_TREE/regressions.json"
-jq -n --slurpfile h "$HEAD_COUNTS" --slurpfile b "$BASE_COUNTS" '
+jq -n --slurpfile h "$HEAD_COUNTS" --slurpfile b "$BASE_COUNTS_AT_HEAD_PATHS" '
   ($h[0]) as $H | ($b[0]) as $B |
   [ $H | to_entries[]
     | select(.value > ($B[.key] // 0))
@@ -158,7 +189,7 @@ jq -n --slurpfile h "$HEAD_COUNTS" --slurpfile b "$BASE_COUNTS" '
 ' > "$REGRESSIONS"
 
 NEW_TOTAL="$(jq '[.[] | .head - .base] | add // 0' "$REGRESSIONS")"
-FIXED_TOTAL="$(jq -n --slurpfile h "$HEAD_COUNTS" --slurpfile b "$BASE_COUNTS" '
+FIXED_TOTAL="$(jq -n --slurpfile h "$HEAD_COUNTS" --slurpfile b "$BASE_COUNTS_AT_HEAD_PATHS" '
   ($h[0]) as $H | ($b[0]) as $B |
   [ $B | to_entries[] | select(.value > ($H[.key] // 0)) | .value - ($H[.key] // 0) ] | add // 0
 ')"
