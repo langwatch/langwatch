@@ -48,10 +48,14 @@ jobs:
     steps:
       # The `services/**` trigger path matches every dependency-lockfile bump
       # in services/langevals, services/aigateway, services/nlpgo too — a pure
-      # manifest/lockfile diff can't add a helm value, env var, or change
-      # `helm install` behavior, so it has no deployment surface by
-      # construction. Skip the gate for those; anything touching a real file
-      # (Dockerfile, chart, config, source) still requires the section.
+      # lockfile diff can't add a helm value, env var, or change `helm
+      # install` behavior, so it has no deployment surface by construction.
+      # Skip the gate for those. Restricted to dependabot: pyproject.toml,
+      # package.json, go.mod and Cargo.toml are hand-edited manifests, not
+      # pure lockfiles — a human PR touching only one of them could still
+      # slip in a real deployment-relevant change (a new package.json
+      # `postinstall` script, a build-system change) alongside the version
+      # bump, so the exemption only applies to dependabot's own PRs.
       - name: Determine whether this PR only touches dependency manifests
         id: manifest-only
         env:
@@ -72,9 +76,12 @@ jobs:
           echo "Changed files:"
           printf '%s\n' "$FILES"
           echo "Manifest-only: $ONLY_MANIFESTS"
+          echo "Actor: ${{ github.actor }}"
 
       - name: Verify deployment-impact section in PR description
-        if: steps.manifest-only.outputs.only_manifests != 'true'
+        if: |
+          steps.manifest-only.outputs.only_manifests != 'true' ||
+          github.actor != 'dependabot[bot]'
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
