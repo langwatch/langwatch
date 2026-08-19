@@ -244,13 +244,21 @@ describe("governance_kpis version column migration", () => {
       expect(refolded[0]!.PromptTokens).toBe(300);
     });
   });
-  describe("given a previous run died after the swap", () => {
+  describe("given a previous run died after the swap, with a write that landed during the copy", () => {
     /**
-     * The state a `RENAME`-based swap cannot recover from: the pre-swap table
-     * still exists under the scratch name, so a re-apply that renamed onto an
-     * existing name would fail and need a human in the database.
+     * The loss window a naive re-apply reopens: a write that lands AFTER the
+     * snapshot copy exists only in the pre-swap table, which the exchange
+     * moves under the scratch name. If the runner then dies before
+     * reconciliation, the first draft's unconditional `DROP` at the top of the
+     * re-apply would discard that write for good. The `trace-before-the-crash`
+     * row (copied into the snapshot) survives either way; `trace-stranded-by-
+     * the-crash` (raced the copy, then stranded by the crash) is the one that
+     * only survives because the re-apply recovers the scratch before dropping
+     * it. Without both flags below the test could pass vacuously — the copy
+     * hook or the crash hook silently never firing.
      */
-    let crashed = false;
+    let crashedAfterExchange = false;
+    let racedAfterCopy = false;
 
     beforeAll(async () => {
       await stageThePreUpgradeTable();
@@ -269,9 +277,28 @@ describe("governance_kpis version column migration", () => {
         client: ch,
         fileName: VERSION_COLUMN_MIGRATION,
         afterStatement: async ({ statement }) => {
-          if (!/EXCHANGE TABLES/i.test(statement)) return;
-          crashed = true;
-          throw new Error("simulated runner crash after the swap");
+          // A write landing after the copy is absent from the rebuilt table
+          // and lives only in the pre-swap one.
+          if (/INSERT INTO\s+\S*governance_kpis_v2/i.test(statement)) {
+            racedAfterCopy = true;
+            await insertKpiRows([
+              {
+                TraceId: "trace-stranded-by-the-crash",
+                SpendUsd: 0.9,
+                PromptTokens: 40,
+                CompletionTokens: 20,
+                CreatedAt: "2026-08-01 10:00:04.000",
+                LastEventOccurredAt: "2026-08-01 10:07:00.000",
+              },
+            ]);
+            return;
+          }
+          // The runner then dies after the exchange but before step 7, the
+          // window where that write exists only under the scratch name.
+          if (/EXCHANGE TABLES/i.test(statement)) {
+            crashedAfterExchange = true;
+            throw new Error("simulated runner crash after the swap");
+          }
         },
       }).catch(() => undefined);
 
@@ -281,18 +308,83 @@ describe("governance_kpis version column migration", () => {
       });
     }, 120_000);
 
-    it("re-applies cleanly and keeps the rows", async () => {
-      expect(crashed).toBe(true);
+    it("recovers the stranded write on the rerun instead of dropping it", async () => {
+      expect(racedAfterCopy).toBe(true);
+      expect(crashedAfterExchange).toBe(true);
 
       const rows = await readKpiRows();
 
       expect(rows.map((row) => row.TraceId)).toEqual([
         "trace-before-the-crash",
+        "trace-stranded-by-the-crash",
       ]);
-      expect(rows[0]!.SpendUsd).toBe(2);
+      expect(rows.map((row) => row.SpendUsd)).toEqual([2, 0.9]);
       expect(await versionColumnOf("governance_kpis")).toContain(
         "ReplacingMergeTree(CreatedAt)",
       );
+    });
+  });
+
+  describe("given a later cumulative row for an already-copied trace races the copy", () => {
+    /**
+     * The accumulating-counter path: a trace already in the snapshot gets a
+     * newer cumulative row during the copy window. Reconciliation carries it
+     * over as a second part sharing the ORDER BY key, and the engine collapses
+     * it to the highest CreatedAt on merge — the same convergence a
+     * steady-state re-write of that trace produces. Reads are plain
+     * `sum(SpendUsd)` with no FINAL, so between merges the sum shows both
+     * parts; that transient is a property of the read path (identical with or
+     * without this migration), so the assertion is the merged result, taken
+     * after an explicit OPTIMIZE FINAL rather than racing a background merge.
+     */
+    let injectedDuringCopy = false;
+
+    beforeAll(async () => {
+      await stageThePreUpgradeTable();
+      await insertKpiRows([
+        {
+          TraceId: "trace-accumulating",
+          SpendUsd: 0.25,
+          PromptTokens: 100,
+          CompletionTokens: 50,
+          CreatedAt: "2026-08-01 10:00:01.000",
+          LastEventOccurredAt: "2026-08-01 10:05:00.000",
+        },
+      ]);
+
+      await replayGooseMigrationUp({
+        client: ch,
+        fileName: VERSION_COLUMN_MIGRATION,
+        afterStatement: async ({ statement }) => {
+          if (!/INSERT INTO\s+\S*governance_kpis_v2/i.test(statement)) return;
+          injectedDuringCopy = true;
+          // Same trace, a later cumulative total, higher CreatedAt.
+          await insertKpiRows([
+            {
+              TraceId: "trace-accumulating",
+              SpendUsd: 1.5,
+              PromptTokens: 300,
+              CompletionTokens: 150,
+              CreatedAt: "2026-08-01 10:00:02.000",
+              LastEventOccurredAt: "2026-08-01 09:55:00.000",
+            },
+          ]);
+        },
+      });
+    }, 120_000);
+
+    it("collapses to the latest cumulative total after merge", async () => {
+      expect(injectedDuringCopy).toBe(true);
+      await ch.command({ query: "OPTIMIZE TABLE governance_kpis FINAL" });
+
+      const rows = await readKpiRows();
+      const accumulating = rows.filter(
+        (row) => row.TraceId === "trace-accumulating",
+      );
+
+      expect(accumulating).toHaveLength(1);
+      expect(accumulating[0]!.SpendUsd).toBe(1.5);
+      expect(accumulating[0]!.PromptTokens).toBe(300);
     });
   });
 });
