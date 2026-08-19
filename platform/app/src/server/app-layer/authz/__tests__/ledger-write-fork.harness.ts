@@ -10,6 +10,7 @@
  *
  * @see specs/rbac/in-place-authz-migration.feature
  */
+import type { LedgerActor } from "@langwatch/authz-server";
 import { vi } from "vitest";
 import {
   Prisma,
@@ -17,11 +18,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import {
-  type AuthzGrantsCommandSenders,
-  GrantsLedgerWriter,
-  type LedgerActor,
-} from "../ledger";
+import { type AuthzGrantsCommandSenders, GrantsLedgerWriter } from "../ledger";
 
 export const ORG_ID = "org_fork";
 export const ACTOR: LedgerActor = { type: "user", id: "user_admin" };
@@ -53,7 +50,15 @@ export function recordNotFound(): Error {
   });
 }
 
-export function harness({ onLedger }: { onLedger: boolean }) {
+export function harness({
+  onLedger,
+  poll,
+}: {
+  onLedger: boolean;
+  /** Defaults to a poll that never retries — one failed `check()` times out
+   *  immediately. Override to exercise the read-your-writes retry loop. */
+  poll?: { intervalMs: number; timeoutMs: number };
+}) {
   const sent: Array<{ verb: string; data: unknown }> = [];
   const db = {
     roleBinding: {
@@ -63,6 +68,7 @@ export function harness({ onLedger }: { onLedger: boolean }) {
       create: vi.fn().mockResolvedValue(undefined),
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
       update: vi.fn().mockResolvedValue(undefined),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     customRole: {
@@ -72,13 +78,19 @@ export function harness({ onLedger }: { onLedger: boolean }) {
       findFirst: vi.fn().mockResolvedValue(null),
     },
     role: { findFirst: vi.fn().mockResolvedValue(null) },
-    grant: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    grant: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      // Known to the fold's head by default, so a test that does not care
+      // about the stranded-row adoption path (`changeBindingRole`) keeps
+      // taking the ordinary `changeGrantRole` branch.
+      findFirst: vi.fn().mockResolvedValue({ id: "known" }),
+    },
     auditLog: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
   };
   const writer = new GrantsLedgerWriter(db as unknown as PrismaClient, {
     onLedgerWrites: async () => onLedger,
     now: () => 1_700_000_000_000,
-    poll: { intervalMs: 0, timeoutMs: 0 },
+    poll: poll ?? { intervalMs: 0, timeoutMs: 0 },
     commands: async () => ({
       commands: Object.fromEntries(
         COMMAND_VERBS.map((verb) => [

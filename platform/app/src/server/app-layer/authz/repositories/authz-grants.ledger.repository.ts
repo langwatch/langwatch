@@ -20,7 +20,7 @@ import type {
   AuthzGrantsRepository,
   AuthzReadRepository,
   BindingPrincipalWhere,
-  GrantWriteActor,
+  LedgerActor,
   OffboardCounts,
   RoleBindingWrite,
 } from "@langwatch/authz-server";
@@ -125,7 +125,7 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
     actor,
   }: {
     row: RoleBindingWrite;
-    actor: GrantWriteActor;
+    actor: LedgerActor;
   }): Promise<void> {
     const { organizationId, ...binding } = row;
     await withPortFailures(() =>
@@ -153,7 +153,7 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
     organizationId: string;
     role: RoleBindingWrite["role"];
     customRoleId: string | null;
-    actor: GrantWriteActor;
+    actor: LedgerActor;
   }): Promise<void> {
     await withPortFailures(() =>
       this.writer.changeBindingRole({
@@ -174,7 +174,7 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
   }: {
     bindingId: string;
     organizationId: string;
-    actor: GrantWriteActor;
+    actor: LedgerActor;
   }): Promise<void> {
     // A ledger revoke of an absent id is a no-op; the port's contract is
     // that a row gone between the caller's pre-read and this write reads
@@ -209,9 +209,31 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
       principal: BindingPrincipalWhere;
     };
     create: RoleBindingWrite;
-    actor: GrantWriteActor;
+    actor: LedgerActor;
   }): Promise<void> {
-    const revoked = await withPortFailures(() =>
+    // Existence has to be established BEFORE anything is appended.
+    // `revokeBindingsWhere`'s returned count is advisory — a lagging compat
+    // projection can read 0 while the broad grant it is meant to narrow
+    // landed moments ago and is genuinely there (its own docstring says so).
+    // Deriving "missing" from that count AFTER the revoke has already
+    // appended used to mean: a selector-only `grant_revoked` sweeps the
+    // grant away once the fold catches up, while the caller is told nothing
+    // was there to replace — a replace that nets to zero access instead of
+    // narrowing it. This pre-read can still see stale-empty under the same
+    // fold lag, but that failure mode is safe: nothing has been appended
+    // yet, so the caller can retry with its access intact.
+    const existing = await this.db.roleBinding.findFirst({
+      where: {
+        organizationId: deleteWhere.organizationId,
+        scopeType: deleteWhere.scopeType,
+        scopeId: deleteWhere.scopeId,
+        ...deleteWhere.principal,
+      },
+      select: { id: true },
+    });
+    if (!existing) throw new BindingMissingError();
+
+    await withPortFailures(() =>
       this.writer.revokeBindingsWhere({
         organizationId: deleteWhere.organizationId,
         where: {
@@ -223,8 +245,6 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
         reason: "replaced by a narrower grant",
       }),
     );
-    // Nothing to reduce: the broad grant this call narrows is already gone.
-    if (revoked === 0) throw new BindingMissingError();
     const { organizationId, ...binding } = create;
     await withPortFailures(() =>
       this.writer.attachBindings({
@@ -244,7 +264,7 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
   }: {
     userId: string;
     organizationId: string;
-    actor: GrantWriteActor;
+    actor: LedgerActor;
     prove: (txReader: AuthzReadRepository) => Promise<void>;
   }): Promise<OffboardCounts> {
     const bindings = await this.db.roleBinding.findMany({

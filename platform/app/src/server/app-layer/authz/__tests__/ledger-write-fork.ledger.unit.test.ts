@@ -7,7 +7,7 @@
  *
  * @see specs/rbac/in-place-authz-migration.feature
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 
 vi.mock("../epoch", () => ({
@@ -22,6 +22,10 @@ import {
   legacyRow,
   ORG_ID,
 } from "./ledger-write-fork.harness";
+
+beforeEach(() => {
+  vi.mocked(bumpAuthzEpoch).mockClear();
+});
 
 describe("given a revocation named by filter", () => {
   describe("when the filter names no organization", () => {
@@ -81,6 +85,20 @@ describe("given a revocation named by filter", () => {
       expect((sent[0]!.data as { revocations: unknown[] }).revocations).toEqual(
         [{ selector: { principal: { type: "api_key", id: "key_1" } } }],
       );
+    });
+
+    it("appends nothing when opted out of the no-match safety net", async () => {
+      const { writer, sent } = harness({ onLedger: true });
+
+      const revoked = await writer.revokeBindingsWhere({
+        organizationId: ORG_ID,
+        where: { apiKeyId: "key_1" },
+        actor: ACTOR,
+        skipAppendWhenNoMatches: true,
+      });
+
+      expect(revoked).toBe(0);
+      expect(sent).toEqual([]);
     });
   });
 
@@ -162,6 +180,29 @@ describe("given an organization whose genesis import has landed", () => {
     expect(bumpAuthzEpoch).toHaveBeenCalledWith({ organizationId: ORG_ID });
   });
 
+  describe("when the read-your-writes poll has to retry", () => {
+    it("keeps polling the compat projection until the fold lands the row", async () => {
+      const { writer, db } = harness({
+        onLedger: true,
+        poll: { intervalMs: 0, timeoutMs: 10_000 },
+      });
+      db.roleBinding.count
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(1);
+
+      await writer.attachBindings({
+        organizationId: ORG_ID,
+        bindings: [binding],
+        actor: ACTOR,
+        onDuplicate: "reject",
+      });
+
+      expect(db.roleBinding.count).toHaveBeenCalledTimes(3);
+      expect(bumpAuthzEpoch).toHaveBeenCalledWith({ organizationId: ORG_ID });
+    });
+  });
+
   /** @scenario "Completing the genesis import moves an organization's writes onto the ledger" */
   it("emits the role change carrying both role keys and the grant's own identity", async () => {
     const { writer, db, sent } = harness({ onLedger: true });
@@ -224,6 +265,51 @@ describe("given an organization whose genesis import has landed", () => {
       grantId: "rb_1",
       from: "member",
       to: "custom:role_auditor",
+    });
+  });
+
+  describe("when a role change targets a grant the fold has never adopted", () => {
+    /**
+     * A compat row can exist with no fact behind it: written imperatively
+     * during the write gate's negative-cache window or the genesis
+     * snapshot -> flip gap. `grant_role_changed` against an unknown grantId
+     * no-ops silently in the reducer, so a bare role change would report
+     * success while nothing changed. The fix adopts the row with an attach
+     * fact instead.
+     */
+    it("adopts the row with an attach fact carrying the new role", async () => {
+      const { writer, db, sent } = harness({ onLedger: true });
+      db.roleBinding.findFirst
+        .mockResolvedValueOnce(legacyRow({ id: "rb_1" }))
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          role: TeamUserRole.ADMIN,
+          customRoleId: null,
+        });
+      db.grant.findFirst.mockResolvedValueOnce(null);
+
+      await writer.changeBindingRole({
+        organizationId: ORG_ID,
+        bindingId: "rb_1",
+        role: TeamUserRole.ADMIN,
+        customRoleId: null,
+        actor: ACTOR,
+      });
+
+      expect(sent.map((command) => command.verb)).toEqual(["attachGrants"]);
+      expect((sent[0]!.data as { grants: unknown[] }).grants).toEqual([
+        {
+          grantId: "rb_1",
+          principal: { type: "user", id: "user_sam" },
+          roleKey: "admin",
+          scope: { type: RoleBindingScopeType.TEAM, id: "team_support" },
+          source: "grants-service",
+          actor: ACTOR,
+          occurredAtMs: 1_700_000_000_000,
+        },
+      ]);
+      expect(db.auditLog.createMany).not.toHaveBeenCalled();
+      expect(bumpAuthzEpoch).toHaveBeenCalledWith({ organizationId: ORG_ID });
     });
   });
 

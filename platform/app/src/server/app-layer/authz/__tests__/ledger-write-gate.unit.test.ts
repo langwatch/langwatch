@@ -10,6 +10,12 @@ import {
   isOrgOnLedgerWrites,
   resetLedgerWriteGateForTests,
 } from "../ledger-write-gate";
+import { authzLedgerWriteGateReadFailuresTotal } from "../metrics";
+
+async function counterValue(): Promise<number> {
+  const metric = await authzLedgerWriteGateReadFailuresTotal.get();
+  return metric.values[0]?.value ?? 0;
+}
 
 const ORG_ID = "org_gate";
 
@@ -85,6 +91,18 @@ describe("the ledger write gate", () => {
       await expect(
         isOrgOnLedgerWrites({ organizationId: ORG_ID, prisma }),
       ).resolves.toBe(false);
+    });
+
+    it("counts the failure so a reopened legacy-fallback window is observable", async () => {
+      const findUnique = vi.fn().mockRejectedValue(new Error("pg is down"));
+      const prisma = {
+        systemMigrationTenantState: { findUnique },
+      } as unknown as Pick<PrismaClient, "systemMigrationTenantState">;
+      const before = await counterValue();
+
+      await isOrgOnLedgerWrites({ organizationId: ORG_ID, prisma });
+
+      expect(await counterValue()).toBe(before + 1);
     });
   });
 

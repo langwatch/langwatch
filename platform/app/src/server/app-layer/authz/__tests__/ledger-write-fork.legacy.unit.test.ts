@@ -27,7 +27,6 @@ import {
   harness,
   legacyRow,
   ORG_ID,
-  recordNotFound,
   uniqueViolation,
 } from "./ledger-write-fork.harness";
 
@@ -180,8 +179,8 @@ describe("given an organization the genesis import has not reached", () => {
       });
 
       expect(sent).toEqual([]);
-      expect(db.roleBinding.update).toHaveBeenCalledWith({
-        where: { id: "rb_1" },
+      expect(db.roleBinding.updateMany).toHaveBeenCalledWith({
+        where: { id: "rb_1", organizationId: ORG_ID },
         data: { role: TeamUserRole.ADMIN, customRoleId: null },
       });
       expect(auditRows(db)).toMatchObject([
@@ -192,27 +191,43 @@ describe("given an organization the genesis import has not reached", () => {
       ]);
     });
 
-    it("keeps both knowable database refusals", async () => {
-      for (const [error, expected] of [
-        [uniqueViolation(), DuplicateBindingError],
-        [recordNotFound(), BindingMissingError],
-      ] as const) {
-        const { writer, db } = harness({ onLedger: false });
-        db.roleBinding.findFirst
-          .mockResolvedValueOnce(legacyRow({ id: "rb_1" }))
-          .mockResolvedValueOnce(null);
-        db.roleBinding.update.mockRejectedValueOnce(error);
+    it("keeps the duplicate-role refusal", async () => {
+      const { writer, db } = harness({ onLedger: false });
+      db.roleBinding.findFirst
+        .mockResolvedValueOnce(legacyRow({ id: "rb_1" }))
+        .mockResolvedValueOnce(null);
+      db.roleBinding.updateMany.mockRejectedValueOnce(uniqueViolation());
 
-        await expect(
-          writer.changeBindingRole({
-            organizationId: ORG_ID,
-            bindingId: "rb_1",
-            role: TeamUserRole.ADMIN,
-            customRoleId: null,
-            actor: ACTOR,
-          }),
-        ).rejects.toBeInstanceOf(expected);
-      }
+      await expect(
+        writer.changeBindingRole({
+          organizationId: ORG_ID,
+          bindingId: "rb_1",
+          role: TeamUserRole.ADMIN,
+          customRoleId: null,
+          actor: ACTOR,
+        }),
+      ).rejects.toBeInstanceOf(DuplicateBindingError);
+    });
+
+    /** `updateMany` never throws Prisma's not-found the way a singular
+     *  `update` does — a row gone between the pre-read and here now shows up
+     *  as a zero-match count instead. */
+    it("keeps the missing-binding refusal when the row is gone by the time of the write", async () => {
+      const { writer, db } = harness({ onLedger: false });
+      db.roleBinding.findFirst
+        .mockResolvedValueOnce(legacyRow({ id: "rb_1" }))
+        .mockResolvedValueOnce(null);
+      db.roleBinding.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(
+        writer.changeBindingRole({
+          organizationId: ORG_ID,
+          bindingId: "rb_1",
+          role: TeamUserRole.ADMIN,
+          customRoleId: null,
+          actor: ACTOR,
+        }),
+      ).rejects.toBeInstanceOf(BindingMissingError);
     });
   });
 
@@ -245,12 +260,14 @@ describe("given an organization the genesis import has not reached", () => {
       ]);
     });
 
+    /**
+     * ONE statement, not a read then a delete-by-ids: there is no fold on
+     * this fork to sweep a row that lands in the gap between the two, so the
+     * single `deleteMany(where)` is what has to catch it.
+     */
     it("revokes a filtered set through the same fork", async () => {
       const { writer, db, sent } = harness({ onLedger: false });
-      db.roleBinding.findMany.mockResolvedValueOnce([
-        { id: "rb_7" },
-        { id: "rb_8" },
-      ]);
+      db.roleBinding.deleteMany.mockResolvedValueOnce({ count: 2 });
 
       const count = await writer.revokeBindingsWhere({
         organizationId: ORG_ID,
@@ -260,9 +277,22 @@ describe("given an organization the genesis import has not reached", () => {
 
       expect(count).toBe(2);
       expect(sent).toEqual([]);
+      expect(db.roleBinding.findMany).not.toHaveBeenCalled();
       expect(db.roleBinding.deleteMany).toHaveBeenCalledWith({
-        where: { organizationId: ORG_ID, id: { in: ["rb_7", "rb_8"] } },
+        where: { apiKeyId: "key_1", organizationId: ORG_ID },
       });
+    });
+
+    it("records no audit row when the filter matched nothing", async () => {
+      const { writer, db } = harness({ onLedger: false });
+
+      await writer.revokeBindingsWhere({
+        organizationId: ORG_ID,
+        where: { apiKeyId: "key_1" },
+        actor: ACTOR,
+      });
+
+      expect(db.auditLog.createMany).not.toHaveBeenCalled();
     });
   });
 
@@ -334,6 +364,30 @@ describe("given an organization the genesis import has not reached", () => {
           },
         },
       ]);
+    });
+
+    /**
+     * The service layer's `assertNameFree` is advisory (a read ahead of the
+     * append, not inside it), so two concurrent renames can both pass it and
+     * race for the same `(organizationId, name)` unique index here. The
+     * loser must still get the deterministic conflict, not a raw Prisma
+     * error degrading to an unknown 500.
+     */
+    it("maps a concurrent name collision onto the deterministic conflict", async () => {
+      const { writer, db } = harness({ onLedger: false });
+      db.customRole.upsert.mockRejectedValueOnce(uniqueViolation());
+
+      await expect(
+        writer.defineRole({
+          organizationId: ORG_ID,
+          roleId: "role_1",
+          name: "Auditor",
+          permissions: ["traces:read"],
+          kind: "custom",
+          actor: ACTOR,
+        }),
+      ).rejects.toMatchObject({ code: "custom_role_name_taken" });
+      expect(db.auditLog.createMany).not.toHaveBeenCalled();
     });
   });
 

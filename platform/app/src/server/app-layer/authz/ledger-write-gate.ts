@@ -11,10 +11,10 @@
  * can safely become the writer. An absent row, `pending`, `parked` (the
  * import failed and will be retried) or `rolled_back` (the operator's flip)
  * all mean the ledger does NOT hold the organization's history, and its
- * writes stay on the imperative path.
+ * writes stay on the legacy path.
  *
  * Rollback is an ops action, not a deploy: writing `rolled_back` on the
- * org's state row puts it back on the imperative path fleet-wide within the
+ * org's state row puts it back on the legacy path fleet-wide within the
  * positive cache's TTL. Rows written imperatively while on the legacy side
  * are ADOPTED by the next genesis pass (the import takes the legacy row's
  * own id as the fact's id), which is what makes flip → rollback → re-flip
@@ -30,6 +30,7 @@ import { GRANTS_GENESIS_IMPORT_MIGRATION_NAME } from "@langwatch/authz-server/mi
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { prisma as appPrisma } from "../../db";
+import { authzLedgerWriteGateReadFailuresTotal } from "./metrics";
 
 const logger = createLogger("langwatch:authz:ledger-write-gate");
 
@@ -120,7 +121,7 @@ export async function isOrgOnLedgerWrites({
       (LEDGER_WRITE_STATUSES as readonly string[]).includes(record.status);
   } catch (error) {
     // Fail safe: an unreadable state table leaves the organization on the
-    // imperative path, which is today's behaviour and always works. Caching
+    // legacy path, which is today's behaviour and always works. Caching
     // that miss briefly keeps an outage from putting a read in front of every
     // grant write, and it can only ever delay a cutover, never extend one.
     //
@@ -133,6 +134,7 @@ export async function isOrgOnLedgerWrites({
       { organizationId, error, ttlMs: NEGATIVE_CACHE_TTL_MS },
       "could not read the genesis-import state; this organization's grant writes stay on the legacy path until the cache expires",
     );
+    authzLedgerWriteGateReadFailuresTotal.inc();
     isOnLedger = false;
   }
 

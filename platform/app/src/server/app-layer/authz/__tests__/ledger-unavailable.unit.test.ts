@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { tryGetApp } from "../../app";
-import { authzGrantsCommands } from "../ledger";
+import {
+  authzGrantsCommands,
+  resetAuthzGrantsCommandsForTests,
+} from "../ledger";
 
 vi.mock("../../app", () => ({
   tryGetApp: vi.fn(),
@@ -8,12 +11,14 @@ vi.mock("../../app", () => ({
 
 const mockTryGetApp = vi.mocked(tryGetApp);
 
-// Order matters here: `authzGrantsCommands` memoizes a SUCCESSFUL resolve for
-// the process lifetime (only failures clear the handle), so the case that
-// ends in a resolve must run last.
 describe("authzGrantsCommands", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // `authzGrantsCommands` memoizes a SUCCESSFUL resolve for the process
+    // lifetime (only failures clear the handle), and under `isolate: false`
+    // that memoization can outlive this file. Reset it explicitly rather
+    // than relying on test order within the file.
+    resetAuthzGrantsCommandsForTests();
   });
 
   describe("when the stack is composed but event sourcing is disabled", () => {

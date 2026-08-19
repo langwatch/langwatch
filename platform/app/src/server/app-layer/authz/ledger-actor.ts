@@ -1,10 +1,10 @@
 /**
  * Who a grant write is attributed to in the ledger (ADR-092), for callers
  * that already have the raw ids in hand — a user id, an API key id, or
- * neither. Framework-free (only a type import from ./ledger, erased at
- * build time) so both server code and the app/api layer can share it.
+ * neither. Framework-free (only a type import, erased at build time) so
+ * both server code and the app/api layer can share it.
  */
-import type { LedgerActor } from "./ledger";
+import type { LedgerActor } from "@langwatch/authz-server";
 
 /**
  * Every system principal a grant write can be attributed to, named by the

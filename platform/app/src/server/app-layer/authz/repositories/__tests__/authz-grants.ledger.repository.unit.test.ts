@@ -9,7 +9,7 @@
  * boundary, which silently breaks the REST contract's 409 and 404 — so every
  * mapping is asserted here, by `code`, because that is how callers match.
  */
-import type { GrantWriteActor } from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/authz-server";
 import {
   BindingMissingError,
   DuplicateBindingError,
@@ -25,7 +25,7 @@ import type { GrantsLedgerWriter } from "../../ledger";
 import { LedgerAuthzGrantsRepository } from "../authz-grants.ledger.repository";
 
 const ORG_ID = "org_ledger";
-const ACTOR: GrantWriteActor = { type: "user", id: "user_admin" };
+const ACTOR: LedgerActor = { type: "user", id: "user_admin" };
 
 function prismaError(code: string): Error {
   return new Prisma.PrismaClientKnownRequestError("conflict", {
@@ -153,11 +153,10 @@ describe("given a delete for a binding that is not there", () => {
 });
 
 describe("given a replace whose broad grant has already gone", () => {
-  describe("when the revocation matched nothing", () => {
-    it("answers the port's missing binding and never attaches the narrower one", async () => {
-      const { repository, writer } = harness({
-        revokeBindingsWhere: vi.fn().mockResolvedValue(0),
-      } as Partial<GrantsLedgerWriter>);
+  describe("when the existence pre-read finds nothing", () => {
+    it("answers the port's missing binding and never revokes or attaches anything", async () => {
+      const { db, repository, writer } = harness();
+      db.roleBinding.findFirst.mockResolvedValueOnce(null);
 
       await expect(
         repository.replaceBinding({
@@ -171,7 +170,40 @@ describe("given a replace whose broad grant has already gone", () => {
           actor: ACTOR,
         }),
       ).rejects.toMatchObject({ code: "role_binding_not_found" });
+      expect(writer.revokeBindingsWhere).not.toHaveBeenCalled();
       expect(writer.attachBindings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the fold is lagging behind a grant that landed moments ago", () => {
+    /**
+     * The existence pre-read found the row (it is genuinely there), but the
+     * lagging compat projection `revokeBindingsWhere` itself reads from can
+     * still answer 0 — its own docstring calls that count advisory. The old
+     * code derived "missing" from that count AFTER already appending a
+     * selector-only revoke, so the grant was swept away by the fold while
+     * the caller was told there was nothing to replace. The fix moves the
+     * existence check earlier, so this case now completes the replace
+     * instead of destroying access while reporting failure.
+     */
+    it("still completes the replace rather than appending a revoke and reporting missing", async () => {
+      const { repository, writer } = harness({
+        revokeBindingsWhere: vi.fn().mockResolvedValue(0),
+      } as Partial<GrantsLedgerWriter>);
+
+      await repository.replaceBinding({
+        deleteWhere: {
+          organizationId: ORG_ID,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: "team_support",
+          principal: { userId: "user_sam" },
+        },
+        create: binding,
+        actor: ACTOR,
+      });
+
+      expect(writer.revokeBindingsWhere).toHaveBeenCalledTimes(1);
+      expect(writer.attachBindings).toHaveBeenCalledTimes(1);
     });
   });
 });
