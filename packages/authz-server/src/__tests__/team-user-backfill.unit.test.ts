@@ -94,6 +94,23 @@ class FakeLedger implements GrantsLedgerEmitter {
     }
   }
 
+  /** The backfill defines no roles; the genesis import is what uses this. */
+  async defineRoles(): Promise<void> {
+    throw new Error("the backfill defines no roles");
+  }
+
+  /** The backfill revokes nothing; the genesis import's deny-direction
+   *  sweep is what uses this. */
+  async revokeGrants(): Promise<void> {
+    throw new Error("the backfill revokes no grants");
+  }
+
+  /** The backfill deletes no roles; the genesis import's deny-direction
+   *  sweep is what uses this. */
+  async deleteRole(): Promise<void> {
+    throw new Error("the backfill deletes no roles");
+  }
+
   async proveMigrationParity(args: {
     organizationId: string;
     commandId: string;

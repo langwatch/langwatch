@@ -25,6 +25,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { scimPatchRequestSchema } from "../scim.types";
 import { ScimGroupService } from "../scim-group.service";
 
@@ -95,15 +96,14 @@ function createMockPrisma() {
       ]),
     },
   };
-  return mock as unknown as Parameters<typeof ScimGroupService.create>[0] &
-    typeof mock;
+  return mock as unknown as PrismaClient & typeof mock;
 }
 
 describe("SCIM group PATCH membership", () => {
   let prisma: ReturnType<typeof createMockPrisma>;
 
   const patchGroup = async (operations: unknown[]) =>
-    ScimGroupService.create(prisma).updateGroup({
+    ScimGroupService.create({ prisma }).updateGroup({
       externalScimId: "group-1",
       organizationId: "org-1",
       patchRequest: parsePatch(operations),

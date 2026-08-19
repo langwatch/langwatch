@@ -11,6 +11,15 @@ export const AUTHZ_GRANTS_AGGREGATE_TYPE = "authz_grants" as const;
 
 export const ATTACH_GRANTS_COMMAND_TYPE =
   "lw.authz_grants.attach_grants" as const;
+export const CHANGE_GRANT_ROLE_COMMAND_TYPE =
+  "lw.authz_grants.change_grant_role" as const;
+export const REVOKE_GRANTS_COMMAND_TYPE =
+  "lw.authz_grants.revoke_grants" as const;
+export const DEFINE_ROLES_COMMAND_TYPE =
+  "lw.authz_grants.define_roles" as const;
+export const DELETE_ROLE_COMMAND_TYPE = "lw.authz_grants.delete_role" as const;
+export const OFFBOARD_MEMBER_COMMAND_TYPE =
+  "lw.authz_grants.offboard_member" as const;
 export const PROVE_MIGRATION_PARITY_COMMAND_TYPE =
   "lw.authz_grants.prove_migration_parity" as const;
 export const COMPLETE_CUTOVER_COMMAND_TYPE =
@@ -22,6 +31,11 @@ export const RECORD_MIGRATION_TENANT_STATE_COMMAND_TYPE =
 
 export const AUTHZ_GRANTS_COMMAND_TYPES = [
   ATTACH_GRANTS_COMMAND_TYPE,
+  CHANGE_GRANT_ROLE_COMMAND_TYPE,
+  REVOKE_GRANTS_COMMAND_TYPE,
+  DEFINE_ROLES_COMMAND_TYPE,
+  DELETE_ROLE_COMMAND_TYPE,
+  OFFBOARD_MEMBER_COMMAND_TYPE,
   PROVE_MIGRATION_PARITY_COMMAND_TYPE,
   COMPLETE_CUTOVER_COMMAND_TYPE,
   ROLL_BACK_CUTOVER_COMMAND_TYPE,
@@ -70,3 +84,31 @@ export const AUTHZ_GRANTS_EVENT_TYPES = [
 ] as const;
 
 export const AUTHZ_GRANTS_EVENT_VERSION_LATEST = "2026-08-17" as const;
+
+/** Stable verb prefix for the pipeline's audit-log `action` column, shared
+ *  by the insert-only subscriber (a migrated organization) and the ledger
+ *  writer's `recordLegacyAudit` (an unmigrated one) — the same action
+ *  vocabulary either way. */
+export const AUTHZ_AUDIT_ACTION_PREFIX = "authz.grants." as const;
+
+/**
+ * The audit verb vocabulary, shared by the subscriber's event-to-verb map
+ * (`authzAuditTrail.subscriber.ts`) and the ledger writer's legacy audit
+ * calls (`recordLegacyAudit` in `ledger.ts`, for organizations not yet on
+ * the ledger). Both write `${AUTHZ_AUDIT_ACTION_PREFIX}${verb}` into the
+ * same `action` column, so a verb invented on one side and not the other
+ * would silently fork the vocabulary a migrated organization's history
+ * reads back against. A plain union, not a Zod schema: these strings never
+ * arrive as external input, so there is nothing here to validate.
+ */
+export const AUTHZ_AUDIT_VERBS = [
+  "attach",
+  "role_change",
+  "revoke",
+  "role_defined",
+  "role_permissions_changed",
+  "role_deleted",
+  "offboard",
+] as const;
+
+export type AuthzAuditVerb = (typeof AUTHZ_AUDIT_VERBS)[number];

@@ -154,7 +154,6 @@ const SEAT_LIMIT_LABELS: Record<string, string> = {
  * underscores would reach a customer half-converted.
  */
 const MIGRATION_STATUS_LABELS: Record<string, string> = {
-  migrated: "still held for parity review",
   parked: "parked for retry",
   rolled_back: "already rolled back",
 };
@@ -1005,13 +1004,13 @@ const presentations = {
     describe: () =>
       "Check the organization id — only organizations a migration has already processed have state to act on.",
   },
-  migration_rollback_requires_finalized: {
-    title: "Only a finalized organization can be rolled back",
+  migration_rollback_requires_migrated_or_finalized: {
+    title: "Only a migrated or finalized organization can be rolled back",
     describe: (error) => {
       const state = label(MIGRATION_STATUS_LABELS, str(error, "status", ""));
       return state
         ? `This organization is ${state}, so it is already on — or on its way back to — the legacy path.`
-        : "This organization is not finalized, so it is already on the legacy path.";
+        : "This organization has not reached the ledger, so it is already on the legacy path.";
     },
   },
   duplicate_invite: {
@@ -1107,6 +1106,11 @@ const presentations = {
     title: "Role binding not found",
     describe: () =>
       "It may have been removed already. Reload to see the current bindings.",
+  },
+  authz_ledger_unavailable: {
+    title: "Access changes are paused",
+    describe: () =>
+      "We could not record the change just now. Nothing was applied — try again in a moment.",
   },
   role_binding_already_exists: {
     title: "That role is already bound",
