@@ -470,6 +470,11 @@ const appConfig = defineConfig({
           muted: {
             value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.850}" },
           },
+          // Navigation rail: one step off the page, so the rail reads as
+          // its own surface next to the sidebar
+          rail: {
+            value: { _light: "{colors.gray.150}", _dark: "{colors.zinc.850}" },
+          },
           // Emphasized background for active states
           emphasized: {
             value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.600}" },

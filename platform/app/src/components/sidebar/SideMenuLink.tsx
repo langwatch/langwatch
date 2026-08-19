@@ -146,6 +146,8 @@ export type SideMenuLinkProps = SideMenuItemProps & {
   href?: string;
   project?: Project;
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
+  /** Opens the destination in a new tab. */
+  isExternal?: boolean;
   /**
    * Why this destination cannot be opened yet. Set it and the item renders
    * dimmed and inert with the reason in a tooltip, instead of offering a link
@@ -163,10 +165,12 @@ export const SideMenuLink = ({
   badgeNumber,
   onClick,
   showLabel = true,
+  rightElement,
   beta,
   betaLabel,
   legacy,
   legacyLabel,
+  isExternal,
   unavailableReason,
 }: SideMenuLinkProps) => {
   if (unavailableReason) {
@@ -206,6 +210,10 @@ export const SideMenuLink = ({
       width="full"
       href={href}
       aria-label={label}
+      // The active item is otherwise only a background colour, which a
+      // screen reader cannot report and a test cannot read.
+      aria-current={isActive ? "page" : undefined}
+      isExternal={isExternal}
       onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
         trackEvent("side_menu_click", {
           project_id: project?.id,
@@ -220,6 +228,7 @@ export const SideMenuLink = ({
         isActive={isActive}
         badgeNumber={badgeNumber}
         showLabel={showLabel}
+        rightElement={rightElement}
         beta={beta}
         betaLabel={betaLabel}
         legacy={legacy}

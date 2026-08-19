@@ -1366,6 +1366,9 @@ jobs:
       - name: Test start-boxd-ssh-agent.sh
         run: bash .github/scripts/__tests__/start-boxd-ssh-agent.test.sh
 
+      - name: Test biome-new-violations.sh
+        run: bash .github/scripts/__tests__/biome-new-violations.test.sh
+
   ci-self-test:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'

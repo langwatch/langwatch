@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
+import { useNavigationModeStore } from "~/features/navigation/navigationModeStore";
 import { OrganizationUserRole, type Project } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import {
@@ -538,7 +539,13 @@ export const useOrganizationTeamProject = (
     );
     if (
       !hasTeamsWithProjectsOnCurrentOrg &&
-      teamsWithProjectsOnAnyOrg.length > 0
+      teamsWithProjectsOnAnyOrg.length > 0 &&
+      // In the navigation-v2 modes the org switch and the landing resolver
+      // own cross-organization destinations; this teleport to another
+      // org's project would fight them mid-navigation. Read fresh from the
+      // store (not subscribed) so legacy devices stay on the exact current
+      // code path. Spec: specs/navigation/navigation-v2-landing.feature
+      useNavigationModeStore.getState().storedMode === "legacy"
     ) {
       // Personal workspaces are never a valid project-home target — only
       // redirect when a shared team's project exists (ADR-038 v6).

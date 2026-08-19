@@ -107,7 +107,7 @@ LangWatch's RBAC layer (`platform/app/src/server/api/rbac.ts`) is the single sou
 
 **Chrome visibility gates**: `hasPermission('governance:view') && release_ui_ai_governance_enabled` for the Govern sidebar section; `hasPermission('virtualKeys:view') && release_ui_ai_gateway_menu_enabled` for the AI Gateway sidebar section. The feature flags are operator rollout knobs; the permissions are the audience predicate. Two flags preserve pilot flexibility so Gateway and Governance can roll out independently.
 
-**tRPC + REST enforcement**: every governance procedure currently checks `organization:manage` (broad). Granularization to the new dedicated permissions (`governance:manage`, `ingestionSources:manage`, etc.) is a deferred follow-up, existing checks still work; the catalog addition unblocks the gate-side migration.
+**tRPC + REST enforcement**: every governance procedure checks the dedicated permission for its resource. Reads use `<resource>:view` (`governance:view`, `ingestionSources:view`, `anomalyRules:view`, `activityMonitor:view`, `routingPolicies:view`) and writes use `<resource>:manage`. The page guards match the read grant, so the custom-role delegation above reaches the pages and each panel names the grant it still needs.
 
 ### 4. Org-tenancy isolation
 

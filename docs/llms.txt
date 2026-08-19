@@ -496,7 +496,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Dashboards
 
-- [/governance dashboard](https://langwatch.ai/docs/ai-governance/governance-dashboard.md): The daily-use org governance home, spend, anomalies, ingestion-source health, per-user activity. Read-mostly; the admin-authoring CRUD pages still live under /settings/governance/*. Available only after the org's setup-state OR-of-flags trips.
+- [/governance dashboard](https://langwatch.ai/docs/ai-governance/governance-dashboard.md): The daily-use org governance home, spend, anomalies, ingestion-source health, per-user activity. Read-mostly; the admin-authoring CRUD pages still live under /governance/*. Available only after the org's setup-state OR-of-flags trips.
 - [Departments](https://langwatch.ai/docs/ai-governance/departments.md): A single-valued accounting dimension for attributing AI spend across people, teams, and projects, including personal AI use. Separate from RBAC; pure accounting.
 
 ## Privacy

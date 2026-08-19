@@ -20,7 +20,7 @@ const sections: SectionCase[] = [
   },
   {
     name: "AI Gateway",
-    path: () => "/settings/gateway/virtual-keys",
+    path: () => "/gateway/virtual-keys",
     sectionLabel: "AI Gateway",
     pageHeading: "Virtual Keys",
     screenshot: "gateway-shared-layout.png",
@@ -109,7 +109,7 @@ test("complex product areas share one local navigation layout", async ({
   await governanceNavigation
     .getByRole("link", { name: "Ingestion Sources", exact: true })
     .click();
-  await expect(page).toHaveURL("/settings/governance/ingestion-sources");
+  await expect(page).toHaveURL("/governance/ingestion-sources");
 
   // The URL flips synchronously on pushState, but the router only commits the
   // new location once the lazily-loaded route resolves; until then the nav

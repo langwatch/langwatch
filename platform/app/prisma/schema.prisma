@@ -3295,7 +3295,7 @@ model AnomalyAlert {
 }
 
 /// Org-scoped catalog of AI tools surfaced on the personal home portal
-/// (/me) and managed by org admins at /settings/governance/tool-catalog.
+/// (/me) and managed by org admins at /governance/tool-catalog.
 ///
 /// Three first-class tile types via `type` discriminator:
 ///   - "coding_assistant" - click expands to setup helper (e.g. `langwatch claude`)

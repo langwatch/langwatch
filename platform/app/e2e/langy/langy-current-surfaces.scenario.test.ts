@@ -56,7 +56,7 @@ describe("Langy current-surfaces coverage", () => {
         },
         {
           label: "surfaces-gateway-virtual-keys",
-          path: "/settings/gateway/virtual-keys",
+          path: "/gateway/virtual-keys",
         },
       );
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
@@ -88,7 +88,7 @@ describe("Langy current-surfaces coverage", () => {
             scenario.judge(),
           ],
         },
-        { label: "surfaces-gateway-usage", path: "/settings/gateway/usage" },
+        { label: "surfaces-gateway-usage", path: "/gateway/usage" },
       );
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);

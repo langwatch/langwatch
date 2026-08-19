@@ -17,6 +17,7 @@ import {
   personalWorkspaceCreateViolation,
   personalWorkspaceMoveViolation,
 } from "~/server/app-layer/projects/project.service";
+import { mintProjectSlug } from "~/server/app-layer/projects/projectSlug";
 import type { Session } from "~/server/auth";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
@@ -122,10 +123,7 @@ export const projectRouter = createTRPCRouter({
 
       const projectNanoId = nanoid();
       const projectId = `project_${projectNanoId}`;
-      const slug =
-        slugify(input.name, { lower: true, strict: true }) +
-        "-" +
-        projectNanoId.substring(0, 6);
+      const slug = mintProjectSlug({ name: input.name, projectNanoId });
 
       const existingProject = await prisma.project.findFirst({
         where: {
