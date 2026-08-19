@@ -7,9 +7,10 @@
  * Prisma surface area is a single `findUnique` and `upsert`, so Prisma
  * itself doesn't need re-testing. The interesting behaviour is the
  * resolver's branching across env / store / legacy / registry-default,
- * and especially the load-bearing invariant that SYSTEM-scoped flags
- * never reach the legacy (PostHog) sub-service. The legacy service is
- * a `vi.fn()` so the test can assert that with `not.toHaveBeenCalled`.
+ * and especially the load-bearing invariant that SYSTEM- and
+ * PRODUCT-scoped flags never reach the legacy sub-service — only
+ * unregistered keys do. The legacy service is a `vi.fn()` so the test
+ * can assert that with `not.toHaveBeenCalled`.
  *
  * Real-postgres coverage is sufficient via direct Prisma store tests
  * (see featureFlagStore.postgres.integration when re-enabled with a
@@ -29,7 +30,7 @@ const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
 const FAMILY_FLAG = "es-trace-projection-spanstorage-killswitch";
 const PRODUCT_FLAG = "release_ui_ai_gateway_menu_enabled";
 const NON_ENV_OVERRIDABLE_FLAG = "release_langy_enabled";
-const UNREGISTERED_FLAG = "experiment_some_adhoc_posthog_flag";
+const UNREGISTERED_FLAG = "experiment_some_adhoc_unregistered_flag";
 
 class InMemoryStore {
   private values = new Map<
@@ -188,20 +189,14 @@ describe("FeatureFlagService", () => {
 
   describe("given a PRODUCT-scoped flag", () => {
     describe("when no store row exists", () => {
-      it("delegates to the legacy (PostHog) service", async () => {
+      it("resolves to the registry default and never calls the legacy service", async () => {
         const { service, legacy } = buildService();
-        (legacy.isEnabled as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-          true,
-        );
         const enabled = await service.isEnabled(PRODUCT_FLAG, {
           distinctId: "user-1",
           defaultValue: false,
         });
         expect(enabled).toBe(true);
-        expect(legacy.isEnabled).toHaveBeenCalledWith(PRODUCT_FLAG, {
-          distinctId: "user-1",
-          defaultValue: true,
-        });
+        expect(legacy.isEnabled).not.toHaveBeenCalled();
       });
     });
 
@@ -219,7 +214,7 @@ describe("FeatureFlagService", () => {
     });
 
     describe("when an operator disables a PRODUCT flag via the store", () => {
-      it("returns false even when PostHog would have said true", async () => {
+      it("returns false regardless of what the legacy service would have returned", async () => {
         const { service, store, legacy } = buildService();
         await store.set(PRODUCT_FLAG, false);
         (legacy.isEnabled as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
@@ -235,7 +230,7 @@ describe("FeatureFlagService", () => {
     });
 
     describe("when the store row carries an org-scoped targeting rule", () => {
-      it("uses the rule for the matching org and skips PostHog", async () => {
+      it("uses the rule for the matching org and skips the legacy service", async () => {
         const { service, store, legacy } = buildService();
         await store.setRules(PRODUCT_FLAG, [
           { match: { organizationId: "org_lw" }, enabled: true },
@@ -249,12 +244,13 @@ describe("FeatureFlagService", () => {
         expect(legacy.isEnabled).not.toHaveBeenCalled();
       });
 
-      it("uses the row-level default for a non-matching org without consulting PostHog", async () => {
+      it("uses the row-level default for a non-matching org without consulting the legacy service", async () => {
         // The store creates a row with row-level enabled=false when only
         // rules are written, so the row counts as an explicit operator
-        // override and stops the PostHog fallthrough. To target an
-        // allowlist while still letting PostHog drive everyone else,
-        // operators must leave the row absent — that's by design.
+        // override and stops the fallthrough to the registry default.
+        // To target an allowlist while leaving the registry default in
+        // effect for everyone else, operators must leave the row
+        // absent — that's by design.
         const { service, store, legacy } = buildService();
         await store.setRules(PRODUCT_FLAG, [
           { match: { organizationId: "org_lw" }, enabled: true },
@@ -270,7 +266,7 @@ describe("FeatureFlagService", () => {
     });
 
     describe("when the row carries both a row-level default and a non-matching rule", () => {
-      it("uses the row-level default (PostHog is not consulted because the row exists)", async () => {
+      it("uses the row-level default (the legacy service is not consulted because the row exists)", async () => {
         const { service, store, legacy } = buildService();
         await store.set(PRODUCT_FLAG, false);
         await store.setRules(PRODUCT_FLAG, [
@@ -288,7 +284,7 @@ describe("FeatureFlagService", () => {
   });
 
   describe("given an unregistered flag", () => {
-    it("falls through to the legacy service so ad-hoc PostHog flags still work", async () => {
+    it("falls through to the legacy service so ad-hoc flags still work", async () => {
       const { service, legacy } = buildService();
       (legacy.isEnabled as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
         true,

@@ -8,7 +8,7 @@ import { z } from "zod";
  * conditions all hold against the calling context wins. When no rule
  * matches, the row's `enabled` boolean is used as the row-level
  * default. When the row itself is missing, the resolver falls
- * through to PostHog (PRODUCT) or the registry default (SYSTEM).
+ * through to the registry default.
  *
  * The shape is intentionally open-ended — today it carries `projectId`
  * and `organizationId`, tomorrow it can grow `userEmail`,

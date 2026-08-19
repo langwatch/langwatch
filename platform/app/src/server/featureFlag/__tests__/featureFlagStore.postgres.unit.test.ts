@@ -7,11 +7,12 @@
  * store's own code rather than through an assertion on call arguments.
  *
  * `get` keeps "no row" as a distinct `null` so the service layer can decide
- * whether a PRODUCT flag still falls through to PostHog. Per-span ingestion
- * cannot afford that fall-through, so the edge calls `getOrRegistryDefault`
- * instead. That makes the registry default the thing an unconfigured
- * deployment actually gets, which is what these tests pin: reading the
- * registry object alone would prove nothing about the path the edge takes.
+ * whether to fall through to the registry default. Per-span ingestion
+ * cannot afford the service layer's per-call overhead, so the edge calls
+ * `getOrRegistryDefault` directly instead. That makes the registry default
+ * the thing an unconfigured deployment actually gets, which is what these
+ * tests pin: reading the registry object alone would prove nothing about
+ * the path the edge takes.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FeatureFlagStorePostgres } from "../featureFlagStore.postgres";
