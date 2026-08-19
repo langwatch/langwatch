@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import type { BatchRunDataResult } from "~/server/scenarios/scenario-event.types";
 
 const logger = createLogger("pollForScenarioRun");
 
@@ -15,25 +16,18 @@ interface PollForRunParams {
   batchRunId: string;
 }
 
-interface ScenarioRun {
-  scenarioRunId: string;
-  status?: string;
-  messages?: unknown[];
-}
-
 /**
- * The narrow slice of the server's `BatchRunDataResult` this poll reads.
- * Deliberately NOT named `BatchRunDataResult`: the canonical, schema-derived
- * type lives in `~/server/scenarios/scenario-event.types` and carries more
- * fields (`lastUpdatedAt`). Reusing the name here would read as the same type.
+ * The server contract, not a local restatement of it.
+ *
+ * `BatchRunDataResult` is derived from `runDataSchema`, so a change to the
+ * wire shape lands here as a compile error instead of drifting silently. An
+ * earlier hand-rolled version of this type declared `status?: string`, which
+ * hid the fact that the server always sends a `ScenarioRunStatus` and forced a
+ * cast in the classifier below.
  */
-type PolledBatchRunData =
-  | { changed: false }
-  | { changed: true; runs: ScenarioRun[] };
-
 type FetchBatchRunData = (
   params: PollForRunParams,
-) => Promise<PolledBatchRunData>;
+) => Promise<BatchRunDataResult>;
 
 export type PollResult =
   | { success: true; scenarioRunId: string }
@@ -83,10 +77,12 @@ const TERMINAL_STATUS_OUTCOME: Record<
 };
 
 function classifyTerminalStatus(
-  status: string | undefined,
+  status: ScenarioRunStatus,
 ): "run_failed" | "run_error" | null {
-  if (status === undefined) return null;
-  return TERMINAL_STATUS_OUTCOME[status as ScenarioRunStatus] ?? null;
+  // The `?? null` is not dead: tRPC does not runtime-validate its output, so a
+  // stored row carrying a status this build's enum does not know still arrives
+  // here. Falling back to "still running" is the safe read.
+  return TERMINAL_STATUS_OUTCOME[status] ?? null;
 }
 
 /**
@@ -106,10 +102,13 @@ function classifyTerminalStatus(
  * attempt with whatever the first one saw and the loop can never observe the
  * run appearing. See the call site in `useRunScenario`.
  */
-export async function pollForScenarioRun(
-  fetchBatchRunData: FetchBatchRunData,
-  params: PollForRunParams,
-): Promise<PollResult> {
+export async function pollForScenarioRun({
+  fetchBatchRunData,
+  params,
+}: {
+  fetchBatchRunData: FetchBatchRunData;
+  params: PollForRunParams;
+}): Promise<PollResult> {
   logger.info(
     {
       projectId: params.projectId,

@@ -1,6 +1,8 @@
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import type { BatchRunDataResult } from "~/server/scenarios/scenario-event.types";
 import { pollForScenarioRun } from "../pollForScenarioRun";
 import { shouldRetryQuery } from "../queryRetryPolicy";
 
@@ -45,31 +47,40 @@ function createAppQueryClient() {
  * A fetcher whose backing server has no run yet, then has one after
  * `appearsAfterMs`. `fetchOptions` is what the hook hands to tRPC's `.fetch`.
  */
-function createCountingFetcher(
-  queryClient: QueryClient,
-  appearsAfterMs: number,
-  fetchOptions: { staleTime?: number; retry?: boolean } = {},
-) {
+function createCountingFetcher({
+  queryClient,
+  appearsAfterMs,
+  fetchOptions = {},
+}: {
+  queryClient: QueryClient;
+  appearsAfterMs: number;
+  fetchOptions?: { staleTime?: number; retry?: boolean };
+}) {
   const counter = { networkCalls: 0 };
   let runExists = false;
   setTimeout(() => {
     runExists = true;
   }, appearsAfterMs);
 
-  const fetcher = (params: typeof POLL_PARAMS) =>
+  const fetcher = (params: typeof POLL_PARAMS): Promise<BatchRunDataResult> =>
     queryClient.fetchQuery({
       ...fetchOptions,
       queryKey: ["scenarios.getBatchRunData", params],
-      queryFn: () => {
+      queryFn: (): Promise<BatchRunDataResult> => {
         counter.networkCalls++;
         return Promise.resolve({
           changed: true as const,
+          lastUpdatedAt: 1_700_000_000_000,
           runs: runExists
             ? [
                 {
+                  scenarioId: "scenario_1",
+                  batchRunId: POLL_PARAMS.batchRunId,
                   scenarioRunId: "run_abc",
-                  status: "IN_PROGRESS",
+                  status: ScenarioRunStatus.IN_PROGRESS,
                   messages: [],
+                  timestamp: 1_700_000_000_000,
+                  durationInMs: 0,
                 },
               ]
             : [],
@@ -85,12 +96,16 @@ describe("polling against the app's real query cache", () => {
     vi.useFakeTimers();
     try {
       const queryClient = createAppQueryClient();
-      const { fetcher, counter } = createCountingFetcher(queryClient, 2000, {
-        staleTime: 0,
-        retry: false,
+      const { fetcher, counter } = createCountingFetcher({
+        queryClient,
+        appearsAfterMs: 2000,
+        fetchOptions: { staleTime: 0, retry: false },
       });
 
-      const polling = pollForScenarioRun(fetcher, POLL_PARAMS);
+      const polling = pollForScenarioRun({
+        fetchBatchRunData: fetcher,
+        params: POLL_PARAMS,
+      });
       await vi.advanceTimersByTimeAsync(35_000);
 
       await expect(polling).resolves.toEqual({
@@ -108,9 +123,15 @@ describe("polling against the app's real query cache", () => {
     try {
       const queryClient = createAppQueryClient();
       // No fetch options: the app's 30s staleTime applies, which is the bug.
-      const { fetcher, counter } = createCountingFetcher(queryClient, 2000);
+      const { fetcher, counter } = createCountingFetcher({
+        queryClient,
+        appearsAfterMs: 2000,
+      });
 
-      const polling = pollForScenarioRun(fetcher, POLL_PARAMS);
+      const polling = pollForScenarioRun({
+        fetchBatchRunData: fetcher,
+        params: POLL_PARAMS,
+      });
       await vi.advanceTimersByTimeAsync(35_000);
 
       await expect(polling).resolves.toEqual({

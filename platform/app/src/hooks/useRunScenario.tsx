@@ -3,7 +3,10 @@ import { showErrorToast } from "~/features/errors";
 import type { TargetValue } from "../components/scenarios/TargetSelector";
 import { toaster } from "../components/ui/toaster";
 import { api } from "../utils/api";
-import { pollForScenarioRun } from "../utils/pollForScenarioRun";
+import {
+  type PollResult,
+  pollForScenarioRun,
+} from "../utils/pollForScenarioRun";
 import { useModelProvidersSettings } from "./useModelProvidersSettings";
 
 interface RunCompleteResult {
@@ -53,6 +56,63 @@ function buildViewRunAction({
   return {
     label,
     onClick: () => onRunFailed({ scenarioRunId, setId, batchRunId }),
+  };
+}
+
+/**
+ * Turns a poll result that is not a success into the toast the user sees.
+ *
+ * The three cases are genuinely different events, and saying so is the point of
+ * this module: a run that did not pass produced an outcome, a run that errored
+ * produced nothing, and a timeout means nothing became visible at all. Lives
+ * outside the hook so the run callback stays about running the scenario.
+ */
+function buildRunOutcomeToast({
+  result,
+  setId,
+  batchRunId,
+  onRunFailed,
+}: {
+  result: Extract<PollResult, { success: false }>;
+  setId: string;
+  batchRunId: string;
+  onRunFailed: ((result: RunCompleteResult) => void) | undefined;
+}) {
+  const viewRunAction = (label: string) =>
+    buildViewRunAction({
+      label,
+      scenarioRunId: result.scenarioRunId,
+      setId,
+      batchRunId,
+      onRunFailed,
+    });
+
+  if (result.error === "run_failed") {
+    // The run executed and did not pass. That is a result, not a fault: no
+    // error framing, and the user decides whether to open it rather than
+    // being navigated there.
+    return {
+      title: "Scenario did not pass",
+      description:
+        "The run finished. Open it to see the criteria and the reasoning.",
+      type: "warning" as const,
+      action: viewRunAction("View run"),
+    };
+  }
+
+  if (result.error === "run_error") {
+    return {
+      title: "Scenario run failed",
+      description: "The scenario encountered an error during execution.",
+      type: "error" as const,
+      action: viewRunAction("View failed run"),
+    };
+  }
+
+  return {
+    title: "Run timed out",
+    description: "The scenario run took too long to start. Please try again.",
+    type: "error" as const,
   };
 }
 
@@ -106,7 +166,7 @@ export function useRunScenario({
           });
 
         setIsPolling(true);
-        const result = await pollForScenarioRun(
+        const result = await pollForScenarioRun({
           // The poll asks for the same input up to 60 times over 30s. Under the
           // app-wide staleTime (30_000, see utils/api.tsx) every call after the
           // first would be answered from the first one's cached result, so the
@@ -115,17 +175,17 @@ export function useRunScenario({
           // retry off when it is undefined, and the app defines it globally, so
           // one failing request would otherwise burn the entire budget on
           // backoff inside a single attempt.
-          (pollParams) =>
+          fetchBatchRunData: (pollParams) =>
             utils.scenarios.getBatchRunData.fetch(pollParams, {
               staleTime: 0,
               retry: false,
             }),
-          {
+          params: {
             projectId,
             scenarioSetId: returnedSetId,
             batchRunId: returnedBatchRunId,
           },
-        );
+        });
 
         if (result.success) {
           onRunComplete?.({
@@ -133,43 +193,15 @@ export function useRunScenario({
             setId: returnedSetId,
             batchRunId: returnedBatchRunId,
           });
-        } else if (result.error === "run_failed") {
-          // The run executed and did not pass. That is a result, not a fault:
-          // no error framing, and the user decides whether to open it rather
-          // than being navigated there.
-          toaster.create({
-            title: "Scenario did not pass",
-            description:
-              "The run finished. Open it to see the criteria and the reasoning.",
-            type: "warning",
-            action: buildViewRunAction({
-              label: "View run",
-              scenarioRunId: result.scenarioRunId,
-              setId: returnedSetId,
-              batchRunId: returnedBatchRunId,
-              onRunFailed,
-            }),
-          });
-        } else if (result.error === "run_error") {
-          toaster.create({
-            title: "Scenario run failed",
-            description: "The scenario encountered an error during execution.",
-            type: "error",
-            action: buildViewRunAction({
-              label: "View failed run",
-              scenarioRunId: result.scenarioRunId,
-              setId: returnedSetId,
-              batchRunId: returnedBatchRunId,
-              onRunFailed,
-            }),
-          });
         } else {
-          toaster.create({
-            title: "Run timed out",
-            description:
-              "The scenario run took too long to start. Please try again.",
-            type: "error",
-          });
+          toaster.create(
+            buildRunOutcomeToast({
+              result,
+              setId: returnedSetId,
+              batchRunId: returnedBatchRunId,
+              onRunFailed,
+            }),
+          );
         }
       } catch (error) {
         showErrorToast({ error, fallbackTitle: "Couldn't start the scenario" });

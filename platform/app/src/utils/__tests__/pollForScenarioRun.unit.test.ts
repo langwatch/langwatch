@@ -12,27 +12,36 @@ import {
   type Mock,
   vi,
 } from "vitest";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import type {
+  BatchRunDataResult,
+  ScenarioRunData,
+} from "~/server/scenarios/scenario-event.types";
 import { pollForScenarioRun } from "../pollForScenarioRun";
 
-interface ScenarioRun {
-  scenarioRunId: string;
-  status?: string;
-  messages?: unknown[];
-}
-
-interface PollForRunParams {
+type FetchBatchRunData = (params: {
   projectId: string;
   scenarioSetId: string;
   batchRunId: string;
+}) => Promise<BatchRunDataResult>;
+
+/**
+ * A run as the server actually sends it. Built from the schema-derived type on
+ * purpose: a fixture that only carries the fields the poll happens to read can
+ * keep passing after the wire shape moves underneath it.
+ */
+function makeRun(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
+  return {
+    scenarioId: "scenario_123",
+    batchRunId: "batch_789",
+    scenarioRunId: "run_123",
+    status: ScenarioRunStatus.IN_PROGRESS,
+    messages: [],
+    timestamp: 1_700_000_000_000,
+    durationInMs: 0,
+    ...overrides,
+  };
 }
-
-type BatchRunDataResult =
-  | { changed: false }
-  | { changed: true; runs: ScenarioRun[] };
-
-type FetchBatchRunData = (
-  params: PollForRunParams,
-) => Promise<BatchRunDataResult>;
 
 describe("pollForScenarioRun", () => {
   const baseParams = {
@@ -56,11 +65,15 @@ describe("pollForScenarioRun", () => {
     // Given: a scenario run exists with IN_PROGRESS status and no messages
     fetchBatchRunData.mockResolvedValue({
       changed: true,
-      runs: [{ scenarioRunId: "run_123", status: "IN_PROGRESS", messages: [] }],
+      lastUpdatedAt: 1_700_000_000_000,
+      runs: [makeRun({ status: ScenarioRunStatus.IN_PROGRESS })],
     });
 
     // When: pollForScenarioRun fetches the batch run data
-    const resultPromise = pollForScenarioRun(fetchBatchRunData, baseParams);
+    const resultPromise = pollForScenarioRun({
+      fetchBatchRunData,
+      params: baseParams,
+    });
 
     // Need to flush promises since the first fetch is immediate
     await vi.advanceTimersByTimeAsync(0);
@@ -80,11 +93,15 @@ describe("pollForScenarioRun", () => {
     // Given: a scenario run exists with ERROR status
     fetchBatchRunData.mockResolvedValue({
       changed: true,
-      runs: [{ scenarioRunId: "run_123", status: "ERROR", messages: [] }],
+      lastUpdatedAt: 1_700_000_000_000,
+      runs: [makeRun({ status: ScenarioRunStatus.ERROR })],
     });
 
     // When: pollForScenarioRun fetches the batch run data
-    const resultPromise = pollForScenarioRun(fetchBatchRunData, baseParams);
+    const resultPromise = pollForScenarioRun({
+      fetchBatchRunData,
+      params: baseParams,
+    });
     await vi.advanceTimersByTimeAsync(0);
     const result = await resultPromise;
 
@@ -103,11 +120,15 @@ describe("pollForScenarioRun", () => {
     // way the run produced an outcome, which an execution error never does.
     fetchBatchRunData.mockResolvedValue({
       changed: true,
-      runs: [{ scenarioRunId: "run_123", status: "FAILED", messages: [] }],
+      lastUpdatedAt: 1_700_000_000_000,
+      runs: [makeRun({ status: ScenarioRunStatus.FAILED })],
     });
 
     // When: pollForScenarioRun fetches the batch run data
-    const resultPromise = pollForScenarioRun(fetchBatchRunData, baseParams);
+    const resultPromise = pollForScenarioRun({
+      fetchBatchRunData,
+      params: baseParams,
+    });
     await vi.advanceTimersByTimeAsync(0);
     const result = await resultPromise;
 
@@ -126,11 +147,15 @@ describe("pollForScenarioRun", () => {
     // Given: a run cancelled before it could produce an outcome
     fetchBatchRunData.mockResolvedValue({
       changed: true,
-      runs: [{ scenarioRunId: "run_123", status: "CANCELLED", messages: [] }],
+      lastUpdatedAt: 1_700_000_000_000,
+      runs: [makeRun({ status: ScenarioRunStatus.CANCELLED })],
     });
 
     // When: pollForScenarioRun fetches the batch run data
-    const resultPromise = pollForScenarioRun(fetchBatchRunData, baseParams);
+    const resultPromise = pollForScenarioRun({
+      fetchBatchRunData,
+      params: baseParams,
+    });
     await vi.advanceTimersByTimeAsync(0);
     const result = await resultPromise;
 
@@ -144,10 +169,17 @@ describe("pollForScenarioRun", () => {
 
   it("continues polling when no runs exist yet and times out", async () => {
     // Given: no scenario runs exist for the batchRunId
-    fetchBatchRunData.mockResolvedValue({ changed: true, runs: [] });
+    fetchBatchRunData.mockResolvedValue({
+      changed: true,
+      lastUpdatedAt: 1_700_000_000_000,
+      runs: [],
+    });
 
     // When: pollForScenarioRun is called
-    const resultPromise = pollForScenarioRun(fetchBatchRunData, baseParams);
+    const resultPromise = pollForScenarioRun({
+      fetchBatchRunData,
+      params: baseParams,
+    });
 
     // Advance timers to simulate the polling (30 seconds = 60 attempts at 500ms)
     for (let i = 0; i < 60; i++) {
@@ -168,11 +200,15 @@ describe("pollForScenarioRun", () => {
     // Given: a completed run with SUCCESS status
     fetchBatchRunData.mockResolvedValue({
       changed: true,
-      runs: [{ scenarioRunId: "run_123", status: "SUCCESS", messages: [] }],
+      lastUpdatedAt: 1_700_000_000_000,
+      runs: [makeRun({ status: ScenarioRunStatus.SUCCESS })],
     });
 
     // When: pollForScenarioRun fetches the batch run data
-    const resultPromise = pollForScenarioRun(fetchBatchRunData, baseParams);
+    const resultPromise = pollForScenarioRun({
+      fetchBatchRunData,
+      params: baseParams,
+    });
     await vi.advanceTimersByTimeAsync(0);
     const result = await resultPromise;
 
@@ -187,17 +223,20 @@ describe("pollForScenarioRun", () => {
     // Given: a run with messages but still IN_PROGRESS
     fetchBatchRunData.mockResolvedValue({
       changed: true,
+      lastUpdatedAt: 1_700_000_000_000,
       runs: [
-        {
-          scenarioRunId: "run_123",
-          status: "IN_PROGRESS",
-          messages: [{ role: "user", content: "Hello" }],
-        },
+        makeRun({
+          status: ScenarioRunStatus.IN_PROGRESS,
+          messages: [{ id: "msg_1", role: "user", content: "Hello" }],
+        }),
       ],
     });
 
     // When: pollForScenarioRun fetches the batch run data
-    const resultPromise = pollForScenarioRun(fetchBatchRunData, baseParams);
+    const resultPromise = pollForScenarioRun({
+      fetchBatchRunData,
+      params: baseParams,
+    });
     await vi.advanceTimersByTimeAsync(0);
     const result = await resultPromise;
 
