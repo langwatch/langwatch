@@ -699,7 +699,7 @@ EXEMPT_WORKLOADS=(
   # Same shape: the upgrade hooks scale the workers Deployment through the
   # Kubernetes API, so they need their token and a writable root. Only render
   # in local-filesystem stored-objects mode, which a strict cluster should not
-  # be running anyway — that mode shares one ReadWriteOnce volume between the
+  # be running anyway: that mode shares one ReadWriteOnce volume between the
   # app and the workers and is the documented hobby tier. Use app.dataplane.
   "templates/app/stored-objects-serialize-upgrade.yaml:app.storedObjects.localFilesystem.serializeUpgrades"
 )

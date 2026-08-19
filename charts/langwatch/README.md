@@ -191,7 +191,7 @@ A default install does **not** clear Pod Security Admission `restricted` on its
 own: four bundled components can't comply. On clusters that enforce it, add
 `examples/overlays/strict-admission.yaml`, which turns off the upstream
 Prometheus subchart, the Langy assistant (whose manager must run as root to
-give each worker its own UID — never force it non-root), the ClickHouse
+give each worker its own UID, never force it non-root), the ClickHouse
 preflight Job and the stored-objects upgrade hooks (both run kubectl, so they
 need a token and a writable root), plus the custom-metrics gateway HPA. Full
 details in

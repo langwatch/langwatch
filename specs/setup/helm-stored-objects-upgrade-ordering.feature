@@ -5,19 +5,19 @@ Feature: A chart upgrade moves one stored-objects volume consumer at a time
   so that my pods do not wedge in ContainerCreating on a multi-attach error.
 
   # Cross-references:
-  #   charts/langwatch/templates/app/stored-objects-pvc.yaml — the ReadWriteOnce
+  #   charts/langwatch/templates/app/stored-objects-pvc.yaml: the ReadWriteOnce
   #     volume, rendered only when local-filesystem is the active backend.
-  #   charts/langwatch/templates/app/stored-objects-serialize-upgrade.yaml — the
+  #   charts/langwatch/templates/app/stored-objects-serialize-upgrade.yaml: the
   #     pre-upgrade and post-upgrade hooks this feature describes.
-  #   charts/langwatch/templates/workers/deployment.yaml — the second consumer of
+  #   charts/langwatch/templates/workers/deployment.yaml: the second consumer of
   #     that volume, and the podAffinity that ties it to the app pod.
-  #   charts/langwatch/templates/_helpers.tpl —
+  #   charts/langwatch/templates/_helpers.tpl:
   #     langwatch.storedObjects.localFilesystemIsActive (the gate these hooks
   #     share with the PVC), langwatch.storedObjects.colocationAffinity, and
   #     langwatch.terminationGracePeriod (the shutdown budget the waits cover).
-  #   charts/langwatch/tests/stored-objects-upgrade-ordering.sh — the suite that
+  #   charts/langwatch/tests/stored-objects-upgrade-ordering.sh: the suite that
   #     renders the chart and asserts what this feature describes.
-  #   specs/event-sourcing/worker-graceful-shutdown.feature — where the 55 second
+  #   specs/event-sourcing/worker-graceful-shutdown.feature: where the 55 second
   #     grace period comes from.
   #
   # Context. In local-filesystem mode the app Deployment and the workers
