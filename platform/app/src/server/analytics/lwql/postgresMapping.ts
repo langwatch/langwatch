@@ -57,6 +57,11 @@ export interface PostgresNamedCollection {
  *
  * Dropped first rather than `IF NOT EXISTS`, so re-provisioning against a host
  * whose address has changed converges instead of silently keeping the old one.
+ *
+ * Not called from any production path in this repo: the real objects are owned
+ * by infra (langwatch-saas#1126). This is the reference implementation that
+ * terraform must match — keep it and its tests in sync, do not delete as dead
+ * code.
  */
 export function postgresNamedCollectionStatements({
   connection,
@@ -252,6 +257,11 @@ export const DEFAULT_POSTGRES_READER_LIMITS = {
  *
  * Idempotent: existence is settled once, then every property is converged with
  * `ALTER`, so re-provisioning an already-configured server is a no-op.
+ *
+ * Not called from any production path in this repo: the real role is owned by
+ * infra (langwatch-saas#1126). This is the reference implementation that
+ * terraform must match — keep it and its tests in sync, do not delete as dead
+ * code.
  */
 export function postgresReaderRoleStatements({
   reader,

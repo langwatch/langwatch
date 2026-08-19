@@ -72,7 +72,7 @@ describe("canonicalErrorFor", () => {
   });
 
   describe("given a handled error with a 4xx status", () => {
-    it("keeps shipping its own code and message, unaffected by the 5xx fix", () => {
+    it("keeps shipping its own code and message", () => {
       const { status, body } = canonicalErrorFor(
         new LangWatchQLNotEnabledError(),
       );

@@ -645,6 +645,11 @@ export function lwqlPostgresReaderConnectionLimit({
  *
  * Run before {@link lwqlViewSetupStatements}, which builds the LangWatchQL
  * views over them, and after the named collection exists.
+ *
+ * Not called from any production path in this repo: the real tables are owned
+ * by infra (langwatch-saas#1126). This is the reference implementation that
+ * terraform must match — keep it and its tests in sync, do not delete as dead
+ * code.
  */
 export function lwqlPostgresEngineTableStatements({
   names,

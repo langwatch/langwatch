@@ -742,7 +742,7 @@ describe("given the saved workbench chart REST endpoints", () => {
 
   describe("when a stored definition does not match the versioned schema", () => {
     /** @scenario "A stored definition this build cannot read is refused, not returned as data" */
-    it("refuses with its typed 500 rather than returning the raw stored payload", async () => {
+    it("refuses with the opaque 500 rather than returning the raw stored payload", async () => {
       const stored = await prisma.customGraph.create({
         data: {
           id: `chart-unreadable-${ns}`,

@@ -188,7 +188,10 @@ export default async function execute() {
         await client.command({ query: statement });
       } catch (error) {
         logger.error(
-          { error, statement: `${index + 1}/${statements.length}` },
+          {
+            error: error instanceof Error ? error.message : String(error),
+            statement: `${index + 1}/${statements.length}`,
+          },
           "lwql provisioning failed creating ClickHouse objects",
         );
         throw error;
