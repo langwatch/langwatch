@@ -11,10 +11,7 @@ import {
   datasetColumnsSchema,
 } from "~/server/datasets/types";
 import { api } from "~/utils/api";
-import {
-  keepDraftForSubFlow,
-  keepDraftOnSubFlowReturn,
-} from "../../state/subFlow";
+import { keepDraftOnSubFlowReturn } from "../../state/subFlow";
 import type { ClientDef, ConfigFormProps, SummaryIdentity } from "../types";
 
 /** A single dataset column's trace source. Mirrors the `traceMappingEntrySchema`
@@ -194,8 +191,8 @@ function DatasetConfigForm({
   /**
    * Hands over to the dataset drawer and returns with `goBack`, the way every
    * drawer-to-drawer step works. The automation draft lives in a singleton
-   * store, so it survives this drawer's unmount once the drawer is told the
-   * departure is a sub-flow rather than a close.
+   * store and the authoring drawer stays in the navigation stack, so the draft
+   * survives this drawer's unmount.
    *
    * `onClose` runs on both endings, so the return trip is written once. The
    * picker clears its selection before handing over, so an ending without a
@@ -206,7 +203,6 @@ function DatasetConfigForm({
     const previousDatasetId = slice.datasetId;
     let created = false;
 
-    keepDraftForSubFlow();
     openDrawer("addOrEditDataset", {
       onSuccess: ({
         datasetId,

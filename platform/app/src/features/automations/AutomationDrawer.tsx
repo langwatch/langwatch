@@ -32,7 +32,14 @@ import {
   type TemplateContext,
 } from "@langwatch/automations/templating/templateContext";
 import { Mail, Send } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
@@ -94,8 +101,8 @@ import {
   useSection,
 } from "./state/selectors";
 import {
-  consumeDraftKeptForSubFlow,
   consumeDraftKeptOnSubFlowReturn,
+  isInAutomationFlow,
 } from "./state/subFlow";
 
 /**
@@ -279,13 +286,13 @@ export function AutomationDrawer({
   const pushAttempt = useAutomationStore((s) => s.pushTestAttempt);
   const testHistory = useAutomationStore((s) => s.testHistory);
 
-  // Wipe the singleton store on unmount — next open is a fresh slate. A
-  // sub-flow (creating a dataset) unmounts this drawer the same way closing
-  // it does, so the draft is kept when the drawer announced it is coming
-  // back through goBack.
+  // Wipe the singleton store when the drawer really closes, so the next open
+  // never paints the previous draft. A sub-flow (creating a dataset) unmounts
+  // this drawer the same way closing it does, so the drawer stack decides
+  // which of the two just happened.
   useEffect(
     () => () => {
-      if (consumeDraftKeptForSubFlow()) return;
+      if (isInAutomationFlow()) return;
       reset();
     },
     [reset],
@@ -295,7 +302,15 @@ export function AutomationDrawer({
   // The departure above skips its reset, so a sub-flow the user walks away
   // from (navigating elsewhere while the dataset drawer is open) would leave
   // that draft in the store and seed the next new automation with it.
-  useEffect(() => {
+  //
+  // Latched in a ref, and before paint: the return intent is one-shot, and
+  // StrictMode replays this effect in development. A replay that read the
+  // intent a second time would find it spent and blank the draft that just
+  // came back.
+  const decidedOnMountDraft = useRef(false);
+  useLayoutEffect(() => {
+    if (decidedOnMountDraft.current) return;
+    decidedOnMountDraft.current = true;
     if (consumeDraftKeptOnSubFlowReturn()) return;
     reset();
     // Mount only: running this again would wipe the draft being written.
