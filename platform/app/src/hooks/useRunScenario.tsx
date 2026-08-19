@@ -66,6 +66,11 @@ function buildViewRunAction({
  * this module: a run that did not pass produced an outcome, a run that errored
  * produced nothing, and a timeout means nothing became visible at all. Lives
  * outside the hook so the run callback stays about running the scenario.
+ *
+ * Note this is the only one of ~411 `toaster.create` call sites in the app that
+ * passes a built config rather than an inline literal. That is not style: three
+ * inline toasts put `runScenario` over `noExcessiveLinesPerFunction` (max 60)
+ * and CI's Biome gate rejects it. Inlining these back will fail lint.
  */
 function buildRunOutcomeToast({
   result,
