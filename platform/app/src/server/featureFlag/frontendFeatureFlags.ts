@@ -51,6 +51,12 @@
  */
 export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_ai_gateway_menu_enabled",
+  // Product-scoped navigation shells (product-switcher / icon-rail) plus
+  // the avatar-menu mode picker. The flag unlocks the picker; the
+  // per-device mode in localStorage decides which shell renders. Flag off
+  // or mode legacy = the current chrome, unchanged. See
+  // specs/navigation/navigation-modes.feature and useNavigationMode.
+  "release_ui_navigation_v2_enabled",
   // Governance: gates the personal-keys / admin oversight /
   // RoutingPolicy / IngestionSource UI surfaces. On by default
   // (ADR-038 Decision 7); SaaS rollout and per-org kill switches live

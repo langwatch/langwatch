@@ -1,5 +1,5 @@
 /**
- * Governed analytics SQL — the mounted app.
+ * LangWatchQL analytics SQL — the mounted app.
  *
  * `basePath` is `/api/v1/projects` because issue #6480 names the endpoints
  * under it; the directory this file sits in is only where the repo keeps route
@@ -17,7 +17,7 @@
 import { createProjectApp } from "~/server/api/security";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { registerSavedWorkbenchChartRoutes } from "./app.charts.v1";
-import { registerGovernedSqlRoutes } from "./app.v1";
+import { registerLangWatchQLRoutes } from "./app.v1";
 
 patchZodOpenapi();
 
@@ -28,7 +28,7 @@ const secured = createProjectApp({
   errorEnvelope: "canonical",
 });
 
-registerGovernedSqlRoutes(secured);
+registerLangWatchQLRoutes(secured);
 registerSavedWorkbenchChartRoutes(secured);
 
 export const app = secured.hono;

@@ -40,6 +40,29 @@
 import { z } from "zod";
 
 /**
+ * Matches `wireMoney.ts`'s DECIMAL_PATTERN — the same shape `usdToNanoUsd`
+ * accepts. Anchored so the schema rejects values the downstream converter
+ * would throw on (`"banana"`, `"0x1a"`, etc.) at the parse boundary instead
+ * of deep in the pricing service.
+ */
+const COST_USD_PATTERN = /^[+-]?\d*(?:\.\d*)?(?:[eE][+-]?\d+)?$/;
+
+/** Validates and stringifies a cost_usd value at the Zod boundary. */
+const costUsdSchema = z
+  .union([z.string(), z.number()])
+  .transform((v) => {
+    const s = String(v).trim();
+    if (s === "" || s === "0" || s === "0.0") return "0";
+    if (!COST_USD_PATTERN.test(s)) return "0";
+    // Reject negative costs — adapters currently only produce non-negative.
+    // If credits/refunds are needed, this guard should be removed explicitly.
+    const n = Number(s);
+    if (!Number.isFinite(n) || n < 0) return "0";
+    return s;
+  })
+  .default("0");
+
+/**
  * Canonical event shape produced by every adapter. Downstream code
  * (worker handoff to trace-store) doesn't care which adapter produced
  * the event — it only cares about this canonical shape. New fields
@@ -57,8 +80,10 @@ export const normalizedPullEventSchema = z.object({
   action: z.string(),
   /** Target of the action (e.g. model name, tool name, document id). */
   target: z.string(),
-  /** USD cost (0 if the source doesn't expose it). */
-  cost_usd: z.number().nonnegative().default(0),
+  /** USD cost as a decimal string ("0" if the source doesn't expose it).
+   *  Kept as a string so sub-cent amounts survive without float rounding.
+   *  Validated against DECIMAL_PATTERN and nonnegative at the parse boundary. */
+  cost_usd: costUsdSchema,
   /** Input tokens (0 if unknown). */
   tokens_input: z.number().nonnegative().int().default(0),
   /** Output tokens (0 if unknown). */

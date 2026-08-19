@@ -8,7 +8,10 @@ import type {
   TeamBindingWrite,
 } from "../authz-migration.repository";
 import type { AuthzAuditWriter, AuthzEpochBumper } from "../grants.service";
+import { grantFactToCompatBinding } from "../ledger/projection-mapping";
 import {
+  type BackfillGrantEmission,
+  type GrantsLedgerEmitter,
   TeamUserBackfillMigration,
   type TeamUserBackfillDeps,
 } from "../team-user-backfill.migration";
@@ -17,6 +20,7 @@ const ORG = "org_acme";
 const TEAM = "team_support";
 const PROJECT = "proj_chatbot";
 const SAM = "user_sam";
+const CREATED_AT_MS = 1_700_000_000_000;
 
 class FakeMigrationRepository implements AuthzMigrationRepository {
   legacyRows: LegacyTeamRow[] = [];
@@ -37,29 +41,83 @@ class FakeMigrationRepository implements AuthzMigrationRepository {
 
   async createTeamBindings(rows: TeamBindingWrite[]): Promise<number> {
     this.createCalls.push(rows);
-    let created = 0;
-    for (const row of rows) {
-      const exists = this.bindings.some(
-        (binding) =>
-          binding.userId === row.userId &&
-          binding.teamId === row.teamId &&
-          binding.role === row.role &&
-          binding.customRoleId === row.customRoleId,
-      );
-      if (exists) continue;
-      this.bindings.push({
-        userId: row.userId,
-        teamId: row.teamId,
-        role: row.role,
-        customRoleId: row.customRoleId,
-      });
-      created += 1;
-    }
-    return created;
+    return rows.length;
   }
 
   async findOrganizationScopeInventory(): Promise<OrganizationScopeInventory> {
     return this.inventory;
+  }
+}
+
+/**
+ * The ledger as the migration sees it: attach commands land as compat rows
+ * through the REAL grantFactToCompatBinding mapping - the same reshaping
+ * the projection store performs - so what the tests observe is what the
+ * legacy resolver would read after the projection converges.
+ */
+class FakeLedger implements GrantsLedgerEmitter {
+  attachCalls: Array<{
+    organizationId: string;
+    commandId: string;
+    grants: BackfillGrantEmission[];
+  }> = [];
+  parityCalls: Array<{
+    organizationId: string;
+    commandId: string;
+    diffs: string[];
+    occurredAtMs: number;
+  }> = [];
+  /** Flip off to simulate a projection that never lands its rows. */
+  shouldProjectionConverge = true;
+
+  constructor(private readonly repository: FakeMigrationRepository) {}
+
+  async attachGrants(args: {
+    organizationId: string;
+    commandId: string;
+    grants: BackfillGrantEmission[];
+  }): Promise<void> {
+    this.attachCalls.push(args);
+    if (!this.shouldProjectionConverge) return;
+    for (const grant of args.grants) {
+      const row = grantFactToCompatBinding({
+        grant,
+        organizationId: args.organizationId,
+      });
+      if (!row || row.userId === null) continue;
+      this.repository.bindings.push({
+        userId: row.userId,
+        teamId: row.scopeId,
+        role: row.role,
+        customRoleId: row.customRoleId,
+      });
+    }
+  }
+
+  /** The backfill defines no roles; the genesis import is what uses this. */
+  async defineRoles(): Promise<void> {
+    throw new Error("the backfill defines no roles");
+  }
+
+  /** The backfill revokes nothing; the genesis import's deny-direction
+   *  sweep is what uses this. */
+  async revokeGrants(): Promise<void> {
+    throw new Error("the backfill revokes no grants");
+  }
+
+  /** The backfill deletes no roles; the genesis import's deny-direction
+   *  sweep is what uses this. */
+  async deleteRole(): Promise<void> {
+    throw new Error("the backfill deletes no roles");
+  }
+
+  async proveMigrationParity(args: {
+    organizationId: string;
+    commandId: string;
+    diffs: string[];
+    occurredAtMs: number;
+  }): Promise<void> {
+    this.parityCalls.push(args);
   }
 }
 
@@ -115,36 +173,46 @@ function grantsFor({
 
 describe("TeamUserBackfillMigration", () => {
   let repository: FakeMigrationRepository;
+  let ledger: FakeLedger;
   let audit: AuthzAuditWriter;
   let bumpEpoch: AuthzEpochBumper;
-  let ids: number;
 
-  const migrationWith = (collectGrants: TeamUserBackfillDeps["collectGrants"]) =>
+  const migrationWith = (
+    collectGrants: TeamUserBackfillDeps["collectGrants"],
+  ) =>
     new TeamUserBackfillMigration({
       repository,
       collectGrants,
+      ledger,
       audit,
       bumpEpoch,
-      newBindingId: () => `rb_${(ids += 1)}`,
+      now: () => Date.now(),
+      poll: { intervalMs: 1, timeoutMs: 50 },
     });
 
   beforeEach(() => {
     repository = new FakeMigrationRepository();
+    ledger = new FakeLedger(repository);
     audit = vi.fn(async () => undefined);
     bumpEpoch = vi.fn(async () => undefined);
-    ids = 0;
   });
 
   describe("given a user whose membership exists only as a legacy team row", () => {
     beforeEach(() => {
       repository.legacyRows = [
-        { userId: SAM, teamId: TEAM, role: "ADMIN", customRoleId: "cr_1" },
+        {
+          userId: SAM,
+          teamId: TEAM,
+          role: "ADMIN",
+          customRoleId: "cr_1",
+          createdAtMs: CREATED_AT_MS,
+        },
       ];
     });
 
     describe("when the migration processes the organization", () => {
       /** @scenario "A legacy team row gains an equivalent team-scoped binding" */
-      it("creates a team-scoped binding carrying the same role and custom role", async () => {
+      it("emits a team-scoped grant the projection lands as an equivalent binding", async () => {
         const migration = migrationWith(async ({ principal }) =>
           grantsFor({
             repository,
@@ -164,16 +232,33 @@ describe("TeamUserBackfillMigration", () => {
 
         await migration.migrateTenant({ tenantId: ORG });
 
-        expect(repository.createCalls).toHaveLength(1);
-        expect(repository.createCalls[0]).toEqual([
+        expect(ledger.attachCalls).toHaveLength(1);
+        expect(ledger.attachCalls[0]).toMatchObject({
+          organizationId: ORG,
+          commandId: `backfill-b:${ORG}:0`,
+        });
+        expect(ledger.attachCalls[0]!.grants).toEqual([
           expect.objectContaining({
-            organizationId: ORG,
+            principal: { type: "user", id: SAM },
+            scope: { type: "TEAM", id: TEAM },
+            // The custom role IS the row's identity, so it rides in the
+            // roleKey; the compat head lands it as (CUSTOM, cr_1).
+            roleKey: "custom:cr_1",
+            source: "backfill-b",
+            // Business time is the legacy row's own createdAt.
+            occurredAtMs: CREATED_AT_MS,
+          }),
+        ]);
+        expect(repository.bindings).toEqual([
+          expect.objectContaining({
             userId: SAM,
             teamId: TEAM,
-            role: "ADMIN",
             customRoleId: "cr_1",
           }),
         ]);
+        // The ledger is the only writer - the migration never touches the
+        // tables directly any more.
+        expect(repository.createCalls).toHaveLength(0);
       });
 
       /** @scenario "The backfill bumps the organization's authorization epoch once" */
@@ -215,7 +300,7 @@ describe("TeamUserBackfillMigration", () => {
 
     describe("when the migration processes the organization twice", () => {
       /** @scenario "Running the backfill twice creates nothing new" */
-      it("creates no additional bindings and emits no second audit event", async () => {
+      it("emits no second command and no second audit event", async () => {
         const migration = migrationWith(async ({ principal }) =>
           grantsFor({
             repository,
@@ -236,7 +321,7 @@ describe("TeamUserBackfillMigration", () => {
         await migration.migrateTenant({ tenantId: ORG });
         await migration.migrateTenant({ tenantId: ORG });
 
-        expect(repository.createCalls).toHaveLength(1);
+        expect(ledger.attachCalls).toHaveLength(1);
         expect(repository.bindings).toHaveLength(1);
         expect(audit).toHaveBeenCalledTimes(1);
         expect(bumpEpoch).toHaveBeenCalledTimes(1);
@@ -245,11 +330,10 @@ describe("TeamUserBackfillMigration", () => {
 
     describe("when a custom-role binding already exists under a different role", () => {
       /** @scenario "A custom role already bound at the team is recognised, whatever its role column says" */
-      it("recognises it instead of attempting an insert the database would drop", async () => {
+      it("recognises it instead of emitting a grant for a fact that has one", async () => {
         // The custom-role unique index is (userId, customRoleId, scopeType,
         // scopeId) - `role` is not in it. Treating role as part of identity
-        // would queue a write that skipDuplicates silently discards, and
-        // report it as created.
+        // would attach a second grant for the same stored fact.
         repository.bindings = [
           {
             userId: SAM,
@@ -277,13 +361,55 @@ describe("TeamUserBackfillMigration", () => {
 
         await migration.migrateTenant({ tenantId: ORG });
 
-        expect(repository.createCalls).toHaveLength(0);
+        expect(ledger.attachCalls).toHaveLength(0);
       });
     });
 
-    describe("when the previous attempt committed its bindings then parked", () => {
+    describe("when a legacy row is CUSTOM with no custom role", () => {
+      it("recognises the row the projection wrote back instead of parking", async () => {
+        // `roleKeyForTeamRole` is lossy: CUSTOM and VIEWER both map to
+        // `viewer`, so this row projects back as VIEWER. Compared on the raw
+        // enum the emitted row is never recognised, and the organization
+        // times out into `parked` on this pass and every pass after it.
+        repository.legacyRows = [
+          {
+            userId: SAM,
+            teamId: TEAM,
+            role: "CUSTOM",
+            customRoleId: null,
+            createdAtMs: CREATED_AT_MS,
+          },
+        ];
+        const migration = migrationWith(async ({ principal }) =>
+          grantsFor({
+            repository,
+            userId: principal.id,
+            organizationRole: "ADMIN",
+            orgAdminBinding: true,
+            legacy: [
+              {
+                teamId: TEAM,
+                role: "CUSTOM",
+                customRoleId: null,
+                isPersonal: false,
+              },
+            ],
+          }),
+        );
+
+        const result = await migration.migrateTenant({ tenantId: ORG });
+
+        expect(result.status).toBe("finalized");
+        expect(ledger.attachCalls).toHaveLength(1);
+        // And the retry sees its own work: no second emission.
+        await migration.migrateTenant({ tenantId: ORG });
+        expect(ledger.attachCalls).toHaveLength(1);
+      });
+    });
+
+    describe("when the previous attempt appended its events then parked", () => {
       /** @scenario "A migration that died after writing publishes its work on the retry" */
-      it("bumps the epoch again so the stranded writes become visible", async () => {
+      it("bumps the epoch again so the stranded rows become visible", async () => {
         const migration = migrationWith(async ({ principal }) =>
           grantsFor({
             repository,
@@ -301,13 +427,13 @@ describe("TeamUserBackfillMigration", () => {
           }),
         );
 
-        // First pass writes the bindings; imagine it died on the bump.
+        // First pass appends and lands the rows; imagine it died on the bump.
         await migration.migrateTenant({ tenantId: ORG });
         vi.mocked(bumpEpoch).mockClear();
 
-        // The retry finds nothing missing - `createMany` skipped the
-        // duplicates - so without the parked signal it would return early
-        // and the epoch would stay stale forever.
+        // The retry finds nothing missing - the projection already landed
+        // the rows - so without the parked signal it would return early and
+        // the epoch would stay stale forever.
         await migration.migrateTenant({
           tenantId: ORG,
           previous: {
@@ -318,9 +444,25 @@ describe("TeamUserBackfillMigration", () => {
           },
         });
 
-        expect(repository.createCalls).toHaveLength(1);
+        expect(ledger.attachCalls).toHaveLength(1);
         expect(bumpEpoch).toHaveBeenCalledTimes(1);
         expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
+      });
+    });
+
+    describe("when the projection never lands the emitted rows", () => {
+      it("parks the organization instead of sweeping against missing rows", async () => {
+        ledger.shouldProjectionConverge = false;
+        const migration = migrationWith(async () => {
+          throw new Error("sweep must not run");
+        });
+
+        await expect(
+          migration.migrateTenant({ tenantId: ORG }),
+        ).rejects.toThrow(/did not land/);
+        // No audit line for work that never became visible.
+        expect(audit).not.toHaveBeenCalled();
+        expect(bumpEpoch).not.toHaveBeenCalled();
       });
     });
 
@@ -335,6 +477,7 @@ describe("TeamUserBackfillMigration", () => {
             teamId: TEAM,
             role: "ADMIN",
             customRoleId: "cr_1",
+            createdAtMs: CREATED_AT_MS,
           },
         ];
         const controller = new AbortController();
@@ -365,6 +508,7 @@ describe("TeamUserBackfillMigration", () => {
             signal: controller.signal,
           }),
         ).rejects.toThrow(/aborted/);
+        expect(ledger.parityCalls).toHaveLength(0);
       });
     });
   });
@@ -373,7 +517,13 @@ describe("TeamUserBackfillMigration", () => {
     /** @scenario "Personal workspace teams keep their bindings team-scoped" */
     it("backfills a binding scoped to the personal team and nothing broader", async () => {
       repository.legacyRows = [
-        { userId: SAM, teamId: "team_personal", role: "ADMIN", customRoleId: null },
+        {
+          userId: SAM,
+          teamId: "team_personal",
+          role: "ADMIN",
+          customRoleId: null,
+          createdAtMs: CREATED_AT_MS,
+        },
       ];
       repository.inventory = {
         teamIds: ["team_personal"],
@@ -398,6 +548,12 @@ describe("TeamUserBackfillMigration", () => {
 
       const outcome = await migration.migrateTenant({ tenantId: ORG });
 
+      expect(ledger.attachCalls[0]?.grants).toEqual([
+        expect.objectContaining({
+          scope: { type: "TEAM", id: "team_personal" },
+          roleKey: "admin",
+        }),
+      ]);
       expect(repository.bindings).toEqual([
         expect.objectContaining({ userId: SAM, teamId: "team_personal" }),
       ]);
@@ -407,9 +563,15 @@ describe("TeamUserBackfillMigration", () => {
 
   describe("when every member's decisions agree with and without legacy rows", () => {
     /** @scenario "Legacy membership rows resolve identically before finalization" */
-    it("finalizes the organization with the sweep's evidence", async () => {
+    it("finalizes the organization and records the clean proof as a fact", async () => {
       repository.legacyRows = [
-        { userId: SAM, teamId: TEAM, role: "ADMIN", customRoleId: null },
+        {
+          userId: SAM,
+          teamId: TEAM,
+          role: "ADMIN",
+          customRoleId: null,
+          createdAtMs: CREATED_AT_MS,
+        },
       ];
       const collectGrants = vi.fn(async ({ principal }) =>
         grantsFor({
@@ -436,6 +598,13 @@ describe("TeamUserBackfillMigration", () => {
         principal: { type: "user", id: SAM },
         organizationId: ORG,
       });
+      expect(ledger.parityCalls).toEqual([
+        expect.objectContaining({
+          organizationId: ORG,
+          commandId: `backfill-b:parity:${ORG}`,
+          diffs: [],
+        }),
+      ]);
     });
   });
 
@@ -443,7 +612,13 @@ describe("TeamUserBackfillMigration", () => {
     /** @scenario "An organization relying on the legacy org-level union is held, not broken" */
     it("holds the organization as migrated with the disagreements in its report", async () => {
       repository.legacyRows = [
-        { userId: SAM, teamId: TEAM, role: "ADMIN", customRoleId: null },
+        {
+          userId: SAM,
+          teamId: TEAM,
+          role: "ADMIN",
+          customRoleId: null,
+          createdAtMs: CREATED_AT_MS,
+        },
       ];
       // No ORGANIZATION-scoped binding: the legacy org-level union is the
       // only source of this user's org-scope answers.
@@ -479,12 +654,20 @@ describe("TeamUserBackfillMigration", () => {
         allowedWithLegacy: true,
         allowedWithoutLegacy: false,
       });
+      // No proof fact for an unfinished argument.
+      expect(ledger.parityCalls).toHaveLength(0);
     });
 
     /** @scenario "A held organization heals itself once the gap is granted" */
     it("finalizes on a later pass once an organization-scoped binding closes the gap", async () => {
       repository.legacyRows = [
-        { userId: SAM, teamId: TEAM, role: "ADMIN", customRoleId: null },
+        {
+          userId: SAM,
+          teamId: TEAM,
+          role: "ADMIN",
+          customRoleId: null,
+          createdAtMs: CREATED_AT_MS,
+        },
       ];
       let orgAdminBinding = false;
       const migration = migrationWith(async ({ principal }) =>
@@ -509,17 +692,20 @@ describe("TeamUserBackfillMigration", () => {
   });
 
   describe("when the organization has no legacy rows at all", () => {
-    it("finalizes immediately without writes, audits, or epoch bumps", async () => {
+    it("finalizes immediately without emissions, audits, or epoch bumps", async () => {
       const collectGrants = vi.fn();
       const migration = migrationWith(collectGrants);
 
       const outcome = await migration.migrateTenant({ tenantId: ORG });
 
       expect(outcome.status).toBe("finalized");
-      expect(repository.createCalls).toHaveLength(0);
+      expect(ledger.attachCalls).toHaveLength(0);
       expect(audit).not.toHaveBeenCalled();
       expect(bumpEpoch).not.toHaveBeenCalled();
       expect(collectGrants).not.toHaveBeenCalled();
+      // The trivially clean proof is still recorded - the cutover
+      // projection gets its provedAt for empty organizations too.
+      expect(ledger.parityCalls).toHaveLength(1);
     });
   });
 });

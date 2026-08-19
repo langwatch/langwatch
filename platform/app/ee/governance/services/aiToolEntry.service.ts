@@ -7,7 +7,7 @@ import { z } from "zod";
  *
  * The portal lives at /me as a card grid (3 sections - coding
  * assistants, model providers, external tools) and is managed by org
- * admins at /settings/governance/tool-catalog.
+ * admins at /governance/tool-catalog.
  *
  * Scoping (read resolution):
  *   - org-scoped entries ("scope":"organization") are visible to ALL

@@ -98,7 +98,6 @@ export function useTextTranslation({
             description:
               "There was an error translating the message, please try again.",
             type: "error",
-            meta: { closable: true },
           });
         }
       })

@@ -1,3 +1,4 @@
+import type { LedgerActor } from "@langwatch/authz-server";
 import type {
   Group,
   GroupMembership,
@@ -36,6 +37,15 @@ export interface CreateGroupInput {
   slug: string;
 }
 
+/**
+ * A binding write's echo. The ledger owns the row now, so a write answers
+ * with the fact it emitted rather than with a database row it did not write.
+ */
+export type CreatedBinding = Pick<
+  RoleBinding,
+  "id" | "role" | "customRoleId" | "scopeType" | "scopeId"
+>;
+
 export interface CreateBindingInput {
   id: string;
   organizationId: string;
@@ -69,6 +79,7 @@ export interface GroupRepository {
     group: CreateGroupInput;
     bindings: CreateBindingInput[];
     memberIds: string[];
+    actor: LedgerActor;
   }): Promise<Group>;
 
   rename(params: {
@@ -100,18 +111,29 @@ export interface GroupRepository {
     Array<RoleBinding & { customRole: { id: string; name: string } | null }>
   >;
 
-  createBinding(data: CreateBindingInput): Promise<RoleBinding>;
+  createBinding(params: {
+    data: CreateBindingInput;
+    actor: LedgerActor;
+  }): Promise<CreatedBinding>;
 
   findBinding(params: {
     id: string;
     organizationId: string;
   }): Promise<RoleBinding | null>;
 
-  deleteBinding(params: { id: string }): Promise<void>;
+  deleteBinding(params: {
+    id: string;
+    organizationId: string;
+    actor: LedgerActor;
+  }): Promise<void>;
 
   deleteAllMemberships(params: { groupId: string }): Promise<void>;
 
-  deleteAllBindings(params: { groupId: string }): Promise<void>;
+  deleteAllBindings(params: {
+    groupId: string;
+    organizationId: string;
+    actor: LedgerActor;
+  }): Promise<void>;
 
   isUserInOrganization(params: {
     userId: string;

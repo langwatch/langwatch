@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createNoNetworkVegaLoader,
-  GovernedVegaLoadBlockedError,
+  LangWatchQLVegaLoadBlockedError,
   redactResourceReference,
 } from "../noNetworkVegaLoader";
 
@@ -23,11 +23,11 @@ import {
  */
 const refusalFrom = async (
   attempt: () => Promise<unknown>,
-): Promise<GovernedVegaLoadBlockedError> => {
+): Promise<LangWatchQLVegaLoadBlockedError> => {
   try {
     await attempt();
   } catch (raised) {
-    if (raised instanceof GovernedVegaLoadBlockedError) return raised;
+    if (raised instanceof LangWatchQLVegaLoadBlockedError) return raised;
     throw raised;
   }
   throw new Error("the loader resolved the load instead of refusing it");

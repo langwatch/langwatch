@@ -158,7 +158,6 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     toaster.create({
       title: isEditing ? "Code evaluator saved" : "Code evaluator created",
       type: "success",
-      meta: { closable: true },
     });
     const onSave =
       getFlowCallbacks("codeEvaluatorEditor")?.onSave ??

@@ -14,61 +14,105 @@ import { AlertCircle, CheckCircle2, Info, TriangleAlert } from "lucide-react";
 import { ErrorActions } from "~/features/errors/components/ErrorActions";
 
 const toaster_ = createToaster({
-  placement: "top-end",
+  placement: "bottom",
   pauseOnPageIdle: true,
 });
+
+/**
+ * `closable` is not an option: the Toaster renders the close button on every
+ * toast unconditionally, so no call site can create a toast the user cannot
+ * dismiss.
+ */
+type ToastCreateArgs = Omit<Parameters<typeof toaster_.create>[0], "meta"> & {
+  meta?: Record<string, unknown> & { closable?: never };
+};
 
 // Workaround for https://github.com/chakra-ui/chakra-ui/issues/9490#issuecomment-2601014577
 export const toaster = {
   ...toaster_,
-  create: (args: Parameters<typeof toaster_.create>[0]) => {
+  create: (args: ToastCreateArgs) => {
     return toaster_.create({
       duration: 5000,
       ...args,
       meta: {
         ...args.meta,
-        placement: "top-end",
+        placement: "bottom",
       },
     });
   },
 };
 
 /**
- * The status colour, spent on the small icon and on the action.
+ * The status colour, spent on the small icon and on the action, and whether
+ * the status arrives on a solid fill.
  *
  * The action carries the accent, and on a toast that already reads as good news
  * the warm accent reads as a warning about it. So a success toast's action wears
  * the same green its icon does, and every other status keeps the accent.
  */
 const STATUS = {
-  error: { fg: "red.fg", action: "orange.fg" },
-  warning: { fg: "yellow.fg", action: "orange.fg" },
-  success: { fg: "green.fg", action: "green.fg" },
-  info: { fg: "fg.muted", action: "orange.fg" },
-  loading: { fg: "fg.muted", action: "orange.fg" },
+  error: { fg: "red.fg", action: "orange.fg", filled: true },
+  warning: { fg: "yellow.fg", action: "orange.fg", filled: true },
+  success: { fg: "green.fg", action: "green.fg", filled: true },
+  info: { fg: "fg.muted", action: "orange.fg", filled: false },
+  loading: { fg: "fg.muted", action: "orange.fg", filled: false },
 } as const;
 
 type ToastStatus = keyof typeof STATUS;
 
+/**
+ * A toast is created with no type at all, or with one this shell does not
+ * paint. Both read as information.
+ */
 const statusOf = (type: string | undefined): ToastStatus =>
   type && type in STATUS ? (type as ToastStatus) : "info";
+
+/**
+ * The height of the title's line, which the icon and the close button both
+ * centre on. It keeps the three on one axis, and a one-line toast as tall as
+ * one line.
+ */
+const TITLE_LINE = "5";
+
+/**
+ * A colour to use on the panel, dropped where the toast arrives on a solid
+ * fill: there the fill sets a contrast colour and everything on it inherits
+ * that, since an accent has nothing to sit on. Only the three status toasts
+ * are filled, and only in light mode — info and loading are a card throughout,
+ * so they keep their colours as they are.
+ */
+const onPanelOnly = (status: ToastStatus, color: string) =>
+  STATUS[status].filled ? { _light: "inherit", _dark: color } : color;
 
 /**
  * The colour a toast's action reads in. Exported because it is the whole of the
  * rule: on a toast that already says something went right, the warm accent
  * reads as a warning about it, so success spends its own green there.
  */
-export const toastActionColor = (type: string | undefined): string =>
-  STATUS[statusOf(type)].action;
+export const toastActionColor = (type: string | undefined) => {
+  const status = statusOf(type);
+  return onPanelOnly(status, STATUS[status].action);
+};
 
+/**
+ * The status, said once, in a small glyph on the title's line. A loading toast
+ * spins instead, since it reports something still running rather than an
+ * outcome.
+ */
 function StatusIcon({ status }: { status: ToastStatus }) {
   const { fg } = STATUS[status];
   const size = 15;
 
   return (
-    <Box color={fg} display="flex" flexShrink={0} marginTop="1px">
+    <Box
+      color={onPanelOnly(status, fg)}
+      display="flex"
+      alignItems="center"
+      height={TITLE_LINE}
+      flexShrink={0}
+    >
       {status === "loading" ? (
-        <Spinner size="xs" color="fg.muted" />
+        <Spinner size="xs" color="inherit" />
       ) : status === "success" ? (
         <CheckCircle2 size={size} aria-hidden="true" />
       ) : status === "error" ? (
@@ -83,19 +127,15 @@ function StatusIcon({ status }: { status: ToastStatus }) {
 }
 
 /**
- * Toasts are surface cards, not coloured slabs.
+ * Every toast carries a close button, a status icon, and whatever the caller
+ * gave it: title, description, the docs link and error id of a handled error,
+ * and one action.
  *
- * The old shell used Chakra's filled variants: a saturated red rectangle with
- * white text for every failure. That shouts, and it makes the message harder
- * to read than the colour it is painted on. This follows the language Langy
- * already established (`features/asaplangy/tokens.ts`,
- * `features/langy/components/LangyError.tsx`): the panel material, ONE
- * hairline carrying the status tone, the status colour spent on a small icon,
- * and the accent reserved for the action. An error still reads in the
- * interface's voice — it says what happened and offers the way forward.
- *
- * The material itself — surface, radius, padding, type and the per-status
- * hairline — is the `toast` slot recipe in `pages/_app.tsx`.
+ * Light mode wears Chakra's filled toast, dark mode a panel with one hairline
+ * in the status tone. That split, and the material itself — surface, radius,
+ * padding and type — is the `toast` slot recipe in `pages/_app.tsx`; what
+ * changes with it here is the colour of the icon and of the action, which have
+ * a fill to sit on in one mode and not the other.
  */
 export const Toaster = () => {
   return (
@@ -126,6 +166,8 @@ export const Toaster = () => {
                     that every handled error offers. Plain `toaster.create` calls
                     leave these unset and render nothing here. */}
                 <ErrorActions
+                  color={onPanelOnly(status, "fg.subtle")}
+                  accentColor={onPanelOnly(status, "orange.fg")}
                   docsUrl={
                     typeof toast.meta?.docsUrl === "string"
                       ? toast.meta.docsUrl
@@ -143,21 +185,31 @@ export const Toaster = () => {
                     alignSelf="flex-start"
                     fontSize="12px"
                     fontWeight="560"
-                    color={toastActionColor(toast.type)}
+                    // Through `css`, not the `color` prop: the trigger renders a
+                    // button, whose own `color` attribute types this as a plain
+                    // string and rejects a per-mode value.
+                    css={{ color: toastActionColor(toast.type) }}
                   >
                     {toast.action.label}
                   </Toast.ActionTrigger>
                 )}
               </Stack>
 
-              {toast.meta?.closable && (
-                <Toast.CloseTrigger
-                  position="static"
-                  flexShrink={0}
-                  color="fg.subtle"
-                  _hover={{ color: "fg" }}
-                />
-              )}
+              {/* In the row rather than absolutely placed, which is what lets
+                  it keep the same inset as the status icon opposite it. Sized
+                  to the title's line so it cannot make the toast taller than
+                  its text, and top-aligned so it stays beside the title on a
+                  toast that runs to several lines. Chakra's own
+                  `currentColor/60` carries it on the fill and on the panel
+                  alike. */}
+              <Toast.CloseTrigger
+                position="static"
+                alignSelf="flex-start"
+                boxSize={TITLE_LINE}
+                padding={0}
+                flexShrink={0}
+                _hover={{ color: "currentColor" }}
+              />
             </Toast.Root>
           );
         }}

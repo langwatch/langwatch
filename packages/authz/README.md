@@ -15,12 +15,12 @@ The design is three layers, app-layer service/repository idiom throughout:
   `AuthzService` (with the epoch cache inside), `GrantsService`,
   `AuthzShadowService` - all written against two repository INTERFACES
   (`AuthzReadRepository`, `AuthzGrantsRepository`). No storage engine.
-- **the app** (`platform/app/src/server/authz/`) - the Prisma repository
+- **the app** (`platform/app/src/server/app-layer/authz/`) - the Prisma repository
   implementations (`repositories/*.prisma.repository.ts`), the redis epoch
   store, the tRPC middleware, and `runtime.ts`: the composition root that
   builds ONE of each service and exports `authz`, `authzCollector` and
   `grantsService()`. The shadow is the exception - `authzShadowFor(prisma)`
-  in `server/authz/shadow.ts` composes one per call, because its caller
+  in `server/app-layer/authz/shadow.ts` composes one per call, because its caller
   `rbac.ts` is imported by client code and must not pull the composition
   root's server-only graph into the browser bundle.
 
@@ -61,7 +61,7 @@ Which door you walk through depends on what you are writing:
 | a share page (anonymous viewer with a link) | `authzCollector.resolveResourceScopeRef` + `authz.check()` |
 
 The composed instances live in the app's composition root,
-`~/server/authz/runtime.ts` - import them from there; nothing else
+`~/server/app-layer/authz/runtime.ts` - import them from there; nothing else
 constructs a service or a repository.
 
 ### Protecting a tRPC procedure
@@ -88,7 +88,7 @@ lineage facts (a project's team and organization) come from storage; a
 hand-built literal is the one way to lie to the engine.
 
 ```ts
-import { authz, authzCollector } from "~/server/authz/runtime";
+import { authz, authzCollector } from "~/server/app-layer/authz/runtime";
 
 const scope = await authzCollector.resolveScopeRef({ projectId });
 if (!scope) throw new NotFoundError(...);          // unknown id: deny, don't leak
@@ -154,12 +154,12 @@ writes an audit event, and bumps the org's epoch so caches die on the next
 request.
 
 ```ts
-import { grantsService } from "~/server/authz/runtime";
+import { grantsService } from "~/server/app-layer/authz/runtime";
 
 const grants = grantsService();
 await grants.attach({ actor, who: { type: "user", id }, role: { builtin: "MEMBER" }, where: teamScope });
-await grants.update({ actor, bindingId, role: { customRoleId } });
-await grants.revoke({ actor, bindingId });
+await grants.update({ actor, bindingId, organizationId, role: { customRoleId } });
+await grants.revoke({ actor, bindingId, organizationId });
 
 // The REDUCE verb - narrowing is one atomic swap, never two bindings fighting:
 await grants.replace({ actor, who, from: orgScope, to: teamScope, role: { builtin: "MEMBER" } });
@@ -212,7 +212,7 @@ them, and the migration deletes the synonyms.
 
 | Term | Meaning |
 |---|---|
-| **Permission** | A `resource:action` string, e.g. `traces:view`. Comes from the one registry; nothing else may invent one. The registry order is **append-only** because bitset indices are derived from it. |
+| **Permission** | A `resource:action` string, e.g. `traces:view`. Comes from the one registry; nothing else may invent one. The registry order is **append-only** because bitset indices are derived from it. **Never call these "scopes"** - see the note under this table. |
 | **Resource** | A noun the registry declares: its supported actions, the scopes it can be granted at, and what `manage` implies for it. `traces:rotate` is a type error, not a runtime surprise. |
 | **Action** | The verb half of a permission. `manage` satisfies the resource's other actions through the hierarchy rule (`permissionSatisfiedBy`). |
 | **Registry** | `AUTHZ_RESOURCES` in `registry.ts` - the single authoritative vocabulary. Everything else (types, validators, bitset indices, pickers) is derived from it. |
@@ -237,12 +237,40 @@ them, and the migration deletes the synonyms.
 | **LEGACY-QUIRK(stage)** | A deliberately reproduced legacy behaviour, tagged with the migration stage that deletes it. Stage-A parity means matching legacy warts and all. |
 | **Witness** | `Authorized<Scope>` - a branded, unforgeable proof that `authz.authorize()` allowed a permission at a scope. Repositories that accept a witness instead of a raw id make "forgot the check" fail to compile. |
 | **Repository port** | The storage interfaces the runtime services are written against: `AuthzReadRepository` (everything COLLECT reads) and `AuthzGrantsRepository` (everything the write surface touches, transactions included). The app implements them as `Prisma*Repository` classes. |
-| **Composition root** | `platform/app/src/server/authz/runtime.ts` - the one place repositories, redis, the audit writer and the KSUID minter meet the services. Everything else imports the composed instances. |
+| **Composition root** | `platform/app/src/server/app-layer/authz/runtime.ts` - the one place repositories, redis, the audit writer and the KSUID minter meet the services. Everything else imports the composed instances. |
 | **Passport** | A signed, short-TTL (≤60s), epoch-bound token carrying per-scope permission bitsets. Lets stateless surfaces (Go gateway, collectors) verify with an HMAC check and an epoch compare - zero database. |
 | **Bitset** | An effective permission set as bits indexed by registry order. The reason the registry is append-only: an index, once shipped inside a passport, must never change meaning. |
 | **Epoch** | A per-organization counter. Every grant write bumps it; caches and passports are valid only for the epoch they were built under, so revocation lands on the next request. |
 | **Shadow mode** | `AUTHZ_V2_SHADOW`: the engine runs beside the legacy resolvers on real traffic and logs mismatches with both verdicts. It never affects the response. |
 | **Divergence family** | A classified, *expected* shadow mismatch: `external-cap` (the legacy API-key path applies no lite-member cap) and `ceiling-legacy-fallback` (the legacy key ceiling consults TeamUser rows un-gated). Dashboards partition on these so real bugs stand out. |
+
+### "Permission" or "scope"? Permission - everywhere (2026-08-17)
+
+`traces:view` looks like an OAuth scope, and on an API key it even behaves
+like one: a key's access is *reductive*, intersected with its owner's
+(`effective(key) = grants(key) ∩ grants(owner)`). That is a real property,
+and it already has a name here - the **owner ceiling**. It is not a reason
+to call the string a scope.
+
+**Scope is taken, and it is taken in the customer's vocabulary, not just
+ours.** The product already teaches "scope = where": `ScopeChipPicker` is a
+hard rule for every scoped-resource surface
+(`dev/docs/best_practices/scope-selector-and-badges.md`), and the scopes it
+offers are organization / team / project. A customer who met "scopes" on
+their API key would be meeting a second, unrelated sense of the word in the
+same settings area.
+
+So one vocabulary, no translation layer, no internal-versus-external split:
+
+```
+ PERMISSION  what you may do     traces:view          registry string
+ SCOPE       where it applies    project p_abc123     org → team → project → resource
+```
+
+This holds in code, API documentation and UI copy alike. On a user binding a
+permission is additive (the union); on a key it is bounded by the owner
+ceiling. Same string, same word, two behaviours the model already names -
+reach for `additive union` and `owner ceiling` when you need to say which.
 
 ## Migration, in one screen
 

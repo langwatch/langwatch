@@ -2,6 +2,11 @@
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { Group, PrismaClient } from "~/generated/prisma/client";
+import {
+  type GrantsLedgerWriter,
+  grantsLedgerWriter,
+} from "~/server/app-layer/authz/ledger";
+import { SYSTEM_ACTORS } from "~/server/app-layer/authz/ledger-actor";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import type {
@@ -13,6 +18,7 @@ import type {
   ScimPatchRequest,
   ScimReplaceGroupRequest,
 } from "./scim.types";
+import { reconcileScimGrants } from "./scim-grants.reconciler";
 
 const logger = createLogger("langwatch:scim:group");
 
@@ -32,10 +38,25 @@ type MemberInstruction =
  * via the Groups settings page.
  */
 export class ScimGroupService {
-  constructor(private readonly prisma: PrismaClient) {}
+  private readonly prisma: PrismaClient;
+  private readonly writer: GrantsLedgerWriter;
 
-  static create(prisma: PrismaClient): ScimGroupService {
-    return new ScimGroupService(prisma);
+  constructor({
+    prisma,
+    writer = grantsLedgerWriter(),
+  }: {
+    prisma: PrismaClient;
+    writer?: GrantsLedgerWriter;
+  }) {
+    this.prisma = prisma;
+    this.writer = writer;
+  }
+
+  static create(options: {
+    prisma: PrismaClient;
+    writer?: GrantsLedgerWriter;
+  }): ScimGroupService {
+    return new ScimGroupService(options);
   }
 
   async listGroups({
@@ -247,10 +268,21 @@ export class ScimGroupService {
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
 
+    // The grants the group carried go first and carry instant enforcement:
+    // an IdP that deletes a group has taken that access away. Reconciled to
+    // the empty set, so a repeated delete emits nothing.
+    await reconcileScimGrants({
+      prisma: this.prisma,
+      writer: this.writer,
+      organizationId,
+      where: { groupId: group.id },
+      desired: [],
+      actor: { type: "system", id: SYSTEM_ACTORS.scim },
+      mintBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+    });
     await this.prisma.groupMembership.deleteMany({
       where: { groupId: group.id },
     });
-    await this.prisma.roleBinding.deleteMany({ where: { groupId: group.id } });
     await this.prisma.group.delete({ where: { id: group.id } });
 
     return null;

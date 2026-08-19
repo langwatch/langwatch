@@ -1,14 +1,8 @@
 import { auditLog } from "@ee/audit-log/auditLog";
-import { generate } from "@langwatch/ksuid";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import {
-  Prisma,
-  type PrismaClient,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "~/generated/prisma/client";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
@@ -17,11 +11,11 @@ import {
   personalWorkspaceCreateViolation,
   personalWorkspaceMoveViolation,
 } from "~/server/app-layer/projects/project.service";
+import { mintProjectSlug } from "~/server/app-layer/projects/projectSlug";
 import type { Session } from "~/server/auth";
-import { KSUID_RESOURCES } from "~/utils/constants";
+import { TeamService } from "~/server/teams/team.service";
 import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { slugify } from "~/utils/slugify";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
 import {
   checkOrganizationPermission,
@@ -122,10 +116,7 @@ export const projectRouter = createTRPCRouter({
 
       const projectNanoId = nanoid();
       const projectId = `project_${projectNanoId}`;
-      const slug =
-        slugify(input.name, { lower: true, strict: true }) +
-        "-" +
-        projectNanoId.substring(0, 6);
+      const slug = mintProjectSlug({ name: input.name, projectNanoId });
 
       const existingProject = await prisma.project.findFirst({
         where: {
@@ -144,30 +135,13 @@ export const projectRouter = createTRPCRouter({
 
       let teamId = input.teamId;
       if (!teamId) {
-        const teamName = input.newTeamName ?? input.name;
-        const teamNanoId = nanoid();
-        const newTeamId = `team_${teamNanoId}`;
-        const teamSlug =
-          slugify(teamName, { lower: true, strict: true }) +
-          "-" +
-          newTeamId.substring(0, 6);
-        const team = await prisma.team.create({
-          data: {
-            id: newTeamId,
-            name: teamName,
-            slug: teamSlug,
-            organizationId: input.organizationId,
-          },
-        });
-        await prisma.roleBinding.create({
-          data: {
-            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            organizationId: input.organizationId,
-            userId: userId,
-            role: TeamUserRole.ADMIN,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: team.id,
-          },
+        // The team and the ADMIN binding that comes with it belong to the team
+        // service: the binding is a grants-ledger fact, and a route is not
+        // where the ledger is driven from.
+        const team = await new TeamService(prisma).createWithFoundingAdmin({
+          organizationId: input.organizationId,
+          name: input.newTeamName ?? input.name,
+          adminUserId: userId,
         });
 
         teamId = team.id;

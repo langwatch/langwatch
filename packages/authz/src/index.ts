@@ -13,7 +13,7 @@
  *                            AuthzShadowService) over repository INTERFACES
  *   platform/app             the Prisma repositories, the redis epoch store,
  *                            the tRPC middleware, and the composition root
- *                            (`src/server/authz/runtime.ts`) that wires them
+ *                            (`src/server/app-layer/authz/runtime.ts`) that wires them
  *
  * The services feed CollectedGrants snapshots into decide(); nothing in this
  * package ever reaches for storage itself.

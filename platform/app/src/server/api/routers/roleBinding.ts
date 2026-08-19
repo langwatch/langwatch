@@ -1,5 +1,10 @@
+import type { LedgerActor } from "@langwatch/authz-server";
 import { z } from "zod";
-import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
+import {
+  type PrismaClient,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { RoleService } from "~/server/role/role.service";
 import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
@@ -8,6 +13,18 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const scopeTypeSchema = z.nativeEnum(RoleBindingScopeType);
 const roleSchema = z.nativeEnum(TeamUserRole);
+
+const roleBindingService = (prisma: PrismaClient): RoleBindingService =>
+  new RoleBindingService({
+    prisma,
+    repo: new PrismaRoleBindingRepository(prisma),
+    roleService: new RoleService(prisma),
+  });
+
+const ledgerActor = (userId: string): LedgerActor => ({
+  type: "user",
+  id: userId,
+});
 
 export const roleBindingRouter = createTRPCRouter({
   /**
@@ -21,10 +38,9 @@ export const roleBindingRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ ctx, input }) => {
-      const repo = new PrismaRoleBindingRepository(ctx.prisma);
-      const roleService = new RoleService(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo, roleService);
-      return service.listForOrg({ organizationId: input.organizationId });
+      return roleBindingService(ctx.prisma).listForOrg({
+        organizationId: input.organizationId,
+      });
     }),
 
   /**
@@ -35,10 +51,7 @@ export const roleBindingRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), userId: z.string() }))
     .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ ctx, input }) => {
-      const repo = new PrismaRoleBindingRepository(ctx.prisma);
-      const roleService = new RoleService(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo, roleService);
-      return service.listForUser({
+      return roleBindingService(ctx.prisma).listForUser({
         organizationId: input.organizationId,
         userId: input.userId,
       });
@@ -52,10 +65,7 @@ export const roleBindingRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
-      const repo = new PrismaRoleBindingRepository(ctx.prisma);
-      const roleService = new RoleService(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo, roleService);
-      return service.getMyAccessBreakdown({
+      return roleBindingService(ctx.prisma).getMyAccessBreakdown({
         organizationId: input.organizationId,
         userId: ctx.session.user.id,
         userName: ctx.session.user.name ?? null,
@@ -83,11 +93,9 @@ export const roleBindingRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
-      const repo = new PrismaRoleBindingRepository(ctx.prisma);
-      const roleService = new RoleService(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo, roleService);
-      return service.create({
+      return roleBindingService(ctx.prisma).create({
         organizationId: input.organizationId,
+        actor: ledgerActor(ctx.session.user.id),
         userId: input.userId,
         groupId: input.groupId,
         role: input.role,
@@ -111,11 +119,9 @@ export const roleBindingRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
-      const repo = new PrismaRoleBindingRepository(ctx.prisma);
-      const roleService = new RoleService(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo, roleService);
-      return service.update({
+      return roleBindingService(ctx.prisma).update({
         organizationId: input.organizationId,
+        actor: ledgerActor(ctx.session.user.id),
         bindingId: input.bindingId,
         role: input.role,
         customRoleId: input.customRoleId,
@@ -134,11 +140,9 @@ export const roleBindingRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
-      const repo = new PrismaRoleBindingRepository(ctx.prisma);
-      const roleService = new RoleService(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo, roleService);
-      return service.delete({
+      return roleBindingService(ctx.prisma).delete({
         organizationId: input.organizationId,
+        actor: ledgerActor(ctx.session.user.id),
         bindingId: input.bindingId,
       });
     }),
@@ -166,11 +170,9 @@ export const roleBindingRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
-      const repo = new PrismaRoleBindingRepository(ctx.prisma);
-      const roleService = new RoleService(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo, roleService);
-      return service.applyMemberBindings({
+      return roleBindingService(ctx.prisma).applyMemberBindings({
         organizationId: input.organizationId,
+        actor: ledgerActor(ctx.session.user.id),
         userId: input.userId,
         bindingIdsToDelete: input.bindingIdsToDelete,
         bindingsToCreate: input.bindingsToCreate,

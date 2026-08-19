@@ -40,6 +40,7 @@ function sessionRow(
     gitBranch: "feat/two",
     gitBranches: ["feat/one", "feat/two"],
     title: "Add the sessions screen",
+    titleSource: "",
     ...over,
   });
 }
@@ -163,6 +164,21 @@ describe("CodingAgentSessionsListService", () => {
       expect(rows[0]?.title).toBe("Add the sessions screen");
       // Nothing to show reads as nothing, never as an empty string, so the
       // page renders its own words for an untitled session.
+      expect(rows[1]?.title).toBeNull();
+    });
+
+    /** @scenario "The session's own name is the title the list shows" */
+    it("shows the one Title column the fold already resolved", async () => {
+      const { service } = serviceWith({
+        rows: [
+          sessionRow({ title: "pr-reviewer", titleSource: "name" }),
+          sessionRow({ sessionId: "session-b", title: "", titleSource: "" }),
+        ],
+      });
+
+      const rows = await service.listForProject({ projectId: PROJECT });
+
+      expect(rows[0]?.title).toBe("pr-reviewer");
       expect(rows[1]?.title).toBeNull();
     });
   });

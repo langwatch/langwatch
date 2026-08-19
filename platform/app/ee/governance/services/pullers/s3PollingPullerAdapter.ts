@@ -386,6 +386,17 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
       const n = typeof v === "number" ? v : Number(v);
       return Number.isFinite(n) ? n : 0;
     };
+    /** Preserves string inputs so sub-cent precision is not lost through
+     *  a float round-trip. Falls back to Number→String for numeric inputs. */
+    const asDecimalString = (v: unknown): string => {
+      if (typeof v === "string") {
+        const trimmed = v.trim();
+        if (trimmed === "") return "0";
+        return trimmed;
+      }
+      if (typeof v === "number" && Number.isFinite(v)) return String(v);
+      return "0";
+    };
     const asInt = (v: unknown): number => Math.trunc(asNumber(v));
 
     const extras: Record<string, unknown> = {};
@@ -401,7 +412,7 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
       actor: asString(get(config.eventMapping.actor)),
       action: asString(get(config.eventMapping.action)),
       target: asString(get(config.eventMapping.target)),
-      cost_usd: asNumber(get(config.eventMapping.cost_usd)),
+      cost_usd: asDecimalString(get(config.eventMapping.cost_usd)),
       tokens_input: asInt(get(config.eventMapping.tokens_input)),
       tokens_output: asInt(get(config.eventMapping.tokens_output)),
       raw_payload: JSON.stringify(rawEvent),

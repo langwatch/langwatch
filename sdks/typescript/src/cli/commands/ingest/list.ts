@@ -9,7 +9,7 @@ import { normalizeEndpoint } from "@/internal/endpoint";
  * `langwatch ingest list [--all] [--json]`
  *
  * Read-only enumeration of the org's IngestionSources, mirroring the
- * `/settings/governance/ingestion-sources` list page for ops folks
+ * `/governance/ingestion-sources` list page for ops folks
  * who live in terminal. Same multi-tenant guard as the web UI
  * (org-scoped via the device-flow Bearer token).
  */
@@ -42,7 +42,7 @@ export async function ingestListCommand(options: {
     console.log(
       chalk.gray(
         "No ingestion sources yet. Open the admin UI at " +
-          `${normalizeEndpoint(cfg.control_plane_url)}/settings/governance/ingestion-sources` +
+          `${normalizeEndpoint(cfg.control_plane_url)}/governance/ingestion-sources` +
           " to connect your first source.",
       ),
     );

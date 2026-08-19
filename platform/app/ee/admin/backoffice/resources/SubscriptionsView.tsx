@@ -348,7 +348,6 @@ function SubscriptionDrawer({
         title: "Organization is required",
         type: "error",
         duration: 3000,
-        meta: { closable: true },
       });
       return;
     }
@@ -370,7 +369,6 @@ function SubscriptionDrawer({
           mode === "edit" ? "Subscription updated" : "Subscription created",
         type: "success",
         duration: 3000,
-        meta: { closable: true },
       });
       onClose();
     };

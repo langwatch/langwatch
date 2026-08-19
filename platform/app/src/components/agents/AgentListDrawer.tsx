@@ -104,7 +104,6 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
           ? "Also deleted: 1 workflow"
           : undefined,
         type: "success",
-        meta: { closable: true },
       });
     },
     onError: () => {
@@ -164,7 +163,6 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
             toaster.create({
               title: "Agent deleted",
               type: "success",
-              meta: { closable: true },
             });
           },
           onError: () => {

@@ -4,11 +4,11 @@
  *
  * The store is an in-memory fake rather than a mock because the claim under
  * test is "nothing was written", which is a fact about the store's contents —
- * an artifact to read, not a call sequence to verify. The governed SQL service
+ * an artifact to read, not a call sequence to verify. The LangWatchQL service
  * is the real one, built with no executor: validation needs no database, and a
  * stubbed validator would prove only that the stub refuses.
  *
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { describe, expect, it } from "vitest";
@@ -17,7 +17,7 @@ import type { CustomGraph } from "~/generated/prisma/client";
 
 import type { Protections } from "../../../traces/protections";
 import { WORKBENCH_SQL_CHART_KIND } from "../../chartKinds";
-import { GovernedSqlService } from "../../governed-sql/governedSql.service";
+import { LangWatchQLService } from "../../lwql/lwql.service";
 import type {
   CreateSavedWorkbenchChartInput,
   SavedWorkbenchChartStore,
@@ -178,7 +178,7 @@ function build() {
   const service = new SavedWorkbenchChartService({
     repository: store,
     // No executor: the gate is a policy decision, not a database round trip.
-    governedSql: new GovernedSqlService({
+    lwql: new LangWatchQLService({
       executor: null,
       database: "analytics",
     }),
@@ -254,9 +254,9 @@ describe("saving a workbench chart", () => {
     });
   });
 
-  describe("given SQL the governed validator refuses", () => {
+  describe("given SQL the LangWatchQL validator refuses", () => {
     describe("when the member saves a chart carrying it", () => {
-      /** @scenario "SQL the governed validator refuses never reaches the database" */
+      /** @scenario "SQL the LangWatchQL validator refuses never reaches the database" */
       it("refuses it with the validator's own code and writes nothing", async () => {
         const { store, service } = build();
 
@@ -273,7 +273,7 @@ describe("saving a workbench chart", () => {
           }),
         );
 
-        expect(refusal.code).toBe("governed_sql_not_permitted");
+        expect(refusal.code).toBe("lwql_not_permitted");
         expect(store.rows.size).toBe(0);
       });
     });
@@ -301,7 +301,7 @@ describe("saving a workbench chart", () => {
           }),
         );
 
-        expect(refusal.code).toBe("governed_sql_parameter_missing");
+        expect(refusal.code).toBe("lwql_parameter_missing");
         expect((refusal.meta as { parameters?: unknown }).parameters).toEqual([
           "since",
         ]);
@@ -347,7 +347,7 @@ describe("saving a workbench chart", () => {
           }),
         );
 
-        expect(refusal.code).toBe("governed_sql_not_permitted");
+        expect(refusal.code).toBe("lwql_not_permitted");
         expect(store.rows.size).toBe(0);
 
         // Falsifiable: the identical statement is admitted for an author whose
@@ -504,7 +504,7 @@ describe("editing a saved workbench chart", () => {
         expect(refusedSpec.code).toBe(
           "saved_workbench_chart_specification_refused",
         );
-        expect(refusedSql.code).toBe("governed_sql_not_permitted");
+        expect(refusedSql.code).toBe("lwql_not_permitted");
 
         // The row is exactly what the accepted create wrote.
         expect(store.rows.get(saved.id)?.graph).toEqual(definition());

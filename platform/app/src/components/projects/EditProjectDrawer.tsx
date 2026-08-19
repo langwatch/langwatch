@@ -97,7 +97,6 @@ export function EditProjectDrawer({
               title: "Project updated",
               type: "success",
               duration: 5000,
-              meta: { closable: true },
             });
             closeDrawer();
           },

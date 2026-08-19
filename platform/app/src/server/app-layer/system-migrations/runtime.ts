@@ -7,8 +7,11 @@
  * Server-only - this graph reaches Prisma, Redis and the EE audit writer.
  */
 import { auditLog } from "@ee/audit-log/auditLog";
-import { TeamUserBackfillMigration } from "@langwatch/authz-server";
-import { generate } from "@langwatch/ksuid";
+import {
+  GrantsGenesisImportMigration,
+  type GrantsLedgerEmitter,
+  TeamUserBackfillMigration,
+} from "@langwatch/authz-server/migration";
 import {
   type MigrationPassSummary,
   type SystemMigration,
@@ -17,21 +20,51 @@ import {
 import type { Cluster, Redis } from "ioredis";
 import { env } from "~/env.mjs";
 import type { Prisma } from "~/generated/prisma/client";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import { bumpAuthzEpoch } from "../../authz/epoch";
-import { PrismaAuthzMigrationRepository } from "../../authz/repositories/authz-migration.prisma.repository";
-import { authzCollector } from "../../authz/runtime";
 import { prisma } from "../../db";
 import { tryGetApp } from "../app";
+import { bumpAuthzEpoch } from "../authz/epoch";
+import { authzGrantsCommands } from "../authz/ledger";
+import { SYSTEM_ACTORS } from "../authz/ledger-actor";
+import { PrismaAuthzMigrationRepository } from "../authz/repositories/authz-migration.prisma.repository";
+import { authzCollector } from "../authz/runtime";
 import { cohortIncludes } from "./cohort";
 import { RedisMigrationLeaseRepository } from "./repositories/migration-lease.redis.repository";
 import { PrismaOrganizationTenantSource } from "./repositories/organization-tenant-source.prisma.repository";
 import { PrismaSystemMigrationStateRepository } from "./repositories/system-migration-state.prisma.repository";
+import { WitnessingSystemMigrationStateRepository } from "./repositories/witnessing-migration-state.repository";
 import { SystemMigrationsService } from "./system-migrations.service";
 
-/** The composed state repository. The runner uses it; routes must not - they
- *  go through `systemMigrationsService` below. */
-const systemMigrationState = new PrismaSystemMigrationStateRepository(prisma);
+/**
+ * The composed state repository, wrapped so every lifecycle transition is
+ * witnessed as a ledger fact (best-effort; the synchronous write stays the
+ * latch). The runner and the ops service both write through this instance,
+ * so operator rollbacks are witnessed too. Routes must not touch it - they
+ * go through `systemMigrationsService` below.
+ */
+const systemMigrationState = new WitnessingSystemMigrationStateRepository({
+  inner: new PrismaSystemMigrationStateRepository(prisma),
+  witness: async ({
+    migrationName,
+    tenantId,
+    status,
+    report,
+    occurredAtMs,
+  }) => {
+    await (
+      await authzGrantsCommands()
+    ).commands.recordMigrationTenantState.send({
+      tenantId,
+      organizationId: tenantId,
+      commandId: `runner:${migrationName}:${tenantId}:${status}:${occurredAtMs}`,
+      migrationName,
+      status,
+      report,
+      actor: { type: "system", id: SYSTEM_ACTORS.migrationRunner },
+      occurredAtMs,
+    });
+  },
+  now: () => Date.now(),
+});
 
 /**
  * What the ops dashboard talks to. The route calls this and never the state
@@ -44,16 +77,99 @@ export const systemMigrationsService = new SystemMigrationsService({
   runPass: () => runSystemMigrationPass(),
 });
 
+/**
+ * The migrations' door into the ledger, over the shared lazy senders in
+ * `server/app-layer/authz/ledger.ts` (a send while the App is still composing waits;
+ * an App without the event-sourcing stack refuses loudly — the migration
+ * then parks its organization with an honest report, and the state witness
+ * logs and moves on).
+ */
+function grantsLedgerEmitter(): GrantsLedgerEmitter {
+  return {
+    attachGrants: async ({ organizationId, commandId, grants }) => {
+      await (await authzGrantsCommands()).commands.attachGrants.send({
+        tenantId: organizationId,
+        organizationId,
+        commandId,
+        grants,
+      });
+    },
+    defineRoles: async ({ organizationId, commandId, roles, actor }) => {
+      await (await authzGrantsCommands()).commands.defineRoles.send({
+        tenantId: organizationId,
+        organizationId,
+        commandId,
+        roles,
+        actor,
+      });
+    },
+    revokeGrants: async ({
+      organizationId,
+      commandId,
+      revocations,
+      actor,
+      occurredAtMs,
+    }) => {
+      await (await authzGrantsCommands()).commands.revokeGrants.send({
+        tenantId: organizationId,
+        organizationId,
+        commandId,
+        revocations,
+        actor,
+        occurredAtMs,
+      });
+    },
+    deleteRole: async ({
+      organizationId,
+      commandId,
+      roleId,
+      actor,
+      occurredAtMs,
+    }) => {
+      await (await authzGrantsCommands()).commands.deleteRole.send({
+        tenantId: organizationId,
+        organizationId,
+        commandId,
+        roleId,
+        actor,
+        occurredAtMs,
+      });
+    },
+    proveMigrationParity: async ({
+      organizationId,
+      commandId,
+      diffs,
+      occurredAtMs,
+    }) => {
+      await (await authzGrantsCommands()).commands.proveMigrationParity.send({
+        tenantId: organizationId,
+        organizationId,
+        commandId,
+        diffs,
+        occurredAtMs,
+      });
+    },
+  };
+}
+
 /** Every registered in-place migration, in the order they run per tenant. */
 export function registeredMigrations(): SystemMigration[] {
   return [
     new TeamUserBackfillMigration({
       repository: new PrismaAuthzMigrationRepository(prisma),
       collectGrants: (args) => authzCollector.collectGrants(args),
+      ledger: grantsLedgerEmitter(),
       audit: (entry) =>
         auditLog({ ...entry, metadata: entry.metadata as Prisma.JsonObject }),
       bumpEpoch: bumpAuthzEpoch,
-      newBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      now: () => Date.now(),
+    }),
+    // After the backfill on purpose: the backfill's grants are legacy rows
+    // by the time this runs, so the import adopts them like any other.
+    new GrantsGenesisImportMigration({
+      repository: new PrismaAuthzMigrationRepository(prisma),
+      ledger: grantsLedgerEmitter(),
+      now: () => Date.now(),
     }),
   ];
 }

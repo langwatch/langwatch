@@ -77,7 +77,6 @@ function ReportsContent() {
               title: "Error renaming dashboard",
               type: "error",
               duration: 3000,
-              meta: { closable: true },
             });
           },
         },
@@ -97,7 +96,6 @@ function ReportsContent() {
             title: "Error deleting graph",
             type: "error",
             duration: 3000,
-            meta: { closable: true },
           });
         },
       },
@@ -151,7 +149,6 @@ function ReportsContent() {
             title: "Error updating graph size",
             type: "error",
             duration: 3000,
-            meta: { closable: true },
           });
         },
       },
@@ -170,7 +167,6 @@ function ReportsContent() {
             title: "Error reordering graphs",
             type: "error",
             duration: 3000,
-            meta: { closable: true },
           });
         },
       },

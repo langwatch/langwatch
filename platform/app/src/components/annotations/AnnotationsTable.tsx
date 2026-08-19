@@ -358,7 +358,6 @@ export const AnnotationsTable = ({
           result.deleted === 1 ? "item" : "items"
         } removed`,
         type: "success",
-        meta: { closable: true },
       });
     },
     onError: (error) =>

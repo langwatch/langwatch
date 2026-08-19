@@ -18,8 +18,9 @@ Feature: Unified authorization engine
   # someone down means granting them less, not overriding them with less.
   # See ADR-092 "Grant semantics" for why. That file's premise sentence -
   # "The most specific scope always wins" - is superseded by the same
-  # decision and gets rewritten with those scenarios at stage C4, not
-  # before: until then it still describes the resolver in production.
+  # decision and gets rewritten with those scenarios in the contract PR
+  # (the delivery plan's PR 4), not before: until then it still describes
+  # the resolver in production for not-yet-cut-over organizations.
   #
   # Also superseded: fetch-org-role-permission-resolution.feature's "Demo
   # projects are accessible without organization membership". Demo access
@@ -245,6 +246,20 @@ Feature: Unified authorization engine
     When an admin revokes that binding
     Then alice's next permission check on "chatbot" is denied
 
+  # The grants ledger's instant enforcement (ADR-092 §13): after the ledger
+  # append is accepted, a revocation applies the deny effect synchronously
+  # on the calling path, without waiting for the queued fold. Redis never
+  # gates it, so the guarantee below must hold with Redis stopped entirely.
+  @integration
+  Scenario: A revocation holds before the revoke call returns, with Redis stopped
+    Given user "alice" has role "member" bound at project "chatbot"
+    And Redis is unavailable
+    And the queue infrastructure is stopped
+    When an admin revokes that binding
+    Then the revoke call succeeds
+    And alice's grant is gone before the call returns
+    And a permission check for alice on "chatbot" is denied immediately
+
   @unit
   Scenario: Repeated checks with unchanged grants read nothing from the database
     Given alice's grants were resolved once after the latest grant change
@@ -335,6 +350,35 @@ Feature: Unified authorization engine
     When a visitor presenting the grant reads a trace whose parent is "th1"
     Then the read is granted through thread "th1"'s single grant
     And a trace outside "th1" is not readable
+
+  # ============================================================================
+  # Collectives as principals (ADR-092 §13: facts, not inference)
+  # ============================================================================
+
+  # A team or an organization can hold a grant directly; the walk expands
+  # membership at check time, so nothing is copied per member and nothing
+  # needs cleaning up when membership changes.
+  @unit @unimplemented
+  Scenario: A grant held by a team reaches every member through membership
+    Given team "client-a" itself holds role "viewer" at project "chatbot"
+    And user "alice" is a member of team "client-a"
+    When alice's permission "traces:view" is checked on project "chatbot"
+    Then the check is granted through the team's grant
+    And removing alice from the team denies her next check with no grant deleted
+
+  # The organization-member floor - today an inference buried in the
+  # resolver - becomes a stored grant held by the organization collective,
+  # which an org admin can see and change like any other grant.
+  @unit @unimplemented
+  Scenario: The organization-member floor is itself a grant an admin can edit
+    Given organization "acme" holds a floor grant of role "member" at "acme"
+    And user "alice" belongs to "acme" with no other grants
+    When alice's permission "datasets:manage" is checked at organization "acme"
+    Then the check is granted through the floor grant
+    # "datasets:manage" on purpose: it separates member from viewer. A
+    # permission both roles carry (analytics:view) would answer the same
+    # either way, and the scenario would pass without the floor moving.
+    And an admin lowering the floor to "viewer" denies alice's next check
 
   @unit
   Scenario: Offboarding a user removes every grant, with proof

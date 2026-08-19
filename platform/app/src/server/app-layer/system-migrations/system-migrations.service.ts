@@ -4,13 +4,31 @@ import type {
   TenantMigrationRecord,
   TenantMigrationStatus,
 } from "@langwatch/system-migrations";
+import {
+  MigrationRollbackRequiresMigratedOrFinalizedError,
+  MigrationStateNotFoundError,
+} from "./errors";
+
+/**
+ * The statuses a tenant may be rolled back from. Mirrors
+ * `LEDGER_WRITE_STATUSES` in ../authz/ledger-write-gate.ts: both are already
+ * on the ledger (writes, and possibly reads too), so both are the
+ * operator's to pull back onto the legacy path. `parked` never reached the
+ * ledger, and `rolled_back` already left it.
+ */
+const ROLLBACK_ELIGIBLE_STATUSES: readonly TenantMigrationStatus[] = [
+  "migrated",
+  "finalized",
+];
 
 const logger = createLogger("langwatch:ops:system-migrations");
 
 /**
- * The ops read model over stored migration state. Deliberately narrower than
- * the runner's own port: the runner reads and writes one tenant at a time,
- * the dashboard reads across them and writes nothing.
+ * The ops model over stored migration state. Deliberately narrower than the
+ * runner's own port: the runner reads and writes one tenant at a time; the
+ * dashboard reads across them, and its ONE write is the operator rollback —
+ * migrated or finalized → rolled_back, the state machine's only
+ * human-driven edge.
  */
 export interface SystemMigrationStateReader {
   findStatusCounts(args: {
@@ -22,6 +40,13 @@ export interface SystemMigrationStateReader {
     statuses: TenantMigrationStatus[];
     limit: number;
   }): Promise<Array<TenantMigrationRecord & { updatedAt: Date }>>;
+
+  findRecord(args: {
+    migrationName: string;
+    tenantId: string;
+  }): Promise<TenantMigrationRecord | null>;
+
+  upsertRecord(record: TenantMigrationRecord): Promise<void>;
 }
 
 /** How many attention rows one migration lists before the page truncates. */
@@ -81,5 +106,57 @@ export class SystemMigrationsService {
       // retries either way.
       logger.error({ error }, "operator-kicked migration pass failed");
     });
+  }
+
+  /**
+   * The operator's rollback: pin a migrated or finalized organization back
+   * onto its legacy path (specs/rbac/in-place-authz-migration.feature, "An
+   * operator rolls a finalized organization back to its legacy path", "An
+   * operator rolls a migrated organization back to its legacy path"). Both
+   * statuses are already live on the ledger (ledger-write-gate.ts) — a
+   * migrated-but-not-yet-finalized organization held there by parity drift
+   * is exactly the population most likely to need this route. Every other
+   * status either never reached the ledger or is the runner's to move. The
+   * ledger-write gate always picks the change up within its cache window;
+   * the legacy-fallback gate only mattered once the organization was
+   * finalized, since that is the only status it treats specially. Later
+   * passes leave the organization alone (rolled_back is terminal until an
+   * operator intervenes again).
+   */
+  async rollBack({
+    migrationName,
+    tenantId,
+    actorUserId,
+  }: {
+    migrationName: string;
+    tenantId: string;
+    actorUserId: string;
+  }): Promise<void> {
+    const record = await this.deps.state.findRecord({
+      migrationName,
+      tenantId,
+    });
+    if (!record) throw new MigrationStateNotFoundError();
+    if (!ROLLBACK_ELIGIBLE_STATUSES.includes(record.status)) {
+      throw new MigrationRollbackRequiresMigratedOrFinalizedError({
+        status: record.status,
+      });
+    }
+    const priorReport =
+      record.report != null && typeof record.report === "object"
+        ? (record.report as Record<string, unknown>)
+        : {};
+    await this.deps.state.upsertRecord({
+      ...record,
+      status: "rolled_back",
+      report: {
+        ...priorReport,
+        rolledBack: { by: actorUserId, at: new Date().toISOString() },
+      },
+    });
+    logger.warn(
+      { migrationName, tenantId, actorUserId, priorStatus: record.status },
+      "operator rolled a migrated or finalized tenant back to its legacy path",
+    );
   }
 }

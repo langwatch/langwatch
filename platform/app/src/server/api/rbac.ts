@@ -6,13 +6,13 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { legacyTeamFallbackDisabled } from "~/server/app-layer/authz/legacy-fallback-gate";
+import { authzShadowFor } from "~/server/app-layer/authz/shadow";
 import {
   LiteMemberRestrictedError,
   ProjectPermissionDeniedError,
 } from "~/server/app-layer/permissions/errors";
 import type { Session } from "~/server/auth";
-import { legacyTeamFallbackDisabled } from "~/server/authz/legacy-fallback-gate";
-import { authzShadowFor } from "~/server/authz/shadow";
 import { isAdmin } from "../../../ee/admin/isAdmin";
 import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 
@@ -106,7 +106,7 @@ export const Resources = {
   //   - aiTools:view → ALL org roles. Portal must work for every member
   //     so they can discover what's available + click through to setup.
   //   - aiTools:manage → org ADMIN only. Catalog editor surface at
-  //     /settings/governance/tool-catalog (CRUD + reorder + enable).
+  //     /governance/tool-catalog (CRUD + reorder + enable).
   AI_TOOLS: "aiTools",
   // Outbound webhook endpoints (the webhook platform). Org-tier only:
   // endpoints are org-anchored, carry signing secrets, and stream every

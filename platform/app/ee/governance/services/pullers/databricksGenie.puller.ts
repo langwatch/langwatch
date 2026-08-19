@@ -2406,7 +2406,7 @@ export class DatabricksGeniePuller
       // message, and the warehouse compute behind it is not on this API — a
       // source that names a warehouse has that share attached afterwards, once
       // the run's billing read has answered. See `withWarehouseCost`.
-      cost_usd: 0,
+      cost_usd: "0",
       tokens_input: 0,
       tokens_output: 0,
       raw_payload: JSON.stringify(message),
@@ -3044,10 +3044,10 @@ function withCost({
   if (priced !== undefined) {
     return {
       ...event,
-      // The audit row's own float field, which ADR-088 keeps for continuity and
-      // does not price from. The ledger reads `costUsd` below, as a string, so
-      // the number a customer reconciles never sees a float.
-      cost_usd: Number(priced.costUsd),
+      // The audit row's own cost field, a decimal string since the Zod
+      // boundary stringified it — the same exact figure the ledger reads from
+      // `costUsd` below, so neither surface ever sees a float.
+      cost_usd: priced.costUsd,
       extra: {
         ...extra,
         // The share's raw ingredients, for the human reading the record: an

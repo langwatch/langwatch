@@ -258,9 +258,6 @@ export const useAutosaveEvaluationsV3 = () => {
           toaster.create({
             title: "Failed to autosave evaluation",
             type: "error",
-            meta: {
-              closable: true,
-            },
           });
           captureException(toError(error), {
             extra: {

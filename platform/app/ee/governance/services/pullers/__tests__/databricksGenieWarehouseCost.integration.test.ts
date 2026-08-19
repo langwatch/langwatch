@@ -223,7 +223,7 @@ describe("a source with no warehouse", () => {
     const result = await pull({});
 
     expect(result.events).toHaveLength(1);
-    expect(result.events[0]?.cost_usd).toBe(0);
+    expect(result.events[0]?.cost_usd).toBe("0");
     expect(hintOf(result).costUsd).toBe("0");
     // The claim that matters: not merely that cost is zero, but that a source
     // which opted out never went near the billing tables.
@@ -246,7 +246,7 @@ describe("a source whose run has no time left to read billing", () => {
     // The questions survive, unpriced. That is the whole point: an unpriced
     // window is asked again next run, a discarded sweep is not.
     expect(result.events).toHaveLength(1);
-    expect(result.events[0]?.cost_usd).toBe(0);
+    expect(result.events[0]?.cost_usd).toBe("0");
     // And it never opened a request it could not have finished.
     expect(statementBodies).toHaveLength(0);
   });
@@ -285,7 +285,7 @@ describe("a source that names a warehouse", () => {
 
     // Half the hour's execution time, so half its $6 bill.
     expect(hintOf(result).costUsd).toBe("3");
-    expect(result.events[0]?.cost_usd).toBe(3);
+    expect(result.events[0]?.cost_usd).toBe("3");
     // Still an estimate: the figure is a share worked out from list prices.
     expect(hintOf(result).costStatus).toBe("estimate");
     // And still attributed to the person who asked.

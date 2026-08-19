@@ -54,7 +54,6 @@ export function useRunScenario({
           title: "No model provider configured",
           description: "A model provider must be configured to run scenarios.",
           type: "error",
-          meta: { closable: true },
           action: {
             label: "Configure model providers",
             onClick: () =>
@@ -106,7 +105,6 @@ export function useRunScenario({
             title: "Scenario run failed",
             description: "The scenario encountered an error during execution.",
             type: "error",
-            meta: { closable: true },
             action: runResult
               ? {
                   label: "View failed run",
@@ -120,7 +118,6 @@ export function useRunScenario({
             description:
               "The scenario run took too long to start. Please try again.",
             type: "error",
-            meta: { closable: true },
           });
         }
       } catch (error) {

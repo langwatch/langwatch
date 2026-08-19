@@ -59,7 +59,6 @@ export default function McpAuthorize() {
       title: "Authorization failed",
       description: message,
       type: "error",
-      meta: { closable: true },
     });
     setIsSubmitting(false);
   };

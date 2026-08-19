@@ -99,6 +99,8 @@ export interface RunHookOptions {
   fetchImpl?: typeof fetch;
   now?: number;
   tool?: string;
+  /** Claude's live session registry. Defaults to an empty per-test one. */
+  claudeRegistryDir?: string;
   readCliConfig?: Parameters<typeof hookCommand>[0]["readCliConfig"];
   /**
    * Run with no exporter variables at all, the way Claude Code hands its hooks
@@ -116,6 +118,8 @@ export interface HookHarness {
   exits: number[];
   /** This test's fingerprint directory. */
   readonly stateDir: string;
+  /** This test's claude session registry directory (not created). */
+  readonly claudeRegistryDir: string;
   /** A collector answering `status`, recording into `posted`. */
   collector(status?: number): typeof fetch;
   runHook(options?: RunHookOptions): Promise<void>;
@@ -172,6 +176,9 @@ export const installHookHarness = (): HookHarness => {
     get stateDir() {
       return stateDir;
     },
+    get claudeRegistryDir() {
+      return path.join(stateDir, "claude-sessions");
+    },
     collector,
     runHook: ({
       input = { session_id: SESSION_ID, cwd: "/repo/worktrees/review" },
@@ -181,6 +188,7 @@ export const installHookHarness = (): HookHarness => {
       fetchImpl = collector(),
       now = NOW,
       tool = "claude-code",
+      claudeRegistryDir,
       readCliConfig = NO_CLI_CONFIG,
       shouldOmitExporterEnv = false,
     }: RunHookOptions = {}) =>
@@ -199,6 +207,9 @@ export const installHookHarness = (): HookHarness => {
         fetchImpl,
         now: () => now,
         stateDir,
+        // Empty by default, so no test ever reads the machine's real
+        // registry and finds a name it did not plant.
+        claudeRegistryDir: claudeRegistryDir ?? path.join(stateDir, "claude-sessions"),
         readCliConfig,
       }),
   };

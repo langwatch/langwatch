@@ -21,9 +21,11 @@ import {
   applySpanToCodingAgentSession,
   createInitCodingAgentSession,
 } from "../services/coding-agent-session.derivation";
-import type {
-  CodingAgentSessionData,
-  MetricSeriesFact,
+import {
+  type CodingAgentSessionData,
+  type MetricSeriesFact,
+  type SessionTitleSource,
+  sessionTitleSourceSchema,
 } from "../services/coding-agent-session.types";
 
 /**
@@ -413,6 +415,12 @@ export interface CodingAgentSessionRow {
   gitBranches: string[];
   gitWorktree: string;
   title: string;
+  /**
+   * Which source set `Title` (00083): "prompt", "generated", "name", or ""
+   * on a row from before the column. Read back so a later fold knows whether
+   * a regenerated title may replace it — a name may not be clobbered.
+   */
+  titleSource: string;
 
   modelCalls: number;
   toolCalls: number;
@@ -649,6 +657,7 @@ function gitContextColumns(state: CodingAgentSessionState): {
   gitBranches: string[];
   gitWorktree: string;
   title: string;
+  titleSource: string;
 } {
   return {
     repositoryHost: state.repositoryHost ?? "",
@@ -658,8 +667,17 @@ function gitContextColumns(state: CodingAgentSessionState): {
     gitBranches: state.gitBranches,
     gitWorktree: state.gitWorktree ?? "",
     title: state.title ?? "",
+    titleSource: state.titleSource ?? "",
   };
 }
+
+/**
+ * The title-source column decodes into its union; anything else — the empty
+ * default on a pre-00083 row included — reads as unset, which the fold ranks
+ * as a generated title (see `withTitle`).
+ */
+const titleSourceFromRow = (value: string): SessionTitleSource | null =>
+  sessionTitleSourceSchema.safeParse(value).data ?? null;
 
 /** An empty string in a row column reads back as "unset" (null) in state. */
 const nullIfEmpty = (value: string): string | null =>
@@ -722,6 +740,7 @@ export function codingAgentSessionStateFromRow(
     gitBranches: row.gitBranches,
     gitWorktree: nullIfEmpty(row.gitWorktree),
     title: nullIfEmpty(row.title),
+    titleSource: titleSourceFromRow(row.titleSource),
 
     modelCalls: row.modelCalls,
     toolCalls: row.toolCalls,

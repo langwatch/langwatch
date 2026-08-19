@@ -59,6 +59,13 @@ export class PrismaSystemMigrationStateRepository
       record.report == null
         ? Prisma.DbNull
         : (record.report as Prisma.InputJsonValue);
+    // The transition's own business time, stamped by the writer. It is what
+    // the grants-ledger projection orders folded transitions against, and it
+    // has to be written here too: a direct write that left the column alone
+    // would let a replayed fact from last year overwrite the latch this call
+    // just set. `updatedAt` cannot serve - it moves for reasons that are not
+    // transitions.
+    const occurredAt = new Date();
     await this.prisma.systemMigrationTenantState.upsert({
       where: {
         migrationName_tenantId: {
@@ -71,8 +78,9 @@ export class PrismaSystemMigrationStateRepository
         tenantId: record.tenantId,
         status: record.status,
         report,
+        occurredAt,
       },
-      update: { status: record.status, report },
+      update: { status: record.status, report, occurredAt },
     });
   }
 

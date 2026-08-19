@@ -108,7 +108,7 @@ function parseCursor(
     }
   }
   return {
-    startingAt: config.startingAt ?? defaultStartingAt(),
+    startingAt: config.startingAt ?? defaultStartingAt(config.report),
     page: null,
   };
 }
@@ -117,9 +117,52 @@ function encodeCursor(startingAt: string, page: string | null): string {
   return JSON.stringify({ startingAt, page });
 }
 
-/** A first run with no configured watermark reads the last full day. */
-function defaultStartingAt(): string {
-  return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+/**
+ * A first run with no configured watermark.
+ *
+ * Cost reports use daily buckets with a ~1-day processing lag, so the most
+ * recent *completed* bucket is ≥2 days ago.  Going back 3 days guarantees at
+ * least one full bucket and avoids the 400 Anthropic returns when there is no
+ * valid ending date after `starting_at`.
+ *
+ * Usage reports can have sub-day granularity, so 24 h is fine.
+ */
+function defaultStartingAt(report: "usage" | "cost"): string {
+  const daysBack = report === "cost" ? 3 : 1;
+  const d = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+  // Snap to midnight UTC so the timestamp aligns with daily bucket boundaries.
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+/** Cap on how much of an error response body we log. */
+const MAX_ERROR_BODY_BYTES = 4_096;
+
+/**
+ * Best-effort read of a non-OK response body, bounded so an unexpectedly
+ * large payload doesn't blow up logs or memory.
+ */
+async function safeResponseText(response: {
+  text(): Promise<string>;
+}): Promise<string> {
+  try {
+    const raw = await response.text();
+    if (raw.length <= MAX_ERROR_BODY_BYTES) return raw;
+    return `${raw.slice(0, MAX_ERROR_BODY_BYTES)}… [truncated]`;
+  } catch {
+    return "";
+  }
+}
+
+async function fetchPageError(
+  response: { status: number; text(): Promise<string> },
+  report: string,
+): Promise<Error> {
+  const detail = await safeResponseText(response);
+  const suffix = detail ? `: ${detail}` : "";
+  return new Error(
+    `HTTP ${response.status} (anthropic ${report}_report)${suffix}`,
+  );
 }
 
 /** One group-by row inside a usage bucket. Unknown fields are tolerated. */
@@ -139,7 +182,7 @@ const usageResultSchema = z
 /** One group-by row inside a cost bucket. `amount` is a decimal string. */
 const costResultSchema = z
   .object({
-    amount: z.union([z.string(), z.number()]),
+    amount: z.union([z.string(), z.number()]).transform(String),
     currency: z.string().default("USD"),
     workspace_id: z.string().nullable().default(null),
     description: z.string().nullable().default(null),
@@ -370,9 +413,7 @@ export class AnthropicAdminPuller
       signal,
     });
     if (!response.ok) {
-      throw new Error(
-        `HTTP ${response.status} ${response.statusText} (anthropic ${config.report}_report)`,
-      );
+      throw await fetchPageError(response, config.report);
     }
     return await response.json();
   }
@@ -431,7 +472,7 @@ export class AnthropicAdminPuller
       action: "usage_report",
       target: dimension(result.model),
       // Anthropic reports no cost on this report; we price the quantities.
-      cost_usd: 0,
+      cost_usd: "0",
       tokens_input: result.uncached_input_tokens,
       tokens_output: result.output_tokens,
       raw_payload: JSON.stringify(result),
@@ -481,16 +522,16 @@ export class AnthropicAdminPuller
       );
       return null;
     }
-    const amount = String(result.amount);
+    const amount = result.amount;
     return {
       source_event_id: `cost:${startingAt}:${dimensionPath(dimensions)}`,
       event_timestamp: startingAt,
       actor: "",
       action: "cost_report",
       target: dimension(result.model),
-      // Kept as a number for the canonical shape; the exact string rides the
-      // hint below, and that is the one the record is priced from.
-      cost_usd: Number(amount),
+      // Decimal string — no Number() coercion. The exact value rides through
+      // to the pricing service via the hint below.
+      cost_usd: amount,
       tokens_input: 0,
       tokens_output: 0,
       raw_payload: JSON.stringify(result),

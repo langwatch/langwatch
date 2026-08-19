@@ -1,5 +1,5 @@
 /**
- * The governed policy: where data may come from, which resource-loading paths
+ * The LangWatchQL policy: where data may come from, which resource-loading paths
  * exist, who controls the chart runtime, and what a transform or an expression
  * is allowed to do.
  *
@@ -8,16 +8,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  GOVERNED_FIXTURE_COLUMNS,
-  GOVERNED_FIXTURE_ROW_COUNTS,
-} from "../../__tests__/fixtures/governedDatasetRegistry";
+  LWQL_FIXTURE_COLUMNS,
+  LWQL_FIXTURE_ROW_COUNTS,
+} from "../../__tests__/fixtures/lwqlDatasetRegistry";
 import { lookupBetweenRegisteredDatasets } from "../../__tests__/fixtures/valid";
 import { validateVegaLiteSpec } from "../validateVegaLiteSpec";
 import { ALLOWED_VEGA_EXPRESSION_IDENTIFIERS } from "../vegaLiteExpressions";
 import {
   ALLOWED_VEGA_LITE_TRANSFORMS,
-  applyGovernedVegaPolicy,
-  GOVERNED_VEGA_LIMITS,
+  applyLangWatchQLVegaPolicy,
+  LWQL_VEGA_LIMITS,
 } from "../vegaLitePolicy";
 import { VEGA_LITE_SCHEMA_URL as S } from "../vegaLiteSchema";
 import type { VegaValidationError } from "../visualization.types";
@@ -25,8 +25,8 @@ import type { VegaValidationError } from "../visualization.types";
 const validate = (spec: unknown) =>
   validateVegaLiteSpec({
     spec,
-    columnsByDataset: GOVERNED_FIXTURE_COLUMNS,
-    rowCountsByDataset: GOVERNED_FIXTURE_ROW_COUNTS,
+    columnsByDataset: LWQL_FIXTURE_COLUMNS,
+    rowCountsByDataset: LWQL_FIXTURE_ROW_COUNTS,
   });
 
 const refusalRules = (spec: unknown): string[] => {
@@ -47,7 +47,7 @@ const bar = (extra: Record<string, unknown>) => ({
   ...extra,
 });
 
-describe("the governed Vega-Lite policy", () => {
+describe("the LangWatchQL Vega-Lite policy", () => {
   describe("given a spec that names a data source", () => {
     describe("when the name is not registered", () => {
       /** @scenario "Every data source must resolve to a registered named dataset" */
@@ -177,7 +177,7 @@ describe("the governed Vega-Lite policy", () => {
         // The schema catches a string `config` at the top level first, so the
         // rule is exercised where the schema is deliberately permissive: the
         // free-form `usermeta` dictionary.
-        const { errors } = applyGovernedVegaPolicy({
+        const { errors } = applyLangWatchQLVegaPolicy({
           spec: {
             config: "https://exfiltrate.example/config.json",
             mark: "bar",
@@ -252,7 +252,7 @@ describe("the governed Vega-Lite policy", () => {
         const pastTheTransformCeiling = bar({
           transform: [
             ...Array.from(
-              { length: GOVERNED_VEGA_LIMITS.maxTransforms },
+              { length: LWQL_VEGA_LIMITS.maxTransforms },
               (_, i) => ({
                 calculate: "datum.total + 1",
                 as: `c${i}`,

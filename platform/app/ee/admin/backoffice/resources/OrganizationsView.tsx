@@ -301,7 +301,6 @@ function OrganizationEditDrawer({
             title: "Organization updated",
             type: "success",
             duration: 3000,
-            meta: { closable: true },
           });
           onClose();
         },
