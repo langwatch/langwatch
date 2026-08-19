@@ -36,10 +36,12 @@ else
   pnpm prisma migrate deploy
 fi
 
-# restart the dev stack (patterns exclude this script itself)
-pkill -f "dev-superviso[r]" 2>/dev/null || true
-pkill -f "bin/pnpm de[v]" 2>/dev/null || true
-pkill -f "concurrentl[y]" 2>/dev/null || true
+# restart the dev stack (patterns exclude this script itself; SIGKILL because
+# concurrently's --restart-tries -1 stack survives plain TERM)
+pkill -9 -f "dev-superviso[r]" 2>/dev/null || true
+pkill -9 -f "bin/pnpm de[v]" 2>/dev/null || true
+pkill -9 -f "concurrentl[y]" 2>/dev/null || true
+pkill -9 -f "start:ap[p]" 2>/dev/null || true
 sleep 3
 nohup pnpm dev > /tmp/pnpm-dev.log 2>&1 &
 
