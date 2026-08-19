@@ -13,10 +13,10 @@ BDD spec:     specs/experiments/pairwise-compare-mvp.feature
 """
 
 import json
-import os
 from typing import Literal, Optional, cast
 
 import litellm
+from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
     BaseEvaluator,
     EvaluationResult,
@@ -161,11 +161,6 @@ class PairwiseCompareEvaluator(
     is_guardrail = False
 
     def evaluate(self, entry: PairwiseCompareEntry) -> SingleEvaluationResult:
-        os.environ["AZURE_API_VERSION"] = "2023-12-01-preview"
-        if self.env:
-            for key, env in self.env.items():
-                os.environ[key] = env
-
         if not entry.candidate_a_output or not entry.candidate_b_output:
             return EvaluationResultSkipped(
                 details="Missing candidate output(s)"
@@ -286,6 +281,7 @@ class PairwiseCompareEvaluator(
 
         response = litellm.completion(
             model=self.settings.model,
+            **azure_api_version(self.settings.model, "2023-12-01-preview"),
             messages=[
                 {
                     "role": "system",
