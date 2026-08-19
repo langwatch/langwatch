@@ -1,13 +1,17 @@
-"""Regression tests for concurrent evaluations sharing one environment.
+"""Regression tests for concurrent evaluations and credential isolation.
 
 The server used to run strictly one evaluation at a time per process, because
-each request's `env` (the caller's model credentials) is written into
-`os.environ` for litellm to read. That made a burst of N judge evaluations
+each request's `env` (the caller's model credentials) was written into
+`os.environ` for litellm to read: two concurrent evaluations with different
+credentials could read each other's. That made a burst of N judge evaluations
 take N times the single-call latency: a customer's 46-call experiment against
-a slow judge model took half an hour. Requests that carry the SAME
-credentials write identical values though, so they can safely overlap. The
-gate admits same-env evaluations together and only serializes generations
-with different envs.
+a slow judge model took half an hour.
+
+Now no evaluation touches `os.environ` at all. The request env is bound to the
+evaluation's own context (`langevals_core.request_env`) and resolved into
+explicit call arguments by the litellm patch layer, so evaluations run
+together whatever credentials they carry, and the gate only bounds how many
+run at once, first come first served.
 
 These tests drive the real ASGI app in-process. The slow evaluator is
 `langevals/exact_match` with its `evaluate` patched to sleep: `time.sleep`
@@ -43,8 +47,8 @@ finally:
         os.environ["DISABLE_EVALUATORS_PRELOAD"] = _original_preload
 
 # The server captured original_env while the temporary preload flag was set,
-# and the gate restores that snapshot after every burst. Rebase it on the
-# clean environment so the restore cannot leak the flag into other tests.
+# and the drift tripwire compares against that snapshot. Rebase it on the
+# clean environment so the flag cannot read as drift.
 server.original_env = os.environ.copy()
 
 
@@ -99,7 +103,12 @@ def slow_exact_match(monkeypatch):
             {
                 "started": started,
                 "finished": time.monotonic(),
-                "openai_key": os.environ.get("OPENAI_API_KEY"),
+                # The credential this evaluation received, and what the
+                # process environment held while it ran. The first must be
+                # the request's own; the second must never hold any
+                # request's.
+                "request_key": (self.env or {}).get("OPENAI_API_KEY"),
+                "global_key": os.environ.get("OPENAI_API_KEY"),
             }
         )
         return original_evaluate(self, entry)
@@ -137,9 +146,79 @@ async def test_same_env_evaluations_run_concurrently(slow_exact_match):
 
     assert all(r.status_code == 200 for r in responses)
     assert len(slow_exact_match) == 4
-    # Four 0.8s evaluations sharing one env must overlap: serialized they
-    # would take at least 3.2s.
+    # Four 0.8s evaluations must overlap: serialized they would take at
+    # least 3.2s.
     assert wall < 2.4
+
+
+@pytest.mark.anyio
+async def test_different_env_evaluations_run_concurrently_without_crossing(
+    slow_exact_match,
+):
+    """Different credentials no longer serialize, and never cross.
+
+    This is the inversion of the old contract: when request credentials were
+    written into os.environ, overlapping two tenants would have swapped their
+    keys mid-call, so the server serialized them. With credentials bound to
+    each evaluation's own context, the two tenants must overlap, each must
+    see exactly its own key, and neither key may ever appear in the process
+    environment.
+    """
+    transport = httpx.ASGITransport(app=server.app)
+    tenant_keys = {"tenant-a-key", "tenant-b-key"}
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", timeout=120
+    ) as client:
+        start = time.monotonic()
+        responses = await asyncio.gather(
+            *(
+                client.post(
+                    "/langevals/exact_match/evaluate",
+                    json=evaluation_request({"OPENAI_API_KEY": key}),
+                )
+                for key in sorted(tenant_keys)
+            )
+        )
+        wall = time.monotonic() - start
+
+    assert all(r.status_code == 200 for r in responses)
+    assert len(slow_exact_match) == 2
+    first, second = sorted(slow_exact_match, key=lambda o: o["started"])
+    # They overlapped: the second started before the first finished, and the
+    # pair beat the 1.6s serial floor.
+    assert second["started"] < first["finished"]
+    assert wall < 1.5
+    # Each evaluation carried its own credential, and no request credential
+    # ever reached the process environment.
+    assert {first["request_key"], second["request_key"]} == tenant_keys
+    assert first["global_key"] not in tenant_keys
+    assert second["global_key"] not in tenant_keys
+
+
+@pytest.mark.anyio
+async def test_the_process_environment_is_never_touched(slow_exact_match):
+    def without_pytest_marker(env: dict) -> dict:
+        # PYTEST_CURRENT_TEST is pytest's own per-phase marker and changes
+        # under our feet; everything else must be byte-identical.
+        return {k: v for k, v in env.items() if k != "PYTEST_CURRENT_TEST"}
+
+    before = without_pytest_marker(dict(os.environ))
+    transport = httpx.ASGITransport(app=server.app)
+    env = {"OPENAI_API_KEY": "must-never-enter-the-environment"}
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", timeout=120
+    ) as client:
+        await asyncio.gather(
+            *(
+                client.post(
+                    "/langevals/exact_match/evaluate",
+                    json=evaluation_request(env),
+                )
+                for _ in range(3)
+            )
+        )
+
+    assert without_pytest_marker(dict(os.environ)) == before
 
 
 @pytest.mark.anyio
@@ -199,158 +278,52 @@ async def test_a_burst_wider_than_the_default_thread_pool_runs_together(
     assert peak > ANYIO_DEFAULT_THREAD_POOL
 
 
-@pytest.mark.anyio
-async def test_different_env_evaluations_never_overlap(slow_exact_match):
-    transport = httpx.ASGITransport(app=server.app)
-    async with httpx.AsyncClient(
-        transport=transport, base_url="http://test", timeout=120
-    ) as client:
-        responses = await asyncio.gather(
-            *(
-                client.post(
-                    "/langevals/exact_match/evaluate",
-                    json=evaluation_request({"OPENAI_API_KEY": key}),
-                )
-                for key in ("tenant-a-key", "tenant-b-key")
-            )
-        )
+def test_admissions_run_in_arrival_order():
+    """Waiters are admitted first come first served, never overtaken."""
+    gate = server.EvaluationGate(max_concurrent=1, timeout_seconds=30)
+    entered: list[str] = []
+    entered_lock = threading.Lock()
+    releases = {name: threading.Event() for name in ("holder", "second", "third")}
+    threads: dict[str, threading.Thread] = {}
 
-    assert all(r.status_code == 200 for r in responses)
-    assert len(slow_exact_match) == 2
-    first, second = sorted(slow_exact_match, key=lambda o: o["started"])
-    # The second tenant's evaluation must not start until the first tenant's
-    # generation drained: overlapping them would swap credentials mid-call.
-    assert second["started"] >= first["finished"]
-    # And each evaluation saw its own credentials in the process env.
-    assert {first["openai_key"], second["openai_key"]} == {
-        "tenant-a-key",
-        "tenant-b-key",
-    }
+    def run(name: str) -> None:
+        with gate.admit():
+            with entered_lock:
+                entered.append(name)
+            releases[name].wait(5)
 
+    def start(name: str) -> None:
+        threads[name] = threading.Thread(target=run, args=(name,))
+        threads[name].start()
 
-@pytest.mark.anyio
-async def test_different_credentials_outside_the_provider_lists_never_overlap(
-    slow_exact_match,
-):
-    """A variable no provider list covers still separates two requests.
+    start("holder")
+    wait_until(lambda: gate.active_evaluations == 1, "The holder was not admitted")
+    start("second")
+    wait_until(lambda: gate.waiting_evaluations == 1, "The second never queued")
+    start("third")
+    wait_until(lambda: gate.waiting_evaluations == 2, "The third never queued")
 
-    `set_model_envs` is not the only writer of the process environment: the
-    custom LLM evaluators and every Ragas evaluator copy the whole request
-    env into `os.environ` while they run. Bedrock credentials travel that
-    way, so two tenants that differ only in an AWS variable would overwrite
-    each other if the gate let them share a generation.
-    """
-    transport = httpx.ASGITransport(app=server.app)
-    async with httpx.AsyncClient(
-        transport=transport, base_url="http://test", timeout=120
-    ) as client:
-        responses = await asyncio.gather(
-            *(
-                client.post(
-                    "/langevals/exact_match/evaluate",
-                    json=evaluation_request(
-                        {
-                            "AWS_ACCESS_KEY_ID": f"{tenant}-id",
-                            "AWS_SECRET_ACCESS_KEY": f"{tenant}-secret",
-                        }
-                    ),
-                )
-                for tenant in ("tenant-a", "tenant-b")
-            )
-        )
+    releases["holder"].set()
+    wait_until(lambda: "second" in entered, "The second was not admitted")
+    # The third is still waiting: capacity is 1 and the second holds it.
+    assert "third" not in entered
+    releases["second"].set()
+    wait_until(lambda: "third" in entered, "The third was not admitted")
+    releases["third"].set()
 
-    assert all(r.status_code == 200 for r in responses)
-    assert len(slow_exact_match) == 2
-    first, second = sorted(slow_exact_match, key=lambda o: o["started"])
-    assert second["started"] >= first["finished"]
-
-
-@pytest.mark.anyio
-async def test_environment_is_restored_after_the_burst(slow_exact_match):
-    expected_env = dict(os.environ)
-    transport = httpx.ASGITransport(app=server.app)
-    env = {"OPENAI_API_KEY": "must-not-outlive-the-burst"}
-    async with httpx.AsyncClient(
-        transport=transport, base_url="http://test", timeout=120
-    ) as client:
-        await asyncio.gather(
-            *(
-                client.post(
-                    "/langevals/exact_match/evaluate",
-                    json=evaluation_request(env),
-                )
-                for _ in range(3)
-            )
-        )
-
-    # The whole environment, not just the injected credential, is back to its
-    # pre-burst state. PYTEST_CURRENT_TEST is pytest's own per-phase marker:
-    # it was set after the server captured its baseline, so the restore
-    # legitimately drops it and pytest re-sets it on the next phase.
-    def without_pytest_marker(env: dict) -> dict:
-        return {k: v for k, v in env.items() if k != "PYTEST_CURRENT_TEST"}
-
-    assert without_pytest_marker(dict(os.environ)) == without_pytest_marker(
-        expected_env
-    )
-
-
-@pytest.mark.anyio
-async def test_waiting_environment_runs_before_later_requests_for_the_old_one(
-    slow_exact_match,
-):
-    transport = httpx.ASGITransport(app=server.app)
-    async with httpx.AsyncClient(
-        transport=transport, base_url="http://test", timeout=120
-    ) as client:
-
-        def post(key: str):
-            return asyncio.create_task(
-                client.post(
-                    "/langevals/exact_match/evaluate",
-                    json=evaluation_request({"OPENAI_API_KEY": key}),
-                )
-            )
-
-        first_generation = [post("tenant-a-key") for _ in range(2)]
-        deadline = time.monotonic() + 5
-        while server.evaluation_gate.active_evaluations == 0:
-            if time.monotonic() >= deadline:
-                pytest.fail("The first generation was not admitted within 5s")
-            await asyncio.sleep(0.01)
-
-        tenant_b = post("tenant-b-key")
-        deadline = time.monotonic() + 5
-        while not server.evaluation_gate.waiting_environments:
-            if time.monotonic() >= deadline:
-                pytest.fail("The waiting environment never queued within 5s")
-            await asyncio.sleep(0.01)
-
-        # Arrives while tenant B is already waiting, so it must queue BEHIND
-        # tenant B even though its env matches the running generation.
-        late_tenant_a = post("tenant-a-key")
-
-        responses = await asyncio.gather(
-            *first_generation, tenant_b, late_tenant_a
-        )
-
-    assert all(r.status_code == 200 for r in responses)
-    by_key: dict[str, list[dict]] = {}
-    for observation in slow_exact_match:
-        by_key.setdefault(observation["openai_key"], []).append(observation)
-    b_evaluation = by_key["tenant-b-key"][0]
-    late_a_started = max(o["started"] for o in by_key["tenant-a-key"])
-    # Generations run in first-waiter order: B before the A request that
-    # queued after it, with no overlap between the generations.
-    assert b_evaluation["started"] < late_a_started
-    assert late_a_started >= b_evaluation["finished"]
+    for name, thread in threads.items():
+        thread.join(timeout=5)
+        assert not thread.is_alive(), f"{name} never finished"
+    assert entered == ["holder", "second", "third"]
+    assert gate.active_evaluations == 0
+    assert gate.waiting_evaluations == 0
 
 
 def test_gate_times_out_with_a_clear_error():
     gate = server.EvaluationGate(max_concurrent=1, timeout_seconds=0.05)
-    with gate.admit(()):
+    with gate.admit():
         with pytest.raises(server.EvaluationQueueTimeout):
-            with gate.admit((("OPENAI_API_KEY", "other"),)):
+            with gate.admit():
                 pass
 
 
@@ -358,16 +331,15 @@ def test_capacity_freed_after_the_deadline_does_not_admit():
     clock = ManualClock()
     gate = server.EvaluationGate(max_concurrent=1, timeout_seconds=30, clock=clock)
     release = threading.Event()
-    late_key = (("OPENAI_API_KEY", "late"),)
     late_outcome: list[str] = []
 
     def holder():
-        with gate.admit(()):
+        with gate.admit():
             release.wait(5)
 
     def late_request():
         try:
-            with gate.admit(late_key):
+            with gate.admit():
                 late_outcome.append("admitted")
         except server.EvaluationQueueTimeout:
             late_outcome.append("timed out")
@@ -379,7 +351,7 @@ def test_capacity_freed_after_the_deadline_does_not_admit():
     waiting = threading.Thread(target=late_request)
     waiting.start()
     wait_until(
-        lambda: gate.waiting_environments == [late_key],
+        lambda: gate.waiting_evaluations == 1,
         "The late request never queued",
     )
 
@@ -394,107 +366,8 @@ def test_capacity_freed_after_the_deadline_does_not_admit():
     assert not waiting.is_alive()
     assert not holding.is_alive()
     assert late_outcome == ["timed out"]
-    assert gate.waiting_environments == []
+    assert gate.waiting_evaluations == 0
     assert gate.active_evaluations == 0
     # The gate is healthy afterwards: a fresh request admits immediately.
-    with gate.admit((("OPENAI_API_KEY", "fresh"),)):
+    with gate.admit():
         assert gate.active_evaluations == 1
-
-
-def test_a_repeating_environment_cannot_hold_the_queue_front():
-    """A request joins a queued generation of its own env, but not a running one.
-
-    Requests that arrive while their own env is still queued join that
-    queued generation, because batching same-env work is what the gate is
-    for. That costs the env behind them one generation, never more: the
-    moment the generation starts, its waiters leave the queue and the front
-    belongs to the next env, so every later request of the running env
-    queues behind it. A repeating env therefore cannot hold the front.
-    """
-    gate = server.EvaluationGate(max_concurrent=3, timeout_seconds=30)
-    env_a = (("OPENAI_API_KEY", "a"),)
-    env_b = (("OPENAI_API_KEY", "b"),)
-    env_c = (("OPENAI_API_KEY", "c"),)
-    entered: list[str] = []
-    entered_lock = threading.Lock()
-    releases = {name: threading.Event() for name in ("a", "b1", "b2", "c", "b3")}
-    threads: dict[str, threading.Thread] = {}
-
-    def entered_so_far() -> list[str]:
-        with entered_lock:
-            return list(entered)
-
-    def start(name: str, key: tuple) -> None:
-        def run():
-            with gate.admit(key):
-                with entered_lock:
-                    entered.append(name)
-                releases[name].wait(5)
-
-        threads[name] = threading.Thread(target=run)
-        threads[name].start()
-
-    start("a", env_a)
-    wait_until(lambda: gate.active_evaluations == 1, "A was not admitted")
-
-    start("b1", env_b)
-    wait_until(lambda: gate.waiting_environments == [env_b], "B never queued")
-    start("c", env_c)
-    wait_until(
-        lambda: gate.waiting_environments == [env_b, env_c],
-        "C never queued behind B",
-    )
-    # Arrives while B is still queued and C waits behind it, so it joins B's
-    # queued generation instead of forming a third one after C.
-    start("b2", env_b)
-    wait_until(lambda: gate.waiting_evaluations == 3, "The second B never queued")
-
-    releases["a"].set()
-    wait_until(
-        lambda: gate.active_evaluations == 2, "Both B requests did not run together"
-    )
-
-    # B is running now, so it no longer holds the queue front. This request
-    # queues behind C even though its env matches the running generation and
-    # the gate still has spare capacity.
-    start("b3", env_b)
-    wait_until(
-        lambda: gate.waiting_environments == [env_c, env_b],
-        "The late B never queued behind C",
-    )
-
-    releases["b1"].set()
-    releases["b2"].set()
-    wait_until(lambda: "c" in entered_so_far(), "C did not run after B drained")
-    releases["c"].set()
-    wait_until(lambda: "b3" in entered_so_far(), "The late B did not run after C")
-    releases["b3"].set()
-
-    for name, thread in threads.items():
-        thread.join(timeout=5)
-        assert not thread.is_alive(), f"{name} never finished"
-
-    assert entered[0] == "a"
-    assert set(entered[1:3]) == {"b1", "b2"}
-    assert entered[3:] == ["c", "b3"]
-    assert gate.active_evaluations == 0
-    assert gate.waiting_evaluations == 0
-
-
-def test_the_env_key_separates_requests_by_every_variable():
-    assert server.request_env_key(None) == ()
-    assert server.request_env_key({}) == ()
-    same = {"OPENAI_API_KEY": "k", "AZURE_API_KEY": "a"}
-    assert server.request_env_key(same) == server.request_env_key(
-        dict(reversed(same.items()))
-    )
-    assert server.request_env_key({"OPENAI_API_KEY": "k"}) != server.request_env_key(
-        {"OPENAI_API_KEY": "other"}
-    )
-    # A credential no provider list here covers still changes the key. Bedrock
-    # reaches litellm through AWS variables, and the evaluators that copy the
-    # whole env would otherwise overwrite each other while both run.
-    assert server.request_env_key({"AWS_SECRET_ACCESS_KEY": "a"}) != ()
-    assert server.request_env_key(
-        {"AWS_SECRET_ACCESS_KEY": "a"}
-    ) != server.request_env_key({"AWS_SECRET_ACCESS_KEY": "b"})

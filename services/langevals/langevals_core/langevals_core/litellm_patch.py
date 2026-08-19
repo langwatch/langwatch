@@ -7,9 +7,31 @@ import litellm.cost_calculator
 from openai import OpenAI, AzureOpenAI
 import json
 
+from langevals_core.request_env import current_request_env
+
 # Necessary for running DSPy on AWS lambdas
 os.environ["DSP_CACHEDIR"] = mkdtemp()
 os.environ["DSPY_CACHEDIR"] = mkdtemp()
+
+# An operator configuring azure on the server environment may use either the
+# AZURE_OPENAI_* names or litellm's AZURE_API_* names; litellm only reads its
+# own. Alias the SERVER environment once at import, both ways. Request
+# credentials never pass through here: they stay in the request context and
+# reach litellm as call arguments, where `request_credentials` accepts both
+# spellings itself.
+def _alias_baseline_azure_env() -> None:
+    aliases = [
+        ("AZURE_OPENAI_API_KEY", "AZURE_API_KEY"),
+        ("AZURE_OPENAI_ENDPOINT", "AZURE_API_BASE"),
+    ]
+    for openai_name, litellm_name in aliases:
+        if os.environ.get(openai_name) and not os.environ.get(litellm_name):
+            os.environ[litellm_name] = os.environ[openai_name]
+        if os.environ.get(litellm_name) and not os.environ.get(openai_name):
+            os.environ[openai_name] = os.environ[litellm_name]
+
+
+_alias_baseline_azure_env()
 
 # Parameters that need type conversion from string env vars
 INT_PARAMS = {"max_tokens", "seed", "n", "top_logprobs", "max_completion_tokens"}
@@ -126,71 +148,187 @@ def convert_param_type(key: str, value: str):
     return value
 
 
-# Patch litellm completion for mapping AZURE_DEPLOYMENT_NAME into the model name
-def patch_litellm():
-    _original_completion = litellm.completion
+# The request env vars that resolve into litellm call arguments, by the
+# model's provider prefix. This is how a request's credentials reach the call
+# without anyone writing os.environ: the names mirror what litellm itself
+# reads from the environment, so behavior is unchanged for credentials that
+# live in the server's own environment (litellm still falls back to those on
+# its own). Azure accepts both its litellm names and the AZURE_OPENAI_* names
+# the platform sends; first present wins.
+PROVIDER_CREDENTIAL_VARS = {
+    "openai": {
+        "api_key": ["OPENAI_API_KEY"],
+        "api_base": ["OPENAI_BASE_URL"],
+    },
+    "azure": {
+        "api_key": ["AZURE_API_KEY", "AZURE_OPENAI_API_KEY"],
+        "api_base": ["AZURE_API_BASE", "AZURE_OPENAI_ENDPOINT"],
+        "api_version": ["AZURE_API_VERSION"],
+    },
+    "anthropic": {"api_key": ["ANTHROPIC_API_KEY"]},
+    "groq": {"api_key": ["GROQ_API_KEY"]},
+    "gemini": {"api_key": ["GEMINI_API_KEY"]},
+    "vertex_ai": {"vertex_credentials": ["GOOGLE_APPLICATION_CREDENTIALS"]},
+}
 
-    def patch_litellm_params(kwargs):
-        kwargs["drop_params"] = True
-        # Caching on disk is timing out for some reason, disable it
-        kwargs["cache"] = {"no-cache": True, "no-store": True}
 
-        if os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") is not None:
-            kwargs["vertex_credentials"] = os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
+def _model_provider(model: str) -> str:
+    # litellm treats a bare model name (no provider prefix) as openai.
+    return model.split("/", 1)[0] if "/" in model else "openai"
 
-        for key, value in os.environ.items():
-            if key.startswith("X_LITELLM_") and not key.startswith(
-                "X_LITELLM_EMBEDDINGS_"
-            ):
-                replaced_key = key.replace("X_LITELLM_", "")
-                # check if key is all uppercase, likely not a litellm key and got here by accident
-                if replaced_key.isupper():
-                    continue
-                kwargs[replaced_key] = convert_param_type(replaced_key, value)
 
-        if "extra_headers" in kwargs and isinstance(kwargs["extra_headers"], str):
-            kwargs["extra_headers"] = json.loads(kwargs["extra_headers"])
+def azure_api_version(model: str, api_version: str) -> dict:
+    """The api_version call argument for an azure model, empty for any other.
 
-        # Azure patches
-        if (
-            os.environ.get("AZURE_DEPLOYMENT_NAME") is not None
-            and "model" in kwargs
-            and kwargs["model"].startswith("azure/")
+    Evaluators used to pin their azure API version by writing AZURE_API_VERSION
+    into os.environ; as a call argument the pin stays with the one call it
+    belongs to. A request's X_LITELLM_api_version still overrides it, the same
+    precedence the environment write had.
+    """
+    return {"api_version": api_version} if model.startswith("azure/") else {}
+
+
+def request_credentials(kwargs: dict) -> None:
+    """Resolve the running evaluation's env into explicit call arguments.
+
+    Explicit arguments already on the call are kept: an evaluator that names
+    its own api_version, or a test that injects a client, always wins. The
+    request env fills the gaps, and whatever the request does not carry is
+    left for litellm to resolve from the server's own environment, which is
+    exactly where non-request credentials live.
+    """
+    env = current_request_env()
+    if not env:
+        return
+    provider_vars = PROVIDER_CREDENTIAL_VARS.get(
+        _model_provider(kwargs.get("model") or ""), {}
+    )
+    for argument, var_names in provider_vars.items():
+        if kwargs.get(argument) is not None:
+            continue
+        for var_name in var_names:
+            if env.get(var_name):
+                kwargs[argument] = env[var_name]
+                break
+
+
+def patch_litellm_params(kwargs):
+    kwargs["drop_params"] = True
+    # Caching on disk is timing out for some reason, disable it
+    kwargs["cache"] = {"no-cache": True, "no-store": True}
+
+    request_env = current_request_env()
+
+    google_credentials = request_env.get(
+        "GOOGLE_APPLICATION_CREDENTIALS"
+    ) or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    if google_credentials is not None:
+        kwargs["vertex_credentials"] = google_credentials
+
+
+    request_credentials(kwargs)
+
+    # X_LITELLM_* variables are litellm call arguments by name. The server's
+    # own environment provides the baseline and the request env overrides it,
+    # the same precedence get_env gives every other variable.
+    for key, value in {**os.environ, **request_env}.items():
+        if key.startswith("X_LITELLM_") and not key.startswith(
+            "X_LITELLM_EMBEDDINGS_"
         ):
-            kwargs["model"] = "azure/" + os.environ["AZURE_DEPLOYMENT_NAME"]
+            replaced_key = key.replace("X_LITELLM_", "")
+            # check if key is all uppercase, likely not a litellm key and got here by accident
+            if replaced_key.isupper():
+                continue
+            kwargs[replaced_key] = convert_param_type(replaced_key, value)
 
-        if "use_azure_gateway" in kwargs:
-            kwargs["model"] = kwargs["model"].replace("azure/", "")
+    if "extra_headers" in kwargs and isinstance(kwargs["extra_headers"], str):
+        kwargs["extra_headers"] = json.loads(kwargs["extra_headers"])
 
-            if "/openai/" in kwargs["api_base"]:
-                if not kwargs["api_base"].endswith("/"):
-                    kwargs["api_base"] += "/"
+    # Azure patches
+    deployment_name = request_env.get("AZURE_DEPLOYMENT_NAME") or os.environ.get(
+        "AZURE_DEPLOYMENT_NAME"
+    )
+    if (
+        deployment_name is not None
+        and "model" in kwargs
+        and kwargs["model"].startswith("azure/")
+    ):
+        kwargs["model"] = "azure/" + deployment_name
 
-                if "/deployments" not in kwargs["api_base"]:
-                    kwargs["api_base"] += "deployments/"
+    if "use_azure_gateway" in kwargs:
+        kwargs["model"] = kwargs["model"].replace("azure/", "")
 
-                kwargs["api_base"] += kwargs["model"]
+        if "/openai/" in kwargs["api_base"]:
+            if not kwargs["api_base"].endswith("/"):
+                kwargs["api_base"] += "/"
 
-            kwargs["client"] = OpenAI(
-                base_url=kwargs["api_base"],
-                default_query={"api-version": kwargs["api_version"]},
-            )
+            if "/deployments" not in kwargs["api_base"]:
+                kwargs["api_base"] += "deployments/"
 
-            del kwargs["api_base"]
-            del kwargs["use_azure_gateway"]
+            kwargs["api_base"] += kwargs["model"]
 
-        # Last, so that an operator's X_LITELLM_reasoning_effort counts as an
-        # explicit choice and the azure rewrites above have already settled
-        # which model the request actually names.
-        kwargs = apply_tool_reasoning_compatibility(kwargs)
+        kwargs["client"] = OpenAI(
+            base_url=kwargs["api_base"],
+            default_query={"api-version": kwargs["api_version"]},
+        )
 
-        return kwargs
+        del kwargs["api_base"]
+        del kwargs["use_azure_gateway"]
+
+    # Last, so that an operator's X_LITELLM_reasoning_effort counts as an
+    # explicit choice and the azure rewrites above have already settled
+    # which model the request actually names.
+    kwargs = apply_tool_reasoning_compatibility(kwargs)
+
+    return kwargs
+
+
+def patch_litellm_embedding_params(kwargs):
+    kwargs["drop_params"] = True
+
+    request_env = current_request_env()
+
+    embeddings_deployment = request_env.get(
+        "AZURE_EMBEDDINGS_DEPLOYMENT_NAME"
+    ) or os.environ.get("AZURE_EMBEDDINGS_DEPLOYMENT_NAME")
+    if embeddings_deployment is not None:
+        kwargs["model"] = "azure/" + embeddings_deployment
+
+    request_credentials(kwargs)
+
+    for key, value in {**os.environ, **request_env}.items():
+        if key.startswith("X_LITELLM_EMBEDDINGS_"):
+            replaced_key = key.replace("X_LITELLM_EMBEDDINGS_", "")
+            # check if key is all uppercase, likely not a litellm key and got here by accident
+            if replaced_key.isupper():
+                continue
+            kwargs[replaced_key] = convert_param_type(replaced_key, value)
+
+    if "extra_headers" in kwargs and isinstance(kwargs["extra_headers"], str):
+        kwargs["extra_headers"] = json.loads(kwargs["extra_headers"])
+
+    return kwargs
+
+
+# The unpatched litellm entry points. Tests replace these to capture the
+# final call arguments after every patch above has been applied; nothing else
+# should touch them.
+originals: dict = {}
+
+
+def patch_litellm():
+    if originals:
+        return
+    originals["completion"] = litellm.completion
+    originals["acompletion"] = litellm.acompletion
+    originals["embedding"] = litellm.embedding
+    originals["completion_cost"] = litellm.cost_calculator.completion_cost
 
     def patched_completion(*args, **kwargs):
         kwargs = patch_litellm_params(kwargs)
 
         try:
-            return _original_completion(*args, **kwargs)
+            return originals["completion"](*args, **kwargs)
         except Exception as exception:
             conflict = tool_reasoning_conflict(kwargs, exception)
             if conflict is not None:
@@ -199,13 +337,11 @@ def patch_litellm():
 
     litellm.completion = patched_completion
 
-    _original_acompletion = litellm.acompletion
-
     async def patched_acompletion(*args, **kwargs):
         kwargs = patch_litellm_params(kwargs)
 
         try:
-            return await _original_acompletion(*args, **kwargs)
+            return await originals["acompletion"](*args, **kwargs)
         except Exception as exception:
             conflict = tool_reasoning_conflict(kwargs, exception)
             if conflict is not None:
@@ -214,35 +350,16 @@ def patch_litellm():
 
     litellm.acompletion = patched_acompletion
 
-    _original_embedding = litellm.embedding
-
     def patched_embedding(*args, **kwargs):
-        kwargs["drop_params"] = True
-        if os.environ.get("AZURE_EMBEDDINGS_DEPLOYMENT_NAME") is not None:
-            kwargs["model"] = "azure/" + os.environ["AZURE_EMBEDDINGS_DEPLOYMENT_NAME"]
-        # if os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") is not None:
-        #     kwargs["vertex_credentials"] = os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
-        for key, value in os.environ.items():
-            if key.startswith("X_LITELLM_EMBEDDINGS_"):
-                replaced_key = key.replace("X_LITELLM_EMBEDDINGS_", "")
-                # check if key is all uppercase, likely not a litellm key and got here by accident
-                if replaced_key.isupper():
-                    continue
-                kwargs[replaced_key] = convert_param_type(replaced_key, value)
-
-        if "extra_headers" in kwargs and isinstance(kwargs["extra_headers"], str):
-            kwargs["extra_headers"] = json.loads(kwargs["extra_headers"])
-
-        return _original_embedding(*args, **kwargs)
+        kwargs = patch_litellm_embedding_params(kwargs)
+        return originals["embedding"](*args, **kwargs)
 
     litellm.embedding = patched_embedding
-
-    _original_completion_cost = litellm.cost_calculator.completion_cost
 
     # Fail silently if completion_cost fails
     def patched_completion_cost(*args, **kwargs):
         try:
-            return _original_completion_cost(*args, **kwargs)
+            return originals["completion_cost"](*args, **kwargs)
         except Exception as e:
             warnings.warn(f"Failed to calculate completion_cost: {e}")
             return None

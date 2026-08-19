@@ -88,44 +88,20 @@ def size_thread_pool_for_evaluations() -> None:
         limiter.total_tokens = wanted
 
 
-def request_env_key(env: Optional[dict[str, str]]) -> tuple:
-    """Everything a request can write into `os.environ`.
-
-    `BaseEvaluator.set_model_envs` writes the model provider credentials and
-    the litellm passthrough variables, but it is not the only writer: the
-    custom LLM evaluators and every Ragas evaluator, through `prepare_llm`,
-    copy the whole `env` of the request into `os.environ` while they run. So
-    the whole `env` is what decides which requests write the same process
-    environment. Requests that share this key write identical values and can
-    run at the same time. Any difference keeps them in separate generations,
-    whether or not the variable belongs to a provider this service knows,
-    because credentials for Bedrock and other providers reach litellm through
-    variables that no allowlist here covers.
-    """
-    if not env:
-        return ()
-    return tuple(sorted(env.items()))
-
-
 class EvaluationQueueTimeout(Exception):
     """Raised when a request waited out the queue timeout without admission."""
 
 
 class EvaluationGate:
-    """Admits evaluations concurrently while they share one environment.
+    """Bounds how many evaluations run at once, first come first served.
 
-    Evaluations write their request `env` into `os.environ` because litellm
-    reads credentials implicitly, so two evaluations with different
-    credentials must never overlap. Two evaluations with the same credentials
-    write identical values, so they can, and on a single-project install
-    (where every request carries the same provider keys) that is every
-    evaluation. The gate tracks the env of the in-flight evaluations as a
-    generation: same-env requests run together up to `max_concurrent`, and
-    waiters queue per env key in arrival order. As soon as any request waits,
-    the running generation stops admitting new entries, so a steady stream
-    with one env cannot starve the others: generations run strictly in the
-    order their first waiter arrived. The process environment is restored
-    once the last evaluation of a generation leaves.
+    Credentials do not constrain admission: a request's `env` stays in its own
+    evaluation context and reaches the model call as explicit arguments (see
+    `langevals_core.request_env`), so evaluations with different credentials
+    run together safely. What is left for the gate is overload protection:
+    at most `max_concurrent` evaluations run, waiters are admitted strictly
+    in arrival order, and a waiter that outlives `timeout_seconds` is
+    rejected so its caller gets a clear signal instead of a stale result.
     """
 
     def __init__(
@@ -136,11 +112,11 @@ class EvaluationGate:
     ):
         self._condition = threading.Condition()
         self._active = 0
-        self._key: Optional[tuple] = None
-        # Waiting env keys in first-arrival order, each with its waiter
-        # count. Timed-out waiters remove themselves, so a key nobody waits
-        # for anymore can never block the queue.
-        self._waiting: OrderedDict[tuple, int] = OrderedDict()
+        # Arrival-ordered tickets of the requests waiting for capacity.
+        # Timed-out waiters remove their ticket, so an abandoned ticket can
+        # never block the queue.
+        self._waiting: OrderedDict[int, None] = OrderedDict()
+        self._next_ticket = 0
         self._max_concurrent = max_concurrent
         self._timeout_seconds = timeout_seconds
         # The queue deadline reads the clock through this attribute, so a
@@ -153,69 +129,79 @@ class EvaluationGate:
         return self._active
 
     @property
-    def waiting_environments(self) -> list[tuple]:
-        return list(self._waiting)
-
-    @property
     def waiting_evaluations(self) -> int:
-        return sum(self._waiting.values())
+        return len(self._waiting)
 
-    def _may_admit(self, key: tuple) -> bool:
+    def _may_admit(self, ticket: Optional[int]) -> bool:
         if self._active >= self._max_concurrent:
             return False
         front = next(iter(self._waiting), None)
-        if front is not None and front != key:
-            return False
-        # Either join the open generation with the same env, or start a new
-        # generation on a drained gate.
-        return self._key == key or self._key is None
-
-    def _leave_queue(self, key: tuple) -> None:
-        remaining = self._waiting.get(key, 0) - 1
-        if remaining > 0:
-            self._waiting[key] = remaining
-        else:
-            self._waiting.pop(key, None)
-            # The queue front may have changed; blocked waiters of the next
-            # key must re-check instead of sitting out their own deadline.
-            self._condition.notify_all()
+        # Nobody may overtake the queue: with waiters present, only the
+        # earliest ticket goes through.
+        return front is None or front == ticket
 
     @contextmanager
-    def admit(self, key: tuple):
+    def admit(self):
         deadline = self._clock() + self._timeout_seconds
         with self._condition:
-            is_queued = False
+            ticket: Optional[int] = None
             try:
                 while True:
                     # A queued request past its deadline is rejected even if
                     # capacity happens to free at that same moment: its
                     # caller already gave up, so running it would only delay
                     # the live requests behind it.
-                    if is_queued and self._clock() >= deadline:
+                    if ticket is not None and self._clock() >= deadline:
                         raise EvaluationQueueTimeout()
-                    if self._may_admit(key):
+                    if self._may_admit(ticket):
                         break
-                    if not is_queued:
-                        self._waiting[key] = self._waiting.get(key, 0) + 1
-                        is_queued = True
+                    if ticket is None:
+                        ticket = self._next_ticket
+                        self._next_ticket += 1
+                        self._waiting[ticket] = None
                     self._condition.wait(deadline - self._clock())
             finally:
-                if is_queued:
-                    self._leave_queue(key)
-            self._key = key
+                if ticket is not None:
+                    self._waiting.pop(ticket, None)
+                    # The queue front may have changed; blocked waiters
+                    # behind it must re-check instead of sitting out their
+                    # own deadline.
+                    self._condition.notify_all()
             self._active += 1
         try:
             yield
         finally:
             with self._condition:
                 self._active -= 1
-                if self._active == 0:
-                    # Drop the request credentials (and anything an evaluator
-                    # library set) the moment nothing is running anymore.
-                    os.environ.clear()
-                    os.environ.update(original_env)
-                    self._key = None
+                self._warn_once_on_environment_drift()
                 self._condition.notify_all()
+
+    _drift_warned = False
+
+    def _warn_once_on_environment_drift(self) -> None:
+        """Tripwire for a writer regression, checked when the gate drains.
+
+        No evaluation writes the process environment anymore; that is what
+        makes different-credential evaluations safe to run together. If an
+        evaluator or library starts writing again, concurrent requests could
+        read each other's credentials, so make the regression visible. Warn
+        rather than restore: rewriting os.environ while other evaluations run
+        is exactly the class of mutation this server no longer does.
+        """
+        if self._active > 0 or EvaluationGate._drift_warned:
+            return
+        if dict(os.environ) != original_env:
+            EvaluationGate._drift_warned = True
+            drifted = {
+                key
+                for key in set(os.environ) | set(original_env)
+                if os.environ.get(key) != original_env.get(key)
+            }
+            print(
+                "WARNING: the process environment changed while evaluations "
+                f"ran (keys: {', '.join(sorted(drifted))}). Evaluations must "
+                "not write os.environ; check for a writer regression."
+            )
 
 
 evaluation_gate = EvaluationGate(
@@ -280,13 +266,13 @@ def create_evaluator_routes(evaluator_cls):
         # evaluation never blocks the event loop and /healthcheck stays
         # responsive under load.
         try:
-            with evaluation_gate.admit(request_env_key(req.env)):
+            with evaluation_gate.admit():
                 if module_name == "ragas":
                     nest_asyncio_if_running_loop()
-                # Constructing the evaluator writes the request env into
-                # os.environ (set_model_envs), and some evaluators write the
-                # whole env again while they run. Everything admitted
-                # together carries the same env, so the writes are identical.
+                # The request env stays on the evaluator and is bound to each
+                # entry's evaluation context; nothing about this request
+                # touches os.environ, which is what lets requests with
+                # different credentials run at the same time.
                 evaluator = evaluator_cls(settings=(req.settings or {}), env=req.env)  # type: ignore
                 return evaluator.evaluate_batch(
                     req.data,
