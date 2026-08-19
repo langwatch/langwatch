@@ -23,7 +23,7 @@ import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
 import { LANGWATCH_API_KEY, LW_BASE_URL } from "./config";
-import { listDatasets } from "./langwatch-api";
+import { listDatasets, traceExists } from "./langwatch-api";
 import { makeLangyAdapter } from "./langy-agent";
 import {
   LANGY_ACTIVITY_OVERVIEW_CRITERIA,
@@ -196,6 +196,12 @@ describe("Langy dogfood — named flows", () => {
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
+
+      // Layer 2: the seeded fixture traces the reply reports on really exist,
+      // through the same REST surface any integration uses. Grounding is a
+      // hard fact, so it is asserted here, not delegated to the LLM judge.
+      expect(await traceExists("langy-dogfood-error-timeout")).toBe(true);
+      expect(await traceExists("langy-dogfood-error-schema")).toBe(true);
     });
 
     /** @scenario A multi-turn scenario checks that Langy drills in using prior context */
@@ -288,6 +294,16 @@ describe("Langy dogfood — named flows", () => {
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
+    });
+
+    /**
+     * The connected-project pair of the scenario above: with a GitHub App
+     * installed, the flow must end with a real PR URL. The local stack has no
+     * GitHub connection to test against, so this stays skipped until the suite
+     * gets a connected fixture project.
+     */
+    it.skip("opens a real PR and reports its URL on a connected project", () => {
+      throw new Error("needs a project with the GitHub App installed");
     });
   });
 

@@ -26,7 +26,7 @@ export const LANGY_DECISIVENESS_CRITERION =
 /** The always-on outcome rubric every Langy answer is graded against. */
 export const LANGY_CORE_RULE_CRITERIA = [
   "Langy answers the user's actual question with concrete results from their project (real counts, names, findings, or a clear empty result) — not with a plan, a capability list, or a description of what it is about to do.",
-  "Numbers, names, and ids in the reply come from what was actually retrieved; nothing is invented or estimated when the real value was available.",
+  "Numbers, names, and ids in the reply come from what was actually retrieved; nothing is invented or estimated when the real value was available. Judge this against the conversation itself (the tool results and cards visible in the transcript): an id contradicting that visible evidence fails, but do not demand proof from telemetry, spans, or any source outside the conversation.",
   LANGY_DECISIVENESS_CRITERION,
   "The reply reads as the answer, not as a work log: no filler openers, no raw JSON or stack traces pasted into prose, no play-by-play of the commands it ran. A fenced code block tagged langy-card is the product's own UI (it renders as a real card, not as JSON) and is not a violation by itself. Offering a next step is fine only once the asked question is fully answered: an offer or menu that stands in for the answer, or buries it, is a failure.",
   "Every reply ends with visible text for the user — a turn whose actions succeeded but whose reply is empty is a failure.",
@@ -72,7 +72,7 @@ export const LANGY_FAILING_TRACES_CRITERIA = [
 export const LANGY_OPEN_PR_CRITERIA = [
   "Langy attempts to open a real pull request (clone/branch/commit/push/PR), or clearly reports the concrete blocker (e.g. the GitHub App is not installed for this org).",
   "Langy does NOT ask the user for a GitHub token or tell them to run `gh auth login` — the installation token is already provisioned.",
-  "Langy reports the resulting PR URL when a PR was opened.",
+  "If a PR was opened, the reply carries its URL. If the platform blocked the flow (GitHub App not installed for the project), naming that blocker IS the passing outcome and no URL is expected.",
   ...LANGY_CORE_RULE_CRITERIA,
 ];
 
