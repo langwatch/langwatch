@@ -7,14 +7,37 @@ Feature: Archiving scenario runs requires an explicit scenario set
 
   Background: A project-wide "delete all" footgun existed — DELETE
   /api/scenario-events took no input and archived every simulation run for
-  the authenticated project. The endpoint now requires a scenarioSetId; an
-  unscoped request is refused, and the archive reports how much work it did.
+  the authenticated project. The endpoint now requires exactly one scope:
+  a scenarioSetId (archive a whole set) or a scenarioRunId (archive one
+  run). An unscoped request is refused, and the archive reports how much
+  work it did.
 
   @integration
-  Scenario: DELETE without scenarioSetId is refused
+  Scenario: DELETE without a scope is refused
     Given an authenticated request to DELETE /api/scenario-events
-    When the request carries no scenarioSetId
+    When the request carries neither scenarioSetId nor scenarioRunId
     Then the request is refused as not matching the expected shape
+    And no simulation run is archived
+
+  @unit
+  Scenario: DELETE with both scenarioSetId and scenarioRunId is refused
+    Given an authenticated request to DELETE /api/scenario-events
+    When the request carries both a scenarioSetId and a scenarioRunId
+    Then the request is refused as not matching the expected shape
+    And no simulation run is archived
+
+  @unit
+  Scenario: DELETE with scenarioRunId archives exactly that run
+    Given a simulation run exists in the project
+    When the caller archives it by scenarioRunId
+    Then only that run is archived
+    And the response reports one archived run and the run id
+
+  @unit
+  Scenario: DELETE with a scenarioRunId the project does not hold is not found
+    Given a scenarioRunId that does not exist in the authenticated project
+    When the caller archives it by scenarioRunId
+    Then the response is not found
     And no simulation run is archived
 
   @integration

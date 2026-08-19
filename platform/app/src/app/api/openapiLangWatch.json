@@ -45688,35 +45688,60 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "archived": {
-                      "type": "integer",
-                      "minimum": 0
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "archived": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "failed": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "scenarioSetId": {
+                          "type": "string"
+                        },
+                        "hasMore": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "archived",
+                        "failed",
+                        "scenarioSetId",
+                        "hasMore"
+                      ]
                     },
-                    "failed": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "scenarioSetId": {
-                      "type": "string"
-                    },
-                    "hasMore": {
-                      "type": "boolean"
+                    {
+                      "type": "object",
+                      "properties": {
+                        "archived": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "failed": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "scenarioRunId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "archived",
+                        "failed",
+                        "scenarioRunId"
+                      ]
                     }
-                  },
-                  "required": [
-                    "archived",
-                    "failed",
-                    "scenarioSetId",
-                    "hasMore"
                   ]
                 }
               }
             }
           },
           "400": {
-            "description": "Missing or invalid scenarioSetId",
+            "description": "Missing or invalid scope parameter",
             "content": {
               "application/json": {
                 "schema": {
@@ -45744,6 +45769,24 @@
                       "type": "string"
                     },
                     "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Scenario run not found in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
                       "type": "string"
                     }
                   },
@@ -45805,11 +45848,18 @@
             "schema": {
               "type": "string",
               "minLength": 1
-            },
-            "required": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "scenarioRunId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         ],
-        "description": "Archive all simulation runs for a scenario set. Pass `scenarioSetId=default` to archive runs in the implicit default set; future SDK runs without an explicit setId will repopulate it.",
+        "description": "Archive simulation runs. Pass exactly one of `scenarioSetId` (archives every run in the set; `scenarioSetId=default` targets the implicit default set) or `scenarioRunId` (archives that one run).",
         "security": [
           {
             "project_api_key": []

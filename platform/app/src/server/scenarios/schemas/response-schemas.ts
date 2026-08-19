@@ -97,14 +97,23 @@ const batchesSchema = z.object({
 
 /**
  * Archive operation response schema
- * Returned by the DELETE /api/scenario-events endpoint after archiving runs for a scenario set
+ * Returned by the DELETE /api/scenario-events endpoint. Set-scoped archives
+ * report the set id plus whether more runs remain; run-scoped archives
+ * report the single run id.
  */
-export const archiveResponseSchema = z.object({
-  archived: z.number().int().nonnegative(),
-  failed: z.number().int().nonnegative(),
-  scenarioSetId: z.string(),
-  hasMore: z.boolean(),
-});
+export const archiveResponseSchema = z.union([
+  z.object({
+    archived: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+    scenarioSetId: z.string(),
+    hasMore: z.boolean(),
+  }),
+  z.object({
+    archived: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+    scenarioRunId: z.string(),
+  }),
+]);
 
 /**
  * Browser-tab handoff response schema
