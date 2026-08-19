@@ -1,4 +1,5 @@
 import { Box, MenuSeparator, Portal, VStack } from "@chakra-ui/react";
+import type { FocusEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   LuActivity,
@@ -41,6 +42,12 @@ export const SupportMenu = ({
   // cursor past the trigger to a sidebar item below leaves the menu
   // stuck open with no cursor over it.
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The menu machine gives focus back to the trigger on every close.
+  // After a keyboard close that is correct; after a pointer-out close it
+  // paints the keyboard focus ring on an entry the reader only hovered,
+  // and the ring stays until the next click. The timestamp marks the
+  // pointer closes so the trigger can drop that one focus when it lands.
+  const pointerCloseAtRef = useRef(Number.NEGATIVE_INFINITY);
   const cancelClose = useCallback(() => {
     if (closeTimerRef.current) {
       clearTimeout(closeTimerRef.current);
@@ -49,7 +56,10 @@ export const SupportMenu = ({
   }, []);
   const scheduleClose = useCallback(() => {
     cancelClose();
-    closeTimerRef.current = setTimeout(() => setIsOpen(false), 120);
+    closeTimerRef.current = setTimeout(() => {
+      pointerCloseAtRef.current = performance.now();
+      setIsOpen(false);
+    }, 120);
   }, [cancelClose]);
   useEffect(() => cancelClose, [cancelClose]);
 
@@ -101,6 +111,12 @@ export const SupportMenu = ({
               setIsOpen(true);
             }}
             onMouseLeave={scheduleClose}
+            onFocus={(e: FocusEvent<HTMLElement>) => {
+              if (performance.now() - pointerCloseAtRef.current < 300) {
+                pointerCloseAtRef.current = Number.NEGATIVE_INFINITY;
+                e.currentTarget.blur();
+              }
+            }}
           >
             <SideMenuItem
               icon={LuLifeBuoy}

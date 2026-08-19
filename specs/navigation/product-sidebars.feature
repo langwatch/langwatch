@@ -91,3 +91,10 @@ Feature: Product sidebars in the new navigation modes
   Scenario: Opening a page by its address reveals its sidebar entry
     Given I open a product page by its address
     Then the sidebar brings that page's entry into view
+
+  @integration
+  Scenario: Closing the Support menu with the pointer leaves no focus ring
+    Given the Support menu opened because the pointer moved over it
+    When the pointer moves away and the menu closes
+    Then the Support entry does not keep focus
+    But a keyboard close keeps focus on the Support entry
