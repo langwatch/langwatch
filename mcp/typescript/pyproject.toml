@@ -9,7 +9,7 @@ dependencies = [
     "langwatch",
     "litellm>=1.96.0",
     "mcp[cli]>=1.13.1",
-    "pandas>=2.3.2",
+    "pandas>=3.0.5",
     "tenacity>=9.1.4",
 ]
 
