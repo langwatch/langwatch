@@ -67,5 +67,5 @@ export function lwqlTenantCapability({ secret }: { secret: string }): string {
       "LangWatchQL tenant capability requires a non-empty secret",
     );
   }
-  return createHash("sha256").update(secret).digest("hex");
+  return createHash("sha512").update(secret).digest("hex");
 }
