@@ -1048,7 +1048,7 @@ examples = [
     { name = "nltk", specifier = ">=3.9.4" },
     { name = "openai", specifier = ">=1.68.2,<2.54.0" },
     { name = "openinference-instrumentation-dspy", specifier = ">=0.1.23,<0.2.0" },
-    { name = "openinference-instrumentation-litellm", specifier = ">=0.1.19" },
+    { name = "openinference-instrumentation-litellm", specifier = ">=0.1.36" },
     { name = "openinference-instrumentation-openai", specifier = ">=0.1.30" },
     { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.65b0" },
     { name = "opentelemetry-instrumentation-langchain", specifier = ">=0.40.4" },
