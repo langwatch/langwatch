@@ -45,6 +45,26 @@ updates:
     open-pull-requests-limit: 50
     cooldown:
       default-days: 8
+      # #7236 grouped `ai` 6.0.217->7.0.60 with `@ai-sdk/react` 3.0.219->4.0.63
+      # into one PR — the `ai-sdk` group below already matched both — and the
+      # build still broke: @ai-sdk/react@4.0.63 imported
+      # Experimental_AbstractRealtimeSession, which ai@7.0.60 didn't export
+      # yet. `patterns` only bundles matching packages into one PR; it does
+      # not check that the versions it lands on actually work together.
+      # `@ai-sdk/react` doesn't help here either — it depends on `ai` as a
+      # normal (non-peer) dependency pinned to an exact version
+      # (`"ai": "7.0.64"` in its own package.json), so pnpm's peer-resolution
+      # never sees the two as linked and raises nothing when they drift.
+      # Vercel publishes the `ai` family as independent npm releases even
+      # though the versions are meant to move in lockstep, so two packages a
+      # few days apart in publish time can each individually clear the
+      # cooldown while still being a broken pair. A longer major-bump
+      # cooldown gives a freshly-published major line more time for every
+      # sibling package to catch up before dependabot proposes any of them,
+      # which is what actually failed here. This does not make the pairing
+      # provably compatible — only CI running the real build does that, which
+      # is exactly what caught #7236 before it merged.
+      semver-major-days: 14
     ignore:
       # Pinned intentionally: langwatch needs @opentelemetry/otlp-transformer
       # held at 0.55.0, and keeps a separate @opentelemetry/otlp-transformer-next
@@ -54,6 +74,10 @@ updates:
     groups:
       ai-sdk:
         applies-to: version-updates
+        # Every interdependent package in the ai-sdk family: the core `ai`
+        # package, every `@ai-sdk/*` provider/adapter/framework package
+        # (openai, anthropic, google, openai-compatible, react, otel, ...),
+        # so a bump never lands one half of the family without the other.
         patterns:
           - "@ai-sdk/*"
           - "ai"
