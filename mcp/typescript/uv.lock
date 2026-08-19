@@ -1080,7 +1080,7 @@ examples = [
     { name = "litellm", specifier = ">=1.96.0" },
     { name = "nltk", specifier = ">=3.10.2" },
     { name = "openai", specifier = ">=1.68.2,<2.55.0" },
-    { name = "openinference-instrumentation-dspy", specifier = ">=0.1.23,<0.2.0" },
+    { name = "openinference-instrumentation-dspy", specifier = ">=0.1.39,<0.2.0" },
     { name = "openinference-instrumentation-litellm", specifier = ">=0.1.36" },
     { name = "openinference-instrumentation-openai", specifier = ">=0.1.30" },
     { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.65b0" },
