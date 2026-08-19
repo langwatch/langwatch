@@ -16,14 +16,25 @@
  * organization ADMIN would be an escalation, not a migration.
  *
  * So the gate is TIME, not shape: the key's own `createdAt` must be strictly
- * earlier than the moment this organization's genesis import first recorded
- * state (`SystemMigrationTenantState` for
- * `GRANTS_GENESIS_IMPORT_MIGRATION_NAME`, read at its EARLIEST timestamp —
- * `createdAt` and `occurredAt` both, because a `finalized` stamp weeks later
- * must not retroactively make a key born last week "legacy"). A key created
- * at or after that moment was born into the ledger era and is never minted
- * for, no matter how many bindings it holds. An unreadable or absent state
- * row mints nothing.
+ * earlier than the moment this organization's genesis import actually
+ * transitioned this organization onto the ledger (`SystemMigrationTenantState`
+ * for `GRANTS_GENESIS_IMPORT_MIGRATION_NAME`, read as that row's own
+ * `occurredAt` when its `status` is `migrated` or `finalized` — the two
+ * statuses ledger-write-gate.ts already treats as "the ledger holds this
+ * organization's history"). A key created at or after that moment was born
+ * into the ledger era and is never minted for, no matter how many bindings it
+ * holds. An unreadable, absent, or not-yet-cutover state row (`parked`,
+ * `rolled_back`, or no row at all) mints nothing.
+ *
+ * The row is a single upserted state, not a history, so `createdAt` — when
+ * the row FIRST appeared — is not read here: an organization can sit
+ * `parked` for weeks before it actually migrates, and blending that early
+ * timestamp in (the old gate took `min(createdAt, occurredAt)`) let the whole
+ * parked period masquerade as ledger era, silently excluding every key
+ * created in it from ever minting. `status` says which transition the row's
+ * `occurredAt` belongs to, which is what keeps the boundary pinned to the
+ * actual cutover instead of either the parked attempt before it or a later
+ * unrelated write.
  *
  * The shape checks stay on top of the time gate: an ingestion key (its
  * access IS its project binding) and a user-owned key (`create` refuses
@@ -41,6 +52,7 @@
  * index — the same derivation the cutover import uses, so the two converge
  * rather than duplicate.
  */
+import type { LedgerActor } from "@langwatch/authz-server";
 import {
   deriveGrantId,
   GRANTS_GENESIS_IMPORT_MIGRATION_NAME,
@@ -51,7 +63,6 @@ import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
-  type LedgerActor,
   type LedgerBindingAttach,
 } from "~/server/app-layer/authz/ledger";
 import { SYSTEM_ACTORS } from "~/server/app-layer/authz/ledger-actor";
@@ -122,17 +133,40 @@ function sweepGuard(): void {
 }
 
 /**
- * The moment this organization's genesis import first recorded state, or null
- * when there is none to read.
- *
- * The earliest timestamp on the row is the era boundary. `occurredAt` is the
- * business time of the LATEST transition, so a `finalized` written weeks
- * after the import would move it forward and quietly re-classify keys born in
- * between as "legacy"; `createdAt` is when the row first appeared. Taking the
- * minimum makes the boundary monotonic in the safe direction — it can only
- * ever shrink the population that mints.
+ * The statuses that mean this organization's genesis import actually cut it
+ * over — mirrors `LEDGER_WRITE_STATUSES` in ledger-write-gate.ts (kept as its
+ * own literal here rather than imported: that gate answers a present-tense
+ * "is this organization on the ledger today", this answers "when did it get
+ * there", and the two must not be forced to share a type only one of them
+ * needs).
  */
-async function genesisImportMoment({
+const CUTOVER_STATUSES: readonly string[] = ["migrated", "finalized"];
+
+/**
+ * The moment this organization's genesis import actually cut it over onto the
+ * ledger, or null when there is none to read yet.
+ *
+ * `SystemMigrationTenantState` holds one row per (migration, tenant),
+ * upserted in place — not a history of every status it has passed through.
+ * `occurredAt` is the business time of whichever transition is CURRENT, and
+ * `status` says which one that is: reading it only when `status` is
+ * `migrated` or `finalized` is what keeps a `parked` attempt's row (an
+ * organization can sit parked for weeks before it actually migrates) from
+ * being mistaken for the cutover itself. Anything else — `pending`,
+ * `parked`, `rolled_back`, or no row — has no cutover to report, so this
+ * returns null and the caller mints nothing (fail-safe: absence must never
+ * be read as "long ago").
+ *
+ * The one gap this cannot close: if an organization passes through
+ * `migrated` (with reconcilable drift) before later reaching `finalized`,
+ * the row's single `occurredAt` moves to the `finalized` transition's time
+ * and the earlier `migrated` moment is gone — nothing about this table keeps
+ * it. A key created in that gap is, at worst, minted (or excluded) one
+ * transition later than the organization's true cutover; there is no data
+ * here to do better, and the direction is still bounded (never earlier than
+ * the true cutover) rather than open-ended.
+ */
+export async function genesisImportMoment({
   organizationId,
   prisma = appPrisma,
 }: {
@@ -147,10 +181,10 @@ async function genesisImportMoment({
           tenantId: organizationId,
         },
       },
-      select: { occurredAt: true, createdAt: true },
+      select: { status: true, occurredAt: true },
     });
-    if (!row) return null;
-    return row.createdAt < row.occurredAt ? row.createdAt : row.occurredAt;
+    if (!row || !CUTOVER_STATUSES.includes(row.status)) return null;
+    return row.occurredAt;
   } catch (err) {
     // Fail safe: an unreadable state table mints nothing, which is exactly
     // the behaviour of an organization that has not migrated.

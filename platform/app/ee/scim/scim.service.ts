@@ -522,16 +522,23 @@ export class ScimService {
 
     // A deprovision is the fired-employee case: the grants go first and carry
     // instant enforcement (ADR-092 decision 7), so the deny holds before this
-    // returns rather than whenever the queue next drains. Reconciled to the
-    // empty set, so a repeated delete emits nothing.
-    await reconcileScimGrants({
-      prisma: this.prisma,
-      writer: this.writer,
+    // returns rather than whenever the queue next drains. `offboardMember`
+    // (not the id-diff `reconcileScimGrants` this used to call) is what makes
+    // that hold even against a lagging projection: its fold sweeps every
+    // grant the principal holds, not only the ones this read could see, so a
+    // grant appended moments before this push — invisible to `current` — is
+    // still revoked once the fold catches up rather than surviving forever.
+    // The id list below is the audit record and today's synchronous
+    // enforcement, not the instruction.
+    const visibleGrants = await this.prisma.roleBinding.findMany({
+      where: { organizationId, userId: id },
+      select: { id: true },
+    });
+    await this.writer.offboardMember({
       organizationId,
-      where: { userId: id },
-      desired: [],
+      userId: id,
+      revokedGrantIds: visibleGrants.map((row) => row.id),
       actor: ScimService.ACTOR,
-      mintBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
     });
     await this.prisma.organizationUser.delete({
       where: { userId_organizationId: { userId: id, organizationId } },

@@ -23,7 +23,9 @@
  * read-only paths that should not allocate.
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import {
   Prisma,
@@ -37,6 +39,8 @@ import {
 } from "~/server/app-layer/authz/ledger";
 import { SYSTEM_ACTORS } from "~/server/app-layer/authz/ledger-actor";
 import { KSUID_RESOURCES } from "~/utils/constants";
+
+const logger = createLogger("langwatch:governance:personal-workspace");
 
 type TxClient = Prisma.TransactionClient;
 
@@ -301,6 +305,15 @@ export class PersonalWorkspaceService {
    * The owner's ADMIN grant on their personal team — a ledger command
    * (ADR-092 §13), duplicate-safe: re-asserting a grant the owner already
    * holds emits nothing.
+   *
+   * `ensure()` runs on the session path (every login), so this must not turn
+   * a ledger outage into a broken sign-in: `awaitProjection: false` skips the
+   * read-your-writes wait (nothing on this request reads the grant right
+   * after), and an `authz_ledger_unavailable` failure is logged and
+   * swallowed rather than thrown — permission checks still resolve via the
+   * legacy fallback during PR 2, and the next session's `ensure()` retries
+   * the attach. Any other failure still propagates: only the named,
+   * actionable ledger-outage case is safe to continue past.
    */
   private async attachOwnerAdminGrant({
     userId,
@@ -311,23 +324,38 @@ export class PersonalWorkspaceService {
     organizationId: string;
     teamId: string;
   }): Promise<void> {
-    await this.writer.attachBindings({
-      organizationId,
-      bindings: [
-        {
-          bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          principal: { userId },
-          role: TeamUserRole.ADMIN,
-          customRoleId: null,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: teamId,
-        },
-      ],
-      // Nobody decided this: the workspace is the product's own, and its
-      // owner administers it by construction.
-      actor: { type: "system", id: SYSTEM_ACTORS.personalWorkspace },
-      onDuplicate: "skip",
-    });
+    try {
+      await this.writer.attachBindings({
+        organizationId,
+        bindings: [
+          {
+            bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+            principal: { userId },
+            role: TeamUserRole.ADMIN,
+            customRoleId: null,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: teamId,
+          },
+        ],
+        // Nobody decided this: the workspace is the product's own, and its
+        // owner administers it by construction.
+        actor: { type: "system", id: SYSTEM_ACTORS.personalWorkspace },
+        onDuplicate: "skip",
+        awaitProjection: false,
+      });
+    } catch (err) {
+      if (
+        HandledError.isHandled(err) &&
+        err.code === "authz_ledger_unavailable"
+      ) {
+        logger.warn(
+          { err, userId, organizationId, teamId },
+          "personal workspace owner grant could not append: the grants ledger is unavailable; continuing sign-in, the next ensure() retries",
+        );
+        return;
+      }
+      throw err;
+    }
   }
 
   /**

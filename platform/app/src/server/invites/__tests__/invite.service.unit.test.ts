@@ -167,6 +167,7 @@ describe("InviteService", () => {
       },
       organizationUser: {
         findFirst: vi.fn(),
+        findUnique: vi.fn(),
       },
       customRole: {
         findMany: vi.fn(),
@@ -1076,7 +1077,9 @@ describe("InviteService", () => {
         );
       });
 
-      it("throws for ACCEPTED invites", async () => {
+      it("throws for ACCEPTED invites whose caller holds no membership", async () => {
+        mockPrisma.organizationUser.findUnique.mockResolvedValue(null);
+
         await expect(
           service.applyInvite({
             userId: "user-1",
@@ -1092,6 +1095,56 @@ describe("InviteService", () => {
         ).rejects.toThrow(
           "Cannot apply invite inv-guard-2: status is ACCEPTED, expected PENDING",
         );
+      });
+    });
+
+    describe("when an ACCEPTED invite is retried by the caller who accepted it", () => {
+      const invite = {
+        id: "inv-retry-1",
+        status: "ACCEPTED",
+        organizationId: "org-1",
+        teamIds: "team-1",
+        teamAssignments: null,
+        role: "MEMBER",
+        requestedBy: "user-inviter",
+      } as any;
+
+      beforeEach(() => {
+        // The crash window this repairs: the membership + ACCEPTED flip
+        // committed, the grant append never ran. The caller holding the
+        // membership the transaction wrote is what tells this retry apart
+        // from a different user reaching for someone else's invite.
+        mockPrisma.organizationUser.findUnique.mockResolvedValue({
+          userId: "user-retry",
+        });
+        ledger.attachBindings.mockClear();
+        ledger.revokeBindingsWhere.mockClear();
+        ledger.revokeBindingsWhere.mockResolvedValue(0);
+        ledger.attachBindings.mockResolvedValue({
+          attached: [],
+          duplicates: [],
+        });
+      });
+
+      it("attaches the grants instead of refusing", async () => {
+        await service.applyInvite({ userId: "user-retry", invite });
+
+        expect(mockPrisma.organizationUser.findUnique).toHaveBeenCalledWith({
+          where: {
+            userId_organizationId: {
+              userId: "user-retry",
+              organizationId: "org-1",
+            },
+          },
+          select: { userId: true },
+        });
+        expect(ledger.attachBindings).toHaveBeenCalled();
+      });
+
+      it("does not re-run the membership transaction", async () => {
+        await service.applyInvite({ userId: "user-retry", invite });
+
+        expect(mockPrisma.organizationInvite.update).not.toHaveBeenCalled();
       });
     });
   });

@@ -1252,7 +1252,13 @@ export class InviteService {
    * more.
    *
    * The grants are idempotent (revoke-then-attach, duplicates skipped), so
-   * re-running the tail of this is safe.
+   * re-running the tail of this is safe — including via the retry path
+   * below, which is what makes that safety reachable: the old guard refused
+   * every retry of an ACCEPTED invite outright, so a crash between the
+   * transaction above and the grants was unrepairable (no caller could ever
+   * reach the idempotent tail again). An ACCEPTED invite whose caller holds
+   * the membership the transaction wrote — the same user retrying, not a
+   * different one — re-runs the grant tail instead of refusing.
    */
   async applyInvite({
     userId,
@@ -1262,6 +1268,16 @@ export class InviteService {
     invite: OrganizationInvite;
   }): Promise<void> {
     if (invite.status !== "PENDING") {
+      const isCallerRetryingItsOwnAccept =
+        invite.status === "ACCEPTED" &&
+        (await this.callerHoldsMembership({
+          userId,
+          organizationId: invite.organizationId,
+        }));
+      if (isCallerRetryingItsOwnAccept) {
+        await this.applyInviteGrants({ userId, invite });
+        return;
+      }
       throw new InviteNotReadyError(invite.id, invite.status);
     }
 
@@ -1286,6 +1302,43 @@ export class InviteService {
       }),
     ]);
 
+    await this.applyInviteGrants({ userId, invite });
+  }
+
+  /**
+   * Whether `userId` holds the organization membership `applyInvite`'s
+   * transaction writes — the two commit together, so holding it means THIS
+   * user's own accept is what committed, and retrying the grant tail is
+   * therefore a repair rather than a different person reaching for someone
+   * else's invite.
+   */
+  private async callerHoldsMembership({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const membership = await this.prisma.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { userId: true },
+    });
+    return membership != null;
+  }
+
+  /**
+   * The grant tail of `applyInvite`: the ORGANIZATION-scoped grant (skipped
+   * for EXTERNAL) and each team's grant. Idempotent (revoke-then-attach,
+   * duplicates skipped), so both the fresh-accept caller and the retry-repair
+   * caller in `applyInvite` can run it safely.
+   */
+  private async applyInviteGrants({
+    userId,
+    invite,
+  }: {
+    userId: string;
+    invite: OrganizationInvite;
+  }): Promise<void> {
     const writer = this.writer;
     // Who decided this access: the person who sent the invitation, not the
     // person receiving it. The invitee never granted themselves anything, and
@@ -1307,6 +1360,7 @@ export class InviteService {
         },
         actor,
         reason: "replaced by the invite's organization role",
+        skipAppendWhenNoMatches: true,
       });
       await writer.attachBindings({
         organizationId: invite.organizationId,
@@ -1375,6 +1429,7 @@ export class InviteService {
         },
         actor,
         reason: "replaced by the invite's team role",
+        skipAppendWhenNoMatches: true,
       });
     }
     if (teamMembershipData.length > 0) {

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import type { ApiKeyWithBindings } from "../api-key.repository";
 import {
+  genesisImportMoment,
   legacyGrantForKey,
   mintLegacyKeyGrant,
   resetLegacyMintGuardForTests,
@@ -312,6 +313,113 @@ describe("legacy API key read-through mint", () => {
       const writer = { attachBindings } as unknown as GrantsLedgerWriter;
 
       expect(() => mintDefault(writer)).not.toThrow();
+    });
+  });
+});
+
+describe("genesisImportMoment()", () => {
+  const findUnique = vi.fn();
+  const prisma = { systemMigrationTenantState: { findUnique } };
+
+  beforeEach(() => {
+    findUnique.mockReset();
+  });
+
+  describe("given an organization parked for weeks before it migrated", () => {
+    /** @scenario "A key born during a parked genesis import still mints once the organization migrates" */
+    it("uses the migrated transition's own time, not the parked row's first appearance", async () => {
+      // The row first appeared weeks earlier as `parked`; `createdAt` still
+      // reflects that, but `occurredAt` has since been overwritten with the
+      // `migrated` transition's own business time.
+      findUnique.mockResolvedValue({
+        status: "migrated",
+        createdAt: new Date("2024-05-01T00:00:00.000Z"),
+        occurredAt: new Date("2024-06-01T00:00:00.000Z"),
+      });
+
+      const moment = await genesisImportMoment({
+        organizationId: "org_1",
+        prisma,
+      });
+
+      expect(moment).toEqual(new Date("2024-06-01T00:00:00.000Z"));
+    });
+  });
+
+  describe("given an organization that finalized cleanly", () => {
+    it("uses the finalized row's occurredAt", async () => {
+      findUnique.mockResolvedValue({
+        status: "finalized",
+        createdAt: new Date("2024-05-01T00:00:00.000Z"),
+        occurredAt: new Date("2024-06-01T00:00:00.000Z"),
+      });
+
+      const moment = await genesisImportMoment({
+        organizationId: "org_1",
+        prisma,
+      });
+
+      expect(moment).toEqual(new Date("2024-06-01T00:00:00.000Z"));
+    });
+  });
+
+  describe("given an organization still parked", () => {
+    it("reports no cutover yet", async () => {
+      findUnique.mockResolvedValue({
+        status: "parked",
+        createdAt: new Date("2024-05-01T00:00:00.000Z"),
+        occurredAt: new Date("2024-05-01T00:00:00.000Z"),
+      });
+
+      const moment = await genesisImportMoment({
+        organizationId: "org_1",
+        prisma,
+      });
+
+      expect(moment).toBeNull();
+    });
+  });
+
+  describe("given an organization rolled back", () => {
+    it("reports no cutover", async () => {
+      findUnique.mockResolvedValue({
+        status: "rolled_back",
+        createdAt: new Date("2024-05-01T00:00:00.000Z"),
+        occurredAt: new Date("2024-07-01T00:00:00.000Z"),
+      });
+
+      const moment = await genesisImportMoment({
+        organizationId: "org_1",
+        prisma,
+      });
+
+      expect(moment).toBeNull();
+    });
+  });
+
+  describe("given no state row at all", () => {
+    it("returns null rather than assuming the organization has migrated", async () => {
+      findUnique.mockResolvedValue(null);
+
+      const moment = await genesisImportMoment({
+        organizationId: "org_1",
+        prisma,
+      });
+
+      expect(moment).toBeNull();
+    });
+  });
+
+  describe("when the state table cannot be read", () => {
+    it("fails safe to null", async () => {
+      findUnique.mockRejectedValue(new Error("connection refused"));
+
+      const moment = await genesisImportMoment({
+        organizationId: "org_1",
+        prisma,
+      });
+
+      expect(moment).toBeNull();
     });
   });
 });

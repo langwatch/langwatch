@@ -12,11 +12,16 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
-import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
+import {
+  AuthzLedgerUnavailableError,
+  type GrantsLedgerWriter,
+} from "~/server/app-layer/authz/ledger";
 
-vi.mock("~/server/app-layer/authz/ledger", () => ({
-  // The service only reaches for the composed writer when none is injected;
-  // these tests always inject, so the factory must never be consulted.
+vi.mock("~/server/app-layer/authz/ledger", async (importOriginal) => ({
+  // Keep the real AuthzLedgerUnavailableError (and everything else) — only
+  // the composed-writer factory is stubbed, and only because the service
+  // must never reach for it: these tests always inject their own writer.
+  ...(await importOriginal<typeof import("~/server/app-layer/authz/ledger")>()),
   grantsLedgerWriter: vi.fn(() => {
     throw new Error("unit test must inject its own writer");
   }),
@@ -127,6 +132,47 @@ describe("PersonalWorkspaceService.ensure", () => {
         expect(writer.attachBindings).toHaveBeenCalledWith(
           ownerAdminGrantOn(TEAM_ID),
         );
+      });
+
+      describe("when the grants ledger is unavailable", () => {
+        it("still returns the workspace instead of failing sign-in", async () => {
+          prisma.team.findFirst.mockResolvedValueOnce(teamRow);
+          prisma.roleBinding.findFirst.mockResolvedValueOnce(null);
+          (
+            writer.attachBindings as ReturnType<typeof vi.fn>
+          ).mockRejectedValueOnce(new AuthzLedgerUnavailableError());
+
+          const result = await service.ensure({
+            userId: USER_ID,
+            organizationId: ORG_ID,
+          });
+
+          expect(result.created).toBe(false);
+          expect(result.team.id).toBe(TEAM_ID);
+        });
+
+        it("does not await the projection, since nothing on this request reads it back", async () => {
+          prisma.team.findFirst.mockResolvedValueOnce(teamRow);
+          prisma.roleBinding.findFirst.mockResolvedValueOnce(null);
+
+          await service.ensure({ userId: USER_ID, organizationId: ORG_ID });
+
+          expect(writer.attachBindings).toHaveBeenCalledWith(
+            expect.objectContaining({ awaitProjection: false }),
+          );
+        });
+
+        it("propagates every other failure", async () => {
+          prisma.team.findFirst.mockResolvedValueOnce(teamRow);
+          prisma.roleBinding.findFirst.mockResolvedValueOnce(null);
+          (
+            writer.attachBindings as ReturnType<typeof vi.fn>
+          ).mockRejectedValueOnce(new Error("boom"));
+
+          await expect(
+            service.ensure({ userId: USER_ID, organizationId: ORG_ID }),
+          ).rejects.toThrow("boom");
+        });
       });
     });
   });

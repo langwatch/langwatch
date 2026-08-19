@@ -18,6 +18,7 @@ const ledger = vi.hoisted(() => ({
   attachBindings: vi.fn(),
   revokeBindings: vi.fn(),
   revokeBindingsWhere: vi.fn(),
+  offboardMember: vi.fn(),
   defineRole: vi.fn(),
   deleteRole: vi.fn(),
 }));
@@ -97,6 +98,7 @@ describe("ScimService", () => {
     vi.clearAllMocks();
     ledger.attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
     ledger.revokeBindings.mockResolvedValue(undefined);
+    ledger.offboardMember.mockResolvedValue(undefined);
     prisma = createMockPrisma();
     service = ScimService.create({ prisma });
   });
@@ -355,6 +357,30 @@ describe("ScimService", () => {
         expect(prisma.user.update).toHaveBeenCalledWith({
           where: { id: "user-1" },
           data: { deactivatedAt: expect.any(Date) },
+        });
+      });
+
+      it("issues an offboard sweep instead of an id-diff revoke, so a grant the projection hasn't caught up to still gets swept", async () => {
+        (
+          prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({
+          userId: "user-1",
+          organizationId: "org-1",
+        });
+        (
+          prisma.roleBinding.findMany as ReturnType<typeof vi.fn>
+        ).mockResolvedValue([{ id: "rb-1" }, { id: "rb-2" }]);
+        (prisma.user.update as ReturnType<typeof vi.fn>).mockResolvedValue(
+          buildMockUser({ deactivatedAt: new Date() }),
+        );
+
+        await service.deleteUser({ id: "user-1", organizationId: "org-1" });
+
+        expect(ledger.offboardMember).toHaveBeenCalledWith({
+          organizationId: "org-1",
+          userId: "user-1",
+          revokedGrantIds: ["rb-1", "rb-2"],
+          actor: { type: "system", id: "system:scim" },
         });
       });
     });
