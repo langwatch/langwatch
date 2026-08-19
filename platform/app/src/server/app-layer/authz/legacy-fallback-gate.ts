@@ -51,21 +51,28 @@ const cached = new Map<string, { disabled: boolean; expiresAt: number }>();
 /** Hard cap on distinct organizations held at once; see `cached` above. */
 export const MAX_CACHE_ENTRIES = 5_000;
 
+/**
+ * Amortized-sweep expired entries, then fall back to evicting the oldest
+ * (by insertion order) until the map is back under the cap - see `cached`
+ * above for why the map is bounded at all.
+ */
+function evictUntilUnderCap(): void {
+  const now = Date.now();
+  for (const [key, value] of cached) {
+    if (value.expiresAt <= now) cached.delete(key);
+  }
+  while (cached.size >= MAX_CACHE_ENTRIES) {
+    const oldestKey: string | undefined = cached.keys().next().value;
+    if (oldestKey === undefined) break;
+    cached.delete(oldestKey);
+  }
+}
+
 function setCacheEntry(
   organizationId: string,
   entry: { disabled: boolean; expiresAt: number },
 ): void {
-  if (cached.size >= MAX_CACHE_ENTRIES) {
-    const now = Date.now();
-    for (const [key, value] of cached) {
-      if (value.expiresAt <= now) cached.delete(key);
-    }
-    while (cached.size >= MAX_CACHE_ENTRIES) {
-      const oldestKey: string | undefined = cached.keys().next().value;
-      if (oldestKey === undefined) break;
-      cached.delete(oldestKey);
-    }
-  }
+  if (cached.size >= MAX_CACHE_ENTRIES) evictUntilUnderCap();
   cached.set(organizationId, entry);
 }
 

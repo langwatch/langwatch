@@ -672,19 +672,58 @@ export class GrantsLedgerWriter {
         actor,
       });
     }
+    await this.changeBindingRoleOnLedger({
+      organizationId,
+      row,
+      bindingId,
+      role,
+      customRoleId,
+      from,
+      to,
+      actor,
+    });
+  }
 
-    // A compat row can exist with no fact behind it in the fold's head: it
-    // was written imperatively during the write gate's negative-cache
-    // window (an organization the gate briefly, wrongly, read as legacy —
-    // see `ledger-write-gate.ts`) or during the genesis snapshot -> flip
-    // gap, and `finalized` genesis passes never revisit it. Sending
-    // `grant_role_changed` for such an id targets a grantId the reducer has
-    // never seen; it no-ops silently there (`state.grants[grantId]`
-    // undefined), `awaitProjection` times out with only a warn, and the
-    // caller is told success while nothing changed. Adopt the row instead,
-    // exactly as genesis adopts a legacy row: an attach fact for this id,
-    // carrying the NEW role, both creates the head entry and lands the
-    // requested change in one step.
+  /**
+   * The ledger-side role change. A compat row can exist with no fact behind
+   * it in the fold's head: it was written imperatively during the write
+   * gate's negative-cache window (an organization the gate briefly, wrongly,
+   * read as legacy — see `ledger-write-gate.ts`) or during the genesis
+   * snapshot -> flip gap, and `finalized` genesis passes never revisit it.
+   * Sending `grant_role_changed` for such an id targets a grantId the
+   * reducer has never seen; it no-ops silently there
+   * (`state.grants[grantId]` undefined), `awaitProjection` times out with
+   * only a warn, and the caller is told success while nothing changed. Adopt
+   * the row instead, exactly as genesis adopts a legacy row: an attach fact
+   * for this id, carrying the NEW role, both creates the head entry and
+   * lands the requested change in one step.
+   */
+  private async changeBindingRoleOnLedger({
+    organizationId,
+    row,
+    bindingId,
+    role,
+    customRoleId,
+    from,
+    to,
+    actor,
+  }: {
+    organizationId: string;
+    row: {
+      id: string;
+      userId: string | null;
+      groupId: string | null;
+      apiKeyId: string | null;
+      scopeType: RoleBindingWrite["scopeType"];
+      scopeId: string;
+    };
+    bindingId: string;
+    role: RoleBindingWrite["role"];
+    customRoleId: string | null;
+    from: string;
+    to: string;
+    actor: LedgerActor;
+  }): Promise<void> {
     const known = await this.prisma.grant.findFirst({
       where: { id: bindingId, organizationId },
       select: { id: true },
@@ -1086,55 +1125,16 @@ export class GrantsLedgerWriter {
   }): Promise<void> {
     const occurredAtMs = this.now();
     if (!(await this.onLedger(organizationId))) {
-      // The pre-ledger role write. `role_defined` collapsed the editor's
-      // create and update into one verb; the upsert is that same collapse
-      // against the table, keyed on the id the caller minted — organization
-      // scoped on the update so a role can never be edited across tenants.
-      // The name-uniqueness pre-check lives at the service layer
-      // (`assertNameFree`) and runs on both sides — but it is advisory, read
-      // ahead of the append rather than inside it, so two concurrent renames
-      // can still both pass it and race for the same `(organizationId,
-      // name)` unique index here. The loser gets the deterministic conflict
-      // rather than a raw Prisma error degrading to an unknown 500.
-      try {
-        await this.prisma.customRole.upsert({
-          where: { id: roleId, organizationId },
-          create: {
-            id: roleId,
-            organizationId,
-            name,
-            description: description ?? null,
-            permissions,
-            kind,
-          },
-          update: {
-            name,
-            description: description ?? null,
-            permissions,
-            kind,
-          },
-        });
-      } catch (error) {
-        if (isUniqueViolation(error)) throw new RoleDuplicateNameError();
-        throw error;
-      }
-      await this.recordLegacyAudit({
+      return await this.defineRoleImperatively({
         organizationId,
+        roleId,
+        name,
+        description,
+        permissions,
+        kind,
         actor,
-        verb: "role_defined",
-        createdAt: new Date(occurredAtMs),
-        facts: [
-          {
-            roleId,
-            name,
-            ...(description ? { description } : {}),
-            permissions,
-            kind,
-          },
-        ],
+        occurredAtMs,
       });
-      await bumpAuthzEpoch({ organizationId });
-      return;
     }
     await (await this.commands()).commands.defineRoles.send({
       tenantId: organizationId,
@@ -1171,6 +1171,77 @@ export class GrantsLedgerWriter {
           samePermissions({ stored: row.permissions, wanted: permissions })
         );
       },
+    });
+    await bumpAuthzEpoch({ organizationId });
+  }
+
+  /**
+   * The pre-ledger role write. `role_defined` collapsed the editor's create
+   * and update into one verb; the upsert is that same collapse against the
+   * table, keyed on the id the caller minted — organization scoped on the
+   * update so a role can never be edited across tenants. The
+   * name-uniqueness pre-check lives at the service layer (`assertNameFree`)
+   * and runs on both sides — but it is advisory, read ahead of the append
+   * rather than inside it, so two concurrent renames can still both pass it
+   * and race for the same `(organizationId, name)` unique index here. The
+   * loser gets the deterministic conflict rather than a raw Prisma error
+   * degrading to an unknown 500.
+   */
+  private async defineRoleImperatively({
+    organizationId,
+    roleId,
+    name,
+    description,
+    permissions,
+    kind,
+    actor,
+    occurredAtMs,
+  }: {
+    organizationId: string;
+    roleId: string;
+    name: string;
+    description?: string;
+    permissions: string[];
+    kind: "custom" | "system_api_key";
+    actor: LedgerActor;
+    occurredAtMs: number;
+  }): Promise<void> {
+    try {
+      await this.prisma.customRole.upsert({
+        where: { id: roleId, organizationId },
+        create: {
+          id: roleId,
+          organizationId,
+          name,
+          description: description ?? null,
+          permissions,
+          kind,
+        },
+        update: {
+          name,
+          description: description ?? null,
+          permissions,
+          kind,
+        },
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new RoleDuplicateNameError();
+      throw error;
+    }
+    await this.recordLegacyAudit({
+      organizationId,
+      actor,
+      verb: "role_defined",
+      createdAt: new Date(occurredAtMs),
+      facts: [
+        {
+          roleId,
+          name,
+          ...(description ? { description } : {}),
+          permissions,
+          kind,
+        },
+      ],
     });
     await bumpAuthzEpoch({ organizationId });
   }

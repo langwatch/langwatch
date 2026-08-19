@@ -248,6 +248,14 @@ Feature: In-place authorization data migration
     Then the state write holds and the pass continues
     And the loss costs replay fidelity for one transition, never correctness
 
+  @unit
+  Scenario: A backdated witness cannot rewrite a migration's status backwards
+    Given the runner has already witnessed "acme" reach a later migration
+      status
+    When an older, redelivered witness for that migration arrives
+    Then the older witness is ignored
+    And the later status still holds
+
   @integration @unimplemented
   Scenario: A clean parity proof and the cutover are recorded as facts
     Given the migration verified "acme" with no disagreement
@@ -328,11 +336,51 @@ Feature: In-place authorization data migration
       duplicating
 
   @unit
+  Scenario: A shifted chunk never reuses a previous pass's idempotency key
+    Given "acme"'s legacy rows changed which one occupies a chunk's position
+      since the last pass
+    When the genesis import runs again for "acme"
+    Then that chunk's fact carries a different idempotency key than the
+      earlier pass did
+    And the newly positioned row is not deduped away as if it were the old
+      one
+
+  @unit
+  Scenario: The row that replaced a deleted one reaches the fold
+    Given a legacy row was deleted and a new row now occupies its chunk
+      position
+    When the genesis import runs again for "acme"
+    Then the replacement row's grant reaches the fold
+
+  @unit
+  Scenario: A grant revoked on the legacy side does not survive a re-import
+    Given a legacy binding row the genesis import already landed as a grant
+    When that row is deleted on the legacy side and the import runs again
+    Then the grant's head fact is cleared
+    And the ledger is asked to revoke the grant, not merely stop re-attaching
+      it
+
+  @unit
+  Scenario: A custom role deleted on the legacy side does not survive a re-import
+    Given a custom role row the genesis import already landed as a role fact
+    When that role is deleted on the legacy side and the import runs again
+    Then the role's head fact is cleared
+    And the ledger is asked to delete the role, not merely stop redefining it
+
+  @unit
   Scenario: An imported grant updates the row it adopted and never authors a new one
     Given a legacy binding row adopted by the genesis import
     When the fold stores that grant
     Then the existing compat row is updated in place
     And no second compat row is created for it
+
+  @unit
+  Scenario: A role change clears the pre-migration legacy role
+    Given a legacy binding row adopted by the genesis import, carrying its
+      pre-migration role
+    When the grant's role is reassigned
+    Then the pre-migration role is dropped rather than carried onto the new
+      role
 
   # ============================================================================
   # One writer (ADR-092 §13 - the ledger becomes the only writer)
@@ -361,6 +409,13 @@ Feature: In-place authorization data migration
     When an admin attaches a role binding
     Then the projected grant row and its legacy-shaped binding row both land
     And a fact the legacy tables cannot express lands the grant row alone
+
+  @unit
+  Scenario: Revoking an orphaned group binding runs before the membership edit commits
+    Given a group edit that both revokes a binding left with no member and
+      removes a member
+    When the edit is applied
+    Then the binding revocation runs before the membership edit commits
 
   # ============================================================================
   # Per-organization write cutover (ADR-092 decision 4)
@@ -480,6 +535,14 @@ Feature: In-place authorization data migration
     When a legacy service key authenticates
     Then the key still resolves
     And the failure is a warning, retried on the key's next use
+
+  @unit
+  Scenario: A key born during a parked genesis import still mints once the organization migrates
+    Given an organization that was parked for weeks before its genesis import
+      finally migrated
+    When a legacy service key from before the parked period authenticates
+    Then the minted grant's business time is the moment the organization
+      migrated, not the moment it was first parked
 
   # One writer, one refusal: for an organization on ledger writes, a grant
   # write with no event-sourcing stack refuses rather than half-happening.
