@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { modelOverrideSchema } from "~/server/modelProviders/modelOverrideSchema";
 import { suiteTargetSchema } from "~/server/suites/types";
 
 export type { SuiteTarget } from "~/server/suites/types";
@@ -21,8 +22,8 @@ export const createSuiteSchema = projectSchema.extend({
   labels: z.array(z.string()).default([]),
   // Run-plan-wide model overrides; null = use the project default
   // (scenarios.user_simulator / scenarios.judge).
-  simulatorModel: z.string().nullish(),
-  judgeModel: z.string().nullish(),
+  simulatorModel: modelOverrideSchema.nullish(),
+  judgeModel: modelOverrideSchema.nullish(),
 });
 
 export const updateSuiteSchema = projectSchema.extend({
@@ -33,6 +34,6 @@ export const updateSuiteSchema = projectSchema.extend({
   targets: z.array(suiteTargetSchema).min(1).optional(),
   repeatCount: z.number().int().min(1).max(100).optional(),
   labels: z.array(z.string()).optional(),
-  simulatorModel: z.string().nullish(),
-  judgeModel: z.string().nullish(),
+  simulatorModel: modelOverrideSchema.nullish(),
+  judgeModel: modelOverrideSchema.nullish(),
 });

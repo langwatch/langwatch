@@ -17,6 +17,7 @@ import { env } from "~/env.mjs";
 import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
+import { expandLatestAlias } from "../../modelProviders/latestAliases";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { extractSuiteId } from "../../suites/suite-set-id";
 import { parseSuiteTargets } from "../../suites/types";
@@ -454,17 +455,26 @@ export async function prefetchScenarioData({
             context.projectId,
           );
     }
-    simulatorModel =
+    // Overrides are stored verbatim, so a virtual "latest" alias like
+    // "openai/latest" can reach this point. Providers only understand
+    // concrete model ids, so every resolved value passes through
+    // expandLatestAlias here; concrete ids pass through unchanged.
+    simulatorModel = expandLatestAlias(
       suiteOverrides?.simulatorModel ??
-      scenarioResult.simulatorModel ??
-      (await deps.modelResolver.resolve(
-        "scenarios.user_simulator",
-        context.projectId,
-      ));
-    judgeModel =
+        scenarioResult.simulatorModel ??
+        (await deps.modelResolver.resolve(
+          "scenarios.user_simulator",
+          context.projectId,
+        )),
+    );
+    judgeModel = expandLatestAlias(
       suiteOverrides?.judgeModel ??
-      scenarioResult.judgeModel ??
-      (await deps.modelResolver.resolve("scenarios.judge", context.projectId));
+        scenarioResult.judgeModel ??
+        (await deps.modelResolver.resolve(
+          "scenarios.judge",
+          context.projectId,
+        )),
+    );
   } catch (err) {
     const message =
       err instanceof Error

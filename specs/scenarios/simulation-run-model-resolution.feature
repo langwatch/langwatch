@@ -151,6 +151,57 @@ Feature: Simulation run model resolution per target type
     And the failure names that node's model
 
   # ============================================================================
+  # Latest-alias expansion at the execution boundary
+  # ============================================================================
+
+  # A scenario or run plan can store a virtual alias like "openai/latest" or
+  # "anthropic/latest-mini" as its simulator or judge model. Providers do not
+  # understand these aliases, so the prefetcher must expand them to the
+  # concrete registry flagship before preparing litellm params. Storage keeps
+  # the alias verbatim so the pick keeps tracking upstream releases.
+
+  @unit
+  Scenario: A latest alias on the scenario simulator model expands to a concrete model at run time
+    Given a scenario whose simulator model is "openai/latest"
+    When the run data is prefetched
+    Then the prepared simulator params carry the concrete model the alias resolves to
+    And they never carry the literal alias
+
+  @unit
+  Scenario: A latest alias on the scenario judge model expands to a concrete model at run time
+    Given a scenario whose judge model is "anthropic/latest-mini"
+    When the run data is prefetched
+    Then the prepared judge params carry the concrete model the alias resolves to
+    And they never carry the literal alias
+
+  @unit
+  Scenario: A latest alias on the run plan simulator model expands to a concrete model at run time
+    Given a run plan whose simulator model is "openai/latest-mini"
+    When a scenario in that plan is prefetched
+    Then the prepared simulator params carry the concrete model the alias resolves to
+    And they never carry the literal alias
+
+  @unit
+  Scenario: A latest alias on the run plan judge model expands to a concrete model at run time
+    Given a run plan whose judge model is "gemini/latest"
+    When a scenario in that plan is prefetched
+    Then the prepared judge params carry the concrete model the alias resolves to
+    And they never carry the literal alias
+
+  @integration
+  Scenario: A latest alias is stored verbatim on the scenario and the run plan
+    Given a scenario updated with simulator model "openai/latest"
+    And a run plan saved with judge model "anthropic/latest-mini"
+    When the records are read back
+    Then both still hold the alias string, not a concrete model
+
+  @unit
+  Scenario: A model override that is not a provider-prefixed id is rejected at save time
+    Given a scenario update whose simulator model is "latest"
+    When the input is validated
+    Then the update is rejected with a message asking for a provider/model id
+
+  # ============================================================================
   # Rollout: the child-process job payload
   # ============================================================================
 
