@@ -1342,12 +1342,13 @@ export const opsRouter = createTRPCRouter({
             (rules) =>
               rules.every((rule) =>
                 [rule.match.projectId, rule.match.organizationId].every(
-                  (id) => id === undefined || id.trim().length > 0,
+                  (id) =>
+                    id === undefined || (id.length > 0 && id === id.trim()),
                 ),
               ),
             {
               message:
-                "A targeting rule's project/organization id must not be blank",
+                "A targeting rule's project/organization id must not be blank or padded",
             },
           ),
       }),

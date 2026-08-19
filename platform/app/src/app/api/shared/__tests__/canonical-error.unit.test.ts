@@ -29,6 +29,23 @@ describe("canonicalErrorFor", () => {
       expect(body.error.type).toBe("internal_error");
     });
 
+    it("preserves the reason chain in meta without leaking the reason's message", () => {
+      const { status, body } = canonicalErrorFor(
+        new LangWatchQLUnavailableError({
+          reasons: [new Error("ClickHouse at ch-internal-host:8123 refused")],
+        }),
+      );
+
+      expect(status).toBe(503);
+      // A non-HandledError reason serializes to its opaque marker only
+      // (`serializeReason`), so the chain's presence is on the wire while
+      // the internal message is not.
+      expect(body.error.meta).toMatchObject({
+        reasons: [{ code: "unknown", kind: "unknown" }],
+      });
+      expect(JSON.stringify(body)).not.toContain("ch-internal-host");
+    });
+
     it("carries the request's trace and span ids when the request was traced", () => {
       const { body } = canonicalErrorFor(new LangWatchQLUnavailableError(), {
         traceId: "trace-abc",

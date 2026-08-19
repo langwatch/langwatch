@@ -73,10 +73,13 @@ const ACCESS_DENIED: ServerError = { code: "497", name: "ACCESS_DENIED" };
  * message: the message echoes the submitted query, so a table or alias named
  * after a variant would otherwise let the caller choose its own error.
  */
-function raisedServerError(
-  error: Error,
-  variants: readonly ServerError[],
-): boolean {
+function raisedServerError({
+  error,
+  variants,
+}: {
+  error: Error;
+  variants: readonly ServerError[];
+}): boolean {
   const type = (error as { type?: string }).type;
   const code = String((error as { code?: unknown }).code ?? "");
   const messageCode = /^Code:\s*(\d+)/.exec(error.message)?.[1] ?? "";
@@ -102,11 +105,10 @@ function raisedServerError(
  */
 export function isClickHouseObjectUnavailableError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
-  return raisedServerError(error, [
-    UNKNOWN_TABLE,
-    UNKNOWN_DATABASE,
-    ACCESS_DENIED,
-  ]);
+  return raisedServerError({
+    error,
+    variants: [UNKNOWN_TABLE, UNKNOWN_DATABASE, ACCESS_DENIED],
+  });
 }
 
 /**
@@ -142,7 +144,7 @@ export function translateClickHouseQueryError(
   // error degrades to "unknown", which is the documented safe outcome
   // (ADR-045). Matching rules live on `raisedServerError`.
   const raised = (...variants: ServerError[]): boolean =>
-    raisedServerError(error, variants);
+    raisedServerError({ error, variants });
 
   if (raised(MEMORY_LIMIT_EXCEEDED)) {
     return new QueryMemoryExceededError({ reasons: [toError(error)] });
