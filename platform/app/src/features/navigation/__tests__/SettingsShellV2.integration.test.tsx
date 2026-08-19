@@ -321,23 +321,36 @@ describe("the settings shell in a new navigation mode", () => {
     });
 
     /** @scenario "The settings groups fold, and start open" */
-    it("opens every group, and folds one away when its heading is pressed", async () => {
+    it("opens every group, folds one away, and keeps it folded next time", async () => {
       const user = userEvent.setup();
-      renderSettings();
+      const { unmount } = renderSettings();
 
+      // A folded group reads "Expand <name>", so none of them means all open.
+      expect(screen.queryAllByRole("button", { name: /^Expand / })).toEqual([]);
+      expect(
+        screen.getAllByRole("button", { name: /^Collapse / }).length,
+      ).toBeGreaterThan(1);
       expect(screen.getByRole("link", { name: "Members" })).toBeInTheDocument();
 
-      const accessHeading = screen.getByRole("button", {
-        name: "Collapse Access",
-      });
-      expect(accessHeading).toHaveAttribute("aria-expanded", "true");
-
-      await user.click(accessHeading);
+      await user.click(screen.getByRole("button", { name: "Collapse Access" }));
 
       expect(
         screen.queryByRole("link", { name: "Members" }),
       ).not.toBeInTheDocument();
-      // Folding one group leaves its neighbours alone.
+      expect(
+        screen.getByRole("button", { name: "Collapse Organization" }),
+      ).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByRole("link", { name: "General" })).toBeInTheDocument();
+
+      unmount();
+      renderSettings();
+
+      expect(
+        screen.getByRole("button", { name: "Expand Access" }),
+      ).toHaveAttribute("aria-expanded", "false");
+      expect(
+        screen.queryByRole("link", { name: "Members" }),
+      ).not.toBeInTheDocument();
       expect(screen.getByRole("link", { name: "General" })).toBeInTheDocument();
     });
 
