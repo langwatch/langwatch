@@ -87,6 +87,14 @@ export interface FetchWithRetryOptions {
   sleep?: (ms: number) => Promise<void>;
   /** Injectable for tests. */
   now?: () => number;
+  /**
+   * Forwarded to `ssrfSafeFetch`. Set false when `url` was itself copied out
+   * of an upstream response (a paginated `nextpageuri`, a listed blob URI): a
+   * redirect would re-validate through the shared SSRF policy but not through
+   * whatever stricter host allow-list the caller checked `url` against before
+   * calling here, silently widening what is actually reachable.
+   */
+  followRedirects?: boolean;
 }
 
 const defaultSleep = (ms: number): Promise<void> =>
@@ -314,6 +322,7 @@ async function attemptOnce({
   body,
   signal,
   nowMs,
+  followRedirects,
 }: {
   url: string;
   method: string;
@@ -321,6 +330,7 @@ async function attemptOnce({
   body: string | undefined;
   signal: AbortSignal | undefined;
   nowMs: number;
+  followRedirects: boolean | undefined;
 }): Promise<AttemptOutcome> {
   // Two independent bounds: this request's own timeout, and the run's
   // deadline. Either one firing must unwind the call.
@@ -333,6 +343,7 @@ async function attemptOnce({
     headers,
     body,
     signal: requestSignal,
+    followRedirects,
   });
   return await classifyResponse(response, url, nowMs);
 }
@@ -373,6 +384,7 @@ async function retryLoop({
   deadlineAtMs,
   sleep,
   now,
+  followRedirects,
 }: ResolvedRetryOptions): Promise<FetchResponse> {
   let lastError: Error | undefined;
 
@@ -384,6 +396,7 @@ async function retryLoop({
       body,
       signal,
       nowMs: now(),
+      followRedirects,
     });
     if (outcome.kind === "done") return outcome.response;
     lastError = outcome.error;

@@ -45,6 +45,8 @@ interface Fixture {
   subscriptionFailure?: { status: number; body: unknown };
   blobFetches: string[];
   listingFetches: number;
+  /** Overrides the `nextpageuri` header the content listing answers with. */
+  nextPageUriOverride?: string;
 }
 
 let fx: Fixture;
@@ -124,7 +126,9 @@ beforeEach(() => {
             page.map((uri) => ({ contentUri: uri })),
             hasNext
               ? {
-                  nextpageuri: `https://manage.office.test/api/v1.0/${TENANT}/activity/feed/subscriptions/content?contentType=Audit.General&page=${pageIndex + 1}`,
+                  nextpageuri:
+                    fx.nextPageUriOverride ??
+                    `https://manage.office.com/api/v1.0/${TENANT}/activity/feed/subscriptions/content?contentType=Audit.General&page=${pageIndex + 1}`,
                 }
               : {},
           );
@@ -158,7 +162,7 @@ async function loadPuller() {
 function seedBlobs(count: number): string[] {
   const uris: string[] = [];
   for (let i = 0; i < count; i += 1) {
-    const uri = `https://manage.office.test/blob/${i}`;
+    const uri = `https://manage.office.com/api/v1.0/blob/${i}`;
     fx.blobs.set(uri, [copilotRecord(`evt-${i}`)]);
     uris.push(uri);
   }
@@ -234,7 +238,7 @@ describe("Microsoft365AuditPuller drain", () => {
       /** @scenario "Only Copilot interaction records are emitted" */
       it("emits only RecordType 261 and counts the rest rather than dropping them silently", async () => {
         const puller = await loadPuller();
-        const uri = "https://manage.office.test/blob/mixed";
+        const uri = "https://manage.office.com/api/v1.0/blob/mixed";
         fx.blobs.set(uri, [
           copilotRecord("keep-1"),
           otherRecord("drop-1"),
@@ -427,6 +431,96 @@ describe("Microsoft365AuditPuller drain", () => {
         // of blobs, never a partial one.
         expect(result.events.length).toBe(fx.blobFetches.length);
         expect(result.cursor).not.toBeNull();
+      });
+    });
+  });
+});
+
+describe("Microsoft365AuditPuller response-supplied URL boundary", () => {
+  describe("given a content listing entry whose contentUri is off-host", () => {
+    describe("when the run reads the listing", () => {
+      /** @scenario "A response-supplied URL outside the trusted host is refused" */
+      it("refuses it and never fetches it with the bearer token", async () => {
+        const { Microsoft365AuditPuller, ManagementApiUriRejectedError } =
+          await import("../microsoft365Audit.puller");
+        const puller = new Microsoft365AuditPuller();
+        fx.listing = ["https://attacker.example/steal-the-token"];
+
+        await expect(puller.runOnce({ cursor: null }, CONFIG)).rejects.toThrow(
+          ManagementApiUriRejectedError,
+        );
+        expect(fx.blobFetches).toHaveLength(0);
+      });
+    });
+  });
+
+  describe("given a nextpageuri response header pointing off the documented host", () => {
+    describe("when the run pages the listing", () => {
+      /** @scenario "A response-supplied URL outside the trusted host is refused" */
+      it("refuses it before it can become the next fetch target", async () => {
+        const { Microsoft365AuditPuller, ManagementApiUriRejectedError } =
+          await import("../microsoft365Audit.puller");
+        const puller = new Microsoft365AuditPuller();
+        const uris = seedBlobs(2);
+        fx.listing = [];
+        fx.listingPages = [uris, []];
+        fx.nextPageUriOverride = "https://attacker.example/next-page";
+
+        await expect(puller.runOnce({ cursor: null }, CONFIG)).rejects.toThrow(
+          ManagementApiUriRejectedError,
+        );
+        expect(fx.blobFetches).toHaveLength(0);
+      });
+    });
+  });
+
+  describe("given a persisted cursor whose nextPageUri was poisoned before this check existed", () => {
+    describe("when the next run resumes from it", () => {
+      /** @scenario "A response-supplied URL outside the trusted host is refused" */
+      it("refuses it without fetching it, rather than trusting the persisted value", async () => {
+        const { Microsoft365AuditPuller, ManagementApiUriRejectedError } =
+          await import("../microsoft365Audit.puller");
+        const puller = new Microsoft365AuditPuller();
+        fx.subscriptionActive = true; // resume skips re-starting the subscription
+        const poisonedCursor = JSON.stringify({
+          version: 1,
+          phase: "listing",
+          windowStart: "2026-05-03T09:00:00.000Z",
+          windowEnd: "2026-05-03T10:00:00.000Z",
+          blobQueue: [],
+          nextPageUri: "https://attacker.example/next-page",
+          watermark: "2026-05-03T09:00:00.000Z",
+        });
+
+        await expect(
+          puller.runOnce({ cursor: poisonedCursor }, CONFIG),
+        ).rejects.toThrow(ManagementApiUriRejectedError);
+        expect(fx.listingFetches).toBe(0);
+      });
+    });
+  });
+
+  describe("given a persisted cursor whose blobQueue was poisoned before this check existed", () => {
+    describe("when the next run resumes from it", () => {
+      /** @scenario "A response-supplied URL outside the trusted host is refused" */
+      it("refuses it without fetching it, rather than trusting the persisted value", async () => {
+        const { Microsoft365AuditPuller, ManagementApiUriRejectedError } =
+          await import("../microsoft365Audit.puller");
+        const puller = new Microsoft365AuditPuller();
+        fx.subscriptionActive = true;
+        const poisonedCursor = JSON.stringify({
+          version: 1,
+          phase: "draining",
+          windowStart: "2026-05-03T09:00:00.000Z",
+          windowEnd: "2026-05-03T10:00:00.000Z",
+          blobQueue: ["https://attacker.example/steal-the-token"],
+          watermark: "2026-05-03T09:00:00.000Z",
+        });
+
+        await expect(
+          puller.runOnce({ cursor: poisonedCursor }, CONFIG),
+        ).rejects.toThrow(ManagementApiUriRejectedError);
+        expect(fx.blobFetches).toHaveLength(0);
       });
     });
   });

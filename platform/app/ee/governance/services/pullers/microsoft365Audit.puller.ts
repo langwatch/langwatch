@@ -63,6 +63,57 @@ export const COPILOT_INTERACTION_RECORD_TYPE = 261;
 export const MANAGEMENT_API_BASE = "https://manage.office.com/api/v1.0";
 export const MANAGEMENT_API_SCOPE = "https://manage.office.com/.default";
 
+const { hostname: MANAGEMENT_API_HOST, pathname: MANAGEMENT_API_PATH_ROOT } =
+  new URL(MANAGEMENT_API_BASE);
+
+/**
+ * Refused when a response-supplied URL is not the documented Management
+ * Activity API host and path.
+ *
+ * `contentUri` (a blob listing entry) and `nextpageuri` (a response header,
+ * persisted into the cursor) are both copied out of the API's own response
+ * and then used as the next fetch target with the Management Activity OAuth
+ * bearer token attached. Without the check that throws this, a malformed
+ * response — or a cursor poisoned before this check existed — turns the
+ * poller into a token-forwarding primitive for whatever URL it names.
+ */
+export class ManagementApiUriRejectedError extends Error {
+  constructor(uri: string) {
+    super(
+      `microsoft_365_audit: refusing to send the bearer token to ${JSON.stringify(uri)} — ` +
+        `only ${MANAGEMENT_API_HOST}${MANAGEMENT_API_PATH_ROOT} is trusted with it`,
+    );
+    this.name = "ManagementApiUriRejectedError";
+  }
+}
+
+/**
+ * Whether `candidate` is HTTPS, on the documented Management Activity API
+ * host, and under its documented path root. Applied to every response-
+ * supplied URL before it is fetched — see {@link ManagementApiUriRejectedError}.
+ */
+export function isManagementApiUri(candidate: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(candidate);
+  } catch {
+    return false;
+  }
+  return (
+    url.protocol === "https:" &&
+    url.hostname.toLowerCase() === MANAGEMENT_API_HOST &&
+    (url.pathname === MANAGEMENT_API_PATH_ROOT ||
+      url.pathname.startsWith(`${MANAGEMENT_API_PATH_ROOT}/`))
+  );
+}
+
+/** Throws {@link ManagementApiUriRejectedError} unless `uri` passes {@link isManagementApiUri}. */
+function assertManagementApiUri(uri: string): void {
+  if (!isManagementApiUri(uri)) {
+    throw new ManagementApiUriRejectedError(uri);
+  }
+}
+
 /**
  * The Management Activity API's code for "this subscription is already
  * enabled", returned as a 400. It is the expected answer on every run after
@@ -219,12 +270,22 @@ export function mapAuditRecord(record: AuditRecord): NormalizedPullEvent {
   };
 }
 
-/** Every non-empty `contentUri` in one page of the content listing. */
+/**
+ * Every non-empty `contentUri` in one page of the content listing.
+ *
+ * Throws {@link ManagementApiUriRejectedError} on the first entry outside the
+ * trusted host/path — the bearer token must never be attached to a fetch of
+ * it, and a mismatch here means either an API contract violation or a
+ * tampered response, neither of which should be swallowed and read as "no
+ * content this page".
+ */
 function contentUrisFrom(listing: ContentListingEntry[]): string[] {
   if (!Array.isArray(listing)) return [];
-  return listing
+  const uris = listing
     .map((entry) => asString(entry.contentUri))
     .filter((uri) => uri !== "");
+  uris.forEach(assertManagementApiUri);
+  return uris;
 }
 
 /**
@@ -547,6 +608,9 @@ export class Microsoft365AuditPuller
     cursor: Microsoft365AuditCursor;
   }): Promise<void> {
     let pageUri = cursor.nextPageUri ?? this.firstListingUri(config, cursor);
+    // Guards a cursor persisted before this check existed, not just a fresh
+    // `nextpageuri` — see ManagementApiUriRejectedError.
+    assertManagementApiUri(pageUri);
 
     cursor.nextPageUri = undefined;
 
@@ -561,6 +625,9 @@ export class Microsoft365AuditPuller
         headers: await this.authHeaders(tokens),
         signal: options.signal,
         deadlineAtMs: options.deadlineMs,
+        // pageUri is response-supplied from the second page on; a redirect
+        // must not be allowed to move the bearer token off-host.
+        followRedirects: false,
       });
 
       cursor.blobQueue.push(
@@ -572,6 +639,7 @@ export class Microsoft365AuditPuller
         cursor.phase = "draining";
         return;
       }
+      assertManagementApiUri(nextPage);
       if (cursor.blobQueue.length >= MAX_QUEUED_BLOBS) {
         // Queue is full. Remember where the listing got to rather than
         // dropping the rest — deferring is not truncating.
@@ -614,12 +682,18 @@ export class Microsoft365AuditPuller
       // fetch threw, and this cursor is the only record that it was pending.
       const uri = cursor.blobQueue[0];
       if (uri === undefined) return;
+      // Guards a queue persisted before this check existed, not just a
+      // fresh contentUri — see ManagementApiUriRejectedError.
+      assertManagementApiUri(uri);
 
       const response = await fetchWithRetry({
         url: uri,
         headers: await this.authHeaders(tokens),
         signal: options.signal,
         deadlineAtMs: options.deadlineMs,
+        // uri is response-supplied; a redirect must not move the bearer
+        // token off-host.
+        followRedirects: false,
       });
 
       collectCopilotEvents(
