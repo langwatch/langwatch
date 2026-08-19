@@ -16,7 +16,11 @@ import { PassThrough } from "node:stream";
 import { describe, expect, it } from "vitest";
 
 import { readStdin } from "../hook-input";
-import { installHookHarness, unreachableCollector } from "./hook-harness";
+import {
+  installHookHarness,
+  SESSION_ID,
+  unreachableCollector,
+} from "./hook-harness";
 
 const hook = installHookHarness();
 const { posted } = hook;
@@ -39,11 +43,15 @@ describe("the session context hook's silence", () => {
       expect(hook.exits).toEqual([]);
     });
 
-    /** @scenario "A blank declared title is no declaration" */
-    it("treats a whitespace LANGWATCH_SESSION_TITLE as nothing to say", async () => {
+    /** @scenario "A blank name is no name" */
+    it("treats a whitespace session title as nothing to say", async () => {
       await hook.runHook({
         git: {},
-        env: { LANGWATCH_SESSION_TITLE: "   " },
+        input: {
+          session_id: SESSION_ID,
+          cwd: "/repo/worktrees/review",
+          session_title: "   ",
+        },
       });
 
       expect(posted).toEqual([]);

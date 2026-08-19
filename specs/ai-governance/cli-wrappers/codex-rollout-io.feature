@@ -172,18 +172,18 @@ Feature: Codex Path B recovers the full request body from the rollout transcript
       # neighbours were listed.
 
     @unit
-    Scenario: A session with no remote, no prompt and no declared title posts no context
+    Scenario: A session with no remote, no prompt and no name posts no context
       Given a rollout whose session_meta names no remote
       And it carries no typed prompt
-      And no explicit session title is declared in the environment
+      And codex's session index does not name the thread
       When the completed turn is harvested
       Then the conversation posts and no session-context record does
 
     @unit
-    Scenario: An orchestrator-declared title rides the codex context record
-      Given LANGWATCH_SESSION_TITLE is set in the harvest's environment
+    Scenario: Codex's own thread name rides the context record
+      Given codex's session index names the thread, then renames it
       When the completed turn is harvested
-      Then the session-context record carries it as the explicit title
+      Then the session-context record carries the newest indexed name
       And the transcript's first prompt still rides as the derived title
 
   Rule: a slow logs endpoint does not hold the conversation back

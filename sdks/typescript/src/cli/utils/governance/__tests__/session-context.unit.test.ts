@@ -113,7 +113,7 @@ describe("sessionContextFingerprint", () => {
       );
       const declared = sessionContextFingerprint(
         { repository },
-        { title: "Fix the build", explicitTitle: "pr-reviewer" },
+        { title: "Fix the build", name: "pr-reviewer" },
       );
       expect(new Set([base, derived, declared]).size).toBe(3);
     });
@@ -122,7 +122,7 @@ describe("sessionContextFingerprint", () => {
   describe("given a session outside any repository", () => {
     it("still names the titles it carries", () => {
       expect(
-        sessionContextFingerprint({}, { explicitTitle: "pr-reviewer" }),
+        sessionContextFingerprint({}, { name: "pr-reviewer" }),
       ).toBe("@#!~pr-reviewer");
     });
   });

@@ -28,32 +28,36 @@ export const SESSION_CONTEXT_SCOPE_NAME = "langwatch.coding_agent.hook";
 const SERVICE_NAME = "langwatch-cli";
 
 /**
- * The attribute a session's name rides on. Codex generates no title of its
+ * The attribute a derived title rides on. Codex generates no title of its
  * own, so the harvest names the session from the transcript's first typed
  * prompt; the platform fills an empty title from it and lets an
  * agent-generated title outrank it.
  */
 const SESSION_TITLE_ATTR = "langwatch.session.title";
-const SESSION_TITLE_EXPLICIT_ATTR = "langwatch.session.title_explicit";
 
 /**
- * The title the session's orchestrator declared, from
- * LANGWATCH_SESSION_TITLE in the session's environment. A launcher that
- * runs a fleet exports it per agent, so every capture seam that posts a
- * session-context record carries it and the platform ranks it above the
- * generated and prompt-derived names. Whitespace is no declaration, and
- * the value is capped the way the derived titles are.
+ * The attribute the session's OWN name rides on: the name the harness itself
+ * holds (claude's `--name` flag and `/rename` command, codex's thread name),
+ * mirrored by the capture seams rather than invented by them. The platform
+ * folds the newest name onto the session's title in place, above both
+ * derived titles.
  */
-export function explicitSessionTitleFromEnv(
-	env: NodeJS.ProcessEnv = process.env,
-): string | null {
-	const raw = env.LANGWATCH_SESSION_TITLE?.trim();
-	if (!raw) return null;
-	return raw.length > 120 ? raw.slice(0, 120) : raw;
-}
+const SESSION_NAME_ATTR = "langwatch.session.name";
 
-/** The most of a prompt that becomes a session's name. */
+/** The most of a prompt or a name that becomes a session's title. */
 const MAX_PROMPT_TITLE_CHARS = 120;
+
+/**
+ * A session name as the harness reported it, trimmed and capped like the
+ * derived titles. Whitespace is no name.
+ */
+export function normalizeSessionName(
+	raw: string | null | undefined,
+): string | null {
+	const trimmed = raw?.trim();
+	if (!trimmed) return null;
+	return trimmed.slice(0, MAX_PROMPT_TITLE_CHARS);
+}
 
 /**
  * A session name out of a prompt's text: the first line, whitespace
@@ -189,15 +193,14 @@ function identityFrom(
  */
 export function sessionContextFingerprint(
 	{ repository, branch, worktree }: SessionContext,
-	titles?: { title?: string | null; explicitTitle?: string | null },
+	titles?: { title?: string | null; name?: string | null },
 ): string {
 	const repo = repository
 		? `${repository.host}/${repository.owner}/${repository.name}`
 		: "";
-	// The titles are part of the identity on purpose: a renamed orchestrator
-	// (a changed LANGWATCH_SESSION_TITLE) must re-post, or the rename never
-	// reaches the platform.
-	return `${repo}@${branch ?? ""}#${worktree ?? ""}!${titles?.title ?? ""}~${titles?.explicitTitle ?? ""}`;
+	// The titles are part of the identity on purpose: a renamed session must
+	// re-post, or the rename never reaches the platform.
+	return `${repo}@${branch ?? ""}#${worktree ?? ""}!${titles?.title ?? ""}~${titles?.name ?? ""}`;
 }
 
 /**
@@ -254,7 +257,7 @@ export function buildSessionContextLogPayload({
 	scopeVersion,
 	trace,
 	title,
-	explicitTitle,
+	name,
 }: {
 	sessionId: string;
 	agent: string;
@@ -262,10 +265,10 @@ export function buildSessionContextLogPayload({
 	timeUnixNano: string;
 	scopeVersion: string;
 	trace?: TraceContext | null;
-	/** The session's name, for agents whose telemetry cannot carry one. */
+	/** The prompt-derived title, for agents whose telemetry carries none. */
 	title?: string | null;
-	/** The orchestrator-declared name; outranks every derived title. */
-	explicitTitle?: string | null;
+	/** The session's own name, as the harness itself holds it. */
+	name?: string | null;
 }): OtlpLogsPayload {
 	const attributes: OtlpKeyValue[] = [
 		attribute({ key: "event.name", value: SESSION_CONTEXT_EVENT_NAME }),
@@ -295,10 +298,8 @@ export function buildSessionContextLogPayload({
 	if (title) {
 		attributes.push(attribute({ key: SESSION_TITLE_ATTR, value: title }));
 	}
-	if (explicitTitle) {
-		attributes.push(
-			attribute({ key: SESSION_TITLE_EXPLICIT_ATTR, value: explicitTitle }),
-		);
+	if (name) {
+		attributes.push(attribute({ key: SESSION_NAME_ATTR, value: name }));
 	}
 
 	return {

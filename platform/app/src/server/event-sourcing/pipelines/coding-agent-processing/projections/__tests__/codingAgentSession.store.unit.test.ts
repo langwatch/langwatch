@@ -167,17 +167,17 @@ describe("the session persist gate", () => {
     });
 
     /** @scenario "A session announced with a name is a row from the start" */
-    it("an orchestrator-declared title stores the row before any prompt", async () => {
+    it("the session's own name stores the row before any prompt", async () => {
       const repo = new FakeRepo();
       const store = new CodingAgentSessionStore(repo);
 
       await store.store(
-        makeState({ prompts: 0, titleExplicit: "pr-reviewer" }),
+        makeState({ prompts: 0, title: "pr-reviewer", titleSource: "name" }),
         context(),
       );
 
       expect(repo.upsertCalls).toHaveLength(1);
-      expect(repo.upsertCalls[0]!.row.titleExplicit).toBe("pr-reviewer");
+      expect(repo.upsertCalls[0]!.row.title).toBe("pr-reviewer");
     });
 
     /** @scenario "a session that sent only metrics still appears" */

@@ -77,7 +77,7 @@ function emptyState() {
     gitBranches: [] as string[],
     gitWorktree: null,
     title: null,
-    titleExplicit: null,
+    titleSource: null,
     modelCalls: 0,
     toolCalls: 0,
     subAgents: 0,

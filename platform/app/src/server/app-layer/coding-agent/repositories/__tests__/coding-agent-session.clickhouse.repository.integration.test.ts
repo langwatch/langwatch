@@ -68,7 +68,7 @@ function sessionRow(
     gitBranches: ["main", "feat/session-git-context"],
     gitWorktree: "widgets-feat",
     title: "Add git context to the session row",
-    titleExplicit: "",
+    titleSource: "",
     modelCalls: 3,
     toolCalls: 5,
     subAgents: 1,

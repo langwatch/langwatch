@@ -295,12 +295,12 @@ describe("liftCodingAgentLogFacts", () => {
       expect(facts).toEqual(attributes);
     });
 
-    /** @scenario "The explicit title lifts from the session context record" */
-    it("lifts the declared and derived titles alongside the vcs attributes", () => {
+    /** @scenario "The session's name lifts from the session context record" */
+    it("lifts the name and the derived title alongside the vcs attributes", () => {
       const titled = {
         ...attributes,
         "langwatch.session.title": "Read notes.txt",
-        "langwatch.session.title_explicit": "pr-reviewer",
+        "langwatch.session.name": "pr-reviewer",
       };
 
       const facts = liftCodingAgentLogFacts({
@@ -310,7 +310,7 @@ describe("liftCodingAgentLogFacts", () => {
 
       expect(facts).toMatchObject({
         "langwatch.session.title": "Read notes.txt",
-        "langwatch.session.title_explicit": "pr-reviewer",
+        "langwatch.session.name": "pr-reviewer",
       });
     });
 

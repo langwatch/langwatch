@@ -19,6 +19,7 @@ import {
   deriveTraceStatus,
   TRACE_STATUS_CLICKHOUSE_EXPRESSION,
 } from "./derive-trace-status";
+import { deriveTraceTimestamp } from "./derive-trace-timestamp";
 import { PageTooDeepError } from "./errors";
 import type {
   ExpressionCategoricalDef,
@@ -1319,10 +1320,10 @@ export function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
 
   return {
     traceId: row.traceId,
-    // The span timing baseline where the trace has one, otherwise the
-    // storage anchor (ADR-087): a log-only trace has no span start, and the
-    // raw baseline of 0 rendered its row as "20684d ago".
-    timestamp: row.occurredAt > 0 ? row.occurredAt : (row.storageAnchorMs ?? 0),
+    timestamp: deriveTraceTimestamp({
+      occurredAt: row.occurredAt,
+      storageAnchorMs: row.storageAnchorMs,
+    }),
     name: row.attributes["langwatch.span.name"] ?? row.traceId.slice(0, 8),
     serviceName: row.attributes["service.name"] ?? "",
     durationMs: row.totalDurationMs,

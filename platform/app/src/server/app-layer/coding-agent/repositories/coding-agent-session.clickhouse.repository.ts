@@ -73,7 +73,7 @@ interface ClickHouseWriteRecord {
   GitBranches: string[];
   GitWorktree: string;
   Title: string;
-  TitleExplicit: string;
+  TitleSource: string;
 
   ModelCalls: number;
   ToolCalls: number;
@@ -234,7 +234,7 @@ function toRecord({
     GitBranches: row.gitBranches,
     GitWorktree: row.gitWorktree,
     Title: row.title,
-    TitleExplicit: row.titleExplicit,
+    TitleSource: row.titleSource,
 
     ModelCalls: row.modelCalls,
     ToolCalls: row.toolCalls,
@@ -806,7 +806,7 @@ export class CodingAgentSessionClickHouseRepository
           UserId,
           GitBranch,
           GitBranches,
-          if(TitleExplicit != '', TitleExplicit, Title) AS Title,
+          Title,
           LastEventOccurredAt,
           ModelCalls,
           ToolCalls,
@@ -1076,7 +1076,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     gitBranches: asStringArray(record.GitBranches),
     gitWorktree: String(record.GitWorktree ?? ""),
     title: String(record.Title ?? ""),
-    titleExplicit: String(record.TitleExplicit ?? ""),
+    titleSource: String(record.TitleSource ?? ""),
 
     modelCalls: asNumber(record.ModelCalls),
     toolCalls: asNumber(record.ToolCalls),

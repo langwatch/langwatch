@@ -40,7 +40,7 @@ function sessionRow(
     gitBranch: "feat/two",
     gitBranches: ["feat/one", "feat/two"],
     title: "Add the sessions screen",
-    titleExplicit: "",
+    titleSource: "",
     ...over,
   });
 }
@@ -167,12 +167,12 @@ describe("CodingAgentSessionsListService", () => {
       expect(rows[1]?.title).toBeNull();
     });
 
-    /** @scenario "An explicit title outranks the generated one" */
-    it("names a row by the orchestrator-declared title over the derived one", async () => {
+    /** @scenario "The session's own name is the title the list shows" */
+    it("shows the one Title column the fold already resolved", async () => {
       const { service } = serviceWith({
         rows: [
-          sessionRow({ titleExplicit: "pr-reviewer" }),
-          sessionRow({ sessionId: "session-b", title: "", titleExplicit: "" }),
+          sessionRow({ title: "pr-reviewer", titleSource: "name" }),
+          sessionRow({ sessionId: "session-b", title: "", titleSource: "" }),
         ],
       });
 

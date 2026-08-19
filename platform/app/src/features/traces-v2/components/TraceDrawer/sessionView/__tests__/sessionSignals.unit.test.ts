@@ -32,7 +32,7 @@ function session(
     gitBranches: [],
     gitWorktree: "",
     title: "",
-    titleExplicit: "",
+    titleSource: "",
     modelCalls: 10,
     toolCalls: 20,
     subAgents: 0,

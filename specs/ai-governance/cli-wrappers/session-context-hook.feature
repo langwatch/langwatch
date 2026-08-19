@@ -163,48 +163,62 @@ Rule: The hook reports the git identity of the session
     When another agent reports the same session id
     Then the second agent posts rather than reading the first one's fingerprint
 
-Rule: The orchestrator that launched the session can name it
+Rule: The session's own name travels with its context
 
-  A scheduled fleet's sessions all open with the same scripted greeting, so
-  prompt-derived names collapse into one repeated line. The launcher knows
-  the session's identity, so it declares it: LANGWATCH_SESSION_TITLE in the
-  session's environment rides the context record as an explicit title, which
-  the platform ranks above generated and prompt-derived names.
+  Claude names every session: --name at launch, /rename mid-session, or its
+  own derived default. The hook MIRRORS that name rather than inventing one.
+  At session start the hook payload carries it (session_title); no hook
+  fires on a mid-session /rename, so the hook reads claude's live session
+  registry instead, and the Stop hook runs after every turn, which is what
+  makes a rename reach the platform within one turn.
 
   @unit
-  Scenario: A declared title rides the context record
-    Given LANGWATCH_SESSION_TITLE is set in the hook's environment
+  Scenario: The session's name rides the context record
+    Given a hook payload whose session_title names the session
     And a hook invocation inside a git worktree
     When the hook runs
-    Then the record carries the explicit title alongside the git identity
+    Then the record carries the name alongside the git identity
 
   @unit
-  Scenario: A declared title posts even outside a git repository
-    Given LANGWATCH_SESSION_TITLE is set in the hook's environment
+  Scenario: A mid-session rename reaches the next hook through the registry
+    Given a hook payload with no session_title
+    And claude's live session registry names the session
+    When the hook runs
+    Then the record carries the newest name the registry holds
+
+  @unit
+  Scenario: A named session posts even outside a git repository
+    Given a hook payload whose session_title names the session
     And a hook invocation in a directory that is not a git repository
     When the hook runs
-    Then one record is posted carrying the session id and the explicit title
+    Then one record is posted carrying the session id and the name
     And it carries no repository attributes
 
   @unit
-  Scenario: A changed declared title re-posts
-    Given a session whose context was already posted with one explicit title
-    When the hook runs again with a different LANGWATCH_SESSION_TITLE
-    Then a new record is posted carrying the new title
+  Scenario: A renamed session re-posts its context
+    Given a session whose context was already posted with one name
+    When the hook runs again with a different name
+    Then a new record is posted carrying the new name
 
   @unit
-  Scenario: A blank declared title is no declaration
-    Given LANGWATCH_SESSION_TITLE is set to whitespace
+  Scenario: A blank name is no name
+    Given a hook payload whose session_title is whitespace
     And a hook invocation in a directory that is not a git repository
     When the hook runs
     Then nothing is posted and the exit code is zero
+
+  @unit
+  Scenario: Only claude's seam reads claude's registry
+    Given claude's live session registry names the session
+    When the hook runs for the codex seam
+    Then the record carries no session name
 
 Rule: The hook never disturbs the session
 
   @unit
   Scenario: Outside a git repository with nothing to declare the hook sends nothing and exits zero
     Given a hook invocation in a directory that is not a git repository
-    And no explicit session title is declared in the environment
+    And nothing names the session
     When the hook runs
     Then nothing is posted and the exit code is zero
 

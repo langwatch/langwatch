@@ -24,15 +24,19 @@ import { assertCodexTurnHarvest } from "../shell-rc";
 const THREAD = "019fc156-02e3-76a1-b462-14c38b450cb6";
 const TRACE = "add81f7dde443979dde88487bd7fb454";
 
+let home: string;
 let root: string;
 
 beforeEach(() => {
-	root = mkdtempSync(join(tmpdir(), "lw-codex-sessions-"));
+	// The real layout: the sessions tree under a codex home, with
+	// session_index.jsonl beside it.
+	home = mkdtempSync(join(tmpdir(), "lw-codex-home-"));
+	root = join(home, "sessions");
 	mkdirSync(join(root, "2026", "08", "02"), { recursive: true });
 });
 
 afterEach(() => {
-	rmSync(root, { recursive: true, force: true });
+	rmSync(home, { recursive: true, force: true });
 });
 
 function writeRollout(threadId: string, lines: unknown[]): string {
@@ -512,14 +516,9 @@ describe("harvestCodexThread", () => {
 			);
 		};
 
-		afterEach(() => {
-			vi.unstubAllEnvs();
-		});
-
 		describe("when the session is harvested with nothing to name it", () => {
-			/** @scenario "A session with no remote, no prompt and no declared title posts no context" */
+			/** @scenario "A session with no remote, no prompt and no name posts no context" */
 			it("posts the conversation and no context record", async () => {
-				vi.stubEnv("LANGWATCH_SESSION_TITLE", "");
 				writeRollout(THREAD, [
 					sessionMeta(),
 					taskStarted(TRACE),
@@ -545,7 +544,6 @@ describe("harvestCodexThread", () => {
 		describe("when the transcript carries a typed prompt", () => {
 			/** @scenario "A session outside any repository still posts a context that names it" */
 			it("posts a context carrying the title and no repository attributes", async () => {
-				vi.stubEnv("LANGWATCH_SESSION_TITLE", "");
 				writeRollout(THREAD, [
 					sessionMeta(),
 					taskStarted(TRACE),
@@ -576,10 +574,26 @@ describe("harvestCodexThread", () => {
 			});
 		});
 
-		describe("when the orchestrator declared the session's title", () => {
-			/** @scenario "An orchestrator-declared title rides the codex context record" */
-			it("carries the explicit title beside the derived one", async () => {
-				vi.stubEnv("LANGWATCH_SESSION_TITLE", "pr-reviewer");
+		describe("when codex's session index names the thread", () => {
+			/** @scenario "Codex's own thread name rides the context record" */
+			it("carries the newest indexed name beside the derived title", async () => {
+				// Appended lines are newer, so the second one is the rename that
+				// must win.
+				writeFileSync(
+					join(home, "session_index.jsonl"),
+					[
+						JSON.stringify({
+							id: THREAD,
+							thread_name: "first name",
+							updated_at: "2026-08-02T10:00:00Z",
+						}),
+						JSON.stringify({
+							id: THREAD,
+							thread_name: "pr-reviewer",
+							updated_at: "2026-08-02T11:00:00Z",
+						}),
+					].join("\n"),
+				);
 				writeRollout(THREAD, [
 					sessionMeta(),
 					taskStarted(TRACE),
@@ -600,9 +614,7 @@ describe("harvestCodexThread", () => {
 				});
 
 				const attributes = contextAttrsOf(bodies, urls);
-				expect(attributes["langwatch.session.title_explicit"]).toBe(
-					"pr-reviewer",
-				);
+				expect(attributes["langwatch.session.name"]).toBe("pr-reviewer");
 				expect(attributes["langwatch.session.title"]).toBe(
 					"Fix the flaky login test",
 				);

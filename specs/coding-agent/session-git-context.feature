@@ -143,11 +143,11 @@ Rule: The session title lifts from the generated conversation title
     And the contribution otherwise proceeds
 
   @unit
-  Scenario: The explicit title lifts from the session context record
-    Given a session context event carrying an explicit title attribute
+  Scenario: The session's name lifts from the session context record
+    Given a session context event carrying the session's name attribute
     When the coding-agent log facts are dispatched
-    Then the explicit title fact carries it
-    And the fold stores it beside the derived title
+    Then the session name fact carries it
+    And the fold ranks it above the derived titles
 
   @unit
   Scenario: A context record with no repository still folds its titles

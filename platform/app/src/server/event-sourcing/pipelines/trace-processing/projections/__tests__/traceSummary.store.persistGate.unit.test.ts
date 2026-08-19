@@ -77,8 +77,11 @@ describe("the trace summary persist gate", () => {
 
       expect(upsert).toHaveBeenCalledTimes(1);
     });
+  });
 
-    it("cost alone is also content", async () => {
+  describe("given a log record whose only contribution is a cost", () => {
+    /** @scenario "A log record carrying content persists the summary" */
+    it("stores the summary", async () => {
       const { store, upsert } = storeWithRecorder();
 
       await store.store(

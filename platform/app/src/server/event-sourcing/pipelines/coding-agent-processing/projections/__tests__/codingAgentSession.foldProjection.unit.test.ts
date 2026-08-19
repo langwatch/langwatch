@@ -722,9 +722,9 @@ describe("CodingAgentSessionFoldProjection", () => {
       expect(state.title).toBe("Read notes.txt and summarize it");
     });
 
-    /** @scenario "An explicit title outranks the generated one" */
-    /** @scenario "An explicit title outranks the prompt-derived name" */
-    it("keeps the declared title apart, so it outranks both derived names on read", () => {
+    /** @scenario "The session's own name outranks the generated title" */
+    /** @scenario "The session's own name outranks the prompt-derived name" */
+    it("holds the session's name over both derived titles", () => {
       const projection = makeProjection();
       let state = initStateOf(projection);
 
@@ -733,7 +733,7 @@ describe("CodingAgentSessionFoldProjection", () => {
           facts: {
             "event.name": "langwatch.session_context",
             "coding_agent.name": "claude_code",
-            "langwatch.session.title_explicit": "pr-reviewer",
+            "langwatch.session.name": "pr-reviewer",
           },
         }),
         state,
@@ -756,13 +756,13 @@ describe("CodingAgentSessionFoldProjection", () => {
         state,
       );
 
-      expect(state.titleExplicit).toBe("pr-reviewer");
-      // The derived names still fold on their own terms.
-      expect(state.title).toBe("Review the open pull requests");
+      // Neither the prompt nor the regenerated conversation title moved it.
+      expect(state.title).toBe("pr-reviewer");
+      expect(state.titleSource).toBe("name");
     });
 
-    /** @scenario "A renamed orchestrator renames the session" */
-    it("lets a later declared title replace the previous one", () => {
+    /** @scenario "A renamed session renames its row" */
+    it("folds the newest name in place", () => {
       const projection = makeProjection();
       let state = initStateOf(projection);
 
@@ -771,7 +771,7 @@ describe("CodingAgentSessionFoldProjection", () => {
           facts: {
             "event.name": "langwatch.session_context",
             "coding_agent.name": "claude_code",
-            "langwatch.session.title_explicit": title,
+            "langwatch.session.name": title,
           },
         });
 
@@ -784,7 +784,33 @@ describe("CodingAgentSessionFoldProjection", () => {
         state,
       );
 
-      expect(state.titleExplicit).toBe("pr-hound");
+      expect(state.title).toBe("pr-hound");
+    });
+
+    /** @scenario "A blank name does not rename the session" */
+    it("keeps the previous title when a later name is whitespace", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      const declared = (title: string) =>
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "claude_code",
+            "langwatch.session.name": title,
+          },
+        });
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        declared("pr-reviewer"),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        declared("   "),
+        state,
+      );
+
+      expect(state.title).toBe("pr-reviewer");
     });
 
     /** @scenario "A context record with no repository still folds its titles" */
@@ -798,7 +824,7 @@ describe("CodingAgentSessionFoldProjection", () => {
             "event.name": "langwatch.session_context",
             "coding_agent.name": "codex",
             "langwatch.session.title": "Read notes.txt",
-            "langwatch.session.title_explicit": "pr-reviewer",
+            "langwatch.session.name": "pr-reviewer",
           },
           agent: "codex",
         }),
@@ -807,8 +833,34 @@ describe("CodingAgentSessionFoldProjection", () => {
 
       expect(state.repositoryHost).toBeNull();
       expect(state.repositoryName).toBeNull();
-      expect(state.title).toBe("Read notes.txt");
-      expect(state.titleExplicit).toBe("pr-reviewer");
+      // The name wins over the prompt-derived title on the same record.
+      expect(state.title).toBe("pr-reviewer");
+      expect(state.titleSource).toBe("name");
+    });
+
+    /** @scenario "A row from before the source column still takes a generated title" */
+    it("lets a generated title replace a title with no recorded source", () => {
+      const projection = makeProjection();
+      // A pre-00083 row decodes with a title and no source; it must keep the
+      // old newest-wins behaviour rather than freezing on its first title.
+      const decoded = {
+        ...initStateOf(projection),
+        title: "Good morning.",
+        titleSource: null,
+      };
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "claude_code.api_response_body",
+            "langwatch.session.title": "Review the open pull requests",
+          },
+        }),
+        decoded,
+      );
+
+      expect(state.title).toBe("Review the open pull requests");
+      expect(state.titleSource).toBe("generated");
     });
   });
 

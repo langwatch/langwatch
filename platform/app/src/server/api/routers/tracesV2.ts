@@ -28,6 +28,7 @@ import {
   type CodingAgentTranscript,
 } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
+import { deriveTraceTimestamp } from "~/server/app-layer/traces/derive-trace-timestamp";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import {
   extractFreeTextTerms,
@@ -185,13 +186,10 @@ export function mapTraceSummaryToHeader(
 
   return {
     traceId: summary.traceId,
-    // The span timing baseline where the trace has one, otherwise the
-    // storage anchor (ADR-087): a log-only trace has no span start, and the
-    // raw baseline of 0 rendered its row as "20684d ago".
-    timestamp:
-      summary.occurredAt > 0
-        ? summary.occurredAt
-        : (summary.storageAnchorMs ?? 0),
+    timestamp: deriveTraceTimestamp({
+      occurredAt: summary.occurredAt,
+      storageAnchorMs: summary.storageAnchorMs,
+    }),
     name:
       summary.attributes["langwatch.span.name"] ?? summary.traceId.slice(0, 8),
     serviceName: summary.attributes["service.name"] ?? "",

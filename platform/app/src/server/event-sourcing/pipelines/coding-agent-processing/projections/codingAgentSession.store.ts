@@ -271,7 +271,6 @@ function hasPersistableSignal(state: CodingAgentSessionState): boolean {
     state.editsAccepted > 0 ||
     state.editsRejected > 0 ||
     (state.title !== null && state.title !== "") ||
-    (state.titleExplicit !== null && state.titleExplicit !== "") ||
     (state.repositoryName !== null && state.repositoryName !== "")
   );
 }

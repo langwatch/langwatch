@@ -378,15 +378,9 @@ function toListRow(
 ): CodingAgentSessionListRow {
   return {
     sessionId: row.sessionId,
-    // The orchestrator-declared name outranks the derived one: the launcher
-    // knows what the session IS, while `title` is whatever the agent
-    // generated or the user first typed.
-    title:
-      row.titleExplicit !== ""
-        ? row.titleExplicit
-        : row.title === ""
-          ? null
-          : row.title,
+    // One Title column; the fold already resolved the precedence (the
+    // session's own name, then the generated title, then the first prompt).
+    title: row.title === "" ? null : row.title,
     agent: row.agent,
     agentVersion: row.agentVersion,
     repositoryHost: row.repositoryHost,

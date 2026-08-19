@@ -100,11 +100,11 @@ Rule: A session row exists once the session says something
 
   @unit
   Scenario: A session announced with a name is a row from the start
-    Given a session whose orchestrator declared an explicit title for it
+    Given a session its harness already named
     When the session-context record arrives before any prompt
-    Then the session row is stored under that title
-    # An orchestrator's agent that wedges before its first prompt still
-    # shows up, attributable by name, rather than vanishing entirely.
+    Then the session row is stored under that name
+    # An agent that wedges before its first prompt still shows up,
+    # attributable by name, rather than vanishing entirely.
 
 Rule: A session is named by its generated title, else by its first prompt
 
@@ -150,32 +150,51 @@ Rule: A session is named by its generated title, else by its first prompt
     When the user reads its row
     Then the row names it as an untitled session
 
-Rule: An explicit title from the session's orchestrator outranks every derived name
+Rule: The session's own name outranks every derived title
 
-  A fleet of scheduled agents all opening with the same scripted greeting
-  reads as a page of identical prompt-derived names. The orchestrator that
-  launched the session knows what the session IS, so it can declare the
-  name: the launcher exports LANGWATCH_SESSION_TITLE, the capture carries
-  it on the session-context record, and the row wears it over anything the
-  agent generated or the user typed.
+  Every harness names its sessions and can rename them: claude with --name
+  and /rename, codex with its thread names. The capture MIRRORS that name
+  on the session-context record, the fold writes the newest name onto the
+  one Title column in place, and neither the generated conversation title
+  nor the first typed prompt may clobber it. A fleet whose sessions all
+  open with the same scripted greeting reads as its agents' names, because
+  the launcher names each session through the harness's own flag.
 
   @unit
-  Scenario: An explicit title outranks the generated one
-    Given a session whose context record carries an explicit title
+  Scenario: The session's own name outranks the generated title
+    Given a session whose context record carries its name
     When the agent later generates its own title
-    Then the row keeps the explicit title
+    Then the row keeps the name
 
   @unit
-  Scenario: An explicit title outranks the prompt-derived name
-    Given a session whose context record carries an explicit title
+  Scenario: The session's own name outranks the prompt-derived name
+    Given a session whose context record carries its name
     When a prompt event arrives carrying a name candidate
-    Then the row keeps the explicit title
+    Then the row keeps the name
 
   @unit
-  Scenario: A renamed orchestrator renames the session
-    Given a session titled explicitly
-    When a later context record carries a different explicit title
-    Then the row wears the newest explicit title
+  Scenario: A renamed session renames its row
+    Given a session named by its harness
+    When a later context record carries a different name
+    Then the row wears the newest name
+
+  @unit
+  Scenario: A blank name does not rename the session
+    Given a session named by its harness
+    When a later context record carries a whitespace name
+    Then the row keeps the name it already had
+
+  @unit
+  Scenario: The session's own name is the title the list shows
+    Given a stored session row named by its harness
+    When the sessions list is read
+    Then the row's title is that name
+
+  @unit
+  Scenario: A row from before the source column still takes a generated title
+    Given a session row stored before the title source column existed
+    When the agent generates a new title
+    Then the row wears the generated title
 
 Rule: A session lists every pull request it drove
 

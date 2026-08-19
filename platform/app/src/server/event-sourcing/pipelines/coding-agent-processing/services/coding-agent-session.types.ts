@@ -33,6 +33,12 @@ export interface SessionStep {
 }
 
 /**
+ * Who set the session's `title`, in rank order: the harness's own session
+ * name beats the generated conversation title beats the prompt-derived name.
+ */
+export type SessionTitleSource = "prompt" | "generated" | "name";
+
+/**
  * One converged metric unit, as its contribution delivered it. A cumulative
  * series is one unit (its latest total wins); a delta point is its own unit
  * (each sums once). Replace-not-increment per ADR-056 §5.
@@ -92,7 +98,9 @@ export interface CodingAgentSessionData {
    *     the whole history the scalar above keeps only the present tense of. A
    *     session that lands one change and moves on drove both branches, and
    *     both of their pull requests.
-   *   - title is LAST-NON-EMPTY-WINS, like every other regenerated label.
+   *   - title is LAST-NON-EMPTY-WINS within its source rank: the harness's
+   *     own session name outranks the generated conversation title, which
+   *     outranks the prompt-derived name.
    *
    * Degradation, stated: agents with no companion emitter carry nulls here.
    * Null means nothing reported it, never "this session has no repository".
@@ -105,14 +113,14 @@ export interface CodingAgentSessionData {
   gitWorktree: string | null;
   title: string | null;
   /**
-   * The title the session's ORCHESTRATOR declared, carried on the companion
-   * event from LANGWATCH_SESSION_TITLE in the session's environment. Its own
-   * field rather than a source flag on `title`, because the fold's state is
-   * decoded back from the row and a merged field cannot say whether a later
-   * generated title may replace it. LAST-NON-EMPTY-WINS, and the read
-   * coalesces it over `title`.
+   * Which source set `title`. Its own field rather than an inference,
+   * because the fold's state is decoded back from the row (ADR-066) and the
+   * title alone cannot say whether a later generated title may replace it —
+   * getting that wrong renames a session away from the name its harness
+   * holds. Null on a row from before the column, which ranks as `generated`
+   * (the strongest source that existed then).
    */
-  titleExplicit: string | null;
+  titleSource: SessionTitleSource | null;
 
   // ── Shape ─────────────────────────────────────────────────────────────
   modelCalls: number;
