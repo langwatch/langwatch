@@ -37,9 +37,32 @@ finally:
     else:
         os.environ["DISABLE_EVALUATORS_PRELOAD"] = _original_preload
 
+# The server captured its baseline while the temporary preload flag was set.
+# Rebase it on the clean environment, so the drift tripwire compares against
+# what the process actually holds.
+server.original_env = os.environ.copy()
+
 from langevals_core import litellm_patch
 from langevals_core.litellm_patch import patch_litellm_params
 from langevals_core.request_env import request_env
+from langevals_langevals.competitor_llm import CompetitorLLMEntry, CompetitorLLMEvaluator
+from langevals_langevals.competitor_llm_function_call import (
+    CompetitorLLMFunctionCallEntry,
+    CompetitorLLMFunctionCallEvaluator,
+)
+from langevals_langevals.llm_boolean import CustomLLMBooleanEntry, CustomLLMBooleanEvaluator
+from langevals_langevals.llm_category import CustomLLMCategoryEntry, CustomLLMCategoryEvaluator
+from langevals_langevals.llm_score import CustomLLMScoreEntry, CustomLLMScoreEvaluator
+from langevals_langevals.off_topic import OffTopicEntry, OffTopicEvaluator
+from langevals_langevals.pairwise_compare import PairwiseCompareEntry, PairwiseCompareEvaluator
+from langevals_langevals.query_resolution import (
+    QueryResolutionEntry,
+    QueryResolutionEvaluator,
+)
+from langevals_langevals.select_best_compare import (
+    SelectBestCompareEntry,
+    SelectBestCompareEvaluator,
+)
 
 
 def environment_snapshot() -> dict:
@@ -111,6 +134,57 @@ def test_the_deployment_name_rewrite_reads_the_request_env():
     with request_env({"AZURE_DEPLOYMENT_NAME": "my-deployment"}):
         kwargs = patch_litellm_params({"model": "openai/gpt-5-mini"})
     assert kwargs["model"] == "openai/gpt-5-mini"
+
+
+def test_bedrock_credentials_resolve_into_call_arguments():
+    """Temporary AWS credentials need all three parts on the call.
+
+    An assumed role gives an access key, a secret and a session token, and
+    the provider rejects the pair without the token.
+    """
+    with request_env(
+        {
+            "AWS_ACCESS_KEY_ID": "req-access-key",
+            "AWS_SECRET_ACCESS_KEY": "req-secret-key",
+            "AWS_SESSION_TOKEN": "req-session-token",
+            "AWS_REGION_NAME": "eu-central-1",
+        }
+    ):
+        kwargs = patch_litellm_params({"model": "bedrock/anthropic.claude-sonnet-4"})
+    assert kwargs["aws_access_key_id"] == "req-access-key"
+    assert kwargs["aws_secret_access_key"] == "req-secret-key"
+    assert kwargs["aws_session_token"] == "req-session-token"
+    assert kwargs["aws_region_name"] == "eu-central-1"
+
+
+def test_vertex_credentials_resolve_from_the_request_env():
+    with request_env({"GOOGLE_APPLICATION_CREDENTIALS": "req-google-credentials"}):
+        kwargs = patch_litellm_params({"model": "vertex_ai/gemini-2.5-pro"})
+    assert kwargs["vertex_credentials"] == "req-google-credentials"
+
+
+def test_an_explicit_vertex_credential_wins_over_the_request_env():
+    with request_env({"GOOGLE_APPLICATION_CREDENTIALS": "from-request"}):
+        kwargs = patch_litellm_params(
+            {"model": "vertex_ai/gemini-2.5-pro", "vertex_credentials": "explicit"}
+        )
+    assert kwargs["vertex_credentials"] == "explicit"
+
+
+def test_the_server_vertex_credential_reaches_vertex_calls_only(monkeypatch):
+    """The server's own Google credentials are a vertex fallback.
+
+    They belong to the vertex call that has none of its own. Attaching them
+    to a call for another provider gives it an argument it cannot use.
+    """
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", "server-google-credentials")
+
+    with request_env({}):
+        vertex = patch_litellm_params({"model": "vertex_ai/gemini-2.5-pro"})
+        openai = patch_litellm_params({"model": "openai/gpt-5-mini"})
+
+    assert vertex["vertex_credentials"] == "server-google-credentials"
+    assert "vertex_credentials" not in openai
 
 
 def test_resolution_never_writes_the_environment():
@@ -189,127 +263,107 @@ AZURE_SENTINEL_ENV = {
 }
 
 
-def evaluator_cases():
-    from langevals_langevals.competitor_llm import CompetitorLLMEntry, CompetitorLLMEvaluator
-    from langevals_langevals.competitor_llm_function_call import (
-        CompetitorLLMFunctionCallEntry,
-        CompetitorLLMFunctionCallEvaluator,
-    )
-    from langevals_langevals.llm_boolean import CustomLLMBooleanEntry, CustomLLMBooleanEvaluator
-    from langevals_langevals.llm_category import CustomLLMCategoryEntry, CustomLLMCategoryEvaluator
-    from langevals_langevals.llm_score import CustomLLMScoreEntry, CustomLLMScoreEvaluator
-    from langevals_langevals.off_topic import OffTopicEntry, OffTopicEvaluator
-    from langevals_langevals.pairwise_compare import PairwiseCompareEntry, PairwiseCompareEvaluator
-    from langevals_langevals.query_resolution import (
-        QueryResolutionEntry,
-        QueryResolutionEvaluator,
-    )
-    from langevals_langevals.select_best_compare import (
-        SelectBestCompareEntry,
+text_entry = {"input": "What is the answer?", "output": "The answer is 42."}
+EVALUATOR_CASES = [
+    pytest.param(
+        CustomLLMBooleanEvaluator,
+        CustomLLMBooleanEntry(**text_entry),
+        {"model": "openai/gpt-5-mini"},
+        OPENAI_SENTINEL_ENV,
+        "sentinel-openai-key",
+        id="llm_boolean-openai",
+    ),
+    pytest.param(
+        CustomLLMBooleanEvaluator,
+        CustomLLMBooleanEntry(**text_entry),
+        {"model": "azure/gpt-4o"},
+        AZURE_SENTINEL_ENV,
+        "sentinel-azure-key",
+        id="llm_boolean-azure",
+    ),
+    pytest.param(
+        CustomLLMScoreEvaluator,
+        CustomLLMScoreEntry(**text_entry),
+        {"model": "azure/gpt-4o"},
+        AZURE_SENTINEL_ENV,
+        "sentinel-azure-key",
+        id="llm_score-azure",
+    ),
+    pytest.param(
+        CustomLLMCategoryEvaluator,
+        CustomLLMCategoryEntry(**text_entry),
+        {"model": "azure/gpt-4o"},
+        AZURE_SENTINEL_ENV,
+        "sentinel-azure-key",
+        id="llm_category-azure",
+    ),
+    pytest.param(
+        PairwiseCompareEvaluator,
+        PairwiseCompareEntry(
+            input="Which is better?",
+            candidate_a_id="a",
+            candidate_a_output="first",
+            candidate_b_id="b",
+            candidate_b_output="second",
+        ),
+        {"model": "azure/gpt-4o"},
+        AZURE_SENTINEL_ENV,
+        "sentinel-azure-key",
+        id="pairwise_compare-azure",
+    ),
+    pytest.param(
         SelectBestCompareEvaluator,
-    )
-
-    text_entry = {"input": "What is the answer?", "output": "The answer is 42."}
-    return [
-        pytest.param(
-            CustomLLMBooleanEvaluator,
-            CustomLLMBooleanEntry(**text_entry),
-            {"model": "openai/gpt-5-mini"},
-            OPENAI_SENTINEL_ENV,
-            "sentinel-openai-key",
-            id="llm_boolean-openai",
+        SelectBestCompareEntry(
+            input="Which is best?",
+            candidates=[
+                {"id": "a", "output": "first"},
+                {"id": "b", "output": "second"},
+            ],
         ),
-        pytest.param(
-            CustomLLMBooleanEvaluator,
-            CustomLLMBooleanEntry(**text_entry),
-            {"model": "azure/gpt-4o"},
-            AZURE_SENTINEL_ENV,
-            "sentinel-azure-key",
-            id="llm_boolean-azure",
+        {"model": "azure/gpt-4o"},
+        AZURE_SENTINEL_ENV,
+        "sentinel-azure-key",
+        id="select_best_compare-azure",
+    ),
+    pytest.param(
+        OffTopicEvaluator,
+        OffTopicEntry(input="Tell me about the weather"),
+        {"model": "azure/gpt-4o"},
+        AZURE_SENTINEL_ENV,
+        "sentinel-azure-key",
+        id="off_topic-azure",
+    ),
+    pytest.param(
+        CompetitorLLMEvaluator,
+        CompetitorLLMEntry(**text_entry),
+        {"model": "azure/gpt-4o"},
+        AZURE_SENTINEL_ENV,
+        "sentinel-azure-key",
+        id="competitor_llm-azure",
+    ),
+    pytest.param(
+        CompetitorLLMFunctionCallEvaluator,
+        CompetitorLLMFunctionCallEntry(**text_entry),
+        {"model": "azure/gpt-4o"},
+        AZURE_SENTINEL_ENV,
+        "sentinel-azure-key",
+        id="competitor_llm_function_call-azure",
+    ),
+    pytest.param(
+        QueryResolutionEvaluator,
+        QueryResolutionEntry(
+            conversation=[{"input": "Where is my order?", "output": "It shipped."}]
         ),
-        pytest.param(
-            CustomLLMScoreEvaluator,
-            CustomLLMScoreEntry(**text_entry),
-            {"model": "azure/gpt-4o"},
-            AZURE_SENTINEL_ENV,
-            "sentinel-azure-key",
-            id="llm_score-azure",
-        ),
-        pytest.param(
-            CustomLLMCategoryEvaluator,
-            CustomLLMCategoryEntry(**text_entry),
-            {"model": "azure/gpt-4o"},
-            AZURE_SENTINEL_ENV,
-            "sentinel-azure-key",
-            id="llm_category-azure",
-        ),
-        pytest.param(
-            PairwiseCompareEvaluator,
-            PairwiseCompareEntry(
-                input="Which is better?",
-                candidate_a_id="a",
-                candidate_a_output="first",
-                candidate_b_id="b",
-                candidate_b_output="second",
-            ),
-            {"model": "azure/gpt-4o"},
-            AZURE_SENTINEL_ENV,
-            "sentinel-azure-key",
-            id="pairwise_compare-azure",
-        ),
-        pytest.param(
-            SelectBestCompareEvaluator,
-            SelectBestCompareEntry(
-                input="Which is best?",
-                candidates=[
-                    {"id": "a", "output": "first"},
-                    {"id": "b", "output": "second"},
-                ],
-            ),
-            {"model": "azure/gpt-4o"},
-            AZURE_SENTINEL_ENV,
-            "sentinel-azure-key",
-            id="select_best_compare-azure",
-        ),
-        pytest.param(
-            OffTopicEvaluator,
-            OffTopicEntry(input="Tell me about the weather"),
-            {"model": "azure/gpt-4o"},
-            AZURE_SENTINEL_ENV,
-            "sentinel-azure-key",
-            id="off_topic-azure",
-        ),
-        pytest.param(
-            CompetitorLLMEvaluator,
-            CompetitorLLMEntry(**text_entry),
-            {"model": "azure/gpt-4o"},
-            AZURE_SENTINEL_ENV,
-            "sentinel-azure-key",
-            id="competitor_llm-azure",
-        ),
-        pytest.param(
-            CompetitorLLMFunctionCallEvaluator,
-            CompetitorLLMFunctionCallEntry(**text_entry),
-            {"model": "azure/gpt-4o"},
-            AZURE_SENTINEL_ENV,
-            "sentinel-azure-key",
-            id="competitor_llm_function_call-azure",
-        ),
-        pytest.param(
-            QueryResolutionEvaluator,
-            QueryResolutionEntry(
-                conversation=[{"input": "Where is my order?", "output": "It shipped."}]
-            ),
-            {"model": "azure/gpt-4o"},
-            AZURE_SENTINEL_ENV,
-            "sentinel-azure-key",
-            id="query_resolution-azure",
-        ),
-    ]
+        {"model": "azure/gpt-4o"},
+        AZURE_SENTINEL_ENV,
+        "sentinel-azure-key",
+        id="query_resolution-azure",
+    ),
+]
 
 
 @pytest.mark.parametrize(
-    "evaluator_cls, entry, settings, env, expected_api_key", evaluator_cases()
+    "evaluator_cls, entry, settings, env, expected_api_key", EVALUATOR_CASES
 )
 def test_the_request_credential_reaches_the_call_and_not_the_environment(
     captured_calls, evaluator_cls, entry, settings, env, expected_api_key

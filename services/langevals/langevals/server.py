@@ -61,6 +61,14 @@ original_env = os.environ.copy()
 EVALUATION_QUEUE_TIMEOUT_SECONDS = (
     positive_float_or_none(os.getenv("LANGEVALS_QUEUE_TIMEOUT")) or 300.0
 )
+# The two concurrency knobs multiply, because they count different things.
+# The gate admits REQUESTS, and each admitted request fans its batch out to at
+# most MAX_EVALUATIONS_IN_PARALLEL entries. With the defaults that is 64
+# requests at once and up to 64 x 50 entry evaluations in flight. The batch
+# executor starts a thread per submitted entry and only when it is submitted,
+# so single-entry requests cost one thread each and the product is a ceiling,
+# not a reservation. Lower MAX_EVALUATIONS_IN_PARALLEL to bound the width of
+# every batch, and MAX_CONCURRENT_EVALUATIONS to bound how many run together.
 MAX_EVALUATIONS_IN_PARALLEL = (
     positive_int_or_none(os.getenv("MAX_EVALUATIONS_IN_PARALLEL")) or 50
 )
@@ -102,6 +110,10 @@ class EvaluationGate:
     at most `max_concurrent` evaluations run, waiters are admitted strictly
     in arrival order, and a waiter that outlives `timeout_seconds` is
     rejected so its caller gets a clear signal instead of a stale result.
+
+    One ticket covers one request, whatever the size of its batch. The width
+    of a batch is `MAX_EVALUATIONS_IN_PARALLEL`, so the two knobs multiply,
+    as the comment on them describes.
     """
 
     def __init__(

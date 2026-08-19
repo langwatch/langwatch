@@ -169,6 +169,16 @@ PROVIDER_CREDENTIAL_VARS = {
     "groq": {"api_key": ["GROQ_API_KEY"]},
     "gemini": {"api_key": ["GEMINI_API_KEY"]},
     "vertex_ai": {"vertex_credentials": ["GOOGLE_APPLICATION_CREDENTIALS"]},
+    # A request carrying its own AWS credentials names them the way the
+    # provider form stores them. The session token is here for temporary
+    # credentials: an assumed role gives all three, and access key with secret
+    # alone is rejected.
+    "bedrock": {
+        "aws_access_key_id": ["AWS_ACCESS_KEY_ID"],
+        "aws_secret_access_key": ["AWS_SECRET_ACCESS_KEY"],
+        "aws_session_token": ["AWS_SESSION_TOKEN"],
+        "aws_region_name": ["AWS_REGION_NAME"],
+    },
 }
 
 
@@ -219,14 +229,19 @@ def patch_litellm_params(kwargs):
 
     request_env = current_request_env()
 
-    google_credentials = request_env.get(
-        "GOOGLE_APPLICATION_CREDENTIALS"
-    ) or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-    if google_credentials is not None:
-        kwargs["vertex_credentials"] = google_credentials
-
-
     request_credentials(kwargs)
+
+    # The server environment is the fallback for vertex, after the request env
+    # had its turn through the table above and only when the caller named
+    # nothing. Reading it for any other provider would attach credentials that
+    # the call has no use for.
+    if (
+        kwargs.get("vertex_credentials") is None
+        and _model_provider(kwargs.get("model") or "") == "vertex_ai"
+    ):
+        google_credentials = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+        if google_credentials is not None:
+            kwargs["vertex_credentials"] = google_credentials
 
     # X_LITELLM_* variables are litellm call arguments by name. The server's
     # own environment provides the baseline and the request env overrides it,
