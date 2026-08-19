@@ -89,6 +89,7 @@ Feature: A chart upgrade moves one stored-objects volume consumer at a time
       When the chart renders
       Then a post-upgrade step stands the workers down again
       And it waits for the app rollout to finish
+      And it reads that from the new pod, never from the one it replaced
       And it then scales the workers back to the count the release names
 
   Rule: The steps render only where the shared volume exists
@@ -134,7 +135,7 @@ Feature: A chart upgrade moves one stored-objects volume consumer at a time
       Given an app that does not finish its rollout in time
       When the post-upgrade step gives up waiting
       Then it warns, scales the workers back up, and reports success
-      So that a problem with the app is never also a silent loss of workers
+      # A problem with the app must never also be a silent loss of workers.
 
     @e2e
     Scenario: A failed step does not block the next upgrade

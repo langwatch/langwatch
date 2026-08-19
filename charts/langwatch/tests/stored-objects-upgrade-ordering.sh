@@ -48,8 +48,10 @@ readonly DEFAULT_GRACE_SECONDS=55
 # through. Matches the other suites in this directory.
 readonly BASE="--set autogen.enabled=true"
 
-# Minimum flags that make S3 the active stored-objects backend.
-readonly DATAPLANE="--set app.dataplane.enabled=true --set app.dataplane.s3.bucket=b --set app.dataplane.s3.region=eu-central-1"
+# Minimum flags that make S3 the active stored-objects backend. The chart
+# already defaults app.dataplane.provider to awsS3 and names a bucket, so the
+# switch is the only thing to set. There is no app.dataplane.s3 key.
+readonly DATAPLANE="--set app.dataplane.enabled=true --set app.dataplane.provider=awsS3 --set app.dataplane.bucket=langwatch-dataset"
 
 failures=0
 
@@ -146,6 +148,27 @@ expect_absent() {
   return 0
 }
 
+# Fails unless EVERY named value is a whole number. Validating them one by one
+# matters: concatenating two values and testing the result would let an empty
+# one hide behind a numeric one, and the arithmetic comparison that follows
+# would then error out, which `if` reads as false and the suite reports as ok.
+# Call as: expect_numbers <label> name=value name=value ...
+expect_numbers() {
+  local label="$1" pair name value
+  shift
+  for pair in "$@"; do
+    name=${pair%%=*}
+    value=${pair#*=}
+    case "$value" in
+      '' | *[!0-9-]* | -*-* | -)
+        fail "$label" "${name} did not render as a number (got '${value:-<absent>}')"
+        return 1
+        ;;
+    esac
+  done
+  return 0
+}
+
 # @scenario "A local-filesystem install gets a pre-upgrade step"
 test_default_install_renders_the_hook() {
   local block pre app_block workers_block
@@ -175,12 +198,7 @@ test_default_install_renders_the_hook() {
   local job_weight rbac_weight
   job_weight=$(printf '%s\n' "$pre" | awk -F'"' '/helm.sh\/hook-weight/ { print $2; exit }')
   rbac_weight=$(printf '%s\n' "$block" | hook_doc Role | awk -F'"' '/helm.sh\/hook-weight/ { print $2; exit }')
-  case "${job_weight}${rbac_weight}" in
-    '' | *[!0-9-]*)
-      fail "default hook" "hook weights did not render as numbers (Job '${job_weight:-<absent>}', Role '${rbac_weight:-<absent>}')"
-      return
-      ;;
-  esac
+  expect_numbers "default hook" "the Job's weight=${job_weight}" "the Role's weight=${rbac_weight}" || return 0
   if [ "$rbac_weight" -ge "$job_weight" ]; then
     fail "default hook" \
       "the Role's weight (${rbac_weight}) must be below the Job's (${job_weight}), or the Job can start without its permissions"
@@ -224,18 +242,7 @@ expect_wait_outlasts_grace() {
   fi
   wait=$(wait_seconds_of "$job")
   deadline=$(deadline_seconds_of "$job")
-  case "${wait}" in
-    '' | *[!0-9]*)
-      fail "$label" "the wait did not render as a number (got '${wait:-<absent>}')"
-      return
-      ;;
-  esac
-  case "${deadline}" in
-    '' | *[!0-9]*)
-      fail "$label" "activeDeadlineSeconds did not render as a number (got '${deadline:-<absent>}')"
-      return
-      ;;
-  esac
+  expect_numbers "$label" "the wait=${wait}" "activeDeadlineSeconds=${deadline}" || return 0
   if [ "$wait" -le "$grace" ]; then
     fail "$label" \
       "the hook waits ${wait}s, which does not outlast the ${grace}s the workers may take to exit"
@@ -282,6 +289,20 @@ test_workers_come_back_after_the_app_rollout() {
   expect_contains "post hook" "$post" "app=\"${APP_DEPLOYMENT}\"" || return 0
   expect_contains "post hook" "$post" 'wait_for_app_rollout "$app_timeout"' || return 0
 
+  # "Rolled out" has to mean the NEW pod. readyReplicas counts ready pods
+  # across every ReplicaSet, so a check built on it alone passes while the old
+  # pod is still the ready one, and the workers come back against the node the
+  # app is leaving. That is the wedge this hook exists to prevent, so assert on
+  # the fields that distinguish the generations.
+  local field
+  for field in updatedReplicas observedGeneration availableReplicas; do
+    expect_contains "post hook" "$post" ".status.${field}" || return 0
+  done
+  expect_absent "post hook" "$post" ".status.readyReplicas" || return 0
+  # No old pod may be left: status.replicas has to equal updatedReplicas.
+  expect_contains "post hook" "$post" '[ "$current" -eq "$updated" ]' || return 0
+  expect_contains "post hook" "$post" '[ "$available" -ge "$updated" ]' || return 0
+
   # And then restore the count the release names, not a hardcoded 1.
   replicas=$(printf '%s' "$post" | awk -F'=' '/^ *replicas=/ { gsub(/ /, "", $2); print $2; exit }')
   if [ "$replicas" != "1" ]; then
@@ -294,17 +315,85 @@ test_workers_come_back_after_the_app_rollout() {
   # bring the workers back.
   app_wait=$(printf '%s' "$post" | awk -F'=' '/^ *app_timeout=/ { gsub(/ /, "", $2); print $2; exit }')
   deadline=$(deadline_seconds_of "$post")
-  case "${app_wait}${deadline}" in
-    '' | *[!0-9]*)
-      fail "post hook" "the app wait or the deadline did not render as numbers (app '${app_wait:-<absent>}', deadline '${deadline:-<absent>}')"
-      return
-      ;;
-  esac
+  expect_numbers "post hook" "app_timeout=${app_wait}" "activeDeadlineSeconds=${deadline}" || return 0
   if [ "$deadline" -le "$app_wait" ]; then
     fail "post hook" "activeDeadlineSeconds is ${deadline}s, which cuts the ${app_wait}s app wait short"
     return
   fi
   echo "ok   [post hook] stands the workers down, waits up to ${app_wait}s for ${APP_DEPLOYMENT}, then restores ${replicas}"
+}
+
+# Prints the shell script a hook Job runs, dedented out of the rendered YAML
+# literal block and cut before the body, so the variables and the function
+# definitions can be sourced and driven directly.
+hook_script_prelude() {
+  printf '%s\n' "$1" | awk '
+    /^            - \|$/ { grab = 1; next }
+    !grab { next }
+    /^$/ { print ""; next }
+    /^              / {
+      line = substr($0, 15)
+      if (line ~ /^if ! deployment_exists/) { exit }
+      print line
+      next
+    }
+    { exit }
+  '
+}
+
+# The rollout check decides when the workers may come back, and getting it
+# wrong reintroduces the wedge silently. Asserting that the script mentions
+# `updatedReplicas` would pass just as happily if the comparison were
+# backwards, so this one runs the function against a fake kubectl and reads its
+# answer. See specs/setup/helm-stored-objects-upgrade-ordering.feature.
+#
+# @scenario "The workers come back only after the app pod that holds the volume is running"
+test_rollout_check_waits_for_the_new_pod() {
+  local post prelude workdir got
+  post=$(hook_block "" | hook_doc_named "$POST_JOB")
+  prelude=$(hook_script_prelude "$post")
+  if ! printf '%s\n' "$prelude" | grep -q 'app_rollout_done()'; then
+    fail "rollout check" "could not extract app_rollout_done from the rendered ${POST_JOB} Job"
+    return
+  fi
+
+  workdir=$(mktemp -d)
+  printf '%s\n' "$prelude" > "$workdir/lib.sh"
+  # A kubectl that answers with whatever the case under test holds.
+  printf '#!/bin/sh\nprintf %%s "$FAKE_STATE"\n' > "$workdir/kubectl"
+  chmod +x "$workdir/kubectl"
+
+  # generation|observedGeneration|spec.replicas|updatedReplicas|status.replicas|availableReplicas|
+  local label state want bad=0
+  local cases='settled on the new spec;5|5|1|1|1|1|;done
+controller has not seen the new spec;5|4|1|1|1|1|;waiting
+old pod still ready, new one not created;5|5|1||1|1|;waiting
+old pod still present beside the new one;5|5|1|1|2|2|;waiting
+new pod created but not yet available;5|5|1|1|1||;waiting
+nothing reported at all;||||||;waiting
+kubectl returned nothing;;waiting
+two replicas, only one updated;5|5|2|1|2|2|;waiting
+two replicas, both updated and available;5|5|2|2|2|2|;done'
+
+  while IFS=';' read -r label state want; do
+    [ -z "$label" ] && continue
+    if PATH="$workdir:$PATH" FAKE_STATE="$state" \
+       bash -c ". '$workdir/lib.sh' >/dev/null 2>&1; app_rollout_done"; then
+      got=done
+    else
+      got=waiting
+    fi
+    if [ "$got" != "$want" ]; then
+      fail "rollout check" "'${label}' reported ${got}, expected ${want} (state '${state}')"
+      bad=1
+    fi
+  done <<EOF
+$cases
+EOF
+
+  rm -rf "$workdir"
+  [ "$bad" -eq 0 ] || return 0
+  echo "ok   [rollout check] the rollout is only done once every replica is from the new spec and available"
 }
 
 # @scenario "An install with object storage gets no upgrade steps"
@@ -460,6 +549,7 @@ test_default_install_renders_the_hook
 test_hook_scales_workers_to_zero_and_waits
 test_wait_outlasts_the_grace_period
 test_workers_come_back_after_the_app_rollout
+test_rollout_check_waits_for_the_new_pod
 test_dataplane_renders_no_hook
 test_no_workers_renders_no_hook
 test_knob_off_renders_no_hook

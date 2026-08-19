@@ -146,7 +146,16 @@ app:
 
 For an air-gapped install, mirror the hook image and point
 `app.storedObjects.localFilesystem.serializeUpgradesImage` at your copy. It
-needs `sh` and `kubectl`.
+needs `sh` and `kubectl`, and it accepts a digest reference. If your registry
+needs credentials, name the pull secrets in
+`app.storedObjects.localFilesystem.serializeUpgradesPullSecrets`: the hook
+Jobs run under their own ServiceAccount, so secrets you attached to the
+namespace's `default` ServiceAccount do not reach them.
+
+The image tag names the kubectl version. `kubectl` supports one minor version of
+skew either way, so change it if your cluster is far from 1.34. The hooks only
+call `get deployment`, `patch deployment --subresource=scale` and `wait
+--for=delete pod`, which have been stable for many releases.
 
 ### Secrets
 
@@ -335,7 +344,8 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `app.storedObjects.localFilesystem.size`                     | PVC size for the stored-objects volume.                                                                                                                                                                                                                                             | `10Gi`                       |
 | `app.storedObjects.localFilesystem.storageClassName`         | PVC storageClassName (cluster default if empty).                                                                                                                                                                                                                                    | `""`                         |
 | `app.storedObjects.localFilesystem.serializeUpgrades`        | Hold the workers at 0 replicas while the app rolls, so only one pod holds the shared RWO volume.                                                                                                                                                                                    | `true`                       |
-| `app.storedObjects.localFilesystem.serializeUpgradesImage`   | Image the upgrade hooks run. Needs sh and kubectl.                                                                                                                                                                                                                                  | `alpine/k8s:1.30.0`          |
+| `app.storedObjects.localFilesystem.serializeUpgradesImage`   | Image the upgrade hooks run. Needs sh and kubectl. A digest reference works too.                                                                                                                                                                                                    | `alpine/k8s:1.34.9`          |
+| `app.storedObjects.localFilesystem.serializeUpgradesPullSecrets` | Pull secrets for that image. The hook Jobs use their own ServiceAccount, so secrets on the namespace default ServiceAccount do not reach them.                                                                                                                                      | `[]`                         |
 | `app.email`                                                  | Email provider configuration.                                                                                                                                                                                                                                                       |                              |
 | `app.email.defaultFrom`                                      | Default "from" address.                                                                                                                                                                                                                                                             | `""`                         |
 | `app.email.provider`                                         | Email provider. Empty sends no email.                                                                                                                                                                                                                                               | `""`                         |
