@@ -31,7 +31,6 @@ import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
 import { app as roleBindingsApp } from "../app/api/role-bindings/[[...route]]/app";
 import { app as rolesApp } from "../app/api/roles/[[...route]]/app";
 import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
-import { restoreLegacyOperationIds } from "../server/api/openapi-operation-id";
 import { requireDefaultedResponseFields } from "../server/api/openapi-response-required";
 import {
   allRegisteredRoutes,
@@ -50,18 +49,22 @@ import { app as experimentsV3App } from "../server/routes/experiments-v3";
 import { app as miscApp } from "../server/routes/misc";
 
 /**
- * `generateSpecs`, holding the document to the shape it already publishes.
+ * `generateSpecs`, with response schemas read as output rather than input.
  *
- * hono-openapi v1 names operations differently and reads response schemas in
- * the other direction from v0.4. Both reach generated clients — one as function
- * names, the other as whether a field is optional — so every call below goes
- * through here rather than each fix living at 44 call sites. Each correction
- * documents itself in its own module.
+ * The single correction the upgrade needs, applied in one place instead of at
+ * 44 call sites. See `openapi-response-required.ts` for why.
+ *
+ * Operation ids are deliberately NOT corrected. hono-openapi v1 derives them
+ * differently — `getApiCoding-agentPull-request-usage` becomes
+ * `getApiCodingAgentPullRequestUsage` for the 49 paths carrying a hyphen or an
+ * underscore — and the new ones are simply better. They are also not a break:
+ * `openapi-python-client` snake-cases the id, so both spellings produce the
+ * same `get_api_coding_agent_pull_request_usage`, and the TypeScript client is
+ * keyed on `paths`, not `operations`. An id that genuinely must not move is
+ * declared on its own route, the way 53 operations already declare theirs.
  */
 const generateSpecs: typeof generateSpecsUnpinned = async (hono, options, c) =>
-  requireDefaultedResponseFields(
-    restoreLegacyOperationIds(await generateSpecsUnpinned(hono, options, c)),
-  );
+  requireDefaultedResponseFields(await generateSpecsUnpinned(hono, options, c));
 
 // Surfaces whose routes come straight from their Hono apps. Their paths
 // REPLACE on merge, and any path the apps no longer serve is pruned from

@@ -6424,7 +6424,7 @@
     },
     "/api/coding-agent/sessions/{sessionId}/events": {
       "get": {
-        "operationId": "getApiCoding-agentSessionsBySessionIdEvents",
+        "operationId": "getApiCodingAgentSessionsBySessionIdEvents",
         "summary": "List coding agent session events",
         "description": "List a coding-agent session's events (model calls, compactions, rate limits, tool runs, prompts) in time order, keyset-paginated. Pass the previous response's nextCursor to continue; filter with kinds (comma-separated).",
         "parameters": [
@@ -6771,7 +6771,7 @@
     },
     "/api/coding-agent/pull-request-usage": {
       "get": {
-        "operationId": "getApiCoding-agentPull-request-usage",
+        "operationId": "getApiCodingAgentPullRequestUsage",
         "summary": "Get pull request coding agent usage",
         "description": "Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price.",
         "parameters": [
@@ -7456,7 +7456,7 @@
     },
     "/api/dataset/direct-upload": {
       "post": {
-        "operationId": "postApiDatasetDirect-upload",
+        "operationId": "postApiDatasetDirectUpload",
         "description": "Start a direct browser→S3 dataset upload (returns a presigned PUT)",
         "responses": {},
         "security": [
@@ -7468,7 +7468,7 @@
     },
     "/api/dataset/direct-upload/staging/{uploadId}": {
       "put": {
-        "operationId": "putApiDatasetDirect-uploadStagingByUploadId",
+        "operationId": "putApiDatasetDirectUploadStagingByUploadId",
         "description": "Stream a heavy upload into staging when there is no browser-reachable S3",
         "responses": {},
         "parameters": [
@@ -7490,7 +7490,7 @@
     },
     "/api/dataset/direct-upload/{datasetId}/finalize": {
       "post": {
-        "operationId": "postApiDatasetDirect-uploadByDatasetIdFinalize",
+        "operationId": "postApiDatasetDirectUploadByDatasetIdFinalize",
         "description": "Finalize a direct upload: size-check and start processing",
         "responses": {},
         "parameters": [
@@ -7512,7 +7512,7 @@
     },
     "/api/dataset/direct-upload/{datasetId}/retry": {
       "post": {
-        "operationId": "postApiDatasetDirect-uploadByDatasetIdRetry",
+        "operationId": "postApiDatasetDirectUploadByDatasetIdRetry",
         "description": "Retry normalization of a failed or stuck dataset",
         "responses": {},
         "parameters": [
@@ -7534,7 +7534,7 @@
     },
     "/api/dataset/direct-upload/{datasetId}": {
       "delete": {
-        "operationId": "deleteApiDatasetDirect-uploadByDatasetId",
+        "operationId": "deleteApiDatasetDirectUploadByDatasetId",
         "description": "Abort a still-pending direct upload and clean up its row",
         "responses": {},
         "parameters": [
@@ -9649,7 +9649,7 @@
     },
     "/api/evaluations/batch/log_results": {
       "post": {
-        "operationId": "postApiEvaluationsBatchLog_results",
+        "operationId": "postApiEvaluationsBatchLogResults",
         "summary": "Report batch evaluation results",
         "description": "Report the rows of a batch evaluation against an experiment, so its scores and progress show up in the app. This is the second half of an SDK batch evaluation: create the experiment with `POST /api/experiment/init`, then post rows here as they finish. Identify the experiment by either `experiment_id` or `experiment_slug`. Bodies up to 20MB are accepted.",
         "tags": [
@@ -14702,7 +14702,7 @@
     },
     "/api/dspy/log_steps": {
       "post": {
-        "operationId": "postApiDspyLog_steps",
+        "operationId": "postApiDspyLogSteps",
         "summary": "Report DSPy optimizer steps",
         "description": "Report the steps of a DSPy optimizer run against an experiment, so the run's progress and scores show up in the app. Send the steps as an array; the optimizer typically posts each batch as it finishes. Bodies up to 20MB are accepted.",
         "tags": [
@@ -15481,7 +15481,7 @@
     },
     "/api/track_event": {
       "post": {
-        "operationId": "postApiTrack_event",
+        "operationId": "postApiTrackEvent",
         "summary": "Track an event (legacy path)",
         "description": "Record a customer event against a trace or thread. Identical to `POST /api/events/track`, which is the path to use in new integrations; this one stays for callers written against it. Supply `event_id` yourself to make the call idempotent.",
         "tags": [
@@ -17075,7 +17075,7 @@
     },
     "/api/gateway/v1/virtual-keys": {
       "get": {
-        "operationId": "getApiGatewayV1Virtual-keys",
+        "operationId": "getApiGatewayV1VirtualKeys",
         "summary": "List virtual keys",
         "description": "Returns the virtual keys visible to the caller's project credential: keys scoped to this project, to its team, or to the whole organization. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Visibility is applied to each page after it is read, so a page can hold fewer than `limit` rows without meaning the walk is finished.",
         "tags": [
@@ -17482,7 +17482,7 @@
         ]
       },
       "post": {
-        "operationId": "postApiGatewayV1Virtual-keys",
+        "operationId": "postApiGatewayV1VirtualKeys",
         "summary": "Create virtual key",
         "description": "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
         "tags": [
@@ -18206,7 +18206,7 @@
     },
     "/api/gateway/v1/virtual-keys/{id}": {
       "get": {
-        "operationId": "getApiGatewayV1Virtual-keysById",
+        "operationId": "getApiGatewayV1VirtualKeysById",
         "summary": "Get virtual key",
         "tags": [
           "Virtual Keys"
@@ -18626,7 +18626,7 @@
         ]
       },
       "patch": {
-        "operationId": "patchApiGatewayV1Virtual-keysById",
+        "operationId": "patchApiGatewayV1VirtualKeysById",
         "summary": "Update virtual key",
         "description": "Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and costs land: send `trace_project_id` for that, validated the way create validates it; explicit null re-resolves it under the create-time rules rather than clearing it. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.",
         "tags": [
@@ -19282,7 +19282,7 @@
     },
     "/api/gateway/v1/virtual-keys/{id}/spend": {
       "get": {
-        "operationId": "getApiGatewayV1Virtual-keysByIdSpend",
+        "operationId": "getApiGatewayV1VirtualKeysByIdSpend",
         "summary": "Read a virtual key's spend",
         "description": "Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Reads the cost path (`trace_summaries`), the same source the dashboard's key list and Usage tab read, so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.",
         "tags": [
@@ -19634,7 +19634,7 @@
     },
     "/api/gateway/v1/virtual-keys/{id}/rotate": {
       "post": {
-        "operationId": "postApiGatewayV1Virtual-keysByIdRotate",
+        "operationId": "postApiGatewayV1VirtualKeysByIdRotate",
         "summary": "Rotate virtual key secret",
         "description": "Mints a fresh secret for an existing VK. The old secret remains valid for 24h (grace window) so in-flight clients can roll over.",
         "tags": [
@@ -20017,7 +20017,7 @@
     },
     "/api/gateway/v1/virtual-keys/{id}/disable": {
       "post": {
-        "operationId": "postApiGatewayV1Virtual-keysByIdDisable",
+        "operationId": "postApiGatewayV1VirtualKeysByIdDisable",
         "summary": "Disable virtual key",
         "requestBody": {
           "required": false,
@@ -20413,7 +20413,7 @@
     },
     "/api/gateway/v1/virtual-keys/{id}/enable": {
       "post": {
-        "operationId": "postApiGatewayV1Virtual-keysByIdEnable",
+        "operationId": "postApiGatewayV1VirtualKeysByIdEnable",
         "summary": "Enable virtual key",
         "description": "Reverses disable: the key returns to `active` exactly as it was, including any rotation grace that was running. Idempotent.",
         "tags": [
@@ -20792,7 +20792,7 @@
     },
     "/api/gateway/v1/virtual-keys/{id}/revoke": {
       "post": {
-        "operationId": "postApiGatewayV1Virtual-keysByIdRevoke",
+        "operationId": "postApiGatewayV1VirtualKeysByIdRevoke",
         "summary": "Revoke virtual key",
         "description": "Marks the virtual key as revoked and archives its own budgets. Clients using it start receiving 401 within ~60s (the gateway's change-event long-poll period). Idempotent.",
         "tags": [
@@ -24939,7 +24939,7 @@
     },
     "/api/gateway/v1/cache-rules": {
       "get": {
-        "operationId": "getApiGatewayV1Cache-rules",
+        "operationId": "getApiGatewayV1CacheRules",
         "summary": "List cache-control rules",
         "description": "Organization-scoped operator-authored rules, sorted priority descending then oldest first, with archived rules excluded. Paged by cursor: follow `next_cursor` until it comes back null. Matchers and action are returned verbatim as JSON.",
         "tags": [
@@ -25262,7 +25262,7 @@
         ]
       },
       "post": {
-        "operationId": "postApiGatewayV1Cache-rules",
+        "operationId": "postApiGatewayV1CacheRules",
         "summary": "Create a cache rule",
         "description": "Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll. Send `Idempotency-Key` to make a retry safe.",
         "tags": [
@@ -25717,7 +25717,7 @@
     },
     "/api/gateway/v1/cache-rules/{id}": {
       "get": {
-        "operationId": "getApiGatewayV1Cache-rulesById",
+        "operationId": "getApiGatewayV1CacheRulesById",
         "summary": "Get a cache rule",
         "description": "Returns the rule if it belongs to the caller's organisation; 404 otherwise. Archived rules are NOT returned (use the audit log to inspect removed rules).",
         "tags": [
@@ -26019,7 +26019,7 @@
         ]
       },
       "patch": {
-        "operationId": "patchApiGatewayV1Cache-rulesById",
+        "operationId": "patchApiGatewayV1CacheRulesById",
         "summary": "Update a cache rule",
         "description": "Partial update. `matchers` and `action` REPLACE the stored value when provided (not merged field-by-field). Omitting them leaves the stored value untouched. The rule id + organisation are immutable.",
         "tags": [
@@ -26409,7 +26409,7 @@
         ]
       },
       "delete": {
-        "operationId": "deleteApiGatewayV1Cache-rulesById",
+        "operationId": "deleteApiGatewayV1CacheRulesById",
         "summary": "Archive a cache rule",
         "description": "Soft-delete: sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.",
         "tags": [
@@ -26713,7 +26713,7 @@
     },
     "/api/governance/ingestion-templates": {
       "get": {
-        "operationId": "getApiGovernanceIngestion-templates",
+        "operationId": "getApiGovernanceIngestionTemplates",
         "summary": "List ingestion templates",
         "description": "Returns the union of platform-published default templates and any org-authored templates visible to the caller's organization. Disabled / archived rows are filtered out. `ottl_rules` is empty in this end-user shape; admins use GET /ingestion-templates/admin to read the canonical OTTL.",
         "tags": [
@@ -26893,7 +26893,7 @@
         ]
       },
       "post": {
-        "operationId": "postApiGovernanceIngestion-templates",
+        "operationId": "postApiGovernanceIngestionTemplates",
         "summary": "Create org-authored ingestion template",
         "description": "Creates a brand-new template scoped to the caller's organization. Slug is auto-generated. Platform rows (organizationId IS NULL) are NEVER created via this endpoint — admins customize platform defaults via POST /ingestion-templates/clone instead.",
         "tags": [
@@ -27085,7 +27085,7 @@
     },
     "/api/governance/ingestion-templates/admin": {
       "get": {
-        "operationId": "getApiGovernanceIngestion-templatesAdmin",
+        "operationId": "getApiGovernanceIngestionTemplatesAdmin",
         "summary": "List ingestion templates (admin shape, includes OTTL)",
         "description": "Same union as the user list but includes the canonical `ottl_rules` source for every row. Used by admin tooling to render the transparency block / authoring drawer.",
         "tags": [
@@ -27267,7 +27267,7 @@
     },
     "/api/governance/ingestion-templates/{id}": {
       "get": {
-        "operationId": "getApiGovernanceIngestion-templatesById",
+        "operationId": "getApiGovernanceIngestionTemplatesById",
         "summary": "Get ingestion template",
         "description": "Single-template lookup by id, scoped to the caller's organization. Cross-org probes collapse to 404 (no enumeration vector).",
         "tags": [
@@ -27488,7 +27488,7 @@
         ]
       },
       "delete": {
-        "operationId": "deleteApiGovernanceIngestion-templatesById",
+        "operationId": "deleteApiGovernanceIngestionTemplatesById",
         "summary": "Soft-archive an org-authored template",
         "description": "Marks the row archived; existing ingestion keys continue to land traces but the row disappears from list views. Platform-published rows reject with 403.",
         "tags": [
@@ -27686,7 +27686,7 @@
     },
     "/api/governance/ingestion-templates/{id}/ottl-rules": {
       "patch": {
-        "operationId": "patchApiGovernanceIngestion-templatesByIdOttl-rules",
+        "operationId": "patchApiGovernanceIngestionTemplatesByIdOttlRules",
         "summary": "Replace ottl_rules on an org-authored template",
         "description": "Audit-logged with line counts pre/post. Platform-published rows reject with 403. Admins must clone a platform row before editing it.",
         "tags": [
@@ -27943,7 +27943,7 @@
     },
     "/api/governance/ingestion-templates/clone": {
       "post": {
-        "operationId": "postApiGovernanceIngestion-templatesClone",
+        "operationId": "postApiGovernanceIngestionTemplatesClone",
         "summary": "Clone a platform-published template into the caller's org",
         "description": "Forks the source row's source_type / display_name / OTTL into a fresh org-authored row that the admin can then edit via PATCH /ingestion-templates/:id/ottl-rules.",
         "tags": [
@@ -35599,7 +35599,7 @@
     },
     "/api/model-defaults": {
       "get": {
-        "operationId": "getApiModel-defaults",
+        "operationId": "getApiModelDefaults",
         "description": "Snapshot of the default-model cascade for this project: effective resolution per role, plus the configs the caller can read.",
         "responses": {
           "200": {
@@ -35885,7 +35885,7 @@
         ]
       },
       "post": {
-        "operationId": "postApiModel-defaults",
+        "operationId": "postApiModelDefaults",
         "description": "Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.",
         "responses": {
           "200": {
@@ -36047,7 +36047,7 @@
     },
     "/api/model-defaults/{id}": {
       "put": {
-        "operationId": "putApiModel-defaultsById",
+        "operationId": "putApiModelDefaultsById",
         "description": "Update a config's JSON payload and/or its scope attachments. Sending `scopes: []` deletes the config.",
         "responses": {
           "204": {
@@ -36197,7 +36197,7 @@
         ]
       },
       "delete": {
-        "operationId": "deleteApiModel-defaultsById",
+        "operationId": "deleteApiModelDefaultsById",
         "description": "Delete a default-model config. Scope attachments cascade.",
         "responses": {
           "204": {
@@ -36307,7 +36307,7 @@
     },
     "/api/model-providers": {
       "get": {
-        "operationId": "getApiModel-providers",
+        "operationId": "getApiModelProviders",
         "description": "List all model providers for a project with masked API keys",
         "responses": {
           "200": {
@@ -36621,7 +36621,7 @@
     },
     "/api/model-providers/{provider}": {
       "put": {
-        "operationId": "putApiModel-providersByProvider",
+        "operationId": "putApiModelProvidersByProvider",
         "description": "Create or update a model provider",
         "responses": {
           "200": {
@@ -43815,7 +43815,7 @@
     },
     "/api/scenario-events": {
       "post": {
-        "operationId": "postApiScenario-events",
+        "operationId": "postApiScenarioEvents",
         "description": "Create a new scenario event",
         "responses": {
           "201": {
@@ -45675,7 +45675,7 @@
         ]
       },
       "delete": {
-        "operationId": "deleteApiScenario-events",
+        "operationId": "deleteApiScenarioEvents",
         "description": "Archive all simulation runs for a scenario set. Pass `scenarioSetId=default` to archive runs in the implicit default set; future SDK runs without an explicit setId will repopulate it.",
         "responses": {
           "200": {
@@ -45812,7 +45812,7 @@
     },
     "/api/scenario-events/browser-tab": {
       "post": {
-        "operationId": "postApiScenario-eventsBrowser-tab",
+        "operationId": "postApiScenarioEventsBrowserTab",
         "description": "Offer a batch run to an already-open simulations tab on the caller's machine. Returns whether a live tab took it.",
         "responses": {
           "200": {
@@ -48259,7 +48259,7 @@
     },
     "/api/simulation-runs": {
       "get": {
-        "operationId": "getApiSimulation-runs",
+        "operationId": "getApiSimulationRuns",
         "description": "List simulation runs, optionally filtered by scenarioSetId or batchRunId",
         "responses": {
           "200": {
@@ -48528,7 +48528,7 @@
     },
     "/api/simulation-runs/{scenarioRunId}": {
       "get": {
-        "operationId": "getApiSimulation-runsByScenarioRunId",
+        "operationId": "getApiSimulationRunsByScenarioRunId",
         "description": "Get a single simulation run by its ID",
         "responses": {
           "200": {
@@ -48778,7 +48778,7 @@
     },
     "/api/simulation-runs/batches/list": {
       "get": {
-        "operationId": "getApiSimulation-runsBatchesList",
+        "operationId": "getApiSimulationRunsBatchesList",
         "description": "List batch summaries for a scenario set (pass/fail counts per batch)",
         "responses": {
           "200": {
@@ -56365,7 +56365,7 @@
     },
     "/api/webhooks/v1/endpoints/{id}/roll-secret": {
       "post": {
-        "operationId": "postApiWebhooksV1EndpointsByIdRoll-secret",
+        "operationId": "postApiWebhooksV1EndpointsByIdRollSecret",
         "tags": [
           "Webhooks"
         ],
@@ -57846,7 +57846,7 @@
     },
     "/api/webhooks/v1/event-types": {
       "get": {
-        "operationId": "getApiWebhooksV1Event-types",
+        "operationId": "getApiWebhooksV1EventTypes",
         "tags": [
           "Webhooks"
         ],
@@ -58670,7 +58670,7 @@
     },
     "/api/gateway/v1/spend-summaries": {
       "get": {
-        "operationId": "getApiGatewayV1Spend-summaries",
+        "operationId": "getApiGatewayV1SpendSummaries",
         "responses": {
           "200": {
             "description": "Per-key spend rollups",
@@ -59311,7 +59311,7 @@
     },
     "/api/gateway/v1/spend-events": {
       "get": {
-        "operationId": "getApiGatewayV1Spend-events",
+        "operationId": "getApiGatewayV1SpendEvents",
         "tags": [
           "Gateway Spend"
         ],
@@ -59989,7 +59989,7 @@
     },
     "/api/gateway/v1/end-users/{id}/spend": {
       "get": {
-        "operationId": "getApiGatewayV1End-usersByIdSpend",
+        "operationId": "getApiGatewayV1EndUsersByIdSpend",
         "tags": [
           "Gateway Spend"
         ],
@@ -60363,7 +60363,7 @@
     },
     "/api/gateway/v1/spend-events/replay": {
       "post": {
-        "operationId": "postApiGatewayV1Spend-eventsReplay",
+        "operationId": "postApiGatewayV1SpendEventsReplay",
         "tags": [
           "Gateway Spend"
         ],
