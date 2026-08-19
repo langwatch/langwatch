@@ -201,18 +201,11 @@ function DatasetConfigForm({
    */
   function openDatasetCreation() {
     const previousDatasetId = slice.datasetId;
-    let created = false;
+    let hasCreatedDataset = false;
 
     openDrawer("addOrEditDataset", {
-      onSuccess: ({
-        datasetId,
-        columnTypes,
-      }: {
-        datasetId: string;
-        name: string;
-        columnTypes: DatasetColumns;
-      }) => {
-        created = true;
+      onSuccess: ({ datasetId, columnTypes }) => {
+        hasCreatedDataset = true;
         void datasets.refetch();
         onChange({
           ...slice,
@@ -221,7 +214,7 @@ function DatasetConfigForm({
         });
       },
       onClose: () => {
-        if (!created && previousDatasetId) {
+        if (!hasCreatedDataset && previousDatasetId) {
           onChange({ ...slice, datasetId: previousDatasetId });
         }
         // The drawer opens blank unless the return says otherwise, so that
