@@ -91,7 +91,7 @@ examples = [
     "langchain-text-splitters>=1.1.2,<2.0.0",
     "langchain-google-vertexai>=2.0.0,<4.0.0",
     "litellm>=1.96.0",
-    "openinference-instrumentation-dspy>=0.1.23,<0.2.0",
+    "openinference-instrumentation-dspy>=0.1.39,<0.2.0",
     "opentelemetry-instrumentation-fastapi>=0.65b0",
     "langgraph>=1.0.0,<2.0.0",
     "openai>=1.68.2,<2.55.0", # cap re-verified against openai 2.43.0 (2.8+ historically called model_dump(by_alias=None) which pydantic-core rejected)
