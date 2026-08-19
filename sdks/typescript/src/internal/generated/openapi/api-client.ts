@@ -766,8 +766,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Run governed analytics SQL
-         * @description Executes one read-only ClickHouse SELECT over the governed analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project. Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
+         * Run LangWatchQL analytics SQL
+         * @description Executes one read-only ClickHouse SELECT over the LangWatchQL analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project. Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
          */
         post: operations["postApiV1ProjectsByProjectIdAnalyticsQueryClickhouse"];
         delete?: never;
@@ -784,8 +784,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Discover the governed analytics schema
-         * @description Lists the governed analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.
+         * Discover the LangWatchQL analytics schema
+         * @description Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.
          */
         get: operations["getApiV1ProjectsByProjectIdAnalyticsSchema"];
         put?: never;
@@ -805,13 +805,13 @@ export interface paths {
         };
         /**
          * List saved workbench charts
-         * @description Lists every saved governed SQL chart in this project, each with the statement it runs, the parameter values it was saved with and the Vega-Lite specification that draws it. Charts built with the chart builder are a different kind and are not listed here.
+         * @description Lists every saved LangWatchQL chart in this project, each with the statement it runs, the parameter values it was saved with and the Vega-Lite specification that draws it. Charts built with the chart builder are a different kind and are not listed here.
          */
         get: operations["getApiV1ProjectsByProjectIdAnalyticsCharts"];
         put?: never;
         /**
          * Save a workbench chart
-         * @description Saves a governed SQL statement, its bound parameter values and an optional Vega-Lite specification as one chart. The statement is validated by the governed analytics SQL validator against this key's own permissions, and the specification by the visualization policy, before anything is written — a chart that could not be run or drawn is refused rather than stored.
+         * @description Saves a LangWatchQL statement, its bound parameter values and an optional Vega-Lite specification as one chart. The statement is validated by the LangWatchQL analytics SQL validator against this key's own permissions, and the specification by the visualization policy, before anything is written — a chart that could not be run or drawn is refused rather than stored.
          */
         post: operations["postApiV1ProjectsByProjectIdAnalyticsCharts"];
         delete?: never;
@@ -829,14 +829,14 @@ export interface paths {
         };
         /**
          * Get a saved workbench chart
-         * @description Returns one saved governed SQL chart with its statement, parameter values and specification. A chart saved in another project is reported as not found.
+         * @description Returns one saved LangWatchQL chart with its statement, parameter values and specification. A chart saved in another project is reported as not found.
          */
         get: operations["getApiV1ProjectsByProjectIdAnalyticsChartsByChartId"];
         put?: never;
         post?: never;
         /**
          * Delete a saved workbench chart
-         * @description Deletes one saved governed SQL chart. Answers 204 with no body; deleting a chart that is not in this project is reported as not found.
+         * @description Deletes one saved LangWatchQL chart. Answers 204 with no body; deleting a chart that is not in this project is reported as not found.
          */
         delete: operations["deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId"];
         options?: never;
@@ -2748,7 +2748,7 @@ export interface paths {
         head?: never;
         /**
          * Update a provisioned user
-         * @description Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active` (deactivating or reactivating the account), of `userName`, and of `name.givenName` / `name.familyName`, written either as an operation path or as keys inside a value object; and `add`, `replace` or `remove` of the enterprise `costCenter`, which reassigns the member's department. Operations outside that set are accepted and change nothing, so a provider sending its full patch set is never rejected.
+         * @description Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active` (deactivating or reactivating the account), of `userName`, and of `name.givenName` / `name.familyName`, written either as an operation path or as keys inside a value object; and `add`, `replace` or `remove` of the enterprise `costCenter`, which reassigns the member's department. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Replace` that Entra ID writes is accepted; any other name, or a missing or non-string one, is rejected with a 400. An understood operation aimed at anything not listed above is accepted and changes nothing.
          */
         patch: operations["scimPatchUser"];
         trace?: never;
@@ -2804,7 +2804,7 @@ export interface paths {
         head?: never;
         /**
          * Update a provisioned group
-         * @description Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of members (named by a value filter on the path, as Entra ID writes it, or in the operation value), `replace` of `displayName`, and `replace` of the whole member list. Operations outside that set are accepted and change nothing.
+         * @description Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of members (named by a value filter on the path, as Entra ID writes it, or in the operation value), `replace` of `displayName`, and `replace` of the whole member list. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Add` / `Remove` that Entra ID writes are accepted; any other name, or a missing or non-string one, is rejected with a 400. An `add` or a `remove` aimed at anything other than members is accepted and changes nothing. A `replace` that is not a `displayName` rename is treated as a replacement of the whole member list, so one that carries no members empties the group.
          */
         patch: operations["scimPatchGroup"];
         trace?: never;
@@ -2820,7 +2820,7 @@ export interface paths {
         put?: never;
         /** @description Create a new scenario event */
         post: operations["postApiScenario-events"];
-        /** @description Archive all simulation runs for a scenario set. Pass `scenarioSetId=default` to archive runs in the implicit default set; future SDK runs without an explicit setId will repopulate it. */
+        /** @description Archive simulation runs. Pass exactly one of `scenarioSetId` (archives every run in the set; `scenarioSetId=default` targets the implicit default set) or `scenarioRunId` (archives that one run). */
         delete: operations["deleteApiScenario-events"];
         options?: never;
         head?: never;
@@ -2878,7 +2878,8 @@ export interface paths {
         delete: operations["deleteApiScenariosById"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** @description Update an existing scenario */
+        patch: operations["patchApiScenariosById"];
         trace?: never;
     };
     "/api/projects": {
@@ -3017,7 +3018,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List simulation runs, optionally filtered by scenarioSetId or batchRunId */
+        /** @description List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass `include=messages` to read whole conversations, which caps the page at 20 runs. A batch-scoped listing always carries whole conversations. */
         get: operations["getApiSimulation-runs"];
         put?: never;
         post?: never;
@@ -3088,7 +3089,8 @@ export interface paths {
         };
         /** @description Get a suite (run plan) by its ID */
         get: operations["getApiSuitesById"];
-        put?: never;
+        /** @description Update a suite (run plan) */
+        put: operations["putApiSuitesById"];
         post?: never;
         /** @description Archive (soft-delete) a suite (run plan) */
         delete: operations["deleteApiSuitesById"];
@@ -5097,8 +5099,8 @@ export interface operations {
                         [key: string]: string | number | boolean | null;
                     };
                     timeWindow?: {
-                        start: string;
-                        end: string;
+                        start: string | number;
+                        end: string | number;
                     };
                 };
             };
@@ -5197,6 +5199,26 @@ export interface operations {
                     };
                 };
             };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
             /** @description Internal Server Error */
             500: {
                 headers: {
@@ -5230,7 +5252,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The governed schema, scoped to the caller's permissions */
+            /** @description The LangWatchQL schema, scoped to the caller's permissions */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -10080,10 +10102,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         }[];
                         /** @description Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more. */
                         next_cursor: string | null;
@@ -10197,6 +10228,8 @@ export interface operations {
                     routing_policy_id?: string | null;
                     /** @enum {string} */
                     routing_mode?: "none" | "fallback_all" | "policy";
+                    /** @description When the key stops serving. Omit it and the key never expires. A date that has already passed is refused with `virtual_key_expiry_in_past`, rather than writing a key that is dead on arrival. */
+                    expires_at?: string;
                     budget?: {
                         limit_usd: number | string;
                         /** @enum {string} */
@@ -10315,10 +10348,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                         secret: string;
                     };
@@ -10473,10 +10515,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                     };
                 };
@@ -10607,6 +10658,8 @@ export interface operations {
                     routing_policy_id?: string | null;
                     /** @enum {string} */
                     routing_mode?: "none" | "fallback_all" | "policy";
+                    /** @description When the key stops serving. Omit it and the stored date stays where it is; null clears it, so the key never expires; a date moves it. A key whose date has already passed accepts this edit like any other, which is how an expired key is put back in service without minting a new secret. A date in the past is refused with `virtual_key_expiry_in_past`. */
+                    expires_at?: string | null;
                     budget?: {
                         limit_usd: number | string;
                         /** @enum {string} */
@@ -10721,10 +10774,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                     };
                 };
@@ -11012,10 +11074,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                         secret: string;
                     };
@@ -11157,10 +11228,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                     };
                 };
@@ -11294,10 +11374,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                     };
                 };
@@ -11431,10 +11520,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                     };
                 };
@@ -20995,8 +21093,9 @@ export interface operations {
     };
     "deleteApiScenario-events": {
         parameters: {
-            query: {
-                scenarioSetId: string;
+            query?: {
+                scenarioSetId?: string;
+                scenarioRunId?: string;
             };
             header?: never;
             path?: never;
@@ -21015,10 +21114,14 @@ export interface operations {
                         failed: number;
                         scenarioSetId: string;
                         hasMore: boolean;
+                    } | {
+                        archived: number;
+                        failed: number;
+                        scenarioRunId: string;
                     };
                 };
             };
-            /** @description Missing or invalid scenarioSetId */
+            /** @description Missing or invalid scope parameter */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -21038,6 +21141,17 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                    };
+                };
+            };
+            /** @description Scenario run not found in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
                     };
                 };
             };
@@ -21172,6 +21286,10 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                         }[];
+                        simulatorModel: string | null;
+                        judgeModel: string | null;
+                        maxTurns: number | null;
+                        minTurns: number | null;
                         /** Format: uri */
                         platformUrl: string;
                     }[];
@@ -21249,6 +21367,14 @@ export interface operations {
                         description?: string;
                         defaultValue?: string | number | boolean;
                     }[];
+                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    simulatorModel?: string | null;
+                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    judgeModel?: string | null;
+                    /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
+                    maxTurns?: number | null;
+                    /** @description Minimum conversation turns before the judge may end the run. Null uses the default. */
+                    minTurns?: number | null;
                 };
             };
         };
@@ -21270,6 +21396,10 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                         }[];
+                        simulatorModel: string | null;
+                        judgeModel: string | null;
+                        maxTurns: number | null;
+                        minTurns: number | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -21353,6 +21483,10 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                         }[];
+                        simulatorModel: string | null;
+                        judgeModel: string | null;
+                        maxTurns: number | null;
+                        minTurns: number | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -21442,6 +21576,14 @@ export interface operations {
                         description?: string;
                         defaultValue?: string | number | boolean;
                     }[];
+                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    simulatorModel?: string | null;
+                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    judgeModel?: string | null;
+                    /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
+                    maxTurns?: number | null;
+                    /** @description Minimum conversation turns before the judge may end the run. Null uses the default. */
+                    minTurns?: number | null;
                 };
             };
         };
@@ -21463,6 +21605,10 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                         }[];
+                        simulatorModel: string | null;
+                        judgeModel: string | null;
+                        maxTurns: number | null;
+                        minTurns: number | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -21550,6 +21696,128 @@ export interface operations {
                     "application/json": {
                         id: string;
                         archived: boolean;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Scenario not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    patchApiScenariosById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    situation?: string;
+                    criteria?: string[];
+                    labels?: string[];
+                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. */
+                    parameters?: {
+                        name: string;
+                        description?: string;
+                        defaultValue?: string | number | boolean;
+                    }[];
+                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    simulatorModel?: string | null;
+                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    judgeModel?: string | null;
+                    /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
+                    maxTurns?: number | null;
+                    /** @description Minimum conversation turns before the judge may end the run. Null uses the default. */
+                    minTurns?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Scenario updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        situation: string;
+                        criteria: string[];
+                        labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                        }[];
+                        simulatorModel: string | null;
+                        judgeModel: string | null;
+                        maxTurns: number | null;
+                        minTurns: number | null;
+                        /** Format: uri */
+                        platformUrl: string;
                     };
                 };
             };
@@ -22412,6 +22680,7 @@ export interface operations {
                 batchRunId?: string;
                 limit?: number;
                 cursor?: string;
+                include?: "messages";
             };
             header?: never;
             path?: never;
@@ -22444,6 +22713,8 @@ export interface operations {
                                 role: string;
                                 content: string;
                             }[];
+                            /** @description True when `messages` holds only the first few messages of a longer conversation. Pass `include=messages` to read them all. */
+                            messagesTruncated?: boolean;
                             timestamp: number;
                             updatedAt: number;
                             durationInMs: number;
@@ -22541,6 +22812,8 @@ export interface operations {
                             role: string;
                             content: string;
                         }[];
+                        /** @description True when `messages` holds only the first few messages of a longer conversation. Pass `include=messages` to read them all. */
+                        messagesTruncated?: boolean;
                         timestamp: number;
                         updatedAt: number;
                         durationInMs: number;
@@ -22727,6 +23000,8 @@ export interface operations {
                         }[];
                         repeatCount: number;
                         labels: string[];
+                        simulatorModel: string | null;
+                        judgeModel: string | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -22806,6 +23081,10 @@ export interface operations {
                     repeatCount?: number;
                     /** @default [] */
                     labels?: string[];
+                    /** @description Model for the simulated user in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default. */
+                    simulatorModel?: string | null;
+                    /** @description Model for the judge in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default. */
+                    judgeModel?: string | null;
                 };
             };
         };
@@ -22829,6 +23108,8 @@ export interface operations {
                         }[];
                         repeatCount: number;
                         labels: string[];
+                        simulatorModel: string | null;
+                        judgeModel: string | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -22916,6 +23197,128 @@ export interface operations {
                         }[];
                         repeatCount: number;
                         labels: string[];
+                        simulatorModel: string | null;
+                        judgeModel: string | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Suite not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    putApiSuitesById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    description?: string | null;
+                    scenarioIds?: string[];
+                    targets?: {
+                        /** @enum {string} */
+                        type: "prompt" | "http" | "code" | "workflow";
+                        referenceId: string;
+                    }[];
+                    repeatCount?: number;
+                    labels?: string[];
+                    /** @description Model for the simulated user in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default. */
+                    simulatorModel?: string | null;
+                    /** @description Model for the judge in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default. */
+                    judgeModel?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Suite updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        slug: string;
+                        description: string | null;
+                        scenarioIds: string[];
+                        targets: {
+                            /** @enum {string} */
+                            type: "prompt" | "http" | "code" | "workflow";
+                            referenceId: string;
+                        }[];
+                        repeatCount: number;
+                        labels: string[];
+                        simulatorModel: string | null;
+                        judgeModel: string | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -23092,6 +23495,10 @@ export interface operations {
                     }[];
                     repeatCount?: number;
                     labels?: string[];
+                    /** @description Model for the simulated user in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default. */
+                    simulatorModel?: string | null;
+                    /** @description Model for the judge in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default. */
+                    judgeModel?: string | null;
                 };
             };
         };
@@ -23115,6 +23522,8 @@ export interface operations {
                         }[];
                         repeatCount: number;
                         labels: string[];
+                        simulatorModel: string | null;
+                        judgeModel: string | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -23214,6 +23623,8 @@ export interface operations {
                         }[];
                         repeatCount: number;
                         labels: string[];
+                        simulatorModel: string | null;
+                        judgeModel: string | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
