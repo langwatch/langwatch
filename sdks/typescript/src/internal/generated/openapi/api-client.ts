@@ -677,7 +677,8 @@ export interface paths {
         };
         /** @description Get an agent by its id */
         get: operations["getApiAgentsById"];
-        put?: never;
+        /** @description Update an agent by its id */
+        put: operations["putApiAgentsById"];
         post?: never;
         /** @description Archive an agent (soft-delete) */
         delete: operations["deleteApiAgentsById"];
@@ -3018,7 +3019,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass `include=messages` to read whole conversations, which caps the page at 20 runs. A batch-scoped listing always carries whole conversations. */
+        /** @description List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass `include=messages` to read whole conversations, which caps the page at 20 runs, ending on a batch boundary. A batch-scoped listing always carries whole conversations. */
         get: operations["getApiSimulation-runs"];
         put?: never;
         post?: never;
@@ -4167,6 +4168,76 @@ export interface operations {
         requestBody?: never;
         responses: never;
     };
+    putApiAgentsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    /** @enum {string} */
+                    type?: "signature" | "code" | "workflow" | "http";
+                    config?: {
+                        [key: string]: unknown;
+                    };
+                    workflowId?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Agent updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        /** @enum {string} */
+                        type: "signature" | "code" | "workflow" | "http";
+                        config: {
+                            [key: string]: unknown;
+                        } | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Agent not found in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description The request body does not match the expected shape */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
     deleteApiAgentsById: {
         parameters: {
             query?: never;
@@ -4201,7 +4272,53 @@ export interface operations {
                 };
             };
         };
-        responses: never;
+        responses: {
+            /** @description Agent updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        /** @enum {string} */
+                        type: "signature" | "code" | "workflow" | "http";
+                        config: {
+                            [key: string]: unknown;
+                        } | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Agent not found in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description The request body does not match the expected shape */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
     };
     listApiKeys: {
         parameters: {
@@ -21121,7 +21238,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Missing or invalid scope parameter */
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -21129,6 +21246,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         error: string;
+                        message?: string;
                     };
                 };
             };
@@ -21155,7 +21273,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Missing or invalid scope parameter */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -21163,7 +21281,6 @@ export interface operations {
                 content: {
                     "application/json": {
                         error: string;
-                        message?: string;
                     };
                 };
             };

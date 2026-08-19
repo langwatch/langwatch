@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 // The tunnel path verifies the binary it is about to run on every start, and
 // the mock below points at the node executable. Verification fails closed on
@@ -95,7 +95,10 @@ const makeAgent = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("agent dev session", () => {
-  let mockGet: ReturnType<typeof vi.fn>;
+  // Typed as async on purpose: the bare `ReturnType<typeof vi.fn>` declares a
+  // void return, so an implementation that returns a promise reads as a
+  // misused promise.
+  let mockGet: Mock<() => Promise<unknown>>;
   let mockList: ReturnType<typeof vi.fn>;
   let mockUpdate: ReturnType<typeof vi.fn>;
 

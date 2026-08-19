@@ -62388,6 +62388,15 @@ Manage AI agent configurations. Create, update, and organize agents that are tra
 
 ---
 
+# FILE: ./api-reference/agents/put-update-agents.mdx
+
+---
+title: "Update an agent by its id"
+openapi: "PUT /api/agents/{id}"
+---
+
+---
+
 # FILE: ./api-reference/agents/update-agents.mdx
 
 ---
@@ -65454,6 +65463,15 @@ Manage test scenarios for agent simulations. Create, update, and organize scenar
 
 ---
 
+# FILE: ./api-reference/scenarios/patch-update-scenarios.mdx
+
+---
+title: "Update an existing scenario"
+openapi: "PATCH /api/scenarios/{id}"
+---
+
+---
+
 # FILE: ./api-reference/scenarios/update-scenarios.mdx
 
 ---
@@ -65926,6 +65944,15 @@ description: "Manage test suites (run plans) that group scenarios for batch exec
 ## Intro
 
 Manage test suites (run plans) that group scenarios for batch execution. Create, update, duplicate, and trigger suite runs.
+
+---
+
+# FILE: ./api-reference/suites/put-update-suites.mdx
+
+---
+title: "Update a suite"
+openapi: "PUT /api/suites/{id}"
+---
 
 ---
 
