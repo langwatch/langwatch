@@ -7,7 +7,7 @@ import { trace } from "@opentelemetry/api";
 import { ChatOpenAI } from "@langchain/openai";
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
-import { AgentExecutor, createToolCallingAgent } from "langchain/agents";
+import { AgentExecutor, createToolCallingAgent } from "@langchain/classic/agents";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { LangWatchCallbackHandler } from "../..";
 import { setupObservability } from "../../../../setup/node";

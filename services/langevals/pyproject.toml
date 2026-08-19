@@ -78,6 +78,18 @@ override-dependencies = [
     "langchain-core>=0.3.86,<1",
     "langchain-openai>=0.2.14,<1",
     "langchain-text-splitters>=0.3.11,<1",
+    # langchain-community 0.4.x dropped langchain_community.chat_models.vertexai
+    # (the whole package is being sunset in favor of standalone integration
+    # packages, see https://github.com/langchain-ai/langchain-community/issues/674).
+    # ragas==0.4.3 — the version this workspace is pinned to, and the latest one
+    # published — still imports that exact module unconditionally at the top of
+    # ragas/llms/base.py, so langchain-community>=0.4.0 breaks every evaluator
+    # load with `ModuleNotFoundError: No module named
+    # 'langchain_community.chat_models.vertexai'`. This is a ragas bug, not
+    # something fixable from our import paths: see langchain-ai/ragas#2741,
+    # #2753 (open) and #2810, #2862, #2923, #2956, #2957 (unmerged fixes as of
+    # this writing). Re-check when ragas cuts a release past 0.4.3.
+    "langchain-community>=0.3.31,<0.4",
     # security: GHSA-f4xh-w4cj-qxq8 — LangSmith SDK TracingMiddleware arbitrary
     # server-side file read; patched in 0.8.18.
     "langsmith>=0.8.18",
@@ -116,10 +128,13 @@ override-dependencies = [
     "torch>=2.13.0",
     #
     # NOT fixed here, deliberately:
-    #   langchain / langchain-core / langchain-openai / langchain-text-splitters
+    #   langchain / langchain-core / langchain-openai / langchain-text-splitters /
+    #   langchain-community
     #     — this workspace is on the 0.3.x line and every patched version is on
-    #       1.x, so clearing those four alerts is a breaking major upgrade of the
-    #       evaluator surface, not a floor bump. Tracked separately.
+    #       1.x, so clearing those alerts is a breaking major upgrade of the
+    #       evaluator surface, not a floor bump. langchain-community additionally
+    #       can't move independently of the other four (see the pin above) until
+    #       ragas fixes its vertexai import. Tracked separately.
     #   ragas, diskcache — no patched release exists upstream yet.
 ]
 
