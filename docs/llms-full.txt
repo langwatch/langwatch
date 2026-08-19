@@ -29486,8 +29486,10 @@ registerTelemetry(
 ```
 
 This keeps the AI SDK's standard GenAI attributes and routes its spans to the
-dedicated provider. Any other auto-instrumentation that only emits through the
-global OTel API still needs `lwProvider.getTracer()` directly, as above.
+dedicated provider. `lwProvider.getTracer("gen_ai")` only reconfigures
+`@ai-sdk/otel` — it does not retarget other auto-instrumentations. Anything
+else that emits through the global OTel API needs its own provider
+configuration, or manual spans via `lwProvider.getTracer()` as shown above.
 </Note>
 
 ## Alternative: Coexistence (TypeScript)
@@ -36005,12 +36007,16 @@ result = customer_support_generation()
 ```typescript
 import { LangWatch, getLangWatchTracer } from "langwatch";
 import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
+import { generateText, registerTelemetry } from "ai";
+import { OpenTelemetry } from "@ai-sdk/otel";
 
 // Initialize LangWatch client
 const langwatch = new LangWatch({
   apiKey: process.env.LANGWATCH_API_KEY,
 });
+
+// AI SDK 7 emits no spans until an integration is registered
+registerTelemetry(new OpenTelemetry());
 
 const tracer = getLangWatchTracer("customer-support");
 

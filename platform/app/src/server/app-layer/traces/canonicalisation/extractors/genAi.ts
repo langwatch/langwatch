@@ -327,15 +327,18 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // Prefer the first *valid* value, not the first present key — a garbage
     // or negative gen_ai.response.time_to_first_chunk must not shadow a good
     // gen_ai.client.operation.time_to_first_chunk.
-    const useResponseTime =
+    const isResponseTime =
       responseTimeToFirstChunkSeconds !== null &&
       responseTimeToFirstChunkSeconds >= 0;
-    const timeToFirstChunkKey = useResponseTime
+    const timeToFirstChunkKey = isResponseTime
       ? ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK
       : ATTR_KEYS.GEN_AI_CLIENT_OPERATION_TIME_TO_FIRST_CHUNK;
-    const timeToFirstChunkSeconds = useResponseTime
+    const timeToFirstChunkSeconds = isResponseTime
       ? responseTimeToFirstChunkSeconds
       : clientTimeToFirstChunkSeconds;
+    const timeToFirstChunkRuleSuffix = isResponseTime
+      ? "response.time_to_first_chunk"
+      : "client.operation.time_to_first_chunk";
     if (
       timeToFirstChunkSeconds !== null &&
       timeToFirstChunkSeconds >= 0 &&
@@ -347,7 +350,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
         ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN,
         timeToFirstChunkSeconds * 1000,
       );
-      ctx.recordRule(`${this.id}:response.time_to_first_chunk`);
+      ctx.recordRule(`${this.id}:${timeToFirstChunkRuleSuffix}`);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

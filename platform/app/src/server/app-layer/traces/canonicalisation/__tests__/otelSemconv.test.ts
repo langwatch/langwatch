@@ -210,6 +210,56 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
       });
     });
 
+    describe("when both time-to-first-chunk keys are present with valid values", () => {
+      it("prefers gen_ai.response.time_to_first_chunk over the client key", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.response.time_to_first_chunk": 0.65,
+            "gen_ai.client.operation.time_to_first_chunk": 0.2,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(
+          result.attributes["gen_ai.server.time_to_first_token"],
+        ).toBeCloseTo(650, 5);
+        expect(
+          result.attributes["gen_ai.response.time_to_first_chunk"],
+        ).toBeUndefined();
+        expect(
+          result.attributes["gen_ai.client.operation.time_to_first_chunk"],
+        ).toBe(0.2);
+      });
+    });
+
+    describe("when gen_ai.response.time_to_first_chunk is negative and the client key is valid", () => {
+      it("falls back to gen_ai.client.operation.time_to_first_chunk", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.response.time_to_first_chunk": -1,
+            "gen_ai.client.operation.time_to_first_chunk": 0.2,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(
+          result.attributes["gen_ai.server.time_to_first_token"],
+        ).toBeCloseTo(200, 5);
+        expect(result.attributes["gen_ai.response.time_to_first_chunk"]).toBe(
+          -1,
+        );
+        expect(
+          result.attributes["gen_ai.client.operation.time_to_first_chunk"],
+        ).toBeUndefined();
+      });
+    });
+
     describe("when an existing time_to_first_token is already present", () => {
       it("does not overwrite it with the chunk-derived value", () => {
         const result = service.canonicalize(

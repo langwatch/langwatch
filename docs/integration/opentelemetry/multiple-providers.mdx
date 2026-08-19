@@ -106,8 +106,10 @@ registerTelemetry(
 ```
 
 This keeps the AI SDK's standard GenAI attributes and routes its spans to the
-dedicated provider. Any other auto-instrumentation that only emits through the
-global OTel API still needs `lwProvider.getTracer()` directly, as above.
+dedicated provider. `lwProvider.getTracer("gen_ai")` only reconfigures
+`@ai-sdk/otel` — it does not retarget other auto-instrumentations. Anything
+else that emits through the global OTel API needs its own provider
+configuration, or manual spans via `lwProvider.getTracer()` as shown above.
 </Note>
 
 ## Alternative: Coexistence (TypeScript)

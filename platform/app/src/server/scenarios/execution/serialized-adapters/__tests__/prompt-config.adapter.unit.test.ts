@@ -348,7 +348,6 @@ describe("SerializedPromptConfigAdapter", () => {
         content: string;
       }>;
 
-      // Template message only - input.messages not appended
       expect(messages).toHaveLength(1);
       expect(callArgs.instructions).toBe("You are helpful.");
       expect(messages[0]!.content).toContain("How are you?");
