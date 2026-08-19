@@ -1,0 +1,95 @@
+name: Boxd Golden Refresh
+
+# On every merge to main: fast-forward the boxd golden machine to main,
+# verify it is actually up and serving, then save the verified state as a
+# snapshot. The golden stays running as the standing staging environment;
+# the snapshot is the durable fork source for preview boxes.
+#
+# A red run of this workflow on main means staging is broken.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: boxd-golden-refresh
+  cancel-in-progress: false
+
+env:
+  BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
+  GOLDEN: langwatch-golden-v3
+  SNAPSHOT: langwatch-main
+  GOLDEN_URL: https://langwatch-golden-v3.boxd.sh
+
+jobs:
+  refresh-golden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github
+
+      - name: Install boxd CLI
+        run: |
+          curl -fsSL https://boxd.sh/downloads/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Golden is running and exec channel works
+        run: |
+          boxd machine get "$GOLDEN" --json
+          boxd machine exec --timeout 30 "$GOLDEN" -- echo exec-ok | grep -q exec-ok
+
+      - name: Launch refresh on golden (detached)
+        run: |
+          B64=$(base64 -w0 .github/scripts/boxd-golden-refresh.sh)
+          boxd machine exec --timeout 60 "$GOLDEN" -- bash -c \
+            "echo $B64 | base64 -d > /tmp/golden-refresh.sh && chmod +x /tmp/golden-refresh.sh && rm -f /tmp/golden-refresh.status"
+          boxd machine exec --timeout 30 "$GOLDEN" -- bash -c \
+            "nohup /tmp/golden-refresh.sh > /tmp/golden-refresh.log 2>&1 & echo launched"
+
+      - name: Wait for refresh to finish
+        run: |
+          for i in $(seq 1 60); do
+            S=$(boxd machine exec --timeout 30 "$GOLDEN" -- cat /tmp/golden-refresh.status 2>/dev/null || true)
+            case "$S" in
+              *done*) echo "refresh done"; exit 0 ;;
+              *failed*)
+                echo "refresh FAILED — log tail:"
+                boxd machine exec --timeout 60 "$GOLDEN" -- tail -50 /tmp/golden-refresh.log || true
+                exit 1 ;;
+            esac
+            sleep 20
+          done
+          echo "refresh timed out — log tail:"
+          boxd machine exec --timeout 60 "$GOLDEN" -- tail -50 /tmp/golden-refresh.log || true
+          exit 1
+
+      - name: Wait for /api/health 204
+        run: |
+          for i in $(seq 1 40); do
+            CODE=$(curl -sk -o /dev/null -w '%{http_code}' "$GOLDEN_URL/api/health" || true)
+            echo "health: $CODE"
+            [ "$CODE" = "204" ] && exit 0
+            sleep 15
+          done
+          echo "app never became healthy"
+          exit 1
+
+      - name: Verify golden serves this exact commit
+        run: |
+          DEPLOYED=$(boxd machine exec --timeout 30 "$GOLDEN" -- git -C /home/boxd/langwatch rev-parse HEAD | tr -d '[:space:]')
+          echo "deployed=$DEPLOYED expected=$GITHUB_SHA"
+          [ "$DEPLOYED" = "$GITHUB_SHA" ]
+
+      - name: Verify API auth layer is up (collector rejects unauthenticated)
+        run: |
+          CODE=$(curl -sk -o /dev/null -w '%{http_code}' -X POST "$GOLDEN_URL/api/collector" -H 'Content-Type: application/json' -d '{}')
+          echo "collector unauthenticated: $CODE"
+          [ "$CODE" = "401" ]
+
+      - name: Save verified snapshot
+        run: |
+          boxd snapshots save "$GOLDEN" "$SNAPSHOT" --json
+          boxd snapshots list
