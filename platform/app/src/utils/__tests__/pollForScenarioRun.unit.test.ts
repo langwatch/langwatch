@@ -45,7 +45,7 @@ function makeRun(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
   };
 }
 
-function batchWith(runs: ScenarioRunData[]): BatchRunDataResult {
+function batchWith({ runs }: { runs: ScenarioRunData[] }): BatchRunDataResult {
   return { changed: true, lastUpdatedAt: NOW, runs };
 }
 
@@ -67,12 +67,13 @@ describe("pollForScenarioRun", () => {
     vi.useRealTimers();
   });
 
-  /** Runs one polling attempt: the first fetch is immediate. */
   async function pollOnce() {
     const resultPromise = pollForScenarioRun({
       fetchBatchRunData,
       params: baseParams,
     });
+    // Advancing by 0 flushes the mock's promise: the poll's first fetch fires
+    // before any timer, so without this the assertion runs before it settles.
     await vi.advanceTimersByTimeAsync(0);
     return resultPromise;
   }
@@ -81,7 +82,9 @@ describe("pollForScenarioRun", () => {
     describe("when it is still in progress", () => {
       it("hands back its id so the caller can show progress", async () => {
         fetchBatchRunData.mockResolvedValue(
-          batchWith([makeRun({ status: ScenarioRunStatus.IN_PROGRESS })]),
+          batchWith({
+            runs: [makeRun({ status: ScenarioRunStatus.IN_PROGRESS })],
+          }),
         );
 
         expect(await pollOnce()).toEqual({
@@ -94,12 +97,14 @@ describe("pollForScenarioRun", () => {
 
       it("hands back its id once messages have started arriving", async () => {
         fetchBatchRunData.mockResolvedValue(
-          batchWith([
-            makeRun({
-              status: ScenarioRunStatus.IN_PROGRESS,
-              messages: [{ id: "msg_1", role: "user", content: "Hello" }],
-            }),
-          ]),
+          batchWith({
+            runs: [
+              makeRun({
+                status: ScenarioRunStatus.IN_PROGRESS,
+                messages: [{ id: "msg_1", role: "user", content: "Hello" }],
+              }),
+            ],
+          }),
         );
 
         expect(await pollOnce()).toEqual({
@@ -112,7 +117,7 @@ describe("pollForScenarioRun", () => {
     describe("when it finished successfully", () => {
       it("hands back its id", async () => {
         fetchBatchRunData.mockResolvedValue(
-          batchWith([makeRun({ status: ScenarioRunStatus.SUCCESS })]),
+          batchWith({ runs: [makeRun({ status: ScenarioRunStatus.SUCCESS })] }),
         );
 
         expect(await pollOnce()).toEqual({
@@ -129,7 +134,7 @@ describe("pollForScenarioRun", () => {
         // error never does. Telling the user execution errored would send them
         // to debug infrastructure that never broke.
         fetchBatchRunData.mockResolvedValue(
-          batchWith([makeRun({ status: ScenarioRunStatus.FAILED })]),
+          batchWith({ runs: [makeRun({ status: ScenarioRunStatus.FAILED })] }),
         );
 
         const result = await pollOnce();
@@ -146,7 +151,7 @@ describe("pollForScenarioRun", () => {
     describe("when it never produced an outcome", () => {
       it("reports run_error for a run that errored", async () => {
         fetchBatchRunData.mockResolvedValue(
-          batchWith([makeRun({ status: ScenarioRunStatus.ERROR })]),
+          batchWith({ runs: [makeRun({ status: ScenarioRunStatus.ERROR })] }),
         );
 
         const result = await pollOnce();
@@ -160,7 +165,9 @@ describe("pollForScenarioRun", () => {
 
       it("reports run_error for a run cancelled before it finished", async () => {
         fetchBatchRunData.mockResolvedValue(
-          batchWith([makeRun({ status: ScenarioRunStatus.CANCELLED })]),
+          batchWith({
+            runs: [makeRun({ status: ScenarioRunStatus.CANCELLED })],
+          }),
         );
 
         const result = await pollOnce();
@@ -182,9 +189,11 @@ describe("pollForScenarioRun", () => {
         // the truth; asserting "it errored" would be a claim we cannot back —
         // and a red toast on a healthy run is the bug this module was fixed for.
         fetchBatchRunData.mockResolvedValue(
-          batchWith([
-            makeRun({ status: "SOME_FUTURE_STATUS" as ScenarioRunStatus }),
-          ]),
+          batchWith({
+            runs: [
+              makeRun({ status: "SOME_FUTURE_STATUS" as ScenarioRunStatus }),
+            ],
+          }),
         );
 
         expect(await pollOnce()).toEqual({
@@ -198,7 +207,7 @@ describe("pollForScenarioRun", () => {
   describe("given no run has appeared yet", () => {
     describe("when the polling budget runs out", () => {
       it("reports a timeout", async () => {
-        fetchBatchRunData.mockResolvedValue(batchWith([]));
+        fetchBatchRunData.mockResolvedValue(batchWith({ runs: [] }));
 
         const resultPromise = pollForScenarioRun({
           fetchBatchRunData,
