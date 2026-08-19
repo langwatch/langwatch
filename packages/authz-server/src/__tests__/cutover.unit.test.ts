@@ -680,6 +680,41 @@ describe("GrantsCutoverMigration", () => {
           [{ kind: "resource_missing", id: "share_1" }],
         );
       });
+
+      /**
+       * The other direction, and the dangerous one: a missing grant DROPS
+       * access, an extra grant INVENTS it - a link nobody minted, resolving
+       * for whoever holds its token. Sweeping only the legacy rows cannot see
+       * it, so this is the case that proves the sweep looks both ways.
+       */
+      /** @scenario "A share grant no legacy link accounts for holds the cutover" */
+      it("reports a grant row no share link accounts for as extra", async () => {
+        // Derived, not overridden: the import lands its own row for
+        // `share_1` as usual, and this one sits on the head beside it with
+        // no legacy row behind it.
+        repository.landedResourceRows.push({
+          grantId: "share_invented",
+          token: "tok_invented",
+          resourceKind: "TRACE",
+          resourceId: "trace_1",
+          projectId: "proj_chatbot",
+          principalType: "ANYONE",
+          principalId: null,
+          expiresAtMs: null,
+          maxViews: null,
+          viewCount: 0,
+        });
+
+        const outcome = await migration().migrateTenant({ tenantId: ORG });
+
+        expect(outcome.status).toBe("migrated");
+        expect(
+          (outcome.report as { diffs: CutoverResourceDiff[] }).diffs,
+        ).toEqual([{ kind: "resource_extra", id: "share_invented" }]);
+        expect(
+          ledger.calls.some((call) => call.verb === "completeCutover"),
+        ).toBe(false);
+      });
     });
   });
 

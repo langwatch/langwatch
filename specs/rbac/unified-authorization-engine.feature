@@ -321,8 +321,7 @@ Feature: Unified authorization engine
   Scenario: Rolling back returns an organization to the legacy path within the gate's cache window
     Given "acme" is being served by the engine
     When "acme" is rolled back onto the legacy path
-    Then checks in "acme" stop consulting the engine within the gate's cache
-      window
+    Then checks in "acme" stop consulting the engine within the gate's cache window
     And nothing is deployed or restarted for that to hold
 
   @unit

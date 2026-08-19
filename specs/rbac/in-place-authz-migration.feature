@@ -288,6 +288,13 @@ Feature: In-place authorization data migration
     And the operator holds a platform-scope grant
     And every imported grant carries the business time of the fact it came from
 
+  @unit
+  Scenario: A share grant no legacy link accounts for holds the cutover
+    Given "acme" holds a resource grant with no share link behind it
+    When the cutover proves the resource import
+    Then "acme" is held with that grant reported as extra
+    And "acme" is not cut over
+
   # ============================================================================
   # The genesis import (ADR-092 §13 - the grants state becomes event-derived)
   # ============================================================================

@@ -136,7 +136,7 @@ const PREREQUISITE_MIGRATIONS: readonly string[] = [
 
 /** One way an imported share link is not reproduced by its Grant row. */
 export type CutoverResourceDiff = {
-  kind: "resource_missing" | "resource_changed";
+  kind: "resource_missing" | "resource_changed" | "resource_extra";
   id: string;
   field?: string;
   expected?: string | null;
@@ -602,9 +602,23 @@ export class GrantsCutoverMigration implements SystemMigration {
       this.deps.repository.findResourceGrantRows({ organizationId }),
     ]);
     const byId = new Map(grantRows.map((row) => [row.grantId, row]));
-    return rows.flatMap((row) =>
-      resourceDiffs({ organizationId, row, grant: byId.get(row.id) }),
-    );
+    const legacyIds = new Set(rows.map((row) => row.id));
+    // BOTH directions, for the reason the deny-direction genesis
+    // reconciliation exists: a ShareLink with no grant is access the cutover
+    // would DROP, and a resource grant with no ShareLink is access it would
+    // INVENT - a link nobody minted, resolving for whoever holds its token.
+    // Only the first direction is visible from the legacy rows, so the extras
+    // are swept separately rather than assumed absent.
+    return [
+      ...rows.flatMap((row) =>
+        resourceDiffs({ organizationId, row, grant: byId.get(row.id) }),
+      ),
+      ...grantRows.flatMap((grant) =>
+        legacyIds.has(grant.grantId)
+          ? []
+          : [{ kind: "resource_extra" as const, id: grant.grantId }],
+      ),
+    ];
   }
 
   /**
