@@ -10,13 +10,16 @@
  * are plain `sum(SpendUsd)` with no `FINAL` and no `argMax`, so nothing
  * compensated.
  *
- * These tests run the real migration file against a real `governance_kpis`,
- * staged into its pre-upgrade state, because the two things that can actually
- * break are properties of the swap procedure and not of ClickHouse:
- *   - the copy reads a snapshot, so a write arriving mid-migration must still
- *     survive (the reconciliation pass),
- *   - the runner may re-apply a partially executed file, so a second run must
- *     converge rather than wedge.
+ * The swap is a copy-and-EXCHANGE. It is only lossless if the KPI writer is
+ * QUIESCED while it runs: the writer inserts with async_insert = 1,
+ * wait_for_async_insert = 0 and is event-driven per trace (it never re-emits),
+ * so a contribution written mid-migration lands only in the pre-swap table and
+ * is lost for good when that table is dropped. No in-migration reconciliation
+ * can close that window — an async buffer can always flush between the last
+ * read and the DROP — so the migration does not try; it depends on the writer
+ * being stopped, and GUARDS that precondition (step 0) by aborting if
+ * `governance_kpis` shows a write in the last 60s. These tests exercise both
+ * the quiesced happy path and that guard.
  *
  * On its OWN endpoint, not the shared migrated one. Staging the pre-upgrade
  * state means dropping and recreating `governance_kpis`, and the shared
@@ -62,6 +65,34 @@ async function insertKpiRows(rows: KpiRow[]): Promise<void> {
       SourceType: "api_key",
       ...row,
     })),
+    format: "JSONEachRow",
+  });
+}
+
+/**
+ * Inserts a row the way the live writer would: no explicit `CreatedAt`, so the
+ * table's `DEFAULT now64(3)` stamps it at the current wall clock. This is what
+ * the step-0 guard is meant to see — a write that just happened — and it is
+ * the only thing in the suite dated to "now" rather than the fixed
+ * 2026-08-01 staging timestamps.
+ */
+async function insertLiveKpiRow(traceId: string): Promise<void> {
+  await ch.insert({
+    table: "governance_kpis",
+    values: [
+      {
+        TenantId: tenantId,
+        SourceId: sourceId,
+        HourBucket: hourBucket,
+        SourceType: "api_key",
+        TraceId: traceId,
+        SpendUsd: 0.5,
+        PromptTokens: 100,
+        CompletionTokens: 50,
+        // CreatedAt intentionally omitted -> DEFAULT now64(3).
+        LastEventOccurredAt: "2026-08-01 10:05:00.000",
+      },
+    ],
     format: "JSONEachRow",
   });
 }
@@ -118,62 +149,42 @@ afterAll(async () => {
 });
 
 describe("governance_kpis version column migration", () => {
-  describe("given the pre-upgrade table holds rows and a write lands mid-migration", () => {
-    /**
-     * Whether the injected write actually happened. Without this the whole
-     * test passes vacuously if the copy statement is ever renamed or
-     * reordered — the hook would simply never fire and the assertion below
-     * would be checking a row nobody raced.
-     */
-    let injectedDuringCopy = false;
-
+  describe("given the writer is quiesced and the pre-upgrade table holds rows", () => {
     beforeAll(async () => {
-      injectedDuringCopy = false;
       await stageThePreUpgradeTable();
-
+      // Staging timestamps are ~weeks before the test clock, so they never
+      // trip the step-0 recent-write guard.
       await insertKpiRows([
         {
-          TraceId: "trace-copied",
+          TraceId: "trace-a",
           SpendUsd: 0.25,
           PromptTokens: 100,
           CompletionTokens: 50,
           CreatedAt: "2026-08-01 10:00:01.000",
           LastEventOccurredAt: "2026-08-01 10:05:00.000",
         },
+        {
+          TraceId: "trace-b",
+          SpendUsd: 1.75,
+          PromptTokens: 300,
+          CompletionTokens: 150,
+          CreatedAt: "2026-08-01 10:00:02.000",
+          LastEventOccurredAt: "2026-08-01 10:06:00.000",
+        },
       ]);
 
+      // No afterStatement hook: the writer is stopped, nothing races the copy.
       await replayGooseMigrationUp({
         client: ch,
         fileName: VERSION_COLUMN_MIGRATION,
-        afterStatement: async ({ statement }) => {
-          // The copy is the statement that opens the loss window: everything
-          // written from here until the swap lands only in the pre-swap table.
-          if (!/INSERT INTO\s+\S*governance_kpis_v2/i.test(statement)) return;
-          injectedDuringCopy = true;
-          await insertKpiRows([
-            {
-              TraceId: "trace-raced-the-copy",
-              SpendUsd: 0.75,
-              PromptTokens: 300,
-              CompletionTokens: 150,
-              CreatedAt: "2026-08-01 10:00:02.000",
-              LastEventOccurredAt: "2026-08-01 09:55:00.000",
-            },
-          ]);
-        },
       });
     }, 120_000);
 
-    it("keeps both the copied row and the one that raced the copy", async () => {
-      expect(injectedDuringCopy).toBe(true);
-
+    it("preserves every row through the swap", async () => {
       const rows = await readKpiRows();
 
-      expect(rows.map((row) => row.TraceId)).toEqual([
-        "trace-copied",
-        "trace-raced-the-copy",
-      ]);
-      expect(rows.map((row) => row.SpendUsd)).toEqual([0.25, 0.75]);
+      expect(rows.map((row) => row.TraceId)).toEqual(["trace-a", "trace-b"]);
+      expect(rows.map((row) => row.SpendUsd)).toEqual([0.25, 1.75]);
     });
 
     it("versions the rebuilt table by CreatedAt", async () => {
@@ -198,10 +209,7 @@ describe("governance_kpis version column migration", () => {
     it("converges on the same rows rather than failing", async () => {
       const rows = await readKpiRows();
 
-      expect(rows.map((row) => row.TraceId)).toEqual([
-        "trace-copied",
-        "trace-raced-the-copy",
-      ]);
+      expect(rows.map((row) => row.TraceId)).toEqual(["trace-a", "trace-b"]);
       expect(await versionColumnOf("governance_kpis")).toContain(
         "ReplacingMergeTree(CreatedAt)",
       );
@@ -244,147 +252,43 @@ describe("governance_kpis version column migration", () => {
       expect(refolded[0]!.PromptTokens).toBe(300);
     });
   });
-  describe("given a previous run died after the swap, with a write that landed during the copy", () => {
+
+  describe("given the writer was NOT quiesced (a write landed within the guard window)", () => {
     /**
-     * The loss window a naive re-apply reopens: a write that lands AFTER the
-     * snapshot copy exists only in the pre-swap table, which the exchange
-     * moves under the scratch name. If the runner then dies before
-     * reconciliation, the first draft's unconditional `DROP` at the top of the
-     * re-apply would discard that write for good. The `trace-before-the-crash`
-     * row (copied into the snapshot) survives either way; `trace-stranded-by-
-     * the-crash` (raced the copy, then stranded by the crash) is the one that
-     * only survives because the re-apply recovers the scratch before dropping
-     * it. Without both flags below the test could pass vacuously — the copy
-     * hook or the crash hook silently never firing.
+     * The step-0 backstop. If an operator applies this without stopping the
+     * `workers` deployment first, the live writer is still inserting and the
+     * copy-and-swap would drop whatever it wrote during the window. The guard
+     * turns that silent loss into a loud, no-op failure: it aborts BEFORE any
+     * DDL, so the table is left exactly as it was.
      */
-    let crashedAfterExchange = false;
-    let racedAfterCopy = false;
+    let rejection: unknown;
 
     beforeAll(async () => {
       await stageThePreUpgradeTable();
-      await insertKpiRows([
-        {
-          TraceId: "trace-before-the-crash",
-          SpendUsd: 2,
-          PromptTokens: 10,
-          CompletionTokens: 5,
-          CreatedAt: "2026-08-01 10:00:03.000",
-          LastEventOccurredAt: "2026-08-01 10:06:00.000",
-        },
-      ]);
+      // A recent write (DEFAULT now64(3)) — the thing the guard exists to see.
+      await insertLiveKpiRow("trace-live");
 
-      await replayGooseMigrationUp({
+      rejection = await replayGooseMigrationUp({
         client: ch,
         fileName: VERSION_COLUMN_MIGRATION,
-        afterStatement: async ({ statement }) => {
-          // A write landing after the copy is absent from the rebuilt table
-          // and lives only in the pre-swap one.
-          if (/INSERT INTO\s+\S*governance_kpis_v2/i.test(statement)) {
-            racedAfterCopy = true;
-            await insertKpiRows([
-              {
-                TraceId: "trace-stranded-by-the-crash",
-                SpendUsd: 0.9,
-                PromptTokens: 40,
-                CompletionTokens: 20,
-                CreatedAt: "2026-08-01 10:00:04.000",
-                LastEventOccurredAt: "2026-08-01 10:07:00.000",
-              },
-            ]);
-            return;
-          }
-          // The runner then dies after the exchange but before step 7, the
-          // window where that write exists only under the scratch name.
-          if (/EXCHANGE TABLES/i.test(statement)) {
-            crashedAfterExchange = true;
-            throw new Error("simulated runner crash after the swap");
-          }
-        },
-      }).catch(() => undefined);
-
-      await replayGooseMigrationUp({
-        client: ch,
-        fileName: VERSION_COLUMN_MIGRATION,
-      });
+      }).then(
+        () => undefined,
+        (error: unknown) => error,
+      );
     }, 120_000);
 
-    it("recovers the stranded write on the rerun instead of dropping it", async () => {
-      expect(racedAfterCopy).toBe(true);
-      expect(crashedAfterExchange).toBe(true);
-
-      const rows = await readKpiRows();
-
-      expect(rows.map((row) => row.TraceId)).toEqual([
-        "trace-before-the-crash",
-        "trace-stranded-by-the-crash",
-      ]);
-      expect(rows.map((row) => row.SpendUsd)).toEqual([2, 0.9]);
-      expect(await versionColumnOf("governance_kpis")).toContain(
-        "ReplacingMergeTree(CreatedAt)",
-      );
+    it("aborts the migration instead of swapping under a live writer", () => {
+      expect(rejection).toBeInstanceOf(Error);
+      expect(String(rejection)).toMatch(/quiesce|workers|recent write/i);
     });
-  });
 
-  describe("given a later cumulative row for an already-copied trace races the copy", () => {
-    /**
-     * The accumulating-counter path: a trace already in the snapshot gets a
-     * newer cumulative row during the copy window. Reconciliation carries it
-     * over as a second part sharing the ORDER BY key, and the engine collapses
-     * it to the highest CreatedAt on merge — the same convergence a
-     * steady-state re-write of that trace produces. Reads are plain
-     * `sum(SpendUsd)` with no FINAL, so between merges the sum shows both
-     * parts; that transient is a property of the read path (identical with or
-     * without this migration), so the assertion is the merged result, taken
-     * after an explicit OPTIMIZE FINAL rather than racing a background merge.
-     */
-    let injectedDuringCopy = false;
-
-    beforeAll(async () => {
-      await stageThePreUpgradeTable();
-      await insertKpiRows([
-        {
-          TraceId: "trace-accumulating",
-          SpendUsd: 0.25,
-          PromptTokens: 100,
-          CompletionTokens: 50,
-          CreatedAt: "2026-08-01 10:00:01.000",
-          LastEventOccurredAt: "2026-08-01 10:05:00.000",
-        },
-      ]);
-
-      await replayGooseMigrationUp({
-        client: ch,
-        fileName: VERSION_COLUMN_MIGRATION,
-        afterStatement: async ({ statement }) => {
-          if (!/INSERT INTO\s+\S*governance_kpis_v2/i.test(statement)) return;
-          injectedDuringCopy = true;
-          // Same trace, a later cumulative total, higher CreatedAt.
-          await insertKpiRows([
-            {
-              TraceId: "trace-accumulating",
-              SpendUsd: 1.5,
-              PromptTokens: 300,
-              CompletionTokens: 150,
-              CreatedAt: "2026-08-01 10:00:02.000",
-              LastEventOccurredAt: "2026-08-01 09:55:00.000",
-            },
-          ]);
-        },
-      });
-    }, 120_000);
-
-    it("collapses to the latest cumulative total after merge", async () => {
-      expect(injectedDuringCopy).toBe(true);
-      await ch.command({ query: "OPTIMIZE TABLE governance_kpis FINAL" });
-
-      const rows = await readKpiRows();
-      const accumulating = rows.filter(
-        (row) => row.TraceId === "trace-accumulating",
+    it("leaves the pre-upgrade table untouched", async () => {
+      // Guard runs first, so the version column never changed and no scratch
+      // table was created.
+      expect(await versionColumnOf("governance_kpis")).toContain(
+        "ReplacingMergeTree(LastEventOccurredAt)",
       );
-
-      expect(accumulating).toHaveLength(1);
-      expect(accumulating[0]!.SpendUsd).toBe(1.5);
-      expect(accumulating[0]!.PromptTokens).toBe(300);
+      expect(await versionColumnOf("governance_kpis_v2")).toBe("");
     });
   });
 });

@@ -17,156 +17,89 @@
 -- CreatedAt (DEFAULT now64(3), never set by the writer) is a monotonic
 -- server wall clock, so a later write always carries a higher version.
 --
--- ClickHouse cannot ALTER the version column of a ReplacingMergeTree, so
--- the table has to be rebuilt and swapped. The statement order below is
--- 00064's (following 00058), and its two guarantees carry over:
+-- ClickHouse cannot ALTER the version column of a ReplacingMergeTree, so the
+-- table is rebuilt into a scratch copy and swapped in with EXCHANGE TABLES.
 --
---   1. Re-run safety (the runner may re-apply a partially executed file
---      after a crash): the scratch table is DROPPED and recreated rather
---      than reused, so it always has the CreatedAt engine rather than
---      whatever a previous partial run left under that name. EXCHANGE
---      TABLES is used rather than RENAME because EXCHANGE requires both
---      names to exist and leaves both existing, so re-applying converges;
---      a RENAME whose destination already exists fails and wedges the
---      migration until a human intervenes.
+-- ----------------------------------------------------------------------------
+-- PRECONDITION: the KPI writer MUST be quiesced before this runs.
+-- ----------------------------------------------------------------------------
+-- This is a copy-and-swap of a live table. The KPI writer
+-- (governanceKpisSync.subscriber.ts, in the `workers` deployment) inserts
+-- with async_insert = 1, wait_for_async_insert = 0 and is event-driven per
+-- trace: "a failure in a trace's final window is not retried at all". So a
+-- contribution written between the copy (step 3) and the drop (step 5)
+-- lands only in the pre-swap table and is discarded permanently when that
+-- table is dropped — there is no re-emit to heal it.
 --
---   2. Reconciliation: the copy at step 5 reads a snapshot, so a row
---      written to governance_kpis after that SELECT begins is absent from
---      the rebuilt table. The KPI writer is event-driven per trace, NOT a
---      periodic re-emitter (governanceKpisSync.subscriber.ts: "a failure
---      in a trace's final window is not retried at all"), and it inserts
---      with async_insert = 1, wait_for_async_insert = 0, so buffered rows
---      keep landing in the pre-swap table. Without a sweep those traces
---      would contribute nothing, permanently. Step 7 runs AFTER the
---      exchange and inserts, from the pre-swap table, exactly the writes
---      the snapshot missed — matched on
---      (TenantId, SourceId, HourBucket, TraceId, CreatedAt), which
---      identifies a write rather than a key. Unlike 00064 the delta needs
---      no arithmetic, because these are whole replacing rows rather than
---      aggregate states: the missed write is simply carried over, and the
---      engine collapses it against its predecessor on the next merge.
+-- Earlier drafts tried to reconcile that window from the exchanged-out table
+-- after the swap. That cannot be made lossless from inside a linear
+-- migration: an async_insert buffer accepted before the exchange can still
+-- flush into the pre-swap table AFTER the reconciliation read, and the drop
+-- then discards it. Every reconciliation attempt only narrowed the race; it
+-- never closed it. The correct fix is to remove the concurrency, not chase
+-- it — so this migration carries no reconciliation and instead REQUIRES the
+-- writer to be stopped.
 --
--- Crash-after-exchange recovery (the loss window 00064 sidesteps by reading
--- its delta from a durable ledger, which this table does not have): if the
--- runner dies between the EXCHANGE (step 6) and the reconciliation
--- (step 7), every write from the copy window lives ONLY in the
--- exchanged-out table, now sitting under the scratch name. A re-apply that
--- dropped the scratch first — as the first draft of this file did — would
--- discard those writes permanently. Steps 1-2 close that window: before
--- anything is dropped, the re-apply reconciles whatever the scratch name
--- currently holds back into the live table. It is the same anti-join as
--- step 7 and a no-op in every state except the one it exists for:
---   - fresh run: step 1 creates an empty scratch, step 2 sweeps nothing;
---   - crashed mid-copy (pre-exchange): the scratch is a partial copy of the
---     live table, so each of its rows already matches a live
---     (key, CreatedAt) and the anti-join selects nothing;
---   - crashed after the exchange: the scratch IS the old live table, and
---     the anti-join carries exactly the copy-window writes the crash
---     stranded there back into the new live table before step 3 drops it.
--- CREATE TABLE IF NOT EXISTS at step 1 is what makes step 2 safe to run
--- unconditionally: on a re-apply the scratch already exists (with whatever
--- engine the crash left it), so the IF NOT EXISTS is a no-op and the sweep
--- reads the real stranded table rather than a freshly-emptied one.
+-- Operational runbook for the deploy that applies this migration:
+--   1. Scale the `workers` deployment to 0 (stops the KPIs subscriber).
+--   2. Wait > 60s so any accepted async_insert buffer has flushed to the
+--      table (bounded by async_insert_busy_timeout, ~1s, with margin).
+--   3. Apply this migration.
+--   4. Scale `workers` back up. It resumes from event_log; governance_kpis is
+--      derived data, so the paused interval folds forward with no loss.
 --
--- Residual, stated rather than hidden: a row still sitting in an
--- async_insert buffer at the instant a reconciliation SELECT runs is
--- missed — bounded by async_insert_busy_timeout, not by the copy duration.
--- It is bounded and this table is derived data: it is rebuildable from
--- event_log, which is the recovery path if it fires.
+-- Step 0 GUARDS this precondition: it aborts the migration if governance_kpis
+-- shows a write in the last 60s, so an operator who forgets to quiesce gets a
+-- failed migration BEFORE any DDL rather than silent data loss. It is a
+-- heuristic backstop, not a substitute for the runbook: CreatedAt is server
+-- wall clock at insert, so "a fresh CreatedAt" means "a recent write", but a
+-- writer paused for under 60s, clock skew, or a write buffered on another
+-- replica can still slip past it. Quiesce first; do not lean on the guard.
+--
+-- Re-run safety (the runner may re-apply a partially executed file after a
+-- crash): the scratch table is DROPPED and recreated rather than reused, so
+-- it always carries the CreatedAt engine rather than whatever a previous
+-- partial run left under that name. EXCHANGE TABLES (not RENAME) requires
+-- both names to exist and leaves both existing, so re-applying converges; a
+-- RENAME whose destination already exists fails and wedges the migration.
+-- Because the writer is quiesced there are no concurrent writes, so a
+-- re-apply re-copies the same rows and converges on the same state.
 --
 -- Replication: governance_kpis is already declared through
 -- CLICKHOUSE_ENGINE_REPLACING_PREFIX (00031), so on a cluster it is a
--- ReplicatedReplacingMergeTree and its content is identical on every
--- replica. That is why this file does not gate on
--- CLICKHOUSE_IS_REPLICATED the way a migration carrying rows over from a
--- plain-engine table must: there is no per-replica partial content to
--- read. goose runs every statement on one connection, i.e. one replica;
--- the DDL replicates through the database engine, and the INSERTs write
--- into a Replicated engine so the rows replicate to every node.
+-- ReplicatedReplacingMergeTree with identical content on every replica. This
+-- file does not gate on CLICKHOUSE_IS_REPLICATED the way a migration carrying
+-- rows over from a plain-engine table must: there is no per-replica partial
+-- content to read. goose runs every statement on one connection (one
+-- replica); the DDL replicates through the database engine, and the INSERT
+-- writes into a Replicated engine so the rows replicate to every node.
 --
 -- @see https://github.com/langwatch/langwatch-saas/issues/1089
 -- ============================================================================
 
--- 1. Ensure the scratch name exists so step 2 can read it unconditionally.
---    On a fresh run this creates an empty table; on a re-apply the scratch
---    already exists (a partial copy, or — after a crash past the exchange —
---    the old live table itself), so IF NOT EXISTS is a no-op and preserves
---    whatever the crash stranded there. The engine here is provisional:
---    step 3 drops this table and step 4 recreates it, so a fresh run's
---    engine is never swapped in. This CREATE mirrors step 4 exactly.
+-- 0. Guard the quiesce precondition. throwIf aborts the migration (and marks
+--    it un-applied) if governance_kpis received a write in the last 60s,
+--    which means the writer is still running. This runs before any DDL, so a
+--    tripped guard leaves the table exactly as it was.
 -- +goose StatementBegin
-CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.governance_kpis_v2
-(
-    -- identity (per-trace contribution)
-    TenantId String CODEC(ZSTD(1)),
-    SourceId String CODEC(ZSTD(1)),
-    HourBucket DateTime CODEC(Delta(4), ZSTD(1)),
-    TraceId String CODEC(ZSTD(1)),
-
-    -- denormalised dimensions (filtered cheaply at read time)
-    SourceType LowCardinality(String),
-
-    -- per-trace contribution
-    SpendUsd Float64 CODEC(ZSTD(1)),
-    PromptTokens UInt64 CODEC(Delta(8), ZSTD(1)),
-    CompletionTokens UInt64 CODEC(Delta(8), ZSTD(1)),
-
-    -- timestamps
-    CreatedAt DateTime64(3) DEFAULT now64(3) CODEC(Delta(8), ZSTD(1)),
-    LastEventOccurredAt DateTime64(3) CODEC(Delta(8), ZSTD(1)),
-
-    -- indexes
-    INDEX idx_source_id SourceId TYPE bloom_filter(0.001) GRANULARITY 1,
-    INDEX idx_source_type SourceType TYPE set(64) GRANULARITY 4,
-    INDEX idx_hour_bucket HourBucket TYPE minmax GRANULARITY 1,
-    INDEX idx_tenant_source (TenantId, SourceId) TYPE bloom_filter(0.001) GRANULARITY 1
-)
-ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}CreatedAt)
-PARTITION BY toYYYYMM(HourBucket)
-ORDER BY (TenantId, SourceId, HourBucket, TraceId)
-SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
+SELECT throwIf(
+    (
+        SELECT count()
+        FROM ${CLICKHOUSE_DATABASE}.governance_kpis
+        WHERE CreatedAt > now64(3) - INTERVAL 60 SECOND
+    ) > 0,
+    'governance_kpis received a write in the last 60s: the KPI writer is not quiesced. Scale the workers deployment to 0 and wait >60s before applying migration 00083 (see the header runbook).'
+);
 -- +goose StatementEnd
 
--- 2. Crash-after-exchange recovery. If a previous run died between the
---    exchange (step 6) and the reconciliation (step 7), the copy-window
---    writes are stranded in the exchanged-out table, now under the scratch
---    name. Carry them back into the live table BEFORE step 3 drops it.
---    Same anti-join as step 7, keyed on the full write identity
---    (TenantId, SourceId, HourBucket, TraceId, CreatedAt): a no-op on a
---    fresh run (empty scratch) and after a pre-exchange crash (the scratch
---    is a subset of the live table), and the recovery in the one case it
---    exists for.
--- +goose StatementBegin
-INSERT INTO ${CLICKHOUSE_DATABASE}.governance_kpis
-    (TenantId, SourceId, HourBucket, TraceId, SourceType, SpendUsd, PromptTokens, CompletionTokens, CreatedAt, LastEventOccurredAt)
-SELECT
-    stranded.TenantId,
-    stranded.SourceId,
-    stranded.HourBucket,
-    stranded.TraceId,
-    stranded.SourceType,
-    stranded.SpendUsd,
-    stranded.PromptTokens,
-    stranded.CompletionTokens,
-    stranded.CreatedAt,
-    stranded.LastEventOccurredAt
-FROM ${CLICKHOUSE_DATABASE}.governance_kpis_v2 AS stranded
-LEFT ANTI JOIN (
-    SELECT TenantId, SourceId, HourBucket, TraceId, CreatedAt
-    FROM ${CLICKHOUSE_DATABASE}.governance_kpis
-) AS live
-USING (TenantId, SourceId, HourBucket, TraceId, CreatedAt);
--- +goose StatementEnd
-
--- 3. Scratch is dropped, never reused: a previous partial run may have left
---    a table of the WRONG engine under this name, and rebuilding into it
---    would swap the backward-moving version column straight back in. Safe
---    now that step 2 has recovered anything the scratch was holding.
+-- 1. Scratch is dropped, never reused: a previous partial run may have left a
+--    table of the WRONG engine under this name, and rebuilding into it would
+--    swap the backward-moving version column straight back in.
 -- +goose StatementBegin
 DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.governance_kpis_v2;
 -- +goose StatementEnd
 
--- 4. The replacement table — 00031's schema with CreatedAt as the version.
+-- 2. The replacement table — 00031's schema with CreatedAt as the version.
 -- +goose StatementBegin
 CREATE TABLE ${CLICKHOUSE_DATABASE}.governance_kpis_v2
 (
@@ -201,9 +134,10 @@ ORDER BY (TenantId, SourceId, HourBucket, TraceId)
 SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
--- 5. Copy the existing rows. CreatedAt carries over from the source: it was
---    already populated by 00031's DEFAULT now64(3) at original insert time,
---    so the copied rows keep their true write order.
+-- 3. Copy the existing rows. With the writer quiesced this snapshot is the
+--    whole table — nothing is landing behind it. CreatedAt carries over from
+--    the source: it was already populated by 00031's DEFAULT now64(3) at
+--    original insert time, so the copied rows keep their true write order.
 --    Columns are listed explicitly. `SELECT *` happens to be correct while
 --    the two schemas are byte-identical, and silently stops being correct
 --    the moment somebody adds a column to one of them.
@@ -224,46 +158,13 @@ SELECT
 FROM ${CLICKHOUSE_DATABASE}.governance_kpis;
 -- +goose StatementEnd
 
--- 6. Atomic swap. Writes reach the rebuilt table from here on.
+-- 4. Atomic swap. governance_kpis is now the CreatedAt-versioned table.
 -- +goose StatementBegin
 EXCHANGE TABLES ${CLICKHOUSE_DATABASE}.governance_kpis AND ${CLICKHOUSE_DATABASE}.governance_kpis_v2;
 -- +goose StatementEnd
 
--- 7. Reconciliation. governance_kpis_v2 now holds the PRE-SWAP table, so
---    this sweeps the rows written to it during the copy at step 5.
---
---    It is a DELTA pass, not a re-copy. Re-inserting the whole pre-swap
---    table would be correct after a merge and wrong until one: reads are
---    plain sum(SpendUsd) with no FINAL, so every duplicated row would
---    double-count spend for as long as the duplicate parts survived.
---    (TenantId, SourceId, HourBucket, TraceId, CreatedAt) identifies a
---    write exactly — a row written during the window shares the ORDER BY
---    key with its copied predecessor but carries a strictly higher
---    CreatedAt — so the anti-join keeps precisely the writes the snapshot
---    missed, and re-running it selects nothing.
--- +goose StatementBegin
-INSERT INTO ${CLICKHOUSE_DATABASE}.governance_kpis
-    (TenantId, SourceId, HourBucket, TraceId, SourceType, SpendUsd, PromptTokens, CompletionTokens, CreatedAt, LastEventOccurredAt)
-SELECT
-    missed.TenantId,
-    missed.SourceId,
-    missed.HourBucket,
-    missed.TraceId,
-    missed.SourceType,
-    missed.SpendUsd,
-    missed.PromptTokens,
-    missed.CompletionTokens,
-    missed.CreatedAt,
-    missed.LastEventOccurredAt
-FROM ${CLICKHOUSE_DATABASE}.governance_kpis_v2 AS missed
-LEFT ANTI JOIN (
-    SELECT TenantId, SourceId, HourBucket, TraceId, CreatedAt
-    FROM ${CLICKHOUSE_DATABASE}.governance_kpis
-) AS rebuilt
-USING (TenantId, SourceId, HourBucket, TraceId, CreatedAt);
--- +goose StatementEnd
-
--- 8. Drop the pre-swap table, now fully swept into the rebuilt one.
+-- 5. Drop the pre-swap table, now sitting under the scratch name. Safe: the
+--    writer is quiesced, so nothing landed in it after the copy.
 -- +goose StatementBegin
 DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.governance_kpis_v2;
 -- +goose StatementEnd
