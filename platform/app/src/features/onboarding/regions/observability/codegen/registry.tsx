@@ -118,10 +118,10 @@ export const registry: IntegrationRegistry = [
     ),
     install: {
       js: {
-        npm: "npm i langwatch ai @ai-sdk/openai",
-        pnpm: "pnpm add langwatch ai @ai-sdk/openai",
-        yarn: "yarn add langwatch ai @ai-sdk/openai",
-        bun: "bun add langwatch ai @ai-sdk/openai",
+        npm: "npm i langwatch ai @ai-sdk/otel @ai-sdk/openai",
+        pnpm: "pnpm add langwatch ai @ai-sdk/otel @ai-sdk/openai",
+        yarn: "yarn add langwatch ai @ai-sdk/otel @ai-sdk/openai",
+        bun: "bun add langwatch ai @ai-sdk/otel @ai-sdk/openai",
       },
     },
     snippet: tsRef(vercelAiTsSource as unknown as string),

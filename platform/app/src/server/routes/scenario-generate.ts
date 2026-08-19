@@ -158,7 +158,7 @@ secured
       const result = await generateObject({
         model,
         schema: scenarioSchema,
-        system: SYSTEM_PROMPT,
+        instructions: SYSTEM_PROMPT,
         prompt: userPrompt,
         maxRetries: SCENARIO_GENERATE_MAX_RETRIES,
         abortSignal: AbortSignal.timeout(scenarioGenerateTimeoutMs()),

@@ -177,7 +177,7 @@ export async function generateTraceQueryFromPrompt(
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const { text } = await generateText({
       model,
-      system: systemPrompt,
+      instructions: systemPrompt,
       messages,
       temperature: 0,
       maxRetries: 1,
@@ -283,7 +283,7 @@ export async function generateTraceAction(
         // splicing those into a "previous attempt produced query X
         // which failed to parse: Y" sentence misleads the model into
         // thinking it produced an empty query that won't parse.
-        system:
+        instructions:
           attempt === 1 || lastFailure !== "validation"
             ? systemPrompt
             : `${systemPrompt}\n\nThe previous attempt produced query "${lastQuery}" which failed to parse: ${lastError}\nReturn a valid query this time.`,

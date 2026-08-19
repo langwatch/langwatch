@@ -10,8 +10,8 @@ import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import { createLogger } from "@langwatch/observability";
 import {
   convertToModelMessages,
+  isStepCount,
   smoothStream,
-  stepCountIs,
   streamText,
   type UIMessage,
 } from "ai";
@@ -65,13 +65,7 @@ secured
       );
     }
 
-    // Add system prompts
-    messages.unshift({
-      role: "system",
-      parts: [
-        {
-          type: "text",
-          text: `
+    const instructions = `
 You are a dataset generation assistant. You will be given a dataset, user instructions and a set of tools to use for adding, updating and deleting rows.
 
 IMPORTANT: When the user asks you to add N rows (e.g., "add 10 examples"), you MUST call the addRow tool exactly N times - once for each row you're creating. Each addRow call adds ONE single row to the dataset.
@@ -82,10 +76,7 @@ Keep the examples short and concise.
 
 Current dataset:
 
-${dataset}`,
-        },
-      ],
-    } as UIMessage);
+${dataset}`;
 
     const model = await getVercelAIModel({
       projectId,
@@ -93,11 +84,12 @@ ${dataset}`,
     });
     const result = streamText({
       model,
+      instructions,
       messages: await convertToModelMessages(messages),
       tools: tools(dataset),
       toolChoice: "required",
       maxOutputTokens: 4096 * 4,
-      stopWhen: stepCountIs(50),
+      stopWhen: isStepCount(50),
       experimental_transform: smoothStream({ chunking: "word" }),
       maxRetries: 3,
       onError: (error) => {
