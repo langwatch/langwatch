@@ -21,14 +21,14 @@ Feature: Deployment-impact check skips manifest-only dependency bumps
   an entrypoint change) — so that weaker exemption only holds for dependency
   bots, not humans.
 
-  @unimplemented
+  @unit
   Scenario: A dependency bot's PR touches only auto-generated lockfiles
     Given the PR is authored by a trusted dependency-update bot
     And every changed file is an auto-generated dependency lockfile
     And the PR description has no deployment-impact writeup
     Then the check passes without requiring one
 
-  @unimplemented
+  @unit
   Scenario: A dependency bot's PR touches only hand-edited dependency manifests
     Given the PR is authored by a trusted dependency-update bot
     And every changed file is a hand-edited dependency manifest, a lockfile,
@@ -36,7 +36,7 @@ Feature: Deployment-impact check skips manifest-only dependency bumps
     And the PR description has no deployment-impact writeup
     Then the check passes without requiring one
 
-  @unimplemented
+  @unit
   Scenario: A human's PR touches only hand-edited dependency manifests
     Given the PR is authored by a human, not a dependency-update bot
     And every changed file is a hand-edited dependency manifest
@@ -44,7 +44,7 @@ Feature: Deployment-impact check skips manifest-only dependency bumps
     Then the check still requires one, since a manifest edit could carry
       more than a version bump
 
-  @unimplemented
+  @unit
   Scenario: A PR touches a file that isn't a recognized dependency manifest
     Given at least one changed file is not a lockfile or dependency manifest
     And the PR description has no deployment-impact writeup

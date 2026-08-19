@@ -46,53 +46,41 @@ jobs:
         startsWith(github.head_ref, 'release-please--'))
     runs-on: ubuntu-latest
     steps:
-      # The `services/**`/`charts/**` trigger paths match every dependency
-      # bump in services/langevals, services/aigateway, services/nlpgo, and
-      # every chart's Chart.lock too. Two tiers, because not all of these
-      # files carry the same guarantee:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+
+      # The `services/**`/`charts/**` trigger paths match every dependency bump
+      # in services/langevals, services/aigateway, services/nlpgo, and every
+      # chart's Chart.lock too. Which of those get an exemption, and why, is
+      # decided by guard-deployment-impact.ts — a plain function with a test,
+      # rather than a `case` statement buried in YAML that nothing can run.
       #
-      # - Pure auto-generated lockfiles (uv.lock, pnpm-lock.yaml, go.sum,
-      #   Cargo.lock, Chart.lock) record only resolved versions/digests. They
-      #   can't add a helm value, env var, or change `helm install`
-      #   behavior — no deployment surface by construction, regardless of
-      #   who authored the PR.
-      # - pyproject.toml, package.json, go.mod, and Cargo.toml are
-      #   hand-edited manifests, not pure lockfiles. A human PR touching only
-      #   one of them could still slip in a real deployment-relevant change
-      #   (a new package.json `postinstall` script, a build-system change)
-      #   alongside the version bump, so that exemption only applies to
-      #   dependabot's own PRs.
+      # PR_AUTHOR is the pull request's author, NOT `github.actor`. This
+      # workflow triggers on `edited`, so `github.actor` is whoever last touched
+      # the pull request: a maintainer tidying a dependabot PR's description
+      # would flip the actor away from the bot and silently withdraw the
+      # exemption the PR qualified for when it opened.
       - name: Determine whether this PR only touches dependency manifests
         id: manifest-only
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
-          FILES=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename')
-          ONLY_LOCKFILES=true
-          ONLY_MANIFESTS=true
-          while IFS= read -r f; do
-            [ -z "$f" ] && continue
-            case "$f" in
-              */uv.lock|uv.lock|pnpm-lock.yaml|*/pnpm-lock.yaml|*/go.sum|go.sum|*/Cargo.lock|Cargo.lock|*/Chart.lock|Chart.lock) ;;
-              */pyproject.toml|pyproject.toml|*/package.json|package.json|*/go.mod|go.mod|*/Cargo.toml|Cargo.toml|*/requirements*.txt|requirements*.txt) ONLY_LOCKFILES=false ;;
-              *) ONLY_LOCKFILES=false; ONLY_MANIFESTS=false ;;
-            esac
-          done <<< "$FILES"
-          echo "only_lockfiles=$ONLY_LOCKFILES" >> "$GITHUB_OUTPUT"
-          echo "only_manifests=$ONLY_MANIFESTS" >> "$GITHUB_OUTPUT"
+          CHANGED_FILES=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename')
+          export CHANGED_FILES
           echo "Changed files:"
-          printf '%s\n' "$FILES"
-          echo "Lockfiles-only (any actor): $ONLY_LOCKFILES"
-          echo "Manifests-only (dependabot only): $ONLY_MANIFESTS"
-          echo "Actor: ${{ github.actor }}"
+          printf '%s\n' "$CHANGED_FILES"
+          echo "Author: $PR_AUTHOR"
+          node --experimental-strip-types .github/scripts/guard-deployment-impact.ts \
+            | tee -a "$GITHUB_OUTPUT"
 
       - name: Verify deployment-impact section in PR description
-        if: |
-          steps.manifest-only.outputs.only_lockfiles != 'true' &&
-          (steps.manifest-only.outputs.only_manifests != 'true' ||
-           github.actor != 'dependabot[bot]')
+        if: steps.manifest-only.outputs.requires_writeup == 'true'
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
