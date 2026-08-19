@@ -199,6 +199,101 @@ const WATERMARK_LAG_MS = 5 * 60 * 1000;
 const WAREHOUSE_COST_TIMEOUT_MS = 60_000;
 
 /**
+ * A sign-in is one small POST. The job has five minutes for everything, so a
+ * token endpoint that never answers must not be allowed to spend it: without a
+ * bound of its own the run would hit the per-job deadline having read nothing
+ * and report a timeout that names no cause.
+ */
+const TOKEN_TIMEOUT_MS = 15_000;
+
+/**
+ * What a Databricks OAuth token endpoint returns. Only `access_token` is
+ * load-bearing — `expires_in` is not kept, because a token is minted per run
+ * and never outlives it.
+ */
+const tokenResponseSchema = z.object({
+  access_token: z.string().min(1),
+});
+
+/**
+ * The bearer to present on this run's Genie calls.
+ *
+ * A pasted workspace token expires about an hour after Databricks issues it,
+ * so a source configured that way works when the admin saves it and is dead by
+ * the next scheduled run, with nothing on the source to say why. A service
+ * principal's client id and secret do not expire, so the source signs in at
+ * the start of every run and the schedule keeps running unattended.
+ *
+ * A pasted token wins when both are present. Someone pasting one into a source
+ * that already had a secret is rotating by hand — usually because the secret
+ * stopped working — and silently preferring the secret would ignore the thing
+ * they just did.
+ *
+ * Minted once per run rather than per request: the sweep walks several pages
+ * across several spaces, and a token per request would multiply one sign-in by
+ * the whole walk for no benefit, since the token outlives any single run.
+ */
+async function resolveWorkspaceToken(params: {
+  credentials: Record<string, string> | undefined;
+  workspaceUrl: string;
+  signal?: AbortSignal;
+}): Promise<string> {
+  const { credentials, workspaceUrl, signal } = params;
+
+  const pasted = credentials?.token;
+  if (pasted) return pasted;
+
+  const clientId = credentials?.clientId;
+  const clientSecret = credentials?.clientSecret;
+  if (!clientId || !clientSecret) {
+    throw new Error(
+      "databricks genie puller needs either a workspace token in credentials.token, " +
+        "or a service principal's credentials.clientId and credentials.clientSecret",
+    );
+  }
+
+  // HTTP Basic rather than the secret in the body: the header is not written
+  // to the request line, so it stays out of proxy and access logs.
+  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+  const timeout = AbortSignal.timeout(TOKEN_TIMEOUT_MS);
+
+  const response = await ssrfSafeFetch(
+    `${workspaceUrl.replace(/\/+$/, "")}/oidc/v1/token`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Basic ${basic}`,
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: "grant_type=client_credentials&scope=all-apis",
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+    },
+  );
+
+  if (!response.ok) {
+    // The status alone, never the body: a token endpoint may echo the request
+    // back, and this reason is logged and shown on the source.
+    throw new Error(
+      `databricks genie puller could not sign in: the workspace refused the ` +
+        `service principal's credentials (HTTP ${response.status})`,
+    );
+  }
+
+  const parsed = tokenResponseSchema.safeParse(await response.json());
+  if (!parsed.success) {
+    // A proxy or captive portal answering 200 with something that is not a
+    // token must not be carried forward as one — it would fail later as an
+    // unauthorised Genie call and read as a permissions problem.
+    throw new Error(
+      "databricks genie puller could not sign in: the workspace answered the " +
+        "sign-in without an access token",
+    );
+  }
+
+  return parsed.data.access_token;
+}
+
+/**
  * Per-statement cost for the window, from the warehouse's own billing.
  *
  * Read it as three independent facts joined by the hour they share:
@@ -1311,12 +1406,11 @@ export class DatabricksGeniePuller
     options: PullRunOptions,
     config: DatabricksGeniePullConfig,
   ): Promise<PullResult> {
-    const token = options.credentials?.token;
-    if (!token) {
-      throw new Error(
-        "databricks genie puller requires a workspace bearer token in credentials.token",
-      );
-    }
+    const token = await resolveWorkspaceToken({
+      credentials: options.credentials,
+      workspaceUrl: config.workspaceUrl,
+      signal: options.signal,
+    });
 
     const cursor = parseCursor(options.cursor, config);
     const budget = new RunBudget(options.deadlineMs, this.maxRequests);

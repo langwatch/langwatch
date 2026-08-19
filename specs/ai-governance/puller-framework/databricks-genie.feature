@@ -386,3 +386,94 @@ Feature: Databricks AI/BI Genie puller
     And the rotation grace window is unchanged
     # A client is never shown either of them, so it cannot send them back, and
     # absent has to mean unchanged rather than cleared.
+
+  Rule: A source can sign in for itself, so a schedule outlives a pasted token
+
+    A Databricks token expires about an hour after it is issued. A source
+    configured by pasting one works when the admin saves it and is dead by the
+    next morning, with nothing on the source to say why. Given a service
+    principal's client id and secret instead, the source signs in at the start
+    of every run and the schedule keeps running unattended.
+
+    @integration
+    Scenario: A source given a client id and secret signs in for itself
+      Given a Genie source holding a service principal's client id and secret
+      And no pasted workspace token
+      When a run starts
+      Then the source asks the workspace for a token
+      And the run records the workspace's Genie activity
+
+    @integration
+    Scenario: A pasted token is still honoured
+      Given a Genie source holding a pasted workspace token
+      When a run starts
+      Then the source does not ask the workspace for a token
+      And the run records the workspace's Genie activity
+      # Sources configured before this existed must keep working untouched.
+
+    @integration
+    Scenario: A pasted token wins over a client secret
+      Given a Genie source holding both a pasted token and a client secret
+      When a run starts
+      Then the source does not ask the workspace for a token
+      # Someone who pastes a token into a source that already had a secret is
+      # rotating by hand, usually because the secret stopped working. Silently
+      # preferring the secret would ignore the thing they just did and leave
+      # them staring at a source that still fails.
+
+    @integration
+    Scenario: A source with no way to sign in says so
+      Given a Genie source holding neither a pasted token nor a client secret
+      When a run starts
+      Then the run fails
+      And the reason names what it needs to be given
+
+    @integration
+    Scenario: Credentials the workspace rejects fail the run rather than emptying it
+      Given a Genie source whose client secret the workspace refuses
+      When a run starts
+      Then the run fails
+      And the reason says signing in was refused
+      # A rejected sign-in that returned no records would look identical to a
+      # workspace where nobody asked Genie anything, and the source would sit
+      # green and silent.
+
+    @integration
+    Scenario: A sign-in answered with no token fails the run
+      Given a Genie source whose workspace answers the sign-in without a token
+      When a run starts
+      Then the run fails
+      # A proxy or captive portal answering 200 with something that is not a
+      # token must not be carried forward as one, which would fail later as an
+      # unauthorised Genie call and read as a permissions problem.
+
+    @integration
+    Scenario: A sign-in that hangs does not consume the whole run
+      Given a Genie source whose workspace never answers the sign-in
+      When a run starts
+      Then the sign-in is abandoned before the run's own deadline
+      And the run fails
+      # The job has five minutes for everything. A sign-in with no bound of its
+      # own would spend all of it and report nothing.
+
+    @integration
+    Scenario: Signing in happens once a run, not once a request
+      Given a Genie source holding a service principal's client id and secret
+      And a run that reads several pages across several spaces
+      When the run finishes
+      Then the workspace was asked for a token exactly once
+
+    @integration
+    Scenario: The client secret is never stored in plain text
+      Given an admin configures a Genie source with a client id and secret
+      When the source is saved
+      Then the secret is held encrypted
+      And the secret is not readable from the source's configuration
+
+    @integration
+    Scenario: A refused sign-in does not put the secret in the reason
+      Given a Genie source whose client secret the workspace refuses
+      When a run starts
+      Then the recorded reason does not contain the secret
+      # The reason is logged and surfaced on the source, so anything it carries
+      # is readable by people who were never given the credential.
