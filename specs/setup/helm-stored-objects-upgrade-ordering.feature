@@ -131,6 +131,20 @@ Feature: A chart upgrade moves one stored-objects volume consumer at a time
       Then it reports success and changes nothing
 
     @e2e
+    Scenario: A rollback is ordered the same way an upgrade is
+      Given an operator rolling the release back after a bad rollout
+      When helm runs its rollback steps
+      Then the same two steps run, because they are registered for the rollback
+      events as well as the upgrade events
+      And the workers come back at the count the target release names
+      # A rollback moves both Deployments the same way an upgrade does, and it
+      # is most likely to be run while recovering from a rollout that already
+      # went wrong. Helm fires pre-rollback and post-rollback there, not the
+      # upgrade pair. The chart cannot protect a downgrade to a version from
+      # before these steps existed, because helm runs the target revision's
+      # hooks: that case needs a manual worker scale-down and is documented.
+
+    @e2e
     Scenario: A slow or broken app never leaves the workers switched off
       Given an app that does not finish its rollout in time
       When the post-upgrade step gives up waiting

@@ -486,11 +486,17 @@ app:
       # attachment on the old node, and both wedge in ContainerCreating with a
       # multi-attach error (issue #7191).
       #
-      # With this on, a pre-upgrade hook Job scales the workers to 0 and waits
-      # for their pods to go away before helm applies the new manifests, and a
-      # post-upgrade hook Job holds them at 0 until the app rollout finishes
-      # and then scales them back to workers.replicaCount. The app rolls as the
-      # only holder of the volume, and the workers follow the NEW app pod.
+      # With this on, a hook Job scales the workers to 0 and waits for their
+      # pods to go away before helm applies the new manifests, and a second
+      # hook Job holds them at 0 until the app rollout finishes and then scales
+      # them back to workers.replicaCount. The app rolls as the only holder of
+      # the volume, and the workers follow the NEW app pod. Both Jobs run on
+      # rollback as well as upgrade.
+      #
+      # One case the chart cannot cover: on a rollback helm runs the hooks
+      # stored in the TARGET revision, so rolling back to a chart version from
+      # before these Jobs existed runs no Jobs at all. Scale the workers
+      # Deployment to 0 by hand before such a downgrade, and back up after it.
       #
       # The hooks need a ServiceAccount token and a small Role (get on the app
       # and the workers Deployments, patch on the workers' scale, read on the

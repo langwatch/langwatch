@@ -107,11 +107,12 @@ multi-attach error.
 
 The chart orders them for you, with two hook Jobs:
 
-1. A **pre-upgrade** Job scales the workers to 0 and waits for their pods to go
-   away, so the old workers pod cannot hold the volume on the old node while
-   Helm rolls the app.
-2. A **post-upgrade** Job scales the workers to 0 again, waits for the app
-   rollout to finish, and then scales them back to `workers.replicaCount`.
+1. A **drain** Job (`pre-upgrade`, `pre-rollback`) scales the workers to 0 and
+   waits for their pods to go away, so the old workers pod cannot hold the
+   volume on the old node while Helm rolls the app.
+2. A **restore** Job (`post-upgrade`, `post-rollback`) scales the workers to 0
+   again, waits for the app rollout to finish, and then scales them back to
+   `workers.replicaCount`.
 
 The second step is not redundant. Helm's apply restores the replica count from
 the manifest, so a new workers pod is created at the same instant as the new app
@@ -129,11 +130,25 @@ and the workers Deployments, `patch` on the workers' scale subresource, and read
 access to the pods of the release namespace. They render only in this mode. With
 `app.dataplane` (S3 / Azure) there is no shared volume, so they never render.
 
-If the pre-upgrade Job fails, the upgrade stops and the workers stay at 0. That
-is deliberate: it is safer than a wedged rollout. Read the Job logs, fix the
-cause, then run the upgrade again, which scales the workers back up. The
-post-upgrade Job never fails the release over a slow or broken app: if the
-rollout does not finish in time it says so and brings the workers back anyway.
+If the drain Job fails, the upgrade stops and the workers stay at 0. That is
+deliberate: it is safer than a wedged rollout. Read the Job logs, fix the cause,
+then run the upgrade again, which scales the workers back up. The restore Job
+never fails the release over a slow or broken app: if the rollout does not
+finish in time it says so and brings the workers back anyway.
+
+**Rollbacks.** `helm rollback` moves both Deployments the same way an upgrade
+does, so both Jobs are registered for the rollback events too and a rollback is
+ordered the same way. One case the chart cannot cover: on a rollback Helm runs
+the hooks stored in the **target** revision, so a rollback to a chart version
+from before these Jobs existed runs no Jobs at all. Before such a downgrade,
+scale the workers down by hand and bring them back after it:
+
+```bash
+kubectl -n <namespace> scale deployment <release>-workers --replicas=0
+kubectl -n <namespace> rollout status deployment <release>-workers --timeout=2m
+helm rollback <release> <old-revision>
+kubectl -n <namespace> scale deployment <release>-workers --replicas=1
+```
 
 To order the rollout yourself, or on a cluster that forbids that RBAC:
 

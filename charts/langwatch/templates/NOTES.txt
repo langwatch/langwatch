@@ -203,6 +203,11 @@ backend for you:
         the pre-upgrade Job fails, the upgrade stops and the workers stay
         at 0: read the Job logs, then run the upgrade again to bring them
         back.
+      • Both Jobs run on `helm rollback` too. They cannot cover a
+        rollback to a chart version from before they existed, because
+        helm runs the TARGET revision's hooks: scale
+        {{ .Release.Name }}-workers to 0 by hand before such a downgrade
+        and back up after it.
 {{- else if .Values.workers.enabled }}
       • Upgrade ordering is OFF
         (app.storedObjects.localFilesystem.serializeUpgrades=false), and

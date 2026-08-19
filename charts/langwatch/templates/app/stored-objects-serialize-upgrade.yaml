@@ -17,13 +17,13 @@
   the whole upgrade, and give the workers back after the app pod that owns the
   volume is running:
 
-    pre-upgrade   scale the workers to 0 and wait for their pods to go away, so
-                  the OLD workers pod cannot hold the volume on the old node
-                  while helm rolls the app.
+    the drain Job     scale the workers to 0 and wait for their pods to go
+    (pre-upgrade,     away, so the OLD workers pod cannot hold the volume on
+     pre-rollback)    the old node while helm rolls the app.
 
-    post-upgrade  scale the workers to 0 again, wait, then wait for the app
-                  rollout to finish and scale the workers back to
-                  workers.replicaCount.
+    the restore Job   scale the workers to 0 again, wait, then wait for the app
+    (post-upgrade,    rollout to finish and scale the workers back to
+     post-rollback)   workers.replicaCount.
 
   The second scale-to-0 is not redundant. Helm's apply restores the replica
   count from the manifest, so a NEW workers pod is created at the same instant
@@ -31,22 +31,37 @@
   is still terminating on the old node, so the scheduler puts the workers back
   on the node the app is leaving, where it takes over the attachment and wedges
   the new app pod for good. Measured on a 4 node EKS cluster: with the
-  pre-upgrade hook alone, an upgrade that moved the app to another node left
-  the app in ContainerCreating with "Multi-Attach error ... Volume is already
-  used by pod(s) <release>-app-<old>". Standing the workers down until the app
-  rollout completes is what makes the workers follow the NEW app pod.
+  drain Job alone, an upgrade that moved the app to another node left the app
+  in ContainerCreating with "Multi-Attach error ... Volume is already used by
+  pod(s) <release>-app-<old>". Standing the workers down until the app rollout
+  completes is what makes the workers follow the NEW app pod.
 
   Scope. Renders only when local-filesystem is the ACTIVE stored-objects
   backend (the same helper the PVC uses), the workers are deployed, and
   `app.storedObjects.localFilesystem.serializeUpgrades` is on. With
   app.dataplane enabled there is no shared volume and nothing to order.
 
-  Hook contract. Upgrade phases only: a first install has no old pod holding
-  the volume. Both Jobs are still defensive about a missing Deployment, because
-  ArgoCD and Flux map these phases to PreSync and PostSync and run them on the
-  first sync too. hook-delete-policy keeps a FAILED Job for the operator to
-  read, and `before-hook-creation` removes it at the start of the next attempt,
-  so a failure never blocks the next upgrade.
+  Hook contract. Upgrade AND rollback phases, never install: a first install
+  has no old pod holding the volume, but a rollback moves both Deployments the
+  same way an upgrade does, and is most likely to be run while recovering from
+  a rollout that already went wrong. Helm fires pre-rollback / post-rollback
+  there, not the upgrade pair, so a Job registered for the upgrade events alone
+  would not run and the race would be back.
+
+  One limit worth knowing, because the chart cannot close it: on a rollback
+  Helm runs the hooks stored in the TARGET revision's manifests, not the
+  current one. So these annotations protect a rollback to any revision that
+  already carries these hooks. A downgrade to a chart version from before them
+  runs no hooks at all. Scale the workers Deployment to 0 by hand before such a
+  downgrade. The same rule decides the replica count the post-rollback Job
+  restores: it renders from the target revision's workers.replicaCount, which
+  is the count that revision asks for and therefore the right one.
+
+  Both Jobs are defensive about a missing Deployment, because ArgoCD and Flux
+  map these phases to PreSync and PostSync and run them on the first sync too.
+  hook-delete-policy keeps a FAILED Job for the operator to read, and
+  `before-hook-creation` removes it at the start of the next attempt, so a
+  failure never blocks the next upgrade or rollback.
 
   Failure posture differs per phase, on purpose. The pre-upgrade Job is
   fail-closed: it stops the upgrade before anything is applied rather than risk
@@ -91,7 +106,7 @@ metadata:
   labels:
     {{- include "langwatch.labels" . | nindent 4 }}
   annotations:
-    helm.sh/hook: pre-upgrade,post-upgrade
+    helm.sh/hook: pre-upgrade,pre-rollback,post-upgrade,post-rollback
     helm.sh/hook-weight: "-10"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 ---
@@ -102,7 +117,7 @@ metadata:
   labels:
     {{- include "langwatch.labels" . | nindent 4 }}
   annotations:
-    helm.sh/hook: pre-upgrade,post-upgrade
+    helm.sh/hook: pre-upgrade,pre-rollback,post-upgrade,post-rollback
     helm.sh/hook-weight: "-10"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 rules:
@@ -133,7 +148,7 @@ metadata:
   labels:
     {{- include "langwatch.labels" . | nindent 4 }}
   annotations:
-    helm.sh/hook: pre-upgrade,post-upgrade
+    helm.sh/hook: pre-upgrade,pre-rollback,post-upgrade,post-rollback
     helm.sh/hook-weight: "-10"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 subjects:
@@ -152,7 +167,7 @@ metadata:
   labels:
     {{- include "langwatch.labels" . | nindent 4 }}
   annotations:
-    helm.sh/hook: pre-upgrade
+    helm.sh/hook: pre-upgrade,pre-rollback
     helm.sh/hook-weight: "-5"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
@@ -217,7 +232,7 @@ metadata:
   labels:
     {{- include "langwatch.labels" . | nindent 4 }}
   annotations:
-    helm.sh/hook: post-upgrade
+    helm.sh/hook: post-upgrade,post-rollback
     helm.sh/hook-weight: "5"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:

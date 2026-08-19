@@ -109,6 +109,14 @@ hook_doc_named() {
   '
 }
 
+# Prints the exact `helm.sh/hook` value of a rendered document. Matched whole,
+# because a substring test for "pre-upgrade" passes just as happily against
+# "pre-upgrade,pre-rollback" and against "pre-upgrade" alone, and the whole
+# point of these assertions is which lifecycle events are covered.
+hook_events_of() {
+  printf '%s\n' "$1" | awk -F': ' '/helm.sh\/hook:/ { gsub(/ /, "", $2); print $2; exit }'
+}
+
 # Prints one component Deployment, the same way workers-shutdown.sh does.
 render_component() {
   render "$2" | awk -v want="langwatch/templates/$1/deployment.yaml" '
@@ -183,7 +191,12 @@ test_default_install_renders_the_hook() {
     fail "default hook" "the hooks rendered no ${PRE_JOB} Job"
     return
   fi
-  expect_contains "default hook" "$pre" "helm.sh/hook: pre-upgrade" || return 0
+  local pre_events
+  pre_events=$(hook_events_of "$pre")
+  if [ "$pre_events" != "pre-upgrade,pre-rollback" ]; then
+    fail "default hook" "the drain Job runs on '${pre_events:-<absent>}', expected pre-upgrade,pre-rollback"
+    return
+  fi
 
   # The ordering claim, stated as the two facts a render can show: the Job is a
   # pre-upgrade hook (helm runs those before it applies anything), and neither
@@ -277,7 +290,12 @@ test_workers_come_back_after_the_app_rollout() {
     fail "post hook" "the hooks rendered no ${POST_JOB} Job"
     return
   fi
-  expect_contains "post hook" "$post" "helm.sh/hook: post-upgrade" || return 0
+  local post_events
+  post_events=$(hook_events_of "$post")
+  if [ "$post_events" != "post-upgrade,post-rollback" ]; then
+    fail "post hook" "the restore Job runs on '${post_events:-<absent>}', expected post-upgrade,post-rollback"
+    return
+  fi
 
   # Stand the workers down again: helm's apply restored the count, and the new
   # workers pod can follow the still-terminating old app pod back to the node
@@ -500,7 +518,64 @@ test_hook_is_upgrade_only_and_tolerates_a_missing_deployment() {
       return
     fi
   done
-  echo "ok   [first install] upgrade phases only, and both Jobs exit 0 when the Deployment is missing"
+  echo "ok   [first install] never an install phase, and both Jobs exit 0 when the Deployment is missing"
+}
+
+# A rollback moves both Deployments the same way an upgrade does, and helm
+# fires its own pair of events for it. A Job registered for the upgrade events
+# alone simply does not run there, silently, which is the worst shape this bug
+# can take: the operator is already recovering from a bad rollout.
+#
+# @scenario "A rollback is ordered the same way an upgrade is"
+test_rollback_runs_the_same_steps() {
+  local block doc name events want
+  block=$(hook_block "")
+  if [ -z "$block" ]; then
+    fail "rollback" "the default local-filesystem install rendered no upgrade hooks"
+    return
+  fi
+
+  # The two Jobs each need their own half of the rollback lifecycle.
+  doc=$(printf '%s\n' "$block" | hook_doc_named "$PRE_JOB")
+  events=$(hook_events_of "$doc")
+  if [ "$events" != "pre-upgrade,pre-rollback" ]; then
+    fail "rollback" "the drain Job runs on '${events:-<absent>}', expected pre-upgrade,pre-rollback"
+    return
+  fi
+  doc=$(printf '%s\n' "$block" | hook_doc_named "$POST_JOB")
+  events=$(hook_events_of "$doc")
+  if [ "$events" != "post-upgrade,post-rollback" ]; then
+    fail "rollback" "the restore Job runs on '${events:-<absent>}', expected post-upgrade,post-rollback"
+    return
+  fi
+
+  # The ServiceAccount, the Role and the RoleBinding need all four events, or a
+  # Job runs during a rollback with no identity and no permissions.
+  local kind
+  for kind in ServiceAccount Role RoleBinding; do
+    doc=$(printf '%s\n' "$block" | hook_doc "$kind")
+    if [ -z "$doc" ]; then
+      fail "rollback" "rendered no ${kind}"
+      return
+    fi
+    events=$(hook_events_of "$doc")
+    want="pre-upgrade,pre-rollback,post-upgrade,post-rollback"
+    if [ "$events" != "$want" ]; then
+      fail "rollback" "the ${kind} runs on '${events:-<absent>}', expected ${want}"
+      return
+    fi
+  done
+
+  # Count as well as sample, so a document added later cannot quietly skip the
+  # rollback events.
+  local rollback_docs doc_count
+  rollback_docs=$(printf '%s\n' "$block" | grep -c 'helm.sh/hook: .*rollback' || true)
+  doc_count=$(printf '%s\n' "$block" | grep -c '^# Source: ' || true)
+  if [ "$rollback_docs" -ne "$doc_count" ]; then
+    fail "rollback" "${doc_count} hook documents but only ${rollback_docs} cover a rollback"
+    return
+  fi
+  echo "ok   [rollback] all ${doc_count} hook documents cover the rollback events too"
 }
 
 # @scenario "A slow or broken app never leaves the workers switched off"
@@ -557,6 +632,7 @@ test_no_workers_renders_no_hook
 test_knob_off_renders_no_hook
 test_hook_rbac_is_scoped
 test_hook_is_upgrade_only_and_tolerates_a_missing_deployment
+test_rollback_runs_the_same_steps
 test_post_hook_restores_workers_even_when_the_app_is_slow
 test_failed_hook_does_not_block_the_next_upgrade
 
