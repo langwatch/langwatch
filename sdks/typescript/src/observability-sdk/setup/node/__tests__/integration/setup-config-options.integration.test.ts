@@ -26,6 +26,17 @@ function createMockLogger() {
   return { error: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn() };
 }
 
+// The concrete tracer provider's resolved config (resource, sampler, spanLimits,
+// idGenerator, ...) isn't part of the public API, so these tests reach into its
+// private state. `@opentelemetry/sdk-node` 0.221 moved from constructing a
+// `NodeTracerProvider`/`BasicTracerProvider` (which stores this under `_config`)
+// to the new unified `@opentelemetry/sdk-trace` package's `TracerProvider`
+// (which stores the equivalent under `_tracerOptions`). Read whichever is
+// present so this doesn't re-break on the next OTel internal reshuffle.
+function getInternalTracerConfig(provider: any): any {
+  return provider._tracerOptions ?? getInternalTracerConfig(provider);
+}
+
 describe('setupObservability Integration - Configuration Options', () => {
   it('reflects apiKey and endpoint in the exporter', async () => {
     const logger = createMockLogger();
@@ -69,9 +80,9 @@ describe('setupObservability Integration - Configuration Options', () => {
     };
     const handle = setupObservability(options);
     const provider: any = getConcreteProvider(trace.getTracerProvider());
-    expect(provider._config.resource.attributes['service.name']).toBe('test-service');
-    expect(provider._config.resource.attributes['deployment.environment']).toBe('test');
-    expect(provider._config.resource.attributes['service.version']).toBe('1.0.0');
+    expect(getInternalTracerConfig(provider).resource.attributes['service.name']).toBe('test-service');
+    expect(getInternalTracerConfig(provider).resource.attributes['deployment.environment']).toBe('test');
+    expect(getInternalTracerConfig(provider).resource.attributes['service.version']).toBe('1.0.0');
     await handle.shutdown();
   });
 
@@ -85,7 +96,7 @@ describe('setupObservability Integration - Configuration Options', () => {
     };
     const handle = setupObservability(options);
     const provider: any = getConcreteProvider(trace.getTracerProvider());
-    expect(provider._config.resource.attributes['custom.resource']).toBe('yes');
+    expect(getInternalTracerConfig(provider).resource.attributes['custom.resource']).toBe('yes');
     await handle.shutdown();
   });
 
@@ -98,7 +109,7 @@ describe('setupObservability Integration - Configuration Options', () => {
     };
     const handle = setupObservability(options);
     const provider: any = getConcreteProvider(trace.getTracerProvider());
-    expect(provider._config.spanLimits?.attributeCountLimit).toBe(1);
+    expect(getInternalTracerConfig(provider).spanLimits?.attributeCountLimit).toBe(1);
     await handle.shutdown();
   });
 
@@ -111,7 +122,7 @@ describe('setupObservability Integration - Configuration Options', () => {
     };
     const handle = setupObservability(options);
     const provider: any = getConcreteProvider(trace.getTracerProvider());
-    expect(provider._config.resource).toBeDefined();
+    expect(getInternalTracerConfig(provider).resource).toBeDefined();
     await handle.shutdown();
   });
 
@@ -125,7 +136,7 @@ describe('setupObservability Integration - Configuration Options', () => {
     };
     const handle = setupObservability(options);
     const provider: any = getConcreteProvider(trace.getTracerProvider());
-    expect(provider._config.sampler.toString()).toBe('customSampler');
+    expect(getInternalTracerConfig(provider).sampler.toString()).toBe('customSampler');
     await handle.shutdown();
   });
 
@@ -139,8 +150,8 @@ describe('setupObservability Integration - Configuration Options', () => {
     };
     const handle = setupObservability(options);
     const provider: any = getConcreteProvider(trace.getTracerProvider());
-    expect(provider._config.idGenerator.generateSpanId()).toBe('spanid');
-    expect(provider._config.idGenerator.generateTraceId()).toBe('traceid');
+    expect(getInternalTracerConfig(provider).idGenerator.generateSpanId()).toBe('spanid');
+    expect(getInternalTracerConfig(provider).idGenerator.generateTraceId()).toBe('traceid');
     await handle.shutdown();
   });
 
