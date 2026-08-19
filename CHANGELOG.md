@@ -1,5 +1,57 @@
 # Changelog
 
+## [3.15.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.14.0...langwatch@v3.15.0) (2026-08-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **lwql:** migration and code must ship in the same release. Prisma enumerates every Project column on ordinary project fetches, so a pod on the previous image against this schema raises 42703 application-wide.
+
+### Features
+
+* **cli:** create the HTTP agent on the spot when agent dev finds none ([#7156](https://github.com/langwatch/langwatch/issues/7156)) ([13b40a8](https://github.com/langwatch/langwatch/commit/13b40a8509a3eafbb49449fc58d1227f3359cccb))
+* **navigation:** product switcher and icon rail behind one flag, gateway/governance URL moves ([#7076](https://github.com/langwatch/langwatch/issues/7076)) ([aadd411](https://github.com/langwatch/langwatch/commit/aadd4112e6a92e3a50f7db8b34a3f4dd376efefd))
+* **ui:** closable toasts at the bottom center, and a compact trace drawer toolbar ([#7124](https://github.com/langwatch/langwatch/issues/7124)) ([073e915](https://github.com/langwatch/langwatch/commit/073e9157cf986f1e2fe2b6bee7de0b14937c41e7))
+
+
+### Bug Fixes
+
+* **automations:** navigate to the dataset drawer and back, instead of stacking one ([#7073](https://github.com/langwatch/langwatch/issues/7073)) ([807b72a](https://github.com/langwatch/langwatch/commit/807b72a717ffe53510d24a87d1ba70e0f75efcb3))
+* **charts:** serialize stored-objects PVC consumers across upgrades ([#7196](https://github.com/langwatch/langwatch/issues/7196)) ([c373527](https://github.com/langwatch/langwatch/commit/c3735278a84624fc4e4624b709c740a78ad806ba))
+* **coding-agent:** a row exists once the session says something, and its orchestrator can name it ([#7197](https://github.com/langwatch/langwatch/issues/7197)) ([52df144](https://github.com/langwatch/langwatch/commit/52df144ee06d86c25403ca094d2005c448a89799))
+* **coding-agent:** terminal session viewer opens at the end, anchors totals, zero scroll jumps ([#7055](https://github.com/langwatch/langwatch/issues/7055)) ([1b149c5](https://github.com/langwatch/langwatch/commit/1b149c56b9128a3800a127d12c504dac9a5872f1))
+* **governance:** anthropic_admin cost_report 400 — default too recent + log error body ([#7178](https://github.com/langwatch/langwatch/issues/7178)) ([7c291d6](https://github.com/langwatch/langwatch/commit/7c291d64987bb749ae6e6de440fa4853bec1c423))
+* **scim:** a group PATCH that names no members no longer empties the group ([#7136](https://github.com/langwatch/langwatch/issues/7136)) ([fd51aca](https://github.com/langwatch/langwatch/commit/fd51acacbd7520cca285ca999dfda211eb51fa36))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump @anthropic-ai/claude-code ([fbc7dcf](https://github.com/langwatch/langwatch/commit/fbc7dcf5f18f9be74ed7d1a390f922d3c9db7ea8))
+* **deps-dev:** bump @anthropic-ai/claude-code from 2.1.202 to 2.1.226 in the anthropic group across 1 directory ([#6546](https://github.com/langwatch/langwatch/issues/6546)) ([fbc7dcf](https://github.com/langwatch/langwatch/commit/fbc7dcf5f18f9be74ed7d1a390f922d3c9db7ea8))
+* **deps-dev:** bump @testing-library/jest-dom from 6.9.1 to 7.0.1 ([#6796](https://github.com/langwatch/langwatch/issues/6796)) ([6c61cc8](https://github.com/langwatch/langwatch/commit/6c61cc8442944f3124114cfd3396688f2b313426))
+* **deps-dev:** bump mermaid from 11.16.0 to 11.16.1 ([#6658](https://github.com/langwatch/langwatch/issues/6658)) ([f437d17](https://github.com/langwatch/langwatch/commit/f437d1717e3d8aeb48ca664abbb9d6abf2e4d724))
+* **deps-dev:** bump the types group across 1 directory with 2 updates ([#6789](https://github.com/langwatch/langwatch/issues/6789)) ([7be2d04](https://github.com/langwatch/langwatch/commit/7be2d04c798b46a29b9b5b046dbb28a1e6c369e7))
+* **deps:** bump @opentelemetry/core from 2.9.0 to 2.10.0 ([#6663](https://github.com/langwatch/langwatch/issues/6663)) ([6fb4051](https://github.com/langwatch/langwatch/commit/6fb40515723afc2dc440982b44b47d940cde4cc8))
+* **deps:** bump @react-email/components from 0.0.42 to 1.0.12 ([#6806](https://github.com/langwatch/langwatch/issues/6806)) ([378f9d9](https://github.com/langwatch/langwatch/commit/378f9d95a275f86d5ca882f5462c85b16b89b84f))
+* **deps:** bump commander from 14.0.3 to 15.0.0 ([#6798](https://github.com/langwatch/langwatch/issues/6798)) ([bbaa2a2](https://github.com/langwatch/langwatch/commit/bbaa2a2d057c8568d97dcbb4ad860eaac15daebd))
+* **deps:** bump js-yaml from 5.2.1 to 5.2.2 ([#6659](https://github.com/langwatch/langwatch/issues/6659)) ([accecef](https://github.com/langwatch/langwatch/commit/accecefbaca5ff6bf58bc919d5e194ddf326c9ed))
+* **deps:** bump nanoid from 5.1.16 to 6.0.0 ([#6739](https://github.com/langwatch/langwatch/issues/6739)) ([addeee3](https://github.com/langwatch/langwatch/commit/addeee3c45b95b085d1d0cc7fdea839d1c29b94c))
+* **deps:** bump pino-opentelemetry-transport from 3.0.0 to 4.0.2 ([#6802](https://github.com/langwatch/langwatch/issues/6802)) ([772e3b6](https://github.com/langwatch/langwatch/commit/772e3b6222d3089de678c674b39589d719a8d5d4))
+* **deps:** bump react-router from 8.1.0 to 8.3.0 ([#6660](https://github.com/langwatch/langwatch/issues/6660)) ([dca5740](https://github.com/langwatch/langwatch/commit/dca57401e1a1d0d23dca82265dd4cf32f28a8ccc))
+* **deps:** bump the posthog group across 1 directory with 2 updates ([#6547](https://github.com/langwatch/langwatch/issues/6547)) ([e7b0174](https://github.com/langwatch/langwatch/commit/e7b017434fe4501c04a89358c3c4e2be62d7d7c5))
+* **release:** pin the platform at 3.15.0 ([#7201](https://github.com/langwatch/langwatch/issues/7201)) ([508ef67](https://github.com/langwatch/langwatch/commit/508ef67c52219e5797bba056cc1a8a07134238ed))
+
+
+### Documentation
+
+* **agent-simulations:** use the skill card on the connect-your-agent page ([#7155](https://github.com/langwatch/langwatch/issues/7155)) ([65307a1](https://github.com/langwatch/langwatch/commit/65307a16eebdc9c7dfbc97a0fd2f8de8d1683048))
+* **claude-code:** document OTEL_LOG_ASSISTANT_RESPONSES flag ([#7193](https://github.com/langwatch/langwatch/issues/7193)) ([ed3feca](https://github.com/langwatch/langwatch/commit/ed3feca741530fc4419541c7260a1b03a1f34900))
+
+
+### Code Refactoring
+
+* **lwql:** rename governed-sql vocabulary to LWQL / LangWatchQL ([#7183](https://github.com/langwatch/langwatch/issues/7183)) ([37df9e4](https://github.com/langwatch/langwatch/commit/37df9e4a8edb04b2d7ba52df871c2f60b4b3b7af))
+
 ## [3.14.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.13.0...langwatch@v3.14.0) (2026-08-18)
 
 
