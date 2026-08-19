@@ -378,6 +378,8 @@ function toListRow(
 ): CodingAgentSessionListRow {
   return {
     sessionId: row.sessionId,
+    // One Title column; the fold already resolved the precedence (the
+    // session's own name, then the generated title, then the first prompt).
     title: row.title === "" ? null : row.title,
     agent: row.agent,
     agentVersion: row.agentVersion,

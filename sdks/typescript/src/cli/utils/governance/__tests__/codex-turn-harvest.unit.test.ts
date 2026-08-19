@@ -24,15 +24,19 @@ import { assertCodexTurnHarvest } from "../shell-rc";
 const THREAD = "019fc156-02e3-76a1-b462-14c38b450cb6";
 const TRACE = "add81f7dde443979dde88487bd7fb454";
 
+let home: string;
 let root: string;
 
 beforeEach(() => {
-	root = mkdtempSync(join(tmpdir(), "lw-codex-sessions-"));
+	// The real layout: the sessions tree under a codex home, with
+	// session_index.jsonl beside it.
+	home = mkdtempSync(join(tmpdir(), "lw-codex-home-"));
+	root = join(home, "sessions");
 	mkdirSync(join(root, "2026", "08", "02"), { recursive: true });
 });
 
 afterEach(() => {
-	rmSync(root, { recursive: true, force: true });
+	rmSync(home, { recursive: true, force: true });
 });
 
 function writeRollout(threadId: string, lines: unknown[]): string {
@@ -499,8 +503,21 @@ describe("harvestCodexThread", () => {
 	});
 
 	describe("given a session with no repository in its transcript", () => {
-		describe("when the session is harvested", () => {
-			/** @scenario "A session outside any repository posts its conversation and no context" */
+		const typedPrompt = (message: string) => ({
+			type: "event_msg",
+			payload: { type: "user_message", message },
+		});
+		const contextAttrsOf = (bodies: any[], urls: string[]) => {
+			const log =
+				bodies[urls.indexOf("https://e/v1/logs")].resourceLogs[0].scopeLogs[0]
+					.logRecords[0];
+			return Object.fromEntries(
+				log.attributes.map((a: any) => [a.key, a.value?.stringValue]),
+			);
+		};
+
+		describe("when the session is harvested with nothing to name it", () => {
+			/** @scenario "A session with no remote, no prompt and no name posts no context" */
 			it("posts the conversation and no context record", async () => {
 				writeRollout(THREAD, [
 					sessionMeta(),
@@ -521,6 +538,86 @@ describe("harvestCodexThread", () => {
 				});
 
 				expect(urls).toEqual(["https://e/v1/traces"]);
+			});
+		});
+
+		describe("when the transcript carries a typed prompt", () => {
+			/** @scenario "A session outside any repository still posts a context that names it" */
+			it("posts a context carrying the title and no repository attributes", async () => {
+				writeRollout(THREAD, [
+					sessionMeta(),
+					taskStarted(TRACE),
+					typedPrompt("Fix the flaky login test"),
+					userMessage("Fix the flaky login test"),
+					agentFinal("done"),
+				]);
+				const { bodies, urls, impl } = recordingFetch();
+
+				await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					logsEndpoint: "https://e/v1/logs",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					fetchImpl: impl,
+				});
+
+				expect(urls).toContain("https://e/v1/logs");
+				const attributes = contextAttrsOf(bodies, urls);
+				expect(attributes["session.id"]).toBe(THREAD);
+				expect(attributes["langwatch.session.title"]).toBe(
+					"Fix the flaky login test",
+				);
+				expect(attributes["vcs.repository.host"]).toBeUndefined();
+				expect(attributes["vcs.repository.name"]).toBeUndefined();
+			});
+		});
+
+		describe("when codex's session index names the thread", () => {
+			/** @scenario "Codex's own thread name rides the context record" */
+			it("carries the newest indexed name beside the derived title", async () => {
+				// Appended lines are newer, so the second one is the rename that
+				// must win.
+				writeFileSync(
+					join(home, "session_index.jsonl"),
+					[
+						JSON.stringify({
+							id: THREAD,
+							thread_name: "first name",
+							updated_at: "2026-08-02T10:00:00Z",
+						}),
+						JSON.stringify({
+							id: THREAD,
+							thread_name: "pr-reviewer",
+							updated_at: "2026-08-02T11:00:00Z",
+						}),
+					].join("\n"),
+				);
+				writeRollout(THREAD, [
+					sessionMeta(),
+					taskStarted(TRACE),
+					typedPrompt("Fix the flaky login test"),
+					userMessage("Fix the flaky login test"),
+					agentFinal("done"),
+				]);
+				const { bodies, urls, impl } = recordingFetch();
+
+				await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					logsEndpoint: "https://e/v1/logs",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					fetchImpl: impl,
+				});
+
+				const attributes = contextAttrsOf(bodies, urls);
+				expect(attributes["langwatch.session.name"]).toBe("pr-reviewer");
+				expect(attributes["langwatch.session.title"]).toBe(
+					"Fix the flaky login test",
+				);
 			});
 		});
 	});

@@ -28,6 +28,7 @@ import {
   type CodingAgentTranscript,
 } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
+import { deriveTraceTimestamp } from "~/server/app-layer/traces/derive-trace-timestamp";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import {
   extractFreeTextTerms,
@@ -185,7 +186,10 @@ export function mapTraceSummaryToHeader(
 
   return {
     traceId: summary.traceId,
-    timestamp: summary.occurredAt,
+    timestamp: deriveTraceTimestamp({
+      occurredAt: summary.occurredAt,
+      storageAnchorMs: summary.storageAnchorMs,
+    }),
     name:
       summary.attributes["langwatch.span.name"] ?? summary.traceId.slice(0, 8),
     serviceName: summary.attributes["service.name"] ?? "",
