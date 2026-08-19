@@ -248,28 +248,35 @@ describe("a source that names a warehouse", () => {
     expect(result.events[0]?.actor).toBe("dana@acme.test");
   });
 
-  /** @scenario "The billing query only ever runs on the configured workspace" */
-  it("asks the configured warehouse, with the id bound rather than pasted in", async () => {
+  /**
+   * @scenario "A question is priced by the warehouse that answered it, not the
+   * one the connector signs in to"
+   */
+  it("runs the billing query on the configured warehouse without restricting the answer to it", async () => {
     costPlan = { rows: [] };
 
     await pull({ warehouseId: WAREHOUSE_ID });
 
     // A day at a time, so one busy day cannot cost the whole window its price.
-    // Every one of them still has to name the configured warehouse: the claim
-    // here is about which workspace is billed, and chunking multiplied the
-    // number of chances to get that wrong.
+    // Every one of them still runs on the configured warehouse: that id says
+    // where the query executes, and chunking multiplied the number of chances
+    // to get that wrong.
     expect(statementBodies.length).toBeGreaterThan(1);
     for (const sent of statementBodies) {
       expect(sent.warehouse_id).toBe(WAREHOUSE_ID);
     }
+
     const body = statementBodies[0]!;
-    // Bound as a parameter. Interpolating it into the statement would make the
-    // statement a function of stored configuration.
-    expect(body.parameters).toEqual(
+    // And nothing narrows the answer to that same warehouse. A Genie space
+    // answers on whichever warehouse it was built against, which is routinely
+    // not the one the connector holds `CAN USE` on — pricing only the executor
+    // would return an empty answer and call it a cost of nothing.
+    expect(body.parameters).not.toEqual(
       expect.arrayContaining([
-        { name: "warehouse_id", value: WAREHOUSE_ID, type: "STRING" },
+        expect.objectContaining({ name: "warehouse_id" }),
       ]),
     );
+    expect(String(body.statement)).not.toContain(":warehouse_id");
     expect(String(body.statement)).not.toContain(WAREHOUSE_ID);
   });
 

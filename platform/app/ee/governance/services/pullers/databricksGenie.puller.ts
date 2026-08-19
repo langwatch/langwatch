@@ -155,10 +155,17 @@ export const databricksGeniePullConfigSchema = z.object({
   startingAt: z.string().datetime().optional(),
   schedule: z.string().default("*/15 * * * *"),
   /**
-   * The SQL warehouse that answers this space's questions. Naming it is what
-   * opts the source into attributing the compute behind each question; leaving
-   * it out keeps the source's records at a cost of zero, which is what Genie
+   * A SQL warehouse this credential can run a query on. Naming it is what opts
+   * the source into attributing the compute behind each question; leaving it
+   * out keeps the source's records at a cost of zero, which is what Genie
    * itself charges.
+   *
+   * This is the executor, not the subject. The billing query reads every
+   * warehouse the workspace's Genie questions actually ran on and prices each
+   * hour against that warehouse's own bill — a space answers on whichever
+   * warehouse it was authored against, and expecting that to be the one the
+   * credential can sign in to is how a whole workspace prices at nothing. Any
+   * warehouse the credential holds `CAN USE` on will do.
    *
    * It is optional because the grants it needs are not the ones the rest of this
    * adapter needs. Reading the billing tables requires `SELECT` on `system` from
@@ -241,40 +248,43 @@ WITH windowed AS (
     statement_id,
     client_application,
     execution_duration_ms,
+    compute.warehouse_id AS warehouse_id,
     date_trunc('HOUR', start_time) AS usage_hour
   FROM system.query.history
-  WHERE compute.warehouse_id = :warehouse_id
-    AND start_time >= :from_ts
+  WHERE start_time >= :from_ts
     AND start_time < :to_ts
     AND execution_duration_ms IS NOT NULL
+    AND compute.warehouse_id IS NOT NULL
 ),
 hour_total AS (
-  SELECT usage_hour, SUM(execution_duration_ms) AS total_ms
+  SELECT usage_hour, warehouse_id, SUM(execution_duration_ms) AS total_ms
   FROM windowed
-  GROUP BY usage_hour
+  GROUP BY usage_hour, warehouse_id
 ),
 hour_dbu AS (
   SELECT
     date_trunc('HOUR', usage_start_time) AS usage_hour,
+    usage_metadata.warehouse_id AS warehouse_id,
     sku_name,
     SUM(usage_quantity) AS dbu
   FROM system.billing.usage
-  WHERE usage_metadata.warehouse_id = :warehouse_id
-    AND usage_start_time >= :from_ts
+  WHERE usage_start_time >= :from_ts
     AND usage_start_time < :to_ts
     AND usage_unit = 'DBU'
-  GROUP BY 1, 2
+    AND usage_metadata.warehouse_id IS NOT NULL
+  GROUP BY 1, 2, 3
 ),
 priced AS (
-  SELECT usage_hour, sku_name, currency_code, billable_usd
+  SELECT usage_hour, warehouse_id, sku_name, currency_code, billable_usd
   FROM (
     SELECT
       d.usage_hour,
+      d.warehouse_id,
       d.sku_name,
       p.currency_code,
       CAST(d.dbu * p.pricing.effective_list.default AS DECIMAL(38, 12)) AS billable_usd,
       ROW_NUMBER() OVER (
-        PARTITION BY d.usage_hour, d.sku_name
+        PARTITION BY d.usage_hour, d.warehouse_id, d.sku_name
         ORDER BY CASE WHEN p.currency_code = 'USD' THEN 0 ELSE 1 END,
                  p.price_start_time DESC
       ) AS pick
@@ -294,8 +304,10 @@ SELECT
   pr.currency_code                        AS currency_code,
   pr.sku_name                             AS sku_name
 FROM windowed w
-JOIN hour_total t ON t.usage_hour = w.usage_hour
-JOIN priced pr ON pr.usage_hour = w.usage_hour
+JOIN hour_total t
+  ON t.usage_hour = w.usage_hour AND t.warehouse_id = w.warehouse_id
+JOIN priced pr
+  ON pr.usage_hour = w.usage_hour AND pr.warehouse_id = w.warehouse_id
 WHERE w.client_application = :genie_app
 LIMIT ${WAREHOUSE_COST_ROW_LIMIT}
 `;
@@ -416,7 +428,10 @@ function readWarehouseCost({
   warehouseId: string;
 }): WarehouseCostRead {
   const statement = warehouseCostResponseSchema.parse(payload);
-  const log = { adapter, warehouseId };
+  // Named for what it is. This warehouse ran the billing query; it is not the
+  // warehouse whose compute the reply is about, and a log line that conflates
+  // the two sends whoever reads it to the wrong workspace object.
+  const log = { adapter, executorWarehouseId: warehouseId };
 
   if (statement.status.state !== "SUCCEEDED") {
     logger.warn(
@@ -2322,11 +2337,15 @@ export class DatabricksGeniePuller
           on_wait_timeout: "CANCEL",
           format: "JSON_ARRAY",
           disposition: "INLINE",
-          // Bound, never interpolated. The warehouse id and the window arrive
-          // from stored configuration and a clock, but the statement is a
-          // constant either way and this keeps it one.
+          // Bound, never interpolated. The window arrives from a clock, but the
+          // statement is a constant either way and this keeps it one.
+          //
+          // The warehouse id is deliberately absent. It says where this query
+          // runs, not what it may answer about: a Genie space answers on the
+          // warehouse it was authored against, which is routinely not the one
+          // the credential holds `CAN USE` on, and filtering to the executor
+          // would price every question at nothing.
           parameters: [
-            { name: "warehouse_id", value: warehouseId, type: "STRING" },
             // Whole hours, both ends. The warehouse is billed per hour and the
             // statements are bucketed per hour, but the two are filtered
             // separately: a window starting at 10:37 keeps hour 10's queries
