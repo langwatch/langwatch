@@ -25205,9 +25205,12 @@ console.log(await main("Hey, tell me a joke"));
 Once `registerTelemetry` has run, every `generateText` and `streamText` call reports to LangWatch — you no longer set a flag per call. For Next.js applications, configure OpenTelemetry in your `instrumentation.ts` file using `LangWatchExporter`.
 
 <Note>
-  On AI SDK 6 and earlier there is no `registerTelemetry`. Drop those two lines
-  and set `experimental_telemetry: { isEnabled: true }` on each call instead.
-  AI SDK 7 emits no spans at all until an integration is registered, so a v6
+  On AI SDK 6 and earlier there is no `registerTelemetry`. Drop `registerTelemetry`
+  from the `ai` import, drop the `@ai-sdk/otel` import and the
+  `registerTelemetry(new OpenTelemetry())` call, and set
+  `experimental_telemetry: { isEnabled: true }` on each `generateText` and
+  `streamText` call instead. AI SDK 7 emits no spans at all until an
+  integration is registered, so a v6
   snippet left unchanged on v7 sends LangWatch nothing.
 </Note>
 
