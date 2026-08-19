@@ -16,9 +16,13 @@
  *   usage_report/messages — token counts per bucket, no cost. We price it
  *                           ourselves, so every record is `computed` /
  *                           `estimate`.
- *   cost_report           — the amount Anthropic will invoice, per bucket,
- *                           as a decimal string. Carried verbatim, so every
- *                           record is `provider_reported` / `exact`.
+ *   cost_report           — Anthropic's own cost figure, per bucket, as a
+ *                           decimal string denominated in CENTS. Converted to
+ *                           USD at this boundary and recorded as
+ *                           `provider_reported` / `estimate` — estimate
+ *                           because the report excludes Priority Tier usage,
+ *                           so it is the provider's figure but not the full
+ *                           invoice.
  *
  * Never both. The same spend arriving down both paths would be counted twice,
  * and the supersede rule that would let them coexist is named and deferred in
@@ -63,6 +67,25 @@ const MAX_PAGES_PER_RUN = 20;
  */
 const COST_REPORT_BUCKET_WIDTH = "1d" as const;
 
+/**
+ * The group-by sets, named once because they are load-bearing twice: they are
+ * the request parameters AND part of the cursor's query identity below.
+ *
+ * Usage asks for every dimension its restatement key is built from —
+ * `service_tier` and `context_window` included, because the API returns null
+ * for any field not in `group_by`, and a dimension that is always "" collapses
+ * batch and long-context usage onto standard usage under one key.
+ */
+const USAGE_GROUP_BY = [
+  "model",
+  "workspace_id",
+  "api_key_id",
+  "service_tier",
+  "context_window",
+] as const;
+/** The cost report only supports these two. */
+const COST_GROUP_BY = ["workspace_id", "description"] as const;
+
 export const ANTHROPIC_ADMIN_ADAPTER_ID = "anthropic_admin" as const;
 
 export const anthropicAdminPullConfigSchema = z.object({
@@ -87,19 +110,48 @@ export type AnthropicAdminPullConfig = z.infer<
  * The durable cursor. `startingAt` is the watermark a fresh run resumes from
  * and `page` is Anthropic's own token inside that window, so a run cut off
  * mid-window resumes mid-window instead of re-reading it.
+ *
+ * `query` is the identity of the request the page token was minted under.
+ * Anthropic returns 400 when a page token is replayed with changed query
+ * params, and this adapter holds the cursor still on failure — so without the
+ * binding, one config edit mid-window would wedge the source permanently:
+ * every retry replays the same dead token. A mismatch drops only the token;
+ * the watermark survives, so the window is re-read rather than skipped.
  */
 const cursorSchema = z.object({
   startingAt: z.string(),
   page: z.string().nullable().default(null),
+  query: z.string().nullable().default(null),
 });
+
+/**
+ * What Anthropic would reject a replayed page token over: the endpoint and
+ * every query parameter that rides beside `page`.
+ */
+function queryIdentity(config: AnthropicAdminPullConfig): string {
+  return config.report === "usage"
+    ? `usage:${config.bucketWidth}:${USAGE_GROUP_BY.join(",")}`
+    : `cost:${COST_REPORT_BUCKET_WIDTH}:${COST_GROUP_BY.join(",")}`;
+}
 
 function parseCursor(
   cursor: string | null,
   config: AnthropicAdminPullConfig,
-): z.infer<typeof cursorSchema> {
+): { startingAt: string; page: string | null } {
   if (cursor) {
     try {
-      return cursorSchema.parse(JSON.parse(cursor));
+      const parsed = cursorSchema.parse(JSON.parse(cursor));
+      if (parsed.page !== null && parsed.query !== queryIdentity(config)) {
+        // Also covers cursors minted before query-binding existed (`query`
+        // null): this change itself widened the group_by set, so their page
+        // tokens are exactly the ones that would 400 on the first replay.
+        logger.warn(
+          { adapter: ANTHROPIC_ADMIN_ADAPTER_ID, report: config.report },
+          "anthropic admin cursor was minted under a different query; dropping the page token and re-reading the window from the watermark",
+        );
+        return { startingAt: parsed.startingAt, page: null };
+      }
+      return { startingAt: parsed.startingAt, page: parsed.page };
     } catch {
       logger.warn(
         { cursor },
@@ -113,8 +165,12 @@ function parseCursor(
   };
 }
 
-function encodeCursor(startingAt: string, page: string | null): string {
-  return JSON.stringify({ startingAt, page });
+function encodeCursor(
+  startingAt: string,
+  page: string | null,
+  query: string,
+): string {
+  return JSON.stringify({ startingAt, page, query });
 }
 
 /**
@@ -169,6 +225,18 @@ async function fetchPageError(
 const usageResultSchema = z
   .object({
     uncached_input_tokens: z.number().nonnegative().default(0),
+    /**
+     * The API nests cache creation, split by cache TTL. The flat
+     * `cache_creation_input_tokens` fallback below is tolerance for a shape
+     * the docs no longer show — the nested object wins whenever present.
+     */
+    cache_creation: z
+      .object({
+        ephemeral_1h_input_tokens: z.number().nonnegative().default(0),
+        ephemeral_5m_input_tokens: z.number().nonnegative().default(0),
+      })
+      .passthrough()
+      .nullish(),
     cache_creation_input_tokens: z.number().nonnegative().default(0),
     cache_read_input_tokens: z.number().nonnegative().default(0),
     output_tokens: z.number().nonnegative().default(0),
@@ -176,8 +244,23 @@ const usageResultSchema = z
     workspace_id: z.string().nullable().default(null),
     api_key_id: z.string().nullable().default(null),
     service_tier: z.string().nullable().default(null),
+    context_window: z.string().nullable().default(null),
   })
   .passthrough();
+
+/**
+ * Every cache-write token in a usage row, whichever shape carried it. The old
+ * flat-only schema read the nested shape as 0 and the `.default(0)` masked it.
+ */
+function cacheWriteTokens(result: z.infer<typeof usageResultSchema>): number {
+  if (result.cache_creation) {
+    return (
+      result.cache_creation.ephemeral_1h_input_tokens +
+      result.cache_creation.ephemeral_5m_input_tokens
+    );
+  }
+  return result.cache_creation_input_tokens;
+}
 
 /** One group-by row inside a cost bucket. `amount` is a decimal string. */
 const costResultSchema = z
@@ -190,6 +273,28 @@ const costResultSchema = z
     model: z.string().nullable().default(null),
   })
   .passthrough();
+
+/**
+ * Anthropic's `amount` is denominated in the currency's LOWEST unit — cents
+ * for USD — as a decimal string: the docs' worked example is `"123.45"` in
+ * USD meaning $1.23. The shift to dollars is index arithmetic on the string,
+ * so no digit ever passes through a float on the way to the ledger.
+ *
+ * An amount that is not a plain decimal throws rather than guesses: same
+ * class as a malformed page — a contract that moved, not a row to retry.
+ */
+function centsToUsd(amount: string): string {
+  const match = /^(-?)(\d+)(?:\.(\d*))?$/.exec(amount.trim());
+  if (!match) {
+    throw new Error(
+      `anthropic cost amount is not a decimal string: ${JSON.stringify(amount)}`,
+    );
+  }
+  const [, sign = "", wholeRaw = "0", fraction = ""] = match;
+  // Three digits guarantee a whole part survives the two-digit shift.
+  const whole = wholeRaw.padStart(3, "0");
+  return `${sign}${whole.slice(0, -2)}.${whole.slice(-2)}${fraction}`;
+}
 
 const bucketSchema = z.object({
   starting_at: z.string(),
@@ -231,6 +336,45 @@ function dimensionPath(dimensions: Record<string, string>): string {
   return Object.values(dimensions).map(encodeURIComponent).join(":");
 }
 
+/**
+ * The request URL for one page of one report. Everything here except `page`
+ * is what `queryIdentity` binds the cursor to — change one, change both.
+ */
+function reportUrl({
+  config,
+  startingAt,
+  page,
+}: {
+  config: AnthropicAdminPullConfig;
+  startingAt: string;
+  page: string | null;
+}): URL {
+  const url = new URL(
+    config.report === "usage"
+      ? `${API_BASE}/usage_report/messages`
+      : `${API_BASE}/cost_report`,
+  );
+  url.searchParams.set("starting_at", startingAt);
+  if (config.report === "usage") {
+    url.searchParams.set("bucket_width", config.bucketWidth);
+    for (const dim of USAGE_GROUP_BY) {
+      url.searchParams.append("group_by[]", dim);
+    }
+  } else {
+    // The cost report is daily-only, so the width is pinned here rather than
+    // taken from config. It has to match `COST_REPORT_BUCKET_WIDTH`, which
+    // rides the restatement key: a width that could vary with config would
+    // re-key unchanged cost buckets the moment an operator edited it, and
+    // the same spend would be recorded twice.
+    url.searchParams.set("bucket_width", COST_REPORT_BUCKET_WIDTH);
+    for (const dim of COST_GROUP_BY) {
+      url.searchParams.append("group_by[]", dim);
+    }
+  }
+  if (page) url.searchParams.set("page", page);
+  return url;
+}
+
 export class AnthropicAdminPuller
   implements PullerAdapter<AnthropicAdminPullConfig>
 {
@@ -250,6 +394,7 @@ export class AnthropicAdminPuller
     // mid-run can never quietly carry a different `startingAt` with it.
     const cursor = parseCursor(options.cursor, config);
     const startingAt = cursor.startingAt;
+    const query = queryIdentity(config);
     let page = cursor.page;
 
     for (let pageCount = 0; pageCount < MAX_PAGES_PER_RUN; pageCount += 1) {
@@ -258,7 +403,7 @@ export class AnthropicAdminPuller
         // so a deadline costs latency rather than a window.
         return {
           events,
-          cursor: encodeCursor(startingAt, page),
+          cursor: encodeCursor(startingAt, page, query),
           errorCount: 0,
         };
       }
@@ -276,7 +421,7 @@ export class AnthropicAdminPuller
         // watermark only ever moves forward.
         return {
           events,
-          cursor: encodeCursor(read.watermark ?? startingAt, null),
+          cursor: encodeCursor(read.watermark ?? startingAt, null, query),
           errorCount: 0,
         };
       }
@@ -287,7 +432,11 @@ export class AnthropicAdminPuller
       { adapter: this.id, report: config.report },
       "anthropic admin hit MAX_PAGES_PER_RUN; the next run resumes from the cursor",
     );
-    return { events, cursor: encodeCursor(startingAt, page), errorCount: 0 };
+    return {
+      events,
+      cursor: encodeCursor(startingAt, page, query),
+      errorCount: 0,
+    };
   }
 
   /**
@@ -373,29 +522,7 @@ export class AnthropicAdminPuller
       );
     }
 
-    const url = new URL(
-      config.report === "usage"
-        ? `${API_BASE}/usage_report/messages`
-        : `${API_BASE}/cost_report`,
-    );
-    url.searchParams.set("starting_at", startingAt);
-    if (config.report === "usage") {
-      url.searchParams.set("bucket_width", config.bucketWidth);
-      for (const dim of ["model", "workspace_id", "api_key_id"]) {
-        url.searchParams.append("group_by[]", dim);
-      }
-    } else {
-      // The cost report is daily-only, so the width is pinned here rather than
-      // taken from config. It has to match `COST_REPORT_BUCKET_WIDTH`, which
-      // rides the restatement key: a width that could vary with config would
-      // re-key unchanged cost buckets the moment an operator edited it, and
-      // the same spend would be recorded twice.
-      url.searchParams.set("bucket_width", COST_REPORT_BUCKET_WIDTH);
-      url.searchParams.append("group_by[]", "workspace_id");
-      url.searchParams.append("group_by[]", "description");
-    }
-    if (page) url.searchParams.set("page", page);
-
+    const url = reportUrl({ config, startingAt, page });
     const signal = options.signal
       ? AbortSignal.any([
           options.signal,
@@ -464,6 +591,7 @@ export class AnthropicAdminPuller
       workspaceId: dimension(result.workspace_id),
       apiKeyId: dimension(result.api_key_id),
       serviceTier: dimension(result.service_tier),
+      contextWindow: dimension(result.context_window),
     };
     return {
       source_event_id: `usage:${startingAt}:${dimensionPath(dimensions)}`,
@@ -482,7 +610,7 @@ export class AnthropicAdminPuller
           dimensions,
           model: dimension(result.model),
           tokensCacheRead: result.cache_read_input_tokens,
-          tokensCacheWrite: result.cache_creation_input_tokens,
+          tokensCacheWrite: cacheWriteTokens(result),
         },
       },
     };
@@ -522,7 +650,7 @@ export class AnthropicAdminPuller
       );
       return null;
     }
-    const amount = result.amount;
+    const amountUsd = centsToUsd(result.amount);
     return {
       source_event_id: `cost:${startingAt}:${dimensionPath(dimensions)}`,
       event_timestamp: startingAt,
@@ -531,16 +659,17 @@ export class AnthropicAdminPuller
       target: dimension(result.model),
       // Decimal string — no Number() coercion. The exact value rides through
       // to the pricing service via the hint below.
-      cost_usd: amount,
+      cost_usd: amountUsd,
       tokens_input: 0,
       tokens_output: 0,
       raw_payload: JSON.stringify(result),
       extra: {
         [PULLED_USAGE_HINT_KEY]: {
           costBasis: "provider_reported",
-          // Anthropic's cost report IS the invoiced figure.
-          costStatus: "exact",
-          costUsd: amount,
+          // Anthropic's own figure, but NOT the invoice: the cost report
+          // excludes Priority Tier usage, so "exact" would overclaim.
+          costStatus: "estimate",
+          costUsd: amountUsd,
           dimensions,
           model: dimension(result.model),
         },

@@ -49,13 +49,19 @@ const USAGE_PAGE = {
       results: [
         {
           uncached_input_tokens: 120_000,
-          cache_creation_input_tokens: 1_000,
+          // The API's real shape: cache creation is NESTED, split by TTL.
+          // There is no flat `cache_creation_input_tokens` field.
+          cache_creation: {
+            ephemeral_1h_input_tokens: 1_000,
+            ephemeral_5m_input_tokens: 500,
+          },
           cache_read_input_tokens: 4_000,
           output_tokens: 8_000,
           model: "anthropic/claude-sonnet-5",
           workspace_id: "ws_1",
           api_key_id: "key_1",
           service_tier: "standard",
+          context_window: "0-200k",
         },
       ],
     },
@@ -64,13 +70,15 @@ const USAGE_PAGE = {
   next_page: null,
 };
 
+// `amount` is denominated in CENTS ("lowest currency units"), per the docs:
+// "41280.000000" in USD is $412.80.
 const COST_PAGE = {
   data: [
     {
       starting_at: "2026-08-01T00:00:00Z",
       results: [
         {
-          amount: "1234.567890123",
+          amount: "41280.000000",
           currency: "USD",
           workspace_id: "ws_1",
           description: "Claude usage",
@@ -116,7 +124,10 @@ describe("the Anthropic Admin puller", () => {
       expect(record?.costNanoUsd).toBeGreaterThan(0);
       expect(record?.tokensInput).toBe(120_000);
       expect(record?.tokensCacheRead).toBe(4_000);
-      expect(record?.tokensCacheWrite).toBe(1_000);
+      // Both TTL variants of the nested `cache_creation` object count as
+      // cache-write tokens. The old flat-field schema read this as 0 and the
+      // `.default(0)` masked the shape mismatch.
+      expect(record?.tokensCacheWrite).toBe(1_500);
       expect(record?.occurredAtMs).toBe(Date.parse("2026-08-01T00:00:00Z"));
     });
 
@@ -135,11 +146,46 @@ describe("the Anthropic Admin puller", () => {
       expect(url).toContain("bucket_width=1d");
       expect(url).toContain("group_by%5B%5D=model");
       expect(url).toContain("group_by%5B%5D=workspace_id");
+      // The API returns null for any field not in group_by, so a dimension
+      // that rides the key MUST also be asked for — otherwise serviceTier and
+      // contextWindow are always "", and batch / long-context usage collapses
+      // onto standard usage under one key.
+      expect(url).toContain("group_by%5B%5D=service_tier");
+      expect(url).toContain("group_by%5B%5D=context_window");
+    });
+
+    it("keys rows differing only by context window apart", async () => {
+      const row = USAGE_PAGE.data[0]!.results[0]!;
+      fetchMock.mockResolvedValue(
+        jsonResponse({
+          ...USAGE_PAGE,
+          data: [
+            {
+              ...USAGE_PAGE.data[0]!,
+              results: [row, { ...row, context_window: "200k-1M" }],
+            },
+          ],
+        }),
+      );
+
+      const result = await new AnthropicAdminPuller().runOnce(RUN_OPTIONS, {
+        adapter: "anthropic_admin",
+        report: "usage",
+        bucketWidth: "1d",
+        schedule: "0 * * * *",
+      });
+
+      // Long-context usage is priced differently, so the two rows must not
+      // collapse onto one identity (source_event_id is the OCSF dedup key).
+      expect(result.events).toHaveLength(2);
+      expect(result.events[0]!.source_event_id).not.toBe(
+        result.events[1]!.source_event_id,
+      );
     });
   });
 
   describe("when the source pulls the cost report", () => {
-    it("carries Anthropic's invoiced figure as an exact provider cost", async () => {
+    it("converts Anthropic's cents figure to USD at the boundary", async () => {
       fetchMock.mockResolvedValue(jsonResponse(COST_PAGE));
 
       const result = await new AnthropicAdminPuller().runOnce(RUN_OPTIONS, {
@@ -155,11 +201,45 @@ describe("the Anthropic Admin puller", () => {
         observedAt: OBSERVED_AT,
       });
       expect(record?.costBasis).toBe("provider_reported");
-      expect(record?.costStatus).toBe("exact");
+      // Not "exact": the cost report excludes Priority Tier usage, so it is
+      // Anthropic's own figure but not the full invoice.
+      expect(record?.costStatus).toBe("estimate");
       expect(record?.rateVersion).toBeNull();
-      // Every digit Anthropic published survives to the integer, which is the
-      // whole reason the exact string rides the hint next to the float.
-      expect(record?.costNanoUsd).toBe(1_234_567_890_123);
+      // The documented worked example: `amount` is denominated in cents, so
+      // "41280.000000" is $412.80 — not $41,280. Stored verbatim it was 100x.
+      expect(record?.costNanoUsd).toBe(412_800_000_000);
+    });
+
+    it("shifts the decimal point without passing through a float", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse({
+          ...COST_PAGE,
+          data: [
+            {
+              starting_at: "2026-08-01T00:00:00Z",
+              results: [
+                { ...COST_PAGE.data[0]!.results[0], amount: "1234.567890123" },
+              ],
+            },
+          ],
+        }),
+      );
+
+      const result = await new AnthropicAdminPuller().runOnce(RUN_OPTIONS, {
+        adapter: "anthropic_admin",
+        report: "cost",
+        bucketWidth: "1d",
+        schedule: "0 * * * *",
+      });
+
+      const record = buildPulledUsageRecord({
+        event: result.events[0]!,
+        source: SOURCE,
+        observedAt: OBSERVED_AT,
+      });
+      // 1234.567890123 cents = $12.34567890123; every digit nano-USD can hold
+      // survives, the sub-nano tail rounds half away from zero.
+      expect(record?.costNanoUsd).toBe(12_345_678_901);
     });
 
     it("drops a non-USD row rather than inventing a rate, and keeps the rest", async () => {
@@ -195,7 +275,7 @@ describe("the Anthropic Admin puller", () => {
         source: SOURCE,
         observedAt: OBSERVED_AT,
       });
-      expect(record?.costNanoUsd).toBe(1_234_567_890_123);
+      expect(record?.costNanoUsd).toBe(412_800_000_000);
     });
 
     it("asks for the daily bucket the cost report actually supports", async () => {
@@ -280,8 +360,100 @@ describe("the Anthropic Admin puller", () => {
         observedAt: new Date("2026-08-07T09:00:00.000Z"),
       });
 
+      // 999.5 cents = $9.995.
       expect(after?.restatementKey).toBe(before?.restatementKey);
-      expect(after?.costNanoUsd).toBe(999_500_000_000);
+      expect(after?.costNanoUsd).toBe(9_995_000_000);
+    });
+  });
+
+  describe("when the query the cursor was minted under changes", () => {
+    // Anthropic returns 400 when a page token is replayed with changed query
+    // params, and the puller holds the cursor still on failure — so a config
+    // edit would wedge the source: every retry replays the same dead token.
+    const config = {
+      adapter: "anthropic_admin" as const,
+      report: "usage" as const,
+      schedule: "0 * * * *",
+      startingAt: "2026-08-01T00:00:00.000Z",
+    };
+
+    /**
+     * A cursor persisted mid-window, holding a live page token: every page
+     * claims another, so the run exhausts MAX_PAGES_PER_RUN and returns with
+     * the token still in hand.
+     */
+    async function midWindowCursor(puller: AnthropicAdminPuller) {
+      fetchMock.mockResolvedValue(
+        jsonResponse({ ...USAGE_PAGE, has_more: true, next_page: "page_2" }),
+      );
+      const run = await puller.runOnce(RUN_OPTIONS, {
+        ...config,
+        bucketWidth: "1d",
+      });
+      if (!run.cursor?.includes("page_2")) {
+        throw new Error(
+          `expected a mid-window cursor holding page_2, got ${String(run.cursor)}`,
+        );
+      }
+      fetchMock.mockClear();
+      fetchMock.mockResolvedValue(jsonResponse(USAGE_PAGE));
+      return run.cursor;
+    }
+
+    it("keeps replaying Anthropic's page token while the query is unchanged", async () => {
+      const puller = new AnthropicAdminPuller();
+      const cursor = await midWindowCursor(puller);
+
+      await puller.runOnce(
+        { ...RUN_OPTIONS, cursor },
+        { ...config, bucketWidth: "1d" },
+      );
+
+      // Same config → the mid-window token is safe to replay.
+      expect(String(fetchMock.mock.calls[0]?.[0])).toContain("page=page_2");
+    });
+
+    it("drops the page token but keeps the watermark on a config edit", async () => {
+      const puller = new AnthropicAdminPuller();
+      const cursor = await midWindowCursor(puller);
+
+      await puller.runOnce(
+        { ...RUN_OPTIONS, cursor },
+        { ...config, bucketWidth: "1h" },
+      );
+
+      const url = String(fetchMock.mock.calls[0]?.[0]);
+      expect(url).not.toContain("page=");
+      // The watermark survives: the window is re-read, not skipped.
+      expect(url).toContain(
+        `starting_at=${encodeURIComponent("2026-08-01T00:00:00.000Z")}`,
+      );
+    });
+
+    it("treats a cursor from before query-binding as unsafe to replay", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(USAGE_PAGE));
+
+      await new AnthropicAdminPuller().runOnce(
+        {
+          ...RUN_OPTIONS,
+          // A cursor persisted by the previous version: no query identity.
+          // This fix itself changes the group_by set, so replaying its page
+          // token would 400 on the first post-deploy run.
+          cursor: '{"startingAt":"2026-08-01T00:00:00Z","page":"page_stale"}',
+        },
+        {
+          adapter: "anthropic_admin",
+          report: "usage",
+          bucketWidth: "1d",
+          schedule: "0 * * * *",
+        },
+      );
+
+      const url = String(fetchMock.mock.calls[0]?.[0]);
+      expect(url).not.toContain("page=");
+      expect(url).toContain(
+        `starting_at=${encodeURIComponent("2026-08-01T00:00:00Z")}`,
+      );
     });
   });
 
