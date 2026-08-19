@@ -3396,14 +3396,14 @@ tests = [
 
 [package.metadata]
 requires-dist = [
-    { name = "attrs", specifier = ">=24" },
+    { name = "attrs", specifier = ">=26.1.0" },
     { name = "coolname", specifier = ">=2.2.0" },
     { name = "deprecated", specifier = ">=1.2.18" },
     { name = "dspy-ai", marker = "extra == 'dspy'", specifier = ">=3.0.3,<4" },
     { name = "factory-boy", marker = "extra == 'tests'", specifier = ">=3.3.0,<4.0.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "langchain-core", marker = "extra == 'langchain'", specifier = ">=0.3.0,<2.0.0" },
-    { name = "litellm", marker = "extra == 'litellm'", specifier = ">=1.84.0" },
+    { name = "litellm", marker = "extra == 'litellm'", specifier = ">=1.96.0" },
     { name = "nanoid", specifier = ">=2.0.0,<3.0.0" },
     { name = "openinference-instrumentation-haystack", specifier = ">=0.1.20" },
     { name = "openinference-instrumentation-langchain", specifier = ">=0.1.24" },
@@ -3428,41 +3428,41 @@ requires-dist = [
 provides-extras = ["langchain", "dspy", "litellm", "dev", "tests"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "black", specifier = ">=26.3.1" }]
+dev = [{ name = "black", specifier = ">=26.5.1" }]
 examples = [
     { name = "anthropic", specifier = ">=0.36.0,<0.122.0" },
     { name = "chainlit", specifier = ">=2.11.1,<3" },
-    { name = "cloudpickle", specifier = ">=3.1.1" },
+    { name = "cloudpickle", specifier = ">=3.1.2" },
     { name = "dspy-ai", specifier = ">=3.0.3,<4" },
     { name = "faiss-cpu", specifier = ">=1.8.0,<2.0.0" },
-    { name = "fastapi", specifier = ">=0.115.12" },
+    { name = "fastapi", specifier = ">=0.141.1" },
     { name = "fonttools", specifier = ">=4.62.0" },
     { name = "haystack-ai", specifier = ">=2.13.2,<4.0.0" },
     { name = "json-repair", specifier = ">=0.42.0" },
     { name = "jupyter", specifier = ">=1.0.0,<2.0.0" },
-    { name = "jupyterlab", specifier = ">=4.5.6" },
+    { name = "jupyterlab", specifier = ">=4.6.3" },
     { name = "langchain", specifier = ">=1.0.0,<2.0.0" },
-    { name = "langchain-community", specifier = ">=0.3.0,<1.0.0" },
+    { name = "langchain-community", specifier = ">=0.4.2,<1.0.0" },
     { name = "langchain-google-vertexai", specifier = ">=2.0.0,<4.0.0" },
     { name = "langchain-openai", specifier = ">=1.1.14,<2.0.0" },
     { name = "langchain-text-splitters", specifier = ">=1.1.2,<2.0.0" },
     { name = "langgraph", specifier = ">=1.0.0,<2.0.0" },
     { name = "langsmith", specifier = ">=0.8.0" },
-    { name = "litellm", specifier = ">=1.84.0" },
+    { name = "litellm", specifier = ">=1.96.0" },
     { name = "nltk", specifier = ">=3.9.4" },
-    { name = "openai", specifier = ">=1.68.2,<2.54.0" },
+    { name = "openai", specifier = ">=1.68.2,<2.55.0" },
     { name = "openinference-instrumentation-dspy", specifier = ">=0.1.23,<0.2.0" },
-    { name = "openinference-instrumentation-litellm", specifier = ">=0.1.19" },
+    { name = "openinference-instrumentation-litellm", specifier = ">=0.1.36" },
     { name = "openinference-instrumentation-openai", specifier = ">=0.1.30" },
-    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.53b1" },
+    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.65b0" },
     { name = "opentelemetry-instrumentation-langchain", specifier = ">=0.40.4" },
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "pydantic", specifier = ">=2.11.0" },
-    { name = "pypdf", specifier = ">=6.8.0" },
+    { name = "pypdf", specifier = ">=6.15.0" },
     { name = "pytest", specifier = ">=7.4.2,<10.0.0" },
     { name = "python-dotenv", specifier = "==1.2.2" },
     { name = "strands-agents", extras = ["otel"], specifier = ">=1.14.0,<2.0.0" },
-    { name = "streamlit", specifier = ">=1.37.1,<2.0.0" },
+    { name = "streamlit", specifier = ">=1.61.1,<2.0.0" },
     { name = "unstructured", extras = ["pdf"], specifier = ">=0.18.18" },
     { name = "uvicorn", specifier = ">=0.38.0,<0.53.0" },
 ]
@@ -4681,7 +4681,7 @@ wheels = [
 
 [[package]]
 name = "openai"
-version = "2.53.0"
+version = "2.54.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -4693,9 +4693,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ef/cf/36e3e7235fdf6d125c052acc0970924611b17a20a4fe580596faf4566a65/openai-2.53.0.tar.gz", hash = "sha256:baf5802ad08980e1d9d561e1b996e800c8bcd14af5847c6d0e7a5cc59e4d4116", size = 1099435, upload-time = "2026-08-03T21:42:01.664Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/50/9a/8c75e8c8a5b407a0586faeb2afac91674ff955c191ecc1d6d3b6669f6788/openai-2.54.0.tar.gz", hash = "sha256:e3e6f8bc1ba30ddf381ace1a14340eed381cb984a1a59bd0f34b5be3b5d49cfa", size = 1100285, upload-time = "2026-08-11T18:46:59.035Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/78/0f/cc6afea3542a5142c5d8fc8211c5e059a8375105d004a41dfa2c7948dbb0/openai-2.53.0-py3-none-any.whl", hash = "sha256:c694ffc747a3c4d1663ef2b07b811315a476164ee5efa3a993967349ebca7618", size = 1659829, upload-time = "2026-08-03T21:41:59.581Z" },
+    { url = "https://files.pythonhosted.org/packages/64/a8/bb76c7356de8ad57f59d5ff993d434df0607f07f08bcc9c9a5c275e399c0/openai-2.54.0-py3-none-any.whl", hash = "sha256:89089789197ccdb87f173a03145ed1598d00795220c93e96cf712b1cbf5e5f2b", size = 1660351, upload-time = "2026-08-11T18:46:56.684Z" },
 ]
 
 [[package]]
