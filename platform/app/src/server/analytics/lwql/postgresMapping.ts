@@ -235,6 +235,9 @@ export interface PostgresReaderRole {
  * has to be derived from how many there are. Use
  * `lwqlPostgresReaderConnectionLimit` from `../views.ts`, which does that —
  * this constant is what a caller mapping a single table by hand would want.
+ *
+ * No production caller in this repo — input to the infra-owned reader role
+ * (langwatch-saas#1126); reference implementation, not dead code.
  */
 export const DEFAULT_POSTGRES_READER_LIMITS = {
   connectionLimit: 5,

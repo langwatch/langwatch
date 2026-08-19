@@ -207,7 +207,7 @@ export default async function execute() {
       await backfillKeyMap({ client, names, sourceDatabase });
     } catch (error) {
       logger.error(
-        { error },
+        { error: error instanceof Error ? error.message : String(error) },
         "lwql key-map backfill failed — continuing; project creation syncs rows inline and the next deploy retries the rest",
       );
     }
