@@ -122,7 +122,7 @@ export class RoleService {
       }
     }
 
-    const updated = await this.repository.update(roleId, params, { actor });
+    const updated = await this.repository.update({ roleId, params, actor });
 
     return {
       ...updated,
@@ -259,7 +259,7 @@ export class RoleService {
       throw new RoleDuplicateNameError();
     }
 
-    const role = await this.repository.create(params, { actor });
+    const role = await this.repository.create({ params, actor });
 
     return {
       ...role,
@@ -285,7 +285,7 @@ export class RoleService {
       throw new RoleNotFoundError(roleId);
     }
 
-    const updated = await this.repository.update(roleId, params, { actor });
+    const updated = await this.repository.update({ roleId, params, actor });
 
     return {
       ...updated,
@@ -370,7 +370,7 @@ export class RoleService {
       client: this.prisma,
       scopes: [{ scopeType: RoleBindingScopeType.TEAM, scopeId: teamId }],
     });
-    await this.repository.removeFromUser(userId, teamId, { actor });
+    await this.repository.removeFromUser({ userId, teamId, actor });
     return { success: true };
   }
 

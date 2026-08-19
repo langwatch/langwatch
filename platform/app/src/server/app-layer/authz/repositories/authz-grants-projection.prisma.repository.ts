@@ -518,10 +518,16 @@ export class PrismaAuthzGrantsProjectionRepository
     const { id, ...rest } = row;
     try {
       if (source === "genesis-import") {
-        await this.prisma.roleBinding.updateMany({
+        const result = await this.prisma.roleBinding.updateMany({
           where: { organizationId, id },
           data: rest,
         });
+        if (result.count === 0) {
+          logger.warn(
+            { organizationId, grantId: id, source },
+            "genesis-import compat binding update matched no legacy row",
+          );
+        }
         return;
       }
       await this.prisma.roleBinding.upsert({

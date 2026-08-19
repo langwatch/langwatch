@@ -73,6 +73,21 @@ async function withPortFailures<T>(write: () => Promise<T>): Promise<T> {
   }
 }
 
+/**
+ * `offboardUser`'s membership-deletion transaction runs `prove` — a read
+ * repository resolution through the transaction's own client — while still
+ * holding whatever row locks the deletes took, so it needs the same explicit
+ * budget every other multi-statement `$transaction` in this codebase sets
+ * rather than Prisma's 5s default (see `dataset-lock.ts`,
+ * `modelDefaults.service.ts`, `prismaProcessStore.ts`): `timeout` bounds the
+ * callback itself, `maxWait` bounds acquiring a connection from the pool
+ * before it even starts.
+ */
+const OFFBOARD_MEMBERSHIP_TXN_OPTIONS = {
+  timeout: 15_000,
+  maxWait: 10_000,
+} as const;
+
 export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
   private readonly reads: PrismaAuthzGrantsRepository;
 
@@ -287,45 +302,42 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
       actor,
     });
 
-    return this.db.$transaction(
-      async (tx) => {
-        const groupMemberships = await tx.groupMembership.deleteMany({
-          where: { userId, group: { organizationId } },
-        });
-        const legacyTeamMemberships = await tx.teamUser.deleteMany({
-          where: { userId, team: { organizationId } },
-        });
-        const organizationMembership = await tx.organizationUser.deleteMany({
-          where: { userId, organizationId },
-        });
-        // Pending invites are keyed by email, not by user id — read the
-        // address inside the transaction so the lookup and the delete
-        // commit or roll back together.
-        const user = await tx.user.findUnique({
-          where: { id: userId },
-          select: { email: true },
-        });
-        const email = user?.email ?? null;
-        const pendingInvites = email
-          ? await tx.organizationInvite.deleteMany({
-              where: { organizationId, email, status: "PENDING" },
-            })
-          : { count: 0 };
+    return this.db.$transaction(async (tx) => {
+      const groupMemberships = await tx.groupMembership.deleteMany({
+        where: { userId, group: { organizationId } },
+      });
+      const legacyTeamMemberships = await tx.teamUser.deleteMany({
+        where: { userId, team: { organizationId } },
+      });
+      const organizationMembership = await tx.organizationUser.deleteMany({
+        where: { userId, organizationId },
+      });
+      // Pending invites are keyed by email, not by user id — read the
+      // address inside the transaction so the lookup and the delete
+      // commit or roll back together.
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+      });
+      const email = user?.email ?? null;
+      const pendingInvites = email
+        ? await tx.organizationInvite.deleteMany({
+            where: { organizationId, email, status: "PENDING" },
+          })
+        : { count: 0 };
 
-        // The proof sees the enforced binding deletes (already committed)
-        // and this transaction's own membership deletes; a throw rolls the
-        // memberships back while the revocations stand — fail-safe.
-        await prove(new PrismaAuthzReadRepository(tx));
+      // The proof sees the enforced binding deletes (already committed)
+      // and this transaction's own membership deletes; a throw rolls the
+      // memberships back while the revocations stand — fail-safe.
+      await prove(new PrismaAuthzReadRepository(tx));
 
-        return {
-          bindings: bindings.length,
-          groupMemberships: groupMemberships.count,
-          legacyTeamMemberships: legacyTeamMemberships.count,
-          pendingInvites: pendingInvites.count,
-          organizationMembership: organizationMembership.count > 0,
-        };
-      },
-      { timeout: 15_000 },
-    );
+      return {
+        bindings: bindings.length,
+        groupMemberships: groupMemberships.count,
+        legacyTeamMemberships: legacyTeamMemberships.count,
+        pendingInvites: pendingInvites.count,
+        organizationMembership: organizationMembership.count > 0,
+      };
+    }, OFFBOARD_MEMBERSHIP_TXN_OPTIONS);
   }
 }

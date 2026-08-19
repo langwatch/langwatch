@@ -164,7 +164,7 @@ function buildMockPrisma() {
     },
   };
 
-  return { ...client, _mockTx: client } as any;
+  return client as unknown as PrismaClient;
 }
 
 function buildCaller(prisma: PrismaClient) {
@@ -337,7 +337,12 @@ describe("apiKey router — restricted permissions", () => {
         ],
       };
 
-      it("updates the existing CustomRole instead of creating a new one", async () => {
+      it("mints a fresh CustomRole and deletes the one it replaces", async () => {
+        // A fresh role is minted rather than the existing exclusive role
+        // being updated in place: mutating it first left a crash window
+        // where the key held new permissions with stale binding state. The
+        // orphan cleanup after replaceRoleBindings deletes the superseded
+        // role.
         prisma.apiKey.findUnique.mockResolvedValue(restrictedKey);
 
         await caller.update({
@@ -354,9 +359,11 @@ describe("apiKey router — restricted permissions", () => {
           ],
         });
 
-        // The same verb either way, so the role id is what says "in place".
         expect(ledger.defineRole).toHaveBeenCalledTimes(1);
-        expect(ledger.defineRole).toHaveBeenCalledWith(
+        expect(ledger.defineRole).not.toHaveBeenCalledWith(
+          expect.objectContaining({ roleId: CUSTOM_ROLE_ID }),
+        );
+        expect(ledger.deleteRole).toHaveBeenCalledWith(
           expect.objectContaining({ roleId: CUSTOM_ROLE_ID }),
         );
       });

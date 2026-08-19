@@ -6,6 +6,7 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
+import { SYSTEM_ACTORS } from "~/server/app-layer/authz/ledger-actor";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import type {
@@ -276,7 +277,7 @@ export class ScimGroupService {
       organizationId,
       where: { groupId: group.id },
       desired: [],
-      actor: { type: "system", id: "system:scim" },
+      actor: { type: "system", id: SYSTEM_ACTORS.scim },
       mintBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
     });
     await this.prisma.groupMembership.deleteMany({

@@ -38,8 +38,36 @@ const POSITIVE_CACHE_TTL_MS = 15 * 60_000;
  * stops counting. A single map (rather than one per answer) is what keeps
  * the two directions from disagreeing, and lets an expired entry be dropped
  * on the way past instead of accumulating for the life of the pod.
+ *
+ * An organization that is only ever read once (a stale customer, a
+ * decommissioned tenant) still leaves its entry in the map forever, since
+ * nothing revisits it to notice it expired - so the map is additionally
+ * bounded: writing a new entry amortized-sweeps expired entries once size
+ * crosses `MAX_CACHE_ENTRIES`, and if it is still over the limit after that,
+ * the oldest entries (by insertion order) are evicted until it is not.
  */
 const cached = new Map<string, { disabled: boolean; expiresAt: number }>();
+
+/** Hard cap on distinct organizations held at once; see `cached` above. */
+export const MAX_CACHE_ENTRIES = 5_000;
+
+function setCacheEntry(
+  organizationId: string,
+  entry: { disabled: boolean; expiresAt: number },
+): void {
+  if (cached.size >= MAX_CACHE_ENTRIES) {
+    const now = Date.now();
+    for (const [key, value] of cached) {
+      if (value.expiresAt <= now) cached.delete(key);
+    }
+    while (cached.size >= MAX_CACHE_ENTRIES) {
+      const oldestKey: string | undefined = cached.keys().next().value;
+      if (oldestKey === undefined) break;
+      cached.delete(oldestKey);
+    }
+  }
+  cached.set(organizationId, entry);
+}
 
 export async function legacyTeamFallbackDisabled({
   prisma,
@@ -64,7 +92,7 @@ export async function legacyTeamFallbackDisabled({
       select: { status: true },
     });
     if (record?.status === "finalized") {
-      cached.set(organizationId, {
+      setCacheEntry(organizationId, {
         disabled: true,
         expiresAt: Date.now() + POSITIVE_CACHE_TTL_MS,
       });
@@ -76,7 +104,7 @@ export async function legacyTeamFallbackDisabled({
     // an outage from putting a read on every permission check - and it can
     // only ever delay switching a tenant off, never extend a switch.
   }
-  cached.set(organizationId, {
+  setCacheEntry(organizationId, {
     disabled: false,
     expiresAt: Date.now() + NEGATIVE_CACHE_TTL_MS,
   });

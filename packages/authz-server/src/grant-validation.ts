@@ -13,11 +13,9 @@
  */
 import { type AuthzScopeRef, isRegistryPermission } from "@langwatch/authz";
 import { HandledError } from "@langwatch/handled-error";
-import {
-  type AuthzGrantsRepository,
-  type BindingPrincipalWhere,
-  BindingMissingError,
-  DuplicateBindingError,
+import type {
+  AuthzGrantsRepository,
+  BindingPrincipalWhere,
 } from "./authz-grants.repository";
 import type { GrantPrincipal, GrantRole } from "./grants.service";
 
@@ -103,18 +101,36 @@ export function bindingNotFound(
  * fires when the principal already holds this SAME role at the scope.
  * Missing: the row went away between the pre-read and the write, which the
  * caller should see as the same not-found the pre-read produces.
+ *
+ * Matched by CODE, not `instanceof`: the port's `DuplicateBindingError` /
+ * `BindingMissingError` are the storage signal, and code is what survives a
+ * bundle boundary or a serialisation hop that `instanceof` does not. `error`
+ * is `unknown` here, so the shape is checked before the code is read.
  */
+function portErrorCode(error: unknown): string | undefined {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof (error as { code: unknown }).code === "string"
+  ) {
+    return (error as { code: string }).code;
+  }
+  return undefined;
+}
+
 export function rethrowKnownWriteFailure(
   error: unknown,
   { bindingId, ...meta }: { bindingId?: string } & Record<string, unknown>,
 ): never {
-  if (error instanceof DuplicateBindingError) {
+  const code = portErrorCode(error);
+  if (code === "role_binding_already_exists") {
     throw new DuplicateGrantError({
       ...meta,
       ...(bindingId ? { bindingId } : {}),
     });
   }
-  if (error instanceof BindingMissingError) {
+  if (code === "role_binding_not_found") {
     throw bindingNotFound({ ...meta, ...(bindingId ? { bindingId } : {}) });
   }
   throw error;

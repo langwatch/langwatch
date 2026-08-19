@@ -215,6 +215,31 @@ describe("GrantsService.attach", () => {
       });
       expect(bumpEpoch).not.toHaveBeenCalled();
     });
+
+    /** @scenario "Attaching a duplicate role binding is rejected with a named error" */
+    it("matches the port signal by code, not by class identity", async () => {
+      // Not a `DuplicateBindingError` instance - e.g. what a port adapter
+      // reconstructs from a serialised error crossing a worker or a bundle
+      // boundary. `rethrowKnownWriteFailure` must still translate it.
+      const repository = makeRepository({
+        createBinding: vi
+          .fn()
+          .mockRejectedValue({ code: "role_binding_already_exists" }),
+      });
+      const { service, bumpEpoch } = makeService(repository);
+      await expect(
+        service.attach({
+          actor,
+          who: { type: "user", id: "user-1" },
+          role: { builtin: "MEMBER" },
+          where: { type: "team", id: TEAM, organizationId: ORG },
+        }),
+      ).rejects.toMatchObject({
+        code: "role_binding_already_exists",
+        httpStatus: 409,
+      });
+      expect(bumpEpoch).not.toHaveBeenCalled();
+    });
   });
 });
 

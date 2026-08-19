@@ -325,15 +325,15 @@ export class ApiKeyService {
     });
 
     if (sortedPermissions) {
-      const customRole = await this.roleRepo.create(
-        {
+      const customRole = await this.roleRepo.create({
+        params: {
           name: `apikey:${apiKey.id}`,
           organizationId,
           permissions: sortedPermissions,
           kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
         },
-        { actor },
-      );
+        actor,
+      });
       effectiveBindings = effectiveBindings.map((b) =>
         b.role === TeamUserRole.CUSTOM
           ? { ...b, customRoleId: customRole.id }
@@ -483,35 +483,23 @@ export class ApiKeyService {
     let effectiveBindings = bindings;
 
     if (sortedPermissions && effectiveBindings) {
-      const existingCustomRoleId = existing.roleBindings.find(
-        (rb) => rb.customRoleId !== null,
-      )?.customRoleId;
-
-      const canReuse = existingCustomRoleId
-        ? await this.roleRepo.isExclusiveToApiKey({
-            roleId: existingCustomRoleId,
-            apiKeyId: id,
-          })
-        : false;
-
-      let customRole;
-      if (canReuse && existingCustomRoleId) {
-        customRole = await this.roleRepo.update(
-          existingCustomRoleId,
-          { permissions: sortedPermissions },
-          { actor },
-        );
-      } else {
-        customRole = await this.roleRepo.create(
-          {
-            name: `apikey:${id}:${generate(KSUID_RESOURCES.API_KEY_ROLE).toString()}`,
-            organizationId,
-            permissions: sortedPermissions,
-            kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
-          },
-          { actor },
-        );
-      }
+      // Always mint a fresh role rather than updating the existing exclusive
+      // role's permissions in place: that path mutated the live role before
+      // replaceRoleBindings pointed the binding at it, so a crash mid-update
+      // could leave the key holding new permissions with stale binding
+      // state, and any request racing the update would read a half-applied
+      // role. A fresh role is atomic with respect to every reader; the
+      // orphan cleanup below (after replaceRoleBindings) deletes the
+      // superseded role once nothing points at it any more.
+      const customRole = await this.roleRepo.create({
+        params: {
+          name: `apikey:${id}:${generate(KSUID_RESOURCES.API_KEY_ROLE).toString()}`,
+          organizationId,
+          permissions: sortedPermissions,
+          kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
+        },
+        actor,
+      });
       effectiveBindings = effectiveBindings.map((b) =>
         b.role === TeamUserRole.CUSTOM
           ? { ...b, customRoleId: customRole.id }

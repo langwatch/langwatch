@@ -74,6 +74,7 @@ import type {
 import {
   AUTHZ_AUDIT_ACTION_PREFIX,
   AUTHZ_GRANTS_PIPELINE_NAME,
+  type AuthzAuditVerb,
 } from "~/server/event-sourcing/pipelines/authz-grants/schemas/constants";
 import { prisma as appPrisma } from "../../db";
 import { RoleDuplicateNameError } from "../../role/errors/role-duplicate-name.error";
@@ -170,6 +171,12 @@ export async function authzGrantsCommands(options?: {
   // every witnessed transition would otherwise re-run the wait. The promise is
   // cleared on failure so a send that arrived before the stack was up does not
   // poison every later one.
+  //
+  // Because the handle is shared, `options.waitMs` only takes effect for the
+  // FIRST caller that creates the pending promise; every other caller racing
+  // in while it is still pending gets that first caller's wait, not its own —
+  // a later caller passing a shorter or longer `waitMs` is silently ignored
+  // until the handle resolves (or fails) and a fresh resolution begins.
   grantsLedgerHandle ??= resolveAuthzGrantsCommands(options).catch((error) => {
     grantsLedgerHandle = null;
     throw error;
@@ -318,7 +325,7 @@ export class GrantsLedgerWriter {
   }: {
     organizationId: string;
     actor: LedgerActor;
-    verb: string;
+    verb: AuthzAuditVerb;
     createdAt: Date;
     facts: Record<string, unknown>[];
   }): Promise<void> {
@@ -1239,10 +1246,14 @@ export class GrantsLedgerWriter {
       intervalMs: CONVERGENCE_POLL_MS,
       timeoutMs: CONVERGENCE_TIMEOUT_MS,
     };
-    const deadline = this.now() + poll.timeoutMs;
+    // Deadline uses wall-clock time, not `this.now()`: `deps.now` is
+    // injectable business time (frozen in tests for deterministic
+    // `occurredAtMs`), and a frozen clock would make this poll loop unable to
+    // ever time out.
+    const deadline = Date.now() + poll.timeoutMs;
     for (;;) {
       if (await check()) return;
-      if (this.now() >= deadline) {
+      if (Date.now() >= deadline) {
         logger.warn(
           { organizationId, what },
           "grants projection did not land a write within the read-your-writes window; the append is durable and the fold will converge",

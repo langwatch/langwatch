@@ -965,6 +965,7 @@ export class TeamService {
         organizationId,
         bindingIds: plan.idsToRemove,
         actor,
+        reason: "removed from team",
       });
     }
   }

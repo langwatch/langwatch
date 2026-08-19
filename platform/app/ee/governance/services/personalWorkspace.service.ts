@@ -145,51 +145,55 @@ export class PersonalWorkspaceService {
     // and keep their transaction; the owner's ADMIN grant on the workspace is
     // a ledger command (ADR-092 §13), so the team it points at is collected
     // here and the grant is emitted once the team exists.
-    let grantOnTeamId: string | null = null;
+    const { workspace, grantOnTeamId } = await this.prisma.$transaction(
+      async (
+        tx,
+      ): Promise<{
+        workspace: PersonalWorkspace;
+        grantOnTeamId: string | null;
+      }> => {
+        const existing = await this.findInTx(tx, { userId, organizationId });
+        if (existing) {
+          // The workspace row existing says nothing about the grant that makes
+          // it usable: the team and the grant are not one transaction, so an
+          // earlier ensure() can have committed the team and died before the
+          // append, leaving an owner with a workspace they cannot administer
+          // and no path back except this repair. Re-assert only when it is
+          // actually missing, since this runs on the session path.
+          const grantHeld = await this.ownerGrantExists(tx, {
+            userId,
+            organizationId,
+            teamId: existing.team.id,
+          });
+          return {
+            workspace: { ...existing, created: false },
+            grantOnTeamId: grantHeld ? null : existing.team.id,
+          };
+        }
 
-    const workspace = await this.prisma.$transaction(async (tx) => {
-      const existing = await this.findInTx(tx, { userId, organizationId });
-      if (existing) {
-        // The workspace row existing says nothing about the grant that makes
-        // it usable: the team and the grant are not one transaction, so an
-        // earlier ensure() can have committed the team and died before the
-        // append, leaving an owner with a workspace they cannot administer
-        // and no path back except this repair. Re-assert only when it is
-        // actually missing, since this runs on the session path.
-        const grantHeld = await this.ownerGrantExists(tx, {
+        const reactivated = await this.reactivateInTx(tx, {
           userId,
           organizationId,
-          teamId: existing.team.id,
         });
-        if (!grantHeld) {
-          grantOnTeamId = existing.team.id;
+        if (reactivated) {
+          return {
+            workspace: { ...reactivated.workspace, created: false },
+            grantOnTeamId: reactivated.teamId,
+          };
         }
-        return { ...existing, created: false };
-      }
 
-      const reactivated = await this.reactivateInTx(tx, {
-        userId,
-        organizationId,
-        onGrantNeeded: (teamId) => {
-          grantOnTeamId = teamId;
-        },
-      });
-      if (reactivated) {
-        return { ...reactivated, created: false };
-      }
-
-      const created = await this.createInTx(tx, {
-        userId,
-        organizationId,
-        displayName,
-        displayEmail,
-      });
-      // ADMIN grant so the user can manage their own personal team. Nobody
-      // else is ever granted this scope — personal teams are single-member by
-      // definition — and it is emitted after this transaction commits.
-      grantOnTeamId = created.team.id;
-      return created;
-    });
+        const created = await this.createInTx(tx, {
+          userId,
+          organizationId,
+          displayName,
+          displayEmail,
+        });
+        // ADMIN grant so the user can manage their own personal team. Nobody
+        // else is ever granted this scope — personal teams are single-member by
+        // definition — and it is emitted after this transaction commits.
+        return { workspace: created, grantOnTeamId: created.team.id };
+      },
+    );
 
     if (grantOnTeamId) {
       await this.attachOwnerAdminGrant({
@@ -403,13 +407,14 @@ export class PersonalWorkspaceService {
     {
       userId,
       organizationId,
-      onGrantNeeded,
     }: {
       userId: string;
       organizationId: string;
-      onGrantNeeded: (teamId: string) => void;
     },
-  ): Promise<Omit<PersonalWorkspace, "created"> | null> {
+  ): Promise<{
+    workspace: Omit<PersonalWorkspace, "created">;
+    teamId: string;
+  } | null> {
     const archived = await tx.team.findFirst({
       where: {
         organizationId,
@@ -445,9 +450,8 @@ export class PersonalWorkspaceService {
     // The grant is re-asserted rather than checked for: the attach that
     // follows the transaction skips a grant the owner already holds, so a
     // workspace revived twice emits the fact once.
-    onGrantNeeded(archived.id);
-
-    return await this.findInTx(tx, { userId, organizationId });
+    const workspace = await this.findInTx(tx, { userId, organizationId });
+    return workspace ? { workspace, teamId: archived.id } : null;
   }
 
   /**

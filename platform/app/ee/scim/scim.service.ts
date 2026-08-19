@@ -12,6 +12,7 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
+import { SYSTEM_ACTORS } from "~/server/app-layer/authz/ledger-actor";
 import { UserService } from "~/server/users/user.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
@@ -55,7 +56,7 @@ export class ScimService {
    */
   private static readonly ACTOR = {
     type: "system",
-    id: "system:scim",
+    id: SYSTEM_ACTORS.scim,
   } as const;
 
   /**
@@ -222,6 +223,13 @@ export class ScimService {
         });
       } catch (e) {
         if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
+          // The membership already exists (lost a race, or a retried push),
+          // but its grant may not: reconcile so a SCIM retry still repairs a
+          // membership left without its grant.
+          await this.reconcileOrganizationMembership({
+            userId: existingUser.id,
+            organizationId,
+          });
           return this.toScimUser(existingUser);
         }
         throw e;

@@ -1286,7 +1286,7 @@ export class InviteService {
     // now opens one of its own.
     const prisma = this.requireRootClient();
     await prisma.$transaction([
-      this.prisma.organizationUser.createMany({
+      prisma.organizationUser.createMany({
         data: [
           {
             userId,
@@ -1296,7 +1296,7 @@ export class InviteService {
         ],
         skipDuplicates: true,
       }),
-      this.prisma.organizationInvite.update({
+      prisma.organizationInvite.update({
         where: { id: invite.id, organizationId: invite.organizationId },
         data: { status: "ACCEPTED" },
       }),

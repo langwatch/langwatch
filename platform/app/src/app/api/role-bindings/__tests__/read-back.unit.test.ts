@@ -10,7 +10,7 @@ import { optimisticBindingWire } from "../[[...route]]/read-back";
 const AT = new Date("2026-08-18T09:00:00.000Z");
 
 describe("the binding a create answers with while the projection lags", () => {
-  describe("given a create for a user", () => {
+  describe("when the create is for a user", () => {
     it("carries the id the write minted and the facts the request stated", () => {
       const wire = optimisticBindingWire({
         id: "rb_1",
@@ -35,7 +35,7 @@ describe("the binding a create answers with while the projection lags", () => {
     });
   });
 
-  describe("given a create for a group", () => {
+  describe("when the create is for a group", () => {
     it("names the group as the principal", () => {
       const wire = optimisticBindingWire({
         id: "rb_2",
@@ -54,7 +54,7 @@ describe("the binding a create answers with while the projection lags", () => {
     });
   });
 
-  describe("given a create for an API key", () => {
+  describe("when the create is for an API key", () => {
     it("names the key as the principal", () => {
       const wire = optimisticBindingWire({
         id: "rb_3",
@@ -73,7 +73,7 @@ describe("the binding a create answers with while the projection lags", () => {
     });
   });
 
-  describe("given a custom role", () => {
+  describe("when the create carries a custom role", () => {
     it("keeps the role id the caller asked for and leaves its name unresolved", () => {
       const wire = optimisticBindingWire({
         id: "rb_4",

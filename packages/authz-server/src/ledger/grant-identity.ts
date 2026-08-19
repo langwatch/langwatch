@@ -120,5 +120,5 @@ export function bindingIdentityKey({
     principal.userId ?? principal.groupId ?? principal.apiKeyId ?? "";
   const roleIdentity =
     customRoleId === null ? `builtin:${role}` : `custom:${customRoleId}`;
-  return [principalId, scopeType, scopeId, roleIdentity].join("");
+  return [principalId, scopeType, scopeId, roleIdentity].join("\u001f");
 }

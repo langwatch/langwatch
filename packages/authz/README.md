@@ -158,8 +158,8 @@ import { grantsService } from "~/server/app-layer/authz/runtime";
 
 const grants = grantsService();
 await grants.attach({ actor, who: { type: "user", id }, role: { builtin: "MEMBER" }, where: teamScope });
-await grants.update({ actor, bindingId, role: { customRoleId } });
-await grants.revoke({ actor, bindingId });
+await grants.update({ actor, bindingId, organizationId, role: { customRoleId } });
+await grants.revoke({ actor, bindingId, organizationId });
 
 // The REDUCE verb - narrowing is one atomic swap, never two bindings fighting:
 await grants.replace({ actor, who, from: orgScope, to: teamScope, role: { builtin: "MEMBER" } });

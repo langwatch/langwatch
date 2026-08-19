@@ -20,6 +20,7 @@ export const SYSTEM_ACTORS = {
   personalWorkspace: "system:personal-workspace",
   readThroughMint: "system:read-through-mint",
   ssoAutoJoin: "system:sso-auto-join",
+  scim: "system:scim",
 } as const satisfies Record<string, string>;
 
 export type SystemActorName = keyof typeof SYSTEM_ACTORS;

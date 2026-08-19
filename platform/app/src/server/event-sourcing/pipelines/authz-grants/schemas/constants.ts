@@ -90,3 +90,25 @@ export const AUTHZ_GRANTS_EVENT_VERSION_LATEST = "2026-08-17" as const;
  *  writer's `recordLegacyAudit` (an unmigrated one) — the same action
  *  vocabulary either way. */
 export const AUTHZ_AUDIT_ACTION_PREFIX = "authz.grants." as const;
+
+/**
+ * The audit verb vocabulary, shared by the subscriber's event-to-verb map
+ * (`authzAuditTrail.subscriber.ts`) and the ledger writer's legacy audit
+ * calls (`recordLegacyAudit` in `ledger.ts`, for organizations not yet on
+ * the ledger). Both write `${AUTHZ_AUDIT_ACTION_PREFIX}${verb}` into the
+ * same `action` column, so a verb invented on one side and not the other
+ * would silently fork the vocabulary a migrated organization's history
+ * reads back against. A plain union, not a Zod schema: these strings never
+ * arrive as external input, so there is nothing here to validate.
+ */
+export const AUTHZ_AUDIT_VERBS = [
+  "attach",
+  "role_change",
+  "revoke",
+  "role_defined",
+  "role_permissions_changed",
+  "role_deleted",
+  "offboard",
+] as const;
+
+export type AuthzAuditVerb = (typeof AUTHZ_AUDIT_VERBS)[number];

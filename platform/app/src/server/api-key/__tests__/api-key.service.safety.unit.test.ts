@@ -312,9 +312,12 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
     };
 
     describe("when existing CustomRole is exclusively owned by this key", () => {
-      it("updates the existing CustomRole in place", async () => {
+      it("mints a fresh CustomRole and deletes the exclusive one it replaces", async () => {
+        // A fresh role is minted rather than the exclusive role being
+        // updated in place: mutating it first left a crash window where the
+        // key held new permissions with stale binding state. The orphan
+        // cleanup after replaceRoleBindings deletes the superseded role.
         prisma.apiKey.findUnique.mockResolvedValue(existingKey);
-        prisma.customRole.findFirst.mockResolvedValue({ id: "cr_owned" });
 
         await service.update({
           id: "ak_existing",
@@ -328,9 +331,11 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           ],
         });
 
-        // The same verb either way, so the role id is what says "in place".
         expect(ledger.defineRole).toHaveBeenCalledTimes(1);
-        expect(ledger.defineRole).toHaveBeenCalledWith(
+        expect(ledger.defineRole).not.toHaveBeenCalledWith(
+          expect.objectContaining({ roleId: "cr_owned" }),
+        );
+        expect(ledger.deleteRole).toHaveBeenCalledWith(
           expect.objectContaining({ roleId: "cr_owned" }),
         );
       });
@@ -858,8 +863,13 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
       });
     });
 
-    describe("when staying restricted with same custom role", () => {
-      it("does not delete the still-referenced role", async () => {
+    describe("when staying restricted with a permissions change", () => {
+      it("mints a fresh role and deletes the superseded one", async () => {
+        // A fresh role is minted on every restricted update rather than the
+        // previous exclusive role being mutated in place — updating it first
+        // left a crash window where the key held new permissions with stale
+        // binding state. The old role is left orphaned and the existing
+        // cleanup path (after replaceRoleBindings) deletes it.
         prisma.apiKey.findUnique.mockResolvedValue({
           id: "ak_1",
           userId: USER_ID,
@@ -869,14 +879,13 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           roleBindings: [
             {
               id: "rb_1",
-              customRoleId: "cr_reused",
+              customRoleId: "cr_previous",
               role: "CUSTOM",
               scopeType: "ORGANIZATION",
               scopeId: ORG_ID,
             },
           ],
         });
-        prisma.customRole.findFirst.mockResolvedValue({ id: "cr_reused" });
 
         await service.update({
           id: "ak_1",
@@ -890,7 +899,10 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           ],
         });
 
-        expect(ledger.deleteRole).not.toHaveBeenCalled();
+        expect(ledger.defineRole).toHaveBeenCalled();
+        expect(ledger.deleteRole).toHaveBeenCalledWith(
+          expect.objectContaining({ roleId: "cr_previous" }),
+        );
       });
     });
   });

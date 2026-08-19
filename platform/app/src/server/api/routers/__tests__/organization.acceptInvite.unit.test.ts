@@ -178,6 +178,13 @@ describe("organization.acceptInvite", () => {
       expect(inviteUpdateMock).toHaveBeenCalledWith(
         expect.objectContaining({ data: { status: "ACCEPTED" } }),
       );
+      // The ACCEPTED update rides the same transaction as the membership row,
+      // and the ledger grant is emitted only once that transaction has
+      // committed — so the update must be ordered before the grant just like
+      // the membership row is.
+      expect(inviteUpdateMock.mock.invocationCallOrder[0]!).toBeLessThan(
+        ledger.attachBindings.mock.invocationCallOrder[0]!,
+      );
     });
   });
 

@@ -1024,13 +1024,15 @@ export class RoleBindingService {
       bindings: bindingsToCreate,
     });
 
-    const bindingIdsToRevoke = await this.applyGroupMembershipEdits({
+    // Resolve the group's own bindings this edit orphans BEFORE touching
+    // membership, and revoke them first. A crash between the revoke and the
+    // membership edit then leaves strictly less access than asked for, never
+    // more, and a retry converges — the same fail-safe ordering
+    // applyMemberBindings uses for a single member's direct rows.
+    const bindingIdsToRevoke = await this.resolveGroupBindingIdsToRevoke({
       organizationId,
       groupId,
-      rename,
       bindingIdsToDelete,
-      memberUserIdsToAdd,
-      memberUserIdsToRemove,
     });
 
     if (bindingIdsToRevoke.length > 0) {
@@ -1040,6 +1042,15 @@ export class RoleBindingService {
         actor,
       });
     }
+
+    await this.applyGroupMembershipEdits({
+      organizationId,
+      groupId,
+      rename,
+      memberUserIdsToAdd,
+      memberUserIdsToRemove,
+    });
+
     if (bindingsToCreate.length > 0) {
       await this.writer.attachBindings({
         organizationId,
@@ -1063,26 +1074,58 @@ export class RoleBindingService {
   }
 
   /**
+   * Which of the group's own bindings this edit orphans: the explicitly
+   * requested deletes, resolved to their current rows. Same desired-state
+   * rule as applyMemberBindings — an id another admin already removed is
+   * already in the state this edit asks for, and an id resolving to a
+   * different group's row is skipped, never deleted. Runs before the
+   * membership transaction (and before the writer.revokeBindings command
+   * that follows it) so a crash after the revoke leaves less access than
+   * asked for, never more.
+   */
+  private async resolveGroupBindingIdsToRevoke({
+    organizationId,
+    groupId,
+    bindingIdsToDelete,
+  }: {
+    organizationId: string;
+    groupId: string;
+    bindingIdsToDelete: string[];
+  }): Promise<string[]> {
+    if (bindingIdsToDelete.length === 0) return [];
+    const existing = await this.prisma.roleBinding.findMany({
+      where: {
+        id: { in: bindingIdsToDelete },
+        organizationId,
+        groupId,
+      },
+      select: { id: true, scopeType: true, scopeId: true },
+    });
+    if (existing.length === 0) return [];
+    await assertNoPersonalTeamScope({ client: this.prisma, scopes: existing });
+    return existing.map((b) => b.id);
+  }
+
+  /**
    * The half of a group edit that is not a grant fact — the rename and the
-   * membership rows — in one transaction, plus the ids the caller's revoke
-   * command should carry. Nothing here writes a binding.
+   * membership rows — in one transaction. Nothing here writes a binding: the
+   * binding revoke this edit implies runs before this is called, so a crash
+   * mid-edit never leaves an orphaned binding live.
    */
   private async applyGroupMembershipEdits({
     organizationId,
     groupId,
     rename,
-    bindingIdsToDelete,
     memberUserIdsToAdd,
     memberUserIdsToRemove,
   }: {
     organizationId: string;
     groupId: string;
     rename?: { name: string; slug: string } | null;
-    bindingIdsToDelete: string[];
     memberUserIdsToAdd: string[];
     memberUserIdsToRemove: string[];
-  }): Promise<string[]> {
-    return this.prisma.$transaction(async (tx) => {
+  }): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
       const group = await tx.group.findFirst({
         where: { id: groupId, organizationId },
         select: { id: true, scimSource: true },
@@ -1102,27 +1145,6 @@ export class RoleBindingService {
           where: { id: groupId },
           data: { name: rename.name, slug: rename.slug },
         });
-      }
-
-      // Same desired-state rule as applyMemberBindings: an id another admin
-      // already removed is already in the state this edit asks for, and an id
-      // resolving to a different group's row is skipped, never deleted. The
-      // read stays in the transaction (its personal-scope guard reads scope
-      // rows too); the revoke command follows the commit.
-      let revokable: string[] = [];
-      if (bindingIdsToDelete.length > 0) {
-        const existing = await tx.roleBinding.findMany({
-          where: {
-            id: { in: bindingIdsToDelete },
-            organizationId,
-            groupId,
-          },
-          select: { id: true, scopeType: true, scopeId: true },
-        });
-        if (existing.length > 0) {
-          await assertNoPersonalTeamScope({ client: tx, scopes: existing });
-          revokable = existing.map((b) => b.id);
-        }
       }
 
       if (memberUserIdsToRemove.length > 0) {
@@ -1163,8 +1185,6 @@ export class RoleBindingService {
           skipDuplicates: true,
         });
       }
-
-      return revokable;
     });
   }
 }

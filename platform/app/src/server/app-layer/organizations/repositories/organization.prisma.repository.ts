@@ -1568,11 +1568,12 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   async updateTeamMemberRole(input: UpdateTeamMemberRoleInput): Promise<void> {
     const { teamId, userId, role, customRoleId, currentUserId } = input;
     const inputIsCustomRole = customRoleId !== undefined;
+    let planned: { organizationId: string; plan: ScopeBindingPlan };
 
     if (inputIsCustomRole && customRoleId) {
       const storedCustomRoleId = customRoleId;
 
-      const planned = await this.prisma.$transaction(async (tx) => {
+      planned = await this.prisma.$transaction(async (tx) => {
         const team = await tx.team.findUnique({
           where: { id: teamId },
           select: { organizationId: true, name: true },
@@ -1655,17 +1656,8 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           }),
         };
       });
-      await emitScopeBindingPlans({
-        writer: this.writer,
-        organizationId: planned.organizationId,
-        plans: [planned.plan],
-        actor: ledgerActorFor({
-          userId: currentUserId,
-          fallback: "organizationService",
-        }),
-      });
     } else {
-      const planned = await this.prisma.$transaction(async (tx) => {
+      planned = await this.prisma.$transaction(async (tx) => {
         const team = await tx.team.findUnique({
           where: { id: teamId },
           select: { organizationId: true, name: true },
@@ -1744,16 +1736,17 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           }),
         };
       });
-      await emitScopeBindingPlans({
-        writer: this.writer,
-        organizationId: planned.organizationId,
-        plans: [planned.plan],
-        actor: ledgerActorFor({
-          userId: currentUserId,
-          fallback: "organizationService",
-        }),
-      });
     }
+
+    await emitScopeBindingPlans({
+      writer: this.writer,
+      organizationId: planned.organizationId,
+      plans: [planned.plan],
+      actor: ledgerActorFor({
+        userId: currentUserId,
+        fallback: "organizationService",
+      }),
+    });
   }
 
   async getAuditLogs(

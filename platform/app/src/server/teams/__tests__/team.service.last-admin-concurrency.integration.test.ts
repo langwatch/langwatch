@@ -89,6 +89,7 @@ describe("TeamService.removeMember", () => {
       ["roleBinding", { organizationId }],
       ["teamUser", { teamId }],
       ["organizationUser", { organizationId }],
+      ["auditLog", { organizationId }],
       ["team", { organizationId }],
       ["user", { email: { contains: ns } }],
       ["organization", { id: organizationId }],

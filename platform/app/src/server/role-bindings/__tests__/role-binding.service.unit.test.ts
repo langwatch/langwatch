@@ -21,7 +21,11 @@ import { RoleBindingService } from "../role-binding.service";
 const validateScopeInOrg = vi.fn();
 const filterAssignableRoleIds = vi.fn();
 const organizationUserFindFirst = vi.fn();
+const organizationUserFindMany = vi.fn();
 const groupFindFirst = vi.fn();
+const groupUpdate = vi.fn();
+const groupMembershipDeleteMany = vi.fn();
+const groupMembershipCreateMany = vi.fn();
 const apiKeyFindFirst = vi.fn();
 const attachBindings = vi.fn();
 const changeBindingRole = vi.fn();
@@ -35,8 +39,15 @@ const customRoleFindMany = vi.fn();
 const transaction = vi.fn();
 
 const prisma = {
-  organizationUser: { findFirst: organizationUserFindFirst },
-  group: { findFirst: groupFindFirst },
+  organizationUser: {
+    findFirst: organizationUserFindFirst,
+    findMany: organizationUserFindMany,
+  },
+  group: { findFirst: groupFindFirst, update: groupUpdate },
+  groupMembership: {
+    deleteMany: groupMembershipDeleteMany,
+    createMany: groupMembershipCreateMany,
+  },
   apiKey: { findFirst: apiKeyFindFirst },
   // The personal-team guard runs on every binding write; a shared team here.
   team: { findFirst: vi.fn().mockResolvedValue(null) },
@@ -88,6 +99,13 @@ beforeEach(() => {
   bindingFindFirst.mockResolvedValue(null);
   bindingFindMany.mockResolvedValue([]);
   customRoleFindMany.mockResolvedValue([]);
+  organizationUserFindMany.mockResolvedValue([]);
+  groupUpdate.mockResolvedValue(undefined);
+  groupMembershipDeleteMany.mockResolvedValue(undefined);
+  groupMembershipCreateMany.mockResolvedValue(undefined);
+  transaction.mockImplementation(async (cb: (tx: PrismaClient) => unknown) =>
+    cb(prisma),
+  );
   // A real RoleService over the same mocked client: the org-exclusive scope
   // guard lives there and reads `customRole.findMany`, so a hand-written
   // double would pin the delegation rather than the rule.
@@ -321,5 +339,91 @@ describe("RoleBindingService applyMemberBindings", () => {
 
     expect(attachBindings).not.toHaveBeenCalled();
     expect(revokeBindings).not.toHaveBeenCalled();
+  });
+});
+
+describe("RoleBindingService applyGroupEdits", () => {
+  const groupEditInput = {
+    organizationId: "org_1",
+    groupId: "group_1",
+    rename: null,
+    bindingsToCreate: [],
+    memberUserIdsToAdd: [],
+    memberUserIdsToRemove: ["user_removed"],
+    actor,
+  };
+
+  describe("when the edit both revokes a group binding and removes a member", () => {
+    /** @scenario "Revoking an orphaned group binding runs before the membership edit commits" */
+    it("revokes the group's bindings before applying the membership edit", async () => {
+      bindingFindMany.mockResolvedValue([
+        {
+          id: "binding_1",
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: "team_1",
+        },
+      ]);
+
+      await service.applyGroupEdits({
+        ...groupEditInput,
+        bindingIdsToDelete: ["binding_1"],
+      });
+
+      expect(revokeBindings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "org_1",
+          bindingIds: ["binding_1"],
+          actor,
+        }),
+      );
+      expect(groupMembershipDeleteMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { groupId: "group_1", userId: { in: ["user_removed"] } },
+        }),
+      );
+      // The mock call orders are process-wide monotonic counters, so a lower
+      // number on the revoke than on the membership delete is proof the
+      // ledger command really ran first, not just that both ran.
+      expect(revokeBindings.mock.invocationCallOrder[0]).toBeLessThan(
+        groupMembershipDeleteMany.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("never opens the membership transaction when the revoke fails", async () => {
+      bindingFindMany.mockResolvedValue([
+        {
+          id: "binding_1",
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: "team_1",
+        },
+      ]);
+      revokeBindings.mockRejectedValue(new Error("ledger unavailable"));
+
+      await expect(
+        service.applyGroupEdits({
+          ...groupEditInput,
+          bindingIdsToDelete: ["binding_1"],
+        }),
+      ).rejects.toThrow("ledger unavailable");
+
+      // A crash between the two commands must leave less access, never more:
+      // the member removal (and any rename) must not have committed.
+      expect(transaction).not.toHaveBeenCalled();
+      expect(groupMembershipDeleteMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when no requested delete resolves to a live binding", () => {
+    it("skips the revoke call but still applies the membership edit", async () => {
+      bindingFindMany.mockResolvedValue([]);
+
+      await service.applyGroupEdits({
+        ...groupEditInput,
+        bindingIdsToDelete: ["binding_ghost"],
+      });
+
+      expect(revokeBindings).not.toHaveBeenCalled();
+      expect(groupMembershipDeleteMany).toHaveBeenCalled();
+    });
   });
 });

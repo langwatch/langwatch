@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { ledgerActorFor } from "~/server/app-layer/authz/ledger-actor";
 import { permissionFormatSchema } from "../../rbac/custom-role-permissions";
 import { RoleService } from "../../role";
 import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
@@ -78,7 +79,10 @@ export const roleRouter = createTRPCRouter({
           description: input.description,
           permissions: input.permissions,
         },
-        actor: { type: "user", id: ctx.session.user.id },
+        actor: ledgerActorFor({
+          userId: ctx.session.user.id,
+          fallback: "managementApi",
+        }),
       });
     }),
 
@@ -125,7 +129,10 @@ export const roleRouter = createTRPCRouter({
           description: input.description,
           permissions: input.permissions,
         },
-        actor: { type: "user", id: ctx.session.user.id },
+        actor: ledgerActorFor({
+          userId: ctx.session.user.id,
+          fallback: "managementApi",
+        }),
       });
     }),
 
@@ -154,7 +161,10 @@ export const roleRouter = createTRPCRouter({
       const roleService = new RoleService(ctx.prisma);
       return await roleService.deleteRole({
         roleId: input.roleId,
-        actor: { type: "user", id: ctx.session.user.id },
+        actor: ledgerActorFor({
+          userId: ctx.session.user.id,
+          fallback: "managementApi",
+        }),
       });
     }),
 
@@ -202,7 +212,10 @@ export const roleRouter = createTRPCRouter({
         userId: input.userId,
         teamId: input.teamId,
         customRoleId: input.customRoleId,
-        actor: { type: "user", id: ctx.session.user.id },
+        actor: ledgerActorFor({
+          userId: ctx.session.user.id,
+          fallback: "managementApi",
+        }),
       });
     }),
 
@@ -220,7 +233,10 @@ export const roleRouter = createTRPCRouter({
       return await roleService.removeRoleFromUser({
         userId: input.userId,
         teamId: input.teamId,
-        actor: { type: "user", id: ctx.session.user.id },
+        actor: ledgerActorFor({
+          userId: ctx.session.user.id,
+          fallback: "managementApi",
+        }),
       });
     }),
 });

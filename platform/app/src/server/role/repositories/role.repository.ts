@@ -245,10 +245,13 @@ export class RoleRepository {
    * read back: the fact is durable the moment the append lands, and the row
    * follows through the fold.
    */
-  async create(
-    params: CreateRoleParams,
-    { actor }: { actor: LedgerActor },
-  ): Promise<CustomRole> {
+  async create({
+    params,
+    actor,
+  }: {
+    params: CreateRoleParams;
+    actor: LedgerActor;
+  }): Promise<CustomRole> {
     const roleId = nanoid();
     await this.assertNameFree({
       organizationId: params.organizationId,
@@ -286,11 +289,15 @@ export class RoleRepository {
    * Redefine a role. The event carries the whole fact, so the fields the
    * caller left out are read off the current definition and re-stated.
    */
-  async update(
-    roleId: string,
-    params: UpdateRoleParams,
-    { actor }: { actor: LedgerActor },
-  ): Promise<CustomRole> {
+  async update({
+    roleId,
+    params,
+    actor,
+  }: {
+    roleId: string;
+    params: UpdateRoleParams;
+    actor: LedgerActor;
+  }): Promise<CustomRole> {
     const existing = await this.prisma.customRole.findUnique({
       where: { id: roleId },
     });
@@ -522,11 +529,15 @@ export class RoleRepository {
     });
   }
 
-  async removeFromUser(
-    userId: string,
-    teamId: string,
-    { actor }: { actor: LedgerActor },
-  ) {
+  async removeFromUser({
+    userId,
+    teamId,
+    actor,
+  }: {
+    userId: string;
+    teamId: string;
+    actor: LedgerActor;
+  }) {
     await this.replaceTeamGrant({
       userId,
       teamId,

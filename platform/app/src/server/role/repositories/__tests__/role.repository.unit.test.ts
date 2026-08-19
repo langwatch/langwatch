@@ -58,14 +58,14 @@ describe("given a role being created", () => {
     it("emits the definition", async () => {
       const { repository, writer } = harness();
 
-      const created = await repository.create(
-        {
+      const created = await repository.create({
+        params: {
           organizationId: ORG_ID,
           name: "Auditor",
           permissions: ["traces:read"],
         },
-        { actor: ACTOR },
-      );
+        actor: ACTOR,
+      });
 
       expect(writer.defineRole).toHaveBeenCalledTimes(1);
       expect(writer.defineRole.mock.calls[0]![0]).toMatchObject({
@@ -80,14 +80,14 @@ describe("given a role being created", () => {
     it("asks the organization's own natural key, with the name exactly as written", async () => {
       const { repository, db } = harness();
 
-      await repository.create(
-        {
+      await repository.create({
+        params: {
           organizationId: ORG_ID,
           name: "Data Auditor",
           permissions: ["traces:read"],
         },
-        { actor: ACTOR },
-      );
+        actor: ACTOR,
+      });
 
       // Scoped and unnormalized: the lookup is the compound unique itself, so
       // another organization's identically named role is never consulted, and
@@ -111,14 +111,14 @@ describe("given a role being created", () => {
       db.customRole.findUnique.mockResolvedValue({ id: "role_existing" });
 
       await expect(
-        repository.create(
-          {
+        repository.create({
+          params: {
             organizationId: ORG_ID,
             name: "Auditor",
             permissions: ["traces:read"],
           },
-          { actor: ACTOR },
-        ),
+          actor: ACTOR,
+        }),
       ).rejects.toMatchObject({ code: "custom_role_name_taken" });
 
       expect(writer.defineRole).not.toHaveBeenCalled();
@@ -132,11 +132,11 @@ describe("given a role being redefined", () => {
       const { repository, db, writer } = harness();
       db.customRole.findUnique.mockResolvedValueOnce(storedRole());
 
-      await repository.update(
-        "role_1",
-        { permissions: ["traces:read", "traces:write"] },
-        { actor: ACTOR },
-      );
+      await repository.update({
+        roleId: "role_1",
+        params: { permissions: ["traces:read", "traces:write"] },
+        actor: ACTOR,
+      });
 
       // One read only: the role itself. The natural-key lookup never ran.
       expect(db.customRole.findUnique).toHaveBeenCalledTimes(1);
@@ -152,7 +152,11 @@ describe("given a role being redefined", () => {
         .mockResolvedValueOnce({ id: "role_other" });
 
       await expect(
-        repository.update("role_1", { name: "Reviewer" }, { actor: ACTOR }),
+        repository.update({
+          roleId: "role_1",
+          params: { name: "Reviewer" },
+          actor: ACTOR,
+        }),
       ).rejects.toMatchObject({ code: "custom_role_name_taken" });
 
       expect(writer.defineRole).not.toHaveBeenCalled();
@@ -169,7 +173,11 @@ describe("given a role being redefined", () => {
         // collision.
         .mockResolvedValueOnce({ id: "role_1" });
 
-      await repository.update("role_1", { name: "Reviewer" }, { actor: ACTOR });
+      await repository.update({
+        roleId: "role_1",
+        params: { name: "Reviewer" },
+        actor: ACTOR,
+      });
 
       expect(writer.defineRole).toHaveBeenCalledWith(
         expect.objectContaining({ roleId: "role_1", name: "Reviewer" }),
@@ -183,7 +191,11 @@ describe("given a role being redefined", () => {
       db.customRole.findUnique.mockResolvedValueOnce(null);
 
       await expect(
-        repository.update("role_1", { name: "Reviewer" }, { actor: ACTOR }),
+        repository.update({
+          roleId: "role_1",
+          params: { name: "Reviewer" },
+          actor: ACTOR,
+        }),
       ).rejects.toMatchObject({ code: "custom_role_not_found" });
 
       expect(writer.defineRole).not.toHaveBeenCalled();

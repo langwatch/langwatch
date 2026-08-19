@@ -42,12 +42,12 @@ export type RoleBindingWrite = {
 export class DuplicateBindingError extends Error {
   /**
    * `rethrowKnownWriteFailure` (grant-validation.ts) lifts this into the
-   * customer-facing `DuplicateGrantError` by `instanceof`, which is safe
-   * here: both classes live in this same package and are never bundled or
-   * serialised apart. The code is what must travel beyond that boundary -
-   * across a process, a worker, or the wire - where `instanceof` stops being
-   * reliable and matching has to fall back to CODE. The two carry the same
-   * code on purpose so that fallback is a lift, not a lookup.
+   * customer-facing `DuplicateGrantError` by CODE, not `instanceof` - even
+   * though both classes live in this same package today, matching by code
+   * is what keeps the lift working unchanged if either side ever crosses a
+   * process, a worker, or a serialisation boundary where `instanceof` stops
+   * being reliable. The two carry the same code on purpose so the lift is a
+   * straight equality check, not a lookup.
    */
   readonly code = "role_binding_already_exists" as const;
 
@@ -66,8 +66,8 @@ export class DuplicateBindingError extends Error {
  * never there.
  */
 export class BindingMissingError extends Error {
-  /** Matched by `instanceof` in-package, by CODE beyond it - see
-   *  `DuplicateBindingError.code`. */
+  /** Matched by CODE, same as `DuplicateBindingError.code` - see there for
+   *  why. */
   readonly code = "role_binding_not_found" as const;
 
   constructor() {

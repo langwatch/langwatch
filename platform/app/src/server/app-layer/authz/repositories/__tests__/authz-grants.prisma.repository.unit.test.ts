@@ -61,17 +61,19 @@ describe("PrismaAuthzGrantsRepository", () => {
       });
     });
 
-    it("reads the team and organization the project belongs to", async () => {
-      const findUnique = vi.fn().mockResolvedValue({
-        team: { id: "team-1", organizationId: "org-1" },
+    describe("when the project has a team", () => {
+      it("reads the team and organization the project belongs to", async () => {
+        const findUnique = vi.fn().mockResolvedValue({
+          team: { id: "team-1", organizationId: "org-1" },
+        });
+        const prisma = { project: { findUnique } } as unknown as PrismaClient;
+
+        const result = await new PrismaAuthzGrantsRepository(
+          prisma,
+        ).findProjectLineage({ projectId: "project-1" });
+
+        expect(result).toEqual({ teamId: "team-1", organizationId: "org-1" });
       });
-      const prisma = { project: { findUnique } } as unknown as PrismaClient;
-
-      const result = await new PrismaAuthzGrantsRepository(
-        prisma,
-      ).findProjectLineage({ projectId: "project-1" });
-
-      expect(result).toEqual({ teamId: "team-1", organizationId: "org-1" });
     });
   });
 });

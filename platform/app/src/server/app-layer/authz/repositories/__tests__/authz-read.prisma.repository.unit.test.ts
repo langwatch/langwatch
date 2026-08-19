@@ -13,34 +13,38 @@ import { PrismaAuthzReadRepository } from "../authz-read.prisma.repository";
  */
 describe("PrismaAuthzReadRepository", () => {
   describe("findOrganizationRole", () => {
-    it("reads the membership row for this user in this organization", async () => {
-      const findFirst = vi.fn().mockResolvedValue({ role: "ADMIN" });
-      const prisma = {
-        organizationUser: { findFirst },
-      } as unknown as Prisma.TransactionClient;
+    describe("when the user is a member of the organization", () => {
+      it("reads the membership row for this user in this organization", async () => {
+        const findFirst = vi.fn().mockResolvedValue({ role: "ADMIN" });
+        const prisma = {
+          organizationUser: { findFirst },
+        } as unknown as Prisma.TransactionClient;
 
-      const role = await new PrismaAuthzReadRepository(
-        prisma,
-      ).findOrganizationRole({ userId: "alice", organizationId: "org-1" });
+        const role = await new PrismaAuthzReadRepository(
+          prisma,
+        ).findOrganizationRole({ userId: "alice", organizationId: "org-1" });
 
-      expect(findFirst).toHaveBeenCalledWith({
-        where: { userId: "alice", organizationId: "org-1" },
-        select: { role: true },
+        expect(findFirst).toHaveBeenCalledWith({
+          where: { userId: "alice", organizationId: "org-1" },
+          select: { role: true },
+        });
+        expect(role).toBe("ADMIN");
       });
-      expect(role).toBe("ADMIN");
     });
 
-    it("reports no membership as null, so the caller fails closed", async () => {
-      const prisma = {
-        organizationUser: { findFirst: vi.fn().mockResolvedValue(null) },
-      } as unknown as Prisma.TransactionClient;
+    describe("when the user has no membership row", () => {
+      it("reports no membership as null, so the caller fails closed", async () => {
+        const prisma = {
+          organizationUser: { findFirst: vi.fn().mockResolvedValue(null) },
+        } as unknown as Prisma.TransactionClient;
 
-      expect(
-        await new PrismaAuthzReadRepository(prisma).findOrganizationRole({
-          userId: "alice",
-          organizationId: "org-1",
-        }),
-      ).toBeNull();
+        expect(
+          await new PrismaAuthzReadRepository(prisma).findOrganizationRole({
+            userId: "alice",
+            organizationId: "org-1",
+          }),
+        ).toBeNull();
+      });
     });
   });
 
@@ -172,38 +176,42 @@ describe("PrismaAuthzReadRepository", () => {
   });
 
   describe("findApiKeyOwner", () => {
-    it("returns the owning user id for a personal key", async () => {
-      const findUnique = vi.fn().mockResolvedValue({ userId: "alice" });
-      const prisma = {
-        apiKey: { findUnique },
-      } as unknown as Prisma.TransactionClient;
+    describe("when the key belongs to a user", () => {
+      it("returns the owning user id for a personal key", async () => {
+        const findUnique = vi.fn().mockResolvedValue({ userId: "alice" });
+        const prisma = {
+          apiKey: { findUnique },
+        } as unknown as Prisma.TransactionClient;
 
-      const owner = await new PrismaAuthzReadRepository(prisma).findApiKeyOwner(
-        "key-1",
-      );
+        const owner = await new PrismaAuthzReadRepository(
+          prisma,
+        ).findApiKeyOwner("key-1");
 
-      expect(findUnique).toHaveBeenCalledWith({
-        where: { id: "key-1" },
-        select: { userId: true },
+        expect(findUnique).toHaveBeenCalledWith({
+          where: { id: "key-1" },
+          select: { userId: true },
+        });
+        expect(owner).toEqual({ userId: "alice" });
       });
-      expect(owner).toEqual({ userId: "alice" });
     });
 
-    it("distinguishes a service key from a key that is not there", async () => {
-      const findUnique = vi
-        .fn()
-        .mockResolvedValueOnce({ userId: null })
-        .mockResolvedValueOnce(null);
-      const prisma = {
-        apiKey: { findUnique },
-      } as unknown as Prisma.TransactionClient;
-      const repository = new PrismaAuthzReadRepository(prisma);
+    describe("when the key is a service key or does not exist", () => {
+      it("distinguishes a service key from a key that is not there", async () => {
+        const findUnique = vi
+          .fn()
+          .mockResolvedValueOnce({ userId: null })
+          .mockResolvedValueOnce(null);
+        const prisma = {
+          apiKey: { findUnique },
+        } as unknown as Prisma.TransactionClient;
+        const repository = new PrismaAuthzReadRepository(prisma);
 
-      // { userId: null } carries no ceiling; null is an unknown key.
-      expect(await repository.findApiKeyOwner("service-key")).toEqual({
-        userId: null,
+        // { userId: null } carries no ceiling; null is an unknown key.
+        expect(await repository.findApiKeyOwner("service-key")).toEqual({
+          userId: null,
+        });
+        expect(await repository.findApiKeyOwner("ghost")).toBeNull();
       });
-      expect(await repository.findApiKeyOwner("ghost")).toBeNull();
     });
   });
 

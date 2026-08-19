@@ -382,7 +382,10 @@ PR 1) — the ledger is the only writer, still dark:
    carved out, `role` included: a custom row's emission carries the stored
    value as `legacyRole`, the compat upsert reproduces it, and a rewrite to
    CUSTOM is drift like any other.
-2. **Every write path emits commands and writes no grant table**: the
+2. **Every write path emits commands and writes no grant table, for an
+   organization migrated or finalized (decision 24) — unmigrated, pending,
+   parked, and rolled-back organizations keep the imperative write intact**:
+   the
    role-binding service and its REST surface, org/team/project/group writes,
    the role editor and API-key bindings, invites, the signup bootstrap and
    the better-auth hooks, and SCIM as a reconciler (decision 18) that diffs

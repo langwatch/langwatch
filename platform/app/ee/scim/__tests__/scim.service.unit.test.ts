@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient, User } from "~/generated/prisma/client";
 import { ScimService } from "../scim.service";
@@ -240,6 +241,50 @@ describe("ScimService", () => {
             role: "MEMBER",
           },
         });
+      });
+    });
+
+    describe("when the membership already exists (P2002 race)", () => {
+      it("reconciles the membership grant before returning the user", async () => {
+        const existingUser = buildMockUser();
+        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+          existingUser,
+        );
+        (
+          prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
+        ).mockResolvedValue(null);
+        (
+          prisma.organizationUser.create as ReturnType<typeof vi.fn>
+        ).mockRejectedValue(
+          new PrismaClientKnownRequestError("Unique constraint failed", {
+            code: "P2002",
+            clientVersion: "7.0.0",
+          }),
+        );
+
+        const result = await service.createUser({
+          request: {
+            schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+            userName: "alice@acme.com",
+          },
+          organizationId: "org-1",
+        });
+
+        expect(result).toHaveProperty("id", "user-1");
+        expect(prisma.roleBinding.findMany).toHaveBeenCalled();
+        expect(ledger.attachBindings).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId: "org-1",
+            bindings: expect.arrayContaining([
+              expect.objectContaining({
+                principal: { userId: "user-1" },
+                role: "MEMBER",
+                scopeType: "ORGANIZATION",
+                scopeId: "org-1",
+              }),
+            ]),
+          }),
+        );
       });
     });
   });

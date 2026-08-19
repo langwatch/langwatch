@@ -4,6 +4,7 @@ import { createLogger } from "@langwatch/observability";
 import type { SubscriberSpec } from "../../../pipeline/processManagerDefinition";
 import {
   AUTHZ_AUDIT_ACTION_PREFIX,
+  type AuthzAuditVerb,
   CUTOVER_COMPLETED_EVENT_TYPE,
   CUTOVER_ROLLED_BACK_EVENT_TYPE,
   GRANT_ATTACHED_EVENT_TYPE,
@@ -53,7 +54,7 @@ type AuditableEventType = (typeof AUTHZ_AUDIT_EVENT_TYPES)[number];
 /** Stable verbs. The event type is a wire name that may gain a version
  *  suffix; the audit `action` is a customer-facing string that must not
  *  move once a row carries it. */
-const AUDIT_VERB_BY_EVENT_TYPE: Record<AuditableEventType, string> = {
+const AUDIT_VERB_BY_EVENT_TYPE: Record<AuditableEventType, AuthzAuditVerb> = {
   [GRANT_ATTACHED_EVENT_TYPE]: "attach",
   [GRANT_ROLE_CHANGED_EVENT_TYPE]: "role_change",
   [GRANT_REVOKED_EVENT_TYPE]: "revoke",
