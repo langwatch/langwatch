@@ -74,7 +74,6 @@
     "generate:vega-validator": "tsx scripts/generate-vega-lite-validator.ts"
   },
   "dependencies": {
-    "@ag-ui/core": "~0.0.57",
     "@ai-sdk/openai": "^3.0.79",
     "@ai-sdk/openai-compatible": "^2.0.55",
     "@aws-sdk/client-cloudwatch-logs": "^3.1080.0",

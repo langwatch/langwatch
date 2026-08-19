@@ -518,9 +518,6 @@ importers:
 
   platform/app:
     dependencies:
-      '@ag-ui/core':
-        specifier: ~0.0.57
-        version: 0.0.57
       '@ai-sdk/openai':
         specifier: ^3.0.79
         version: 3.0.79(zod@3.25.76)
@@ -1535,9 +1532,6 @@ packages:
 
   '@ag-ui/core@0.0.28':
     resolution: {integrity: sha512-2Vjuxl0gE8E2RFjFccGZNczDw3Xqxve/EfoYRVAFNX3+rY7z64Mj0OWDw5p9L+X8UG0/+t0xYIquQpw7B4NdHA==}
-
-  '@ag-ui/core@0.0.57':
-    resolution: {integrity: sha512-gho1OWjNE6E3Rl7ZEZ1wr2CEpUHjLFU0FqzCZZk439TicLu+BfLCMkMokB07bMGlRmbJ60hM6LW60iOVauCx+Q==}
 
   '@ai-sdk/anthropic@3.0.69':
     resolution: {integrity: sha512-LshR7X3pFugY0o41G2VKTmg1XoGpSl7uoYWfzk6zjVZLhCfeFiwgpOga+eTV4XY1VVpZwKVqRnkDbIL7K2eH5g==}
@@ -10497,10 +10491,6 @@ snapshots:
   '@ag-ui/core@0.0.28':
     dependencies:
       rxjs: 7.8.1
-      zod: 3.25.76
-
-  '@ag-ui/core@0.0.57':
-    dependencies:
       zod: 3.25.76
 
   '@ai-sdk/anthropic@3.0.69(zod@4.4.3)':
