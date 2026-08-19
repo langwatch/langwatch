@@ -94,6 +94,46 @@ helm upgrade lw . -f examples/overlays/size-dev.yaml -f examples/overlays/access
 helm uninstall lw
 ```
 
+#### Upgrades with local-filesystem stored objects
+
+This is the default mode, where the app and the workers mount one
+`ReadWriteOnce` PVC. A `ReadWriteOnce` volume attaches to one node, so every
+pod that mounts it has to run on that node. Both Deployments already use a
+kill-then-start rollout for this reason, but a `helm upgrade` rolls both at the
+same time. On a cluster with more than one node, the new pod of one Deployment
+can be scheduled on a fresh node while the old pod of the other still holds the
+attachment on the old node, and both then wedge in `ContainerCreating` with a
+multi-attach error.
+
+The chart orders them for you. A pre-upgrade hook Job scales the workers to 0
+and waits for their pods to go away, so the app rolls as the only holder of the
+volume. The workers come back at `workers.replicaCount` when Helm applies the
+release, and the new workers pod follows the new app pod through the affinity
+the chart already sets. Expect a brief worker outage per upgrade, on top of the
+brief app outage the kill-then-start rollout already carries.
+
+The hook needs a ServiceAccount token and a namespaced Role: `get` on the
+workers Deployment, `patch` on its scale subresource, and read access to the
+pods of the release namespace. It renders only in this mode. With
+`app.dataplane` (S3 / Azure) there is no shared volume, so it never renders.
+
+If the hook fails, the upgrade stops and the workers stay at 0. That is
+deliberate: it is safer than a wedged rollout. Read the Job logs, fix the cause,
+then run the upgrade again, which scales the workers back up.
+
+To order the rollout yourself, or on a cluster that forbids that RBAC:
+
+```yaml
+app:
+  storedObjects:
+    localFilesystem:
+      serializeUpgrades: false
+```
+
+For an air-gapped install, mirror the hook image and point
+`app.storedObjects.localFilesystem.serializeUpgradesImage` at your copy. It
+needs `sh` and `kubectl`.
+
 ### Secrets
 
 Use `secretKeyRef` to reference existing Kubernetes Secrets instead of inlining values:
@@ -279,6 +319,8 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `app.storedObjects.localFilesystem.path`                     | Mount point that the LocalFilesystemDriver writes under.                                                                                                                                                                                                                            | `/var/lib/langwatch/objects` |
 | `app.storedObjects.localFilesystem.size`                     | PVC size for the stored-objects volume.                                                                                                                                                                                                                                             | `10Gi`                       |
 | `app.storedObjects.localFilesystem.storageClassName`         | PVC storageClassName (cluster default if empty).                                                                                                                                                                                                                                    | `""`                         |
+| `app.storedObjects.localFilesystem.serializeUpgrades`        | Scale the workers to 0 in a pre-upgrade hook, so only one pod holds the shared RWO volume while the app rolls.                                                                                                                                                                      | `true`                       |
+| `app.storedObjects.localFilesystem.serializeUpgradesImage`   | Image the pre-upgrade hook runs. Needs sh and kubectl.                                                                                                                                                                                                                              | `alpine/k8s:1.30.0`          |
 | `app.email`                                                  | Email provider configuration.                                                                                                                                                                                                                                                       |                              |
 | `app.email.defaultFrom`                                      | Default "from" address.                                                                                                                                                                                                                                                             | `""`                         |
 | `app.email.provider`                                         | Email provider. Empty sends no email.                                                                                                                                                                                                                                               | `""`                         |

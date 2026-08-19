@@ -1,0 +1,215 @@
+{{/*
+  Pre-upgrade hook that stands the workers down before helm rolls the app, for
+  installs where the app and the workers share one ReadWriteOnce
+  stored-objects PVC.
+
+  Why. In local-filesystem mode both Deployments mount
+  `<release>-stored-objects`. A ReadWriteOnce volume attaches to ONE node, so
+  every consumer has to sit on that node. Each Deployment already defends this
+  on its own: a kill-then-start rollout (maxSurge=0/maxUnavailable=1) and, for
+  the workers, a required podAffinity to the app pod. A helm upgrade rolls both
+  Deployments at the same time and nothing orders them, so the new pod of one
+  can be scheduled on a fresh node while the old pod of the other still holds
+  the attachment on the old node. Both then wedge in ContainerCreating with a
+  multi-attach error, and the attach-detach controller can hold that state for
+  many minutes. Issue #7191.
+
+  What this does. It makes the manual recovery part of the upgrade: scale the
+  workers to 0, wait until their pods are gone, and only then let helm apply
+  the new manifests. The app is the single remaining consumer of the volume at
+  that point, which maxSurge=0 handles correctly, and the workers Deployment
+  comes back with the release because its manifest names `replicas` (helm's
+  three-way merge sees the live 0, the manifest's count, and patches the count
+  back). The new workers pod then follows the new app pod through the affinity
+  that is already there.
+
+  Scope. Renders only when local-filesystem is the ACTIVE stored-objects
+  backend (the same helper the PVC uses), the workers are deployed, and
+  `app.storedObjects.localFilesystem.serializeUpgrades` is on. With
+  app.dataplane enabled there is no shared volume and nothing to order.
+
+  Hook contract. pre-upgrade only: a first install has no old pod holding the
+  volume, so there is nothing to serialize. The Job is still defensive about a
+  missing Deployment, because ArgoCD and Flux map pre-upgrade to PreSync and
+  run it on the first sync too. hook-delete-policy keeps a FAILED Job for the
+  operator to read, and `before-hook-creation` removes it at the start of the
+  next attempt, so a failure never blocks the next upgrade.
+
+  Failure is fail-closed: the upgrade stops rather than risking the wedge. The
+  workers stay at 0 in that case; `helm rollback`, a repeat upgrade, or a
+  manual scale brings them back. Operators who order the rollout themselves
+  (or whose RBAC forbids the patch) set serializeUpgrades=false.
+*/}}
+{{- if and (eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true") .Values.workers.enabled .Values.app.storedObjects.localFilesystem.serializeUpgrades }}
+{{- $name := printf "%s-stored-objects-upgrade" .Release.Name }}
+{{- $workersDeployment := printf "%s-workers" .Release.Name }}
+{{- /* The wait has to outlast the workers' own shutdown budget. A terminating
+       pod keeps its volume attached to its node until it is fully gone, so a
+       wait shorter than terminationGracePeriodSeconds would report success
+       while the old pod still holds the attachment, which is the state this
+       hook exists to prevent. The helper is the same one the workers
+       Deployment renders its grace period from, so an operator who raises the
+       grace period raises this with it. */}}
+{{- $graceSeconds := int (include "langwatch.terminationGracePeriod" (dict "component" .Values.workers "name" "workers")) }}
+{{- $waitSeconds := add $graceSeconds 60 }}
+{{- $deadlineSeconds := add $waitSeconds 60 }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "langwatch.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "langwatch.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+rules:
+  # Read the workers Deployment by name, so "not installed yet" is
+  # distinguishable from a real failure.
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: [{{ $workersDeployment | quote }}]
+    verbs: ["get"]
+  # Change the replica count and nothing else. A patch on the scale
+  # subresource cannot touch the image, the environment, or any other field of
+  # the pod spec.
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    resourceNames: [{{ $workersDeployment | quote }}]
+    verbs: ["get", "patch"]
+  # Watch the workers pods go away. Kubernetes ignores resourceNames on list
+  # and watch, so this covers the pods of this namespace, read only. The Role
+  # is namespaced, so it reaches no other namespace and nothing cluster-wide.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "langwatch.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ $name }}
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "langwatch.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ $deadlineSeconds }}
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        {{- include "langwatch.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ $name }}
+      # This pod is the one workload in the release that DOES call the
+      # Kubernetes API, so it needs the token global.automountServiceAccountToken
+      # withholds from the rest.
+      automountServiceAccountToken: true
+      {{- with .Values.global.scheduling.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.scheduling.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.scheduling.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: serialize-upgrade
+          image: {{ .Values.app.storedObjects.localFilesystem.serializeUpgradesImage | quote }}
+          imagePullPolicy: IfNotPresent
+          # readOnlyRootFilesystem is omitted, the same way the ClickHouse
+          # preflight Job omits it: kubectl writes a discovery cache under
+          # $HOME and warns or fails on a read-only root.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -u
+              ns={{ .Release.Namespace | quote }}
+              deploy={{ $workersDeployment | quote }}
+              selector={{ printf "app.kubernetes.io/name=%s,app.kubernetes.io/instance=%s" $workersDeployment .Release.Name | quote }}
+              timeout={{ $waitSeconds }}
+
+              if ! kubectl -n "$ns" get deployment "$deploy" >/dev/null 2>&1; then
+                printf 'serialize-upgrade: no Deployment %s in namespace %s, nothing to stand down\n' "$deploy" "$ns"
+                exit 0
+              fi
+
+              printf 'serialize-upgrade: scaling %s to 0 so the app is the only holder of the stored-objects volume\n' "$deploy"
+              if ! kubectl -n "$ns" patch deployment "$deploy" --subresource=scale --type=merge -p '{"spec":{"replicas":0}}'; then
+                printf 'serialize-upgrade: could not scale %s to 0. Scale it yourself and retry, or set app.storedObjects.localFilesystem.serializeUpgrades=false to order the rollout on your own.\n' "$deploy" >&2
+                exit 1
+              fi
+
+              printf 'serialize-upgrade: waiting up to %ss for the %s pods to go away\n' "$timeout" "$deploy"
+              out=$(kubectl -n "$ns" wait --for=delete pod --selector="$selector" --timeout="${timeout}s" 2>&1)
+              status=$?
+              printf '%s\n' "$out"
+              if [ "$status" -ne 0 ]; then
+                # kubectl below 1.31 reports an empty selector result as an
+                # error. No pods left IS the state this step waits for, so it
+                # must not read as a failure.
+                case "$out" in
+                  *'no matching resources found'*)
+                    printf 'serialize-upgrade: no %s pods left, the app can roll alone\n' "$deploy"
+                    exit 0
+                    ;;
+                esac
+                printf 'serialize-upgrade: %s pods were still present after %ss. The upgrade is stopped so it cannot wedge on a multi-attach error. Check why the pods do not terminate, then run the upgrade again (it scales the workers back up).\n' "$deploy" "$timeout" >&2
+                exit 1
+              fi
+              printf 'serialize-upgrade: the %s pods are gone, the app can roll alone\n' "$deploy"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+{{- end }}

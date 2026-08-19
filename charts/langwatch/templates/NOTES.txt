@@ -186,6 +186,18 @@ backend for you:
         clusters). Expect a brief downtime per upgrade; set app/workers
         deployment.strategy explicitly to override. Zero-downtime
         upgrades require S3-backed stored objects instead of local-FS.
+      • That rollout is per Deployment, and a helm upgrade rolls both at
+        once. So a pre-upgrade hook Job scales the workers to 0 and waits
+        for their pods to go away first, and the app then rolls as the
+        only holder of the volume. The workers come back at
+        workers.replicaCount when helm applies the release. The hook
+        needs a ServiceAccount token and a small namespaced Role (get on
+        the workers Deployment, patch on its scale, read on pods). Turn
+        it off with
+        app.storedObjects.localFilesystem.serializeUpgrades=false if you
+        order the rollout yourself or your cluster forbids that RBAC. If
+        the hook fails, the upgrade stops and the workers stay at 0: read
+        the Job logs, then run the upgrade again to bring them back.
       • GitOps (ArgoCD / Flux): the dataset-migration hook maps to a
         PostSync hook, which already waits for the rollout to be healthy;
         plain Helm should upgrade with --wait when crossing the ADR-032
