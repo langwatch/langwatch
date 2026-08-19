@@ -145,19 +145,18 @@ export function canonicalErrorFor(
 
 /**
  * The envelope for a handled error: its own code, status, meta, and reason
- * chain — at ANY status, including 5xx.
+ * chain below 5xx; the opaque body at 5xx.
  *
- * A HandledError's message is customer-safe by construction (ADR-045: thrown
- * only when "the cause is both known and user-relevant"), so a platform
- * failure like `lwql_unavailable` (503) ships its real code and message the
- * same as a 404 would; collapsing it to the generic body would throw away
- * the one piece of information ("this deployment doesn't have LangWatchQL
- * provisioned, retrying won't help") the class exists to carry. Only a
- * genuinely unhandled error — `HttpError` and the final fallback below, which
- * carry no such guarantee — stays opaque at 5xx. Mirrors the legacy Hono
- * handler's `handledErrorResponseBody`
- * (`src/app/api/middleware/error-handler.ts`), which never special-cased
- * status for a HandledError either.
+ * A HandledError's message is customer-safe by construction (ADR-045), but
+ * customer-safe and caller-actionable are different questions. At 5xx the
+ * failure is the platform's — retrying the same request does not fix
+ * `lwql_unavailable` any more than it fixes a database outage — so the
+ * caller has nothing to act on and the class's own code/message/meta/reasons
+ * are not API copy. The status still answers as the class's own (503 stays
+ * 503); only the body collapses, to the same opaque shape an unhandled
+ * failure gets. Trace ids are the correlation channel that survives the
+ * collapse — quote one to support and the platform-side detail is in the
+ * logs, not the response.
  */
 function handledErrorEnvelope(
   error: HandledError,
@@ -167,6 +166,18 @@ function handledErrorEnvelope(
   const status = (
     isValidation ? VALIDATION_ERROR_STATUS : (error.httpStatus ?? 500)
   ) as ContentfulStatusCode;
+
+  if (status >= 500) {
+    return {
+      status,
+      body: apiErrorBody({
+        status,
+        code: FALLBACK_ERROR_CODE,
+        message: INTERNAL_ERROR_MESSAGE,
+        ...traceIds,
+      }),
+    };
+  }
 
   const reasons = reasonsOf(error);
   return {

@@ -11,25 +11,18 @@ import { InternalServerError } from "../errors";
 
 describe("canonicalErrorFor", () => {
   describe("given a handled error with a 5xx status", () => {
-    it("keeps its own code and message instead of collapsing to internal_error", () => {
+    it("collapses to the opaque body instead of shipping its own code and message", () => {
       const { status, body } = canonicalErrorFor(
         new LangWatchQLUnavailableError(),
       );
 
       expect(status).toBe(503);
-      expect(body.error.code).toBe("lwql_unavailable");
-      expect(body.error.message).toBe(
-        "The LangWatchQL analytics SQL API is not available on this deployment.",
-      );
-      // `type` is the status CLASS (apiErrorType), a separate axis from
-      // `code`. 503 has no entry in API_ERROR_TYPE_BY_STATUS, so it falls
-      // back to "internal_error" same as an unhandled 500 — that is correct
-      // and orthogonal to this fix, which is about `code`/`message` surviving,
-      // not about `type`.
-      expect(body.error.type).toBe("internal_error");
+      expect(body.error.code).toBe("internal_error");
+      expect(body.error.message).toBe("An unknown error occurred");
+      expect(body.error.message).not.toContain("LangWatchQL");
     });
 
-    it("preserves the reason chain in meta without leaking the reason's message", () => {
+    it("drops meta and the reason chain from the opaque body", () => {
       const { status, body } = canonicalErrorFor(
         new LangWatchQLUnavailableError({
           reasons: [new Error("ClickHouse at ch-internal-host:8123 refused")],
@@ -37,18 +30,13 @@ describe("canonicalErrorFor", () => {
       );
 
       expect(status).toBe(503);
-      // A non-HandledError reason serializes to its opaque marker
-      // (`serializeReason` → `{code: "unknown"}`), which `reasonsOf` puts on
-      // the wire as `{code, message}` with the code standing in for the
-      // absent safe message — the chain's presence survives while the
-      // internal message does not.
-      expect(body.error.meta).toMatchObject({
-        reasons: [{ code: "unknown", message: "unknown" }],
-      });
+      expect(body.error.meta).toBeUndefined();
       expect(JSON.stringify(body)).not.toContain("ch-internal-host");
     });
 
     it("carries the request's trace and span ids when the request was traced", () => {
+      // The collapse drops the class's own code/message/meta, not the
+      // correlation handles — trace ids ride on the opaque body too.
       const { body } = canonicalErrorFor(new LangWatchQLUnavailableError(), {
         traceId: "trace-abc",
         spanId: "span-def",
