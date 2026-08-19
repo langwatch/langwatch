@@ -205,55 +205,63 @@ secured.access(requires("project:view")).get(
 );
 
 // ── Update Agent ─────────────────────────────────────────────
-secured.access(requires("project:update")).patch(
-  "/:id",
-  agentServiceMiddleware,
-  describeRoute({
-    description: "Update an agent by its id",
-  }),
-  zValidator("json", updateAgentSchema),
-  async (c) => {
-    const { id } = c.req.param();
-    const project = c.get("project");
-    const body = c.req.valid("json");
-    const service = c.get("agentService");
+// Registered under both verbs. The update is partial either way, so a caller
+// reaching for the other verb should get the same behavior instead of a 404.
+for (const verb of ["patch", "put"] as const) {
+  registerUpdateAgentVerb(verb);
+}
 
-    let agent;
-    try {
-      agent = await service.updateOrThrow({
-        id,
-        projectId: project.id,
-        data: {
-          ...(body.name && { name: body.name }),
-          ...(body.type && { type: body.type }),
-          ...(body.config && { config: body.config as AgentComponentConfig }),
-          ...(body.workflowId !== undefined && {
-            workflowId: body.workflowId,
-          }),
-        },
-      });
-    } catch (error) {
-      if (error instanceof Error && error.name === "AgentNotFoundError") {
-        throw new NotFoundError("Agent not found");
+function registerUpdateAgentVerb(verb: "patch" | "put"): void {
+  secured.access(requires("project:update"))[verb](
+    "/:id",
+    agentServiceMiddleware,
+    describeRoute({
+      description: "Update an agent by its id",
+    }),
+    zValidator("json", updateAgentSchema),
+    async (c) => {
+      const { id } = c.req.param();
+      const project = c.get("project");
+      const body = c.req.valid("json");
+      const service = c.get("agentService");
+
+      let agent;
+      try {
+        agent = await service.updateOrThrow({
+          id,
+          projectId: project.id,
+          data: {
+            ...(body.name && { name: body.name }),
+            ...(body.type && { type: body.type }),
+            ...(body.config && { config: body.config as AgentComponentConfig }),
+            ...(body.workflowId !== undefined && {
+              workflowId: body.workflowId,
+            }),
+          },
+        });
+      } catch (error) {
+        if (error instanceof Error && error.name === "AgentNotFoundError") {
+          throw new NotFoundError("Agent not found");
+        }
+        return mapConfigValidationError(error);
       }
-      return mapConfigValidationError(error);
-    }
 
-    return c.json({
-      id: agent.id,
-      name: agent.name,
-      type: agent.type,
-      config: agent.config,
-      createdAt: agent.createdAt,
-      updatedAt: agent.updatedAt,
-      platformUrl: agentPlatformUrl({
-        projectSlug: project.slug,
-        agentId: agent.id,
-        agentType: agent.type,
-      }),
-    });
-  },
-);
+      return c.json({
+        id: agent.id,
+        name: agent.name,
+        type: agent.type,
+        config: agent.config,
+        createdAt: agent.createdAt,
+        updatedAt: agent.updatedAt,
+        platformUrl: agentPlatformUrl({
+          projectSlug: project.slug,
+          agentId: agent.id,
+          agentType: agent.type,
+        }),
+      });
+    },
+  );
+}
 
 // ── Delete (Archive) Agent ───────────────────────────────────
 secured.access(requires("project:delete")).delete(

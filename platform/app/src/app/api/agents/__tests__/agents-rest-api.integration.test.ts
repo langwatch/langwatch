@@ -99,6 +99,12 @@ describe("Feature: Agent REST API", () => {
             headers: createAuthHeaders(testApiKey),
             body: JSON.stringify(body),
           }),
+        put: (path: string, body: unknown) =>
+          app.request(path, {
+            method: "PUT",
+            headers: createAuthHeaders(testApiKey),
+            body: JSON.stringify(body),
+          }),
         delete: (path: string, body?: unknown) =>
           app.request(path, {
             method: "DELETE",
@@ -360,6 +366,19 @@ describe("Feature: Agent REST API", () => {
         name: "Whatever",
       });
       expect(res.status).toBe(404);
+    });
+
+    /** @scenario Update an agent with PUT */
+    it("accepts PUT as well as PATCH", async () => {
+      const agent = await createAgent({ name: "Verb Agent" });
+
+      const res = await helpers.api.put(`/api/agents/${agent.id}`, {
+        name: "Renamed By Put",
+      });
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.name).toBe("Renamed By Put");
     });
   });
 
