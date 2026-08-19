@@ -1,12 +1,7 @@
 /**
  * Scenario event schemas
- * Extends the AG-UI base event schema to add scenario-specific fields.
+ * The wire contract for events the scenario SDK posts to /api/scenario-events.
  */
-import {
-  EventType,
-  MessageSchema,
-  MessagesSnapshotEventSchema,
-} from "@ag-ui/core";
 import { z } from "zod";
 import { chatMessageSchema } from "~/server/tracer/types";
 import {
@@ -14,13 +9,19 @@ import {
   ScenarioRunStatus,
   Verdict,
 } from "../scenario-event.enums";
+import { agentMessageSchema } from "./agent-message-schemas";
 
 /**
- * AG-UI Base Event Schema
- * Provides the foundation for all events with type, timestamp, and raw event data
+ * Base Event Schema
+ * Provides the foundation for all events with type, timestamp, and raw event data.
+ *
+ * Every event below narrows `type` to its own `ScenarioEventType` literal, so
+ * this declaration never validates a real payload. It stays a plain `z.string()`
+ * rather than being dropped because Zod strips undeclared keys silently: an
+ * event schema that forgot its own `type` would lose the field with no error.
  */
 const baseEventSchema = z.object({
-  type: z.nativeEnum(EventType),
+  type: z.string(),
   timestamp: z.number(),
   rawEvent: z.any().optional(),
 });
@@ -146,8 +147,9 @@ const inputAudioContentPartSchema = z.object({
 /**
  * A message whose `content` array mixes plain text with `input_audio` parts.
  * Added as a third member of the message union below so existing text / image /
- * tool / binary messages keep validating via `MessageSchema` / `chatMessageSchema`
- * — this is purely additive and rejects no previously-accepted shape.
+ * tool / binary messages keep validating via `agentMessageSchema` /
+ * `chatMessageSchema` — this is purely additive and rejects no
+ * previously-accepted shape.
  */
 const scenarioAudioMessageSchema = z.object({
   role: z.string().optional(),
@@ -164,20 +166,22 @@ const scenarioAudioMessageSchema = z.object({
  * Captures the conversation state at a specific point during scenario execution.
  * Includes searchable_content and payload for full message functionality.
  */
-export const scenarioMessageSnapshotSchema = MessagesSnapshotEventSchema.merge(
-  baseScenarioEventSchema.extend({
-    type: z.literal(ScenarioEventType.MESSAGE_SNAPSHOT),
-    messages: z.array(
-      z.intersection(
-        z.union([MessageSchema, chatMessageSchema, scenarioAudioMessageSchema]),
-        z.object({
-          id: z.string().optional(),
-          trace_id: z.string().optional(),
-        }),
-      ),
+export const scenarioMessageSnapshotSchema = baseScenarioEventSchema.extend({
+  type: z.literal(ScenarioEventType.MESSAGE_SNAPSHOT),
+  messages: z.array(
+    z.intersection(
+      z.union([
+        agentMessageSchema,
+        chatMessageSchema,
+        scenarioAudioMessageSchema,
+      ]),
+      z.object({
+        id: z.string().optional(),
+        trace_id: z.string().optional(),
+      }),
     ),
-  }),
-);
+  ),
+});
 
 /**
  * Scenario Text Message Start Event Schema
