@@ -1238,6 +1238,100 @@ podAffinity:
       topologyKey: kubernetes.io/hostname
 {{- end -}}
 
+{{/*
+  Shared pod spec for the stored-objects upgrade hook Jobs, up to and including
+  the `containers:` key. Both the pre-upgrade and the post-upgrade Job run the
+  same image with the same identity, so the parts that are not the script live
+  here rather than being written twice.
+
+  automountServiceAccountToken is true on purpose. These Jobs are the only
+  workloads in the release that call the Kubernetes API, so they need the token
+  global.automountServiceAccountToken withholds from the rest.
+
+  The scheduling keys come from global.scheduling so the Jobs land where the
+  rest of the release lands. On a cluster whose nodes are tainted, a hook that
+  ignored them would sit Pending and stall every upgrade.
+
+  See templates/app/stored-objects-serialize-upgrade.yaml.
+*/}}
+{{- define "langwatch.storedObjects.upgradeHookPodSpec" -}}
+restartPolicy: Never
+serviceAccountName: {{ .Release.Name }}-stored-objects-upgrade
+automountServiceAccountToken: true
+{{- with .Values.global.scheduling.nodeSelector }}
+nodeSelector:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with .Values.global.scheduling.tolerations }}
+tolerations:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with .Values.global.scheduling.priorityClassName }}
+priorityClassName: {{ . | quote }}
+{{- end }}
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  seccompProfile:
+    type: RuntimeDefault
+containers:
+{{- end -}}
+
+{{/*
+  Shell functions both stored-objects upgrade hook Jobs use. They read the
+  `ns`, `deploy` and `selector` variables the Job's script sets above them.
+*/}}
+{{- define "langwatch.storedObjects.upgradeHookShellHelpers" -}}
+deployment_exists() {
+  kubectl -n "$ns" get deployment "$deploy" >/dev/null 2>&1
+}
+
+scale_workers() {
+  kubectl -n "$ns" patch deployment "$deploy" --subresource=scale --type=merge -p "{\"spec\":{\"replicas\":${1}}}"
+}
+
+wait_for_workers_gone() {
+  printf 'serialize-upgrade: waiting up to %ss for the %s pods to go away\n' "${1}" "$deploy"
+  out=$(kubectl -n "$ns" wait --for=delete pod --selector="$selector" --timeout="${1}s" 2>&1)
+  status=$?
+  printf '%s\n' "$out"
+  [ "$status" -eq 0 ] && return 0
+  # kubectl below 1.31 reports an empty selector result as an error. No pods
+  # left IS the state this waits for, so it must not read as a failure.
+  case "$out" in
+    *'no matching resources found'*) return 0 ;;
+  esac
+  return 1
+}
+{{- end -}}
+
+{{/*
+  The post-upgrade hook's wait for the app rollout. Reads `ns` and `app`.
+
+  It polls rather than calling `kubectl rollout status`, which LISTs
+  Deployments. Kubernetes ignores resourceNames on `list`, so `rollout status`
+  cannot run under a Role restricted to two Deployments by name, and using it
+  would mean granting read access to every Deployment in the namespace.
+
+  Done means the Deployment has observed its current generation and every
+  replica it asks for is ready, which is what proves the NEW app pod, not the
+  one it replaced, is the pod holding the volume.
+*/}}
+{{- define "langwatch.storedObjects.upgradeHookAppRolloutHelper" -}}
+wait_for_app_rollout() {
+  deadline=$(( $(date +%s) + ${1} ))
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    state=$(kubectl -n "$ns" get deployment "$app" -o jsonpath='{.metadata.generation} {.status.observedGeneration} {.spec.replicas} {.status.readyReplicas}' 2>/dev/null)
+    set -- $state
+    if [ -n "${1:-}" ] && [ "${1:-}" = "${2:-}" ] && [ -n "${3:-}" ] && [ "${4:-0}" = "${3:-}" ]; then
+      return 0
+    fi
+    sleep 5
+  done
+  return 1
+}
+{{- end -}}
+
 {{/* ClickHouse: Cluster name for the app (only when replicas > 1 or external.cluster set) */}}
 {{- define "langwatch.clickhouse.clusterName" -}}
   {{- if .Values.clickhouse.chartManaged -}}

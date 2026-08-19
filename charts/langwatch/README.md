@@ -105,21 +105,35 @@ can be scheduled on a fresh node while the old pod of the other still holds the
 attachment on the old node, and both then wedge in `ContainerCreating` with a
 multi-attach error.
 
-The chart orders them for you. A pre-upgrade hook Job scales the workers to 0
-and waits for their pods to go away, so the app rolls as the only holder of the
-volume. The workers come back at `workers.replicaCount` when Helm applies the
-release, and the new workers pod follows the new app pod through the affinity
-the chart already sets. Expect a brief worker outage per upgrade, on top of the
-brief app outage the kill-then-start rollout already carries.
+The chart orders them for you, with two hook Jobs:
 
-The hook needs a ServiceAccount token and a namespaced Role: `get` on the
-workers Deployment, `patch` on its scale subresource, and read access to the
-pods of the release namespace. It renders only in this mode. With
-`app.dataplane` (S3 / Azure) there is no shared volume, so it never renders.
+1. A **pre-upgrade** Job scales the workers to 0 and waits for their pods to go
+   away, so the old workers pod cannot hold the volume on the old node while
+   Helm rolls the app.
+2. A **post-upgrade** Job scales the workers to 0 again, waits for the app
+   rollout to finish, and then scales them back to `workers.replicaCount`.
 
-If the hook fails, the upgrade stops and the workers stay at 0. That is
-deliberate: it is safer than a wedged rollout. Read the Job logs, fix the cause,
-then run the upgrade again, which scales the workers back up.
+The second step is not redundant. Helm's apply restores the replica count from
+the manifest, so a new workers pod is created at the same instant as the new app
+pod. Its required `podAffinity` matches the old app pod, which is still
+terminating on the old node, so the scheduler puts the workers back on the node
+the app is leaving, where they take over the attachment and wedge the new app
+pod for good. Holding the workers at 0 until the app rollout finishes is what
+makes them follow the new app pod.
+
+Expect a worker outage that covers the app rollout, on top of the brief app
+outage the kill-then-start rollout already carries.
+
+The hooks need a ServiceAccount token and a namespaced Role: `get` on the app
+and the workers Deployments, `patch` on the workers' scale subresource, and read
+access to the pods of the release namespace. They render only in this mode. With
+`app.dataplane` (S3 / Azure) there is no shared volume, so they never render.
+
+If the pre-upgrade Job fails, the upgrade stops and the workers stay at 0. That
+is deliberate: it is safer than a wedged rollout. Read the Job logs, fix the
+cause, then run the upgrade again, which scales the workers back up. The
+post-upgrade Job never fails the release over a slow or broken app: if the
+rollout does not finish in time it says so and brings the workers back anyway.
 
 To order the rollout yourself, or on a cluster that forbids that RBAC:
 
@@ -319,8 +333,8 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `app.storedObjects.localFilesystem.path`                     | Mount point that the LocalFilesystemDriver writes under.                                                                                                                                                                                                                            | `/var/lib/langwatch/objects` |
 | `app.storedObjects.localFilesystem.size`                     | PVC size for the stored-objects volume.                                                                                                                                                                                                                                             | `10Gi`                       |
 | `app.storedObjects.localFilesystem.storageClassName`         | PVC storageClassName (cluster default if empty).                                                                                                                                                                                                                                    | `""`                         |
-| `app.storedObjects.localFilesystem.serializeUpgrades`        | Scale the workers to 0 in a pre-upgrade hook, so only one pod holds the shared RWO volume while the app rolls.                                                                                                                                                                      | `true`                       |
-| `app.storedObjects.localFilesystem.serializeUpgradesImage`   | Image the pre-upgrade hook runs. Needs sh and kubectl.                                                                                                                                                                                                                              | `alpine/k8s:1.30.0`          |
+| `app.storedObjects.localFilesystem.serializeUpgrades`        | Hold the workers at 0 replicas while the app rolls, so only one pod holds the shared RWO volume.                                                                                                                                                                                    | `true`                       |
+| `app.storedObjects.localFilesystem.serializeUpgradesImage`   | Image the upgrade hooks run. Needs sh and kubectl.                                                                                                                                                                                                                                  | `alpine/k8s:1.30.0`          |
 | `app.email`                                                  | Email provider configuration.                                                                                                                                                                                                                                                       |                              |
 | `app.email.defaultFrom`                                      | Default "from" address.                                                                                                                                                                                                                                                             | `""`                         |
 | `app.email.provider`                                         | Email provider. Empty sends no email.                                                                                                                                                                                                                                               | `""`                         |

@@ -469,8 +469,8 @@ app:
   ## @param app.storedObjects.localFilesystem.path [string, default: /var/lib/langwatch/objects] Mount point that the LocalFilesystemDriver writes under.
   ## @param app.storedObjects.localFilesystem.size [string, default: 10Gi] PVC size for the stored-objects volume.
   ## @param app.storedObjects.localFilesystem.storageClassName [string] PVC storageClassName (cluster default if empty).
-  ## @param app.storedObjects.localFilesystem.serializeUpgrades [default: true] Scale the workers to 0 in a pre-upgrade hook, so only one pod holds the shared RWO volume while the app rolls.
-  ## @param app.storedObjects.localFilesystem.serializeUpgradesImage [string, default: alpine/k8s:1.30.0] Image the pre-upgrade hook runs. Needs sh and kubectl.
+  ## @param app.storedObjects.localFilesystem.serializeUpgrades [default: true] Hold the workers at 0 replicas while the app rolls, so only one pod holds the shared RWO volume.
+  ## @param app.storedObjects.localFilesystem.serializeUpgradesImage [string, default: alpine/k8s:1.30.0] Image the upgrade hooks run. Needs sh and kubectl.
   storedObjects:
     localFilesystem:
       enabled: true
@@ -486,15 +486,16 @@ app:
       # multi-attach error (issue #7191).
       #
       # With this on, a pre-upgrade hook Job scales the workers to 0 and waits
-      # for their pods to go away before helm applies the new manifests. The
-      # app then rolls as the only holder of the volume, and the workers come
-      # back at workers.replicaCount with the release.
+      # for their pods to go away before helm applies the new manifests, and a
+      # post-upgrade hook Job holds them at 0 until the app rollout finishes
+      # and then scales them back to workers.replicaCount. The app rolls as the
+      # only holder of the volume, and the workers follow the NEW app pod.
       #
-      # The hook needs a ServiceAccount token and a small Role (get on the
-      # workers Deployment, patch on its scale, read on the namespace's pods).
-      # Turn it off if you order the rollout yourself, if your cluster forbids
-      # that RBAC, or if you moved to app.dataplane (where it never renders
-      # anyway, because no volume is shared).
+      # The hooks need a ServiceAccount token and a small Role (get on the app
+      # and the workers Deployments, patch on the workers' scale, read on the
+      # namespace's pods). Turn them off if you order the rollout yourself, if
+      # your cluster forbids that RBAC, or if you moved to app.dataplane (where
+      # they never render anyway, because no volume is shared).
       serializeUpgrades: true
       # Needs sh + kubectl. registry.k8s.io/kubectl is distroless and has no
       # /bin/sh. Mirror this image into your own registry for an air-gapped
