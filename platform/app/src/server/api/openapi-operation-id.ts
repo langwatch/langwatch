@@ -136,21 +136,31 @@ interface SpecLike {
  * because a hand-written id never equals the derived one it was written to
  * replace.
  */
+/** Swaps one operation's id, if and only if v1 is the one that derived it. */
+function restoreOperationId(
+  operation: OperationLike | undefined,
+  method: string,
+  path: string,
+): void {
+  if (!operation?.operationId) return;
+  if (operation.operationId !== derivedOperationIdV1(method, path)) return;
+
+  operation.operationId = derivedOperationIdLegacy(method, path);
+}
+
+/** Every operation hanging off one path. */
+function restorePathItem(rawItem: unknown, path: string): void {
+  const item = rawItem as Record<string, OperationLike | undefined> | undefined;
+  if (!item) return;
+
+  for (const method of OPENAPI_METHODS) {
+    restoreOperationId(item[method], method, path);
+  }
+}
+
 export function restoreLegacyOperationIds<T extends SpecLike>(spec: T): T {
   for (const [path, rawItem] of Object.entries(spec.paths ?? {})) {
-    const item = rawItem as
-      | Record<string, OperationLike | undefined>
-      | undefined;
-    if (!item) continue;
-
-    for (const method of OPENAPI_METHODS) {
-      const operation = item[method];
-      if (!operation?.operationId) continue;
-
-      if (operation.operationId === derivedOperationIdV1(method, path)) {
-        operation.operationId = derivedOperationIdLegacy(method, path);
-      }
-    }
+    restorePathItem(rawItem, path);
   }
 
   return spec;

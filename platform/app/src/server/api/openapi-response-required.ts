@@ -50,23 +50,40 @@ interface JsonSchemaLike {
   oneOf?: JsonSchemaLike[];
 }
 
-/** Adds every defaulted property to `required`, depth-first. */
-function requireDefaultedProperties(schema: JsonSchemaLike | undefined): void {
-  if (!schema || typeof schema !== "object") return;
+/** The nested schemas a composite one is built from. */
+function subSchemasOf(schema: JsonSchemaLike): (JsonSchemaLike | undefined)[] {
+  return [
+    ...(schema.allOf ?? []),
+    ...(schema.anyOf ?? []),
+    ...(schema.oneOf ?? []),
+    schema.items,
+  ];
+}
 
-  for (const branch of [schema.allOf, schema.anyOf, schema.oneOf]) {
-    branch?.forEach(requireDefaultedProperties);
-  }
-  requireDefaultedProperties(schema.items);
-
-  if (!schema.properties) return;
-
+/**
+ * Names the properties this schema always serialises, having recursed first.
+ *
+ * The recursion happens here rather than in the caller so that a property is
+ * visited exactly once, whether or not it turns out to carry a default.
+ */
+function defaultedPropertyNames(schema: JsonSchemaLike): string[] {
   const defaulted: string[] = [];
-  for (const [name, property] of Object.entries(schema.properties)) {
+
+  for (const [name, property] of Object.entries(schema.properties ?? {})) {
     requireDefaultedProperties(property);
     if (property && "default" in property) defaulted.push(name);
   }
 
+  return defaulted;
+}
+
+/** Adds every defaulted property to `required`, depth-first. */
+function requireDefaultedProperties(schema: JsonSchemaLike | undefined): void {
+  if (!schema || typeof schema !== "object") return;
+
+  subSchemasOf(schema).forEach(requireDefaultedProperties);
+
+  const defaulted = defaultedPropertyNames(schema);
   if (defaulted.length === 0) return;
 
   // Existing entries keep their order so the document stays diff-stable; the
@@ -116,20 +133,28 @@ interface SpecLike {
  * Request bodies and parameters are deliberately untouched: their input reading
  * is both correct and unchanged by the upgrade.
  */
+/** Every response body schema one operation can answer with. */
+function requireInOperation(operation: OperationLike | undefined): void {
+  for (const response of Object.values(operation?.responses ?? {})) {
+    for (const media of Object.values(response?.content ?? {})) {
+      requireDefaultedProperties(media?.schema);
+    }
+  }
+}
+
+/** Every operation hanging off one path. */
+function requireInPathItem(rawItem: unknown): void {
+  const item = rawItem as Record<string, OperationLike | undefined> | undefined;
+  if (!item) return;
+
+  for (const method of OPENAPI_METHODS) {
+    requireInOperation(item[method]);
+  }
+}
+
 export function requireDefaultedResponseFields<T extends SpecLike>(spec: T): T {
   for (const rawItem of Object.values(spec.paths ?? {})) {
-    const item = rawItem as
-      | Record<string, OperationLike | undefined>
-      | undefined;
-    if (!item) continue;
-
-    for (const method of OPENAPI_METHODS) {
-      for (const response of Object.values(item[method]?.responses ?? {})) {
-        for (const media of Object.values(response?.content ?? {})) {
-          requireDefaultedProperties(media?.schema);
-        }
-      }
-    }
+    requireInPathItem(rawItem);
   }
 
   return spec;
