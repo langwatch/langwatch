@@ -305,12 +305,28 @@ describe("the settings shell in a new navigation mode", () => {
       expect(screen.getByTestId("settings-page-content")).toBeInTheDocument();
     });
 
-    /** @scenario Enterprise entries carry a violet pill */
-    it("marks the enterprise entries with the pill", () => {
+    /** @scenario "Enterprise entries carry a quiet grey pill" */
+    it("marks the enterprise entries with a grey pill in a hairline border", () => {
       renderSettings();
 
       expect(screen.getByRole("link", { name: "Groups" })).toBeInTheDocument();
-      expect(screen.getAllByText("ENT").length).toBeGreaterThanOrEqual(1);
+      const pills = screen.getAllByText("ENT");
+      expect(pills.length).toBeGreaterThanOrEqual(1);
+      // The hairline border is pinned on the shared chip style itself:
+      // shell/__tests__/quietChipStyle.unit.test.ts.
+      expect(pills[0]).toHaveStyle({
+        color: "var(--chakra-colors-gray-400)",
+      });
+    });
+
+    /** @scenario "A rule separates the way back from the pages below it" */
+    it("draws a rule under the way back entry", () => {
+      renderSettings();
+
+      const backEntry = screen.getByRole("link", { name: /^Back/ });
+      expect(backEntry.parentElement).toHaveStyle({
+        borderBottomWidth: "1px",
+      });
     });
 
     it("hides the enterprise entries outside an enterprise plan", () => {

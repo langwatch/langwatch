@@ -11,6 +11,11 @@ Feature: Product sidebars in the new navigation modes
   Govern group (the product switcher replaces it), and Gateway and
   Governance promote their section pages from the shared registry.
 
+  The column is wider than the current chrome's and its type is one step
+  smaller, which is what lets the longer page names hold one line. The
+  size is a property of the sidebar, not of the menu components, so the
+  current chrome keeps its own size unchanged.
+
   @integration
   Scenario: Quick Search sits first and opens the command bar
     Given a product sidebar in a new navigation mode
@@ -56,3 +61,26 @@ Feature: Product sidebars in the new navigation modes
     Given the current chrome on the cloud version
     Then the sidebar shows the standalone "Chat" entry
     And the Support menu has no chat entry
+
+  @integration
+  Scenario: The sidebar draws its menu one step smaller
+    Given a product sidebar in a new navigation mode
+    Then the menu items use the compact type and spacing
+    And the group headings use the compact heading style
+    And the column is wider than the current chrome's menu
+
+  @integration
+  Scenario: The current chrome keeps its own menu size
+    Given the current chrome
+    Then the menu items keep the comfortable type and spacing
+    And the group headings keep the comfortable heading style
+
+  @integration
+  Scenario: The search key cap reads as a quiet hint
+    Given a product sidebar in a new navigation mode
+    Then the key cap next to Quick Search is grey with a hairline border
+
+  @integration
+  Scenario: A rule separates the bottom block from the pages above it
+    Given a product sidebar in a new navigation mode
+    Then a rule runs above the bottom block

@@ -253,12 +253,12 @@ vi.mock("~/components/sidebar/PresenceMenuItem", () => ({
   PresenceMenuItem: () => null,
 }));
 
-import { MENU_WIDTH_EXPANDED } from "~/components/MainMenu";
 import { useNavigationModeStore } from "~/features/navigation/navigationModeStore";
 import {
   DashboardLayout,
   type DashboardLayoutProps,
 } from "../../../components/DashboardLayout";
+import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../shell/shellLayout";
 
 function renderShell(props: Partial<DashboardLayoutProps> = {}) {
   return render(
@@ -362,13 +362,13 @@ describe("the product-switcher top bar", () => {
       renderShell();
 
       expect(screen.getByTestId("shell-product-cluster")).toHaveStyle({
-        width: MENU_WIDTH_EXPANDED,
-        minWidth: MENU_WIDTH_EXPANDED,
+        width: SHELL_SIDEBAR_WIDTH_EXPANDED,
+        minWidth: SHELL_SIDEBAR_WIDTH_EXPANDED,
       });
       // The content column caps itself at the viewport minus that same
       // width, so the two cannot drift apart.
       expect(screen.getByTestId("shell-content-column")).toHaveStyle({
-        maxWidth: `${window.innerWidth - Number.parseInt(MENU_WIDTH_EXPANDED, 10)}px`,
+        maxWidth: `${window.innerWidth - Number.parseInt(SHELL_SIDEBAR_WIDTH_EXPANDED, 10)}px`,
       });
     });
   });

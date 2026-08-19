@@ -58,7 +58,7 @@ export interface SettingsMenuItem {
    */
   alsoActiveAt?: string[];
   icon: LucideIcon;
-  /** Enterprise-plan entry; renders the violet pill. */
+  /** Enterprise-plan entry; renders the quiet grey pill. */
   isEnterprise?: boolean;
 }
 

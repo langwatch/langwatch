@@ -75,7 +75,9 @@ export function ShellTopBar({
           gap={3}
           alignItems="center"
           minWidth={0}
-          paddingLeft={shouldShowProductCluster ? 3 : 0}
+          // The cluster ends at the sidebar edge, so this inset is the
+          // gap the organization control keeps from the content column.
+          paddingLeft={shouldShowProductCluster ? "22px" : 0}
         >
           <OrganizationSelect activeProductId={activeProductId} />
           <ProductScopeControl activeProductId={activeProductId} />
@@ -117,8 +119,9 @@ function ProductCluster({
         <ProductSwitcherMenu activeProductId={activeProductId} />
       ) : (
         // Settings is a detour, not a product to switch between; the way
-        // out is the sidebar's back entry.
-        <HStack gap={2} paddingX={2}>
+        // out is the sidebar's back entry. It keeps the switcher pill's
+        // inset, so the icon sits where a product icon sits.
+        <HStack gap={2} paddingX={2.5} height="28px">
           <SettingsIcon size={14} color="var(--chakra-colors-fg-muted)" />
           <Text fontSize="13px" fontWeight="medium">
             Settings
