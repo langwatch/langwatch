@@ -30890,7 +30890,7 @@ For more failure modes see [CLI debug](/ai-governance/cli-debug).
 
 ## Manual OpenTelemetry setup
 
-Use this when you cannot install the LangWatch command line tool. The variables below are the ones `langwatch instrument claude` writes for you.
+Use this when you cannot install the LangWatch command line tool. The block below mirrors the variables `langwatch instrument claude` writes for you, plus the optional `OTEL_LOG_ASSISTANT_RESPONSES` flag, which the wrapper does not set. Drop that line if you only want what the wrapper gives you.
 
 ### Environment variables
 
