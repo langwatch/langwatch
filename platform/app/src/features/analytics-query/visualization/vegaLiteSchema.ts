@@ -17,7 +17,7 @@
 
 import type { ErrorObject } from "ajv";
 
-import { governedVegaError } from "./vegaLitePolicy";
+import { lwqlVegaError } from "./vegaLitePolicy";
 import vegaLiteSchemaValidator, {
   type VegaLiteSchemaValidator,
 } from "./vegaLiteSchemaValidator.generated.js";
@@ -69,7 +69,7 @@ export function checkSchemaDeclaration(
   if (isSupportedSchemaDeclaration(declared)) return [];
 
   return [
-    governedVegaError({
+    lwqlVegaError({
       rule: "spec.unsupported-schema-version",
       path: `${JSON_POINTER_ROOT}$schema`,
       message: `This chart specification declares ${JSON.stringify(declared)}. Only Vega-Lite v6 is supported — set "$schema" to ${VEGA_LITE_SCHEMA_URL} and adjust the specification, or remove it.`,
@@ -94,7 +94,7 @@ export function validateAgainstVegaLiteSchema(
   // schema rejected. This runtime is fail-closed: say so generically instead.
   if (reported.length === 0) {
     return [
-      governedVegaError({
+      lwqlVegaError({
         rule: "spec.schema-invalid",
         path: JSON_POINTER_ROOT,
         message:
@@ -144,7 +144,7 @@ function mostSpecificErrors(errors: readonly ErrorObject[]): ErrorObject[] {
 function toValidationError(error: ErrorObject): VegaValidationError {
   const path =
     error.instancePath === "" ? JSON_POINTER_ROOT : error.instancePath;
-  return governedVegaError({
+  return lwqlVegaError({
     rule: "spec.schema-invalid",
     path,
     message: `${path} ${error.message ?? "is not valid"}${detailOf(error)}.`,

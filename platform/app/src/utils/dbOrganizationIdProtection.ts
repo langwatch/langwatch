@@ -258,6 +258,19 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
       (action === "updateMany" && isSystemManagedKeySweep(clause)),
   },
   RoutingPolicy: {},
+  // The grants ledger's projection tables (ADR-092 §13). Written only by
+  // the authz_grants fold (plus revocation enforcement); read by the engine
+  // per organization. Row id / organizationId cover every access pattern.
+  Grant: {
+    // The resource tier's possession path presents only the share token —
+    // globally unique, resolving to exactly one organization (ADR-057's
+    // ShareLink lookup, inherited when share links become RESOURCE grants).
+    extraBound: ({ clause }) =>
+      typeof clauseField(clause, "token") === "string",
+  },
+  Role: {},
+  AuthzProjectionCursor: {},
+  AuthzCutoverProjection: {},
   AiToolEntry: {},
   GatewayBudget: {},
   // Per-bucket period boundaries for attributed-user templates. Bound by

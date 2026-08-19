@@ -10,7 +10,7 @@
  *
  * Both governors are *called*, never re-implemented:
  *
- *  - the governed SQL validator, through `GovernedSqlService.validate` — the
+ *  - the LangWatchQL validator, through `LangWatchQLService.validate` — the
  *    same decision `execute` makes, derived from the same catalog for the same
  *    caller's permissions, so what an author may read decides what their saved
  *    SQL may name;
@@ -24,15 +24,15 @@
  * render time, which is also what keeps a chart saved by a member with wider
  * protections from disclosing anything to one with narrower protections.
  *
- * @see specs/analytics/governed-sql-saved-charts.feature
- * @see ../governed-sql/governedSql.service.ts — the other half of the gate
+ * @see specs/analytics/lwql-saved-charts.feature
+ * @see ../lwql/lwql.service.ts — the other half of the gate
  */
 
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { GOVERNED_QUERY_RESULT_DATASET } from "~/features/analytics-query/visualization/governedDatasetNames";
+import { LWQL_QUERY_RESULT_DATASET } from "~/features/analytics-query/visualization/lwqlDatasetNames";
 import { validateVegaLiteSpecStructure } from "~/features/analytics-query/visualization/validateVegaLiteSpec";
 import type {
   CustomGraph,
@@ -43,9 +43,9 @@ import type {
 import type { Protections } from "../../traces/protections";
 import { isUniqueConstraintError } from "../../utils/prismaErrors";
 import {
-  type GovernedSqlService,
-  getGovernedSqlService,
-} from "../governed-sql/governedSql.service";
+  getLangWatchQLService,
+  type LangWatchQLService,
+} from "../lwql/lwql.service";
 import {
   SavedWorkbenchChartAlreadyExistsError,
   SavedWorkbenchChartDefinitionInvalidError,
@@ -65,7 +65,7 @@ const logger = createLogger("langwatch:analytics:saved-workbench-charts");
 
 /**
  * The identity fields a caller supplies alongside the definition. Bounded here
- * because {@link SavedWorkbenchChartService.governed} speaks only for the
+ * because {@link SavedWorkbenchChartService.LangWatchQL} speaks only for the
  * definition, this service is the sole write path, and Prisma is not a
  * validator.
  */
@@ -94,7 +94,7 @@ export interface SavedWorkbenchChartServiceDependencies {
    * Consulted for its verdict, never for rows. Validation needs no restricted
    * identity, so charts can be saved on a deployment that could not run them.
    */
-  readonly governedSql: GovernedSqlService;
+  readonly lwql: LangWatchQLService;
 }
 
 export class SavedWorkbenchChartService {
@@ -104,7 +104,7 @@ export class SavedWorkbenchChartService {
   static create(prisma: PrismaClient): SavedWorkbenchChartService {
     return new SavedWorkbenchChartService({
       repository: new SavedWorkbenchChartRepository(prisma),
-      governedSql: getGovernedSqlService(),
+      lwql: getLangWatchQLService(),
     });
   }
 
@@ -170,7 +170,7 @@ export class SavedWorkbenchChartService {
       .safeParse({ id: input.id, name: input.name });
     if (!identity.success) throw ValidationError.fromZodError(identity.error);
 
-    const definition = this.governed({
+    const definition = this.LangWatchQL({
       projectId,
       protections,
       definition: input.definition,
@@ -210,7 +210,7 @@ export class SavedWorkbenchChartService {
    *
    * A definition offered here goes through exactly the governors a create goes
    * through — there is no edit path that skips them, which is the point of
-   * routing both through {@link governed}.
+   * routing both through {@link LangWatchQL}.
    *
    * @throws {SavedWorkbenchChartNotFoundError} when no chart of this kind has
    *   that id in this project.
@@ -242,7 +242,7 @@ export class SavedWorkbenchChartService {
     const definition =
       input.definition === undefined
         ? undefined
-        : this.governed({
+        : this.LangWatchQL({
             projectId,
             protections,
             definition: input.definition,
@@ -282,16 +282,16 @@ export class SavedWorkbenchChartService {
    * The gate. Everything written by this service passes through here.
    *
    * The first refusal wins rather than both being collected: each one is
-   * complete on its own — the governed validator reports every violation it
+   * complete on its own — the LangWatchQL validator reports every violation it
    * found, and the chart policy every rule it broke — and a member repairing
    * SQL is not helped by also being told about the specification.
    *
    * @throws {ValidationError} when the definition is not the shape a saved
-   *   chart has, the governed validator's own refusal when it will not admit
+   *   chart has, the LangWatchQL validator's own refusal when it will not admit
    *   the SQL, and {@link SavedWorkbenchChartSpecificationRefusedError} when
    *   the chart policy will not admit the specification.
    */
-  private governed({
+  private LangWatchQL({
     projectId,
     protections,
     definition,
@@ -303,7 +303,7 @@ export class SavedWorkbenchChartService {
     const parsed = workbenchChartDefinitionSchema.safeParse(definition);
     if (!parsed.success) throw ValidationError.fromZodError(parsed.error);
 
-    this.deps.governedSql.validate({
+    this.deps.lwql.validate({
       projectId,
       protections,
       sql: parsed.data.sql,
@@ -316,7 +316,7 @@ export class SavedWorkbenchChartService {
         // The one dataset the workbench registers. Naming it here is what makes
         // a specification reading anything else refused at save rather than
         // discovered at render.
-        registeredDatasets: [GOVERNED_QUERY_RESULT_DATASET],
+        registeredDatasets: [LWQL_QUERY_RESULT_DATASET],
       });
       if (!verdict.ok) {
         logger.info(

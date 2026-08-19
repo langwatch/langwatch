@@ -12,7 +12,7 @@
  */
 
 import { VEGA_LITE_SCHEMA_URL } from "./vegaLiteSchema";
-import type { GovernedDatasetColumn } from "./visualization.types";
+import type { LangWatchQLDatasetColumn } from "./visualization.types";
 
 /** ClickHouse types that belong on a time axis. */
 const TEMPORAL_TYPE = /\b(Date|Date32|DateTime|DateTime64)\b/;
@@ -37,7 +37,7 @@ export function starterEncodingType(type: string): StarterEncodingType {
 }
 
 export interface StarterVegaLiteSpecInput {
-  readonly columns: readonly GovernedDatasetColumn[];
+  readonly columns: readonly LangWatchQLDatasetColumn[];
   /** The registered dataset the starter reads. */
   readonly datasetName: string;
 }

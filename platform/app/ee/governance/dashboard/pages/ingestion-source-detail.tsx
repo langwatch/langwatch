@@ -468,7 +468,7 @@ function useIngestionSourceDetailPage() {
     },
   );
   const eventsQuery = api.activityMonitor.eventsForSource.useQuery(
-    { organizationId: orgId, sourceId: sourceId ?? "", limit: 50 },
+    { organizationId: orgId, sourceId: sourceId ?? "", limit: 20 },
     {
       enabled: !!orgId && !!sourceId && canReadActivity,
       refetchOnWindowFocus: false,

@@ -7,8 +7,10 @@
  * Server-only - this graph reaches Prisma, Redis and the EE audit writer.
  */
 import { auditLog } from "@ee/audit-log/auditLog";
-import { TeamUserBackfillMigration } from "@langwatch/authz-server";
-import { generate } from "@langwatch/ksuid";
+import {
+  type GrantsLedgerEmitter,
+  TeamUserBackfillMigration,
+} from "@langwatch/authz-server/migration";
 import {
   type MigrationPassSummary,
   type SystemMigration,
@@ -17,7 +19,12 @@ import {
 import type { Cluster, Redis } from "ioredis";
 import { env } from "~/env.mjs";
 import type { Prisma } from "~/generated/prisma/client";
-import { KSUID_RESOURCES } from "~/utils/constants";
+import type {
+  AttachGrantsCommandData,
+  ProveMigrationParityCommandData,
+  RecordMigrationTenantStateCommandData,
+} from "~/server/event-sourcing/pipelines/authz-grants/schemas/commands";
+import { AUTHZ_GRANTS_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/authz-grants/schemas/constants";
 import { bumpAuthzEpoch } from "../../authz/epoch";
 import { PrismaAuthzMigrationRepository } from "../../authz/repositories/authz-migration.prisma.repository";
 import { authzCollector } from "../../authz/runtime";
@@ -27,11 +34,40 @@ import { cohortIncludes } from "./cohort";
 import { RedisMigrationLeaseRepository } from "./repositories/migration-lease.redis.repository";
 import { PrismaOrganizationTenantSource } from "./repositories/organization-tenant-source.prisma.repository";
 import { PrismaSystemMigrationStateRepository } from "./repositories/system-migration-state.prisma.repository";
+import { WitnessingSystemMigrationStateRepository } from "./repositories/witnessing-migration-state.repository";
 import { SystemMigrationsService } from "./system-migrations.service";
 
-/** The composed state repository. The runner uses it; routes must not - they
- *  go through `systemMigrationsService` below. */
-const systemMigrationState = new PrismaSystemMigrationStateRepository(prisma);
+/**
+ * The composed state repository, wrapped so every lifecycle transition is
+ * witnessed as a ledger fact (best-effort; the synchronous write stays the
+ * latch). The runner and the ops service both write through this instance,
+ * so operator rollbacks are witnessed too. Routes must not touch it - they
+ * go through `systemMigrationsService` below.
+ */
+const systemMigrationState = new WitnessingSystemMigrationStateRepository({
+  inner: new PrismaSystemMigrationStateRepository(prisma),
+  witness: async ({
+    migrationName,
+    tenantId,
+    status,
+    report,
+    occurredAtMs,
+  }) => {
+    await (
+      await grantsLedgerCommands()
+    ).commands.recordMigrationTenantState.send({
+      tenantId,
+      organizationId: tenantId,
+      commandId: `runner:${migrationName}:${tenantId}:${status}:${occurredAtMs}`,
+      migrationName,
+      status,
+      report,
+      actor: { type: "system", id: "system:migration-runner" },
+      occurredAtMs,
+    });
+  },
+  now: () => Date.now(),
+});
 
 /**
  * What the ops dashboard talks to. The route calls this and never the state
@@ -44,16 +80,104 @@ export const systemMigrationsService = new SystemMigrationsService({
   runPass: () => runSystemMigrationPass(),
 });
 
+/**
+ * The `authz_grants` pipeline's senders, resolved lazily at send time (the
+ * pipeline is being registered while this module loads). The boot pass
+ * starts DURING App composition (`tryGetApp()` is null for its first
+ * seconds), so a null App is waited out rather than refused; an App whose
+ * event-sourcing stack is disabled throws immediately rather than letting
+ * DisabledPipeline swallow the send - the backfill then parks its
+ * organization with an honest report, and the state witness logs and
+ * moves on.
+ */
+interface GrantsLedgerSenders {
+  commands: {
+    attachGrants: { send: (data: AttachGrantsCommandData) => Promise<unknown> };
+    proveMigrationParity: {
+      send: (data: ProveMigrationParityCommandData) => Promise<unknown>;
+    };
+    recordMigrationTenantState: {
+      send: (data: RecordMigrationTenantStateCommandData) => Promise<unknown>;
+    };
+  };
+}
+
+/**
+ * Memoized: the poll below costs up to 30 seconds, and every `attachGrants`
+ * chunk, parity proof and witnessed transition would otherwise re-run it.
+ * The promise is cleared on failure so a send that arrived before the stack
+ * was up does not poison every later one.
+ */
+let grantsLedgerHandle: Promise<GrantsLedgerSenders> | null = null;
+
+async function grantsLedgerCommands(): Promise<GrantsLedgerSenders> {
+  grantsLedgerHandle ??= resolveGrantsLedgerCommands().catch((error) => {
+    grantsLedgerHandle = null;
+    throw error;
+  });
+  return grantsLedgerHandle;
+}
+
+async function resolveGrantsLedgerCommands(): Promise<GrantsLedgerSenders> {
+  const deadline = Date.now() + 30_000;
+  let app = tryGetApp();
+  while (!app && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    app = tryGetApp();
+  }
+  if (!app?.eventSourcing?.isEnabled) {
+    throw new Error(
+      "the grants ledger requires the event-sourcing stack; send refused",
+    );
+  }
+  // The pipeline registry is keyed by name and cannot express which command
+  // set a name carries, so the handle itself is untyped. The PAYLOADS are
+  // not: `GrantsLedgerSenders` restates them from the command schemas'
+  // inferred types, so a change to any command's shape breaks here rather
+  // than at runtime inside the fold.
+  return app.eventSourcing.getPipeline(
+    AUTHZ_GRANTS_PIPELINE_NAME as never,
+  ) as unknown as GrantsLedgerSenders;
+}
+
+function grantsLedgerEmitter(): GrantsLedgerEmitter {
+  return {
+    attachGrants: async ({ organizationId, commandId, grants }) => {
+      await (await grantsLedgerCommands()).commands.attachGrants.send({
+        tenantId: organizationId,
+        organizationId,
+        commandId,
+        grants,
+      });
+    },
+    proveMigrationParity: async ({
+      organizationId,
+      commandId,
+      diffs,
+      occurredAtMs,
+    }) => {
+      await (await grantsLedgerCommands()).commands.proveMigrationParity.send({
+        tenantId: organizationId,
+        organizationId,
+        commandId,
+        diffs,
+        occurredAtMs,
+      });
+    },
+  };
+}
+
 /** Every registered in-place migration, in the order they run per tenant. */
 export function registeredMigrations(): SystemMigration[] {
   return [
     new TeamUserBackfillMigration({
       repository: new PrismaAuthzMigrationRepository(prisma),
       collectGrants: (args) => authzCollector.collectGrants(args),
+      ledger: grantsLedgerEmitter(),
       audit: (entry) =>
         auditLog({ ...entry, metadata: entry.metadata as Prisma.JsonObject }),
       bumpEpoch: bumpAuthzEpoch,
-      newBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      now: () => Date.now(),
     }),
   ];
 }

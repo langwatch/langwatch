@@ -1,22 +1,22 @@
 /**
- * The LangWatch Vega configuration: what a governed chart looks like.
+ * The LangWatch Vega configuration: what a LangWatchQL chart looks like.
  *
  * A pure function over *resolved* values. It imports no Chakra and reads no
  * DOM, because everything under `visualization/` has to stay server-import-safe
  * — the component layer resolves the theme tokens and hands the answers in.
  *
- * Precedence is deliberate, and `buildGovernedVegaSpec` is what enforces it:
+ * Precedence is deliberate, and `buildLangWatchQLVegaSpec` is what enforces it:
  *
  *   this config  <  the member's own `config`  <  the pinned overrides
  *
  * So a member can restyle an axis or a mark, and cannot change the background
  * the chart is drawn on or the font it is drawn in — the two that decide
  * whether a chart reads as part of the application or as something pasted into
- * it, and the two a screenshot of a governed result is judged on.
+ * it, and the two a screenshot of a LangWatchQL result is judged on.
  */
 
 /** Which of the application's two modes the chart is being drawn in. */
-export type GovernedVegaColorMode = "light" | "dark";
+export type LangWatchQLVegaColorMode = "light" | "dark";
 
 /**
  * The theme values a chart needs, already resolved to literals.
@@ -39,7 +39,7 @@ export interface LangwatchVegaTokens {
   readonly domainColor: string;
   /**
    * The categorical series colours, in the application's own chart order, so a
-   * governed chart's third series is the colour every other chart gives its
+   * LangWatchQL chart's third series is the colour every other chart gives its
    * third series.
    */
   readonly categoricalRange: readonly string[];
@@ -50,7 +50,7 @@ export interface LangwatchVegaTokens {
  * `Config`: importing that type would pull the Vega runtime into the policy
  * modules, which is exactly what they are kept free of.
  */
-export type GovernedVegaConfig = Readonly<Record<string, unknown>>;
+export type LangWatchQLVegaConfig = Readonly<Record<string, unknown>>;
 
 /**
  * Sequential and diverging schemes, which are the one part of the palette that
@@ -59,7 +59,7 @@ export type GovernedVegaConfig = Readonly<Record<string, unknown>>;
  * direction rather than the same scheme in two colours.
  */
 const CONTINUOUS_SCHEMES: Record<
-  GovernedVegaColorMode,
+  LangWatchQLVegaColorMode,
   { heatmap: string; ramp: string; diverging: string }
 > = {
   light: { heatmap: "blues", ramp: "blues", diverging: "blueorange" },
@@ -69,7 +69,7 @@ const CONTINUOUS_SCHEMES: Record<
 /**
  * The values a member's own `config` can never override.
  *
- * Kept separate from the rest so the merge in `buildGovernedVegaSpec` has one
+ * Kept separate from the rest so the merge in `buildLangWatchQLVegaSpec` has one
  * obvious "and these win" step rather than a hand-audited diff of two large
  * objects.
  */
@@ -77,7 +77,7 @@ export function langwatchVegaPinnedConfig({
   tokens,
 }: {
   tokens: LangwatchVegaTokens;
-}): GovernedVegaConfig {
+}): LangWatchQLVegaConfig {
   return {
     // The chart sits on a card that already has a background. An opaque chart
     // background would paint a rectangle over it in whichever mode disagreed.
@@ -99,9 +99,9 @@ export function langwatchVegaConfig({
   colorMode,
   tokens,
 }: {
-  colorMode: GovernedVegaColorMode;
+  colorMode: LangWatchQLVegaColorMode;
   tokens: LangwatchVegaTokens;
-}): GovernedVegaConfig {
+}): LangWatchQLVegaConfig {
   return {
     background: "transparent",
     font: tokens.fontFamily,

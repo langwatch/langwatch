@@ -171,11 +171,11 @@ export const FEATURE_FLAGS = [
 
   // ----- PRODUCT -----
   {
-    key: "release_governed_sql_workbench",
+    key: "release_lwql_workbench",
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Gates the whole governed SQL surface — the Custom query workbench UI and the analytics.governedSql tRPC endpoints — while it is experimental. Off by default; enable per project or organization via a targeting rule, or globally via the operator store.",
+      "Gates the whole LangWatchQL surface — the Custom query workbench UI and the analytics.lwql tRPC endpoints — while it is experimental. Off by default; enable per project or organization via a targeting rule, or globally via the operator store.",
   },
   {
     key: "release_ui_ai_gateway_menu_enabled",
@@ -235,7 +235,7 @@ export const FEATURE_FLAGS = [
     // On by default (ADR-038 Decision 7): self-hosted installations get
     // governance (AI-tools device login, /me, admin surfaces, the
     // onboarding intent fork, the org "Primary use" setting) with zero
-    // configuration. SaaS stays PostHog-governed: a per-org off-condition
+    // configuration. SaaS stays PostHog-LangWatchQL: a per-org off-condition
     // (or an operator store row / RELEASE_UI_AI_GOVERNANCE_ENABLED=0)
     // re-arms every gate for that org. This default and the auth-cli
     // device-login fallback are a pinned pair, move them together

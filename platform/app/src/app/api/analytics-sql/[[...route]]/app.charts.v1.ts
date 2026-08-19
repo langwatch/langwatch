@@ -1,7 +1,7 @@
 /**
  * Saved workbench charts — the REST routes.
  *
- * Five endpoints under the governed analytics SQL family:
+ * Five endpoints under the LangWatchQL analytics SQL family:
  *
  *  - `GET    /api/v1/projects/{projectId}/analytics/charts`
  *  - `POST   /api/v1/projects/{projectId}/analytics/charts`
@@ -10,7 +10,7 @@
  *  - `DELETE /api/v1/projects/{projectId}/analytics/charts/{chartId}`
  *
  * They sit here rather than under `/api/dashboards` because a saved chart is a
- * governed SQL artifact before it is a dashboard one: it is behind the same
+ * LangWatchQL artifact before it is a dashboard one: it is behind the same
  * experimental switch, resolved for the project's organization by the same
  * guard, and its refusals are `HandledError`s the family already serialises
  * with their `meta` intact. Dashboard placement stays a dashboard concern.
@@ -19,20 +19,20 @@
  *
  * The handlers check the request's *envelope* — a name, and a definition that
  * was supplied — and nothing about what a definition means. The versioned
- * definition schema, the governed SQL validator and the Vega-Lite policy all
+ * definition schema, the LangWatchQL validator and the Vega-Lite policy all
  * live behind `SavedWorkbenchChartService`, which is the single write path.
  * Re-declaring any of them here would fork the contract and hand this surface
  * the power to admit a chart the workbench would refuse, which is the one thing
  * slice 1 exists to prevent.
  *
  * @see ~/server/analytics/saved-workbench-charts — the service and its schema
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
-import { GOVERNED_VEGA_LIMITS } from "~/features/analytics-query/visualization/vegaLitePolicy";
+import { LWQL_VEGA_LIMITS } from "~/features/analytics-query/visualization/vegaLitePolicy";
 import { measureSpecBytes } from "~/features/analytics-query/visualization/vegaLiteStructure";
 import type { Project } from "~/generated/prisma/client";
 
@@ -49,7 +49,7 @@ import { canonicalBaseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 import { apiErrorSchema } from "../../shared/schemas";
 import type { RouteResponse } from "../../shared/types";
-import { governedSqlProject } from "./routeGuards";
+import { lwqlProject } from "./routeGuards";
 
 /** Request shape only — a length, not a meaning. Matches the tRPC surface. */
 const nameSchema = z.string().min(1).max(200);
@@ -68,7 +68,7 @@ const nameSchema = z.string().min(1).max(200);
  * headroom sits above the query endpoint's statement ceiling too: SQL short
  * enough to run is always short enough to save.
  */
-const MAX_CHART_DEFINITION_BYTES = GOVERNED_VEGA_LIMITS.maxSpecBytes + 65_536;
+const MAX_CHART_DEFINITION_BYTES = LWQL_VEGA_LIMITS.maxSpecBytes + 65_536;
 
 /**
  * The definition: bounded, and otherwise untouched.
@@ -141,7 +141,7 @@ const chartSchema = z.object({
 const chartListSchema = z.object({ data: z.array(chartSchema) });
 
 /** The tags every operation in this file carries in the published document. */
-const CHART_TAGS = ["Analytics / Governed SQL"];
+const CHART_TAGS = ["Analytics / LangWatchQL"];
 
 /**
  * The not-found answer every resource operation can give — a missing id and
@@ -217,7 +217,7 @@ function registerList(secured: ReturnType<typeof createProjectApp>): void {
     describeRoute({
       summary: "List saved workbench charts",
       description:
-        "Lists every saved governed SQL chart in this project, each with the statement it runs, the parameter values it was saved with and the Vega-Lite specification that draws it. Charts built with the chart builder are a different kind and are not listed here.",
+        "Lists every saved LangWatchQL chart in this project, each with the statement it runs, the parameter values it was saved with and the Vega-Lite specification that draws it. Charts built with the chart builder are a different kind and are not listed here.",
       tags: CHART_TAGS,
       responses: {
         ...canonicalBaseResponses,
@@ -230,7 +230,7 @@ function registerList(secured: ReturnType<typeof createProjectApp>): void {
       },
     }),
     async (c) => {
-      const project = await governedSqlProject({
+      const project = await lwqlProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -248,7 +248,7 @@ function registerCreate(secured: ReturnType<typeof createProjectApp>): void {
     describeRoute({
       summary: "Save a workbench chart",
       description:
-        "Saves a governed SQL statement, its bound parameter values and an optional Vega-Lite specification as one chart. The statement is validated by the governed analytics SQL validator against this key's own permissions, and the specification by the visualization policy, before anything is written — a chart that could not be run or drawn is refused rather than stored.",
+        "Saves a LangWatchQL statement, its bound parameter values and an optional Vega-Lite specification as one chart. The statement is validated by the LangWatchQL analytics SQL validator against this key's own permissions, and the specification by the visualization policy, before anything is written — a chart that could not be run or drawn is refused rather than stored.",
       tags: CHART_TAGS,
       responses: {
         ...canonicalBaseResponses,
@@ -260,7 +260,7 @@ function registerCreate(secured: ReturnType<typeof createProjectApp>): void {
     }),
     zValidator("json", createChartSchema),
     async (c) => {
-      const project = await governedSqlProject({
+      const project = await lwqlProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -283,7 +283,7 @@ function registerRead(secured: ReturnType<typeof createProjectApp>): void {
     describeRoute({
       summary: "Get a saved workbench chart",
       description:
-        "Returns one saved governed SQL chart with its statement, parameter values and specification. A chart saved in another project is reported as not found.",
+        "Returns one saved LangWatchQL chart with its statement, parameter values and specification. A chart saved in another project is reported as not found.",
       tags: CHART_TAGS,
       responses: {
         ...canonicalBaseResponses,
@@ -295,7 +295,7 @@ function registerRead(secured: ReturnType<typeof createProjectApp>): void {
       },
     }),
     async (c) => {
-      const project = await governedSqlProject({
+      const project = await lwqlProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -327,7 +327,7 @@ function registerUpdate(secured: ReturnType<typeof createProjectApp>): void {
     }),
     zValidator("json", updateChartSchema),
     async (c) => {
-      const project = await governedSqlProject({
+      const project = await lwqlProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -354,7 +354,7 @@ function registerDelete(secured: ReturnType<typeof createProjectApp>): void {
     describeRoute({
       summary: "Delete a saved workbench chart",
       description:
-        "Deletes one saved governed SQL chart. Answers 204 with no body; deleting a chart that is not in this project is reported as not found.",
+        "Deletes one saved LangWatchQL chart. Answers 204 with no body; deleting a chart that is not in this project is reported as not found.",
       tags: CHART_TAGS,
       responses: {
         ...canonicalBaseResponses,
@@ -363,7 +363,7 @@ function registerDelete(secured: ReturnType<typeof createProjectApp>): void {
       },
     }),
     async (c) => {
-      const project = await governedSqlProject({
+      const project = await lwqlProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -377,7 +377,7 @@ function registerDelete(secured: ReturnType<typeof createProjectApp>): void {
 }
 
 /**
- * Registers the saved workbench chart routes on the governed analytics SQL app.
+ * Registers the saved workbench chart routes on the LangWatchQL analytics SQL app.
  *
  * One function per verb because the house line ceiling is per function and a
  * described route is a dozen lines of prose before it is a handler; the split

@@ -59,11 +59,39 @@ export type {
 } from "./grants.service";
 export { OffboardIncompleteError } from "./offboard";
 export type { OffboardResult } from "./offboard";
+export { TEAM_USER_BACKFILL_MIGRATION_NAME } from "./team-user-backfill.name";
 export {
-  TEAM_USER_BACKFILL_MIGRATION_NAME,
-  TeamUserBackfillMigration,
-} from "./team-user-backfill.migration";
+  grantFactToCompatBinding,
+  grantFactToRow,
+  grantRowToFact,
+  roleFactToRow,
+  roleRowToFact,
+} from "./ledger/projection-mapping";
 export type {
-  ParityDiff,
-  TeamUserBackfillDeps,
-} from "./team-user-backfill.migration";
+  CompatBindingRowShape,
+  GrantPrincipalTypeDb,
+  GrantRowShape,
+  GrantScopeTypeDb,
+  RoleRowShape,
+} from "./ledger/projection-mapping";
+export {
+  emptyGrantsLedgerState,
+  reduceGrantsLedger,
+} from "./ledger/grants-ledger.reducer";
+export type {
+  GrantEventSource,
+  GrantFact,
+  GrantsLedgerActor,
+  GrantsLedgerCutover,
+  GrantsLedgerEvent,
+  GrantsLedgerState,
+  LedgerMigrationStatus,
+  LedgerMigrationTenantState,
+  LedgerPrincipal,
+  LedgerPrincipalType,
+  LedgerScope,
+  LedgerScopeType,
+  LegacyBindingRole,
+  ResourceGrantTerms,
+  RoleFact,
+} from "./ledger/grants-ledger.reducer";

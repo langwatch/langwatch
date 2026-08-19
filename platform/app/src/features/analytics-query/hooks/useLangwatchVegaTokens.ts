@@ -8,7 +8,7 @@
  *
  * The categorical range is the application's own chart palette, in the
  * application's own order: `rotatingColors.colors` is what `CustomGraph` colours
- * its series from, so a series that is third in a governed chart is the colour a
+ * its series from, so a series that is third in a LangWatchQL chart is the colour a
  * series that is third anywhere else already has.
  */
 
@@ -19,7 +19,7 @@ import { getRawColorValue, useColorMode } from "~/components/ui/color-mode";
 import { rotatingColors } from "~/utils/rotatingColors";
 
 import type {
-  GovernedVegaColorMode,
+  LangWatchQLVegaColorMode,
   LangwatchVegaTokens,
 } from "../visualization/langwatchVegaConfig";
 
@@ -36,13 +36,13 @@ const CHART_PALETTES = rotatingColors.colors.map(
  * Tone per mode. A mid-saturation hue reads on white; the same hue is too dark
  * on a near-black card, so dark mode moves two steps lighter.
  */
-const SERIES_TONE: Record<GovernedVegaColorMode, number> = {
+const SERIES_TONE: Record<LangWatchQLVegaColorMode, number> = {
   light: 500,
   dark: 300,
 };
 
 const TEXT_TOKENS: Record<
-  GovernedVegaColorMode,
+  LangWatchQLVegaColorMode,
   { text: string; muted: string; grid: string; domain: string }
 > = {
   light: {
@@ -60,7 +60,7 @@ const TEXT_TOKENS: Record<
 };
 
 export interface LangwatchVegaTheme {
-  readonly colorMode: GovernedVegaColorMode;
+  readonly colorMode: LangWatchQLVegaColorMode;
   readonly tokens: LangwatchVegaTokens;
 }
 
@@ -69,7 +69,7 @@ export function useLangwatchVegaTokens(): LangwatchVegaTheme {
   const [bodyFont] = useToken("fonts", "body");
   // `useColorMode` reports the *resolved* theme, which is undefined for the
   // first paint before next-themes has read the preference.
-  const colorMode: GovernedVegaColorMode = raw === "dark" ? "dark" : "light";
+  const colorMode: LangWatchQLVegaColorMode = raw === "dark" ? "dark" : "light";
 
   return useMemo(() => {
     const palette = TEXT_TOKENS[colorMode];
