@@ -8,6 +8,7 @@ import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import { modelOverrideSchema } from "~/server/modelProviders/modelOverrideSchema";
 import { ProjectRepository } from "~/server/projects/project.repository";
 import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 import { SuiteDomainError } from "~/server/suites/errors";
@@ -25,6 +26,11 @@ const suiteTargetSchema = z.object({
   referenceId: z.string(),
 });
 
+const simulatorModelDescription =
+  "Model for the simulated user in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default.";
+const judgeModelDescription =
+  "Model for the judge in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default.";
+
 const suiteResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -34,6 +40,8 @@ const suiteResponseSchema = z.object({
   targets: z.array(suiteTargetSchema),
   repeatCount: z.number(),
   labels: z.array(z.string()),
+  simulatorModel: z.string().nullable(),
+  judgeModel: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -49,6 +57,10 @@ const createSuiteInputSchema = z.object({
   targets: z.array(suiteTargetSchema).min(1, "At least one target is required"),
   repeatCount: z.number().int().min(1).max(100).default(1),
   labels: z.array(z.string()).default([]),
+  simulatorModel: modelOverrideSchema
+    .nullish()
+    .describe(simulatorModelDescription),
+  judgeModel: modelOverrideSchema.nullish().describe(judgeModelDescription),
 });
 
 const updateSuiteInputSchema = z.object({
@@ -58,6 +70,10 @@ const updateSuiteInputSchema = z.object({
   targets: z.array(suiteTargetSchema).min(1).optional(),
   repeatCount: z.number().int().min(1).max(100).optional(),
   labels: z.array(z.string()).optional(),
+  simulatorModel: modelOverrideSchema
+    .nullish()
+    .describe(simulatorModelDescription),
+  judgeModel: modelOverrideSchema.nullish().describe(judgeModelDescription),
 });
 
 const runSuiteInputSchema = z.object({
@@ -104,6 +120,8 @@ function toSuiteResponse(suite: SimulationSuite) {
     targets,
     repeatCount: suite.repeatCount,
     labels: suite.labels,
+    simulatorModel: suite.simulatorModel,
+    judgeModel: suite.judgeModel,
     createdAt: suite.createdAt.toISOString(),
     updatedAt: suite.updatedAt.toISOString(),
   };
@@ -254,58 +272,62 @@ secured.access(requires("scenarios:create")).post(
 );
 
 // ── Update Suite ───────────────────────────────────────────
-// `:update` for the same reason as `:create` above.
-secured.access(requires("scenarios:update")).patch(
-  "/:id",
-  describeRoute({
-    description: "Update a suite (run plan)",
-    responses: {
-      ...baseResponses,
-      200: {
-        description: "Suite updated",
-        content: {
-          "application/json": {
-            schema: resolver(suiteResponseWithPlatformUrlSchema),
+// `:update` for the same reason as `:create` above. PATCH and PUT register
+// the same partial-update handler, so a client using either verb gets the
+// same behavior instead of a 404 on one of them.
+for (const verb of ["patch", "put"] as const) {
+  secured.access(requires("scenarios:update"))[verb](
+    "/:id",
+    describeRoute({
+      description: "Update a suite (run plan)",
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Suite updated",
+          content: {
+            "application/json": {
+              schema: resolver(suiteResponseWithPlatformUrlSchema),
+            },
+          },
+        },
+        404: {
+          description: "Suite not found",
+          content: {
+            "application/json": { schema: resolver(badRequestSchema) },
           },
         },
       },
-      404: {
-        description: "Suite not found",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
-    },
-  }),
-  zValidator("json", updateSuiteInputSchema),
-  async (c) => {
-    const project = c.get("project");
-    const { id } = c.req.param();
-    const body = c.req.valid("json");
-    logger.info({ projectId: project.id, suiteId: id }, "Updating suite");
+    }),
+    zValidator("json", updateSuiteInputSchema),
+    async (c) => {
+      const project = c.get("project");
+      const { id } = c.req.param();
+      const body = c.req.valid("json");
+      logger.info({ projectId: project.id, suiteId: id }, "Updating suite");
 
-    const service = createService();
-    try {
-      const suite = await service.update({
-        id,
-        projectId: project.id,
-        data: body,
-      });
-      return c.json({
-        ...toSuiteResponse(suite),
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: `/simulations/run-plans/${suite.slug}`,
-        }),
-      });
-    } catch (error) {
-      if (error instanceof SuiteDomainError) {
-        return c.json({ error: error.message }, 400);
+      const service = createService();
+      try {
+        const suite = await service.update({
+          id,
+          projectId: project.id,
+          data: body,
+        });
+        return c.json({
+          ...toSuiteResponse(suite),
+          platformUrl: platformUrl({
+            projectSlug: project.slug,
+            path: `/simulations/run-plans/${suite.slug}`,
+          }),
+        });
+      } catch (error) {
+        if (error instanceof SuiteDomainError) {
+          return c.json({ error: error.message }, 400);
+        }
+        throw error;
       }
-      throw error;
-    }
-  },
-);
+    },
+  );
+}
 
 // ── Duplicate Suite ────────────────────────────────────────
 // A duplicate is a create: it leaves the source suite untouched and produces a

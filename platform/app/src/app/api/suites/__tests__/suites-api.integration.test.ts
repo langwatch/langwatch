@@ -38,6 +38,7 @@ describe("Feature: Suites REST API", () => {
       get: (path: string) => Response | Promise<Response>;
       post: (path: string, body: unknown) => Response | Promise<Response>;
       patch: (path: string, body: unknown) => Response | Promise<Response>;
+      put: (path: string, body: unknown) => Response | Promise<Response>;
       delete: (path: string) => Response | Promise<Response>;
     };
   };
@@ -111,6 +112,12 @@ describe("Feature: Suites REST API", () => {
         patch: (path: string, body: unknown) =>
           app.request(path, {
             method: "PATCH",
+            headers: createAuthHeaders(testApiKey),
+            body: JSON.stringify(body),
+          }),
+        put: (path: string, body: unknown) =>
+          app.request(path, {
+            method: "PUT",
             headers: createAuthHeaders(testApiKey),
             body: JSON.stringify(body),
           }),
@@ -324,6 +331,94 @@ describe("Feature: Suites REST API", () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.name).toBe("New Name");
+    });
+  });
+
+  describe("run-plan model overrides over REST", () => {
+    describe("when creating with model overrides", () => {
+      /** @scenario "Create over REST accepts run-plan model overrides" */
+      it("carries the values back on create and on read", async () => {
+        const scenario = await createScenario("Override Scenario");
+
+        const res = await helpers.api.post("/api/suites", {
+          name: "Override Suite",
+          scenarioIds: [scenario.id],
+          targets: [{ type: "http", referenceId: "agent_abc" }],
+          simulatorModel: "openai/gpt-5-mini",
+          judgeModel: "openai/latest",
+        });
+
+        expect(res.status).toBe(201);
+        const created = await res.json();
+        expect(created).toMatchObject({
+          simulatorModel: "openai/gpt-5-mini",
+          judgeModel: "openai/latest",
+        });
+
+        const readRes = await helpers.api.get(`/api/suites/${created.id}`);
+        expect(readRes.status).toBe(200);
+        const read = await readRes.json();
+        expect(read).toMatchObject({
+          simulatorModel: "openai/gpt-5-mini",
+          judgeModel: "openai/latest",
+        });
+      });
+    });
+
+    describe("when updating an override to null", () => {
+      /** @scenario "Update over REST clears a run-plan model override with null" */
+      it("clears the stored override", async () => {
+        const scenario = await createScenario("Clear Override Scenario");
+        const createRes = await helpers.api.post("/api/suites", {
+          name: "Clear Override Suite",
+          scenarioIds: [scenario.id],
+          targets: [{ type: "http", referenceId: "agent_abc" }],
+          judgeModel: "openai/gpt-5-mini",
+        });
+        const created = await createRes.json();
+
+        const updateRes = await helpers.api.patch(`/api/suites/${created.id}`, {
+          judgeModel: null,
+        });
+        expect(updateRes.status).toBe(200);
+        const updated = await updateRes.json();
+        expect(updated.judgeModel).toBeNull();
+
+        const readRes = await helpers.api.get(`/api/suites/${created.id}`);
+        const read = await readRes.json();
+        expect(read.judgeModel).toBeNull();
+      });
+    });
+
+    describe("when the override has no provider prefix", () => {
+      /** @scenario "REST rejects a run-plan model override with no provider prefix" */
+      it("rejects the create with a validation error", async () => {
+        const scenario = await createScenario("Bad Model Scenario");
+
+        const res = await helpers.api.post("/api/suites", {
+          name: "Bad Model Suite",
+          scenarioIds: [scenario.id],
+          targets: [{ type: "http", referenceId: "agent_abc" }],
+          judgeModel: "gpt-5-mini",
+        });
+
+        expect(res.status).toBe(422);
+      });
+    });
+  });
+
+  describe("PUT /api/suites/:id", () => {
+    /** @scenario "PUT updates a suite the same way PATCH does" */
+    it("updates the suite like PATCH does", async () => {
+      const suite = await createSuite({ name: "Put Me" });
+
+      const res = await helpers.api.put(`/api/suites/${suite.id}`, {
+        name: "Put Name",
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.name).toBe("Put Name");
     });
   });
 

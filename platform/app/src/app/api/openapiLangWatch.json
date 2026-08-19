@@ -46035,6 +46035,30 @@
                           ]
                         }
                       },
+                      "simulatorModel": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "judgeModel": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "maxTurns": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "minTurns": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
                       "platformUrl": {
                         "type": "string",
                         "format": "uri"
@@ -46047,6 +46071,10 @@
                       "criteria",
                       "labels",
                       "parameters",
+                      "simulatorModel",
+                      "judgeModel",
+                      "maxTurns",
+                      "minTurns",
                       "platformUrl"
                     ]
                   }
@@ -46213,6 +46241,30 @@
                         ]
                       }
                     },
+                    "simulatorModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "judgeModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "maxTurns": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "minTurns": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -46225,6 +46277,10 @@
                     "criteria",
                     "labels",
                     "parameters",
+                    "simulatorModel",
+                    "judgeModel",
+                    "maxTurns",
+                    "minTurns",
                     "platformUrl"
                   ]
                 }
@@ -46382,6 +46438,42 @@
                     },
                     "maxItems": 20,
                     "description": "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME."
+                  },
+                  "simulatorModel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "maxLength": 200,
+                    "description": "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default."
+                  },
+                  "judgeModel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "maxLength": 200,
+                    "description": "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default."
+                  },
+                  "maxTurns": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1,
+                    "maximum": 100,
+                    "description": "Maximum conversation turns for a run of this scenario. Null uses the default."
+                  },
+                  "minTurns": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Minimum conversation turns before the judge may end the run. Null uses the default."
                   }
                 },
                 "required": [
@@ -46465,6 +46557,30 @@
                         ]
                       }
                     },
+                    "simulatorModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "judgeModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "maxTurns": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "minTurns": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -46477,6 +46593,10 @@
                     "criteria",
                     "labels",
                     "parameters",
+                    "simulatorModel",
+                    "judgeModel",
+                    "maxTurns",
+                    "minTurns",
                     "platformUrl"
                   ]
                 }
@@ -46672,6 +46792,30 @@
                         ]
                       }
                     },
+                    "simulatorModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "judgeModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "maxTurns": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "minTurns": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -46684,6 +46828,10 @@
                     "criteria",
                     "labels",
                     "parameters",
+                    "simulatorModel",
+                    "judgeModel",
+                    "maxTurns",
+                    "minTurns",
                     "platformUrl"
                   ]
                 }
@@ -46869,6 +47017,380 @@
                     },
                     "maxItems": 20,
                     "description": "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME."
+                  },
+                  "simulatorModel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "maxLength": 200,
+                    "description": "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default."
+                  },
+                  "judgeModel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "maxLength": 200,
+                    "description": "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default."
+                  },
+                  "maxTurns": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1,
+                    "maximum": 100,
+                    "description": "Maximum conversation turns for a run of this scenario. Null uses the default."
+                  },
+                  "minTurns": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Minimum conversation turns before the judge may end the run. Null uses the default."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "patch": {
+        "responses": {
+          "200": {
+            "description": "Scenario updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "situation": {
+                      "type": "string"
+                    },
+                    "criteria": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "parameters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 500
+                          },
+                          "defaultValue": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 4096
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ]
+                      }
+                    },
+                    "simulatorModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "judgeModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "maxTurns": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "minTurns": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "platformUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "situation",
+                    "criteria",
+                    "labels",
+                    "parameters",
+                    "simulatorModel",
+                    "judgeModel",
+                    "maxTurns",
+                    "minTurns",
+                    "platformUrl"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Scenario not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "patchApiScenariosById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Update an existing scenario",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "situation": {
+                    "type": "string"
+                  },
+                  "criteria": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "parameters": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "description": {
+                          "type": "string",
+                          "maxLength": 500
+                        },
+                        "defaultValue": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 4096
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "boolean"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    },
+                    "maxItems": 20,
+                    "description": "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME."
+                  },
+                  "simulatorModel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "maxLength": 200,
+                    "description": "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default."
+                  },
+                  "judgeModel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "maxLength": 200,
+                    "description": "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default."
+                  },
+                  "maxTurns": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1,
+                    "maximum": 100,
+                    "description": "Maximum conversation turns for a run of this scenario. Null uses the default."
+                  },
+                  "minTurns": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Minimum conversation turns before the judge may end the run. Null uses the default."
                   }
                 }
               }
@@ -49051,6 +49573,18 @@
                           "type": "string"
                         }
                       },
+                      "simulatorModel": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "judgeModel": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
                       "createdAt": {
                         "type": "string"
                       },
@@ -49071,6 +49605,8 @@
                       "targets",
                       "repeatCount",
                       "labels",
+                      "simulatorModel",
+                      "judgeModel",
                       "createdAt",
                       "updatedAt",
                       "platformUrl"
@@ -49237,6 +49773,18 @@
                         "type": "string"
                       }
                     },
+                    "simulatorModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "judgeModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -49257,6 +49805,8 @@
                     "targets",
                     "repeatCount",
                     "labels",
+                    "simulatorModel",
+                    "judgeModel",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
@@ -49410,6 +49960,24 @@
                       "type": "string"
                     },
                     "default": []
+                  },
+                  "simulatorModel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "maxLength": 200,
+                    "description": "Model for the simulated user in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default."
+                  },
+                  "judgeModel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "maxLength": 200,
+                    "description": "Model for the judge in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default."
                   }
                 },
                 "required": [
@@ -49492,6 +50060,18 @@
                         "type": "string"
                       }
                     },
+                    "simulatorModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "judgeModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -49512,6 +50092,8 @@
                     "targets",
                     "repeatCount",
                     "labels",
+                    "simulatorModel",
+                    "judgeModel",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
@@ -49707,6 +50289,18 @@
                         "type": "string"
                       }
                     },
+                    "simulatorModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "judgeModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -49727,6 +50321,8 @@
                     "targets",
                     "repeatCount",
                     "labels",
+                    "simulatorModel",
+                    "judgeModel",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
@@ -49911,6 +50507,335 @@
                     "items": {
                       "type": "string"
                     }
+                  },
+                  "simulatorModel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "maxLength": 200,
+                    "description": "Model for the simulated user in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default."
+                  },
+                  "judgeModel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "maxLength": 200,
+                    "description": "Model for the judge in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "put": {
+        "responses": {
+          "200": {
+            "description": "Suite updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "scenarioIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "targets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "prompt",
+                              "http",
+                              "code",
+                              "workflow"
+                            ]
+                          },
+                          "referenceId": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "referenceId"
+                        ]
+                      }
+                    },
+                    "repeatCount": {
+                      "type": "number"
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "simulatorModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "judgeModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "platformUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "description",
+                    "scenarioIds",
+                    "targets",
+                    "repeatCount",
+                    "labels",
+                    "simulatorModel",
+                    "judgeModel",
+                    "createdAt",
+                    "updatedAt",
+                    "platformUrl"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Suite not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "putApiSuitesById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Update a suite (run plan)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "scenarioIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1
+                  },
+                  "targets": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "prompt",
+                            "http",
+                            "code",
+                            "workflow"
+                          ]
+                        },
+                        "referenceId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "referenceId"
+                      ]
+                    },
+                    "minItems": 1
+                  },
+                  "repeatCount": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "simulatorModel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "maxLength": 200,
+                    "description": "Model for the simulated user in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default."
+                  },
+                  "judgeModel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[a-zA-Z0-9_-]+\\/.+$",
+                    "maxLength": 200,
+                    "description": "Model for the judge in every scenario of this plan, e.g. openai/gpt-5-mini. Null uses each scenario's own override or the project default."
                   }
                 }
               }
@@ -50136,6 +51061,18 @@
                         "type": "string"
                       }
                     },
+                    "simulatorModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "judgeModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -50156,6 +51093,8 @@
                     "targets",
                     "repeatCount",
                     "labels",
+                    "simulatorModel",
+                    "judgeModel",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
