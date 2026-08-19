@@ -44,6 +44,15 @@ minimumReleaseAgeExclude:
   - ws@8.21.1
   - "@browserbasehq/sdk@2.16.0"
   - postcss@8.5.19
+  # deepmerge-ts prototype pollution: the patched 8.0.0 (and 8.0.1) both
+  # published 2026-08-16, inside the age gate. Drop this once they age out.
+  - deepmerge-ts@8.0.0
+  # Collateral of the security re-resolve below, NOT a new dependency: 1.11.23
+  # is already the version this lockfile carries for mermaid's dayjs, but it
+  # published 2026-08-17 and re-resolving re-tests it against the gate, which
+  # fails the whole install. Drop this once it ages out (2026-08-24).
+  - dayjs@1.11.23
+  - es-toolkit@1.51.0
 
 # The union of what the six roots each pinned separately. Overrides are
 # workspace-root-only in pnpm, which is precisely why the old split let these
@@ -85,7 +94,9 @@ overrides:
   react-dom: ^19.2.7
   react-is: ^19.2.7
   kysely: 0.28.17
-  postcss: ^8.5.13
+  # Raised from ^8.5.13 to clear a postcss parsing DoS: the caret already
+  # permitted 8.5.23, but resolution was sitting on a vulnerable 8.5.x.
+  postcss: ^8.5.23
   lodash: ^4.18.1
   glob: ^11.1.0
   picomatch: ">=4.0.4"
@@ -100,8 +111,9 @@ overrides:
   "@langchain/community>fast-xml-parser": ^5.7.0
 
   # --- Security ---
-  # shell-quote quote() newline escaping (CRITICAL)
-  "shell-quote@<1.8.4": ">=1.8.4"
+  # shell-quote quote() newline escaping (CRITICAL), then a further escaping
+  # bypass fixed in 1.9.0 — 1.8.4 itself is vulnerable to the follow-up.
+  "shell-quote@<1.9.0": ">=1.9.0"
   # esbuild Deno binary integrity RCE + dev-server file read
   # (GHSA-gv7w-rqvm-qjhr / GHSA-g7r4-m6w7-qqqr)
   "esbuild@<0.28.1": ">=0.28.1"
@@ -125,19 +137,37 @@ overrides:
   cross-spawn: ^7.0.6
   "exec-sh": ^0.4.0
   tmp: ">=0.2.6"
-  # @hono/node-server request smuggling
+  # @hono/node-server request smuggling. Per-major: the 2.x line is a separate
+  # advisory and an unconditional floor would force 1.x dependents onto 2.
   "@hono/node-server@<1.19.13": ">=1.19.13"
-  # undici DoS / request smuggling
+  "@hono/node-server@>=2.0.0 <2.0.10": ">=2.0.10"
+  # ...and path-scoped for the MCP SDK specifically. With two range selectors
+  # already present for this name, pnpm matched only the first and left the
+  # SDK's own `@hono/node-server: 2.0.6` (inside the advisory range) in place.
+  # Verified: without this line the lockfile still resolves a vulnerable 2.0.6.
+  "@modelcontextprotocol/sdk>@hono/node-server": ">=2.0.10"
+  # undici DoS / request smuggling. The 8.x line carries its own advisory and
+  # was previously unpinned entirely.
   "undici@>=6.0.0 <6.27.0": ">=6.27.0 <7"
   "undici@>=7.0.0 <7.28.0": ">=7.28.0 <8"
-  # vitest advisory floor
+  "undici@>=8.0.0 <8.9.0": ">=8.9.0 <9"
+  # vitest advisory floor. @vitest/browser is a separate package with its own
+  # CRITICAL advisory (Browser Mode provider commands bypass the file-access
+  # permission gate) and is NOT covered by the vitest pin.
   "vitest@<4.1.0": ">=4.1.0"
-  "brace-expansion@>=4.0.0 <5.0.6": ">=5.0.6"
+  "@vitest/browser@>=4.0.0 <4.1.10": ">=4.1.10"
+  # brace-expansion ReDoS. Five major lines are published and the tree carries
+  # 1.x, 2.x and 5.x, so each needs its own floor; an unconditional pin would
+  # force every dependent onto 5.x. The 4.x line is stagnant at 4.0.1 and its
+  # advisory range resolves up into 5.x, which is why 4 and 5 share a selector.
+  "brace-expansion@<1.1.18": ">=1.1.18 <2"
+  "brace-expansion@>=2.0.0 <2.1.4": ">=2.1.4 <3"
+  "brace-expansion@>=4.0.0 <5.0.9": ">=5.0.9"
   "file-type@>=13.0.0 <21.3.1": ">=21.3.1 <22"
   "prismjs@<1.30.0": ">=1.30.0"
   "@grpc/grpc-js@<1.14.4": ">=1.14.4"
   "js-yaml@>=3.0.0 <3.15.0": ">=3.15.0 <4"
-  "dompurify@<3.4.11": ">=3.4.11 <4"
+  "dompurify@<3.4.13": ">=3.4.13 <4"
   # validator incomplete filtering (#216) via class-validator
   "validator@<13.15.22": ">=13.15.22"
   # express-rate-limit DoS (from mcp/typescript)
@@ -152,8 +182,25 @@ overrides:
   "axios@>=1.0.0 <1.16.0": ">=1.16.0"
   # fast-xml-builder attribute value quote bypass (#1028)
   "fast-xml-builder@<1.1.7": ">=1.1.7"
-  # fast-uri path traversal + host confusion (#1031-#1042)
-  "fast-uri@<3.1.2": ">=3.1.2"
+  # fast-uri path traversal + host confusion (#1031-#1042), with two further
+  # advisories fixed in 3.1.4 and 3.1.5.
+  "fast-uri@<3.1.5": ">=3.1.5"
+  # systeminformation command injection / privilege issues across five
+  # advisories; 5.31.7 is the first release above all of them.
+  "systeminformation@<5.31.7": ">=5.31.7"
+  # deepmerge-ts prototype pollution. Pinned to the exact patched release
+  # rather than a range: 8.0.0 and 8.0.1 both published 2026-08-16 and are
+  # inside the minimumReleaseAge window, so only the exact version named in
+  # minimumReleaseAgeExclude below can resolve. Widen to a range and drop the
+  # exclude once 8.0.x ages past the gate.
+  "deepmerge-ts@<8.0.0": "8.0.0"
+  # body-parser DoS on malformed urlencoded input.
+  "body-parser@<1.20.6": ">=1.20.6"
+  # @langchain/community SSRF / path traversal in loaders.
+  "@langchain/community@<=1.1.17": ">=1.1.18"
+  # OpenTelemetry core + Jaeger propagator parsing advisories.
+  "@opentelemetry/core@<2.8.0": ">=2.8.0"
+  "@opentelemetry/propagator-jaeger@<2.9.0": ">=2.9.0"
   # protobufjs code execution, prototype pollution, DoS, Any-expansion DoS and
   # property shadowing (GHSA-xq3m-2v4x-88gg, GHSA-66ff-xgx4-vchm,
   # GHSA-75px-5xx7-5xc7, GHSA-jvwf-75h9-cwgg, GHSA-685m-2w69-288q,
@@ -187,12 +234,12 @@ overrides:
   "@opentelemetry/sdk-node@<0.217.0": ">=0.217.0"
   # From skills/ (liquidjs is in the alignment block above, intersected with
   # platform/app/'s narrower `>=10.6 <11`)
-  "hono@<4.12.25": ">=4.12.25"
+  "hono@<4.12.34": ">=4.12.34"
   "uuid@<11.1.1": ">=11.1.1 <12"
-  "ip-address@<=10.1.0": ">=10.1.1"
+  "ip-address@<10.3.1": ">=10.3.1"
   "qs@>=6.11.1 <=6.15.1": ">=6.15.2"
   "form-data@<4.0.6": ">=4.0.6"
-  "js-yaml@>=4.0.0 <4.2.0": ">=4.2.0 <5"
+  "js-yaml@>=4.0.0 <4.3.1": ">=4.3.1 <5"
 
   # --- vite ---
   # platform/app/pnpm-workspace.yaml carried an unconditional `vite: 8.0.10`, but

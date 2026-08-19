@@ -79,6 +79,38 @@ override-dependencies = [
     "pydantic-settings>=2.14.2",  # security: pydantic-settings advisory (#1517)
     # security: GHSA circular JSON Schema $ref unbounded-CPU DoS; patched in 0.60.1.
     "json-repair>=0.60.1",
+    # --- Security floors below carry no API change for this workspace. Each is
+    # the first patched release named by the advisory that produced the alert;
+    # raise a floor rather than removing it, so a transitive downgrade can never
+    # walk back under a fix.
+    #
+    # litellm auth bypass via Host header injection AND via OIDC userinfo cache
+    # key collision (both CRITICAL), plus four further advisories fixed across
+    # 1.83.7 / 1.83.10 / 1.83.14. 1.84.0 is the first release above all of them.
+    "litellm>=1.84.0",
+    # Pillow: heap overflow / DoS across several decoders.
+    "pillow>=12.3.0",
+    # nltk unsafe deserialization in the pickle loader path.
+    "nltk>=3.10.0",
+    # pyasn1 decoder DoS on crafted BER/DER input.
+    "pyasn1>=0.6.4",
+    # aiohttp request smuggling and header-parsing advisories.
+    "aiohttp>=3.14.3",
+    # cryptography: bundled OpenSSL advisories.
+    "cryptography>=50.0.0",
+    # h2 HTTP/2 control-frame flood DoS.
+    "h2>=4.4.1",
+    # setuptools path traversal in PackageIndex.
+    "setuptools>=83.0.0",
+    # torch: deserialization advisory in torch.load.
+    "torch>=2.13.0",
+    #
+    # NOT fixed here, deliberately:
+    #   langchain / langchain-core / langchain-openai / langchain-text-splitters
+    #     — this workspace is on the 0.3.x line and every patched version is on
+    #       1.x, so clearing those four alerts is a breaking major upgrade of the
+    #       evaluator surface, not a floor bump. Tracked separately.
+    #   ragas, diskcache — no patched release exists upstream yet.
 ]
 
 [tool.uv.workspace]

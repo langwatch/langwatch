@@ -132,6 +132,51 @@ updates:
           - "minor"
           - "patch"
 
+  # The other two uv projects. Both were missing here, so neither got scheduled
+  # version updates and their locks only ever moved when an advisory-triggered
+  # security PR fired — which for services/langevals was never: it had accrued
+  # 47 open alerts, two of them critical, with zero dependabot PRs raised in the
+  # project's history. A lock that never moves also drifts far enough that a
+  # single security bump stops resolving cleanly, which is how the backlog
+  # became self-sustaining. Same shape as /sdks/python above.
+  - package-ecosystem: "uv"
+    directory: "/services/langevals"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 50
+    cooldown:
+      default-days: 8
+    groups:
+      langchain:
+        applies-to: version-updates
+        patterns:
+          - "langchain*"
+      minor-and-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "uv"
+    directory: "/mcp/typescript"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 50
+    cooldown:
+      default-days: 8
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
