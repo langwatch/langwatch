@@ -6,6 +6,7 @@ import signal
 import sys
 import threading
 import time
+import anyio.to_thread
 import dotenv
 from fastapi.responses import RedirectResponse
 
@@ -44,6 +45,7 @@ def handle_sigterm(signum, frame):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    size_thread_pool_for_evaluations()
     if os.getenv("RUNNING_IN_DOCKER"):
         signal.signal(signal.SIGTERM, handle_sigterm)
         signal.signal(signal.SIGINT, handle_sigterm)
@@ -64,8 +66,27 @@ MAX_EVALUATIONS_IN_PARALLEL = (
     positive_int_or_none(os.getenv("MAX_EVALUATIONS_IN_PARALLEL")) or 50
 )
 MAX_CONCURRENT_EVALUATIONS = (
-    positive_int_or_none(os.getenv("MAX_CONCURRENT_EVALUATIONS")) or 8
+    positive_int_or_none(os.getenv("MAX_CONCURRENT_EVALUATIONS")) or 64
 )
+# Spare threads for anything the framework runs off the event loop that is not
+# an evaluation. The pool is sized from the knob plus this, never below it.
+THREAD_POOL_HEADROOM = 8
+
+
+def size_thread_pool_for_evaluations() -> None:
+    """Give the worker-thread pool room for every evaluation the gate admits.
+
+    The evaluate endpoints are sync, so FastAPI runs them on AnyIO's shared
+    worker-thread pool, which holds 40 threads by default. A request with no
+    thread waits BEFORE it reaches the gate, where nothing knows its
+    credentials, so a pool smaller than the gate would both cap the knob
+    silently and decide the running order the gate is there to decide.
+    Sizing the pool from the knob keeps the gate the only limit.
+    """
+    limiter = anyio.to_thread.current_default_thread_limiter()
+    wanted = MAX_CONCURRENT_EVALUATIONS + THREAD_POOL_HEADROOM
+    if limiter.total_tokens < wanted:
+        limiter.total_tokens = wanted
 
 
 def model_env_key(env: Optional[dict[str, str]]) -> tuple:

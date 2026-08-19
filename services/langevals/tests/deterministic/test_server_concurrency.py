@@ -21,6 +21,7 @@ import sys
 import threading
 import time
 
+import anyio.to_thread
 import httpx
 import pytest
 
@@ -69,6 +70,11 @@ class ManualClock:
     def advance(self, seconds: float) -> None:
         with self._lock:
             self._now += seconds
+
+
+# AnyIO's default worker-thread pool, which is what caps sync endpoints
+# until the server sizes it for the gate.
+ANYIO_DEFAULT_THREAD_POOL = 40
 
 
 def wait_until(condition, description: str, timeout: float = 5) -> None:
@@ -134,6 +140,63 @@ async def test_same_env_evaluations_run_concurrently(slow_exact_match):
     # Four 0.8s evaluations sharing one env must overlap: serialized they
     # would take at least 3.2s.
     assert wall < 2.4
+
+
+@pytest.mark.anyio
+async def test_the_thread_pool_has_room_for_every_evaluation_the_gate_admits():
+    limiter = anyio.to_thread.current_default_thread_limiter()
+    assert limiter.total_tokens == ANYIO_DEFAULT_THREAD_POOL
+    async with server.lifespan(server.app):
+        assert limiter.total_tokens >= server.MAX_CONCURRENT_EVALUATIONS
+
+
+@pytest.mark.anyio
+async def test_a_burst_wider_than_the_default_thread_pool_runs_together(
+    slow_exact_match,
+):
+    """The knob decides the width, not the framework's thread pool.
+
+    Sync endpoints run on AnyIO's worker threads, and a request with no
+    thread waits before it reaches the gate. With the pool left at its
+    default the gate could never admit more than 40 evaluations whatever the
+    knob said, and the requests above that would queue where the gate cannot
+    order them.
+    """
+    if server.MAX_CONCURRENT_EVALUATIONS <= ANYIO_DEFAULT_THREAD_POOL:
+        pytest.skip("the knob is below the default pool, so there is nothing to prove")
+
+    burst = ANYIO_DEFAULT_THREAD_POOL + 8
+    env = {"OPENAI_API_KEY": "one-tenant"}
+    peak = 0
+
+    async def sample_active():
+        nonlocal peak
+        while True:
+            peak = max(peak, server.evaluation_gate.active_evaluations)
+            await asyncio.sleep(0.005)
+
+    transport = httpx.ASGITransport(app=server.app)
+    async with server.lifespan(server.app):
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://test", timeout=120
+        ) as client:
+            sampler = asyncio.create_task(sample_active())
+            try:
+                responses = await asyncio.gather(
+                    *(
+                        client.post(
+                            "/langevals/exact_match/evaluate",
+                            json=evaluation_request(env),
+                        )
+                        for _ in range(burst)
+                    )
+                )
+            finally:
+                sampler.cancel()
+
+    assert all(r.status_code == 200 for r in responses)
+    assert len(slow_exact_match) == burst
+    assert peak > ANYIO_DEFAULT_THREAD_POOL
 
 
 @pytest.mark.anyio
