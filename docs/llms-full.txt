@@ -19287,6 +19287,8 @@ module.exports = nextConfig;
 // ./src/instrumentation.ts - Configure LangWatch export
 import { registerOTel } from '@vercel/otel';
 import { LangWatchExporter } from 'langwatch';
+import { registerTelemetry } from 'ai';
+import { OpenTelemetry } from '@ai-sdk/otel';
 
 export function register() {
   registerOTel({
@@ -19296,15 +19298,15 @@ export function register() {
       projectId: process.env.LANGWATCH_PROJECT_ID, // Required for service API keys
     })
   });
+
+  // AI SDK 7 emits no spans until an integration is registered
+  registerTelemetry(new OpenTelemetry());
 }
 
-// ./src/index.ts - Enable telemetry where needed
+// ./src/index.ts - every call now reports automatically
 const result = await generateText({
   model: openai('gpt-5'),
   prompt: 'How many calories do I burn jumping to conclusions?',
-  experimental_telemetry: {
-    isEnabled: true, // Ensure telemetry is active for relevant operations
-  },
 });
 ```
     </CodeGroup>
@@ -28017,20 +28019,31 @@ Then work through:
 
 ### Vercel AI SDK
 
-When using the Vercel AI SDK, enable telemetry so usage is captured:
+When using the Vercel AI SDK, register the OpenTelemetry integration once at
+startup so usage is captured:
 
 ```typescript
-import { generateText } from "ai";
+import { generateText, registerTelemetry } from "ai";
+import { OpenTelemetry } from "@ai-sdk/otel";
 import { openai } from "@ai-sdk/openai";
+
+registerTelemetry(new OpenTelemetry());
 
 const result = await generateText({
   model: openai("gpt-5-mini"),
   prompt: "Hello!",
-  experimental_telemetry: { isEnabled: true },
 });
 ```
 
-Token usage flows through the `ai.usage.promptTokens` / `ai.usage.completionTokens` attributes automatically.
+Token usage then flows through the `gen_ai.usage.input_tokens` /
+`gen_ai.usage.output_tokens` attributes automatically.
+
+<Note>
+  On AI SDK 6 and earlier, drop `registerTelemetry` and set
+  `experimental_telemetry: { isEnabled: true }` on each call instead; usage
+  arrives as `ai.usage.promptTokens` / `ai.usage.completionTokens`. AI SDK 7
+  emits nothing at all until an integration is registered.
+</Note>
 
 ## Getting Help
 
@@ -28073,7 +28086,8 @@ If your instrumentation already emits any of the signals below, TTFT shows up wi
 
 | Source | Signal |
 |--------|--------|
-| Vercel AI SDK | `ai.response.msToFirstChunk` span attribute |
+| Vercel AI SDK 7+ | `gen_ai.client.operation.time_to_first_chunk` span attribute (seconds) |
+| Vercel AI SDK 6 and earlier | `ai.response.msToFirstChunk` span attribute (milliseconds) |
 | OpenLLMetry / OpenLIT instrumentors | `llm.content.completion.chunk` / `First Token Stream Event` span events |
 | OTel GenAI semconv emitters | `gen_ai.server.time_to_first_token` span attribute (milliseconds) |
 | LangWatch SDKs | `timestamps.first_token_at` on the span (see below) |
@@ -28081,7 +28095,7 @@ If your instrumentation already emits any of the signals below, TTFT shows up wi
 When more than one LLM span in a trace reports a TTFT, the trace-level value is the smallest one, the first token the user could have seen.
 
 <Note>
-  If you stream through the Vercel AI SDK with `experimental_telemetry` enabled, TTFT is captured automatically from `ai.response.msToFirstChunk`, nothing to do.
+  If you stream through the Vercel AI SDK, TTFT is captured automatically, nothing to do. On AI SDK 7 this requires `registerTelemetry(new OpenTelemetry())` from `@ai-sdk/otel` at startup — without it the SDK emits no spans at all.
 </Note>
 
 ## Setting TTFT manually
@@ -29455,10 +29469,10 @@ Only spans created through `lwProvider.getTracer()` go to LangWatch. The global
 provider is untouched.
 
 <Note>
-Auto-instrumentations that emit spans through the global OTel API (like Vercel
-AI SDK's `experimental_telemetry`) send spans to the global provider, not the
-dedicated one. For those, use `lwProvider.getTracer()` directly to create LLM
-spans on the isolated provider.
+Auto-instrumentations that emit spans through the global OTel API (like the
+Vercel AI SDK's `@ai-sdk/otel` integration) send spans to the global provider,
+not the dedicated one. For those, use `lwProvider.getTracer()` directly to
+create LLM spans on the isolated provider.
 </Note>
 
 ## Alternative: Coexistence (TypeScript)
@@ -35997,11 +36011,13 @@ async function customerSupportGeneration() {
       input: "I need help with my account",
     });
 
-    // Use with AI SDK (native instrumentation support)
+    // Use with AI SDK (native instrumentation support). A compiled prompt
+    // carries your system turn inside `messages`, so AI SDK 7 needs
+    // allowSystemInMessages to accept it.
     const result = await generateText({
       model: openai(prompt.model.replace("openai/", "")),
       messages: compiledPrompt.messages,
-      experimental_telemetry: { isEnabled: true },
+      allowSystemInMessages: true,
     });
 
     return result.text;
@@ -52281,7 +52297,7 @@ langwatch trace get <traceId> -f json    # Full span hierarchy as JSON
 
 For traces that look problematic, check for:
 
-- **Empty input/output**: The most common issue. Check if `autotrack_openai_calls(client)` (Python) or `experimental_telemetry` (TypeScript/Vercel AI) is configured.
+- **Empty input/output**: The most common issue. Check if `autotrack_openai_calls(client)` (Python) or the telemetry integration (TypeScript/Vercel AI) is configured. On AI SDK 7 that means `registerTelemetry(new OpenTelemetry())` from `@ai-sdk/otel` at startup; on AI SDK 6 and earlier, `experimental_telemetry: { isEnabled: true }` per call.
 - **Disconnected spans**: Spans that don't connect to a parent trace. Usually means `@langwatch.trace()` decorator is missing on the entry function.
 - **Missing labels**: No way to filter traces by feature/version. Add labels via `langwatch.get_current_trace().update(metadata={"labels": ["feature_name"]})`.
 - **Missing user_id/thread_id**: Can't correlate traces to users or conversations. Add via trace metadata.
@@ -52324,7 +52340,7 @@ langwatch trace export --format jsonl --limit 50 -o traces.jsonl
 
 | Issue | Cause | Fix |
 |-------|-------|-----|
-| All traces show `<empty>` input/output | Missing autotrack or telemetry config | Add `autotrack_openai_calls(client)` or `experimental_telemetry: { isEnabled: true }` |
+| All traces show `<empty>` input/output | Missing autotrack or telemetry config | Add `autotrack_openai_calls(client)`, or `registerTelemetry(new OpenTelemetry())` on AI SDK 7 (`experimental_telemetry: { isEnabled: true }` on AI SDK 6 and earlier) |
 | Spans not connected to traces | Missing `@langwatch.trace()` on entry function | Add trace decorator to the main function |
 | No labels on traces | Labels not set in trace metadata | Add `metadata={"labels": ["feature"]}` to trace update |
 | Missing user_id | User ID not passed to trace | Add `user_id` to trace metadata |

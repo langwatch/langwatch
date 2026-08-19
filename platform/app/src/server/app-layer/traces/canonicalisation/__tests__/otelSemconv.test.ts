@@ -189,6 +189,24 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
       });
     });
 
+    describe("when the span carries gen_ai.client.operation.time_to_first_chunk", () => {
+      it("canonicalises the AI SDK 7 key to gen_ai.server.time_to_first_token", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.client.operation.time_to_first_chunk": 0.65,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(
+          result.attributes["gen_ai.server.time_to_first_token"],
+        ).toBeCloseTo(650, 5);
+      });
+    });
+
     describe("when an existing time_to_first_token is already present", () => {
       it("does not overwrite it with the chunk-derived value", () => {
         const result = service.canonicalize(

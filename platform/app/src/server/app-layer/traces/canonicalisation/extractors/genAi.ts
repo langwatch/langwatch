@@ -318,16 +318,19 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // summary TTFT and the span first_token timing both populate. An explicit
     // time_to_first_token already on the span wins.
     // ─────────────────────────────────────────────────────────────────────────
-    const timeToFirstChunkSeconds = asNumber(
-      attrs.get(ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK),
-    );
+    const timeToFirstChunkKey = attrs.has(
+      ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK,
+    )
+      ? ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK
+      : ATTR_KEYS.GEN_AI_CLIENT_OPERATION_TIME_TO_FIRST_CHUNK;
+    const timeToFirstChunkSeconds = asNumber(attrs.get(timeToFirstChunkKey));
     if (
       timeToFirstChunkSeconds !== null &&
       timeToFirstChunkSeconds >= 0 &&
       ctx.out[ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN] === undefined &&
       !attrs.has(ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN)
     ) {
-      attrs.delete(ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK);
+      attrs.delete(timeToFirstChunkKey);
       ctx.setAttr(
         ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN,
         timeToFirstChunkSeconds * 1000,

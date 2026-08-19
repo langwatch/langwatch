@@ -178,20 +178,31 @@ Then work through:
 
 ### Vercel AI SDK
 
-When using the Vercel AI SDK, enable telemetry so usage is captured:
+When using the Vercel AI SDK, register the OpenTelemetry integration once at
+startup so usage is captured:
 
 ```typescript
-import { generateText } from "ai";
+import { generateText, registerTelemetry } from "ai";
+import { OpenTelemetry } from "@ai-sdk/otel";
 import { openai } from "@ai-sdk/openai";
+
+registerTelemetry(new OpenTelemetry());
 
 const result = await generateText({
   model: openai("gpt-5-mini"),
   prompt: "Hello!",
-  experimental_telemetry: { isEnabled: true },
 });
 ```
 
-Token usage flows through the `ai.usage.promptTokens` / `ai.usage.completionTokens` attributes automatically.
+Token usage then flows through the `gen_ai.usage.input_tokens` /
+`gen_ai.usage.output_tokens` attributes automatically.
+
+<Note>
+  On AI SDK 6 and earlier, drop `registerTelemetry` and set
+  `experimental_telemetry: { isEnabled: true }` on each call instead; usage
+  arrives as `ai.usage.promptTokens` / `ai.usage.completionTokens`. AI SDK 7
+  emits nothing at all until an integration is registered.
+</Note>
 
 ## Getting Help
 
