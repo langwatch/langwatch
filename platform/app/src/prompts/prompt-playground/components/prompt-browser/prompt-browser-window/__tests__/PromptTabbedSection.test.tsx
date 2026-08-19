@@ -407,22 +407,10 @@ vi.mock("../../ui/TabContext", () => ({
   useTabId: () => tabIdRef.current,
 }));
 
-// Mock CopilotKit
-vi.mock("@copilotkit/react-core", () => ({
-  CopilotKit: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useCopilotChat: () => ({
-    visibleMessages: [],
-    appendMessage: vi.fn(),
-    setMessages: vi.fn(),
-    isLoading: false,
-  }),
-  useCopilotContext: () => ({
-    chatComponentsCache: { current: {} },
-  }),
-}));
-
-vi.mock("@copilotkit/react-ui", () => ({
-  CopilotChat: () => <div data-testid="copilot-chat">CopilotChat</div>,
+// The chat mounts the shared conversation renderer, which reaches tRPC for
+// each turn's trace. This suite is about the tab section around it.
+vi.mock("../../../chat/PromptPlaygroundChat", () => ({
+  PromptPlaygroundChat: () => <div data-testid="playground-chat" />,
 }));
 
 /**

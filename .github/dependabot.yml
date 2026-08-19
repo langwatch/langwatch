@@ -66,10 +66,6 @@ updates:
         patterns:
           - "@opentelemetry/*"
           - "import-in-the-middle"
-      copilotkit:
-        applies-to: version-updates
-        patterns:
-          - "@copilotkit/*"
       vitest:
         applies-to: version-updates
         patterns:

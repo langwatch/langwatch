@@ -1,17 +1,22 @@
 /**
- * Turn separator line for the run detail conversation, matching the
- * Traces V2 conversation view: a hairline with "TURN N" centered. When the
- * turn's trace has landed, the separator grows a "View trace" affordance —
- * hover previews the trace, click opens the trace drawer.
+ * Turn separator for a conversation: a hairline with "TURN N" centred.
+ *
+ * When the turn's trace has landed the separator grows a "View trace"
+ * affordance — hover previews the trace, click opens the trace drawer. Until
+ * then it stays a plain rule, because advertising a trace that 404s is worse
+ * than waiting a beat for one that opens.
+ *
+ * Shared by every conversation surface, so the way you get from a message to
+ * its trace is the same wherever you are reading one.
  */
 
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { LuListTree } from "react-icons/lu";
-import { TRACE_QUERY_CONFIG } from "~/components/copilot-kit/TraceMessage";
 import { TracePreviewHoverCard } from "~/features/traces-v2/components/TraceIdPeek";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import { api } from "~/utils/api";
+import { TRACE_QUERY_CONFIG } from "./traceQuery";
 
 function SeparatorLine() {
   return (
@@ -65,7 +70,7 @@ function SeparatorLabel({
   );
 }
 
-export function RunTurnSeparator({
+export function TurnSeparator({
   index,
   traceId,
 }: {

@@ -17,7 +17,6 @@ import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { app as analyticsApp } from "~/app/api/analytics/[...route]/app";
-import { app as copilotkitApp } from "~/app/api/copilotkit/[[...route]]/app";
 import { app as experimentsApp } from "~/app/api/experiments/[[...route]]/app";
 import { app as modelDefaultsApp } from "~/app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "~/app/api/model-providers/[[...route]]/app";
@@ -240,15 +239,6 @@ describe("Feature: migrated Hono apps enforce RBAC + tenant isolation", () => {
     it("forbids GET /api/experiments for a workflows:view-only key (decoupled from experiments)", async () => {
       const res = await experimentsApp.request("/api/experiments", {
         headers: headers(workflowsViewerTokenA, projectA1.id),
-      });
-      expect(res.status).toBe(403);
-    });
-
-    it("forbids POST /api/copilotkit (requires prompts:view)", async () => {
-      const res = await copilotkitApp.request("/api/copilotkit", {
-        method: "POST",
-        headers: headers(readOnlyTokenA, projectA1.id),
-        body: JSON.stringify({}),
       });
       expect(res.status).toBe(403);
     });
