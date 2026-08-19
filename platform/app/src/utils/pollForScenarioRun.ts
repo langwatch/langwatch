@@ -56,10 +56,7 @@ export type PollResult =
  *
  * The table is exhaustive over `ScenarioRunStatus` with no index signature, so
  * adding a status to the enum is a compile error here until it is classified.
- * That is deliberate: an unclassified terminal status would read as "still
- * running", and the poll would burn its whole budget and report a false
- * timeout — the exact bug this module was fixed for. Mirrors the
- * exhaustive-switch rule in `scenario-run-category.ts`.
+ * Mirrors the exhaustive-switch rule in `scenario-run-category.ts`.
  */
 const TERMINAL_STATUS_OUTCOME: Record<
   ScenarioRunStatus,
@@ -79,9 +76,17 @@ const TERMINAL_STATUS_OUTCOME: Record<
 function classifyTerminalStatus(
   status: ScenarioRunStatus,
 ): "run_failed" | "run_error" | null {
-  // The `?? null` is not dead: tRPC does not runtime-validate its output, so a
-  // stored row carrying a status this build's enum does not know still arrives
-  // here. Falling back to "still running" is the safe read.
+  // The `?? null` is not dead code. tRPC does not runtime-validate its output,
+  // so a status added to the server after this client shipped arrives here
+  // unclassified, and the compile-time exhaustiveness above cannot see it.
+  //
+  // null makes the caller fall through to "a run exists, hand it back", not to
+  // a timeout — the loop only keeps polling while no run is visible at all.
+  // That is the right read for an unknown status: it could be a new active
+  // state or a new failure state and we cannot tell which, so we show the user
+  // the run and let the run page report the truth. Classifying it as an error
+  // instead would put a red "the scenario encountered an error" toast on a
+  // healthy run, which is the bug this module was fixed for.
   return TERMINAL_STATUS_OUTCOME[status] ?? null;
 }
 
