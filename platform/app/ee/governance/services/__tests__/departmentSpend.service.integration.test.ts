@@ -257,7 +257,7 @@ describe("ActivityMonitorService.spendByDepartment", () => {
 
       // The whole org's spend rolls up (2 + 3 + 1 = 6), proving the card is
       // not limited to a single governance ingestion project.
-      const total = rows.reduce((sum, r) => sum + r.spendUsd, 0);
+      const total = rows.reduce((sum, r) => sum + Number(r.spendUsd), 0);
       expect(total).toBeCloseTo(6.0, 2);
     });
   });
@@ -270,7 +270,7 @@ describe("ActivityMonitorService.spendByDepartment", () => {
         organizationId: org.id,
         windowDays: 7,
       });
-      const total = rows.reduce((sum, r) => sum + r.spendUsd, 0);
+      const total = rows.reduce((sum, r) => sum + Number(r.spendUsd), 0);
       // The cross-org $50 must not leak - primary's total stays at $6.
       expect(total).toBeLessThan(10);
       // The Engineering row is this org's $3 agent spend, not the cross

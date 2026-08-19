@@ -94,8 +94,10 @@ function isNotFoundError(error: unknown): boolean {
   return readHandledError(error)?.httpStatus === 404;
 }
 
-const fmtUsd = (n: number) =>
-  n === 0 ? "$0.00" : numeral(n).format("$0,0.0000");
+const fmtUsd = (n: number | string) => {
+  const v = typeof n === "string" ? Number(n) : n;
+  return v === 0 ? "$0.00" : numeral(v).format("$0,0.0000");
+};
 
 const fmtRelative = (iso: string | null): string => {
   if (!iso) return "-";
