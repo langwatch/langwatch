@@ -1,57 +1,51 @@
-Feature: Deployment impact gate skips manifest-only dependency bumps
-  The deployment-impact-check workflow fails a PR that touches charts/,
-  services/, ADRs, best-practices docs, .env.example, or self-hosting docs
-  without a filled-in "## Deployment Impact" section. Its `services/**`
-  trigger path matches every dependency-manifest bump under
-  services/langevals, services/aigateway, and services/nlpgo too, but a pure
-  lockfile/manifest diff cannot add an env var, a helm value, or change
-  `helm install` behavior — it has no deployment surface by construction.
-  Dependabot never writes that section, so this recurring false positive
-  blocked every services/* dependency PR from merging.
-
-  The manifest-only exemption is restricted to dependabot: pyproject.toml,
-  package.json, go.mod, and Cargo.toml are hand-edited manifests, not pure
-  lockfiles, so a human PR touching only one of them could still slip in a
-  real deployment-relevant change (a new package.json postinstall script, a
-  build-system change) alongside a version bump.
+Feature: Deployment-impact check skips manifest-only dependency bumps
+  As a dependency-bump author (dependabot, or a human running a routine
+  version bump)
+  I want a PR that only changes resolved dependency versions to merge without
+  writing a deployment-impact writeup
+  So that routine version bumps are not blocked by a requirement that only
+  makes sense for PRs that actually touch deployed behavior
 
   Background:
     Given a pull request whose head repo matches the target repo
     And the branch is not a release-please branch
+    And the PR touches an area the deployment-impact check normally requires
+      a "## Deployment Impact" section for
+
+  A pure lockfile (an auto-generated resolution snapshot: nothing hand-edits
+  it) can't add an env var, a helm value, or change default install
+  behavior — it has no deployment surface by construction, no matter who
+  authored the PR. A hand-edited dependency manifest is a step down in that
+  guarantee: it's still usually just a version bump, but a person editing it
+  by hand could slip in something else at the same time (a new build script,
+  an entrypoint change) — so that weaker exemption only holds for dependency
+  bots, not humans.
 
   @unimplemented
-  Scenario: Dependabot PR only touches dependency manifests and lockfiles
-    Given the PR author is dependabot[bot]
-    And the PR's changed files are all uv.lock, pyproject.toml,
-      package.json, pnpm-lock.yaml, go.mod, go.sum, Cargo.lock, Cargo.toml,
-      or requirements*.txt
-    And the PR touches a path under services/**
-    And the PR description has no "## Deployment Impact" section
-    When deployment-impact-check runs
-    Then the check passes without requiring the section
+  Scenario: A dependency bot's PR touches only auto-generated lockfiles
+    Given the PR is authored by a trusted dependency-update bot
+    And every changed file is an auto-generated dependency lockfile
+    And the PR description has no deployment-impact writeup
+    Then the check passes without requiring one
 
   @unimplemented
-  Scenario: Human PR only touches dependency manifests and lockfiles
-    Given the PR author is not dependabot[bot]
-    And the PR's changed files are all uv.lock, pyproject.toml,
-      package.json, pnpm-lock.yaml, go.mod, go.sum, Cargo.lock, Cargo.toml,
-      or requirements*.txt
-    And the PR touches a path under services/**
-    And the PR description has no "## Deployment Impact" section
-    When deployment-impact-check runs
-    Then the check fails and requests the section
+  Scenario: A dependency bot's PR touches only hand-edited dependency manifests
+    Given the PR is authored by a trusted dependency-update bot
+    And every changed file is a hand-edited dependency manifest, a lockfile,
+      or both
+    And the PR description has no deployment-impact writeup
+    Then the check passes without requiring one
 
   @unimplemented
-  Scenario: PR touches a real deployment-relevant file
-    Given the PR's changed files include a Dockerfile under services/**
-    And the PR description has no "## Deployment Impact" section
-    When deployment-impact-check runs
-    Then the check fails and requests the section
+  Scenario: A human's PR touches only hand-edited dependency manifests
+    Given the PR is authored by a human, not a dependency-update bot
+    And every changed file is a hand-edited dependency manifest
+    And the PR description has no deployment-impact writeup
+    Then the check still requires one, since a manifest edit could carry
+      more than a version bump
 
   @unimplemented
-  Scenario: PR mixes a manifest bump with a real file change
-    Given the PR's changed files include both uv.lock and a chart template
-      under charts/**
-    And the PR description has no "## Deployment Impact" section
-    When deployment-impact-check runs
-    Then the check fails and requests the section
+  Scenario: A PR touches a file that isn't a recognized dependency manifest
+    Given at least one changed file is not a lockfile or dependency manifest
+    And the PR description has no deployment-impact writeup
+    Then the check still requires one, regardless of what else changed
