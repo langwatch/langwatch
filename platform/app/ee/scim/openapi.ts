@@ -22,7 +22,7 @@
  * each operation's `description` says which one it takes.
  */
 
-import type { DescribeRouteOptions, OpenApiSpecsOptions } from "hono-openapi";
+import type { DescribeRouteOptions, GenerateSpecOptions } from "hono-openapi";
 
 type ParameterSpec = NonNullable<DescribeRouteOptions["parameters"]>[number];
 
@@ -52,7 +52,7 @@ const NO_SECURITY: DescribeRouteOptions["security"] = [];
  * the admin key would tell an identity administrator to paste the wrong
  * secret.
  */
-export const SCIM_SPEC_OPTIONS: OpenApiSpecsOptions = {
+export const SCIM_SPEC_OPTIONS: Partial<GenerateSpecOptions> = {
   documentation: {
     components: {
       securitySchemes: {

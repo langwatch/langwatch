@@ -2,7 +2,7 @@ import { SCIM_SPEC_OPTIONS } from "@ee/scim/openapi";
 import { app as scimApp } from "@ee/scim/routes";
 import deepmerge from "deepmerge";
 import fs from "fs";
-import { generateSpecs } from "hono-openapi";
+import { generateSpecs as generateSpecsUnpinned } from "hono-openapi";
 import path from "path";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
@@ -31,6 +31,8 @@ import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
 import { app as roleBindingsApp } from "../app/api/role-bindings/[[...route]]/app";
 import { app as rolesApp } from "../app/api/roles/[[...route]]/app";
 import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
+import { restoreLegacyOperationIds } from "../server/api/openapi-operation-id";
+import { requireDefaultedResponseFields } from "../server/api/openapi-response-required";
 import {
   allRegisteredRoutes,
   type CredentialClass,
@@ -46,6 +48,20 @@ import {
 import { app as evaluationsLegacyApp } from "../server/routes/evaluations-legacy";
 import { app as experimentsV3App } from "../server/routes/experiments-v3";
 import { app as miscApp } from "../server/routes/misc";
+
+/**
+ * `generateSpecs`, holding the document to the shape it already publishes.
+ *
+ * hono-openapi v1 names operations differently and reads response schemas in
+ * the other direction from v0.4. Both reach generated clients — one as function
+ * names, the other as whether a field is optional — so every call below goes
+ * through here rather than each fix living at 44 call sites. Each correction
+ * documents itself in its own module.
+ */
+const generateSpecs: typeof generateSpecsUnpinned = async (hono, options, c) =>
+  requireDefaultedResponseFields(
+    restoreLegacyOperationIds(await generateSpecsUnpinned(hono, options, c)),
+  );
 
 // Surfaces whose routes come straight from their Hono apps. Their paths
 // REPLACE on merge, and any path the apps no longer serve is pruned from
