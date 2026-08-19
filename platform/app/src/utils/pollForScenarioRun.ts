@@ -21,13 +21,19 @@ interface ScenarioRun {
   messages?: unknown[];
 }
 
-type BatchRunDataResult =
+/**
+ * The narrow slice of the server's `BatchRunDataResult` this poll reads.
+ * Deliberately NOT named `BatchRunDataResult`: the canonical, schema-derived
+ * type lives in `~/server/scenarios/scenario-event.types` and carries more
+ * fields (`lastUpdatedAt`). Reusing the name here would read as the same type.
+ */
+type PolledBatchRunData =
   | { changed: false }
   | { changed: true; runs: ScenarioRun[] };
 
 type FetchBatchRunData = (
   params: PollForRunParams,
-) => Promise<BatchRunDataResult>;
+) => Promise<PolledBatchRunData>;
 
 export type PollResult =
   | { success: true; scenarioRunId: string }
@@ -53,19 +59,34 @@ export type PollResult =
  *
  * STALLED is still handled for stored rows predating the stall watchdog, which
  * now terminates such runs as ERROR (see scenario-event.enums.ts).
+ *
+ * The table is exhaustive over `ScenarioRunStatus` with no index signature, so
+ * adding a status to the enum is a compile error here until it is classified.
+ * That is deliberate: an unclassified terminal status would read as "still
+ * running", and the poll would burn its whole budget and report a false
+ * timeout — the exact bug this module was fixed for. Mirrors the
+ * exhaustive-switch rule in `scenario-run-category.ts`.
  */
+const TERMINAL_STATUS_OUTCOME: Record<
+  ScenarioRunStatus,
+  "run_failed" | "run_error" | null
+> = {
+  [ScenarioRunStatus.FAILED]: "run_failed",
+  [ScenarioRunStatus.ERROR]: "run_error",
+  [ScenarioRunStatus.CANCELLED]: "run_error",
+  [ScenarioRunStatus.STALLED]: "run_error",
+  [ScenarioRunStatus.SUCCESS]: null,
+  [ScenarioRunStatus.IN_PROGRESS]: null,
+  [ScenarioRunStatus.PENDING]: null,
+  [ScenarioRunStatus.QUEUED]: null,
+  [ScenarioRunStatus.RUNNING]: null,
+};
+
 function classifyTerminalStatus(
   status: string | undefined,
 ): "run_failed" | "run_error" | null {
-  if (status === ScenarioRunStatus.FAILED) return "run_failed";
-  if (
-    status === ScenarioRunStatus.ERROR ||
-    status === ScenarioRunStatus.CANCELLED ||
-    status === ScenarioRunStatus.STALLED
-  ) {
-    return "run_error";
-  }
-  return null;
+  if (status === undefined) return null;
+  return TERMINAL_STATUS_OUTCOME[status as ScenarioRunStatus] ?? null;
 }
 
 /**
