@@ -21,7 +21,8 @@
 
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import { LANGWATCH_API_KEY, LW_BASE_URL } from "./config";
 import { listDatasets } from "./langwatch-api";
 import { makeLangyAdapter } from "./langy-agent";
 import {
@@ -36,7 +37,86 @@ import { runScenarioAndLog } from "./scenario-logger";
 
 const model = openai("gpt-5-mini");
 
+/**
+ * The failing-traces flows need errored APPLICATION traces to exist: Langy
+ * correctly excludes simulation/langy origins (its own runs and this suite's),
+ * so on a clean project "no failed traces" is a true answer and the drill
+ * scenario has nothing to drill into. Stable trace ids make re-posts upserts,
+ * so repeated runs refresh the same two traces instead of accumulating.
+ */
+async function seedFailingApplicationTraces(): Promise<void> {
+  const now = Date.now();
+  const fixtures = [
+    {
+      traceId: "langy-dogfood-error-timeout",
+      user: "Summarize the quarterly report for the board.",
+      error:
+        "OpenAI request timed out after 60000ms (model gpt-5-mini, attempt 2 of 2)",
+      startedAt: now - 50 * 60 * 1000,
+      durationMs: 60_000,
+    },
+    {
+      traceId: "langy-dogfood-error-schema",
+      user: "Extract the invoice fields as JSON.",
+      error:
+        'Output validation failed: expected key "total_amount" missing from model response',
+      startedAt: now - 30 * 60 * 1000,
+      durationMs: 2_400,
+    },
+  ];
+  for (const f of fixtures) {
+    const res = await fetch(`${LW_BASE_URL}/api/collector`, {
+      method: "POST",
+      headers: {
+        "X-Auth-Token": LANGWATCH_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        trace_id: f.traceId,
+        spans: [
+          {
+            type: "llm",
+            span_id: `${f.traceId}-llm`,
+            name: "chat-completion",
+            model: "gpt-5-mini",
+            input: {
+              type: "chat_messages",
+              value: [{ role: "user", content: f.user }],
+            },
+            error: {
+              has_error: true,
+              message: f.error,
+              stacktrace: [],
+            },
+            timestamps: {
+              started_at: f.startedAt,
+              finished_at: f.startedAt + f.durationMs,
+            },
+          },
+        ],
+        metadata: {
+          user_id: "langy-dogfood-fixture",
+          thread_id: "langy-dogfood-fixture",
+        },
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) {
+      throw new Error(
+        `Seeding errored trace ${f.traceId} failed: ${res.status} ${await res.text()}`,
+      );
+    }
+  }
+  // The collector queues into the async pipeline; the traces only exist for
+  // Langy once the workers have projected them.
+  await new Promise((resolve) => setTimeout(resolve, 15_000));
+}
+
 describe("Langy dogfood — named flows", () => {
+  beforeAll(async () => {
+    await seedFailingApplicationTraces();
+  }, 60_000);
+
   describe("when the user just says hi", () => {
     /** @scenario A greeting gets a friendly hello, never a refusal */
     it("greets back and introduces itself instead of refusing", async () => {
@@ -215,6 +295,19 @@ describe("Langy dogfood — named flows", () => {
     /** @scenario A completed write ends with a visible next-step line */
     it("creates the dataset and closes with a short line pointing forward", async () => {
       const langy = makeLangyAdapter();
+      // A leftover dataset with this name turns the scenario's create into an
+      // "already exists" reply and fails it for the wrong reason.
+      const stale = (await listDatasets()).filter(
+        (d) => d.name === "langy-dogfood-reply-check",
+      );
+      await Promise.all(
+        stale.map((d) =>
+          fetch(`${LW_BASE_URL}/api/dataset/${d.id}`, {
+            method: "DELETE",
+            headers: { "X-Auth-Token": LANGWATCH_API_KEY },
+          }),
+        ),
+      );
       const before = await listDatasets();
       const beforeIds = new Set(before.map((d) => d.id));
       const result = await runScenarioAndLog({
@@ -227,7 +320,7 @@ describe("Langy dogfood — named flows", () => {
           scenario.judgeAgent({
             model,
             criteria: [
-              "The dataset gets created: the conversation shows a successful creation naming the dataset.",
+              "Langy's reply names the dataset it created (the name alone is enough; ids and column lists belong to the card, not the reply).",
               "Langy's final reply contains at least one visible line of text — a reply that is empty or whitespace-only fails this scenario.",
               "The final reply is one short line that points forward (what to do with the dataset next) or states the change plainly — it does not recite ids or restate every field of what was created.",
               ...LANGY_CORE_RULE_CRITERIA,

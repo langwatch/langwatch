@@ -28,7 +28,7 @@ export const LANGY_CORE_RULE_CRITERIA = [
   "Langy answers the user's actual question with concrete results from their project (real counts, names, findings, or a clear empty result) — not with a plan, a capability list, or a description of what it is about to do.",
   "Numbers, names, and ids in the reply come from what was actually retrieved; nothing is invented or estimated when the real value was available.",
   LANGY_DECISIVENESS_CRITERION,
-  "The reply reads as the answer, not as a work log: no filler openers, no raw JSON or stack traces pasted into prose, no play-by-play of the commands it ran, and no menu of unsolicited follow-up offers.",
+  "The reply reads as the answer, not as a work log: no filler openers, no raw JSON or stack traces pasted into prose, no play-by-play of the commands it ran, and no menu of unsolicited follow-up offers. A fenced code block tagged langy-card is the product's own UI (it renders as a real card, not as JSON) and is NOT a violation by itself — but a choices card offering follow-up actions nobody asked for still counts as an unsolicited menu.",
   "Every reply ends with visible text for the user — a turn whose actions succeeded but whose reply is empty is a failure.",
   "The reply's length matches the question: compact for a lookup, complete for an analysis or diagnosis — nothing padded, and nothing the user asked for missing.",
 ];
@@ -88,7 +88,7 @@ export const LANGY_OPEN_PR_CRITERIA = [
 export const LANGY_EVAL_CREATION_CRITERIA = [
   "On the first turn, Langy asks ONE short question distinguishing a batch experiment (offline, runs against a dataset) from an online evaluator (scores live production traffic) — and creates NOTHING until the user answers.",
   "Langy does not run any create command (evaluator, monitor, or experiment) before the user has answered the experiment-vs-evaluator question.",
-  "After the user answers, Langy creates the matching resource and the creation succeeds — the result names the thing that was created.",
+  "After the user answers, Langy runs the matching create. A batch answer ends with a successful creation naming the thing created. A live answer ends with the evaluator created, and the monitor either created or refused by the platform over permissions with Langy stating that refusal and the user's next step in one line — a silent stop or an unexplained drop of the request fails this.",
   "If a create is rejected over an invalid field value and the error names the accepted values, Langy corrects that exact field from the error's expected list and retries once within the same turn — it never asks the user to pick a type slug and never abandons the create over a fixable field.",
   ...LANGY_CORE_RULE_CRITERIA.filter(
     (criterion) => criterion !== LANGY_DECISIVENESS_CRITERION,

@@ -112,7 +112,7 @@ async function trpcMutate<T>({
   });
   const body: any = await res.json().catch(() => null);
   if (!res.ok || !body || body.error) {
-    const domainErrorCode = body?.error?.json?.data?.domainError?.code;
+    const domainErrorCode = body?.error?.json?.data?.error?.code;
     const err = new Error(
       `Langy ${path} -> ${res.status}: ${JSON.stringify(body?.error ?? body)}`,
     ) as Error & { domainErrorCode?: string };
@@ -171,6 +171,27 @@ async function trpcMutateWithTurnLockRetry<T>({
   throw new Error("unreachable");
 }
 
+/**
+ * The stream's error entry carries the handled-error JSON as a string in
+ * `error` (and human text in `errorText`). Returns its code and tips when it
+ * parses as one, null for anything else.
+ */
+function parseHandledStreamError(entry: {
+  error?: unknown;
+}): { code: string; tips: string[] } | null {
+  if (typeof entry.error !== "string") return null;
+  try {
+    const parsed = JSON.parse(entry.error) as {
+      code?: string;
+      tips?: string[];
+    };
+    if (typeof parsed.code !== "string") return null;
+    return { code: parsed.code, tips: parsed.tips ?? [] };
+  } catch {
+    return null;
+  }
+}
+
 /** Reads the onTurnStream SSE frames until the server closes the response. */
 async function streamTurnText({
   cookie,
@@ -216,10 +237,23 @@ async function streamTurnText({
         // The server emits errorText (see langyChatTransport.ts's onEntry
         // "error" case), not message — checking the wrong field silently
         // swallowed every real error message behind a generic placeholder.
-        streamError =
-          typeof entry.errorText === "string"
-            ? entry.errorText
-            : `Langy stream error (raw: ${JSON.stringify(entry)})`;
+        //
+        // One handled code is a conversation outcome, not a failure:
+        // langy_github_not_connected stops the turn and the panel renders an
+        // Install prompt from the error's tips. Grade that visible outcome
+        // instead of erroring the scenario — locally no GitHub App exists, so
+        // this is the product's expected answer to any PR request.
+        const parsed = parseHandledStreamError(entry);
+        if (parsed?.code === "langy_github_not_connected") {
+          assistantText +=
+            parsed.tips[0] ??
+            "The LangWatch GitHub App is not installed for this project.";
+        } else {
+          streamError =
+            typeof entry.errorText === "string"
+              ? entry.errorText
+              : `Langy stream error (raw: ${JSON.stringify(entry)})`;
+        }
       }
       // "end" (turn finished) / "complete" (SSE stream finished) / "connected"
       // / "status" carry no assistant text — nothing further to accumulate.
