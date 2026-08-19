@@ -79,13 +79,15 @@ afterEach(() => {
 });
 
 type RunOptions = {
+  /** Names the run in the shared event log. */
+  tag: string;
   /** How long the fake command holds the slot once it starts. */
   holdMs?: number;
   env?: Record<string, string | undefined>;
   /** Everything after the script path, replacing the fake command. */
   argv?: string[];
   /** Give the run its own process group, so a test can signal the group. */
-  detached?: boolean;
+  isDetached?: boolean;
 };
 
 type Run = {
@@ -93,13 +95,19 @@ type Run = {
   done: Promise<{ code: number | null; stdout: string; stderr: string }>;
 };
 
-function startRun(tag: string, options: RunOptions = {}): Run {
-  const argv = options.argv ?? [
+function startRun({
+  tag,
+  holdMs = 0,
+  env: envOverrides,
+  argv: argvOverride,
+  isDetached = false,
+}: RunOptions): Run {
+  const argv = argvOverride ?? [
     "node",
     fakeCommand,
     logFile,
     tag,
-    String(options.holdMs ?? 0),
+    String(holdMs),
   ];
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries({
@@ -120,7 +128,7 @@ function startRun(tag: string, options: RunOptions = {}): Run {
     // assertion would flake red. The pressure tests below force their own
     // levels the same way.
     CHECK_PRESSURE: "green",
-    ...options.env,
+    ...envOverrides,
   })) {
     if (value !== undefined) env[key] = value;
   }
@@ -128,7 +136,7 @@ function startRun(tag: string, options: RunOptions = {}): Run {
   const child = spawn(process.execPath, [QUEUE_SCRIPT, ...argv], {
     env,
     stdio: ["ignore", "pipe", "pipe"],
-    detached: options.detached ?? false,
+    detached: isDetached,
   });
   running.add(child);
 
@@ -204,7 +212,7 @@ describe("check queue", () => {
   describe("given a free slot", () => {
     /** @scenario "A run that finds a free slot is silent" */
     it("runs immediately and says nothing of its own", async () => {
-      const run = startRun("solo", { env: { CHECK_SLOTS: "2" } });
+      const run = startRun({ tag: "solo", env: { CHECK_SLOTS: "2" } });
       const result = await run.done;
 
       expect(result.code).toBe(0);
@@ -217,7 +225,8 @@ describe("check queue", () => {
       // The bin shims mean a queued `pnpm typecheck` spawns another gated
       // entry point. Without this, it queues behind the slot it is holding and
       // waits out the entire maximum wait before starting.
-      const run = startRun("nested", {
+      const run = startRun({
+        tag: "nested",
         argv: ["node", "-e", "process.stdout.write(process.env.CHECK_SLOTS)"],
         env: { CHECK_SLOTS: "3" },
       });
@@ -228,7 +237,8 @@ describe("check queue", () => {
 
     /** @scenario "The wrapper is transparent to the command it runs" */
     it("passes the command's exit code and output straight through", async () => {
-      const run = startRun("passthrough", {
+      const run = startRun({
+        tag: "passthrough",
         argv: [
           "node",
           "-e",
@@ -247,9 +257,9 @@ describe("check queue", () => {
     /** @scenario "A run past the limit waits and names what it is waiting for" */
     /** @scenario "A run that waited says how long it waited" */
     it("waits, reports what it is queued behind, and reports the wait", async () => {
-      const holder = startRun("holder", { holdMs: 700 });
+      const holder = startRun({ tag: "holder", holdMs: 700 });
       await waitForHolder();
-      const queued = startRun("queued");
+      const queued = startRun({ tag: "queued" });
 
       const [, second] = await Promise.all([holder.done, queued.done]);
 
@@ -268,12 +278,13 @@ describe("check queue", () => {
         npm_package_name: "@langwatch/web",
         npm_lifecycle_event: script,
       });
-      const typecheck = startRun("typecheck", {
+      const typecheck = startRun({
+        tag: "typecheck",
         holdMs: 700,
         env: scriptEnv("typecheck"),
       });
       await waitForHolder();
-      const lint = startRun("lint", { env: scriptEnv("lint") });
+      const lint = startRun({ tag: "lint", env: scriptEnv("lint") });
 
       const [, second] = await Promise.all([typecheck.done, lint.done]);
 
@@ -313,7 +324,8 @@ describe("check queue", () => {
 
     /** @scenario "A long wait repeats itself so it never looks hung" */
     it("repeats its position and names the holder while it waits", async () => {
-      const holder = startRun("holder", {
+      const holder = startRun({
+        tag: "holder",
         holdMs: 900,
         // A run's label is the package and script pnpm is running, which is
         // what makes one worktree's typecheck distinguishable from another's.
@@ -323,7 +335,8 @@ describe("check queue", () => {
         },
       });
       await waitForHolder();
-      const queued = startRun("queued", {
+      const queued = startRun({
+        tag: "queued",
         env: { CHECK_QUEUE_HEARTBEAT_MS: "150" },
       });
 
@@ -339,11 +352,11 @@ describe("check queue", () => {
 
     /** @scenario "Waiters are served in arrival order" */
     it("serves the run that queued first", async () => {
-      const holder = startRun("holder", { holdMs: 900 });
+      const holder = startRun({ tag: "holder", holdMs: 900 });
       await waitForHolder();
-      const first = startRun("first");
+      const first = startRun({ tag: "first" });
       await sleep(200);
-      const second = startRun("second");
+      const second = startRun({ tag: "second" });
 
       await Promise.all([holder.done, first.done, second.done]);
 
@@ -352,7 +365,7 @@ describe("check queue", () => {
 
     /** @scenario "An explicit limit is honored" */
     it("never runs more than the limit at once", async () => {
-      const runs = ["a", "b", "c"].map((tag) => startRun(tag, { holdMs: 150 }));
+      const runs = ["a", "b", "c"].map((tag) => startRun({ tag, holdMs: 150 }));
       await Promise.all(runs.map((run) => run.done));
 
       expect(startOrder(readEvents())).toHaveLength(3);
@@ -363,13 +376,13 @@ describe("check queue", () => {
   describe("given a slot cannot be released normally", () => {
     /** @scenario "A slot held by a dead process is reclaimed" */
     it("reclaims a slot whose owner was killed", async () => {
-      const holder = startRun("killed", { holdMs: 3000 });
+      const holder = startRun({ tag: "killed", holdMs: 3000 });
       await waitForHolder();
       expect(queueEntries()).toHaveLength(1);
       holder.child.kill("SIGKILL");
       await holder.done;
 
-      const next = startRun("after-kill");
+      const next = startRun({ tag: "after-kill" });
       const result = await next.done;
 
       expect(result.code).toBe(0);
@@ -386,13 +399,14 @@ describe("check queue", () => {
       // overlap has been read, so holding far longer than that costs the suite
       // nothing and keeps a loaded machine from ending the holder first, which
       // reads as the queue having serialized the two runs.
-      const holder = startRun("holder", { holdMs: 60_000 });
+      const holder = startRun({ tag: "holder", holdMs: 60_000 });
       await waitForHolder();
       // The hold must be wide enough that the run's start and end cannot
       // share a Date.now() millisecond: maxOverlap breaks ties end-first
       // (which "never runs more than the limit" needs), and a same-instant
       // start/end pair would collapse this run's occupancy to nothing.
-      const impatient = startRun("impatient", {
+      const impatient = startRun({
+        tag: "impatient",
         holdMs: 150,
         env: { CHECK_QUEUE_MAX_WAIT_MS: "200" },
       });
@@ -477,7 +491,7 @@ describe("check queue", () => {
     /** @scenario "The limit can be turned off" */
     it("runs everything at once and keeps no state", async () => {
       const runs = ["a", "b", "c"].map((tag) =>
-        startRun(tag, { holdMs: 300, env: { CHECK_SLOTS: "0" } }),
+        startRun({ tag, holdMs: 300, env: { CHECK_SLOTS: "0" } }),
       );
       const results = await Promise.all(runs.map((run) => run.done));
 
@@ -490,7 +504,8 @@ describe("check queue", () => {
   describe("given no explicit limit", () => {
     /** @scenario "The default limit is derived from the machine" */
     it("bounds the default by both memory and cores, never below one", async () => {
-      const run = startRun("explain", {
+      const run = startRun({
+        tag: "explain",
         argv: ["--explain"],
         env: { CHECK_SLOTS: undefined, CI: undefined },
       });
@@ -506,7 +521,8 @@ describe("check queue", () => {
 
     /** @scenario "Memory pressure narrows the queue to one run" */
     it("narrows the derived limit to one under pressure", async () => {
-      const result = await startRun("explain", {
+      const result = await startRun({
+        tag: "explain",
         argv: ["--explain"],
         env: { CHECK_SLOTS: undefined, CI: undefined, CHECK_PRESSURE: "red" },
       }).done;
@@ -516,7 +532,8 @@ describe("check queue", () => {
     });
 
     it("lets an explicit CHECK_SLOTS win over pressure", async () => {
-      const result = await startRun("explain", {
+      const result = await startRun({
+        tag: "explain",
         argv: ["--explain"],
         env: { CHECK_SLOTS: "3", CI: undefined, CHECK_PRESSURE: "red" },
       }).done;
@@ -526,7 +543,8 @@ describe("check queue", () => {
 
     /** @scenario "CI does not queue by default" */
     it("does not queue under CI", async () => {
-      const explained = await startRun("explain", {
+      const explained = await startRun({
+        tag: "explain",
         argv: ["--explain"],
         env: { CHECK_SLOTS: undefined, CI: "true" },
       }).done;
@@ -534,7 +552,8 @@ describe("check queue", () => {
       expect(explained.stderr).toContain("queue=off");
 
       const runs = ["a", "b"].map((tag) =>
-        startRun(tag, {
+        startRun({
+          tag,
           holdMs: 300,
           env: { CHECK_SLOTS: undefined, CI: "true" },
         }),
@@ -545,7 +564,8 @@ describe("check queue", () => {
 
     /** @scenario "CI keeps the runtime limits it had before the pressure policy" */
     it("reads green under CI whatever the machine measures", async () => {
-      const explained = await startRun("ci-pressure", {
+      const explained = await startRun({
+        tag: "ci-pressure",
         argv: ["--explain"],
         // No forced level: this is the measured path, which CI short-circuits.
         env: { CHECK_SLOTS: undefined, CI: "true", CHECK_PRESSURE: undefined },
@@ -557,7 +577,8 @@ describe("check queue", () => {
     });
 
     it("still lets an explicit level through under CI", async () => {
-      const explained = await startRun("ci-forced", {
+      const explained = await startRun({
+        tag: "ci-forced",
         argv: ["--explain"],
         env: { CHECK_SLOTS: undefined, CI: "true", CHECK_PRESSURE: "red" },
       }).done;
@@ -592,7 +613,8 @@ describe("check queue", () => {
     /** @scenario "Memory pressure halves the compiler's parallelism" */
     it("hands the command the floor and half the cores", async () => {
       const { script, out } = envDumper();
-      const result = await startRun("pressured", {
+      const result = await startRun({
+        tag: "pressured",
         argv: ["node", script, out],
         env: {
           CHECK_PRESSURE: "red",
@@ -610,7 +632,8 @@ describe("check queue", () => {
 
     it("leaves the parallelism alone on a green machine", async () => {
       const { script, out } = envDumper();
-      const result = await startRun("green", {
+      const result = await startRun({
+        tag: "green",
         argv: ["node", script, out],
         env: {
           CHECK_PRESSURE: "green",
@@ -628,7 +651,8 @@ describe("check queue", () => {
 
     it("lets an operator's explicit settings through unchanged", async () => {
       const { script, out } = envDumper();
-      const result = await startRun("operator", {
+      const result = await startRun({
+        tag: "operator",
         argv: ["node", script, out],
         env: { CHECK_PRESSURE: "red", GOMEMLIMIT: "8GiB", GOMAXPROCS: "9" },
       }).done;
@@ -643,7 +667,8 @@ describe("check queue", () => {
   describe("given a run is killed from outside the queue", () => {
     /** @scenario "A run killed from outside is reported as not the queue's doing" */
     it("says the queue never kills and names the wrong fix", async () => {
-      const result = await startRun("killed", {
+      const result = await startRun({
+        tag: "killed",
         argv: ["sh", "-c", "kill -KILL $$"],
       }).done;
 
@@ -659,16 +684,20 @@ describe("check queue", () => {
       // the signal together, so the command can be gone before the wrapper has
       // handled its own copy. Reading the record too early accuses the operator
       // of an outside kill for their own interrupt.
-      const run = startRun("group", { holdMs: 5000, detached: true });
+      const run = startRun({ tag: "group", holdMs: 5000, isDetached: true });
       await waitForHolder();
-      process.kill(-(run.child.pid ?? 0), "SIGTERM");
+      // Never negate a missing pid: -0 reaches process.kill as 0, which signals
+      // the caller's own process group, and the caller here is the test runner.
+      const group = run.child.pid;
+      if (!group) throw new Error("the detached run reported no pid to signal");
+      process.kill(-group, "SIGTERM");
       const result = await run.done;
 
       expect(result.stderr).not.toContain("killed from outside");
     });
 
     it("says nothing about a signal the wrapper itself forwarded", async () => {
-      const run = startRun("interrupted", { holdMs: 5000 });
+      const run = startRun({ tag: "interrupted", holdMs: 5000 });
       await waitForHolder();
       run.child.kill("SIGTERM");
       const result = await run.done;
@@ -681,7 +710,8 @@ describe("check queue", () => {
       const pidFile = path.join(scratch, "escalated.pid");
       // The command ignores the forwarded SIGTERM (the disposition survives the
       // exec), so the signal that finally ends it is one nobody forwarded.
-      const run = startRun("escalated", {
+      const run = startRun({
+        tag: "escalated",
         argv: ["sh", "-c", `trap '' TERM; echo $$ > ${pidFile}; exec sleep 5`],
       });
 
@@ -709,7 +739,8 @@ describe("check queue", () => {
     });
 
     it("says nothing about a clean failure", async () => {
-      const result = await startRun("failing", {
+      const result = await startRun({
+        tag: "failing",
         argv: ["sh", "-c", "exit 7"],
       }).done;
 
@@ -734,7 +765,8 @@ describe("check queue", () => {
     /** @scenario "With haven installed the queue runs inside haven" */
     it("hands the run to `haven slot run` and passes its exit code through", async () => {
       const { bin, argvFile } = fakeHaven(7);
-      const result = await startRun("delegated", {
+      const result = await startRun({
+        tag: "delegated",
         env: { CHECK_QUEUE_IMPL: undefined, HAVEN_BIN: bin },
       }).done;
 
@@ -748,7 +780,8 @@ describe("check queue", () => {
 
     /** @scenario "Without haven the JavaScript queue still gates" */
     it("falls back to the JS queue when the haven binary does not exist", async () => {
-      const result = await startRun("fallback", {
+      const result = await startRun({
+        tag: "fallback",
         env: {
           CHECK_QUEUE_IMPL: undefined,
           HAVEN_BIN: path.join(scratch, "no-such-haven"),
@@ -764,7 +797,8 @@ describe("check queue", () => {
     /** @scenario "The operator can force the JavaScript queue" */
     it("never delegates when CHECK_QUEUE_IMPL is js", async () => {
       const { bin, argvFile } = fakeHaven(7);
-      const result = await startRun("forced-js", {
+      const result = await startRun({
+        tag: "forced-js",
         env: { CHECK_QUEUE_IMPL: "js", HAVEN_BIN: bin },
       }).done;
 
