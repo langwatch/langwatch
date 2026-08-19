@@ -1057,7 +1057,7 @@ examples = [
     { name = "pypdf", specifier = ">=6.15.0" },
     { name = "pytest", specifier = ">=9.1.1,<10.0.0" },
     { name = "python-dotenv", specifier = "==1.2.2" },
-    { name = "strands-agents", extras = ["otel"], specifier = ">=1.14.0,<2.0.0" },
+    { name = "strands-agents", extras = ["otel"], specifier = ">=1.51.0,<2.0.0" },
     { name = "streamlit", specifier = ">=1.61.1,<2.0.0" },
     { name = "unstructured", extras = ["pdf"], specifier = ">=0.18.18" },
     { name = "uvicorn", specifier = ">=0.38.0,<0.53.0" },
