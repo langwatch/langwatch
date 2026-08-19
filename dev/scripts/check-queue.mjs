@@ -567,20 +567,27 @@ function runCommand(commandArgv, pressure = "green") {
       resolve(127);
     });
     child.on("exit", (code, signal) => {
-      detach();
-      // A child that dies by a signal this wrapper never forwarded was killed
-      // from outside: an operator, or the OS reclaiming memory. Without this
-      // line the run ends in a bare exit 137, which reads as "the queue killed
-      // it" and teaches people (and agents) to bypass the queue with
-      // CHECK_SLOTS=0, removing the serialization for the whole machine.
-      if (signal && !forwarded.has(signal)) {
-        stderr(
-          `${PREFIX} ${commandArgv[0]} was killed from outside by ${signal}. ` +
-            `The queue never kills runs; the likely cause is an operator kill or the OS reclaiming memory. ` +
-            `Re-run the same command. Do not set CHECK_SLOTS=0.\n`,
-        );
-      }
-      resolve(signal ? 128 + (os.constants.signals[signal] ?? 0) : (code ?? 0));
+      // One turn later, so that a signal delivered to the whole process group
+      // is in the record before it is read. A Ctrl-C at a terminal reaches the
+      // wrapper and the child together, and the child's exit can be handled
+      // first, with our own handler for the same signal still pending.
+      // Detaching here rather than there would drop that handler outright.
+      setImmediate(() => {
+        detach();
+        // A child that dies by a signal this wrapper never forwarded was killed
+        // from outside: an operator, or the OS reclaiming memory. Without this
+        // line the run ends in a bare exit 137, which reads as "the queue killed
+        // it" and teaches people (and agents) to bypass the queue with
+        // CHECK_SLOTS=0, removing the serialization for the whole machine.
+        if (signal && !forwarded.has(signal)) {
+          stderr(
+            `${PREFIX} ${commandArgv[0]} was killed from outside by ${signal}. ` +
+              `The queue never kills runs; the likely cause is an operator kill or the OS reclaiming memory. ` +
+              `Re-run the same command. Do not set CHECK_SLOTS=0.\n`,
+          );
+        }
+        resolve(signal ? 128 + (os.constants.signals[signal] ?? 0) : (code ?? 0));
+      });
     });
   });
 }

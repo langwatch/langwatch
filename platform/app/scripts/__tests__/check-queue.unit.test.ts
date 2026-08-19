@@ -84,6 +84,8 @@ type RunOptions = {
   env?: Record<string, string | undefined>;
   /** Everything after the script path, replacing the fake command. */
   argv?: string[];
+  /** Give the run its own process group, so a test can signal the group. */
+  detached?: boolean;
 };
 
 type Run = {
@@ -126,6 +128,7 @@ function startRun(tag: string, options: RunOptions = {}): Run {
   const child = spawn(process.execPath, [QUEUE_SCRIPT, ...argv], {
     env,
     stdio: ["ignore", "pipe", "pipe"],
+    detached: options.detached ?? false,
   });
   running.add(child);
 
@@ -650,6 +653,20 @@ describe("check queue", () => {
       expect(result.stderr).toContain("Do not set CHECK_SLOTS=0");
     });
 
+    /** @scenario "A signal delivered to the whole process group still counts as forwarded" */
+    it("says nothing when the whole process group is signalled", async () => {
+      // What a Ctrl-C at a terminal does: the wrapper and the command receive
+      // the signal together, so the command can be gone before the wrapper has
+      // handled its own copy. Reading the record too early accuses the operator
+      // of an outside kill for their own interrupt.
+      const run = startRun("group", { holdMs: 5000, detached: true });
+      await waitForHolder();
+      process.kill(-(run.child.pid ?? 0), "SIGTERM");
+      const result = await run.done;
+
+      expect(result.stderr).not.toContain("killed from outside");
+    });
+
     it("says nothing about a signal the wrapper itself forwarded", async () => {
       const run = startRun("interrupted", { holdMs: 5000 });
       await waitForHolder();
@@ -673,8 +690,12 @@ describe("check queue", () => {
         try {
           pid = readFileSync(pidFile, "utf8").trim();
         } catch {
-          await sleep(25);
+          // Not created yet.
         }
+        // The redirection creates the file before the shell writes the pid into
+        // it, so an empty read is as much "not ready" as a missing file. Waiting
+        // on both is what keeps the attempts from burning off in microseconds.
+        if (pid === "") await sleep(25);
       }
       expect(pid).not.toBe("");
 

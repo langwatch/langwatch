@@ -262,29 +262,60 @@ type slotDeath struct {
 type signalRelay struct {
 	mu        sync.Mutex
 	forwarded map[syscall.Signal]bool
+	signals   chan os.Signal
 	stop      chan struct{}
+	done      chan struct{}
 }
 
 func startSignalRelay(proc *os.Process) *signalRelay {
-	relay := &signalRelay{
-		forwarded: map[syscall.Signal]bool{},
-		stop:      make(chan struct{}),
-	}
 	signals := make(chan os.Signal, 4)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
-	go func() {
-		defer signal.Stop(signals)
-		for {
-			select {
-			case sig := <-signals:
-				relay.record(sig)
-				_ = proc.Signal(sig)
-			case <-relay.stop:
-				return
-			}
-		}
-	}()
+	relay := newSignalRelay(signals)
+	go relay.pump(proc)
 	return relay
+}
+
+// newSignalRelay builds the relay over a channel the caller owns, so a test
+// can deliver a signal without raising one at the whole test binary.
+func newSignalRelay(signals chan os.Signal) *signalRelay {
+	return &signalRelay{
+		forwarded: map[syscall.Signal]bool{},
+		signals:   signals,
+		stop:      make(chan struct{}),
+		done:      make(chan struct{}),
+	}
+}
+
+func (r *signalRelay) pump(proc *os.Process) {
+	defer close(r.done)
+	defer signal.Stop(r.signals)
+	for {
+		select {
+		case sig := <-r.signals:
+			r.record(sig)
+			_ = proc.Signal(sig)
+		case <-r.stop:
+			r.drain()
+			return
+		}
+	}
+}
+
+// drain records the signals still queued when the child died. A Ctrl-C at a
+// terminal reaches the whole process group, so the child can die of the signal
+// while the wrapper's own copy of it is still in the channel. Without this the
+// select can take the stop branch, discard that copy, and report the operator's
+// own interrupt as a kill from outside, which is the mistake this whole report
+// exists to prevent.
+func (r *signalRelay) drain() {
+	for {
+		select {
+		case sig := <-r.signals:
+			r.record(sig)
+		default:
+			return
+		}
+	}
 }
 
 func (r *signalRelay) record(sig os.Signal) {
@@ -297,9 +328,12 @@ func (r *signalRelay) record(sig os.Signal) {
 	r.forwarded[number] = true
 }
 
-// close ends the relay and reports the signals it forwarded.
+// close ends the relay and reports the signals it forwarded. It waits for the
+// pump to drain what is still queued, so a signal delivered to the process
+// group is in the record before the caller reads it.
 func (r *signalRelay) close() map[syscall.Signal]bool {
 	close(r.stop)
+	<-r.done
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return maps.Clone(r.forwarded)

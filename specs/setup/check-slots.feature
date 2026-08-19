@@ -226,6 +226,19 @@ Feature: Machine-wide slots for whole-repo checks
     Then the wrapper still reports the kill, because the earlier interrupt did not cause it
     And a run the wrapper itself canceled is not reported
 
+  # A Ctrl-C at a terminal reaches the wrapper and the command together, so the
+  # command can be gone before the wrapper has handled its own copy of the
+  # signal. Reading the record at that moment would accuse the operator of a
+  # kill from outside for their own interrupt, which is the exact mistake the
+  # report exists to prevent.
+
+  @unit
+  Scenario: A signal delivered to the whole process group still counts as forwarded
+    Given a check is running through the queue
+    When the whole process group is signalled at once
+    Then the wrapper counts the signal as one it forwarded
+    And it reports no kill from outside
+
   # --- The bin shims: the package scripts are not the only way in ---
 
   # Wrapping the scripts left every other route to the binary uncounted, and

@@ -102,21 +102,47 @@ Explicit `GOMEMLIMIT`, `GOMAXPROCS` and `CHECK_SLOTS` still win, and
 operator who knows better). A machine the queue cannot read is green: a
 governor that cannot see must not throttle.
 
-CI reads green by rule, before any measurement. The queue already stands down
-there, and the same reasoning retires the pressure policy with it: a runner runs
-one job, nobody is typing on it, so buying back an interactive machine buys
-nothing and only makes the job slower. A swap figure read inside a container
-also describes the host rather than the job. The rule is what makes "CI is
-unaffected" true, instead of true by accident of the runner's kernel. An
-explicit `CHECK_PRESSURE` still wins there, for a CI test that needs a level.
+With no forced level, CI reads green by rule, before any measurement. An
+explicit `CHECK_PRESSURE` is read first and still wins there, for a CI test that
+needs a level. Otherwise the queue already stands down on a runner, and the same
+reasoning retires the pressure policy with it: a runner runs one job, nobody is
+typing on it, so buying back an interactive machine buys nothing and only makes
+the job slower. A swap figure read inside a container also describes the host
+rather than the job. The rule is what makes "CI is unaffected" true, instead of
+true by accident of the runner's kernel.
 
-Validated on the same machine at red: the pressured shape (3 GiB, 5 procs)
-completed the same cold typecheck with the numbers recorded in the PR that
-landed this amendment. There is no swap-only-the-check mechanism to reach for
-instead: macOS offers no per-process swap steering, and `taskpolicy -b`
-(background QoS) was measured starving a typecheck to 0.3 to 4% CPU for eight
-minutes on a pressured machine, because background priority deprioritizes the
-page-ins it needs to make progress at all.
+What was measured, on the 18 GiB / 11-core machine described above, so a later
+reader does not have to trust a PR link:
+
+| | uncapped, red machine | pressured shape |
+|---|---|---|
+| `GOMEMLIMIT` | 6 GiB (the clamp) | 3 GiB (the floor) |
+| `GOMAXPROCS` | unset, 11 cores | 5 |
+| peak footprint | 7.26 GB | not comparable, see below |
+| max RSS | 1.9 GB | about 1 to 2 GB |
+| wall / user / system | 331 s / 80 s / 162 s | not established |
+| peak CPU | ~2.8 of 11 cores | not sampled |
+
+The pressured column is thinner on purpose. `--explain` resolved
+`pressure=red gomemlimit=3GiB gomaxprocs=5`, and this PR's own `typecheck:tests`
+ran to a clean exit inside that shape, but a matched **cold** run was stopped by
+hand when swap reached 15.6 of 16.4 GB, two days after a swap-exhaustion kernel
+panic on the same machine. So the ceiling and the parallelism are confirmed to
+apply, and the wall-clock cost of applying them is not. Reproduce with:
+
+```bash
+/bin/rm -f platform/app/node_modules/.cache/tsbuildinfo/tsgo-app.tsbuildinfo
+/usr/bin/time -l node dev/scripts/check-queue.mjs \
+  ./platform/app/node_modules/.bin/tsc.real --noEmit -p platform/app/tsconfig.tsgo.json
+```
+
+with `CHECK_PRESSURE` set to `green` and then `red` for the two columns.
+
+There is no swap-only-the-check mechanism to reach for instead: macOS offers no
+per-process swap steering, and `taskpolicy -b` (background QoS) was measured
+starving a typecheck to 0.3 to 4% CPU for eight minutes on a pressured machine,
+because background priority deprioritizes the page-ins it needs to make progress
+at all.
 
 ## References
 

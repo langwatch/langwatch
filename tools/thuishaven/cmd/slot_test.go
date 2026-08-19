@@ -316,3 +316,27 @@ func TestSlotRunQueuesAndSaysSo(t *testing.T) {
 		t.Fatalf("a run that waited must report it, got %q", report)
 	}
 }
+
+// @scenario "A signal delivered to the whole process group still counts as forwarded"
+func TestSignalRelayRecordsAQueuedSignal(t *testing.T) {
+	child := exec.Command("sleep", "10")
+	if err := child.Start(); err != nil {
+		t.Fatalf("starting the stand-in child: %v", err)
+	}
+	defer func() {
+		_ = child.Process.Kill()
+		_ = child.Wait()
+	}()
+
+	// A Ctrl-C at a terminal reaches the wrapper and the child together, so the
+	// wrapper's own copy of the signal can still be queued at the moment the
+	// child is already gone and the relay closes.
+	signals := make(chan os.Signal, 4)
+	relay := newSignalRelay(signals)
+	signals <- syscall.SIGINT
+	go relay.pump(child.Process)
+
+	if forwarded := relay.close(); !forwarded[syscall.SIGINT] {
+		t.Fatal("a signal queued when the child died must still count as forwarded, or the wrapper reports the operator's own interrupt as a kill from outside")
+	}
+}
