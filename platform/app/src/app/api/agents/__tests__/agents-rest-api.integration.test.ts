@@ -34,6 +34,7 @@ describe("Feature: Agent REST API", () => {
       get: (path: string) => Response | Promise<Response>;
       post: (path: string, body: unknown) => Response | Promise<Response>;
       patch: (path: string, body: unknown) => Response | Promise<Response>;
+      put: (path: string, body: unknown) => Response | Promise<Response>;
       delete: (path: string, body?: unknown) => Response | Promise<Response>;
     };
   };

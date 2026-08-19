@@ -1,4 +1,5 @@
 import { describeRoute } from "hono-openapi";
+import { resolver } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
@@ -204,6 +205,21 @@ secured.access(requires("project:view")).get(
   },
 );
 
+const agentResponseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: agentTypeSchema,
+  config: z.record(z.unknown()).nullable(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  platformUrl: z.string().url(),
+});
+
+const agentErrorSchema = z.object({
+  error: z.string(),
+  message: z.string().optional(),
+});
+
 // ── Update Agent ─────────────────────────────────────────────
 // Registered under both verbs. The update is partial either way, so a caller
 // reaching for the other verb should get the same behavior instead of a 404.
@@ -217,6 +233,26 @@ function registerUpdateAgentVerb(verb: "patch" | "put"): void {
     agentServiceMiddleware,
     describeRoute({
       description: "Update an agent by its id",
+      responses: {
+        200: {
+          description: "Agent updated",
+          content: {
+            "application/json": { schema: resolver(agentResponseSchema) },
+          },
+        },
+        404: {
+          description: "Agent not found in this project",
+          content: {
+            "application/json": { schema: resolver(agentErrorSchema) },
+          },
+        },
+        422: {
+          description: "The request body does not match the expected shape",
+          content: {
+            "application/json": { schema: resolver(agentErrorSchema) },
+          },
+        },
+      },
     }),
     zValidator("json", updateAgentSchema),
     async (c) => {
