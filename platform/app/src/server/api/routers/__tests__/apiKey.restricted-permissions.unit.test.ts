@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
@@ -249,7 +249,7 @@ describe("apiKey router — restricted permissions", () => {
     describe("when creating a restricted key with camelCase permissions", () => {
       /** @scenario Restricted key with camelCase permissions saves without error */
       it("accepts auditLog:view without malformed error", async () => {
-        vi.mocked(prisma.customRole.findFirst).mockResolvedValue({
+        (prisma.customRole.findFirst as unknown as Mock).mockResolvedValue({
           id: CUSTOM_ROLE_ID,
           name: "API Key: Audit Key",
           permissions: ["auditLog:view"],
@@ -299,7 +299,7 @@ describe("apiKey router — restricted permissions", () => {
       it("succeeds and returns the updated key", async () => {
         // The pre-read sees the key as it was; the read-back after the write
         // sees the row the update left.
-        vi.mocked(prisma.apiKey.findUnique)
+        (prisma.apiKey.findUnique as unknown as Mock)
           .mockResolvedValueOnce(existingKey)
           .mockResolvedValue({ ...existingKey, permissionMode: "restricted" });
 
@@ -343,7 +343,7 @@ describe("apiKey router — restricted permissions", () => {
         // where the key held new permissions with stale binding state. The
         // orphan cleanup after replaceRoleBindings deletes the superseded
         // role.
-        vi.mocked(prisma.apiKey.findUnique).mockResolvedValue(restrictedKey);
+        (prisma.apiKey.findUnique as unknown as Mock).mockResolvedValue(restrictedKey);
 
         await caller.update({
           organizationId: ORG_ID,
@@ -371,8 +371,8 @@ describe("apiKey router — restricted permissions", () => {
 
     describe("when updating restricted key with camelCase permissions", () => {
       it("accepts auditLog:view without malformed error", async () => {
-        vi.mocked(prisma.apiKey.findUnique).mockResolvedValue(existingKey);
-        vi.mocked(prisma.customRole.findFirst).mockResolvedValue({
+        (prisma.apiKey.findUnique as unknown as Mock).mockResolvedValue(existingKey);
+        (prisma.customRole.findFirst as unknown as Mock).mockResolvedValue({
           id: CUSTOM_ROLE_ID,
           name: "API Key: Old Key",
           permissions: ["auditLog:view"],
