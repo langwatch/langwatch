@@ -69,9 +69,6 @@ export const useComponentExecution = () => {
       toaster.create({
         title: "Studio is not connected yet",
         type: "error",
-        meta: {
-          closable: true,
-        },
       });
       return false;
     }

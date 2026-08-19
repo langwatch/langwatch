@@ -572,7 +572,6 @@ function DataRetentionPage({
                   toaster.create({
                     title: `Saved ${pairs.length - failed.length} of ${pairs.length} updates`,
                     type: "warning",
-                    meta: { closable: true },
                   });
                 }
                 showErrorToast({

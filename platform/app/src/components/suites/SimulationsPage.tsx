@@ -246,7 +246,6 @@ export default function SimulationsPage() {
       toaster.create({
         title: "Run plan archived",
         type: "success",
-        meta: { closable: true },
       });
     },
     onError: (err) =>
@@ -263,7 +262,6 @@ export default function SimulationsPage() {
       toaster.create({
         title: "Run plan duplicated",
         type: "success",
-        meta: { closable: true },
       });
     },
     onError: (err) =>

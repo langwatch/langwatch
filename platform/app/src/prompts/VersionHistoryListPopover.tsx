@@ -464,9 +464,6 @@ export function VersionHistoryListPopover({
           onClose();
           toaster.info({
             title: `Restored prompt to version ${prompt.version}`,
-            meta: {
-              closable: true,
-            },
           });
         } catch (error) {
           logger.error({ error }, "Error loading version");

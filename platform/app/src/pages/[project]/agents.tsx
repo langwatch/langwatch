@@ -59,7 +59,6 @@ function Page() {
         title: "Agent updated",
         description: "Agent has been updated from source.",
         type: "success",
-        meta: { closable: true },
       });
     },
     onError: (error) =>
@@ -107,7 +106,6 @@ function Page() {
           ? "Also deleted: 1 workflow"
           : undefined,
         type: "success",
-        meta: { closable: true },
       });
     },
     onError: (error) =>
@@ -146,7 +144,6 @@ function Page() {
             toaster.create({
               title: "Agent deleted",
               type: "success",
-              meta: { closable: true },
             });
           },
           onError: (error) =>
