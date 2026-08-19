@@ -17,6 +17,7 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -305,12 +306,62 @@ describe("the settings shell in a new navigation mode", () => {
       expect(screen.getByTestId("settings-page-content")).toBeInTheDocument();
     });
 
-    /** @scenario Enterprise entries carry a violet pill */
-    it("marks the enterprise entries with the pill", () => {
+    /** @scenario "Enterprise entries carry a quiet grey pill" */
+    it("marks the enterprise entries with a grey pill in a hairline border", () => {
       renderSettings();
 
       expect(screen.getByRole("link", { name: "Groups" })).toBeInTheDocument();
-      expect(screen.getAllByText("ENT").length).toBeGreaterThanOrEqual(1);
+      const pills = screen.getAllByText("ENT");
+      expect(pills.length).toBeGreaterThanOrEqual(1);
+      // The hairline border is pinned on the shared chip style itself:
+      // shell/__tests__/quietChipStyle.unit.test.ts.
+      expect(pills[0]).toHaveStyle({
+        color: "var(--chakra-colors-gray-400)",
+      });
+    });
+
+    /** @scenario "The settings groups fold, and start open" */
+    it("opens every group, folds one away, and keeps it folded next time", async () => {
+      const user = userEvent.setup();
+      const { unmount } = renderSettings();
+
+      // A folded group reads "Expand <name>", so none of them means all open.
+      expect(screen.queryAllByRole("button", { name: /^Expand / })).toEqual([]);
+      expect(
+        screen.getAllByRole("button", { name: /^Collapse / }).length,
+      ).toBeGreaterThan(1);
+      expect(screen.getByRole("link", { name: "Members" })).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Collapse Access" }));
+
+      expect(
+        screen.queryByRole("link", { name: "Members" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Collapse Organization" }),
+      ).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByRole("link", { name: "General" })).toBeInTheDocument();
+
+      unmount();
+      renderSettings();
+
+      expect(
+        screen.getByRole("button", { name: "Expand Access" }),
+      ).toHaveAttribute("aria-expanded", "false");
+      expect(
+        screen.queryByRole("link", { name: "Members" }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "General" })).toBeInTheDocument();
+    });
+
+    /** @scenario "A rule separates the way back from the pages below it" */
+    it("draws a rule under the way back entry", () => {
+      renderSettings();
+
+      const backEntry = screen.getByRole("link", { name: /^Back/ });
+      expect(backEntry.parentElement).toHaveStyle({
+        borderBottomWidth: "1px",
+      });
     });
 
     it("hides the enterprise entries outside an enterprise plan", () => {

@@ -64,6 +64,48 @@ describe("the support menu chat placement", () => {
     });
   });
 
+  describe("when the pointer opens the menu and moves away", () => {
+    /** @scenario Closing the Support menu with the pointer leaves no focus ring */
+    it("closes the menu without leaving focus on the Support entry", async () => {
+      renderMenu({ chatPlacement: "in-menu" });
+      const trigger = screen.getByRole("button", { name: "Support" });
+
+      const user = await openSupportMenu();
+      await user.unhover(trigger);
+
+      await waitFor(() => {
+        expect(trigger).toHaveAttribute("aria-expanded", "false");
+      });
+      // The machine focuses the trigger in a microtask after the close;
+      // give that focus time to land before asserting it was dropped.
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      expect(trigger).not.toHaveFocus();
+    });
+
+    /** @scenario Closing the Support menu with the pointer leaves no focus ring */
+    it("keeps focus on the Support entry after a keyboard close", async () => {
+      renderMenu({ chatPlacement: "in-menu" });
+      const trigger = screen.getByRole("button", { name: "Support" });
+      const user = userEvent.setup();
+
+      trigger.focus();
+      await user.keyboard("{Enter}");
+      // The machine moves focus into the menu a frame after it opens;
+      // Escape only closes the menu once it carries the focus.
+      await waitFor(() => {
+        expect(screen.getByRole("menu")).toHaveFocus();
+      });
+
+      await user.keyboard("{Escape}");
+      await waitFor(() => {
+        expect(trigger).toHaveAttribute("aria-expanded", "false");
+      });
+      await waitFor(() => {
+        expect(trigger).toHaveFocus();
+      });
+    });
+  });
+
   describe("when rendered for a navigation-v2 sidebar", () => {
     /** @scenario Chat moves inside the Support menu in the new modes */
     it("folds the chat into the Support menu and drops the standalone entry", async () => {

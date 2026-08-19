@@ -1,14 +1,15 @@
 import { Badge, Box, HStack, Text } from "@chakra-ui/react";
 import type React from "react";
+import { useEffect, useRef } from "react";
 import type { Project } from "~/generated/prisma/client";
 import { trackEvent } from "../../utils/tracking";
 import { BetaPill } from "../ui/BetaPill";
 import { LegacyPill } from "../ui/LegacyPill";
 import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
+import { SIDE_MENU_DENSITIES, useSideMenuDensity } from "./sideMenuDensity";
 
-export const MENU_ITEM_HEIGHT = "32px";
-export const ICON_SIZE = 16;
+export const MENU_ITEM_HEIGHT = SIDE_MENU_DENSITIES.comfortable.height;
 
 // Base props for the visual menu item styling
 export type SideMenuItemProps = {
@@ -76,6 +77,7 @@ export const SideMenuItem = ({
       </Badge>
     ) : null;
 
+  const density = useSideMenuDensity();
   const IconElem = icon as React.ComponentType<{
     size?: string | number;
     color?: string;
@@ -84,7 +86,10 @@ export const SideMenuItem = ({
   const iconNode =
     typeof IconElem === "function" ||
     (IconElem as unknown as { render?: unknown }).render ? (
-      <IconElem size={ICON_SIZE} color="var(--chakra-colors-nav-fg-muted)" />
+      <IconElem
+        size={density.iconSize}
+        color="var(--chakra-colors-nav-fg-muted)"
+      />
     ) : (
       (icon as React.ReactNode)
     );
@@ -92,9 +97,9 @@ export const SideMenuItem = ({
   return (
     <HStack
       width={showLabel ? "full" : "auto"}
-      height={MENU_ITEM_HEIGHT}
-      gap={3}
-      paddingX={3}
+      height={density.height}
+      gap={density.gap}
+      paddingX={density.paddingX}
       borderRadius="lg"
       backgroundColor={isActive ? "nav.bgActive" : "transparent"}
       _hover={{
@@ -108,8 +113,8 @@ export const SideMenuItem = ({
         display="flex"
         alignItems="center"
         justifyContent="center"
-        width={`${ICON_SIZE}px`}
-        height={`${ICON_SIZE}px`}
+        width={`${density.iconSize}px`}
+        height={`${density.iconSize}px`}
       >
         {iconNode}
         {badge && !showLabel && (
@@ -121,7 +126,7 @@ export const SideMenuItem = ({
       {showLabel && (
         <>
           <Text
-            fontSize="14px"
+            fontSize={density.fontSize}
             fontWeight="normal"
             color="nav.fg"
             whiteSpace="nowrap"
@@ -173,6 +178,16 @@ export const SideMenuLink = ({
   isExternal,
   unavailableReason,
 }: SideMenuLinkProps) => {
+  const linkRef = useRef<HTMLAnchorElement>(null);
+  // A page opened by its address can have its entry below the visible
+  // part of a scrolled menu. "nearest" leaves the menu alone whenever
+  // the entry is already visible, so click navigation never shifts it.
+  useEffect(() => {
+    if (isActive) {
+      linkRef.current?.scrollIntoView?.({ block: "nearest" });
+    }
+  }, [isActive]);
+
   if (unavailableReason) {
     return (
       <Tooltip
@@ -206,6 +221,7 @@ export const SideMenuLink = ({
 
   return (
     <Link
+      ref={linkRef}
       variant="plain"
       width="full"
       href={href}

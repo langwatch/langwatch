@@ -1,14 +1,12 @@
-import { Badge, Box, Kbd, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, Kbd, VStack } from "@chakra-ui/react";
 import { ArrowLeft, ExternalLink, Search } from "lucide-react";
 import { useState } from "react";
-import {
-  MainMenuSections,
-  MENU_WIDTH_COMPACT,
-  MENU_WIDTH_EXPANDED,
-} from "~/components/MainMenu";
+import { MainMenuSections } from "~/components/MainMenu";
 import { PersonalSidebarLinks } from "~/components/PersonalSidebar";
+import { SidebarSection } from "~/components/sidebar/SidebarSection";
 import { SideMenuItem, SideMenuLink } from "~/components/sidebar/SideMenuLink";
 import { SupportMenu } from "~/components/sidebar/SupportMenu";
+import { SideMenuDensityProvider } from "~/components/sidebar/sideMenuDensity";
 import { ThemeToggle } from "~/components/sidebar/ThemeToggle";
 import { UsageIndicator } from "~/components/sidebar/UsageIndicator";
 import { useCommandBar } from "~/features/command-bar";
@@ -27,6 +25,11 @@ import {
 } from "../sectionNavItems";
 import { useReachableProducts } from "../useReachableProducts";
 import { useSettingsMenu } from "../useSettingsMenu";
+import { QUIET_SIDEBAR_CHIP } from "./quietChipStyle";
+import {
+  SHELL_SIDEBAR_WIDTH_COMPACT,
+  SHELL_SIDEBAR_WIDTH_EXPANDED,
+} from "./shellLayout";
 
 export type SidebarSurface = ProductId | "settings";
 
@@ -51,7 +54,17 @@ function QuickSearchMenuItem({ showLabel }: { showLabel: boolean }) {
         icon={Search}
         label="Quick Search"
         showLabel={showLabel}
-        rightElement={<Kbd size="sm">{getCommandBarShortcut()}</Kbd>}
+        rightElement={
+          <Kbd
+            variant="outline"
+            fontSize="10px"
+            fontWeight="normal"
+            background="bg.muted"
+            {...QUIET_SIDEBAR_CHIP}
+          >
+            {getCommandBarShortcut()}
+          </Kbd>
+        }
       />
     </Box>
   );
@@ -77,7 +90,20 @@ function SidebarBottomBlock({
   });
 
   return (
-    <VStack width="full" gap={0.5} align="start">
+    <VStack
+      data-testid="sidebar-bottom-block"
+      width="full"
+      gap={0.5}
+      align="start"
+      borderTopWidth="1px"
+      borderTopColor="border"
+      paddingTop={2}
+      marginTop={2}
+      // The rule reads as the edge of the block, so it runs a little
+      // wider than the items it separates.
+      marginX="-4px"
+      paddingX="4px"
+    >
       <UsageIndicator showLabel={showExpanded} />
       {shouldIncludeSettingsLink && hasPermission("organization:view") && (
         <SideMenuLink
@@ -123,9 +149,9 @@ function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
     <Box
       width="full"
       borderBottomWidth="1px"
-      borderBottomColor="border.muted"
-      paddingBottom={1.5}
-      marginBottom={1}
+      borderBottomColor="border"
+      paddingBottom={2.5}
+      marginBottom={1.5}
     >
       <SideMenuLink
         icon={ArrowLeft}
@@ -140,7 +166,7 @@ function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
 /**
  * The Settings sidebar body: the regrouped, iconed settings menu with
  * the same gates the legacy settings navigation applies. Enterprise
- * entries carry the violet pill.
+ * entries carry the quiet grey pill.
  */
 function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
   const router = useRouter();
@@ -149,21 +175,12 @@ function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
   return (
     <>
       {groups.map((group) => (
-        <VStack key={group.label} width="full" gap={0.5} align="start">
-          {showExpanded && (
-            <Text
-              fontSize="11px"
-              fontWeight="medium"
-              textTransform="uppercase"
-              whiteSpace="nowrap"
-              color="gray.500"
-              paddingX={2}
-              paddingTop={2.5}
-              paddingBottom={0.5}
-            >
-              {group.label}
-            </Text>
-          )}
+        <SidebarSection
+          key={group.id}
+          id={group.id}
+          label={group.label}
+          showExpanded={showExpanded}
+        >
           {group.items.map((item) => (
             <SideMenuLink
               key={item.href}
@@ -181,10 +198,12 @@ function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
                 item.isEnterprise ? (
                   <Badge
                     title="Enterprise plan feature"
-                    colorPalette="purple"
                     variant="outline"
-                    fontSize="9px"
-                    borderRadius="sm"
+                    fontSize="8.5px"
+                    fontWeight="semibold"
+                    letterSpacing="0.06em"
+                    textTransform="uppercase"
+                    {...QUIET_SIDEBAR_CHIP}
                   >
                     ENT
                   </Badge>
@@ -192,7 +211,7 @@ function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
               }
             />
           ))}
-        </VStack>
+        </SidebarSection>
       ))}
     </>
   );
@@ -272,12 +291,78 @@ function ProductSidebarBody({
 }
 
 /**
+ * Everything inside the sidebar column: the way back on Settings, Quick
+ * Search, the surface's own pages, and the bottom block pinned under
+ * them. Laid out at the expanded width whatever the column is showing,
+ * so a collapsing column slides the same content out of view instead of
+ * reflowing it.
+ */
+function SidebarContent({
+  surface,
+  showExpanded,
+}: {
+  surface: SidebarSurface;
+  showExpanded: boolean;
+}) {
+  return (
+    <VStack
+      paddingTop={2}
+      paddingBottom={2}
+      gap={0}
+      height="100%"
+      align="start"
+      width={SHELL_SIDEBAR_WIDTH_EXPANDED}
+      justifyContent="space-between"
+    >
+      {/* The scroll region spans the full column and carries the
+          horizontal inset itself, so its scrollbar runs against the
+          content panel instead of floating a padding away from it. */}
+      <VStack
+        width="full"
+        paddingX={3}
+        gap={0.5}
+        align="start"
+        flex={1}
+        minHeight={0}
+        overflowY="auto"
+        overflowX="hidden"
+        css={{
+          // No standard scrollbar-width here: Chromium treats it as an
+          // opt out of the ::-webkit-scrollbar styling below, and the
+          // native bar it falls back to is a wide one with a track.
+          // Firefox takes its default scrollbar instead.
+          "&::-webkit-scrollbar": { width: "4px" },
+          "&::-webkit-scrollbar-thumb": {
+            background: "var(--chakra-colors-border-emphasized)",
+            borderRadius: "2px",
+          },
+          "&::-webkit-scrollbar-track": { background: "transparent" },
+        }}
+      >
+        {surface === "settings" && (
+          <SettingsBackEntry showLabel={showExpanded} />
+        )}
+        <QuickSearchMenuItem showLabel={showExpanded} />
+        <Box height={2} width="full" flexShrink={0} />
+        <ProductSidebarBody surface={surface} showExpanded={showExpanded} />
+      </VStack>
+
+      <Box width="full" paddingX={3}>
+        <SidebarBottomBlock
+          showExpanded={showExpanded}
+          shouldIncludeSettingsLink={surface !== "settings"}
+        />
+      </Box>
+    </VStack>
+  );
+}
+
+/**
  * The navigation-v2 sidebar frame, shared by the product-switcher and
- * icon-rail shells: Quick Search first, the active surface's own pages,
- * and the pinned bottom block. The Settings surface opens with the way
- * back to the product the user came from. It never auto-hides; only
- * small screens keep the hover-expanded responsive collapse the legacy
- * chrome has.
+ * icon-rail shells: a wider column than the current chrome's, drawn one
+ * step tighter so the longer page names hold one line. It never
+ * auto-hides; only small screens keep the hover-expanded responsive
+ * collapse the legacy chrome has.
  *
  * Specs: specs/navigation/product-sidebars.feature,
  *        specs/navigation/settings-shell-v2.feature
@@ -291,71 +376,41 @@ export function ProductSidebar({
 }) {
   const [isHovered, setIsHovered] = useState(false);
   const showExpanded = !isCompact || isHovered;
-  const currentWidth = showExpanded ? MENU_WIDTH_EXPANDED : MENU_WIDTH_COMPACT;
+  const columnWidth = isCompact
+    ? SHELL_SIDEBAR_WIDTH_COMPACT
+    : SHELL_SIDEBAR_WIDTH_EXPANDED;
+  const fullHeight = `calc(100vh - ${APP_HEADER_HEIGHT}px)`;
 
   return (
-    <Box
-      background="bg.page"
-      width={isCompact ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED}
-      minWidth={isCompact ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED}
-      height={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
-      position="relative"
-      onMouseEnter={() => isCompact && setIsHovered(true)}
-      onMouseLeave={() => isCompact && setIsHovered(false)}
-    >
+    <SideMenuDensityProvider density="compact">
       <Box
-        position={isCompact ? "absolute" : "relative"}
-        zIndex={isCompact ? 100 : "auto"}
-        top={0}
-        left={0}
-        width={currentWidth}
-        height={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
+        data-testid="product-sidebar"
         background="bg.page"
-        transition="width 0.15s ease-in-out"
-        overflow="hidden"
+        width={columnWidth}
+        minWidth={columnWidth}
+        height={fullHeight}
+        position="relative"
+        onMouseEnter={() => isCompact && setIsHovered(true)}
+        onMouseLeave={() => isCompact && setIsHovered(false)}
       >
-        <VStack
-          paddingX={2}
-          paddingTop={2}
-          paddingBottom={2}
-          gap={0}
-          height="100%"
-          align="start"
-          width={MENU_WIDTH_EXPANDED}
-          justifyContent="space-between"
+        <Box
+          position={isCompact ? "absolute" : "relative"}
+          zIndex={isCompact ? 100 : "auto"}
+          top={0}
+          left={0}
+          width={
+            showExpanded
+              ? SHELL_SIDEBAR_WIDTH_EXPANDED
+              : SHELL_SIDEBAR_WIDTH_COMPACT
+          }
+          height={fullHeight}
+          background="bg.page"
+          transition="width 0.15s ease-in-out"
+          overflow="hidden"
         >
-          <VStack
-            width="full"
-            gap={0.5}
-            align="start"
-            flex={1}
-            minHeight={0}
-            overflowY="auto"
-            overflowX="hidden"
-            css={{
-              scrollbarWidth: "thin",
-              "&::-webkit-scrollbar": { width: "4px" },
-              "&::-webkit-scrollbar-thumb": {
-                background: "var(--chakra-colors-border-emphasized)",
-                borderRadius: "2px",
-              },
-              "&::-webkit-scrollbar-track": { background: "transparent" },
-            }}
-          >
-            {surface === "settings" && (
-              <SettingsBackEntry showLabel={showExpanded} />
-            )}
-            <QuickSearchMenuItem showLabel={showExpanded} />
-            <Box height={2} width="full" flexShrink={0} />
-            <ProductSidebarBody surface={surface} showExpanded={showExpanded} />
-          </VStack>
-
-          <SidebarBottomBlock
-            showExpanded={showExpanded}
-            shouldIncludeSettingsLink={surface !== "settings"}
-          />
-        </VStack>
+          <SidebarContent surface={surface} showExpanded={showExpanded} />
+        </Box>
       </Box>
-    </Box>
+    </SideMenuDensityProvider>
   );
 }

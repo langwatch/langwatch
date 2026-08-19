@@ -1,6 +1,7 @@
 import { Button, Portal } from "@chakra-ui/react";
 import { Monitor, PanelsTopLeft } from "lucide-react";
 import {
+  DEFAULT_NAVIGATION_MODE,
   type NavigationMode,
   useNavigationModeStore,
 } from "~/features/navigation/navigationModeStore";
@@ -88,6 +89,9 @@ export function AppHeaderUserMenu({
   const setStoredNavigationMode = useNavigationModeStore(
     (s) => s.setStoredMode,
   );
+  // The picker only shows with the flag on, where a device that never
+  // picked runs the default mode. It reports that, not the old chrome.
+  const currentNavigationMode = storedNavigationMode ?? DEFAULT_NAVIGATION_MODE;
 
   const graphicsQualityOverride = useGraphicsQualityOverrideStore(
     (s) => s.override,
@@ -169,11 +173,11 @@ export function AppHeaderUserMenu({
                 >
                   <Menu.TriggerItem value="navigation-mode">
                     <PanelsTopLeft size={14} />
-                    Navigation ({NAVIGATION_MODE_LABELS[storedNavigationMode]})
+                    Navigation ({NAVIGATION_MODE_LABELS[currentNavigationMode]})
                   </Menu.TriggerItem>
                   <Menu.Content>
                     <Menu.RadioItemGroup
-                      value={storedNavigationMode}
+                      value={currentNavigationMode}
                       onValueChange={(e) => {
                         const mode = e.value as NavigationMode;
                         setStoredNavigationMode(mode);
