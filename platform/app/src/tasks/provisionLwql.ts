@@ -152,6 +152,10 @@ async function backfillKeyMap({
   );
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export default async function execute() {
   const connection = lwqlConnectionFromEnv();
   if (!connection) {
@@ -189,7 +193,7 @@ export default async function execute() {
       } catch (error) {
         logger.error(
           {
-            error: error instanceof Error ? error.message : String(error),
+            error: errorMessage(error),
             statement: `${index + 1}/${statements.length}`,
           },
           "lwql provisioning failed creating ClickHouse objects",
@@ -207,7 +211,7 @@ export default async function execute() {
       await backfillKeyMap({ client, names, sourceDatabase });
     } catch (error) {
       logger.error(
-        { error: error instanceof Error ? error.message : String(error) },
+        { error: errorMessage(error) },
         "lwql key-map backfill failed — continuing; project creation syncs rows inline and the next deploy retries the rest",
       );
     }
