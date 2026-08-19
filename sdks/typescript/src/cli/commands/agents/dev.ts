@@ -29,7 +29,17 @@ import {
   applyDevTunnel,
   deriveSimulationsUrl,
   restoreDevTunnel,
+  touchDevTunnel,
 } from "./dev/write-back";
+
+/** How often the session probes the tunnel end to end. */
+const HEALTH_INTERVAL_MS = 30_000;
+
+/** Unhealthy probes in a row before the tunnel is declared dead. */
+const HEALTH_FAILURE_THRESHOLD = 3;
+
+/** How long a repeated signal waits for the in-flight restore before forcing exit. */
+const FORCE_EXIT_GRACE_MS = 2_000;
 
 export interface AgentDevOptions {
   port?: string;
@@ -47,6 +57,11 @@ export interface AgentDevSession {
   /** Resolves with the exit code once shutdown finishes. */
   done: Promise<number>;
   shutdown: (code?: number) => Promise<void>;
+}
+
+/** Test hooks for `startAgentDevSession`; sessions use the defaults. */
+export interface AgentDevSessionHooks {
+  healthIntervalMs?: number;
 }
 
 function printBanner({
@@ -94,6 +109,7 @@ function printBanner({
  */
 export async function startAgentDevSession(
   options: AgentDevOptions,
+  hooks: AgentDevSessionHooks = {},
 ): Promise<AgentDevSession> {
   const localUrl = resolveLocalUrl(options);
   if (options.tunnelUrl) {
@@ -112,6 +128,33 @@ export async function startAgentDevSession(
     localUrl,
   });
   rememberAgentForDirectory(agent.id);
+
+  const updateUrl = options.updateUrl !== false;
+
+  // A crashed session leaves the agent pointing at a dead tunnel, with the
+  // real URL still stashed under devTunnel. Restore it before provisioning:
+  // if THIS session dies before its own write-back, the agent is left on the
+  // real URL rather than on a dead tunnel.
+  const staleStash = (
+    agent.config as { devTunnel?: { previousUrl?: string } } | undefined
+  )?.devTunnel;
+  if (updateUrl && staleStash?.previousUrl) {
+    try {
+      const fresh = await service.get(agent.id);
+      const restored = restoreDevTunnel({ config: fresh.config ?? {} });
+      if (restored) {
+        await service.update(agent.id, { config: restored });
+        console.log(
+          chalk.yellow(
+            `Found a dev tunnel left behind by a previous session. Restored agent "${agent.name}" to ${staleStash.previousUrl} first.`,
+          ),
+        );
+      }
+    } catch {
+      // Best-effort: the write-back below stashes the same previous URL, so a
+      // failed early restore costs nothing.
+    }
+  }
 
   // A bring-your-own tunnel forwards straight to the user's own server, so
   // the local auth proxy would sit outside that chain and protect nothing.
@@ -151,7 +194,6 @@ export async function startAgentDevSession(
     }
   }
 
-  const updateUrl = options.updateUrl !== false;
   let previousUrl: string | undefined;
   let needsRestore = false;
 
@@ -185,10 +227,13 @@ export async function startAgentDevSession(
     resolveDone = resolve;
   });
 
-  let shuttingDown = false;
-  const shutdown = async (code = 0): Promise<void> => {
-    if (shuttingDown) return;
-    shuttingDown = true;
+  // The tunnel the session currently runs over. Re-provisioning replaces it.
+  let currentTunnel = tunnel;
+  let currentTunnelUrl = tunnelUrl;
+  let healthTimer: NodeJS.Timeout | undefined;
+
+  const performShutdown = async (code: number): Promise<void> => {
+    if (healthTimer) clearTimeout(healthTimer);
 
     if (needsRestore) {
       needsRestore = false;
@@ -217,18 +262,136 @@ export async function startAgentDevSession(
       }
     }
 
-    tunnel?.stop();
+    currentTunnel?.stop();
     await proxy?.close();
     resolveDone(code);
   };
 
-  tunnel?.once("exit", () => {
-    if (shuttingDown) return;
+  // Idempotent: every caller of a second shutdown (a repeated signal, a tunnel
+  // event racing a crash handler) shares the ONE in-flight restore instead of
+  // starting another.
+  let shutdownPromise: Promise<void> | undefined;
+  const shutdown = (code = 0): Promise<void> =>
+    (shutdownPromise ??= performShutdown(code));
+
+  const attachTunnelEnd = (attached: TunnelHandle): void => {
+    attached.once("exit", () => {
+      if (shutdownPromise || attached !== currentTunnel) return;
+      console.error(
+        chalk.yellow("The tunnel process ended. Restoring the agent URL."),
+      );
+      void shutdown(0);
+    });
+    attached.once("error", (error) => {
+      if (shutdownPromise || attached !== currentTunnel) return;
+      console.error(
+        chalk.yellow(
+          `The tunnel reported an error (${error.message}). Restoring the agent URL.`,
+        ),
+      );
+      void shutdown(1);
+    });
+  };
+  if (currentTunnel) attachTunnelEnd(currentTunnel);
+
+  // The health monitor: probe the local server THROUGH the public tunnel URL,
+  // so the whole chain (edge, tunnel process, auth proxy, local server) is
+  // covered. The auth proxy answers unauthenticated probes with 401, which
+  // still proves the chain is up; Cloudflare's 530 or a transport failure
+  // means the edge cannot reach the tunnel.
+  const probeTunnel = async (): Promise<boolean> => {
+    try {
+      const response = await fetch(currentTunnelUrl, { method: "GET" });
+      return response.status !== 530;
+    } catch {
+      return false;
+    }
+  };
+
+  const refreshHeartbeat = async (): Promise<void> => {
+    if (!needsRestore) return;
+    try {
+      const fresh = await service.get(agent.id);
+      const touched = touchDevTunnel({ config: fresh.config ?? {} });
+      if (touched) await service.update(agent.id, { config: touched });
+    } catch {
+      // Best-effort: a missed heartbeat is not worth ending the session over.
+    }
+  };
+
+  const reprovisionTunnel = async (): Promise<void> => {
     console.error(
-      chalk.yellow("The tunnel process ended. Restoring the agent URL."),
+      chalk.yellow(
+        "The tunnel stopped answering. Provisioning a replacement tunnel...",
+      ),
     );
-    void shutdown(0);
-  });
+    const previous = currentTunnel;
+    const started = await startQuickTunnel({ localUrl: tunnelTarget });
+    currentTunnel = started.tunnel;
+    currentTunnelUrl = started.url;
+    attachTunnelEnd(started.tunnel);
+    previous?.stop();
+    if (needsRestore) {
+      const fresh = await service.get(agent.id);
+      const config = applyDevTunnel({
+        config: fresh.config ?? {},
+        tunnelUrl: currentTunnelUrl,
+        secret,
+      });
+      await service.update(agent.id, { config });
+    }
+    console.error(chalk.green(`Tunnel replaced: ${currentTunnelUrl}`));
+  };
+
+  // A bring-your-own tunnel is not ours to replace, and with --no-update-url
+  // the caller pointed things at the printed URL themselves, so a silent swap
+  // would strand them. Both only get the warning.
+  const canReprovision =
+    updateUrl && !options.tunnelUrl && currentTunnel !== undefined;
+  let consecutiveFailures = 0;
+
+  const runHealthCheck = async (): Promise<void> => {
+    if (await probeTunnel()) {
+      consecutiveFailures = 0;
+      await refreshHeartbeat();
+      return;
+    }
+    consecutiveFailures++;
+    if (consecutiveFailures < HEALTH_FAILURE_THRESHOLD) return;
+    consecutiveFailures = 0;
+    if (!canReprovision) {
+      console.error(
+        chalk.yellow(
+          `The tunnel at ${currentTunnelUrl} stopped answering. This session cannot replace it. Restart your tunnel, or restart \`agent dev\`.`,
+        ),
+      );
+      return;
+    }
+    try {
+      await reprovisionTunnel();
+    } catch (error) {
+      console.error(
+        chalk.red(
+          `Could not provision a replacement tunnel: ${
+            error instanceof Error ? error.message : String(error)
+          }. Restoring the agent URL.`,
+        ),
+      );
+      await shutdown(1);
+    }
+  };
+
+  const healthIntervalMs = hooks.healthIntervalMs ?? HEALTH_INTERVAL_MS;
+  const scheduleHealthCheck = (): void => {
+    healthTimer = setTimeout(() => {
+      if (shutdownPromise) return;
+      void runHealthCheck().finally(() => {
+        if (!shutdownPromise) scheduleHealthCheck();
+      });
+    }, healthIntervalMs);
+    healthTimer.unref?.();
+  };
+  scheduleHealthCheck();
 
   return { done, shutdown };
 }
@@ -239,8 +402,33 @@ export const agentDevCommand = async (
 ): Promise<void> => {
   const session = await startAgentDevSession(options);
 
-  process.once("SIGINT", () => void session.shutdown(0));
-  process.once("SIGTERM", () => void session.shutdown(0));
+  let shutdownRequested = false;
+  const onSignal = (): void => {
+    if (!shutdownRequested) {
+      shutdownRequested = true;
+      void session.shutdown(0);
+      return;
+    }
+    // A repeated signal while the restore is in flight: give it a moment to
+    // finish, then force-exit. Never a second restore; shutdown is idempotent.
+    setTimeout(() => process.exit(130), FORCE_EXIT_GRACE_MS).unref();
+  };
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
+    process.on(signal, onSignal);
+  }
+
+  const onCrash = (error: unknown): void => {
+    console.error(
+      chalk.red(
+        `The dev session crashed: ${
+          error instanceof Error ? error.message : String(error)
+        }. Restoring the agent URL.`,
+      ),
+    );
+    void session.shutdown(1);
+  };
+  process.once("uncaughtException", onCrash);
+  process.once("unhandledRejection", onCrash);
 
   const code = await session.done;
   process.exit(code);
