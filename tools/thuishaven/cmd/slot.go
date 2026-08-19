@@ -5,11 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"os/signal"
 	"runtime"
-	"sync/atomic"
+	"sync"
 	"syscall"
 	"time"
 
@@ -95,6 +96,7 @@ func resolveSlotPressure() domain.Pressure {
 	return domain.ResolveCheckPressure(
 		os.Getenv("CHECK_PRESSURE"),
 		domain.ClassifyPressure(system.New().MemStat()),
+		os.Getenv("CI"),
 	)
 }
 
@@ -235,26 +237,72 @@ func slotExec(ctx context.Context, argv []string, pressure domain.Pressure) int 
 		fmt.Fprintf(os.Stderr, "checks: could not run %s: %v\n", argv[0], err)
 		return 127
 	}
+	relay := startSignalRelay(cmd.Process)
+	err := cmd.Wait()
+	death := slotDeath{forwarded: relay.close(), canceled: ctx.Err() != nil}
+	reportOutsideKill(err, argv[0], death)
+	return slotExitCode(err, argv[0])
+}
+
+// slotDeath is what the wrapper knows about how the child ended beyond the
+// Wait error: which signals it forwarded, and whether it ended the run itself
+// through the context. exec.CommandContext kills with SIGKILL on cancellation,
+// which no forwarded-signal record can account for, so the cancellation is
+// tracked next to them.
+type slotDeath struct {
+	forwarded map[syscall.Signal]bool
+	canceled  bool
+}
+
+// signalRelay passes the wrapper's terminating signals down to the child and
+// records which ones it sent. Which signals, not merely whether any: a run
+// that is interrupted and then killed by the OS dies of a signal nobody
+// forwarded, and that is the death worth naming, which a boolean would have
+// suppressed because an earlier SIGINT set it.
+type signalRelay struct {
+	mu        sync.Mutex
+	forwarded map[syscall.Signal]bool
+	stop      chan struct{}
+}
+
+func startSignalRelay(proc *os.Process) *signalRelay {
+	relay := &signalRelay{
+		forwarded: map[syscall.Signal]bool{},
+		stop:      make(chan struct{}),
+	}
 	signals := make(chan os.Signal, 4)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
-	done := make(chan struct{})
-	var forwarded atomic.Bool
 	go func() {
+		defer signal.Stop(signals)
 		for {
 			select {
 			case sig := <-signals:
-				forwarded.Store(true)
-				_ = cmd.Process.Signal(sig)
-			case <-done:
+				relay.record(sig)
+				_ = proc.Signal(sig)
+			case <-relay.stop:
 				return
 			}
 		}
 	}()
-	err := cmd.Wait()
-	close(done)
-	signal.Stop(signals)
-	reportOutsideKill(err, argv[0], forwarded.Load())
-	return slotExitCode(err, argv[0])
+	return relay
+}
+
+func (r *signalRelay) record(sig os.Signal) {
+	number, ok := sig.(syscall.Signal)
+	if !ok {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.forwarded[number] = true
+}
+
+// close ends the relay and reports the signals it forwarded.
+func (r *signalRelay) close() map[syscall.Signal]bool {
+	close(r.stop)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return maps.Clone(r.forwarded)
 }
 
 // reportOutsideKill names the one death this wrapper is reliably blamed for
@@ -263,8 +311,12 @@ func slotExec(ctx context.Context, argv []string, pressure domain.Pressure) int 
 // this line the run ends in a bare exit 137, which reads as "the queue killed
 // it" and teaches people (and agents) to bypass the queue with CHECK_SLOTS=0,
 // removing the machine-wide serialization for everyone.
-func reportOutsideKill(err error, argv0 string, forwarded bool) {
-	if err == nil || forwarded {
+//
+// The test is the signal that ended the child, not whether any signal was
+// forwarded before it. Ctrl-C on a child that ignores SIGINT and is then
+// reclaimed by the OS is an outside kill and says so.
+func reportOutsideKill(err error, argv0 string, death slotDeath) {
+	if err == nil || death.canceled {
 		return
 	}
 	exitErr, ok := errors.AsType[*exec.ExitError](err)
@@ -276,6 +328,9 @@ func reportOutsideKill(err error, argv0 string, forwarded bool) {
 		return
 	}
 	sig := status.Signal()
+	if death.forwarded[sig] {
+		return
+	}
 	fmt.Fprintf(os.Stderr,
 		"checks: %s was killed from outside by signal %d (%s). The queue never kills runs; the likely cause is an operator kill or the OS reclaiming memory. Re-run the same command. Do not set CHECK_SLOTS=0.\n",
 		argv0, int(sig), sig.String())

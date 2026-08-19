@@ -216,13 +216,14 @@ checks in their smallest shape**: when swap or the compressor is filling
 `GOMEMLIMIT` to its 3 GiB floor and halves `GOMAXPROCS`, so the check pays for
 the shortage in its own GC time instead of everything else paying in swap
 (`CHECK_PRESSURE=green|amber|red` forces the level; explicit `GOMEMLIMIT` /
-`GOMAXPROCS` / `CHECK_SLOTS` still win). `node dev/scripts/check-queue.mjs
+`GOMAXPROCS` / `CHECK_SLOTS` still win). CI reads green by rule, so it keeps
+the ceiling and the parallelism it had before. `node dev/scripts/check-queue.mjs
 --explain` shows the limit, the pressure level and who currently holds a slot.
 Don't cap the tools'
 own threads instead (`RAYON_NUM_THREADS` does work on biome): it spends the same
 CPU over 5x the wall clock. See `specs/setup/check-slots.feature`.
-**A check that dies with exit 137 was killed from outside** — an operator kill
-or macOS reclaiming memory — never by the queue, which kills nothing and now
+**A check that dies with exit 137 was killed from outside**, by an operator or
+by macOS reclaiming memory, never by the queue, which kills nothing and now
 says so on stderr when it happens. Re-run the same command through the queue;
 never react with `CHECK_SLOTS=0`, which removes the serialization for every
 worktree and agent on the machine.

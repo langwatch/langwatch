@@ -539,6 +539,29 @@ describe("check queue", () => {
       await Promise.all(runs.map((run) => run.done));
       expect(maxOverlap(readEvents())).toBe(2);
     });
+
+    /** @scenario "CI keeps the runtime limits it had before the pressure policy" */
+    it("reads green under CI whatever the machine measures", async () => {
+      const explained = await startRun("ci-pressure", {
+        argv: ["--explain"],
+        // No forced level: this is the measured path, which CI short-circuits.
+        env: { CHECK_SLOTS: undefined, CI: "true", CHECK_PRESSURE: undefined },
+      }).done;
+
+      expect(explained.stderr).toContain("pressure=green");
+      // Green sets no GOMAXPROCS at all, so the line is absent entirely.
+      expect(explained.stderr).not.toContain("gomaxprocs=");
+    });
+
+    it("still lets an explicit level through under CI", async () => {
+      const explained = await startRun("ci-forced", {
+        argv: ["--explain"],
+        env: { CHECK_SLOTS: undefined, CI: "true", CHECK_PRESSURE: "red" },
+      }).done;
+
+      expect(explained.stderr).toContain("pressure=red");
+      expect(explained.stderr).toContain("slots=0 source=CI");
+    });
   });
 
   describe("given the machine is under memory pressure", () => {
@@ -634,6 +657,34 @@ describe("check queue", () => {
       const result = await run.done;
 
       expect(result.stderr).not.toContain("killed from outside");
+    });
+
+    /** @scenario "An interrupted run killed from outside is still reported" */
+    it("still names the kill when an interrupt came first", async () => {
+      const pidFile = path.join(scratch, "escalated.pid");
+      // The command ignores the forwarded SIGTERM (the disposition survives the
+      // exec), so the signal that finally ends it is one nobody forwarded.
+      const run = startRun("escalated", {
+        argv: ["sh", "-c", `trap '' TERM; echo $$ > ${pidFile}; exec sleep 5`],
+      });
+
+      let pid = "";
+      for (let attempt = 0; attempt < 200 && pid === ""; attempt++) {
+        try {
+          pid = readFileSync(pidFile, "utf8").trim();
+        } catch {
+          await sleep(25);
+        }
+      }
+      expect(pid).not.toBe("");
+
+      run.child.kill("SIGTERM");
+      await sleep(100);
+      process.kill(Number(pid), "SIGKILL");
+      const result = await run.done;
+
+      expect(result.code).toBe(137);
+      expect(result.stderr).toContain("killed from outside by SIGKILL");
     });
 
     it("says nothing about a clean failure", async () => {

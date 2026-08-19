@@ -187,6 +187,20 @@ Feature: Machine-wide slots for whole-repo checks
     Then the forced level is used instead of measuring the machine
     And a misspelled level falls back to the measurement, like a CHECK_SLOTS typo
 
+  # CI already runs one check per job on a machine of its own, which is why it
+  # gets no queue. The same reasoning retires the pressure policy there: nobody
+  # is typing on a runner, so buying back an interactive machine buys nothing
+  # and only makes the job slower, and a swap figure read inside a container
+  # describes the host rather than the job.
+
+  @unit
+  Scenario: CI keeps the runtime limits it had before the pressure policy
+    Given the run is under CI
+    When the level is resolved
+    Then it is green whatever the machine measures
+    And the check runs with the same memory ceiling and parallelism it had before
+    And an explicitly forced level still wins, for a test that needs one
+
   # --- A killed run must not read as the queue's doing ---
 
   # Observed in the wild: a whole-tree typecheck ended in a bare exit 137, and
@@ -204,6 +218,13 @@ Feature: Machine-wide slots for whole-repo checks
     And it says to re-run the same command rather than set CHECK_SLOTS=0
     And a signal the wrapper itself forwarded, like Ctrl-C, is not reported
     And a command that fails on its own is not reported
+
+  @unit
+  Scenario: An interrupted run killed from outside is still reported
+    Given a check was interrupted and the command ignored the forwarded signal
+    When the command is then killed by a signal the wrapper did not forward
+    Then the wrapper still reports the kill, because the earlier interrupt did not cause it
+    And a run the wrapper itself canceled is not reported
 
   # --- The bin shims: the package scripts are not the only way in ---
 

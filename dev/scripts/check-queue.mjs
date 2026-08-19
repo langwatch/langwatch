@@ -76,6 +76,17 @@ const stderr = (line) => process.stderr.write(line);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
+ * The CI convention: the variable is set to something that is not one of the
+ * values meaning "not CI". The slot limit and the pressure policy both ask
+ * this, so they ask it in one place and cannot drift apart. Mirrors
+ * isTruthyCI in tools/thuishaven/domain/checkslots.go.
+ */
+function isTruthyCI(ci) {
+  const value = (ci ?? "").trim().toLowerCase();
+  return value !== "" && value !== "0" && value !== "false";
+}
+
+/**
  * How much trouble the machine is in: "green", "amber" or "red". A mirror of
  * domain/pressure.go in tools/thuishaven, which is the source of truth for the
  * thresholds (ADR-090): swap above 40% is amber and above 75% red, compressor
@@ -86,12 +97,19 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * A machine this cannot read is green: a governor that cannot see must not
  * throttle. Only darwin is measured, because the thrash this exists to stop is
  * the compressor-and-swap spiral of a memory-oversubscribed Mac.
+ *
+ * CI is green whatever the machine says. The queue already stands down there,
+ * and the same reasoning retires the pressure policy with it: a runner runs one
+ * job and nobody is typing on it, so halving its cores buys back an interactive
+ * machine that does not exist and only makes the job slower. This is what makes
+ * "CI is unaffected" true rather than a side effect of the runner's kernel.
  */
 function resolvePressure(env) {
   const forced = (env.CHECK_PRESSURE ?? "").trim().toLowerCase();
   if (forced === "green" || forced === "amber" || forced === "red") {
     return forced;
   }
+  if (isTruthyCI(env.CI)) return "green";
   if (process.platform !== "darwin") return "green";
 
   const probe = (command, args) => {
@@ -103,7 +121,7 @@ function resolvePressure(env) {
     }
   };
 
-  // "total = 11264.00M  used = 10096.94M  free = ..." — used over total.
+  // "total = 11264.00M  used = 10096.94M  free = ...", used over total.
   let swapFraction = 0;
   const swap = probe("sysctl", ["-n", "vm.swapusage"]);
   const total = /total = ([\d.]+)([MG])/.exec(swap);
@@ -115,7 +133,7 @@ function resolvePressure(env) {
   }
 
   // The page size is in the header (16384 on Apple silicon, 4096 on Intel) and
-  // the line is "Pages occupied by compressor", not "stored in" — the stored
+  // the line is "Pages occupied by compressor", not "stored in": the stored
   // figure is several times larger and reading it would cry red on a healthy
   // machine. Both traps are documented at the Go mirror.
   let compFraction = 0;
@@ -165,8 +183,7 @@ function resolveSlots(env, pressure = "green") {
     }
   }
 
-  const ci = (env.CI ?? "").trim().toLowerCase();
-  if (ci !== "" && ci !== "0" && ci !== "false") {
+  if (isTruthyCI(env.CI)) {
     return { slots: 0, source: "CI" };
   }
 
@@ -524,10 +541,14 @@ function runCommand(commandArgv, pressure = "green") {
     // Handling these keeps the wrapper alive through a Ctrl-C so it releases its
     // slot after the child is done, instead of dying first and leaving an entry
     // for the next run to prune.
-    let forwarded = false;
+    // Which signals were forwarded, not merely whether any was. A run that is
+    // interrupted and then killed by the OS dies of a signal nobody forwarded,
+    // and that is the death worth naming; a flag would have suppressed it
+    // because an earlier SIGINT set it.
+    const forwarded = new Set();
     const handlers = ["SIGINT", "SIGTERM", "SIGHUP"].map((signal) => {
       const handler = () => {
-        forwarded = true;
+        forwarded.add(signal);
         try {
           child.kill(signal);
         } catch {
@@ -552,7 +573,7 @@ function runCommand(commandArgv, pressure = "green") {
       // line the run ends in a bare exit 137, which reads as "the queue killed
       // it" and teaches people (and agents) to bypass the queue with
       // CHECK_SLOTS=0, removing the serialization for the whole machine.
-      if (signal && !forwarded) {
+      if (signal && !forwarded.has(signal)) {
         stderr(
           `${PREFIX} ${commandArgv[0]} was killed from outside by ${signal}. ` +
             `The queue never kills runs; the likely cause is an operator kill or the OS reclaiming memory. ` +

@@ -65,25 +65,42 @@ func TestResolveCheckSlots(t *testing.T) {
 }
 
 // @scenario "A forced pressure level overrides the measurement"
+// @scenario "CI keeps the runtime limits it had before the pressure policy"
 func TestResolveCheckPressure(t *testing.T) {
 	t.Run("given an explicit CHECK_PRESSURE", func(t *testing.T) {
-		if got := ResolveCheckPressure("green", Red); got != Green {
+		if got := ResolveCheckPressure("green", Red, ""); got != Green {
 			t.Fatalf("green must override a red measurement, got %s", got)
 		}
-		if got := ResolveCheckPressure("RED", Green); got != Red {
+		if got := ResolveCheckPressure("RED", Green, ""); got != Red {
 			t.Fatalf("red must override in any case, got %s", got)
 		}
-		if got := ResolveCheckPressure(" amber ", Green); got != Amber {
+		if got := ResolveCheckPressure(" amber ", Green, ""); got != Amber {
 			t.Fatalf("surrounding spaces must not matter, got %s", got)
 		}
 	})
 
 	t.Run("given no or a misspelled override", func(t *testing.T) {
-		if got := ResolveCheckPressure("", Amber); got != Amber {
+		if got := ResolveCheckPressure("", Amber, ""); got != Amber {
 			t.Fatalf("empty must fall back to the measurement, got %s", got)
 		}
-		if got := ResolveCheckPressure("bananas", Red); got != Red {
+		if got := ResolveCheckPressure("bananas", Red, ""); got != Red {
 			t.Fatalf("a typo must fall back to the measurement, got %s", got)
+		}
+	})
+
+	t.Run("given CI", func(t *testing.T) {
+		for _, ci := range []string{"true", "1", "TRUE", " true "} {
+			if got := ResolveCheckPressure("", Red, ci); got != Green {
+				t.Fatalf("CI=%q must read green, got %s", ci, got)
+			}
+		}
+		for _, notCI := range []string{"", "0", "false", "FALSE", "  "} {
+			if got := ResolveCheckPressure("", Red, notCI); got != Red {
+				t.Fatalf("CI=%q is not CI and must keep the measurement, got %s", notCI, got)
+			}
+		}
+		if got := ResolveCheckPressure("red", Green, "true"); got != Red {
+			t.Fatalf("an explicit level must win even under CI, got %s", got)
 		}
 	})
 }

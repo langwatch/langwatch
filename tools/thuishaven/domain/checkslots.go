@@ -42,7 +42,16 @@ type CheckMachine struct {
 // disabled for a good reason) needs the same lever. A value that is not one of
 // the three level names falls back to the measurement, exactly like a
 // CHECK_SLOTS typo: a misspelling must not change the policy.
-func ResolveCheckPressure(override string, measured Pressure) Pressure {
+//
+// CI reads green whatever the machine says. The queue already stands down
+// there, and the same reasoning retires the pressure policy with it: a runner
+// runs one job and nobody is typing on it, so halving its cores buys back an
+// interactive machine that does not exist and only makes the job slower. A
+// swap figure read inside a container describes the host, not this job. The
+// level is measured on macOS only, so today CI is green by accident of the
+// runner's kernel on a Linux runner and by this rule everywhere; the rule is
+// what makes "CI is unaffected" true rather than lucky.
+func ResolveCheckPressure(override string, measured Pressure, ci string) Pressure {
 	switch strings.ToLower(strings.TrimSpace(override)) {
 	case "green":
 		return Green
@@ -50,9 +59,19 @@ func ResolveCheckPressure(override string, measured Pressure) Pressure {
 		return Amber
 	case "red":
 		return Red
-	default:
-		return measured
 	}
+	if isTruthyCI(ci) {
+		return Green
+	}
+	return measured
+}
+
+// isTruthyCI reads the CI convention: the variable is set to something that is
+// not one of the values meaning "not CI". The slot limit and the pressure
+// policy both ask this, so they ask it in one place and cannot drift apart.
+func isTruthyCI(ci string) bool {
+	value := strings.ToLower(strings.TrimSpace(ci))
+	return value != "" && value != "0" && value != "false"
 }
 
 // ResolveCheckSlots resolves how many whole-repo checks may run at once, and
@@ -70,7 +89,7 @@ func ResolveCheckPressure(override string, measured Pressure) Pressure {
 // says. The formula assumes an otherwise idle machine, and pressure is the
 // machine reporting that assumption false: its RAM is spoken for, so a second
 // concurrent check is paid for in everyone's swap. Only the derived default
-// narrows — an explicit CHECK_SLOTS is the operator's call either way.
+// narrows. An explicit CHECK_SLOTS is the operator's call either way.
 func ResolveCheckSlots(machine CheckMachine, env CheckEnv) (int, string) {
 	raw := strings.TrimSpace(env.CheckSlots)
 	if raw != "" {
@@ -84,8 +103,7 @@ func ResolveCheckSlots(machine CheckMachine, env CheckEnv) (int, string) {
 		// An unparseable value falls through to the derived default, exactly
 		// like the JS wrapper: a typo must not turn the gate off.
 	}
-	ci := strings.ToLower(strings.TrimSpace(env.CI))
-	if ci != "" && ci != "0" && ci != "false" {
+	if isTruthyCI(env.CI) {
 		return 0, "CI"
 	}
 	if machine.Pressure > Green {
@@ -130,7 +148,7 @@ func CheckGoMemLimit(totalRAMBytes uint64, existing string, pressure Pressure) s
 }
 
 // CheckGoMaxProcs is the parallelism the queue grants the Go-runtime tools it
-// wraps. On a green machine it grants nothing — an empty string means "do not
+// wraps. On a green machine it grants nothing: an empty string means "do not
 // set it" and the tool uses every core, which is the right spend for one run
 // on an idle machine. Under pressure it halves the cores, never below two:
 // eleven runnable threads on a machine that has to page every allocation in

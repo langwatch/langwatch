@@ -4,8 +4,12 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -119,8 +123,9 @@ func TestSlotRunUnderPressure(t *testing.T) {
 			t.Fatalf("reading the child's env dump: %v", err)
 		}
 		fields := strings.Fields(string(env))
-		if len(fields) != 2 || fields[0] != "3GiB" || fields[1] == "" {
-			t.Fatalf("child env = %q, want the 3GiB floor and a GOMAXPROCS cap", string(env))
+		wantProcs := strconv.Itoa(max(2, runtime.NumCPU()/2))
+		if len(fields) != 2 || fields[0] != "3GiB" || fields[1] != wantProcs {
+			t.Fatalf("child env = %q, want the 3GiB floor and GOMAXPROCS=%s", string(env), wantProcs)
 		}
 	})
 
@@ -188,6 +193,64 @@ func TestSlotRunReportsAnOutsideKill(t *testing.T) {
 			if !strings.Contains(stderr, want) {
 				t.Fatalf("kill report %q is missing %q", stderr, want)
 			}
+		}
+	})
+}
+
+// @scenario "An interrupted run killed from outside is still reported"
+func TestReportOutsideKillReadsTheSignalThatKilled(t *testing.T) {
+	// A real SIGKILL death, so the Wait error carries the wait status the
+	// wrapper reads rather than a synthetic one.
+	killed := exec.Command("sh", "-c", "kill -KILL $$").Run()
+	if killed == nil {
+		t.Fatal("the probe command was supposed to die by SIGKILL")
+	}
+
+	t.Run("a forwarded SIGINT does not excuse a SIGKILL", func(t *testing.T) {
+		out := captureStderr(t, func() {
+			reportOutsideKill(killed, "sh", slotDeath{
+				forwarded: map[syscall.Signal]bool{syscall.SIGINT: true},
+			})
+		})
+		if !strings.Contains(out, "killed from outside") {
+			t.Fatalf("an escalation after an interrupt must still be named, got %q", out)
+		}
+	})
+
+	t.Run("the signal the wrapper forwarded is not reported", func(t *testing.T) {
+		out := captureStderr(t, func() {
+			reportOutsideKill(killed, "sh", slotDeath{
+				forwarded: map[syscall.Signal]bool{syscall.SIGKILL: true},
+			})
+		})
+		if strings.Contains(out, "killed from outside") {
+			t.Fatalf("the wrapper must not blame a kill it sent: %q", out)
+		}
+	})
+
+	t.Run("a run the wrapper canceled is not an outside kill", func(t *testing.T) {
+		out := captureStderr(t, func() {
+			reportOutsideKill(killed, "sh", slotDeath{canceled: true})
+		})
+		if strings.Contains(out, "killed from outside") {
+			t.Fatalf("cancellation is the wrapper's own doing: %q", out)
+		}
+	})
+
+	// exec.CommandContext kills with SIGKILL on cancellation, which no
+	// forwarded-signal record accounts for, so this path needs the real thing.
+	t.Run("a canceled context stays quiet end to end", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		out := captureStderr(t, func() {
+			go func() {
+				time.Sleep(100 * time.Millisecond)
+				cancel()
+			}()
+			slotExec(ctx, []string{"sh", "-c", "sleep 5"}, domain.Green)
+		})
+		if strings.Contains(out, "killed from outside") {
+			t.Fatalf("a canceled run must not be reported as an outside kill: %q", out)
 		}
 	})
 }
