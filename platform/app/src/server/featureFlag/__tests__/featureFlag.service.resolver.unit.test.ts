@@ -19,6 +19,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FeatureFlagService } from "../featureFlag.service";
 import type { FeatureFlagStorePostgres } from "../featureFlagStore.postgres";
+import { resolveFlagDefinition } from "../registry";
 import {
   evaluateRules,
   type FeatureFlagRules,
@@ -52,7 +53,15 @@ class InMemoryStore {
   }
   async setRules(key: string, rules: FeatureFlagRules): Promise<void> {
     const existing = this.values.get(key);
-    this.values.set(key, { enabled: existing?.enabled ?? false, rules });
+    // Matches FeatureFlagStorePostgres.setRules: a rules-only write on a
+    // missing row seeds the row-level default from the registry, so
+    // non-matching contexts keep the registry default rather than
+    // silently flipping to false.
+    this.values.set(key, {
+      enabled:
+        existing?.enabled ?? resolveFlagDefinition(key)?.defaultValue ?? false,
+      rules,
+    });
   }
   async clear(key: string): Promise<void> {
     this.values.delete(key);
@@ -245,12 +254,11 @@ describe("FeatureFlagService", () => {
       });
 
       it("uses the row-level default for a non-matching org without consulting the legacy service", async () => {
-        // The store creates a row with row-level enabled=false when only
-        // rules are written, so the row counts as an explicit operator
-        // override and stops the fallthrough to the registry default.
-        // To target an allowlist while leaving the registry default in
-        // effect for everyone else, operators must leave the row
-        // absent — that's by design.
+        // A rules-only write seeds the new row's row-level default from
+        // the registry (FeatureFlagStorePostgres.setRules), so an operator
+        // targeting an allowlist does not silently flip everyone else to
+        // false — non-matching contexts keep the registry default, which
+        // is true for this flag.
         const { service, store, legacy } = buildService();
         await store.setRules(PRODUCT_FLAG, [
           { match: { organizationId: "org_lw" }, enabled: true },
@@ -260,7 +268,7 @@ describe("FeatureFlagService", () => {
           organizationId: "org_other",
           defaultValue: false,
         });
-        expect(enabled).toBe(false);
+        expect(enabled).toBe(true);
         expect(legacy.isEnabled).not.toHaveBeenCalled();
       });
     });

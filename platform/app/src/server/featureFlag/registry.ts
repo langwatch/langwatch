@@ -229,14 +229,17 @@ export const FEATURE_FLAGS = [
     // On by default (ADR-038 Decision 7): self-hosted installations get
     // governance (AI-tools device login, /me, admin surfaces, the
     // onboarding intent fork, the org "Primary use" setting) with zero
-    // configuration. For SaaS, a per-org off-condition — an operator store
-    // row, or RELEASE_UI_AI_GOVERNANCE_ENABLED=0 — re-arms every gate for
-    // that org. This default and the auth-cli device-login fallback are a
+    // configuration. Two off-switches with different blast radii: an
+    // operator store row targets per organization, while
+    // RELEASE_UI_AI_GOVERNANCE_ENABLED=0 is deployment-wide — it is
+    // evaluated before store targeting and disables the flag for every
+    // context in the process, so it cannot re-arm the gate for just one
+    // org. This default and the auth-cli device-login fallback are a
     // pinned pair, move them together (governanceGaDefaults.unit.test.ts
     // enforces it).
     defaultValue: true,
     description:
-      "Gates the personal keys, admin oversight, RoutingPolicy, IngestionSource UI surfaces, the onboarding intent fork, and the org Primary use setting (ADR-038). On by default; switch off per org via PostHog or the operator store to hide governance and refuse AI-tools device login. Distinct from release_ui_ai_gateway_menu_enabled: the gateway product ships on its own flag.",
+      "Gates the personal keys, admin oversight, RoutingPolicy, IngestionSource UI surfaces, the onboarding intent fork, and the org Primary use setting (ADR-038). On by default; switch off per org via the operator store (or deployment-wide via RELEASE_UI_AI_GOVERNANCE_ENABLED=0) to hide governance and refuse AI-tools device login. Distinct from release_ui_ai_gateway_menu_enabled: the gateway product ships on its own flag.",
   },
   // ADR-034 Phase 3 — routes analytics getTimeseries reads to the slim
   // `trace_analytics` / rollup `trace_analytics_rollup` tables (Phases 1+2)
