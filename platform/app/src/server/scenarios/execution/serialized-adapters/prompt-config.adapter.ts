@@ -86,7 +86,6 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
       })),
     );
 
-    // Build messages: template messages + conversation history (if not handled by template)
     const messages = [
       ...promptMessages,
       // Only append input.messages if the template doesn't place them itself

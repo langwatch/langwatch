@@ -318,12 +318,24 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // summary TTFT and the span first_token timing both populate. An explicit
     // time_to_first_token already on the span wins.
     // ─────────────────────────────────────────────────────────────────────────
-    const timeToFirstChunkKey = attrs.has(
-      ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK,
-    )
+    const responseTimeToFirstChunkSeconds = asNumber(
+      attrs.get(ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK),
+    );
+    const clientTimeToFirstChunkSeconds = asNumber(
+      attrs.get(ATTR_KEYS.GEN_AI_CLIENT_OPERATION_TIME_TO_FIRST_CHUNK),
+    );
+    // Prefer the first *valid* value, not the first present key — a garbage
+    // or negative gen_ai.response.time_to_first_chunk must not shadow a good
+    // gen_ai.client.operation.time_to_first_chunk.
+    const useResponseTime =
+      responseTimeToFirstChunkSeconds !== null &&
+      responseTimeToFirstChunkSeconds >= 0;
+    const timeToFirstChunkKey = useResponseTime
       ? ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK
       : ATTR_KEYS.GEN_AI_CLIENT_OPERATION_TIME_TO_FIRST_CHUNK;
-    const timeToFirstChunkSeconds = asNumber(attrs.get(timeToFirstChunkKey));
+    const timeToFirstChunkSeconds = useResponseTime
+      ? responseTimeToFirstChunkSeconds
+      : clientTimeToFirstChunkSeconds;
     if (
       timeToFirstChunkSeconds !== null &&
       timeToFirstChunkSeconds >= 0 &&

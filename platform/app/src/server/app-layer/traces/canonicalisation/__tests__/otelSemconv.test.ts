@@ -204,6 +204,9 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         expect(
           result.attributes["gen_ai.server.time_to_first_token"],
         ).toBeCloseTo(650, 5);
+        expect(
+          result.attributes["gen_ai.client.operation.time_to_first_chunk"],
+        ).toBeUndefined();
       });
     });
 

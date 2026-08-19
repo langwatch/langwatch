@@ -72,7 +72,7 @@ In v6, OpenTelemetry was built into `ai` and `experimental_telemetry:
 { isEnabled: true }` was enough. In v7 it lives in a separate package and emits
 **nothing** until an integration is registered. There is no warning.
 
-```
+```text
 v6:  generateText ──► ai's built-in OTel ──► global TracerProvider ──► exporter
                        (per-call flag)
 

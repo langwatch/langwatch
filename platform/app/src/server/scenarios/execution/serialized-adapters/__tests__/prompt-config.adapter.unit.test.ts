@@ -401,7 +401,6 @@ describe("SerializedPromptConfigAdapter", () => {
         content: string;
       }>;
 
-      // Template message + input message
       expect(messages).toHaveLength(2);
       expect(messages[1]).toEqual({ role: "user", content: "How are you?" });
     });
