@@ -284,13 +284,23 @@ const costResultSchema = z
  * class as a malformed page — a contract that moved, not a row to retry.
  */
 function centsToUsd(amount: string): string {
-  const match = /^(-?)(\d+)(?:\.(\d*))?$/.exec(amount.trim());
+  const match = /^([+-]?)(\d+)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(
+    amount.trim(),
+  );
   if (!match) {
     throw new Error(
       `anthropic cost amount is not a decimal string: ${JSON.stringify(amount)}`,
     );
   }
-  const [, sign = "", wholeRaw = "0", fraction = ""] = match;
+  const [, sign = "", wholeRaw = "0", fraction = "", exponent] = match;
+  if (exponent !== undefined) {
+    // Exponent form ("1e-7") can only reach here via the schema's number
+    // branch stringifying a float. Shift the exponent instead of the digits —
+    // the money parser downstream reads exponents exactly.
+    return `${sign}${wholeRaw}${fraction ? `.${fraction}` : ""}e${
+      Number(exponent) - 2
+    }`;
+  }
   // Three digits guarantee a whole part survives the two-digit shift.
   const whole = wholeRaw.padStart(3, "0");
   return `${sign}${whole.slice(0, -2)}.${whole.slice(-2)}${fraction}`;

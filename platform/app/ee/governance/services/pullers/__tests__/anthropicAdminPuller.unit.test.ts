@@ -242,6 +242,39 @@ describe("the Anthropic Admin puller", () => {
       expect(record?.costNanoUsd).toBe(12_345_678_901);
     });
 
+    it("survives an exponent-form amount from the schema's number branch", async () => {
+      // JSON.stringify never emits this, but the amount schema accepts raw
+      // numbers, and String(1e-7) is "1e-7" — the one input class the digit
+      // shift can't handle by slicing. It must convert, not throw: a throw
+      // here holds the cursor and replays forever.
+      fetchMock.mockResolvedValue(
+        jsonResponse({
+          ...COST_PAGE,
+          data: [
+            {
+              starting_at: "2026-08-01T00:00:00Z",
+              results: [{ ...COST_PAGE.data[0]!.results[0], amount: 1e-7 }],
+            },
+          ],
+        }),
+      );
+
+      const result = await new AnthropicAdminPuller().runOnce(RUN_OPTIONS, {
+        adapter: "anthropic_admin",
+        report: "cost",
+        bucketWidth: "1d",
+        schedule: "0 * * * *",
+      });
+
+      const record = buildPulledUsageRecord({
+        event: result.events[0]!,
+        source: SOURCE,
+        observedAt: OBSERVED_AT,
+      });
+      // 1e-7 cents = 1e-9 USD = exactly one nano-USD.
+      expect(record?.costNanoUsd).toBe(1);
+    });
+
     it("drops a non-USD row rather than inventing a rate, and keeps the rest", async () => {
       fetchMock.mockResolvedValue(
         jsonResponse({
