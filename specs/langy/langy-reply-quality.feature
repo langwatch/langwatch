@@ -16,6 +16,14 @@ Feature: Langy reply quality
     And that line says the turn produced no answer and points at the cards, so a
       turn that completed a write is not repeated blindly
 
+  @unit
+  Scenario: The card shapes the prompt teaches are shapes the panel renders
+    Given the derived-card examples written in Langy's prompt
+    When each one is checked against the card contract
+    Then every kind the model may emit has an example
+    And each example validates, so following the prompt cannot produce a
+      card that degrades to the failed-card disclosure
+
   @e2e
   Scenario: A completed write ends with a visible next-step line
     When the user asks Langy to create a dataset

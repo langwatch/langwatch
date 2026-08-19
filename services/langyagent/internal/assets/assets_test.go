@@ -39,7 +39,7 @@ func TestAgentsTemplate_FitsSizeBudget(t *testing.T) {
 		t.Fatalf("AgentsTemplate: %v", err)
 	}
 	if got := len(tmpl); got > maxPromptBytes {
-		t.Errorf("AGENTS.md is %d bytes, over the %d-byte budget — shrink it (merge overlapping rules, state the class, or move the constraint into the harness config) instead of raising the ceiling", got, maxPromptBytes)
+		t.Errorf("AGENTS.md is %d bytes, over the %d-byte budget: shrink it (merge overlapping rules, state the class, or move the constraint into the harness config) instead of raising the ceiling", got, maxPromptBytes)
 	}
 }
 
