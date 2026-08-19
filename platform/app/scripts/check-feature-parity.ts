@@ -66,6 +66,11 @@ const DEFAULT_TEST_ROOTS: string[] = [
   "platform/app/src",
   "platform/app/ee",
   "platform/app/scripts",
+  // Build configuration is behavior: which passes run over the frontend
+  // decides what ships. Its tests sit beside the config rather than under
+  // `src`, so without this root a scenario about the build could only ever be
+  // @unimplemented.
+  "platform/app/vite",
   "packages",
   "mcp/typescript/src",
   "sdks/typescript/src",

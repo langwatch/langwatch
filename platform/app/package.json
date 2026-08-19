@@ -214,6 +214,7 @@
   },
   "devDependencies": {
     "@ai-sdk/react": "^3.0.219",
+    "@babel/core": "^7.29.7",
     "@biomejs/biome": "2.5.1",
     "@chakra-ui/charts": "^3.36.0",
     "@copilotkit/react-core": "~1.8.14",
@@ -233,6 +234,7 @@
     "@opentelemetry/sdk-trace-web": "2.8.0",
     "@paper-design/shaders-react": "^0.0.76",
     "@playwright/test": "^1.61.1",
+    "@rolldown/plugin-babel": "^0.2.3",
     "@tanstack/react-query": "5.101.4",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.14.5",
@@ -249,6 +251,7 @@
     "@tiptap/extension-text": "^3.27.1",
     "@tiptap/pm": "^3.27.1",
     "@tiptap/react": "^3.27.1",
+    "@types/babel__core": "^7.20.5",
     "@types/bcrypt": "^6.0.0",
     "@types/diff": "^8.0.0",
     "@types/jsonwebtoken": "^9.0.10",

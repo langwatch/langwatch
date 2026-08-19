@@ -1,7 +1,8 @@
 import dotenv from "dotenv";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { defineConfig, type Plugin, type UserConfig } from "vite";
-import react from "@vitejs/plugin-react";
+import react, { reactCompilerPreset } from "@vitejs/plugin-react";
+import babel from "@rolldown/plugin-babel";
 import path from "path";
 import { generate as generateSelfsigned } from "selfsigned";
 import { shikiManualChunk } from "./src/features/traces-v2/components/TraceDrawer/markdownView/shikiChunking";
@@ -146,7 +147,26 @@ export default defineConfig(async (): Promise<UserConfig> => {
   }
 
   return {
-  plugins: [react(), patchObjectInspectBrowserStub(), havenHmrGate()],
+  plugins: [
+    react(),
+    // React Compiler. It memoizes components and hooks at build time, which is
+    // what `useMemo`/`useCallback`/`memo` are hand-written to do — so the win
+    // is on the render paths nobody got around to memoizing by hand, and this
+    // codebase has plenty (large tables, the trace drawer, the studio canvas).
+    //
+    // It was on under Next.js (`experimental.reactCompiler`) and the migration
+    // to Vite (#3170) dropped it while leaving `babel-plugin-react-compiler`
+    // in package.json, so the dependency has been paid for and unused since.
+    // plugin-react v6 transforms with oxc and no longer takes a `babel`
+    // option; the compiler runs as its own Babel pass over the same files.
+    //
+    // The compiler bails out per-component when it cannot prove a component
+    // follows the rules of React, so an offending file loses the optimization
+    // rather than breaking the build.
+    babel({ presets: [reactCompilerPreset()] }),
+    patchObjectInspectBrowserStub(),
+    havenHmrGate(),
+  ],
   resolve: {
     alias: {
       // The generated Prisma client's `client.ts` entry hard-imports the node
