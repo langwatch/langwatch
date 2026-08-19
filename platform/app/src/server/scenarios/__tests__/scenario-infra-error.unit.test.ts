@@ -110,6 +110,30 @@ describe("classifyScenarioInfraError", () => {
     });
   });
 
+  describe("when the raw error names the HTTP agent target it could not reach", () => {
+    /** @scenario "An unreachable target names itself in the customer-facing message" */
+    it("carries the target host into the customer-facing message", () => {
+      const envelope = classifyScenarioInfraError(
+        "HTTP agent target agent.example.com could not be reached: " +
+          "getaddrinfo ENOTFOUND agent.example.com",
+      );
+
+      expect(envelope.code).toBe(ScenarioInfraErrorCode.PlatformUnreachable);
+      expect(envelope.message).toContain("agent.example.com");
+      expect(envelope.message).not.toContain("getaddrinfo");
+    });
+
+    /** @scenario "An unreachable endpoint with no named target keeps the generic message" */
+    it("keeps the generic sentence when no target is named", () => {
+      const envelope = classifyScenarioInfraError("TypeError: fetch failed");
+
+      expect(envelope.code).toBe(ScenarioInfraErrorCode.PlatformUnreachable);
+      expect(envelope.message).toBe(
+        "Couldn't reach the endpoint while running the simulation.",
+      );
+    });
+  });
+
   describe("when the raw error is the tunnel edge's HTTP 530 answer", () => {
     /** @scenario "A dead tunnel names itself without a devTunnel lookup" */
     it("classifies the Cloudflare 530 + 1033 pair as the named dev-tunnel error", () => {

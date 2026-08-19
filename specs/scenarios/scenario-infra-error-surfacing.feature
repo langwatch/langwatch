@@ -45,6 +45,22 @@ Feature: Scenario infrastructure error surfacing and empty-response state
     When the failure is classified
     Then the handled error code is "scenario_platform_unreachable"
 
+  # Knowing the run could not reach the target is half the answer. Which
+  # target it was is the other half, and it is the half a customer acts on.
+
+  @unit
+  Scenario: An unreachable target names itself in the customer-facing message
+    Given a scenario run failed because an HTTP agent target could not be reached
+    When the failure is classified
+    Then the customer-facing message names the target host
+    And it holds none of the raw resolver text
+
+  @unit
+  Scenario: An unreachable endpoint with no named target keeps the generic message
+    Given a scenario run failed with a bare transport error naming no target
+    When the failure is classified
+    Then the customer-facing message is the generic unreachable sentence
+
   @unit
   Scenario: A DNS failure on an agent with a dev tunnel names the dead tunnel
     Given a target that still carries a devTunnel marker
