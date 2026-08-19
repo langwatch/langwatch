@@ -607,9 +607,9 @@ describe("Langy via HTTP wrapper", () => {
           scenario.judgeAgent({
             model,
             criteria: [
-              "Langy actually created the dataset (reports success / an id / a name).",
+              "Langy's reply reports the dataset as created and names it.",
               "Langy did NOT ask 'should I go ahead?' — it executed the mutation directly.",
-              "Langy did NOT just describe what it would do — it actually did it.",
+              "Langy ran the create rather than describing what it would do.",
             ],
           }),
         ],
@@ -645,9 +645,14 @@ describe("Langy via HTTP wrapper", () => {
           scenario.judgeAgent({
             model,
             criteria: [
-              "Langy actually created the dataset and populated it with rows (reports row count / success).",
+              // Whether the rows PERSISTED is a hard fact, proved by the Layer 2
+              // recordCount assert below. The judge grades only what the
+              // conversation shows: asking it for independent evidence sends it
+              // hunting through telemetry it cannot read, and it fails the
+              // scenario for the absence of proof it was never given.
+              "Langy's reply names the dataset and reports that the rows were added (a row count or an equivalent success statement).",
               "Langy did not ask for confirmation before creating.",
-              "Langy did not just print the rows back as text — committed them.",
+              "Langy ran the commands that add the rows rather than printing the rows back as text for the user to enter themselves.",
             ],
           }),
         ],
@@ -686,7 +691,7 @@ describe("Langy via HTTP wrapper", () => {
           scenario.judgeAgent({
             model,
             criteria: [
-              "Langy actually created a scenario (reports success / id / handle).",
+              "Langy's reply reports the scenario as created (naming it, or its id or handle).",
               "Langy did NOT just dump a code snippet for the user to paste — it created via the platform.",
               "Langy did NOT ask for permission first — executed directly.",
             ],
@@ -724,7 +729,7 @@ describe("Langy via HTTP wrapper", () => {
             criteria: [
               "Langy reports successfully creating the evaluator (returns success/id/name).",
               "Langy did NOT ask the user to confirm before creating — executed directly.",
-              "Langy did NOT just describe what an evaluator is — actually created one.",
+              "Langy ran the create rather than explaining what an evaluator is.",
             ],
           }),
         ],
@@ -1206,7 +1211,7 @@ describe("Langy via HTTP wrapper", () => {
           scenario.judgeAgent({
             model,
             criteria: [
-              "On turn 3, Langy actually created an evaluator (not just described one).",
+              "On turn 3, Langy ran the create and its reply reports the evaluator as created, rather than describing one.",
               "Langy did not re-ask 'what kind of evaluator?' on turn 3 — used context from turns 1-2.",
               "By turn 3, Langy executed the mutation without asking permission again.",
             ],
