@@ -1,11 +1,16 @@
 /**
  * @vitest-environment node
  *
- * ADR-092 delivery-plan PR 3 — the fork at the tRPC seams. Every case here is
+ * ADR-092 delivery-plan PR 3 — the fork at the tRPC seams. Most cases here are
  * built so the two resolvers CANNOT agree: the organization holds a
  * grant-head fact and no compat `RoleBinding` row at all, so legacy denies and
  * the engine allows. Which answer comes back is therefore proof of which
  * resolver is primary, rather than a coincidence of both saying yes.
+ *
+ * The organization-permission case is the exception, and says so where it
+ * stands: both resolvers deny an org-exclusive permission, so its answer
+ * discriminates nothing and the proof is that the legacy shadow was never
+ * called. Do not read it as one of the disagreement cases.
  *
  * The mirror case is the point of the whole PR: with the cutover projection
  * off (or absent), the same stubs must produce the legacy answer and the
