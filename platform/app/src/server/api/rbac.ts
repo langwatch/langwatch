@@ -1936,6 +1936,79 @@ export async function batchProjectPermissions(
 }
 
 /**
+ * The legacy batch resolution, as ONE implementation both paths run: the
+ * answering path in `batchScopePermissions` when the organization is still on
+ * legacy, and the fork's reverse-shadow thunk when it is not. It builds its
+ * own maps per call, so the two paths can never hand out the same mutable
+ * pair.
+ */
+async function legacyBatchScopePermissions(
+  ctx: { prisma: PrismaClient; session: Session | null },
+  args: {
+    organizationId: string;
+    teamIds: string[];
+    projectIds: string[];
+    projectTeamId: Record<string, string>;
+    permission: Permission;
+  },
+): Promise<{ teams: Map<string, boolean>; projects: Map<string, boolean> }> {
+  const teamsMap = new Map<string, boolean>();
+  const projectsMap = new Map<string, boolean>();
+
+  // A project inherits TEAM-scoped bindings from its team, so the binding
+  // load must cover the projects' team ids too — `projectGrants` below
+  // checks `scopeKey(TEAM, teamId)`, and a binding that was never loaded
+  // can't grant. Without this, a member whose only access is a TEAM-scope
+  // binding (no legacy TeamUser rows) fails every project in the batch
+  // while the single-project resolver — which always queries the team
+  // scope — grants it.
+  const resolution = await loadScopeResolution(ctx, {
+    organizationId: args.organizationId,
+    scopeIds: [
+      ...new Set([
+        ...args.teamIds,
+        ...args.projectIds,
+        ...Object.values(args.projectTeamId),
+      ]),
+    ],
+  });
+  if (!resolution) {
+    args.teamIds.forEach((id) => teamsMap.set(id, false));
+    args.projectIds.forEach((id) => projectsMap.set(id, false));
+    return { teams: teamsMap, projects: projectsMap };
+  }
+
+  for (const teamId of args.teamIds) {
+    teamsMap.set(
+      teamId,
+      teamGrants(
+        resolution,
+        { organizationId: args.organizationId, teamId },
+        args.permission,
+      ),
+    );
+  }
+
+  for (const projectId of args.projectIds) {
+    const teamId = args.projectTeamId[projectId];
+    projectsMap.set(
+      projectId,
+      projectGrants(
+        resolution,
+        {
+          organizationId: args.organizationId,
+          projectId,
+          ...(teamId ? { teamId } : {}),
+        },
+        args.permission,
+      ),
+    );
+  }
+
+  return { teams: teamsMap, projects: projectsMap };
+}
+
+/**
  * Batched team + project permission check used by surfaces that need to
  * test the SAME permission across many scopes inside one organization
  * (e.g. the model-defaults settings page enumerating every team +
@@ -1962,71 +2035,7 @@ export async function batchScopePermissions(
     permission: Permission;
   },
 ): Promise<{ teams: Map<string, boolean>; projects: Map<string, boolean> }> {
-  /**
-   * The legacy batch resolution, as ONE implementation both paths run: the
-   * answering path below when the organization is still on legacy, and the
-   * fork's reverse-shadow thunk when it is not. It builds its own maps per
-   * call, so the two paths can never hand out the same mutable pair.
-   */
-  const legacyBatch = async (): Promise<{
-    teams: Map<string, boolean>;
-    projects: Map<string, boolean>;
-  }> => {
-    const teamsMap = new Map<string, boolean>();
-    const projectsMap = new Map<string, boolean>();
-
-    // A project inherits TEAM-scoped bindings from its team, so the binding
-    // load must cover the projects' team ids too — `projectGrants` below
-    // checks `scopeKey(TEAM, teamId)`, and a binding that was never loaded
-    // can't grant. Without this, a member whose only access is a TEAM-scope
-    // binding (no legacy TeamUser rows) fails every project in the batch
-    // while the single-project resolver — which always queries the team
-    // scope — grants it.
-    const resolution = await loadScopeResolution(ctx, {
-      organizationId: args.organizationId,
-      scopeIds: [
-        ...new Set([
-          ...args.teamIds,
-          ...args.projectIds,
-          ...Object.values(args.projectTeamId),
-        ]),
-      ],
-    });
-    if (!resolution) {
-      args.teamIds.forEach((id) => teamsMap.set(id, false));
-      args.projectIds.forEach((id) => projectsMap.set(id, false));
-      return { teams: teamsMap, projects: projectsMap };
-    }
-
-    for (const teamId of args.teamIds) {
-      teamsMap.set(
-        teamId,
-        teamGrants(
-          resolution,
-          { organizationId: args.organizationId, teamId },
-          args.permission,
-        ),
-      );
-    }
-
-    for (const projectId of args.projectIds) {
-      const teamId = args.projectTeamId[projectId];
-      projectsMap.set(
-        projectId,
-        projectGrants(
-          resolution,
-          {
-            organizationId: args.organizationId,
-            projectId,
-            ...(teamId ? { teamId } : {}),
-          },
-          args.permission,
-        ),
-      );
-    }
-
-    return { teams: teamsMap, projects: projectsMap };
-  };
+  const legacyBatch = () => legacyBatchScopePermissions(ctx, args);
 
   const userId = ctx.session?.user?.id;
 

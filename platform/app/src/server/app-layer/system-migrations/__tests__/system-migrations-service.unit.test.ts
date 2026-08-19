@@ -96,9 +96,13 @@ describe("SystemMigrationsService.rollBack", () => {
           actorUserId: "user_alex",
         });
 
+        // `decidedAt` rides along so an effect can key a deduplicating
+        // command id off the DECISION rather than the clock, which is what
+        // makes a retry idempotent.
         expect(effect).toHaveBeenCalledWith({
           tenantId: TENANT,
           actorUserId: "user_alex",
+          decidedAt: expect.any(String),
         });
         expect(otherEffect).not.toHaveBeenCalled();
         // The pin lands first: it is what stops the next pass re-finalizing

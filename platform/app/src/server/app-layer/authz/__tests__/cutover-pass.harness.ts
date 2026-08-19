@@ -37,7 +37,9 @@ import {
   AttachGrantsCommand,
   CompleteCutoverCommand,
   DefineRolesCommand,
+  DeleteRoleCommand,
   ProveMigrationParityCommand,
+  RevokeGrantsCommand,
   RollBackCutoverCommand,
 } from "~/server/event-sourcing/pipelines/authz-grants/commands/grantsLedgerCommands";
 import {
@@ -48,7 +50,9 @@ import {
   ATTACH_GRANTS_COMMAND_TYPE,
   COMPLETE_CUTOVER_COMMAND_TYPE,
   DEFINE_ROLES_COMMAND_TYPE,
+  DELETE_ROLE_COMMAND_TYPE,
   PROVE_MIGRATION_PARITY_COMMAND_TYPE,
+  REVOKE_GRANTS_COMMAND_TYPE,
   ROLL_BACK_CUTOVER_COMMAND_TYPE,
 } from "~/server/event-sourcing/pipelines/authz-grants/schemas/constants";
 import type { AuthzGrantsEvent } from "~/server/event-sourcing/pipelines/authz-grants/schemas/events";
@@ -166,6 +170,32 @@ export function inlineGrantsLedger(prisma: PrismaClient): InlineLedger {
           type: DEFINE_ROLES_COMMAND_TYPE,
           aggregateId: organizationId,
           data: { commandId, roles, actor },
+        }),
+      revokeGrants: ({
+        organizationId,
+        commandId,
+        revocations,
+        actor,
+        occurredAtMs,
+      }) =>
+        send({
+          handler: new RevokeGrantsCommand(),
+          type: REVOKE_GRANTS_COMMAND_TYPE,
+          aggregateId: organizationId,
+          data: { commandId, revocations, actor, occurredAtMs },
+        }),
+      deleteRole: ({
+        organizationId,
+        commandId,
+        roleId,
+        actor,
+        occurredAtMs,
+      }) =>
+        send({
+          handler: new DeleteRoleCommand(),
+          type: DELETE_ROLE_COMMAND_TYPE,
+          aggregateId: organizationId,
+          data: { commandId, roleId, actor, occurredAtMs },
         }),
       proveMigrationParity: ({
         organizationId,

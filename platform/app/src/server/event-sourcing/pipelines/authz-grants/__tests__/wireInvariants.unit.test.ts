@@ -26,6 +26,19 @@ function entry(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ * One resource grant's full terms. The schema requires the resource's own
+ * identity - what the shared thing is, and which project it lives in -
+ * alongside the terms, so a fixture carrying only token and permission is
+ * refused before any test here reaches the rule it is actually about.
+ */
+const SHARE_TERMS = {
+  kind: "trace",
+  projectId: "proj_chatbot",
+  token: "tok_1",
+  permission: "traces:view",
+} as const;
+
 function parse(overrides: Record<string, unknown> = {}, entryOverrides = {}) {
   return attachGrantsCommandDataSchema.safeParse({
     tenantId: ORG,
@@ -49,7 +62,7 @@ describe("the grants ledger's wire boundary", () => {
           principal: { type: "anyone", id: null },
           roleKey: null,
           scope: { type: "RESOURCE", id: "trace_t1" },
-          resource: { token: "tok_1", permission: "traces:view" },
+          resource: SHARE_TERMS,
         },
       );
       expect(result.success).toBe(true);
@@ -77,7 +90,7 @@ describe("the grants ledger's wire boundary", () => {
             principal: { type: "anyone", id: "user_alice" },
             roleKey: null,
             scope: { type: "RESOURCE", id: "trace_t1" },
-            resource: { token: "tok_1", permission: "traces:view" },
+            resource: SHARE_TERMS,
           },
         ).success,
       ).toBe(false);
@@ -86,10 +99,7 @@ describe("the grants ledger's wire boundary", () => {
 
   describe("when resource terms and scope disagree", () => {
     it("refuses share terms on a team-wide grant", () => {
-      expect(
-        parse({}, { resource: { token: "tok_1", permission: "traces:view" } })
-          .success,
-      ).toBe(false);
+      expect(parse({}, { resource: SHARE_TERMS }).success).toBe(false);
     });
 
     it("refuses a resource grant with no terms", () => {
@@ -117,7 +127,7 @@ describe("the grants ledger's wire boundary", () => {
             principal: { type: "anyone", id: null },
             roleKey: "member",
             scope: { type: "RESOURCE", id: "trace_t1" },
-            resource: { token: "tok_1", permission: "traces:view" },
+            resource: SHARE_TERMS,
           },
         ).success,
       ).toBe(false);

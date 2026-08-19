@@ -20,13 +20,14 @@
  * organization rolled back to legacy keeps counting from where it got to.
  */
 import {
+  type LedgerActor,
   SHARE_LINK_PERMISSION,
   shareVisibilityAudience,
 } from "@langwatch/authz-server";
 import { nanoid } from "nanoid";
 import type { PrismaClient, ShareLink } from "~/generated/prisma/client";
 import { cutoverOnEngine } from "../../authz/cutover-gate";
-import type { GrantsLedgerWriter, LedgerActor } from "../../authz/ledger";
+import type { GrantsLedgerWriter } from "../../authz/ledger";
 import type {
   CreateShareLinkParams,
   ShareRepository,

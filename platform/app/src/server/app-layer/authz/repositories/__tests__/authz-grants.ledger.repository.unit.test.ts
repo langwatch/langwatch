@@ -272,61 +272,61 @@ function buildRepository({
 }
 
 describe("given a member being offboarded", () => {
-    describe("given a user with facts on both heads", () => {
-      /** @scenario "Offboarding a user removes every grant, with proof" */
-      it("revokes the union of compat rows and grant-head rows, once each", async () => {
-        const { repository, offboardMember, grantFindMany } = buildRepository({
-          bindingIds: ["shared-1", "compat-only-2"],
-          // "shared-1" is the same fact seen through the other head; the
-          // lite-member row exists ONLY as a grant, which is exactly the
-          // class a compat-only enumeration used to leave resolving.
-          grantIds: ["shared-1", "lite-member-3"],
-        });
-
-        await repository.offboardUser({
-          userId: OFFBOARD_USER_ID,
-          organizationId: OFFBOARD_ORG_ID,
-          actor: ACTOR,
-          prove: async () => undefined,
-        });
-
-        expect(grantFindMany).toHaveBeenCalledWith({
-          where: {
-            organizationId: OFFBOARD_ORG_ID,
-            principalType: "USER",
-            principalId: OFFBOARD_USER_ID,
-          },
-          select: { id: true },
-        });
-        expect(offboardMember).toHaveBeenCalledWith(
-          expect.objectContaining({
-            organizationId: OFFBOARD_ORG_ID,
-            userId: OFFBOARD_USER_ID,
-            revokedGrantIds: ["shared-1", "compat-only-2", "lite-member-3"],
-          }),
-        );
+  describe("given a user with facts on both heads", () => {
+    /** @scenario "Offboarding a user removes every grant, with proof" */
+    it("revokes the union of compat rows and grant-head rows, once each", async () => {
+      const { repository, offboardMember, grantFindMany } = buildRepository({
+        bindingIds: ["shared-1", "compat-only-2"],
+        // "shared-1" is the same fact seen through the other head; the
+        // lite-member row exists ONLY as a grant, which is exactly the
+        // class a compat-only enumeration used to leave resolving.
+        grantIds: ["shared-1", "lite-member-3"],
       });
-    });
 
-    describe("when the proof runs", () => {
-      it("reads through the head the organization is served from", async () => {
-        const { repository } = buildRepository({
-          bindingIds: [],
-          grantIds: [],
-        });
-        const seen: AuthzReadRepository[] = [];
-
-        await repository.offboardUser({
-          userId: OFFBOARD_USER_ID,
-          organizationId: OFFBOARD_ORG_ID,
-          actor: ACTOR,
-          prove: async (reader) => {
-            seen.push(reader);
-          },
-        });
-
-        expect(seen).toHaveLength(1);
-        expect(seen[0]).toBeInstanceOf(CutoverAwareAuthzReadRepository);
+      await repository.offboardUser({
+        userId: OFFBOARD_USER_ID,
+        organizationId: OFFBOARD_ORG_ID,
+        actor: ACTOR,
+        prove: async () => undefined,
       });
+
+      expect(grantFindMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: OFFBOARD_ORG_ID,
+          principalType: "USER",
+          principalId: OFFBOARD_USER_ID,
+        },
+        select: { id: true },
+      });
+      expect(offboardMember).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: OFFBOARD_ORG_ID,
+          userId: OFFBOARD_USER_ID,
+          revokedGrantIds: ["shared-1", "compat-only-2", "lite-member-3"],
+        }),
+      );
     });
   });
+
+  describe("when the proof runs", () => {
+    it("reads through the head the organization is served from", async () => {
+      const { repository } = buildRepository({
+        bindingIds: [],
+        grantIds: [],
+      });
+      const seen: AuthzReadRepository[] = [];
+
+      await repository.offboardUser({
+        userId: OFFBOARD_USER_ID,
+        organizationId: OFFBOARD_ORG_ID,
+        actor: ACTOR,
+        prove: async (reader) => {
+          seen.push(reader);
+        },
+      });
+
+      expect(seen).toHaveLength(1);
+      expect(seen[0]).toBeInstanceOf(CutoverAwareAuthzReadRepository);
+    });
+  });
+});

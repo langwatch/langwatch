@@ -86,6 +86,14 @@ class RecordingLedger implements GrantsLedgerEmitter {
   async defineRoles(): Promise<void> {
     throw new Error("the cutover defines no roles");
   }
+  // The deny direction belongs to the genesis import, never to the cutover -
+  // so reaching either of these from here is the failure, not the fallback.
+  async revokeGrants(): Promise<void> {
+    throw new Error("the cutover revokes nothing");
+  }
+  async deleteRole(): Promise<void> {
+    throw new Error("the cutover deletes no roles");
+  }
   async proveMigrationParity({ diffs }: { diffs: string[] }): Promise<void> {
     this.parityDiffs.push(diffs);
   }

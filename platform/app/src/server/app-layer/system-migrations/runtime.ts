@@ -164,31 +164,16 @@ async function rollBackAuthzCutover({
 }
 
 /**
- * The migrations' door into the ledger, over the shared lazy senders in
- * `server/app-layer/authz/ledger.ts` (a send while the App is still composing waits;
- * an App without the event-sourcing stack refuses loudly — the migration
- * then parks its organization with an honest report, and the state witness
- * logs and moves on).
+ * The genesis import's compensating half, split out because it IS a separate
+ * job: every other verb here states a grant that exists, these two state one
+ * that stopped existing — a head grant whose legacy row is gone, and a stale
+ * custom role. Nothing but the genesis import emits them.
  */
-function grantsLedgerEmitter(): GrantsLedgerEmitter {
+function genesisDenyDirectionEmitter(): Pick<
+  GrantsLedgerEmitter,
+  "revokeGrants" | "deleteRole"
+> {
   return {
-    attachGrants: async ({ organizationId, commandId, grants }) => {
-      await (await authzGrantsCommands()).commands.attachGrants.send({
-        tenantId: organizationId,
-        organizationId,
-        commandId,
-        grants,
-      });
-    },
-    defineRoles: async ({ organizationId, commandId, roles, actor }) => {
-      await (await authzGrantsCommands()).commands.defineRoles.send({
-        tenantId: organizationId,
-        organizationId,
-        commandId,
-        roles,
-        actor,
-      });
-    },
     revokeGrants: async ({
       organizationId,
       commandId,
@@ -221,6 +206,36 @@ function grantsLedgerEmitter(): GrantsLedgerEmitter {
         occurredAtMs,
       });
     },
+  };
+}
+
+/**
+ * The migrations' door into the ledger, over the shared lazy senders in
+ * `server/app-layer/authz/ledger.ts` (a send while the App is still composing waits;
+ * an App without the event-sourcing stack refuses loudly — the migration
+ * then parks its organization with an honest report, and the state witness
+ * logs and moves on).
+ */
+function grantsLedgerEmitter(): GrantsLedgerEmitter {
+  return {
+    attachGrants: async ({ organizationId, commandId, grants }) => {
+      await (await authzGrantsCommands()).commands.attachGrants.send({
+        tenantId: organizationId,
+        organizationId,
+        commandId,
+        grants,
+      });
+    },
+    defineRoles: async ({ organizationId, commandId, roles, actor }) => {
+      await (await authzGrantsCommands()).commands.defineRoles.send({
+        tenantId: organizationId,
+        organizationId,
+        commandId,
+        roles,
+        actor,
+      });
+    },
+    ...genesisDenyDirectionEmitter(),
     proveMigrationParity: async ({
       organizationId,
       commandId,
