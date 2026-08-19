@@ -1134,10 +1134,7 @@ export const workflowRouter = createTRPCRouter({
               reasoningEffort: "low",
             } satisfies OpenAIResponsesProviderOptions,
           },
-          messages: [
-            {
-              role: "system",
-              content: `
+          instructions: `
 You are a diff generator for the LLM Workflow builder from LangWatch Optimization Studio.
 Generate very short, concise commit messages for the changes in the diff. From 1 to 5 words max, all lowercase.
 If changing the model, just say the short new model name, like "gpt-4o", nothing else.
@@ -1149,7 +1146,7 @@ but the actual change that was made inside the fields with as few words as possi
 - When changing the evaluator, it's not just the name the changes, it means the workflow is actually now using a different evaluator.
 - Do not use the word "edge", the user doesn't know the internal structure of the DSL, understand what is going on instead.
             `,
-            },
+          messages: [
             {
               role: "user",
               content: `

@@ -86,9 +86,8 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
       })),
     );
 
-    // Build messages: system + template messages + conversation history (if not handled by template)
+    // Build messages: template messages + conversation history (if not handled by template)
     const messages = [
-      { role: "system" as const, content: systemPrompt },
       ...promptMessages,
       // Only append input.messages if the template doesn't place them itself
       ...(templateUsesConversation ? [] : input.messages),
@@ -101,7 +100,11 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
 
     const result = await generateText({
       model,
+      instructions: systemPrompt,
       messages,
+      // Scenario authors may script a system turn into the conversation
+      // history, which AI SDK 7 rejects by default.
+      allowSystemInMessages: true,
       temperature: this.config.temperature,
       maxOutputTokens: this.config.maxTokens,
     });

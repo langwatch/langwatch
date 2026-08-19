@@ -85,8 +85,8 @@ secured
         model: async (prompt) => {
           const { text } = await generateText({
             model,
+            instructions: prompt.context,
             messages: [
-              { role: "system", content: prompt.context },
               {
                 role: "user",
                 content: `${prompt.instruction}\n\n${prompt.fileContent}`,
