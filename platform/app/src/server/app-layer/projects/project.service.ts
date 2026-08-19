@@ -306,7 +306,7 @@ export class ProjectService {
       // ClickHouse database — not `names.database`. See
       // `lwqlKeyMapTableQualifiedName`'s doc comment.
       const { database: sourceDatabase } = parseConnectionUrl();
-      const fullMode = process.env.LWQL_PROVISION_ACCESS_MODEL === "true";
+      const isFullMode = process.env.LWQL_PROVISION_ACCESS_MODEL === "true";
       const row: LwqlKeyMapRow = {
         KeyHash: lwqlTenantCapability({ secret: project.lwqlKey }),
         TenantId: project.id,
@@ -315,7 +315,7 @@ export class ProjectService {
         table: lwqlKeyMapTableQualifiedName({
           names,
           sourceDatabase,
-          fullMode,
+          isFullMode,
         }),
         row,
       });

@@ -100,7 +100,7 @@ describe("given lwqlKeyMapTableQualifiedName", () => {
       const result = lwqlKeyMapTableQualifiedName({
         names: NAMES,
         sourceDatabase: SOURCE_DATABASE,
-        fullMode: false,
+        isFullMode: false,
       });
 
       expect(result).toBe(`${SOURCE_DATABASE}.${LWQL_KEY_MAP_TABLE}`);
@@ -113,7 +113,7 @@ describe("given lwqlKeyMapTableQualifiedName", () => {
       const result = lwqlKeyMapTableQualifiedName({
         names: NAMES,
         sourceDatabase: SOURCE_DATABASE,
-        fullMode: true,
+        isFullMode: true,
       });
 
       expect(result).toBe(`${NAMES.database}.${LWQL_KEY_MAP_TABLE}`);

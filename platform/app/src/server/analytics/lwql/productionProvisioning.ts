@@ -113,13 +113,13 @@ export function productionLangWatchQLNames({
 export function lwqlKeyMapTableQualifiedName({
   names,
   sourceDatabase,
-  fullMode,
+  isFullMode,
 }: {
   names: LangWatchQLNames;
   sourceDatabase: string;
-  fullMode: boolean;
+  isFullMode: boolean;
 }): string {
-  return fullMode
+  return isFullMode
     ? qualified(names, names.keyMapTable)
     : qualified(names, names.keyMapTable, sourceDatabase);
 }

@@ -69,16 +69,40 @@ async function runPostgresStatements(statements: string[]): Promise<void> {
   }
 }
 
+/**
+ * Driver and Prisma errors commonly embed the failing statement text, and in
+ * full mode the statement text carries the two live secrets this run holds
+ * (the restricted ClickHouse user's password and the PostgreSQL reader's).
+ * Everything logged or rethrown out of a statement loop goes through here
+ * first, so a DDL failure cannot write either credential into the deploy logs.
+ */
+function redactSecrets(text: string, secrets: Array<string | null>): string {
+  let redacted = text;
+  for (const secret of secrets) {
+    if (secret) redacted = redacted.replaceAll(secret, "[REDACTED]");
+  }
+  return redacted;
+}
+
+function redactedFailure(error: unknown, secrets: Array<string | null>): Error {
+  return new Error(
+    redactSecrets(
+      error instanceof Error ? error.message : String(error),
+      secrets,
+    ),
+  );
+}
+
 async function planBackfillFromCurrentState({
   client,
   names,
   sourceDatabase,
-  fullMode,
+  isFullMode,
 }: {
   client: ClickHouseClient;
   names: LangWatchQLNames;
   sourceDatabase: string;
-  fullMode: boolean;
+  isFullMode: boolean;
 }): Promise<LwqlKeyMapBackfillPlan> {
   const projects = await prisma.project.findMany({
     select: { id: true, lwqlKey: true },
@@ -87,8 +111,13 @@ async function planBackfillFromCurrentState({
   const table = lwqlKeyMapTableQualifiedName({
     names,
     sourceDatabase,
-    fullMode,
+    isFullMode,
   });
+  // Deliberately unfiltered: this admin scan collects key hashes across ALL
+  // tenants to diff against every project's key — the one query shape the
+  // "every ClickHouse query MUST filter on TenantId" rule cannot apply to.
+  // `qualified()` (via lwqlKeyMapTableQualifiedName) validates the
+  // interpolated database and table identifiers.
   const existingResult = await client.query({
     query: `SELECT DISTINCT ${KEY_MAP_COLUMNS.keyHash} FROM ${table}`,
     format: "JSONEachRow",
@@ -113,18 +142,18 @@ async function backfillKeyMap({
   client,
   names,
   sourceDatabase,
-  fullMode,
+  isFullMode,
 }: {
   client: ClickHouseClient;
   names: LangWatchQLNames;
   sourceDatabase: string;
-  fullMode: boolean;
+  isFullMode: boolean;
 }): Promise<void> {
   const plan = await planBackfillFromCurrentState({
     client,
     names,
     sourceDatabase,
-    fullMode,
+    isFullMode,
   });
 
   // Surfaced loudly, never silently skipped: a blank key is a project that
@@ -148,7 +177,7 @@ async function backfillKeyMap({
   const table = lwqlKeyMapTableQualifiedName({
     names,
     sourceDatabase,
-    fullMode,
+    isFullMode,
   });
   await client.insert({
     table,
@@ -171,10 +200,10 @@ export default async function execute() {
 
   const names = productionLangWatchQLNames({ connection });
   const { database: sourceDatabase } = parseConnectionUrl();
-  const fullMode = process.env.LWQL_PROVISION_ACCESS_MODEL === "true";
+  const isFullMode = process.env.LWQL_PROVISION_ACCESS_MODEL === "true";
 
   logger.info(
-    { database: names.database, sourceDatabase, fullMode },
+    { database: names.database, sourceDatabase, isFullMode },
     "provisioning LangWatchQL objects",
   );
 
@@ -189,8 +218,24 @@ export default async function execute() {
   }
 
   let postgresReaderPassword: string | null = null;
-  if (fullMode) {
-    postgresReaderPassword = randomBytes(24).toString("hex");
+  if (isFullMode) {
+    // A stable secret from the environment when the deploy provides one:
+    // the reader-role write (here) and the matching ClickHouse named
+    // collection (later, in the statement loop) are two halves of one
+    // credential, and a run that fails between them would leave a freshly
+    // generated password on the role with the previous one still in the
+    // collection — breaking every PostgreSQL-mapped view until a later run
+    // completes both halves. With the env var set, both halves converge on
+    // the same value on every run, partial or not. Generation is the
+    // first-run fallback only.
+    postgresReaderPassword =
+      process.env.LWQL_POSTGRES_READER_PASSWORD ??
+      randomBytes(24).toString("hex");
+    if (!process.env.LWQL_POSTGRES_READER_PASSWORD) {
+      logger.warn(
+        "LWQL_POSTGRES_READER_PASSWORD is not set — generating a one-run reader password; a run that fails between the PostgreSQL role write and the ClickHouse named-collection write will desynchronize the two until a later run completes. Set the env var to make the credential stable across runs.",
+      );
+    }
     try {
       await runPostgresStatements(
         productionPostgresReaderRoleStatements({
@@ -198,55 +243,94 @@ export default async function execute() {
         }),
       );
     } catch (error) {
+      const failure = redactedFailure(error, [postgresReaderPassword]);
       logger.error(
-        { error },
+        { error: failure.message },
         "lwql provisioning failed creating the PostgreSQL reader role",
       );
-      throw error;
+      throw failure;
     }
   }
 
-  await withAdminClickHouseClient(async (client) => {
-    const statements = fullMode
-      ? productionClickHouseAccessModelStatements({
-          names,
-          sourceDatabase,
-          restrictedUserPassword: connection.password,
-          postgresConnection: {
-            collection: `lwql_${names.database}_postgres`,
-            ...parseAppPostgresConnection(),
-            user: LWQL_POSTGRES_READER_ROLE,
-            // Non-null: only reachable when fullMode generated it above.
-            password: postgresReaderPassword as string,
-          },
-        })
-      : productionClickHouseObjectStatements({ names, sourceDatabase });
-
-    if (!fullMode) {
-      logger.info(
-        "skipping LangWatchQL access-model grants/policies and PostgreSQL-mapped views — set LWQL_PROVISION_ACCESS_MODEL=true for a self-hosted deploy that owns its own ClickHouse access model",
-      );
-    }
-
-    try {
-      for (const statement of statements) {
-        await client.command({ query: statement });
-      }
-    } catch (error) {
-      logger.error(
-        { error, fullMode },
-        "lwql provisioning failed creating ClickHouse objects",
-      );
-      throw error;
-    }
-
-    try {
-      await backfillKeyMap({ client, names, sourceDatabase, fullMode });
-    } catch (error) {
-      logger.error({ error }, "lwql key-map backfill failed");
-      throw error;
-    }
-  });
+  await withAdminClickHouseClient((client) =>
+    provisionClickHouse({
+      client,
+      names,
+      sourceDatabase,
+      isFullMode,
+      restrictedUserPassword: connection.password,
+      postgresReaderPassword,
+    }),
+  );
 
   logger.info("LangWatchQL provisioning complete");
+}
+
+async function provisionClickHouse({
+  client,
+  names,
+  sourceDatabase,
+  isFullMode,
+  restrictedUserPassword,
+  postgresReaderPassword,
+}: {
+  client: ClickHouseClient;
+  names: LangWatchQLNames;
+  sourceDatabase: string;
+  isFullMode: boolean;
+  restrictedUserPassword: string;
+  postgresReaderPassword: string | null;
+}): Promise<void> {
+  const statements = isFullMode
+    ? productionClickHouseAccessModelStatements({
+        names,
+        sourceDatabase,
+        restrictedUserPassword,
+        postgresConnection: {
+          collection: `lwql_${names.database}_postgres`,
+          ...parseAppPostgresConnection(),
+          user: LWQL_POSTGRES_READER_ROLE,
+          // Non-null: only reachable when full mode resolved it in execute().
+          password: postgresReaderPassword as string,
+        },
+      })
+    : productionClickHouseObjectStatements({ names, sourceDatabase });
+
+  if (!isFullMode) {
+    logger.info(
+      "skipping LangWatchQL access-model grants/policies and PostgreSQL-mapped views — set LWQL_PROVISION_ACCESS_MODEL=true for a self-hosted deploy that owns its own ClickHouse access model",
+    );
+  }
+
+  const secrets = [restrictedUserPassword, postgresReaderPassword];
+  for (const [index, statement] of statements.entries()) {
+    try {
+      await client.command({ query: statement });
+    } catch (error) {
+      const failure = redactedFailure(error, secrets);
+      logger.error(
+        {
+          error: failure.message,
+          statement: `${index + 1}/${statements.length}`,
+          isFullMode,
+        },
+        "lwql provisioning failed creating ClickHouse objects",
+      );
+      throw failure;
+    }
+  }
+
+  // Non-fatal by design: the backfill is convergent — project creation
+  // writes new rows inline (`project.service.ts`) and the next run of this
+  // task picks up anything missed — so a slow or briefly unavailable
+  // key-map table must not block the whole deploy. The views above ARE
+  // fatal: without them every LangWatchQL query fails.
+  try {
+    await backfillKeyMap({ client, names, sourceDatabase, isFullMode });
+  } catch (error) {
+    logger.error(
+      { error: redactedFailure(error, secrets).message },
+      "lwql key-map backfill failed — continuing; project creation syncs rows inline and the next deploy retries the rest",
+    );
+  }
 }
