@@ -18760,9 +18760,9 @@ An `ik-lw-` write-only ingest key also authenticates the project OTLP endpoint, 
 
 Commit `.claude/settings.json` with the exporter wiring, and keep the bearer token, the `CLAUDE_CODE_ENABLE_TELEMETRY` enable flag and **every content flag** in a gitignored `.claude/settings.local.json`. Telemetry is **off by default**: nothing exports until the enable flag is set, so a fresh clone carrying only the committed `settings.json` sends nothing.
 
-The committed file decides the shape of the export. What that export carries is decided by four flags, and they stay out of the repository so each person turns them on for themselves: `OTEL_LOG_USER_PROMPTS` puts prompt text on the wire, `OTEL_LOG_TOOL_DETAILS` and `OTEL_LOG_TOOL_CONTENT` put the input and output of every tool call on it, and `OTEL_LOG_RAW_API_BODIES` puts the Messages API request and response JSON on it. Inline bodies are truncated at 60 KB (`CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH` raises the limit, `file:<dir>` writes untruncated bodies to disk instead) and extended thinking is redacted.
+The committed file decides the shape of the export. What that export carries is decided by five flags, and they stay out of the repository so each person turns them on for themselves: `OTEL_LOG_USER_PROMPTS` puts prompt text on the wire, `OTEL_LOG_TOOL_DETAILS` and `OTEL_LOG_TOOL_CONTENT` put the input and output of every tool call on it, `OTEL_LOG_RAW_API_BODIES` puts the Messages API request and response JSON on it, and `OTEL_LOG_ASSISTANT_RESPONSES` puts just the assistant's response text on it without the rest of the body. Inline bodies are truncated at 60 KB (`CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH` raises the limit, `file:<dir>` writes untruncated bodies to disk instead) and extended thinking is redacted.
 
-<Warning>Those four flags are what put your session content in LangWatch: prompt text, the input and output of every tool call, including file contents, and the model request and response bodies of every turn. A committed content flag does not switch telemetry on by itself, because Claude Code exports nothing until `CLAUDE_CODE_ENABLE_TELEMETRY` is set. It does not have to be set in the repository for that to happen, though: a managed settings file, a shell export, or a contributor's own `~/.claude/settings.json` can each turn telemetry on, and from that moment a content flag sitting in the committed file applies to everyone who cloned the repo. That is why the recipe keeps all four in each person's own gitignored file.</Warning>
+<Warning>Those five flags are what put your session content in LangWatch: prompt text, the input and output of every tool call, including file contents, the model request and response bodies of every turn, and the assistant's response text on its own. A committed content flag does not switch telemetry on by itself, because Claude Code exports nothing until `CLAUDE_CODE_ENABLE_TELEMETRY` is set. It does not have to be set in the repository for that to happen, though: a managed settings file, a shell export, or a contributor's own `~/.claude/settings.json` can each turn telemetry on, and from that moment a content flag sitting in the committed file applies to everyone who cloned the repo. That is why the recipe keeps all five in each person's own gitignored file.</Warning>
 
 `settings.local.json`'s `env` merges per-key with `settings.json`'s `env`, so the local flags combine with the committed ones rather than replacing them.
 
@@ -18800,6 +18800,7 @@ For self-hosted (`npx @langwatch/server`), replace the endpoint with `http://loc
     "OTEL_LOG_TOOL_DETAILS": "1",
     "OTEL_LOG_TOOL_CONTENT": "1",
     "OTEL_LOG_RAW_API_BODIES": "1",
+    "OTEL_LOG_ASSISTANT_RESPONSES": "1",
     "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer sk-lw-…",
     "OTEL_RESOURCE_ATTRIBUTES": "project.repo=my-repo-name,cost_center=my-team,enduser.id=you@example.com"
   }
@@ -30840,6 +30841,8 @@ The setup that `langwatch claude` and `langwatch instrument claude` write turns 
 
 Remove the flags from `~/.claude/settings.json` to keep only the usage numbers: tokens, cost, model, latency, the tool call tree and the subagent tree stay, and the content stops.
 
+`langwatch claude` and `langwatch instrument claude` set `OTEL_LOG_RAW_API_BODIES`, which already carries the assistant's response text along with the rest of the request and response body. If you want the response text on its own, without the full body, add `OTEL_LOG_ASSISTANT_RESPONSES` yourself: the wrapper does not set it for you.
+
 Claude Code shortens each inline body at 60 kilobytes. `CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH` raises that limit. Claude Code always removes extended thinking from the bodies, so LangWatch never receives it.
 
 ## Troubleshooting
@@ -30860,9 +30863,11 @@ Claude Code shortens each inline body at 60 kilobytes. `CLAUDE_CODE_OTEL_CONTENT
   </Accordion>
 
   <Accordion title="The trace has no response">
-    `OTEL_LOG_RAW_API_BODIES` is missing. Claude Code reports the response text of the assistant on its `api_response_body` event only, and that event is off by default.
+    Both `OTEL_LOG_RAW_API_BODIES` and `OTEL_LOG_ASSISTANT_RESPONSES` are missing. Claude Code reports the response text of the assistant on its `api_response_body` event (needs `OTEL_LOG_RAW_API_BODIES=1`, and carries the full request and response JSON) or on its lighter `assistant_response` event (needs `OTEL_LOG_ASSISTANT_RESPONSES=1`, and carries only the response text). Both are off by default. Set `OTEL_LOG_ASSISTANT_RESPONSES=1` if you want the response without the rest of the body.
 
-    Claude Code also reports `api_response_body` for work that is not a conversation, such as an autosuggestion or a session title. LangWatch filters those out, so a title never becomes the output of a trace.
+    Claude Code docs describe `OTEL_LOG_ASSISTANT_RESPONSES` as falling back to the value of `OTEL_LOG_USER_PROMPTS`. Don't rely on that fallback: set it explicitly.
+
+    Claude Code also reports `api_response_body` and `assistant_response` for work that is not a conversation, such as an autosuggestion or a session title. LangWatch filters those out, so a title never becomes the output of a trace.
   </Accordion>
 
   <Accordion title="The telemetry goes to the wrong workspace">
@@ -30884,7 +30889,7 @@ For more failure modes see [CLI debug](/ai-governance/cli-debug).
 
 ## Manual OpenTelemetry setup
 
-Use this when you cannot install the LangWatch command line tool. The variables below are the ones `langwatch instrument claude` writes for you.
+Use this when you cannot install the LangWatch command line tool. The block below mirrors the variables `langwatch instrument claude` writes for you, plus the optional `OTEL_LOG_ASSISTANT_RESPONSES` flag, which the wrapper does not set. Drop that line if you only want what the wrapper gives you.
 
 ### Environment variables
 
@@ -30898,6 +30903,7 @@ export OTEL_LOG_USER_PROMPTS=1
 export OTEL_LOG_TOOL_DETAILS=1
 export OTEL_LOG_TOOL_CONTENT=1
 export OTEL_LOG_RAW_API_BODIES=1
+export OTEL_LOG_ASSISTANT_RESPONSES=1
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
@@ -30910,7 +30916,7 @@ The header takes an ingest key (`ik-lw-…`), which can create traces and nothin
 For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. Claude Code appends `/v1/traces`, `/v1/logs` and `/v1/metrics` on its own. Never write the per-signal path yourself.
 
 <Warning>
-  The four `OTEL_LOG_*` flags put your session content in LangWatch. Read [Content and privacy](#content-and-privacy) before you use them where the content matters.
+  The five `OTEL_LOG_*` flags put your session content in LangWatch. Read [Content and privacy](#content-and-privacy) before you use them where the content matters.
 </Warning>
 
 ### Settings file
@@ -30929,6 +30935,7 @@ Claude Code reads the same variables from the `env` block of `~/.claude/settings
     "OTEL_LOG_TOOL_DETAILS": "1",
     "OTEL_LOG_TOOL_CONTENT": "1",
     "OTEL_LOG_RAW_API_BODIES": "1",
+    "OTEL_LOG_ASSISTANT_RESPONSES": "1",
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "https://app.langwatch.ai/api/otel",
     "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer ik-lw-your-ingest-key",
