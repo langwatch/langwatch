@@ -20,6 +20,7 @@ import {
   isSimulationRunQueuedEvent,
   isSimulationTextMessageEndEvent,
 } from "../schemas/events";
+import type { SimulationResults } from "../schemas/shared";
 
 const logger = createLogger("langwatch:simulation-processing:finish-run");
 
@@ -70,6 +71,43 @@ function collectTraceIds(
 }
 
 /**
+ * Classifies results that carry a failure nobody wrote a reason for.
+ *
+ * A judge's results carry its own reasoning, which is prose about the
+ * conversation and must reach the customer verbatim. A run that failed
+ * before any judging reports the raw failure instead: as the reasoning
+ * itself, or with no reasoning at all. Those two shapes are what this
+ * rewrites, so the drawer renders a named error rather than a Node stack.
+ *
+ * Everything else is returned untouched: a passing verdict, results with no
+ * error, and any result whose reasoning says something the error does not.
+ */
+function classifyUnjudgedResults({
+  results,
+  cancelled,
+}: {
+  results: SimulationResults;
+  cancelled: boolean;
+}): SimulationResults {
+  const { error, reasoning, verdict } = results;
+  if (verdict === "success") return results;
+  if (error === undefined || error.trim().length === 0) return results;
+
+  const reasonIsTheFailure =
+    reasoning === undefined ||
+    reasoning.trim().length === 0 ||
+    reasoning.trim() === error.trim();
+  if (!reasonIsTheFailure) return results;
+
+  const classified = buildFailureResults({ cancelled, error });
+  return {
+    ...results,
+    reasoning: classified.reasoning,
+    error: classified.error,
+  };
+}
+
+/**
  * Command handler for finishing a simulation run.
  *
  * Emits the RunFinished event with event-carried state (ECST): identity
@@ -104,15 +142,20 @@ export class FinishRunCommand
     // Infrastructure callers (stall watchdog, cancel-grace) supply a bare
     // `error` and no verdict; synthesize the same failure-results envelope
     // the in-process failure path writes, so the reason is recorded on the
-    // event rather than lost. A caller-supplied `results` always wins.
-    const results =
-      data.results ??
-      (data.error !== undefined
+    // event rather than lost. Caller-supplied `results` win, but a run that
+    // failed before any judging reports its raw failure as the reasoning, so
+    // those are classified on the way in rather than stored as a stack.
+    const results = data.results
+      ? classifyUnjudgedResults({
+          results: data.results,
+          cancelled: data.status === ScenarioRunStatus.CANCELLED,
+        })
+      : data.error !== undefined
         ? buildFailureResults({
             cancelled: data.status === ScenarioRunStatus.CANCELLED,
             error: data.error,
           })
-        : undefined);
+        : undefined;
 
     const eventData: SimulationRunFinishedEventData = {
       scenarioRunId,

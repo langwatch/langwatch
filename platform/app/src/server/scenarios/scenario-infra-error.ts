@@ -263,6 +263,12 @@ const NETWORK_UNREACHABLE_NEEDLES = [
   "ECONNRESET",
   "fetch failed",
   "network error",
+  // Name resolution, in the two shapes it reaches us: Node prefixes every
+  // resolver failure with the syscall, and curl-style clients print prose
+  // instead of an errno. Both mean the same thing as ENOTFOUND, which only
+  // covers one of the errno values a resolver can return.
+  "getaddrinfo",
+  "could not resolve hostname",
 ] as const;
 
 /**

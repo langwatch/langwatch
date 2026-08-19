@@ -93,6 +93,38 @@ Feature: HTTP agent error surfacing and per-call diagnostics
     Then the values of "Authorization" and "x-api-key" do not appear in the log line
     And the redacted placeholder appears in their place
 
+  # ============================================================================
+  # Transport failures — the target could not be reached at all
+  # ============================================================================
+
+  # A non-2xx answer is the target rejecting the request, and the scenarios
+  # above cover it. A transport failure is different: nothing answered, and
+  # what fetch throws is a Node error whose text ("TypeError: fetch failed",
+  # "getaddrinfo ENOTFOUND ...") reads as a crash rather than a reason. The
+  # adapter names the target and the failure kind, and keeps the raw error as
+  # the cause so the log still holds it.
+
+  @unit
+  Scenario: An unreachable target produces a customer-safe transport error
+    Given an HTTP agent target whose host does not resolve
+    When the adapter calls it
+    Then the thrown error names the target host
+    And the thrown error says the target could not be reached
+    And the raw fetch error is kept as the thrown error's cause
+
+  @unit
+  Scenario: A transport error keeps the underlying failure text for classification
+    Given an HTTP agent target whose connection is refused
+    When the adapter calls it
+    Then the thrown error still carries the underlying "ECONNREFUSED" text
+    And classifying it yields the unreachable-endpoint code
+
+  @unit
+  Scenario: A transport error never carries a Node stack in its message
+    Given an HTTP agent target that fails at the transport level
+    When the adapter calls it
+    Then the thrown error message holds no stack frames
+
   # --- AC Coverage Map ---
   # AC #1: "Root cause for parallel-mode 422s identified and documented" → OUT OF SCOPE in this PR.
   #        Issue body explicitly defers to #3590; depends on a real failure being captured AFTER

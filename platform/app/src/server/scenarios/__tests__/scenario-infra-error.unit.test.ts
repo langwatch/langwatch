@@ -92,6 +92,24 @@ describe("classifyScenarioInfraError", () => {
     });
   });
 
+  describe("when the raw error is a name-resolution failure", () => {
+    /** @scenario "A DNS resolution failure becomes an unreachable-endpoint error" */
+    /** @scenario "A hostname that could not be resolved becomes an unreachable-endpoint error" */
+    it.each([
+      // A resolver failure that is not one of the errno codes already listed:
+      // the getaddrinfo prefix is the part every form of it shares.
+      "getaddrinfo EAI_FAIL agent.internal",
+      "Error: getaddrinfo failed",
+      // What curl and several HTTP clients print instead of an errno.
+      "Could not resolve hostname agent.example.com",
+      "could not resolve hostname",
+    ])("classifies %s as platform unreachable", (raw) => {
+      expect(classifyScenarioInfraError(raw).code).toBe(
+        ScenarioInfraErrorCode.PlatformUnreachable,
+      );
+    });
+  });
+
   describe("when the raw error is the tunnel edge's HTTP 530 answer", () => {
     /** @scenario "A dead tunnel names itself without a devTunnel lookup" */
     it("classifies the Cloudflare 530 + 1033 pair as the named dev-tunnel error", () => {

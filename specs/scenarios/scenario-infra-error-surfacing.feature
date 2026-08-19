@@ -34,6 +34,56 @@ Feature: Scenario infrastructure error surfacing and empty-response state
     Then the handled error code is "scenario_platform_unreachable"
 
   @unit
+  Scenario: A DNS resolution failure becomes an unreachable-endpoint error
+    Given a scenario run failed with a raw error mentioning "getaddrinfo"
+    When the failure is classified
+    Then the handled error code is "scenario_platform_unreachable"
+
+  @unit
+  Scenario: A hostname that could not be resolved becomes an unreachable-endpoint error
+    Given a scenario run failed with a raw error saying the hostname could not be resolved
+    When the failure is classified
+    Then the handled error code is "scenario_platform_unreachable"
+
+  @unit
+  Scenario: A DNS failure on an agent with a dev tunnel names the dead tunnel
+    Given a target that still carries a devTunnel marker
+    And the run failed with a raw error mentioning "getaddrinfo"
+    When the failure results are built
+    Then the handled error code is "agent_dev_tunnel_unreachable"
+
+  # A run that failed before any judging reports results whose reasoning is
+  # the raw failure itself, or nothing at all. Those results went to storage
+  # unclassified, so the drawer rendered a Node stack as the reason. They are
+  # now classified on the way in, the same as a bare error. Results a judge
+  # actually wrote carry their own reasoning and are never rewritten.
+
+  @unit
+  Scenario: Caller-supplied results whose reasoning is the raw failure are classified before storage
+    Given a finish-run command whose results carry a raw transport failure as both error and reasoning
+    When the run is finished
+    Then the stored reasoning is the customer-safe sentence, not the raw failure
+    And the stored error is the encoded envelope with a stable code
+
+  @unit
+  Scenario: Caller-supplied results with an error and no reasoning are classified before storage
+    Given a finish-run command whose results carry an error and no reasoning
+    When the run is finished
+    Then the stored reasoning is the customer-safe sentence for that error
+
+  @unit
+  Scenario: Results a judge wrote are stored untouched
+    Given a finish-run command whose results carry a judge verdict with its own reasoning
+    When the run is finished
+    Then the results are stored exactly as the caller supplied them
+
+  @unit
+  Scenario: Passing results are never reclassified
+    Given a finish-run command whose results carry a success verdict
+    When the run is finished
+    Then the results are stored exactly as the caller supplied them
+
+  @unit
   Scenario: A dead tunnel names itself without a devTunnel lookup
     Given a raw failure carrying the Cloudflare edge's HTTP 530 answer with its "error code: 1033" body
     When the failure is classified
