@@ -16,9 +16,13 @@ The output of a diagnosis is a verdict naming **one primary dimension** (plus an
 
 Work the dimensions in order. If the evidence convicts at a step, report and stop — later dimensions are noise until this one is fixed.
 
+Each dimension states **the bar** — what good looks like — before its checks. A diagnosis is a comparison against that bar, not a hunt for anything that could be improved: convict a dimension only when the failing runs measurably fall short of its bar, and recommend the fix as "close the gap to the bar", not a rewrite.
+
 ## 1. Rubric hygiene — is the judge itself broken?
 
 Only applies when the complaint comes from a scenario, eval, or judge verdict. Check this **first**: if the measuring stick is bent, every other reading is noise.
+
+**The bar:** every criterion is observable in the transcript (behavior, not intent), independently satisfiable alongside every other criterion, provoked by something the scenario actually does, and phrased so two humans reading the same transcript would agree on the verdict. A good rubric is stable: the same transcript passes or fails it every time.
 
 - Read the failing criteria side by side. Look for pairs no answer can satisfy simultaneously (e.g. "hands over the exact command" and "never echoes commands"), criteria about behavior the scenario's opening never provokes, and borderline judgement calls (tone, brevity) that flip run-to-run.
 - Re-run a borderline scenario 2–3 times. A verdict that flips is a rubric or sampling problem, not an agent problem.
@@ -27,12 +31,16 @@ Only applies when the complaint comes from a scenario, eval, or judge verdict. C
 
 ## 2. Harness hygiene — did the agent even get to answer?
 
+**The bar:** the harness delivers every agent answer to the judge exactly once, complete, and attributed to the right run. Timeouts exceed the agent's real worst-case latency (cold start included), concurrent turns are serialized or retried on lock conflicts, async responses are polled to completion, and a harness-level error fails the run loudly as *infrastructure* — never silently recorded as a bad agent answer.
+
 - In the failing runs, find errors that happened *before* the model's reply was judged: turn-lock conflicts (409s), timeouts shorter than cold-start, unpolled async responses read as blank answers, transcript-capture races (empty output files).
 - An intermittent failure that reproduces neither always nor never is a race in the harness until proven otherwise — reproduce ~6 times before calling it an agent defect.
 
 **Convicts when:** the trace shows the turn erroring or truncating for infrastructure reasons; the agent's actual answer was never evaluated.
 
 ## 3. Tool availability and completeness — does it have the tools the task needs?
+
+**The bar:** for every task the agent is instructed or advertised to do, there is a tool that can do it end-to-end, and the agent's credential permits it. The toolset is closed and honest: no instruction promises a capability that isn't wired up, and every deliberate boundary (a permission the key is *meant* to lack) is stated in the instructions so the agent can decline up front instead of discovering it via a 403.
 
 - List the tool calls in failing traces. For each goal the user's message implies: is there a tool that can do it, and does the agent's credential actually permit it (401/403 spans)?
 - An agent instructed to do X with no tool (or no permission) for X will either hallucinate the result or fail confusingly. The defect is in the toolbox or the instructions offering X — not in the model.
@@ -41,6 +49,8 @@ Only applies when the complaint comes from a scenario, eval, or judge verdict. C
 
 ## 4. Tool-call hygiene — does it call the tools it has correctly?
 
+**The bar:** a good tool definition makes correct calls the path of least resistance — a description that says when to use it (and when not to), parameter names and types that match the schema exactly, required scoping (time windows, project/entity filters) called out, and error messages that tell the model what to change. A healthy trace shows well-formed arguments, no retry storms on terminal errors, and results read from the entity the user asked about.
+
 - Inspect the arguments of tool-call spans in failing traces: wrong flags, missing scoping (time windows, project filters), retry storms on terminal errors, results read from the wrong entity.
 - Compare a failing call's arguments against the tool's schema or help output.
 
@@ -48,12 +58,16 @@ Only applies when the complaint comes from a scenario, eval, or judge verdict. C
 
 ## 5. Context hygiene — is what the model sees healthy?
 
+**The bar:** everything in the window earns its place. One voice (no second persona's instructions sharing the context), no two instructions in conflict, tool results trimmed to what the turn needs, stale material dropped or summarized, and the information the current request depends on sitting well inside the model's effective attention — not buried under accumulated history.
+
 - Reconstruct what was actually in the model's context at the failing turn: system prompt + history + tool results. Look for pollution (irrelevant or stale material), conflicts (two instructions that disagree), incongruence (persona bleed from other instructions sharing the context), and sheer bloat pushing the relevant part out of attention.
 - Long multi-turn failures that don't reproduce on turn 1 are a context smell: replay the same request in a fresh conversation and compare.
 
 **Convicts when:** the failing behavior tracks something visible in the context window rather than the request itself.
 
 ## 6. System-prompt hygiene — are the standing instructions well written for this model and harness?
+
+**The bar:** a good system prompt states each rule once with a positive alternative ("do X" beats "never do Y"), reinforces the rules the model actually breaks with concrete counter-examples of the exact failure, declares every mandate and boundary up front (nothing discoverable only by failing), matches how the harness renders output, and contains no rule that contradicts another. Length is earned: every line demonstrably changes behavior.
 
 - Check the system prompt against how the harness actually renders output (e.g. status text concatenating into the final reply), for rules stated once versus reinforced with examples, for forbidden behaviors described but never given a positive alternative, and for mandates only discoverable by failing — the agent should know its boundaries *before* attempting an action, not by reading a 403.
 - A rule the model keeps breaking in the same shape across traces is a prompt-strength problem: add the counter-example of the exact failure.
@@ -63,6 +77,8 @@ Only applies when the complaint comes from a scenario, eval, or judge verdict. C
 ## 7. Model strength, thinking, and corrective steps — last, because it is the expensive conclusion
 
 Only after 1–6 are ruled out.
+
+**The bar:** given correct tools, healthy context, and clear instructions, the model plans the right steps, adapts when a tool result contradicts the plan, self-corrects after an error result instead of repeating or giving up, and spends thinking proportional to task difficulty. The bar for the *configuration* is that model tier and thinking budget match the hardest task the agent is expected to handle.
 
 - Look for: correct tools, correct context, and clear instructions — yet reasoning failures (wrong plan, no self-correction after an error result, giving up mid-task).
 - Test cheaply before concluding: run the same scenario with more thinking budget or a stronger model a handful of times. A defect that persists across models is **not** a model-strength problem — go back to dimensions 1–6.

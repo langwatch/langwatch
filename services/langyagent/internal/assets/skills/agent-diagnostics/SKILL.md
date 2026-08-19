@@ -20,8 +20,11 @@ langwatch docs agent-simulations/agent-diagnostics-playbook
 The seven dimensions, in the order the playbook works them:
 rubric hygiene → harness hygiene → tool availability and completeness →
 tool-call hygiene → context hygiene → system-prompt hygiene → model strength
-(last, because it is the expensive conclusion). At each step, if the evidence
-convicts, report and stop — later dimensions are noise until this one is fixed.
+(last, because it is the expensive conclusion). Each dimension in the playbook
+states the bar — what good looks like — before its checks: convict only when
+the failing runs measurably fall short of that bar, and frame the fix as
+closing the gap to it. At each step, if the evidence convicts, report and
+stop — later dimensions are noise until this one is fixed.
 
 **Inputs you need:** recent traces from the agent under diagnosis
 (`langwatch trace search --format json`, scope with `--origin` and a time window
