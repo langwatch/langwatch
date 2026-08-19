@@ -195,7 +195,10 @@ function terminalFooterCost(): number {
   } as unknown as SpanDetail;
 
   const transcript = buildCodingAgentTranscript({ spans: [detail], logs: [] });
-  return buildEntryTimeline(transcript.entries).at(-1)?.cumulativeCostUsd ?? 0;
+  return (
+    buildEntryTimeline({ entries: transcript.entries }).at(-1)
+      ?.cumulativeCostUsd ?? 0
+  );
 }
 
 describe("the cost of one claude code model call", () => {

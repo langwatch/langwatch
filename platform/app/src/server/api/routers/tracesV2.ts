@@ -43,6 +43,7 @@ import type {
   SpanSummaryRow,
   TraceEventRollup,
 } from "~/server/app-layer/traces/repositories/span-storage.repository";
+import type { TraceListItem } from "~/server/app-layer/traces/trace-list.service";
 import {
   traceMetadataUpdateSchema,
   updateTraceMetadata,
@@ -502,6 +503,7 @@ type V2RedactionFlags = {
 
 /** Protection facts the V2 read mappers consume to enforce restrict at read. */
 type V2Protections = {
+  canSeeCosts?: boolean | null;
   canSeeCapturedInput?: boolean | null;
   canSeeCapturedOutput?: boolean | null;
   capturedInputVisibleTo?: string | null;
@@ -765,6 +767,61 @@ export function redactV2Content<
     }
   }
   return redacted;
+}
+
+/**
+ * One turn of a session, as `conversationContext` lists it. Carries the
+ * permission-nulled input/output AND the redaction flags so a hidden turn
+ * renders the "Redacted" marker in the conversation strip / view instead of an
+ * empty "(no message)" placeholder that would read as a genuinely-absent turn.
+ * Carries the turn's totals so the terminal's bottom bar can count the
+ * session's turns above its loaded window without reading their transcripts.
+ */
+export function toConversationContextTurn({
+  trace: t,
+  protections,
+}: {
+  trace: TraceListItem;
+  protections: V2Protections;
+}) {
+  const {
+    input,
+    output,
+    inputRedacted,
+    outputRedacted,
+    inputVisibleTo,
+    outputVisibleTo,
+  } = redactV2Content(
+    {
+      traceId: t.traceId,
+      timestamp: t.timestamp,
+      name: t.traceName || t.name,
+      rootSpanType: t.rootSpanType ?? null,
+      status: t.status,
+      input: t.input ?? null,
+      output: t.output ?? null,
+    },
+    protections,
+  );
+  return {
+    traceId: t.traceId,
+    timestamp: t.timestamp,
+    name: t.traceName || t.name,
+    rootSpanType: t.rootSpanType ?? null,
+    status: t.status,
+    input,
+    output,
+    inputRedacted,
+    outputRedacted,
+    inputVisibleTo,
+    outputVisibleTo,
+    totalTokens: t.totalTokens,
+    // Spend follows the viewer's own `cost:view` (ADR-057), the same rule the
+    // session rows and the trace header apply through `gateSessionCost` /
+    // `gateHeaderCost`. Without it a viewer who may not read the session
+    // rollup could add the same total up one turn at a time.
+    totalCost: protections.canSeeCosts === true ? t.totalCost : null,
+  };
 }
 
 /**
@@ -1301,44 +1358,9 @@ export const tracesV2Router = createTRPCRouter({
           input.projectId,
         ),
       });
-      const turns = page.items.map((t) => {
-        // Carry the permission-nulled input/output AND the redaction flags so a
-        // hidden turn renders the "Redacted" marker in the conversation strip /
-        // view instead of an empty "(no message)" placeholder that would read
-        // as a genuinely-absent turn.
-        const {
-          input,
-          output,
-          inputRedacted,
-          outputRedacted,
-          inputVisibleTo,
-          outputVisibleTo,
-        } = redactV2Content(
-          {
-            traceId: t.traceId,
-            timestamp: t.timestamp,
-            name: t.traceName || t.name,
-            rootSpanType: t.rootSpanType ?? null,
-            status: t.status,
-            input: t.input ?? null,
-            output: t.output ?? null,
-          },
-          protections,
-        );
-        return {
-          traceId: t.traceId,
-          timestamp: t.timestamp,
-          name: t.traceName || t.name,
-          rootSpanType: t.rootSpanType ?? null,
-          status: t.status,
-          input,
-          output,
-          inputRedacted,
-          outputRedacted,
-          inputVisibleTo,
-          outputVisibleTo,
-        };
-      });
+      const turns = page.items.map((t) =>
+        toConversationContextTurn({ trace: t, protections }),
+      );
       // Position/previous/next are derived client-side from the active
       // traceId so the cache key doesn't churn on J/K navigation.
       return {
