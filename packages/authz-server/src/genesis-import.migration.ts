@@ -12,13 +12,16 @@
  * legacy-visible row at all (the projection's compat write is UPDATE-ONLY
  * for this source — that is what keeps PR 2 dark).
  *
- * Three kinds of fact, emitted in that order, chunked, with deterministic
- * commandIds (decision 23) so a retried pass appends the same events and
- * the store dedupes them:
+ * Three kinds of fact, emitted in that order, chunked, with idempotency keys
+ * derived from each chunk's own content (decision 23; see
+ * `contentCommandId`) so a retried pass appends the same events and the
+ * store dedupes them — a positional key does NOT hold this property when the
+ * upstream rows shift between passes, which is why the key is a hash of the
+ * chunk's ids and not its index:
  *
- *   1. `genesis:roles:<org>:<i>`      every CustomRole, adopted by id.
- *   2. `genesis:grants:<org>:<i>`     every RoleBinding, adopted by id.
- *   3. `genesis:org-facts:<org>:<i>`  the facts the legacy schema INFERRED
+ *   1. `genesis:roles:<org>:<hash>`      every CustomRole, adopted by id.
+ *   2. `genesis:grants:<org>:<hash>`     every RoleBinding, adopted by id.
+ *   3. `genesis:org-facts:<org>:<hash>`  the facts the legacy schema INFERRED
  *      rather than stored (decision 15): the org-member floor row
  *      (decision 11 — one per organization, `members-of(org)` as a
  *      principal) and, per decision 20, an org-scoped admin grant for every
@@ -34,19 +37,30 @@
  * facts, the organization's and the membership row's — which is what makes
  * `deriveGrantId` stable across re-runs.
  *
- * The proof is the compat projection byte-equalling the original rows: every
- * binding row still there, id-equal and field-equal, and every CustomRole
- * matched by an id-equal `Role` head. No column is carved out, `role`
- * included: a custom row's emission carries the stored value as
- * `legacyRole`, so the compat upsert must reproduce it, and a rewrite to
- * CUSTOM is drift like any other. Drift
- * HOLDS the organization with the differences in its report; a clean sweep
- * finalizes it. No epoch bump and no `migration_parity_proved` fact — this
- * import changes no decision, and the proof fact belongs to the backfill and
- * the cutover machine.
+ * A fourth step reconciles the DENY direction: a legacy row deleted while an
+ * organization was off the engine has no event of its own (the legacy fork's
+ * writes are imperative row-deletes), so every pass diffs the Grant/Role
+ * heads this import owns against the rows it just read and emits a
+ * compensating `grant_revoked` / `role_deleted` for anything the legacy side
+ * no longer has (`reconcileRevocations`) — otherwise a
+ * flip-rollback-imperative-revoke-reflip sequence leaves a zombie grant in
+ * the head forever.
+ *
+ * The proof is the compat projection byte-equalling the original rows in
+ * BOTH directions: every binding row still there, id-equal and field-equal,
+ * every CustomRole matched by an id-equal `Role` head, AND neither head
+ * holding a genesis-owned fact the legacy rows no longer name. No column is
+ * carved out, `role` included: a custom row's emission carries the stored
+ * value as `legacyRole`, so the compat upsert must reproduce it, and a
+ * rewrite to CUSTOM is drift like any other. Drift HOLDS the organization
+ * with the differences in its report; a clean sweep finalizes it. No epoch
+ * bump and no `migration_parity_proved` fact — this import changes no
+ * decision, and the proof fact belongs to the backfill and the cutover
+ * machine.
  *
  * Spec: specs/rbac/in-place-authz-migration.feature.
  */
+import { createHash } from "node:crypto";
 import { roleKeyForTeamRole } from "@langwatch/authz";
 import type {
   SystemMigration,
@@ -92,9 +106,21 @@ const MAX_REPORTED_DIFFS = 50;
 
 const DEFAULT_POLL = { intervalMs: 500, timeoutMs: 120_000 };
 
-/** One way the projection failed to reproduce a legacy row. */
+/** One way the projection failed to reproduce a legacy row - the ALLOW
+ *  direction (`binding_missing`, `binding_changed`, `role_missing`,
+ *  `role_changed`) - or a way it holds a fact the legacy side no longer
+ *  does - the DENY direction (`binding_extra`, `role_extra`). The deny
+ *  kinds surface only when the reconciliation sweep already tried to
+ *  revoke the fact and it is still there on re-read: a real fold lag or a
+ *  parked convergence, not a first-time miss. */
 export type GenesisDiff = {
-  kind: "binding_missing" | "binding_changed" | "role_missing" | "role_changed";
+  kind:
+    | "binding_missing"
+    | "binding_changed"
+    | "binding_extra"
+    | "role_missing"
+    | "role_changed"
+    | "role_extra";
   id: string;
   field?: string;
   expected?: string | null;
@@ -147,6 +173,14 @@ export class GrantsGenesisImportMigration implements SystemMigration {
       bindingRows,
       organizationCreatedAtMs,
     });
+    // What THIS pass says the Grant/Role heads should hold, from the
+    // legacy rows just read. Anything the import previously authored that
+    // is no longer in these sets has lost its legacy row - see
+    // `reconcileRevocations`.
+    const expectedGrantIds = new Set(
+      [...bindingGrants, ...orgFacts].map((grant) => grant.grantId),
+    );
+    const expectedRoleIds = new Set(roleRows.map((row) => row.id));
 
     await this.emit({
       organizationId,
@@ -157,8 +191,14 @@ export class GrantsGenesisImportMigration implements SystemMigration {
     });
     await this.awaitConvergence({
       organizationId,
-      grantIds: [...bindingGrants, ...orgFacts].map((grant) => grant.grantId),
+      grantIds: [...expectedGrantIds],
       roleIds: roles.map((role) => role.roleId),
+      signal,
+    });
+    await this.reconcileRevocations({
+      organizationId,
+      expectedGrantIds,
+      expectedRoleIds,
       signal,
     });
 
@@ -166,6 +206,8 @@ export class GrantsGenesisImportMigration implements SystemMigration {
       organizationId,
       bindingRows,
       roleRows,
+      expectedGrantIds,
+      expectedRoleIds,
     });
     const counts = {
       bindings: bindingGrants.length,
@@ -200,30 +242,158 @@ export class GrantsGenesisImportMigration implements SystemMigration {
     orgFacts: BackfillGrantEmission[];
     signal?: AbortSignal;
   }): Promise<void> {
-    for (const [index, chunk] of chunked(roles).entries()) {
+    for (const chunk of chunked(roles)) {
       this.assertNotAborted(signal);
       await this.deps.ledger.defineRoles({
         organizationId,
-        commandId: `genesis:roles:${organizationId}:${index}`,
+        commandId: contentCommandId({
+          kind: "roles",
+          organizationId,
+          ids: chunk.map((role) => role.roleId),
+        }),
         roles: chunk,
         actor: GENESIS_ACTOR,
       });
     }
-    for (const [index, chunk] of chunked(bindingGrants).entries()) {
+    for (const chunk of chunked(bindingGrants)) {
       this.assertNotAborted(signal);
       await this.deps.ledger.attachGrants({
         organizationId,
-        commandId: `genesis:grants:${organizationId}:${index}`,
+        commandId: contentCommandId({
+          kind: "grants",
+          organizationId,
+          ids: chunk.map((grant) => grant.grantId),
+        }),
         grants: chunk,
       });
     }
-    for (const [index, chunk] of chunked(orgFacts).entries()) {
+    for (const chunk of chunked(orgFacts)) {
       this.assertNotAborted(signal);
       await this.deps.ledger.attachGrants({
         organizationId,
-        commandId: `genesis:org-facts:${organizationId}:${index}`,
+        commandId: contentCommandId({
+          kind: "org-facts",
+          organizationId,
+          ids: chunk.map((grant) => grant.grantId),
+        }),
         grants: chunk,
       });
+    }
+  }
+
+  /**
+   * The deny-direction half of the import: every head fact this migration
+   * previously authored (`source: "genesis-import"`) whose legacy row is no
+   * longer among the ones this pass just read gets a compensating
+   * revocation - a legacy-side imperative delete has no event of its own,
+   * so this sweep is the only thing that ever tells the ledger. Custom
+   * roles get the same treatment against the Role head; `system_api_key`
+   * roles are never legacy-sourced and are left alone.
+   *
+   * Runs after `awaitConvergence` so the just-emitted attaches have already
+   * landed - reading the head before that would misread work in flight as
+   * drift and revoke facts this very pass just asked for.
+   */
+  private async reconcileRevocations({
+    organizationId,
+    expectedGrantIds,
+    expectedRoleIds,
+    signal,
+  }: {
+    organizationId: string;
+    expectedGrantIds: Set<string>;
+    expectedRoleIds: Set<string>;
+    signal?: AbortSignal;
+  }): Promise<void> {
+    const [genesisGrantIds, roleHeads] = await Promise.all([
+      this.deps.repository.findGenesisOwnedGrantHeadIds({ organizationId }),
+      this.deps.repository.findRoleHeads({ organizationId }),
+    ]);
+    const staleGrantIds = genesisGrantIds
+      .filter((id) => !expectedGrantIds.has(id))
+      .sort();
+    const staleRoleIds = roleHeads
+      .filter((head) => head.kind === "custom" && !expectedRoleIds.has(head.id))
+      .map((head) => head.id)
+      .sort();
+    if (staleGrantIds.length === 0 && staleRoleIds.length === 0) return;
+
+    const occurredAtMs = this.deps.now();
+    for (const chunk of chunked(staleGrantIds)) {
+      this.assertNotAborted(signal);
+      await this.deps.ledger.revokeGrants({
+        organizationId,
+        commandId: contentCommandId({
+          kind: "deny-grants",
+          organizationId,
+          ids: chunk,
+        }),
+        revocations: chunk.map((grantId) => ({
+          grantId,
+          reason: "genesis reconciliation: legacy row no longer exists",
+        })),
+        actor: GENESIS_ACTOR,
+        occurredAtMs,
+      });
+    }
+    for (const roleId of staleRoleIds) {
+      this.assertNotAborted(signal);
+      await this.deps.ledger.deleteRole({
+        organizationId,
+        commandId: `genesis:deny:role:${organizationId}:${roleId}`,
+        roleId,
+        actor: GENESIS_ACTOR,
+        occurredAtMs,
+      });
+    }
+    await this.awaitRevocationConvergence({
+      organizationId,
+      staleGrantIds,
+      staleRoleIds,
+      signal,
+    });
+  }
+
+  /**
+   * Block until the head no longer carries the facts just revoked - the
+   * deny-direction twin of `awaitConvergence`, waiting for absence rather
+   * than presence. Timing out throws: the tenant parks, and the proof would
+   * otherwise report the still-landing revocation as fresh drift.
+   */
+  private async awaitRevocationConvergence({
+    organizationId,
+    staleGrantIds,
+    staleRoleIds,
+    signal,
+  }: {
+    organizationId: string;
+    staleGrantIds: string[];
+    staleRoleIds: string[];
+    signal?: AbortSignal;
+  }): Promise<void> {
+    if (staleGrantIds.length === 0 && staleRoleIds.length === 0) return;
+    const poll = this.deps.poll ?? DEFAULT_POLL;
+    const deadline = this.deps.now() + poll.timeoutMs;
+    for (;;) {
+      this.assertNotAborted(signal);
+      const [genesisGrantIds, roleHeads] = await Promise.all([
+        this.deps.repository.findGenesisOwnedGrantHeadIds({ organizationId }),
+        this.deps.repository.findRoleHeads({ organizationId }),
+      ]);
+      const grants = new Set(genesisGrantIds);
+      const roles = new Set(roleHeads.map((head) => head.id));
+      if (
+        staleGrantIds.every((id) => !grants.has(id)) &&
+        staleRoleIds.every((id) => !roles.has(id))
+      ) {
+        return;
+      }
+      if (this.deps.now() >= deadline) {
+        throw new Error(
+          `grants projection did not clear ${staleGrantIds.length + staleRoleIds.length} stale genesis fact(s) for ${organizationId} within ${poll.timeoutMs}ms; tenant parked for retry`,
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, poll.intervalMs));
     }
   }
 
@@ -271,23 +441,31 @@ export class GrantsGenesisImportMigration implements SystemMigration {
   }
 
   /**
-   * The proof: the compat projection byte-equals the rows we imported from.
-   * Re-read rather than trust the first read — the import ran in between,
-   * and what this asserts is that it changed nothing the legacy resolver
-   * can see.
+   * The proof: the compat projection byte-equals the rows we imported from
+   * (the ALLOW direction) AND the heads hold nothing beyond them (the DENY
+   * direction - decision from the deny-direction review: a revoked legacy
+   * row must not leave a zombie fact behind). Re-read rather than trust the
+   * first read — the import ran in between, and what this asserts is that
+   * it changed nothing the legacy resolver can see and left nothing extra
+   * for the ledger to answer with instead.
    */
   private async proveCompatEquality({
     organizationId,
     bindingRows,
     roleRows,
+    expectedGrantIds,
+    expectedRoleIds,
   }: {
     organizationId: string;
     bindingRows: LegacyBindingRow[];
     roleRows: LegacyRoleRow[];
+    expectedGrantIds: Set<string>;
+    expectedRoleIds: Set<string>;
   }): Promise<GenesisDiff[]> {
-    const [currentBindings, roleHeads] = await Promise.all([
+    const [currentBindings, roleHeads, genesisGrantIds] = await Promise.all([
       this.deps.repository.findLegacyBindingRows({ organizationId }),
       this.deps.repository.findRoleHeads({ organizationId }),
+      this.deps.repository.findGenesisOwnedGrantHeadIds({ organizationId }),
     ]);
     const byId = new Map(currentBindings.map((row) => [row.id, row]));
     const headsById = new Map(roleHeads.map((head) => [head.id, head]));
@@ -299,6 +477,12 @@ export class GrantsGenesisImportMigration implements SystemMigration {
       ...roleRows.flatMap((row) =>
         roleDiffs({ original: row, head: headsById.get(row.id) }),
       ),
+      ...genesisGrantIds
+        .filter((id) => !expectedGrantIds.has(id))
+        .map((id): GenesisDiff => ({ kind: "binding_extra", id })),
+      ...roleHeads
+        .filter((head) => head.kind === "custom" && !expectedRoleIds.has(head.id))
+        .map((head): GenesisDiff => ({ kind: "role_extra", id: head.id })),
     ];
     return diffs;
   }
@@ -318,6 +502,35 @@ function chunked<T>(items: T[]): T[][] {
     chunks.push(items.slice(i, i + GENESIS_CHUNK));
   }
   return chunks;
+}
+
+/**
+ * A chunk's idempotency key, derived from the identities it carries rather
+ * than from its position in the list (decision 23: ids are functions of
+ * event content). The event store dedupes on the idempotencyKey ALONE
+ * (`platform/app/src/server/event-sourcing/stores/eventStoreUtils.ts`), so a
+ * positional key (`genesis:grants:<org>:3`) is only safe while every pass
+ * sorts and chunks identically - the moment a legacy row is deleted and
+ * another created between two passes, chunk 3's membership shifts and its
+ * positional key collides with whatever the FIRST pass already wrote there,
+ * silently dropping the new fact on every retry. A hash of the chunk's own
+ * (sorted) ids never collides across differing content and always repeats
+ * for identical content, which is what idempotency actually requires.
+ */
+function contentCommandId({
+  kind,
+  organizationId,
+  ids,
+}: {
+  kind: string;
+  organizationId: string;
+  ids: string[];
+}): string {
+  const digest = createHash("sha256")
+    .update(ids.slice().sort().join(""))
+    .digest("hex")
+    .slice(0, 16);
+  return `genesis:${kind}:${organizationId}:${digest}`;
 }
 
 /**

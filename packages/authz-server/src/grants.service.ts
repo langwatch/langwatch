@@ -13,7 +13,7 @@ import { type AuthzScopeRef, scopeOrganizationId } from "@langwatch/authz";
 import type { AuthzCollectorService } from "./authz-collector.service";
 import type {
   AuthzGrantsRepository,
-  GrantWriteActor,
+  LedgerActor,
   OffboardCounts,
   RoleBindingWrite,
 } from "./authz-grants.repository";
@@ -294,6 +294,6 @@ export class GrantsService {
 
 }
 
-function writeActor(actor: Actor): GrantWriteActor {
+function writeActor(actor: Actor): LedgerActor {
   return { type: "user", id: actor.userId };
 }

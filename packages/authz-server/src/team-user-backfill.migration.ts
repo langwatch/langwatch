@@ -77,6 +77,14 @@ export type ParityDiff = {
  *  system actor that authored it. */
 export type BackfillGrantEmission = GrantFact & { actor: GrantsLedgerActor };
 
+/** One compensating revocation the genesis import's deny-direction sweep
+ *  asks the ledger to apply. Named by id only - the import always knows the
+ *  exact head fact it is retracting, never a selector to resolve. */
+export type GenesisRevocationEmission = {
+  grantId: string;
+  reason?: string;
+};
+
 /**
  * The migration's door into the grants ledger. The app binds these to the
  * `authz_grants` pipeline's command senders; the package never sees the
@@ -100,6 +108,31 @@ export type GrantsLedgerEmitter = {
     commandId: string;
     roles: RoleFact[];
     actor: GrantsLedgerActor;
+  }) => Promise<void>;
+  /**
+   * The deny-direction half of the genesis import: compensating
+   * `grant_revoked` facts for head grants whose legacy row is gone. Batched
+   * like `attachGrants`, on the same `revokeGrantsCommandDataSchema` the
+   * live revoke path already uses.
+   */
+  revokeGrants: (args: {
+    organizationId: string;
+    commandId: string;
+    revocations: GenesisRevocationEmission[];
+    actor: GrantsLedgerActor;
+    occurredAtMs: number;
+  }) => Promise<void>;
+  /**
+   * One stale custom role's compensating `role_deleted` fact. Singular
+   * because `deleteRoleCommandDataSchema` on the wire takes one roleId, not
+   * a batch - unlike every other genesis command, one call per role.
+   */
+  deleteRole: (args: {
+    organizationId: string;
+    commandId: string;
+    roleId: string;
+    actor: GrantsLedgerActor;
+    occurredAtMs: number;
   }) => Promise<void>;
   proveMigrationParity: (args: {
     organizationId: string;

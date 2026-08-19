@@ -24,7 +24,7 @@ export {
   type BindingPrincipalWhere,
   DuplicateBindingError,
   type AuthzGrantsRepository,
-  type GrantWriteActor,
+  type LedgerActor,
   type OffboardCounts,
   type RoleBindingWrite,
 } from "./authz-grants.repository";

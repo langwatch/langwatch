@@ -279,12 +279,17 @@ export function reduceGrantsLedger({
     case "grant_role_changed": {
       const existing = state.grants[event.grantId];
       if (!existing) return state;
+      // `legacyRole` is the pre-migration row's role column, kept only so an
+      // adopted fact's compat projection reproduces it (see the field's own
+      // doc). Reassigning the role is a decision this ledger now owns, so
+      // the pre-migration value stops being meaningful the moment it fires -
+      // carrying it forward would let a later custom-role reassignment
+      // project as the OLD built-in role instead of CUSTOM (ADR-092 review).
+      const updated: GrantFact = { ...existing, roleKey: event.to };
+      delete updated.legacyRole;
       return {
         ...state,
-        grants: {
-          ...state.grants,
-          [event.grantId]: { ...existing, roleKey: event.to },
-        },
+        grants: { ...state.grants, [event.grantId]: updated },
       };
     }
     case "grant_revoked":
@@ -364,7 +369,8 @@ export function reduceGrantsLedger({
           changedAtMs: event.occurredAtMs,
         },
       };
-    case "migration_tenant_state_changed":
+    case "migration_tenant_state_changed": {
+      if (isStaleMigrationStateFact({ state, event })) return state;
       return {
         ...state,
         migrationStates: {
@@ -376,6 +382,7 @@ export function reduceGrantsLedger({
           },
         },
       };
+    }
   }
 }
 
@@ -394,6 +401,26 @@ function isStaleCutoverFact({
 }): boolean {
   const { changedAtMs } = state.cutover;
   return changedAtMs !== null && event.occurredAtMs < changedAtMs;
+}
+
+/**
+ * Whether a runner lifecycle fact is older than the witnessed state already
+ * folded for THAT migration name. The same last-write-wins shape as the
+ * cutover fields above - one row per migration, arrival order otherwise
+ * decides - so it needs the identical monotonic guard: without it a
+ * backdated witness could rewrite a migration's status backwards on replay
+ * or on an out-of-order redelivery. Equal timestamps still apply, so a
+ * replay of the same stream converges.
+ */
+function isStaleMigrationStateFact({
+  state,
+  event,
+}: {
+  state: GrantsLedgerState;
+  event: { migrationName: string; occurredAtMs: number };
+}): boolean {
+  const existing = state.migrationStates[event.migrationName];
+  return existing !== undefined && event.occurredAtMs < existing.occurredAtMs;
 }
 
 /**

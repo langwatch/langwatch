@@ -103,6 +103,38 @@ function grantsLedgerEmitter(): GrantsLedgerEmitter {
         actor,
       });
     },
+    revokeGrants: async ({
+      organizationId,
+      commandId,
+      revocations,
+      actor,
+      occurredAtMs,
+    }) => {
+      await (await authzGrantsCommands()).commands.revokeGrants.send({
+        tenantId: organizationId,
+        organizationId,
+        commandId,
+        revocations,
+        actor,
+        occurredAtMs,
+      });
+    },
+    deleteRole: async ({
+      organizationId,
+      commandId,
+      roleId,
+      actor,
+      occurredAtMs,
+    }) => {
+      await (await authzGrantsCommands()).commands.deleteRole.send({
+        tenantId: organizationId,
+        organizationId,
+        commandId,
+        roleId,
+        actor,
+        occurredAtMs,
+      });
+    },
     proveMigrationParity: async ({
       organizationId,
       commandId,

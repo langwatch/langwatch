@@ -58,6 +58,13 @@ class FakeGenesisRepository implements AuthzGenesisRepository {
   async findGrantHeadIds(): Promise<string[]> {
     return this.grantHeadIds;
   }
+  /** The fake's whole head is genesis-owned - every test that wants a
+   *  non-genesis-sourced fact standing in the head does so explicitly by
+   *  pushing straight onto `grantHeadIds` outside a ledger call, and such a
+   *  test must override this method itself. None currently need to. */
+  async findGenesisOwnedGrantHeadIds(): Promise<string[]> {
+    return this.grantHeadIds;
+  }
   async findRoleHeads(): Promise<RoleHeadRow[]> {
     return this.roleHeads;
   }
@@ -68,6 +75,12 @@ class FakeLedger implements GrantsLedgerEmitter {
   calls: Array<
     | { verb: "defineRoles"; commandId: string; roles: RoleFact[] }
     | { verb: "attachGrants"; commandId: string; grants: BackfillGrantEmission[] }
+    | {
+        verb: "revokeGrants";
+        commandId: string;
+        revocations: Array<{ grantId: string; reason?: string }>;
+      }
+    | { verb: "deleteRole"; commandId: string; roleId: string }
   > = [];
   /** Flip off to simulate a fold that never runs. */
   projectionConverges = true;
@@ -109,6 +122,41 @@ class FakeLedger implements GrantsLedgerEmitter {
     this.calls.push({ verb: "defineRoles", commandId, roles });
     if (!this.projectionConverges) return;
     this.repository.roleHeads.push(...roles.map(this.landRoleHead));
+  }
+
+  async revokeGrants({
+    commandId,
+    revocations,
+  }: {
+    organizationId: string;
+    commandId: string;
+    revocations: Array<{ grantId: string; reason?: string }>;
+    actor: { type: "user" | "system"; id: string | null };
+    occurredAtMs: number;
+  }): Promise<void> {
+    this.calls.push({ verb: "revokeGrants", commandId, revocations });
+    if (!this.projectionConverges) return;
+    const revoked = new Set(revocations.map((r) => r.grantId));
+    this.repository.grantHeadIds = this.repository.grantHeadIds.filter(
+      (id) => !revoked.has(id),
+    );
+  }
+
+  async deleteRole({
+    commandId,
+    roleId,
+  }: {
+    organizationId: string;
+    commandId: string;
+    roleId: string;
+    actor: { type: "user" | "system"; id: string | null };
+    occurredAtMs: number;
+  }): Promise<void> {
+    this.calls.push({ verb: "deleteRole", commandId, roleId });
+    if (!this.projectionConverges) return;
+    this.repository.roleHeads = this.repository.roleHeads.filter(
+      (head) => head.id !== roleId,
+    );
   }
 
   async proveMigrationParity(): Promise<void> {
@@ -237,14 +285,20 @@ describe("GrantsGenesisImportMigration", () => {
         );
       });
 
-      it("names each chunk deterministically so a retry appends the same events", async () => {
+      it("names each chunk from its own content so a retry appends the same events", async () => {
+        await migration().migrateTenant({ tenantId: ORG });
+        const firstPass = ledger.calls.map((call) => call.commandId);
+
+        repository.importHasLanded = false;
+        repository.grantHeadIds = [];
+        repository.roleHeads = [];
+        ledger.calls = [];
         await migration().migrateTenant({ tenantId: ORG });
 
-        expect(ledger.calls.map((call) => call.commandId)).toEqual([
-          `genesis:roles:${ORG}:0`,
-          `genesis:grants:${ORG}:0`,
-          `genesis:org-facts:${ORG}:0`,
-        ]);
+        expect(ledger.calls.map((call) => call.commandId)).toEqual(firstPass);
+        for (const commandId of firstPass) {
+          expect(commandId).toMatch(/^genesis:(roles|grants|org-facts):org_acme:[0-9a-f]{16}$/);
+        }
       });
 
       /** @scenario "The import proves itself against the rows it started from" */
@@ -416,6 +470,138 @@ describe("GrantsGenesisImportMigration", () => {
       await migration().migrateTenant({ tenantId: ORG });
 
       expect(attachedGrants().map((grant) => grant.grantId)).toEqual(first);
+    });
+  });
+
+  describe("given a retried pass whose legacy rows shifted", () => {
+    const rowA = bindingRow({ id: "rb_a", userId: "user_a" });
+    const rowB = bindingRow({ id: "rb_b", userId: "user_b" });
+    const rowD = bindingRow({ id: "rb_d", userId: "user_d" });
+    const rowE = bindingRow({ id: "rb_e", userId: "user_e" });
+
+    /** @scenario "A shifted chunk never reuses a previous pass's idempotency key" */
+    it("derives a different commandId when a chunk's content differs at the same position", async () => {
+      repository.bindingRows = [rowA, rowB, rowD];
+      await migration().migrateTenant({ tenantId: ORG });
+      const firstKey = ledger.calls.find(
+        (call) =>
+          call.verb === "attachGrants" &&
+          call.grants.some((grant) => grant.grantId === "rb_a"),
+      )?.commandId;
+
+      // rb_b is deleted on the legacy side (imperative row-delete, no
+      // event) and rb_e is created there while the organization sits on
+      // the legacy path. Both passes still chunk to a single batch at
+      // index 0 - a positional key (`genesis:grants:<org>:0`) would be
+      // IDENTICAL for both, and the event store dedupes on the
+      // idempotencyKey alone, so rb_e's attach would be silently dropped
+      // on every retry forever.
+      repository.bindingRows = [rowA, rowD, rowE];
+      ledger.calls = [];
+      await migration().migrateTenant({ tenantId: ORG });
+      const secondKey = ledger.calls.find(
+        (call) =>
+          call.verb === "attachGrants" &&
+          call.grants.some((grant) => grant.grantId === "rb_a"),
+      )?.commandId;
+
+      expect(secondKey).toBeDefined();
+      expect(secondKey).not.toBe(firstKey);
+    });
+
+    /** @scenario "The row that replaced a deleted one reaches the fold" */
+    it("lands the replacement row's grant instead of it being deduped away", async () => {
+      repository.bindingRows = [rowA, rowB, rowD];
+      await migration().migrateTenant({ tenantId: ORG });
+
+      repository.bindingRows = [rowA, rowD, rowE];
+      await migration().migrateTenant({ tenantId: ORG });
+
+      expect(repository.grantHeadIds).toContain("rb_e");
+    });
+  });
+
+  describe("given a legacy binding deleted after the import already landed it", () => {
+    /** @scenario "A grant revoked on the legacy side does not survive a re-import" */
+    it("clears the head fact once the legacy row is gone", async () => {
+      repository.bindingRows = [bindingRow({ id: "rb_1" })];
+      await migration().migrateTenant({ tenantId: ORG });
+      expect(repository.grantHeadIds).toContain("rb_1");
+
+      repository.bindingRows = [];
+      await migration().migrateTenant({ tenantId: ORG });
+
+      expect(repository.grantHeadIds).not.toContain("rb_1");
+    });
+
+    it("asks the ledger to revoke it, not merely stop re-attaching it", async () => {
+      repository.bindingRows = [bindingRow({ id: "rb_1" })];
+      await migration().migrateTenant({ tenantId: ORG });
+
+      repository.bindingRows = [];
+      ledger.calls = [];
+      await migration().migrateTenant({ tenantId: ORG });
+
+      expect(ledger.calls).toContainEqual(
+        expect.objectContaining({
+          verb: "revokeGrants",
+          revocations: [expect.objectContaining({ grantId: "rb_1" })],
+        }),
+      );
+    });
+  });
+
+  describe("given a custom role deleted after the import already landed it", () => {
+    beforeEach(() => {
+      repository.roleRows = [
+        {
+          id: "cr_1",
+          name: "Analyst",
+          description: null,
+          permissions: ["traces.read"],
+          kind: "custom",
+          createdAtMs: ROW_CREATED_AT_MS,
+        },
+      ];
+    });
+
+    /** @scenario "A custom role deleted on the legacy side does not survive a re-import" */
+    it("clears the role head once the legacy row is gone", async () => {
+      await migration().migrateTenant({ tenantId: ORG });
+      expect(repository.roleHeads.map((head) => head.id)).toContain("cr_1");
+
+      repository.roleRows = [];
+      await migration().migrateTenant({ tenantId: ORG });
+
+      expect(repository.roleHeads.map((head) => head.id)).not.toContain(
+        "cr_1",
+      );
+    });
+
+    it("asks the ledger to delete it, not merely stop redefining it", async () => {
+      await migration().migrateTenant({ tenantId: ORG });
+
+      repository.roleRows = [];
+      ledger.calls = [];
+      await migration().migrateTenant({ tenantId: ORG });
+
+      expect(ledger.calls).toContainEqual(
+        expect.objectContaining({ verb: "deleteRole", roleId: "cr_1" }),
+      );
+    });
+  });
+
+  describe("when a compensating revocation never lands", () => {
+    it("parks the organization rather than finalizing over a zombie grant", async () => {
+      repository.bindingRows = [bindingRow({ id: "rb_1" })];
+      await migration().migrateTenant({ tenantId: ORG });
+
+      repository.bindingRows = [];
+      ledger.projectionConverges = false;
+
+      await expect(
+        migration().migrateTenant({ tenantId: ORG }),
+      ).rejects.toThrow(/did not clear/);
     });
   });
 

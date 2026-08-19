@@ -13,7 +13,7 @@ import { HandledError } from "@langwatch/handled-error";
 import type { AuthzCollectorService } from "./authz-collector.service";
 import type {
   AuthzGrantsRepository,
-  GrantWriteActor,
+  LedgerActor,
   OffboardCounts,
 } from "./authz-grants.repository";
 import type { AuthzReadRepository } from "./authz-read.repository";
@@ -55,7 +55,7 @@ export async function offboardUserFromOrganization({
 }: {
   repository: AuthzGrantsRepository;
   collectorFor: (reader: AuthzReadRepository) => AuthzCollectorService;
-  actor: GrantWriteActor;
+  actor: LedgerActor;
   userId: string;
   organizationId: string;
 }): Promise<OffboardResult> {

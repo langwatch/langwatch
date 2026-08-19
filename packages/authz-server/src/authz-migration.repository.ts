@@ -105,6 +105,15 @@ export interface AuthzGenesisRepository {
   }): Promise<OrganizationMemberFact[]>;
   /** Ids present in the Grant head — the convergence check. */
   findGrantHeadIds(args: { organizationId: string }): Promise<string[]>;
+  /**
+   * Grant head ids whose `source` column is `genesis-import` — the
+   * deny-direction sweep's inventory. Every other source's facts (live
+   * writes, the backfill, SCIM, invites) are none of this import's
+   * business to revoke, so the check must never see them at all.
+   */
+  findGenesisOwnedGrantHeadIds(args: {
+    organizationId: string;
+  }): Promise<string[]>;
   findRoleHeads(args: { organizationId: string }): Promise<RoleHeadRow[]>;
 }
 

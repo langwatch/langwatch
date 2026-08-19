@@ -124,6 +124,31 @@ describe("grants ledger reducer", () => {
       });
     });
 
+    describe("when an adopted binding's role is reassigned", () => {
+      /** @scenario "A role change clears the pre-migration legacy role" */
+      it("drops the imported legacyRole rather than carrying it onto the new role", () => {
+        const imported = grantFact({
+          roleKey: "custom:cr_ops",
+          legacyRole: "ADMIN",
+        });
+        const state = apply([
+          { kind: "grant_attached", grant: imported, actor: ACTOR },
+          {
+            kind: "grant_role_changed",
+            grantId: imported.grantId,
+            from: "custom:cr_ops",
+            to: "custom:cr_sre",
+            actor: ACTOR,
+            occurredAtMs: 2,
+          },
+        ]);
+        expect(state.grants[imported.grantId]?.roleKey).toBe("custom:cr_sre");
+        expect(state.grants[imported.grantId]).not.toHaveProperty(
+          "legacyRole",
+        );
+      });
+    });
+
     describe("when the grant is revoked", () => {
       const state = apply([
         ...attached,

@@ -41,12 +41,13 @@ export type RoleBindingWrite = {
  */
 export class DuplicateBindingError extends Error {
   /**
-   * Matched by CODE, never by identity. This error is raised behind an
-   * implementation that may be a database adapter, the ledger writer, or a
-   * writer several modules away, and `instanceof` stops being reliable the
-   * moment one of them is bundled or serialised separately. The code is the
-   * same one the customer-facing `DuplicateGrantError` carries, so the
-   * translation at the service boundary is a lift, not a lookup.
+   * `rethrowKnownWriteFailure` (grant-validation.ts) lifts this into the
+   * customer-facing `DuplicateGrantError` by `instanceof`, which is safe
+   * here: both classes live in this same package and are never bundled or
+   * serialised apart. The code is what must travel beyond that boundary -
+   * across a process, a worker, or the wire - where `instanceof` stops being
+   * reliable and matching has to fall back to CODE. The two carry the same
+   * code on purpose so that fallback is a lift, not a lookup.
    */
   readonly code = "role_binding_already_exists" as const;
 
@@ -65,7 +66,8 @@ export class DuplicateBindingError extends Error {
  * never there.
  */
 export class BindingMissingError extends Error {
-  /** Matched by CODE, for the reason `DuplicateBindingError.code` gives. */
+  /** Matched by `instanceof` in-package, by CODE beyond it - see
+   *  `DuplicateBindingError.code`. */
   readonly code = "role_binding_not_found" as const;
 
   constructor() {
@@ -75,7 +77,7 @@ export class BindingMissingError extends Error {
 }
 
 /** Who performed a grant write — stamped onto the emitted ledger fact. */
-export type GrantWriteActor = { type: "user" | "system"; id: string | null };
+export type LedgerActor = { type: "user" | "system"; id: string | null };
 
 export type OffboardCounts = {
   bindings: number;
@@ -89,7 +91,7 @@ export interface AuthzGrantsRepository extends ScopeLineageRepository {
   /** @throws DuplicateBindingError on a unique-index collision. */
   createBinding(args: {
     row: RoleBindingWrite;
-    actor: GrantWriteActor;
+    actor: LedgerActor;
   }): Promise<void>;
   /**
    * @throws DuplicateBindingError on a unique-index collision.
@@ -100,13 +102,13 @@ export interface AuthzGrantsRepository extends ScopeLineageRepository {
     organizationId: string;
     role: RoleBindingWrite["role"];
     customRoleId: string | null;
-    actor: GrantWriteActor;
+    actor: LedgerActor;
   }): Promise<void>;
   /** @throws BindingMissingError when the row is gone. */
   deleteBinding(args: {
     bindingId: string;
     organizationId: string;
-    actor: GrantWriteActor;
+    actor: LedgerActor;
   }): Promise<void>;
   findBinding(args: {
     bindingId: string;
@@ -131,7 +133,7 @@ export interface AuthzGrantsRepository extends ScopeLineageRepository {
       principal: BindingPrincipalWhere;
     };
     create: RoleBindingWrite;
-    actor: GrantWriteActor;
+    actor: LedgerActor;
   }): Promise<void>;
   /**
    * Delete every grant source for the user in one transaction, call
@@ -147,7 +149,7 @@ export interface AuthzGrantsRepository extends ScopeLineageRepository {
   offboardUser(args: {
     userId: string;
     organizationId: string;
-    actor: GrantWriteActor;
+    actor: LedgerActor;
     prove: (txReader: AuthzReadRepository) => Promise<void>;
   }): Promise<OffboardCounts>;
   findOwnedApiKeys(args: {

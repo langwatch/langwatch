@@ -120,6 +120,18 @@ export class PrismaAuthzMigrationRepository
     return rows.map((row) => row.id);
   }
 
+  async findGenesisOwnedGrantHeadIds({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<string[]> {
+    const rows = await this.prisma.grant.findMany({
+      where: { organizationId, source: "genesis-import" },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
   async findRoleHeads({
     organizationId,
   }: {
