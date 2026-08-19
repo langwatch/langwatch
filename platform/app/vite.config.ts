@@ -1,8 +1,7 @@
 import dotenv from "dotenv";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { defineConfig, type Plugin, type UserConfig } from "vite";
-import react, { reactCompilerPreset } from "@vitejs/plugin-react";
-import babel from "@rolldown/plugin-babel";
+import react from "@vitejs/plugin-react";
 import path from "path";
 import { generate as generateSelfsigned } from "selfsigned";
 import { shikiManualChunk } from "./src/features/traces-v2/components/TraceDrawer/markdownView/shikiChunking";
@@ -148,22 +147,21 @@ export default defineConfig(async (): Promise<UserConfig> => {
 
   return {
   plugins: [
-    react(),
     // React Compiler. It memoizes components and hooks at build time, which is
     // what `useMemo`/`useCallback`/`memo` are hand-written to do — so the win
     // is on the render paths nobody got around to memoizing by hand, and this
     // codebase has plenty (large tables, the trace drawer, the studio canvas).
     //
-    // It was on under Next.js (`experimental.reactCompiler`) and the migration
-    // to Vite (#3170) dropped it while leaving `babel-plugin-react-compiler`
-    // in package.json, so the dependency has been paid for and unused since.
-    // plugin-react v6 transforms with oxc and no longer takes a `babel`
-    // option; the compiler runs as its own Babel pass over the same files.
+    // `compiler: true` runs the Rust port (`oxc-transform-react`, an optional
+    // peer) rather than Babel. It replaces a separate Babel pass over every
+    // file, and it folds the compiler, TypeScript/JSX and Fast Refresh into
+    // the one transform the plugin already performs — so the compiler stops
+    // being a second parse of the whole frontend.
     //
     // The compiler bails out per-component when it cannot prove a component
     // follows the rules of React, so an offending file loses the optimization
     // rather than breaking the build.
-    babel({ presets: [reactCompilerPreset()] }),
+    react({ compiler: true }),
     patchObjectInspectBrowserStub(),
     havenHmrGate(),
   ],
