@@ -1036,7 +1036,7 @@ examples = [
     { name = "dspy-ai", specifier = ">=3.3.0,<4" },
     { name = "faiss-cpu", specifier = ">=1.15.0,<2.0.0" },
     { name = "fastapi", specifier = ">=0.141.1" },
-    { name = "fonttools", specifier = ">=4.62.0" },
+    { name = "fonttools", specifier = ">=4.63.0" },
     { name = "haystack-ai", specifier = ">=2.13.2,<4.0.0" },
     { name = "json-repair", specifier = ">=0.42.0" },
     { name = "jupyter", specifier = ">=1.1.1,<2.0.0" },
