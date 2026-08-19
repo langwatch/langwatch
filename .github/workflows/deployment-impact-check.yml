@@ -46,7 +46,35 @@ jobs:
         startsWith(github.head_ref, 'release-please--'))
     runs-on: ubuntu-latest
     steps:
+      # The `services/**` trigger path matches every dependency-lockfile bump
+      # in services/langevals, services/aigateway, services/nlpgo too — a pure
+      # manifest/lockfile diff can't add a helm value, env var, or change
+      # `helm install` behavior, so it has no deployment surface by
+      # construction. Skip the gate for those; anything touching a real file
+      # (Dockerfile, chart, config, source) still requires the section.
+      - name: Determine whether this PR only touches dependency manifests
+        id: manifest-only
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          FILES=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename')
+          ONLY_MANIFESTS=true
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              */uv.lock|uv.lock|*/pyproject.toml|pyproject.toml|*/package.json|package.json|pnpm-lock.yaml|*/pnpm-lock.yaml|*/go.mod|go.mod|*/go.sum|go.sum|*/Cargo.lock|Cargo.lock|*/Cargo.toml|Cargo.toml|*/requirements*.txt|requirements*.txt) ;;
+              *) ONLY_MANIFESTS=false ;;
+            esac
+          done <<< "$FILES"
+          echo "only_manifests=$ONLY_MANIFESTS" >> "$GITHUB_OUTPUT"
+          echo "Changed files:"
+          printf '%s\n' "$FILES"
+          echo "Manifest-only: $ONLY_MANIFESTS"
+
       - name: Verify deployment-impact section in PR description
+        if: steps.manifest-only.outputs.only_manifests != 'true'
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
