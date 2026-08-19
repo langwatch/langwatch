@@ -22,6 +22,7 @@ import {
   WAREHOUSE_COST_CHUNK_MS,
   WAREHOUSE_COST_SETTLING_LAG_MS,
   warehouseCostChunks,
+  warehouseCostPieces,
 } from "../databricksWarehouseCost";
 
 /** One billable hour: $6.00 across 3600s of warehouse time. */
@@ -334,16 +335,52 @@ describe("splitting the window into readable pieces", () => {
     );
   });
 
-  it("asks about a first sweep in about thirty pieces, not one", () => {
-    // The whole point of the split: one question over thirty days has a single
-    // row cap to trip, and tripping it leaves the entire month unpriced.
+  it("asks about a first sweep in few enough questions to finish a run", () => {
+    // The split is bounded from both ends. One question over thirty days has a
+    // single row cap to trip, and tripping it leaves the entire month unpriced;
+    // thirty questions cost about the same few seconds EACH, whatever period
+    // they cover, and thirty of them do not fit in the time a run is given —
+    // so the sweep never finished and no day was ever priced.
     const chunks = warehouseCostChunks({
       fromMs: HOUR_START,
       toMs: HOUR_START + 30 * 24 * ONE_HOUR,
     });
 
-    expect(chunks).toHaveLength(30);
-    expect(WAREHOUSE_COST_CHUNK_MS).toBe(24 * ONE_HOUR);
+    expect(chunks.length).toBeLessThanOrEqual(5);
+    expect(WAREHOUSE_COST_CHUNK_MS).toBe(7 * 24 * ONE_HOUR);
+  });
+
+  it("offers a refused period back as days", () => {
+    // What the size above trades away: a chunk big enough to be answered in one
+    // question is also big enough to hold more statements than one reply can
+    // carry. Days are what the caller re-asks with, so the periods it can still
+    // price are priced instead of the whole chunk being surrendered.
+    const pieces = warehouseCostPieces({
+      fromMs: HOUR_START,
+      toMs: HOUR_START + 7 * 24 * ONE_HOUR,
+    });
+
+    expect(pieces).toHaveLength(7);
+    expect(pieces[0]!.fromMs).toBe(HOUR_START);
+    expect(pieces.at(-1)!.toMs).toBe(HOUR_START + 7 * 24 * ONE_HOUR);
+    for (let i = 1; i < pieces.length; i += 1) {
+      expect(pieces[i]!.fromMs).toBe(pieces[i - 1]!.toMs);
+    }
+  });
+
+  it("offers nothing back for a period already as small as it is asked", () => {
+    // The caller stops when there is nothing smaller to ask, and this is what
+    // tells it so. Handing back the same period would re-ask an identical
+    // question, get an identical refusal, and spend a request each time.
+    expect(
+      warehouseCostPieces({
+        fromMs: HOUR_START,
+        toMs: HOUR_START + 24 * ONE_HOUR,
+      }),
+    ).toEqual([]);
+    expect(
+      warehouseCostPieces({ fromMs: HOUR_START, toMs: HOUR_START + ONE_HOUR }),
+    ).toEqual([]);
   });
 
   it("asks nothing about an empty or backwards window", () => {

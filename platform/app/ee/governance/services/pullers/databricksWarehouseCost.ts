@@ -62,22 +62,48 @@ const ONE_HOUR_MS = 60 * 60 * 1000;
 /**
  * How much of the window one cost request asks about.
  *
- * The reply is capped, and a cut-short reply is refused whole, so the SIZE of
- * the question decides whether a busy warehouse can be priced at all. A first
- * sweep reads thirty days: asked as one question there is a single cap to trip,
- * and tripping it leaves every question in the whole month unpriced. Asked a
- * day at a time it takes a day busy enough to trip the cap on its own, and the
- * days answered before it keep their cost.
+ * Bounded from both ends, and the two bounds were in conflict until this was
+ * measured.
  *
- * A day rather than an hour because every chunk spends a request from the run's
- * budget. Thirty days is thirty requests of the four hundred a run may spend;
- * hourly would be seven hundred and twenty and could not finish in one run.
+ * From above: the reply is capped, and a cut-short reply is refused whole, so a
+ * first sweep asked as ONE question has a single cap to trip and tripping it
+ * leaves the whole month unpriced. Smaller pieces mean a piece busy enough to
+ * trip the cap on its own, with the pieces before it keeping their cost.
+ *
+ * From below: every piece is a request, and a request is not cheap in the only
+ * currency that binds here. The run gets five minutes (`PER_JOB_DEADLINE_MS`)
+ * and a run that overruns is killed holding the questions its sweep had already
+ * read — it discards them and keeps its cursor, so the next run stalls in the
+ * same place. A day at a time made a thirty-day sweep thirty sequential
+ * requests, and it could never finish one.
+ *
+ * A week is what the measurement supports. Against a real workspace on
+ * 2026-08-19 the reply time barely moved with the size of the question — five
+ * weekly reads of a thirty-day window took 10.8s, 23.4s, 26.9s, 37.7s and 22.0s
+ * for 120.8s in total, against 648s for the same window read daily and 22.6s
+ * for it read whole. Latency is nearly all fixed cost per question, so asking
+ * fewer, larger questions is very close to free, and the cap is the only reason
+ * not to ask exactly one.
+ *
+ * A week that still cannot be answered whole is not surrendered: the caller
+ * re-asks it in days (`warehouseCostPieces`). So this size is a bet on the
+ * common case, not a limit on what can be priced — which is what lets it be
+ * this large.
  *
  * Whole hours either way. The bill is published per hour and the statements are
  * bucketed per hour, so a boundary inside an hour would separate that hour's
  * queries from that hour's bill and price every one of them at nothing.
  */
-export const WAREHOUSE_COST_CHUNK_MS = 24 * ONE_HOUR_MS;
+export const WAREHOUSE_COST_CHUNK_MS = 7 * 24 * ONE_HOUR_MS;
+
+/**
+ * How much of one refused chunk a follow-up request asks about.
+ *
+ * A day, because that is the size the whole window used to be read at: it is
+ * known to be answerable on workspaces busy enough to refuse a week, and it is
+ * the smallest piece worth asking for given the bill is published per hour.
+ */
+const WAREHOUSE_COST_PIECE_MS = 24 * ONE_HOUR_MS;
 
 /**
  * How long the watermark may be held waiting for a bill before it gives up.
@@ -118,9 +144,12 @@ export const WAREHOUSE_COST_MAX_HOLD_MS = 7 * 24 * ONE_HOUR_MS;
 export function warehouseCostChunks({
   fromMs,
   toMs,
+  chunkMs = WAREHOUSE_COST_CHUNK_MS,
 }: {
   fromMs: number;
   toMs: number;
+  /** Overridden only to re-ask a refused chunk in smaller pieces. */
+  chunkMs?: number;
 }): Array<{ fromMs: number; toMs: number }> {
   if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) return [];
 
@@ -129,13 +158,46 @@ export function warehouseCostChunks({
   if (end <= start) return [];
 
   const chunks: Array<{ fromMs: number; toMs: number }> = [];
-  for (let at = start; at < end; at += WAREHOUSE_COST_CHUNK_MS) {
+  for (let at = start; at < end; at += chunkMs) {
     chunks.push({
       fromMs: at,
-      toMs: Math.min(at + WAREHOUSE_COST_CHUNK_MS, end),
+      toMs: Math.min(at + chunkMs, end),
     });
   }
   return chunks;
+}
+
+/**
+ * One refused chunk, as the smaller pieces to ask about instead.
+ *
+ * The caller refuses a reply whole, so a chunk with more statements than one
+ * reply can carry costs every question inside it its cost figure — including
+ * the days that would have answered on their own. Asking again in pieces buys
+ * those days back, and it is only ever paid for after a chunk was actually
+ * refused, so a workspace whose chunks answer never spends a request on it.
+ *
+ * Oldest first, hour-aligned, and half-open exactly like `warehouseCostChunks`,
+ * for the same reason: the caller stops at the first piece it cannot price and
+ * holds the watermark there, which only describes the truth if the unpriced
+ * remainder is a suffix.
+ *
+ * One level deep and no further. A piece that is still refused holds the
+ * watermark, and `WAREHOUSE_COST_MAX_HOLD_MS` decides how long that may go on —
+ * splitting further would spend the run's whole budget chasing an answer that a
+ * day-sized question already failed to get.
+ */
+export function warehouseCostPieces(chunk: {
+  fromMs: number;
+  toMs: number;
+}): Array<{ fromMs: number; toMs: number }> {
+  const pieces = warehouseCostChunks({
+    fromMs: chunk.fromMs,
+    toMs: chunk.toMs,
+    chunkMs: WAREHOUSE_COST_PIECE_MS,
+  });
+  // A chunk already at or below the piece size has nothing smaller to be asked
+  // as. Reporting no pieces is what tells the caller re-asking is pointless.
+  return pieces.length > 1 ? pieces : [];
 }
 
 /**

@@ -63,6 +63,7 @@ import {
   GENIE_CLIENT_APPLICATION,
   WAREHOUSE_COST_MAX_HOLD_MS,
   warehouseCostChunks,
+  warehouseCostPieces,
   warehouseCostRowSchema,
 } from "./databricksWarehouseCost";
 import { PULLED_USAGE_HINT_KEY } from "./pulledUsageRecord";
@@ -329,7 +330,7 @@ async function resolveWorkspaceToken(params: {
  * than used: a partial answer prices some questions and silently leaves the
  * rest at nothing.
  *
- * The cap applies per DAY, not per window — see `WAREHOUSE_COST_CHUNK_MS`. That
+ * The cap applies per CHUNK, not per window — see `WAREHOUSE_COST_CHUNK_MS`. That
  * is what keeps a refusal survivable: only the day that tripped it goes
  * unpriced, the days read before it keep their cost, and the watermark stops
  * there so the refused day is asked about again rather than being recorded at
@@ -479,8 +480,39 @@ const WAREHOUSE_COST_COLUMNS = [
  */
 type WarehouseCostRead =
   | { outcome: "priced"; costByStatementId: Map<string, string> }
+  /** More rows exist than arrived. A smaller question would carry them. */
   | { outcome: "cut_short" }
+  /**
+   * The answer never came back: cancelled for exceeding its time limit, given
+   * up on by this end, or refused by something that will not still be refusing
+   * next run.
+   *
+   * Split out from `failed` because the two are opposites in the only way that
+   * matters here — whether asking again is worth anything. Collapsed together
+   * they were, and a workspace whose billing tables are merely slow had the
+   * whole unpriced remainder of its window written off at zero for good.
+   */
+  | { outcome: "timed_out" }
+  /** Answered, and the answer was no. Asking again would be answered no. */
   | { outcome: "failed" };
+
+type WarehouseCostStatement = z.infer<typeof warehouseCostResponseSchema>;
+
+/**
+ * Statement states that mean the answer did not arrive in time, as opposed to
+ * the workspace declining to give one.
+ *
+ * `CANCELED` is what `on_wait_timeout: "CANCEL"` produces, and it is by far the
+ * common one. The other two are the shapes a reply takes when it is still being
+ * worked on — which the request asks never to receive, so seeing one means the
+ * assumption behind that request no longer holds, and treating it as a refusal
+ * would write off a window nobody ever declined to price.
+ */
+const WAREHOUSE_COST_UNFINISHED_STATES = new Set([
+  "CANCELED",
+  "PENDING",
+  "RUNNING",
+]);
 
 /**
  * The last instant still covered by what this run priced, given that `chunk` is
@@ -502,6 +534,96 @@ type WarehouseCostRead =
  */
 function unpricedFloor(chunk: { fromMs: number }): number {
   return chunk.fromMs - 1;
+}
+
+/** Fold one chunk's priced statements into the sweep's running total. */
+function mergeWarehouseCost(
+  into: Map<string, string>,
+  from: Map<string, string>,
+): void {
+  for (const [statementId, cost] of from) into.set(statementId, cost);
+}
+
+/**
+ * The shape of a cost question, for the log line. Every defect this puller has
+ * had was a timing one — too many questions for the run's deadline, or a wait
+ * that sat inside the spread of how long answers take — and neither is visible
+ * from an outcome alone, so each question records how wide it was.
+ */
+function warehouseCostObserved({
+  adapter,
+  warehouseId,
+  chunk,
+}: {
+  adapter: string;
+  warehouseId: string;
+  chunk: { fromMs: number; toMs: number };
+}) {
+  return {
+    adapter,
+    warehouseId,
+    askedFrom: new Date(startOfHourMs(chunk.fromMs)).toISOString(),
+    askedTo: new Date(endOfHourMs(chunk.toMs)).toISOString(),
+    askedHours: Math.round(
+      (endOfHourMs(chunk.toMs) - startOfHourMs(chunk.fromMs)) / ONE_HOUR_MS,
+    ),
+  };
+}
+
+/**
+ * The window is unpriced and we know why. Whether it is worth asking about
+ * again is decided entirely here, and every state that is not a success used to
+ * answer no. A statement cancelled for running past its wait is the one this
+ * gets wrong most often: the warehouse was answering it perfectly well and
+ * simply ran out of the time the request allowed, so the same question asked
+ * again — or asked about less — answers fine.
+ */
+function readUnsuccessfulWarehouseCost({
+  statement,
+  log,
+}: {
+  statement: WarehouseCostStatement;
+  log: Record<string, unknown>;
+}): WarehouseCostRead {
+  const unfinished = WAREHOUSE_COST_UNFINISHED_STATES.has(
+    statement.status.state,
+  );
+  logger.warn(
+    {
+      ...log,
+      state: statement.status.state,
+      error: statement.status.error?.message,
+    },
+    unfinished
+      ? "databricks warehouse cost query ran out of time; holding the window so it is asked again"
+      : "databricks warehouse cost query did not succeed; recording the questions without cost",
+  );
+  return { outcome: unfinished ? "timed_out" : "failed" };
+}
+
+/**
+ * An answer can be cut short three ways, and only the first is obvious. A full
+ * page means the LIMIT bit. A `next_chunk_index` means the reply was too large
+ * to send at once and the rest is elsewhere — that one arrives *under* the
+ * LIMIT, so a row count alone would call it complete. And a manifest that counts
+ * more rows than arrived says so outright.
+ *
+ * Which statements are missing is exactly what none of these can tell us, so
+ * pricing the ones that did arrive would put a confident zero on the rest.
+ */
+function warehouseAnswerCutShort({
+  statement,
+  dataLength,
+}: {
+  statement: WarehouseCostStatement;
+  dataLength: number;
+}): boolean {
+  const total = statement.manifest?.total_row_count;
+  return (
+    dataLength >= WAREHOUSE_COST_ROW_LIMIT ||
+    statement.result?.next_chunk_index !== undefined ||
+    (total !== undefined && total > dataLength)
+  );
 }
 
 /**
@@ -529,15 +651,7 @@ function readWarehouseCost({
   const log = { adapter, executorWarehouseId: warehouseId };
 
   if (statement.status.state !== "SUCCEEDED") {
-    logger.warn(
-      {
-        ...log,
-        state: statement.status.state,
-        error: statement.status.error?.message,
-      },
-      "databricks warehouse cost query did not succeed; recording the questions without cost",
-    );
-    return { outcome: "failed" };
+    return readUnsuccessfulWarehouseCost({ statement, log });
   }
 
   // No manifest is a refusal, not a pass. The rows are positional and every
@@ -557,26 +671,13 @@ function readWarehouseCost({
 
   const data = statement.result?.data_array ?? [];
 
-  // An answer can be cut short three ways, and only the first is obvious. A
-  // full page means the LIMIT bit. A `next_chunk_index` means the reply was too
-  // large to send at once and the rest is elsewhere — that one arrives *under*
-  // the LIMIT, so a row count alone would call it complete. And a manifest that
-  // counts more rows than arrived says so outright.
-  //
-  // Which statements are missing is exactly what none of them can tell us, so
-  // pricing the ones that did arrive would put a confident zero on the rest.
-  const total = statement.manifest?.total_row_count;
-  const cutShort =
-    data.length >= WAREHOUSE_COST_ROW_LIMIT ||
-    statement.result?.next_chunk_index !== undefined ||
-    (total !== undefined && total > data.length);
-  if (cutShort) {
+  if (warehouseAnswerCutShort({ statement, dataLength: data.length })) {
     logger.error(
       {
         ...log,
         rows: data.length,
         limit: WAREHOUSE_COST_ROW_LIMIT,
-        totalRowCount: total,
+        totalRowCount: statement.manifest?.total_row_count,
         nextChunkIndex: statement.result?.next_chunk_index,
       },
       "databricks warehouse cost answer was cut short; refusing a partial answer",
@@ -2316,16 +2417,22 @@ export class DatabricksGeniePuller
    * alternative trades the thing that always works for the thing that sometimes
    * does.
    *
-   * The window is read a day at a time, oldest first, and the walk stops at the
-   * first day it cannot price. `pricedThroughMs` is where it stopped, and the
-   * caller keeps the watermark at or below it so that day is asked about again
-   * next run instead of being written off. A first sweep spans thirty days, and
-   * without that the whole month would be recorded at zero the one time a busy
-   * warehouse tripped the row cap — permanently, because later runs only re-read
-   * the settling window and would never look at those days again.
+   * The window is read a chunk at a time, oldest first, and the walk stops at
+   * the first period it cannot price. `pricedThroughMs` is where it stopped,
+   * and the caller keeps the watermark at or below it so that period is asked
+   * about again next run instead of being written off. A first sweep spans
+   * thirty days, and without that the whole month would be recorded at zero the
+   * one time a busy warehouse tripped the row cap — permanently, because later
+   * runs only re-read the settling window and would never look at those days
+   * again.
+   *
+   * A chunk that cannot be answered whole is re-asked in days before the walk
+   * gives up on it. Only a chunk that is REFUSED — the question reached billing
+   * and billing said no — skips that, since asking the same question about less
+   * gets the same no.
    *
    * `null` means no ceiling is owed: either the whole window priced, or the
-   * question could not be answered at all and re-asking it would not help.
+   * question was refused and re-asking it would not help.
    */
   private async warehouseCost({
     config,
@@ -2352,75 +2459,207 @@ export class DatabricksGeniePuller
     const costByStatementId = new Map<string, string>();
 
     for (const chunk of warehouseCostChunks({ fromMs, toMs })) {
-      // Out of requests, or out of the time one more would need, with days
-      // still unpriced. Those days are not refused, just unread, so the
-      // watermark holds here and the next run starts its cost read where this
-      // one ran out — which is what turns a month-long backfill into several
-      // runs that each make progress.
-      //
-      // The time half has to be asked BEFORE the request, against the whole of
-      // `WAREHOUSE_COST_TIMEOUT_MS`. A billing read still in flight when the
-      // worker's deadline lands does not merely go unpriced: the worker kills
-      // the run and discards the questions the sweep had already read, and the
-      // cursor stays where it was, so the next run reads them and stalls in the
-      // same place. Unpriced questions are recoverable; a run killed holding
-      // them is the sweep done for nothing.
-      if (budget.exhaustedWithin(WAREHOUSE_COST_TIMEOUT_MS)) {
-        logger.warn(
-          {
-            adapter: this.id,
-            warehouseId,
-            pricedThrough: new Date(chunk.fromMs).toISOString(),
-          },
-          "databricks warehouse cost has no room left in this run; holding the watermark at the last priced day",
-        );
-        return { costByStatementId, pricedThroughMs: unpricedFloor(chunk) };
-      }
-
-      const read = await this.warehouseCostChunk({
+      const outcome = await this.priceWarehouseCostChunk({
         config,
         token,
         options,
         budget,
         warehouseId,
         chunk,
+        costByStatementId,
       });
-
-      // Rows exist for this day that did not arrive. Everything older is
-      // already priced and keeps its cost; this day and everything after it
-      // stays inside the next run's window.
-      if (read.outcome === "cut_short") {
-        logger.error(
-          {
-            adapter: this.id,
-            warehouseId,
-            pricedThrough: new Date(chunk.fromMs).toISOString(),
-            chunkTo: new Date(chunk.toMs).toISOString(),
-          },
-          "databricks warehouse cost could not price a day whole; holding the watermark so it is asked again",
-        );
-        return { costByStatementId, pricedThroughMs: unpricedFloor(chunk) };
-      }
-
-      // The question itself did not land. Asking about less would not change
-      // that, so no ceiling is owed: the questions are recorded without cost,
-      // exactly as they were before any of this existed, and the source keeps
-      // moving rather than stalling on billing tables it may never read.
-      if (read.outcome === "failed") {
-        return { costByStatementId, pricedThroughMs: null };
-      }
-
-      // A statement is bucketed by the hour it started in and every hour lies
-      // inside exactly one day, so no two chunks can answer for the same one.
-      for (const [statementId, cost] of read.costByStatementId) {
-        costByStatementId.set(statementId, cost);
+      if (outcome.done) {
+        return { costByStatementId, pricedThroughMs: outcome.pricedThroughMs };
       }
     }
 
     return { costByStatementId, pricedThroughMs: null };
   }
 
-  /** One day of the window, priced or refused. */
+  /**
+   * One chunk of the sweep: whether the run still has room for it, the answer,
+   * and — when the answer is not whole — the pieces. `done` stops the walk with
+   * a ceiling; `!done` carries it to the next chunk.
+   */
+  private async priceWarehouseCostChunk({
+    config,
+    token,
+    options,
+    budget,
+    warehouseId,
+    chunk,
+    costByStatementId,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+    warehouseId: string;
+    chunk: { fromMs: number; toMs: number };
+    costByStatementId: Map<string, string>;
+  }): Promise<
+    { done: true; pricedThroughMs: number | null } | { done: false }
+  > {
+    // Out of requests, or out of the time one more would need, with days still
+    // unpriced. Those days are not refused, just unread, so the watermark holds
+    // here and the next run starts its cost read where this one ran out — which
+    // is what turns a month-long backfill into several runs that each progress.
+    //
+    // The time half has to be asked BEFORE the request, against the whole of
+    // `WAREHOUSE_COST_TIMEOUT_MS`. A billing read still in flight when the
+    // worker's deadline lands does not merely go unpriced: the worker kills the
+    // run and discards the questions the sweep had already read, and the cursor
+    // stays where it was, so the next run reads them and stalls in the same
+    // place. Unpriced questions are recoverable; a run killed holding them is
+    // the sweep done for nothing.
+    if (budget.exhaustedWithin(WAREHOUSE_COST_TIMEOUT_MS)) {
+      logger.warn(
+        {
+          adapter: this.id,
+          warehouseId,
+          pricedThrough: new Date(chunk.fromMs).toISOString(),
+        },
+        "databricks warehouse cost has no room left in this run; holding the watermark at the last priced day",
+      );
+      return { done: true, pricedThroughMs: unpricedFloor(chunk) };
+    }
+
+    const read = await this.warehouseCostChunk({
+      config,
+      token,
+      options,
+      budget,
+      warehouseId,
+      chunk,
+    });
+
+    // The question itself was answered, and the answer was no. Asking about
+    // less would be answered no the same way, so no ceiling is owed: the
+    // questions are recorded without cost, exactly as they were before any of
+    // this existed, and the source keeps moving rather than stalling on billing
+    // tables it may never read.
+    if (read.outcome === "failed") {
+      return { done: true, pricedThroughMs: null };
+    }
+
+    if (read.outcome === "priced") {
+      // A statement is bucketed by the hour it started in and every hour lies
+      // inside exactly one chunk, so no two chunks answer for the same one.
+      mergeWarehouseCost(costByStatementId, read.costByStatementId);
+      return { done: false };
+    }
+
+    // Either more rows exist here than one reply can carry, or the answer did
+    // not come back in time. Both are reasons to ask about LESS rather than to
+    // give up on the period: surrendering the whole chunk costs every question
+    // inside it its cost figure, including the days that would have answered on
+    // their own.
+    return this.warehouseCostChunkInPieces({
+      config,
+      token,
+      options,
+      budget,
+      warehouseId,
+      chunk,
+      read,
+      costByStatementId,
+    });
+  }
+
+  /**
+   * A chunk that could not be priced whole, re-asked in smaller pieces. Every
+   * piece that answers is priced into the shared map; the walk stops at the
+   * first that does not.
+   *
+   * Paid for only once a chunk has actually been refused, so a workspace whose
+   * chunks answer never spends a request here. `done` tells the walk whether to
+   * stop with a ceiling — some piece was refused, or the run ran out of room —
+   * or carry on to the next chunk because every piece priced. When a piece is
+   * refused the ceiling holds at that piece, not at the start of the chunk it
+   * was in: the pieces answered before it keep their cost and are never asked
+   * about again.
+   */
+  private async warehouseCostChunkInPieces({
+    config,
+    token,
+    options,
+    budget,
+    warehouseId,
+    chunk,
+    read,
+    costByStatementId,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+    warehouseId: string;
+    chunk: { fromMs: number; toMs: number };
+    read: WarehouseCostRead;
+    costByStatementId: Map<string, string>;
+  }): Promise<
+    { done: true; pricedThroughMs: number | null } | { done: false }
+  > {
+    const pieces = warehouseCostPieces(chunk);
+    logger.warn(
+      {
+        adapter: this.id,
+        warehouseId,
+        outcome: read.outcome,
+        chunkFrom: new Date(chunk.fromMs).toISOString(),
+        chunkTo: new Date(chunk.toMs).toISOString(),
+        pieces: pieces.length,
+      },
+      "databricks warehouse cost could not price a period whole; asking about smaller pieces of it",
+    );
+
+    let refused: { fromMs: number; toMs: number } | null =
+      pieces.length === 0 ? chunk : null;
+
+    for (const piece of pieces) {
+      if (budget.exhaustedWithin(WAREHOUSE_COST_TIMEOUT_MS)) {
+        refused = piece;
+        break;
+      }
+
+      const pieceRead = await this.warehouseCostChunk({
+        config,
+        token,
+        options,
+        budget,
+        warehouseId,
+        chunk: piece,
+      });
+
+      // A refusal to a piece is still a refusal to the question, and it is the
+      // same one whichever size it was asked at.
+      if (pieceRead.outcome === "failed") {
+        return { done: true, pricedThroughMs: null };
+      }
+      if (pieceRead.outcome !== "priced") {
+        refused = piece;
+        break;
+      }
+      mergeWarehouseCost(costByStatementId, pieceRead.costByStatementId);
+    }
+
+    if (refused) {
+      logger.error(
+        {
+          adapter: this.id,
+          warehouseId,
+          pricedThrough: new Date(refused.fromMs).toISOString(),
+          refusedTo: new Date(refused.toMs).toISOString(),
+        },
+        "databricks warehouse cost could not price a period even in pieces; holding the watermark so it is asked again",
+      );
+      return { done: true, pricedThroughMs: unpricedFloor(refused) };
+    }
+
+    return { done: false };
+  }
+
+  /** One chunk of the window, priced or refused. */
   private async warehouseCostChunk({
     config,
     token,
@@ -2437,6 +2676,12 @@ export class DatabricksGeniePuller
     chunk: { fromMs: number; toMs: number };
   }): Promise<WarehouseCostRead> {
     const { fromMs, toMs } = chunk;
+    const askedAtMs = Date.now();
+    const observed = warehouseCostObserved({
+      adapter: this.id,
+      warehouseId,
+      chunk,
+    });
 
     try {
       const payload = await this.post({
@@ -2449,10 +2694,21 @@ export class DatabricksGeniePuller
           warehouse_id: warehouseId,
           statement: WAREHOUSE_COST_STATEMENT,
           // One request, no polling. A query that cannot finish inside the
-          // wait is cancelled and this run simply reports no cost — the next
-          // run asks again, and the questions were recorded regardless. Polling
-          // would hold a run open on the slowest thing it does.
-          wait_timeout: "30s",
+          // wait is cancelled, and the window it covered is held rather than
+          // written off, so the next run asks about it again. Polling would
+          // hold a run open on the slowest thing it does.
+          //
+          // Fifty seconds is the most the API accepts, and it is asked for
+          // because the warehouse routinely needs more than the thirty this
+          // used to allow. Measured against a real workspace on 2026-08-19,
+          // five reads of a week each came back in 10.8s, 23.4s, 26.9s, 37.7s
+          // and 22.0s — a thirty-second limit sits inside that spread and
+          // cancels answers that were on their way.
+          //
+          // Still inside the client's own `WAREHOUSE_COST_TIMEOUT_MS`, which
+          // stays the outer bound: the warehouse gives up before this end does,
+          // so a cancelled statement is reported rather than merely abandoned.
+          wait_timeout: "50s",
           on_wait_timeout: "CANCEL",
           format: "JSON_ARRAY",
           disposition: "INLINE",
@@ -2490,21 +2746,45 @@ export class DatabricksGeniePuller
         },
       });
 
-      return readWarehouseCost({
+      const read = readWarehouseCost({
         payload,
         adapter: this.id,
         warehouseId,
       });
+      logger.info(
+        {
+          ...observed,
+          outcome: read.outcome,
+          elapsedMs: Date.now() - askedAtMs,
+          statements:
+            read.outcome === "priced" ? read.costByStatementId.size : 0,
+        },
+        "databricks warehouse cost question answered",
+      );
+      return read;
     } catch (error) {
+      // The same split the statement states get, at the other door. A request
+      // this end gave up on, or one the workspace could not serve right now,
+      // says nothing about whether the window can ever be priced — writing it
+      // off puts a permanent zero on questions over a hiccup. Only an answer
+      // that will be the same next run is a refusal: a token without the grant
+      // is refused identically forever, and holding for it would stall the
+      // source with no way out but turning the feature off.
+      const unfinished =
+        !(error instanceof GenieHttpError) ||
+        error.status === 429 ||
+        error.status >= 500;
       logger.warn(
         {
-          adapter: this.id,
-          warehouseId,
+          ...observed,
+          elapsedMs: Date.now() - askedAtMs,
           error: error instanceof Error ? error.message : String(error),
         },
-        "databricks warehouse cost is unavailable; recording the questions without cost",
+        unfinished
+          ? "databricks warehouse cost could not be reached; holding the window so it is asked again"
+          : "databricks warehouse cost is unavailable; recording the questions without cost",
       );
-      return { outcome: "failed" };
+      return { outcome: unfinished ? "timed_out" : "failed" };
     }
   }
 

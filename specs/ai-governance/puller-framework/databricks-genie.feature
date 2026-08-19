@@ -189,14 +189,84 @@ Feature: Databricks AI/BI Genie puller
       # and re-emitting a question replaces its ledger row rather than adding
       # one, so the real figure lands as soon as the bill does.
       #
-      # The window is read a day at a time so that holding it is recoverable
-      # rather than a stall: a day busy enough to be refused does not stop the
-      # twenty-nine that were priced before it from keeping their cost.
+      # The window is read a week at a time so that holding it is recoverable
+      # rather than a stall: a week busy enough to be refused does not stop the
+      # ones priced before it from keeping their cost, and the refused week is
+      # re-asked in days rather than surrendered whole.
       #
-      # Held only when the answer was CUT SHORT. Billing refusing the question
-      # outright is not held: a narrower question would be refused the same way,
-      # and holding would stall a workspace that never granted the billing
-      # tables, with no way out but turning the feature off.
+      # Held when the answer was CUT SHORT, and when it RAN OUT OF TIME. Billing
+      # refusing the question outright is not held: a narrower question would be
+      # refused the same way, and holding would stall a workspace that never
+      # granted the billing tables, with no way out but turning the feature off.
+      #
+      # Running out of time is not refusing. The two arrive as the same shape —
+      # an answer that is not a success — and reading them as one was worth a
+      # month of silent zeroes on a workspace whose billing tables are merely
+      # slow. The scenarios below hold the two apart.
+
+    @integration
+    Scenario: A cost answer cancelled for taking too long is asked about again
+      Given a period whose billing answer is cancelled for exceeding its time limit
+      When the puller reads the cost
+      Then that period is read again on the next run
+      And a question asked on its very first instant is read again too
+      # The second line is the one with teeth, for the reason the cut-short
+      # scenario above gives: inside the settling look-back a period is re-read
+      # whatever the watermark says, so an assertion about re-reading alone goes
+      # green with the watermark left standing exactly where the defect puts it.
+      #
+      # A cancelled answer and a refused one arrive identically: neither says
+      # SUCCEEDED. Only one of them is worth asking again. Reading both as
+      # "cannot be answered" moves the watermark past a period nothing priced,
+      # and later runs look only at the settling window — so the zero those
+      # questions carry becomes the final answer to a question billing was
+      # merely slow to answer.
+
+    @integration
+    Scenario: Billing refusing the question outright is still not held
+      Given a workspace that will not let this credential read its billing
+      When the puller reads the cost
+      Then the watermark moves on without it
+      And the questions are still recorded
+      # The counterpart to the scenario above, and the reason that one is phrased
+      # about time rather than about failure. A credential without the billing
+      # grant is refused identically forever; holding for it would stall the
+      # source with no way out but turning the feature off.
+      #
+      # Deliberately silent on how the refusal arrives. A missing grant comes
+      # back as a successful request carrying a failed statement, while a revoked
+      # token comes back as the request itself being rejected — two different
+      # paths that must reach the same answer, and a scenario naming either one
+      # would leave the other free to hold forever.
+
+    @integration
+    Scenario: A period the answer cannot carry whole is re-asked in smaller pieces
+      Given a period with more statements than one billing answer can carry
+      When the puller reads the cost
+      Then the questions in the parts of it that can be priced still get a cost
+      And only the part that cannot be priced is left for a later run
+      # Surrendering the whole period costs every question in it its cost figure,
+      # including the days that would have answered on their own. Asked only
+      # after the whole period was refused, so a healthy workspace never pays for
+      # the extra questions.
+
+    @integration
+    Scenario: Pricing a month of questions fits in the time a run is given
+      Given a source whose first run looks back a month
+      When that run prices its questions
+      Then it asks the warehouse for billing few enough times to finish in one run
+      And no part of the month is left unpriced for want of time
+      # Phrased as a count of questions asked, not as elapsed time, and that is
+      # the load-bearing choice. Nothing that exercises this waits on a real
+      # warehouse, so an answer that arrives instantly makes any number of
+      # questions fit — a scenario about the clock goes green on the very defect
+      # it is here for. The count is what overran: the look-back and the size of
+      # one billing question decide it, and a month asked a day at a time needs
+      # more time than a run is given.
+      #
+      # A run that overruns does not merely go unpriced. It is killed holding the
+      # questions the sweep had already read, so it discards them and keeps its
+      # cursor, and the next run stalls in exactly the same place.
 
     @integration
     Scenario: Compute the workspace prices in another currency is not converted

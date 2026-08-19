@@ -583,9 +583,12 @@ describe("a source that names a warehouse", () => {
     expect(hintOf(result).costUsd).toBe("0");
     // Still back at the start of the window, not up at the sweep's clock.
     expect(cursor.sinceMs).toBeLessThan(Date.now() - 29 * 24 * 60 * 60 * 1000);
-    // And it stopped asking at the first day it could not price, rather than
-    // spending the rest of the run's budget on days it would refuse anyway.
-    expect(statementBodies).toHaveLength(1);
+    // And it stopped at the first period it could not price, rather than
+    // spending the rest of the run's budget on periods it would refuse anyway.
+    // Two questions, not one: the chunk, then the first day of it, because a
+    // chunk that cannot be answered whole is re-asked smaller before the walk
+    // gives up on it. Both refuse here, so the walk stops at the second.
+    expect(statementBodies).toHaveLength(2);
 
     // The half that holding the watermark exists for, and the half a cursor
     // assertion alone does not show: the next run, resuming from that cursor,
@@ -678,7 +681,14 @@ describe("a source that names a warehouse", () => {
     // ahead of the old watermark and the seam is actually load-bearing. A
     // first-day refusal would hold at the old watermark and prove nothing.
     messageCreatedMs = watermark + 24 * oneHourMs;
-    costPlanQueue = [{ rows: [] }];
+    // The whole window is one chunk, so the seam is reached the way it is
+    // reached in practice: the chunk cannot be answered whole, it is re-asked
+    // in days, the first day answers and the second does not.
+    costPlanQueue = [
+      { rows: [], nextChunkIndex: 1 },
+      { rows: [] },
+      { rows: [], nextChunkIndex: 1 },
+    ];
     costPlan = { rows: [], nextChunkIndex: 1 };
 
     const runFrom = async (cursor: string) =>
@@ -971,5 +981,170 @@ describe("a source that names a warehouse", () => {
     );
 
     expect(result.events).toHaveLength(0);
+  });
+});
+
+/**
+ * How much of the window one billing question covers, and what happens to the
+ * rest of it when that question is not answered.
+ *
+ * The three things asserted here were one thing in the code: a reply that is
+ * not a success. Reading them as one is what put a month of real spend at zero
+ * — permanently, because later runs re-read only the settling window.
+ */
+describe("a month of questions to price", () => {
+  /** @scenario "Pricing a month of questions fits in the time a run is given" */
+  it("asks the warehouse for billing few enough times to finish in one run", async () => {
+    costPlan = { rows: [] };
+
+    await pull({ warehouseId: WAREHOUSE_ID });
+
+    // A run is given five minutes and one billing question is allowed a minute
+    // of it, so a first sweep that needs more questions than this cannot finish
+    // however healthy the workspace is. Counted rather than timed on purpose:
+    // the fixture answers instantly, so a deadline assertion here would pass on
+    // exactly the defect this is here for.
+    expect(statementBodies.length).toBeLessThanOrEqual(5);
+  });
+
+  /** @scenario "Pricing a month of questions fits in the time a run is given" */
+  it("gives each billing question longer to answer than the warehouse usually takes", async () => {
+    costPlan = { rows: [] };
+
+    await pull({ warehouseId: WAREHOUSE_ID });
+
+    // Measured against the real workspace on 2026-08-19: five sequential reads
+    // of a week each came back in 10.8s, 23.4s, 26.9s, 37.7s and 22.0s. A limit
+    // of thirty seconds sits inside that spread, so the warehouse cancels a
+    // question it was answering perfectly well — and a cancelled answer used to
+    // cost the rest of the window its cost figure for good.
+    expect(statementBodies[0]?.wait_timeout).toBe("50s");
+  });
+});
+
+describe("a billing answer that did not come back", () => {
+  /** @scenario "A cost answer cancelled for taking too long is asked about again" */
+  it("asks again about a period whose answer was cancelled for taking too long", async () => {
+    // What the warehouse says when it runs out of the time the request allowed
+    // it. Not a refusal: the same question asked again, or asked about less,
+    // answers fine — which is exactly what makes writing it off so expensive.
+    costPlan = { state: "CANCELED", rows: [] };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+    const cursor = JSON.parse(result.cursor!) as { sinceMs: number };
+
+    expect(hintOf(result).costUsd).toBe("0");
+    // Still back at the start of the month. A watermark up at the sweep's clock
+    // means those thirty days are never looked at again and their zero is final.
+    expect(cursor.sinceMs).toBeLessThan(Date.now() - 29 * 24 * 60 * 60 * 1000);
+
+    // The half a cursor assertion alone cannot show, for the reason the spec
+    // gives: inside the settling look-back a period is re-read whatever the
+    // watermark says. The instant that separates the two is the period's first.
+    const askedAboutFirst = (
+      statementBodies[0]!.parameters as Array<{ name: string; value: string }>
+    ).find((p) => p.name === "from_ts")!.value;
+
+    statementBodies.length = 0;
+    costPlan = {
+      rows: [
+        [
+          STATEMENT_ID,
+          "3600000",
+          "3600000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+      ],
+    };
+
+    const second = await new DatabricksGeniePuller().runOnce(
+      { cursor: result.cursor, credentials: { token: "dapi-fixture" } },
+      {
+        adapter: DATABRICKS_GENIE_ADAPTER_ID,
+        workspaceUrl: baseUrl,
+        spaceIds: [],
+        schedule: "*/15 * * * *",
+        warehouseId: WAREHOUSE_ID,
+      },
+    );
+
+    const askedAboutAgain = (
+      statementBodies[0]!.parameters as Array<{ name: string; value: string }>
+    ).find((p) => p.name === "from_ts")!.value;
+
+    expect(askedAboutAgain).toBe(askedAboutFirst);
+    expect(hintOf(second).costUsd).toBe("6");
+  });
+
+  /** @scenario "Billing refusing the question outright is still not held" */
+  it("moves on when the statement itself fails", async () => {
+    // A missing grant comes back as a request that succeeded carrying a
+    // statement that did not. Asking about less would fail the same way, so
+    // holding here would stall the source with no way out but turning the
+    // feature off. Green before the change above and required to stay green
+    // after it: that is the whole reason the cancelled case is phrased about
+    // time rather than about failure.
+    costPlan = { state: "FAILED", rows: [] };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+    const cursor = JSON.parse(result.cursor!) as { sinceMs: number };
+
+    expect(result.events).toHaveLength(1);
+    expect(cursor.sinceMs).toBeGreaterThan(Date.now() - 60 * 60 * 1000);
+  });
+
+  /** @scenario "Billing refusing the question outright is still not held" */
+  it("moves on when the workspace rejects the request outright", async () => {
+    // The other door to the same answer: a revoked or unprivileged token is
+    // refused before any statement runs. Both have to reach the same place.
+    costPlan = { status: 403 };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+    const cursor = JSON.parse(result.cursor!) as { sinceMs: number };
+
+    expect(result.events).toHaveLength(1);
+    expect(cursor.sinceMs).toBeGreaterThan(Date.now() - 60 * 60 * 1000);
+  });
+});
+
+describe("a period with more statements than one answer can carry", () => {
+  /** @scenario "A period the answer cannot carry whole is re-asked in smaller pieces" */
+  it("prices the parts of it that can be priced instead of surrendering it whole", async () => {
+    // The first week of the month cannot be carried whole. Two days of it can;
+    // the third cannot either.
+    costPlanQueue = [
+      { rows: [], nextChunkIndex: 1 },
+      { rows: [] },
+      { rows: [] },
+      { rows: [], nextChunkIndex: 1 },
+    ];
+    costPlan = { rows: [] };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+    const cursor = JSON.parse(result.cursor!) as { sinceMs: number };
+
+    // Asked about again, but only the day it could not price — not the week
+    // that day was in. Surrendering the week costs the two days inside it that
+    // answered perfectly well their cost figure, and later runs never look at
+    // them again.
+    expect(cursor.sinceMs).toBeLessThan(Date.now() - 27 * 24 * 60 * 60 * 1000);
+    expect(cursor.sinceMs).toBeGreaterThan(
+      Date.now() - 29 * 24 * 60 * 60 * 1000,
+    );
+
+    // And the narrower questions were actually asked: a day at most, where the
+    // refused one covered a week.
+    const spanOf = (body: Record<string, unknown>) => {
+      const p = body.parameters as Array<{ name: string; value: string }>;
+      const at = (name: string) =>
+        Date.parse(p.find((x) => x.name === name)!.value);
+      return at("to_ts") - at("from_ts");
+    };
+    expect(spanOf(statementBodies[0]!)).toBeGreaterThan(24 * 60 * 60 * 1000);
+    expect(spanOf(statementBodies[1]!)).toBeLessThanOrEqual(
+      24 * 60 * 60 * 1000,
+    );
   });
 });
