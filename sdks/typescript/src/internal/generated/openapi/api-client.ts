@@ -766,8 +766,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Run LangWatchQL analytics SQL
-         * @description Executes one read-only ClickHouse SELECT over the LangWatchQL analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project. Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
+         * Run governed analytics SQL
+         * @description Executes one read-only ClickHouse SELECT over the governed analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project. Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
          */
         post: operations["postApiV1ProjectsByProjectIdAnalyticsQueryClickhouse"];
         delete?: never;
@@ -784,8 +784,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Discover the LangWatchQL analytics schema
-         * @description Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.
+         * Discover the governed analytics schema
+         * @description Lists the governed analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.
          */
         get: operations["getApiV1ProjectsByProjectIdAnalyticsSchema"];
         put?: never;
@@ -805,13 +805,13 @@ export interface paths {
         };
         /**
          * List saved workbench charts
-         * @description Lists every saved LangWatchQL chart in this project, each with the statement it runs, the parameter values it was saved with and the Vega-Lite specification that draws it. Charts built with the chart builder are a different kind and are not listed here.
+         * @description Lists every saved governed SQL chart in this project, each with the statement it runs, the parameter values it was saved with and the Vega-Lite specification that draws it. Charts built with the chart builder are a different kind and are not listed here.
          */
         get: operations["getApiV1ProjectsByProjectIdAnalyticsCharts"];
         put?: never;
         /**
          * Save a workbench chart
-         * @description Saves a LangWatchQL statement, its bound parameter values and an optional Vega-Lite specification as one chart. The statement is validated by the LangWatchQL analytics SQL validator against this key's own permissions, and the specification by the visualization policy, before anything is written — a chart that could not be run or drawn is refused rather than stored.
+         * @description Saves a governed SQL statement, its bound parameter values and an optional Vega-Lite specification as one chart. The statement is validated by the governed analytics SQL validator against this key's own permissions, and the specification by the visualization policy, before anything is written — a chart that could not be run or drawn is refused rather than stored.
          */
         post: operations["postApiV1ProjectsByProjectIdAnalyticsCharts"];
         delete?: never;
@@ -829,14 +829,14 @@ export interface paths {
         };
         /**
          * Get a saved workbench chart
-         * @description Returns one saved LangWatchQL chart with its statement, parameter values and specification. A chart saved in another project is reported as not found.
+         * @description Returns one saved governed SQL chart with its statement, parameter values and specification. A chart saved in another project is reported as not found.
          */
         get: operations["getApiV1ProjectsByProjectIdAnalyticsChartsByChartId"];
         put?: never;
         post?: never;
         /**
          * Delete a saved workbench chart
-         * @description Deletes one saved LangWatchQL chart. Answers 204 with no body; deleting a chart that is not in this project is reported as not found.
+         * @description Deletes one saved governed SQL chart. Answers 204 with no body; deleting a chart that is not in this project is reported as not found.
          */
         delete: operations["deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId"];
         options?: never;
@@ -2748,7 +2748,7 @@ export interface paths {
         head?: never;
         /**
          * Update a provisioned user
-         * @description Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active` (deactivating or reactivating the account), of `userName`, and of `name.givenName` / `name.familyName`, written either as an operation path or as keys inside a value object; and `add`, `replace` or `remove` of the enterprise `costCenter`, which reassigns the member's department. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Replace` that Entra ID writes is accepted; any other name, or a missing or non-string one, is rejected with a 400. An understood operation aimed at anything not listed above is accepted and changes nothing.
+         * @description Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active` (deactivating or reactivating the account), of `userName`, and of `name.givenName` / `name.familyName`, written either as an operation path or as keys inside a value object; and `add`, `replace` or `remove` of the enterprise `costCenter`, which reassigns the member's department. Operations outside that set are accepted and change nothing, so a provider sending its full patch set is never rejected.
          */
         patch: operations["scimPatchUser"];
         trace?: never;
@@ -2804,7 +2804,7 @@ export interface paths {
         head?: never;
         /**
          * Update a provisioned group
-         * @description Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of members (named by a value filter on the path, as Entra ID writes it, or in the operation value), `replace` of `displayName`, and `replace` of the whole member list. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Add` / `Remove` that Entra ID writes are accepted; any other name, or a missing or non-string one, is rejected with a 400. An `add` or a `remove` aimed at anything other than members is accepted and changes nothing. A `replace` that is not a `displayName` rename is treated as a replacement of the whole member list, so one that carries no members empties the group.
+         * @description Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of members (named by a value filter on the path, as Entra ID writes it, or in the operation value), `replace` of `displayName`, and `replace` of the whole member list. Operations outside that set are accepted and change nothing.
          */
         patch: operations["scimPatchGroup"];
         trace?: never;
@@ -5097,8 +5097,8 @@ export interface operations {
                         [key: string]: string | number | boolean | null;
                     };
                     timeWindow?: {
-                        start: string | number;
-                        end: string | number;
+                        start: string;
+                        end: string;
                     };
                 };
             };
@@ -5197,26 +5197,6 @@ export interface operations {
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
             /** @description Internal Server Error */
             500: {
                 headers: {
@@ -5250,7 +5230,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The LangWatchQL schema, scoped to the caller's permissions */
+            /** @description The governed schema, scoped to the caller's permissions */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -10100,19 +10080,10 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
-                            /** Format: date-time */
                             created_at: string;
-                            /** Format: date-time */
                             updated_at: string;
-                            /** Format: date-time */
                             last_used_at: string | null;
-                            /** Format: date-time */
                             revoked_at: string | null;
-                            /**
-                             * Format: date-time
-                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
-                             */
-                            expires_at: string | null;
                         }[];
                         /** @description Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more. */
                         next_cursor: string | null;
@@ -10226,8 +10197,6 @@ export interface operations {
                     routing_policy_id?: string | null;
                     /** @enum {string} */
                     routing_mode?: "none" | "fallback_all" | "policy";
-                    /** @description When the key stops serving. Omit it and the key never expires. A date that has already passed is refused with `virtual_key_expiry_in_past`, rather than writing a key that is dead on arrival. */
-                    expires_at?: string;
                     budget?: {
                         limit_usd: number | string;
                         /** @enum {string} */
@@ -10346,19 +10315,10 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
-                            /** Format: date-time */
                             created_at: string;
-                            /** Format: date-time */
                             updated_at: string;
-                            /** Format: date-time */
                             last_used_at: string | null;
-                            /** Format: date-time */
                             revoked_at: string | null;
-                            /**
-                             * Format: date-time
-                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
-                             */
-                            expires_at: string | null;
                         };
                         secret: string;
                     };
@@ -10513,19 +10473,10 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
-                            /** Format: date-time */
                             created_at: string;
-                            /** Format: date-time */
                             updated_at: string;
-                            /** Format: date-time */
                             last_used_at: string | null;
-                            /** Format: date-time */
                             revoked_at: string | null;
-                            /**
-                             * Format: date-time
-                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
-                             */
-                            expires_at: string | null;
                         };
                     };
                 };
@@ -10656,8 +10607,6 @@ export interface operations {
                     routing_policy_id?: string | null;
                     /** @enum {string} */
                     routing_mode?: "none" | "fallback_all" | "policy";
-                    /** @description When the key stops serving. Omit it and the stored date stays where it is; null clears it, so the key never expires; a date moves it. A key whose date has already passed accepts this edit like any other, which is how an expired key is put back in service without minting a new secret. A date in the past is refused with `virtual_key_expiry_in_past`. */
-                    expires_at?: string | null;
                     budget?: {
                         limit_usd: number | string;
                         /** @enum {string} */
@@ -10772,19 +10721,10 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
-                            /** Format: date-time */
                             created_at: string;
-                            /** Format: date-time */
                             updated_at: string;
-                            /** Format: date-time */
                             last_used_at: string | null;
-                            /** Format: date-time */
                             revoked_at: string | null;
-                            /**
-                             * Format: date-time
-                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
-                             */
-                            expires_at: string | null;
                         };
                     };
                 };
@@ -11072,19 +11012,10 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
-                            /** Format: date-time */
                             created_at: string;
-                            /** Format: date-time */
                             updated_at: string;
-                            /** Format: date-time */
                             last_used_at: string | null;
-                            /** Format: date-time */
                             revoked_at: string | null;
-                            /**
-                             * Format: date-time
-                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
-                             */
-                            expires_at: string | null;
                         };
                         secret: string;
                     };
@@ -11226,19 +11157,10 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
-                            /** Format: date-time */
                             created_at: string;
-                            /** Format: date-time */
                             updated_at: string;
-                            /** Format: date-time */
                             last_used_at: string | null;
-                            /** Format: date-time */
                             revoked_at: string | null;
-                            /**
-                             * Format: date-time
-                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
-                             */
-                            expires_at: string | null;
                         };
                     };
                 };
@@ -11372,19 +11294,10 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
-                            /** Format: date-time */
                             created_at: string;
-                            /** Format: date-time */
                             updated_at: string;
-                            /** Format: date-time */
                             last_used_at: string | null;
-                            /** Format: date-time */
                             revoked_at: string | null;
-                            /**
-                             * Format: date-time
-                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
-                             */
-                            expires_at: string | null;
                         };
                     };
                 };
@@ -11518,19 +11431,10 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
-                            /** Format: date-time */
                             created_at: string;
-                            /** Format: date-time */
                             updated_at: string;
-                            /** Format: date-time */
                             last_used_at: string | null;
-                            /** Format: date-time */
                             revoked_at: string | null;
-                            /**
-                             * Format: date-time
-                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
-                             */
-                            expires_at: string | null;
                         };
                     };
                 };

@@ -8,6 +8,13 @@ Feature: Langy reply quality
   Background:
     Given a project with traces and a working Langy session
 
+  @unit
+  Scenario: A turn never ends silently
+    Given Langy ran its commands and produced cards but wrote no prose
+    When the turn reaches its end
+    Then the panel still shows one visible line of text
+    And that line says the turn produced no answer and invites the user to ask again
+
   @e2e
   Scenario: A completed write ends with a visible next-step line
     When the user asks Langy to create a dataset

@@ -183,7 +183,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
         ...ids,
         id: "call_1",
         name: "bash",
-        phase: "completed",
+        phase: "end",
       });
       await buffer.markEnd(ids);
 
