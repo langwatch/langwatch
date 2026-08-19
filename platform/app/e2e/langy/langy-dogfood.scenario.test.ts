@@ -302,6 +302,7 @@ describe("Langy dogfood — named flows", () => {
      * GitHub connection to test against, so this stays skipped until the suite
      * gets a connected fixture project.
      */
+    // biome-ignore lint/suspicious/noSkippedTests: the fixture project has no GitHub App, so this pair documents the connected path until one exists
     it.skip("opens a real PR and reports its URL on a connected project", () => {
       throw new Error("needs a project with the GitHub App installed");
     });
