@@ -46,8 +46,11 @@ export async function readCodexThreadNames(
 			if (typeof record.id !== "string") continue;
 			if (typeof record.thread_name !== "string") continue;
 			const name = record.thread_name.trim();
-			// Later lines are newer, so the last write for an id wins.
-			if (name !== "") names.set(record.id, name);
+			// Later lines are newer, so the last write for an id wins. A blank
+			// name is a write too: a thread renamed back to nothing has no name,
+			// and keeping the earlier one would re-post a title codex dropped.
+			if (name === "") names.delete(record.id);
+			else names.set(record.id, name);
 		} catch {
 			// A torn tail line while codex is mid-append. It names nothing.
 		}

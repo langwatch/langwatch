@@ -20,6 +20,7 @@
  * an error class). That invariant is what makes it safe to summarise a session of
  * unknown size — it is the same one that let us delete MAX_PROCESSED_SPANS.
  */
+import { z } from "zod";
 
 /** One thing the agent did, in the order it did it. */
 export interface SessionStep {
@@ -35,8 +36,13 @@ export interface SessionStep {
 /**
  * Who set the session's `title`, in rank order: the harness's own session
  * name beats the generated conversation title beats the prompt-derived name.
+ *
+ * A schema rather than a bare union because the value is also decoded back
+ * from a row column, so the names have to exist at runtime. One declaration
+ * serves both, and the two cannot drift apart.
  */
-export type SessionTitleSource = "prompt" | "generated" | "name";
+export const sessionTitleSourceSchema = z.enum(["prompt", "generated", "name"]);
+export type SessionTitleSource = z.infer<typeof sessionTitleSourceSchema>;
 
 /**
  * One converged metric unit, as its contribution delivered it. A cumulative

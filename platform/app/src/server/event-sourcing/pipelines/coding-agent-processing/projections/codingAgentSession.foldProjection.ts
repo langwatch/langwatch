@@ -21,10 +21,11 @@ import {
   applySpanToCodingAgentSession,
   createInitCodingAgentSession,
 } from "../services/coding-agent-session.derivation";
-import type {
-  CodingAgentSessionData,
-  MetricSeriesFact,
-  SessionTitleSource,
+import {
+  type CodingAgentSessionData,
+  type MetricSeriesFact,
+  type SessionTitleSource,
+  sessionTitleSourceSchema,
 } from "../services/coding-agent-session.types";
 
 /**
@@ -675,13 +676,8 @@ function gitContextColumns(state: CodingAgentSessionState): {
  * default on a pre-00083 row included — reads as unset, which the fold ranks
  * as a generated title (see `withTitle`).
  */
-const TITLE_SOURCES: ReadonlySet<string> = new Set([
-  "prompt",
-  "generated",
-  "name",
-]);
 const titleSourceFromRow = (value: string): SessionTitleSource | null =>
-  TITLE_SOURCES.has(value) ? (value as SessionTitleSource) : null;
+  sessionTitleSourceSchema.safeParse(value).data ?? null;
 
 /** An empty string in a row column reads back as "unset" (null) in state. */
 const nullIfEmpty = (value: string): string | null =>

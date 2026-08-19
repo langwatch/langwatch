@@ -6,7 +6,7 @@
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -102,13 +102,13 @@ describe("the claude session registry", () => {
 		});
 	});
 
-	describe("the default location", () => {
+	describe("when resolving the default location", () => {
 		it("honours CLAUDE_CONFIG_DIR over the home directory", () => {
 			expect(
 				defaultClaudeSessionRegistryDir({ CLAUDE_CONFIG_DIR: "/etc/claude" }),
 			).toBe(join("/etc/claude", "sessions"));
-			expect(defaultClaudeSessionRegistryDir({})).toContain(
-				join(".claude", "sessions"),
+			expect(defaultClaudeSessionRegistryDir({})).toBe(
+				join(homedir(), ".claude", "sessions"),
 			);
 		});
 
@@ -116,8 +116,8 @@ describe("the claude session registry", () => {
 			// A variable set to whitespace names no directory. Reading it as one
 			// would root the registry at the filesystem root.
 			for (const CLAUDE_CONFIG_DIR of ["", "   "]) {
-				expect(defaultClaudeSessionRegistryDir({ CLAUDE_CONFIG_DIR })).toContain(
-					join(".claude", "sessions"),
+				expect(defaultClaudeSessionRegistryDir({ CLAUDE_CONFIG_DIR })).toBe(
+					join(homedir(), ".claude", "sessions"),
 				);
 			}
 		});

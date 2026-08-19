@@ -80,7 +80,7 @@ describe("the trace summary persist gate", () => {
   });
 
   describe("given a log record whose only contribution is a cost", () => {
-    /** @scenario "A log record carrying content persists the summary" */
+    /** @scenario "A log record whose only contribution is a cost persists the summary" */
     it("stores the summary", async () => {
       const { store, upsert } = storeWithRecorder();
 

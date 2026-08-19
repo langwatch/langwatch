@@ -59,6 +59,23 @@ describe("the codex session index", () => {
 			// A blank name is no name.
 			expect(names.has("thread-c")).toBe(false);
 		});
+
+		/** @scenario "Codex's own thread name rides the context record" */
+		it("clears a name a later line blanks out", async () => {
+			writeFileSync(
+				join(home, "session_index.jsonl"),
+				[
+					indexLine("thread-a", "docs-writer"),
+					JSON.stringify({ id: "thread-a", thread_name: "  " }),
+				].join("\n"),
+			);
+
+			const names = await readCodexThreadNames(
+				codexSessionIndexPath(join(home, "sessions")),
+			);
+
+			expect(names.has("thread-a")).toBe(false);
+		});
 	});
 
 	describe("given no index at all", () => {

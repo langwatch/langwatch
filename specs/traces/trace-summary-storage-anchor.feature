@@ -103,6 +103,12 @@ Feature: Trace summaries are filed under a real time, and their span reads stay 
       And it reports that input
 
     @unit
+    Scenario: A log record whose only contribution is a cost persists the summary
+      Given a trace whose log record carries a cost and no input or output
+      When the record is folded
+      Then the trace summary is stored
+
+    @unit
     Scenario: A span persists the summary regardless of content
       Given a trace whose first signal is a span
       When the span is folded

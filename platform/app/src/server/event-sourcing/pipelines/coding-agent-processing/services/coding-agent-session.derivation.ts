@@ -182,11 +182,15 @@ const TITLE_RANK: Record<SessionTitleSource, number> = {
  * it ranks as `generated`, the strongest source that existed then, so a
  * newer generated title still replaces it and a name still wins.
  */
-function withTitle(
-  state: CodingAgentSessionData,
-  value: string | null,
-  source: SessionTitleSource,
-): CodingAgentSessionData {
+function withTitle({
+  state,
+  value,
+  source,
+}: {
+  state: CodingAgentSessionData;
+  value: string | null;
+  source: SessionTitleSource;
+}): CodingAgentSessionData {
   const title = value?.trim() || null;
   if (title === null) return state;
   if (source === "prompt" && state.title !== null) return state;
@@ -889,7 +893,11 @@ export function applyLogToCodingAgentSession({
       return {
         // The first prompt names an unnamed session; the generated title
         // (API_RESPONSE below) and the session's own name replace it.
-        ...withTitle(base, str(attrs[LANGWATCH.ATTR.TITLE_FALLBACK]), "prompt"),
+        ...withTitle({
+          state: base,
+          value: str(attrs[LANGWATCH.ATTR.TITLE_FALLBACK]),
+          source: "prompt",
+        }),
         prompts: base.prompts + 1,
         // The length, never the text.
         promptChars: base.promptChars + num(attrs.prompt_length),
@@ -921,7 +929,11 @@ export function applyLogToCodingAgentSession({
       // agent regenerates the title as the conversation turns, and the
       // newest one describes it — but it never replaces the session's own
       // name.
-      return withTitle(base, str(attrs[LANGWATCH.ATTR.TITLE]), "generated");
+      return withTitle({
+        state: base,
+        value: str(attrs[LANGWATCH.ATTR.TITLE]),
+        source: "generated",
+      });
 
     case LANGWATCH.EVENT.SESSION_CONTEXT: {
       // Repository identity and worktree are once-set: a session is one
@@ -937,11 +949,15 @@ export function applyLogToCodingAgentSession({
       // one the harness itself holds — claude's --name and /rename, codex's
       // thread name — mirrored by the capture seams: the newest name
       // replaces the title in place and neither derived tier may clobber it.
-      const named = withTitle(
-        withTitle(base, str(attrs[LANGWATCH.ATTR.TITLE]), "prompt"),
-        str(attrs[LANGWATCH.ATTR.NAME]),
-        "name",
-      );
+      const named = withTitle({
+        state: withTitle({
+          state: base,
+          value: str(attrs[LANGWATCH.ATTR.TITLE]),
+          source: "prompt",
+        }),
+        value: str(attrs[LANGWATCH.ATTR.NAME]),
+        source: "name",
+      });
       return {
         ...named,
         repositoryHost:
