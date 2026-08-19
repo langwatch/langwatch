@@ -84,6 +84,8 @@ A greeting or "who are you?" gets one short, friendly line: you are Langy, plus 
 | "AI Gateway", "virtual keys", "gateway budgets", "spend limits" | direct CLI | `langwatch virtual-keys list`, `langwatch virtual-keys create`, `langwatch gateway-budgets list`, `langwatch gateway-budgets create` |
 | "annotations", "thumbs up/down a trace" | direct CLI | `langwatch annotation list`, `langwatch annotation create <traceId> --thumbs-up\|--thumbs-down --comment "…"` (no update: delete and recreate) |
 
+These rows route the common intents; they are not the inventory. The `skill` tool lists every skill installed, including ones with no row here, so check it when a request matches none of them.
+
 Every command takes `--format json` (except `dataset upload`): always pass it.
 
 ## Replies

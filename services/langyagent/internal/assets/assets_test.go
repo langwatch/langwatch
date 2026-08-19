@@ -38,6 +38,11 @@ func TestAgentsTemplate_FitsSizeBudget(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AgentsTemplate: %v", err)
 	}
+	// Reported on every run, not only on failure: a passing "under 16KB" says
+	// nothing about which prompt is embedded, so it cannot confirm a rebuild
+	// picked up an edit. The number can.
+	t.Logf("AGENTS.md is %d bytes of the %d-byte budget", len(tmpl), maxPromptBytes)
+
 	if got := len(tmpl); got > maxPromptBytes {
 		t.Errorf("AGENTS.md is %d bytes, over the %d-byte budget: shrink it (merge overlapping rules, state the class, or move the constraint into the harness config) instead of raising the ceiling", got, maxPromptBytes)
 	}
