@@ -242,6 +242,130 @@ describe("SimulationClickHouseRepository (integration)", () => {
     });
   });
 
+  describe("getRunDataForScenarioSet() message truncation", () => {
+    /** Ten messages: four more than the trimmed projection keeps. */
+    function longConversation() {
+      const count = 10;
+      return {
+        "Messages.Id": Array.from({ length: count }, (_, i) => `msg-${i}`),
+        "Messages.Role": Array.from({ length: count }, (_, i) =>
+          i % 2 === 0 ? "user" : "assistant",
+        ),
+        "Messages.Content": Array.from(
+          { length: count },
+          (_, i) => `turn ${i}`,
+        ),
+        "Messages.TraceId": Array.from({ length: count }, () => ""),
+        "Messages.Rest": Array.from({ length: count }, () => "{}"),
+      };
+    }
+
+    describe("when a run holds more messages than the list keeps", () => {
+      /** @scenario "A set-level list marks a run whose messages were trimmed" */
+      it("returns the first 6 and reports the trim", async () => {
+        const scenarioSetId = `set-trunc-${nanoid()}`;
+
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-trunc-${nanoid()}`,
+            ScenarioSetId: scenarioSetId,
+            ...longConversation(),
+          }),
+        );
+
+        const result = await repo.getRunDataForScenarioSet({
+          projectId: tenantId,
+          scenarioSetId,
+          limit: 10,
+        });
+
+        expect(result.runs).toHaveLength(1);
+        const run = result.runs[0]!;
+        expect(run.messages).toHaveLength(6);
+        expect(run.messagesTruncated).toBe(true);
+      });
+
+      /** @scenario "include=messages returns every message on a set-level list" */
+      it("returns every message when the caller includes them", async () => {
+        const scenarioSetId = `set-full-${nanoid()}`;
+
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-full-${nanoid()}`,
+            ScenarioSetId: scenarioSetId,
+            ...longConversation(),
+          }),
+        );
+
+        const result = await repo.getRunDataForScenarioSet({
+          projectId: tenantId,
+          scenarioSetId,
+          limit: 10,
+          includeMessages: true,
+        });
+
+        expect(result.runs).toHaveLength(1);
+        const run = result.runs[0]!;
+        expect(run.messages).toHaveLength(10);
+        expect(run.messagesTruncated).toBe(false);
+      });
+    });
+
+    describe("when a run holds no more messages than the list keeps", () => {
+      /** @scenario "A run within the message limit is not marked as truncated" */
+      it("returns them all and reports no trim", async () => {
+        const scenarioSetId = `set-short-${nanoid()}`;
+
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-short-${nanoid()}`,
+            ScenarioSetId: scenarioSetId,
+          }),
+        );
+
+        const result = await repo.getRunDataForScenarioSet({
+          projectId: tenantId,
+          scenarioSetId,
+          limit: 10,
+        });
+
+        expect(result.runs).toHaveLength(1);
+        const run = result.runs[0]!;
+        expect(run.messages).toHaveLength(1);
+        expect(run.messagesTruncated).toBe(false);
+      });
+    });
+
+    describe("when the runs are read through the batch-scoped query", () => {
+      /** @scenario "A batch-scoped list is unchanged by the include parameter" */
+      it("carries whole conversations without an include parameter", async () => {
+        const batchRunId = `batch-full-${nanoid()}`;
+
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-batch-full-${nanoid()}`,
+            BatchRunId: batchRunId,
+            ...longConversation(),
+          }),
+        );
+
+        const result = await repo.getRunDataForBatchRun({
+          projectId: tenantId,
+          batchRunId,
+        });
+
+        const runs = "runs" in result ? result.runs : [];
+        expect(runs).toHaveLength(1);
+        expect(runs[0]!.messages).toHaveLength(10);
+        expect(runs[0]!.messagesTruncated).toBe(false);
+      });
+    });
+  });
+
   describe("getRunDataForBatchRun()", () => {
     describe("when runs have metadata", () => {
       it("returns runs with metadata", async () => {

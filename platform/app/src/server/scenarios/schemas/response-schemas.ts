@@ -56,6 +56,10 @@ export const runDataSchema = z.object({
   status: z.nativeEnum(ScenarioRunStatus),
   results: scenarioResultsSchema.optional().nullable(),
   messages: scenarioMessageSnapshotSchema.shape.messages,
+  // True when `messages` holds only the first few messages of a longer
+  // conversation. List reads trim the message arrays to protect ClickHouse;
+  // pass `include=messages` to read them all.
+  messagesTruncated: z.boolean().optional(),
   timestamp: z.number(), // Unix timestamp when run started (stable sort key)
   updatedAt: z.number().optional(), // Last update timestamp (for conditional fetch)
   durationInMs: z.number(), // Execution time in milliseconds
