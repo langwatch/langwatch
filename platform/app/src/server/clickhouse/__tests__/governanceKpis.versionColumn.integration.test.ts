@@ -1,5 +1,5 @@
 /**
- * Migration 00083: swap `governance_kpis` from
+ * Migration 00084: swap `governance_kpis` from
  * `ReplacingMergeTree(LastEventOccurredAt)` to `ReplacingMergeTree(CreatedAt)`.
  *
  * `LastEventOccurredAt` moves BACKWARD — the fold takes
@@ -38,7 +38,7 @@ import { startTestClickHouseEndpoints } from "~/test-utils/clickhouseTestEndpoin
 import { replayGooseMigrationUp } from "./migrationReplay";
 
 const CREATE_MIGRATION = "00031_create_governance_kpis.sql";
-const VERSION_COLUMN_MIGRATION = "00083_governance_kpis_version_column_fix.sql";
+const VERSION_COLUMN_MIGRATION = "00084_governance_kpis_version_column_fix.sql";
 
 const tenantId = `test-kpis-${generate("tenant").toString()}`;
 const sourceId = "src-1";
@@ -125,7 +125,7 @@ async function versionColumnOf(table: string): Promise<string> {
 
 /**
  * Puts `governance_kpis` in the shape 00031 leaves it: the pre-upgrade engine,
- * empty. 00083 is what is under test, so every case has to start from before
+ * empty. 00084 is what is under test, so every case has to start from before
  * it ran — and each one starts from a clean table so the cases cannot read each
  * other's rows.
  */

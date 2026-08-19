@@ -88,7 +88,7 @@ SELECT throwIf(
         FROM ${CLICKHOUSE_DATABASE}.governance_kpis
         WHERE CreatedAt > now64(3) - INTERVAL 60 SECOND
     ) > 0,
-    'governance_kpis received a write in the last 60s: the KPI writer is not quiesced. Scale the workers deployment to 0 and wait >60s before applying migration 00083 (see the header runbook).'
+    'governance_kpis received a write in the last 60s: the KPI writer is not quiesced. Scale the workers deployment to 0 and wait >60s before applying migration 00084 (see the header runbook).'
 );
 -- +goose StatementEnd
 
