@@ -18,6 +18,7 @@
  * stable contract.
  */
 import { createLogger } from "@langwatch/observability";
+import type { SSEStreamingApi } from "hono/streaming";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
@@ -26,7 +27,10 @@ import {
   LlmModelNotSetError,
 } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
-import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import type {
+  StudioClientEvent,
+  StudioServerEvent,
+} from "~/optimization_studio/types/events";
 import { formSchema } from "~/prompts/schemas";
 import { runtimeInputsSchema } from "~/prompts/schemas/field-schemas";
 import { hasProjectPermission } from "~/server/api/rbac";
@@ -71,6 +75,139 @@ export type PlaygroundStreamEvent =
   | { type: "delta"; content: string }
   | { type: "error"; error: ReturnType<typeof parseLLMError> }
   | { type: "done" };
+
+/**
+ * The new text since the last chunk we sent.
+ *
+ * The engine reports the output field's whole current value on every state
+ * change, so the delta is what has been appended. A value shorter than what we
+ * already sent is a different field winning a race rather than the model
+ * retracting what it said, so it is ignored.
+ */
+function deltaFrom({
+  outputs,
+  outputConfigs,
+  alreadySent,
+}: {
+  outputs: Parameters<typeof extractStreamableOutput>[0];
+  outputConfigs: Parameters<typeof extractStreamableOutput>[1];
+  alreadySent: string;
+}): { text: string; total: string } | undefined {
+  const current = extractStreamableOutput(outputs, outputConfigs);
+  if (current === undefined || current.length < alreadySent.length) {
+    return undefined;
+  }
+  return { text: current.slice(alreadySent.length), total: current };
+}
+
+/**
+ * Reads one engine event, sending whatever it means for the client.
+ *
+ * Returns true once the run is over, so the caller stops rather than the
+ * handler having to reason about ordering.
+ */
+function handleEngineEvent({
+  serverEvent,
+  outputConfigs,
+  sentSoFar,
+  send,
+}: {
+  serverEvent: StudioServerEvent;
+  outputConfigs: ReturnType<typeof outputConfigsFor>;
+  sentSoFar: string;
+  send: (event: PlaygroundStreamEvent) => void;
+}): { sent: string; done: boolean } {
+  if (serverEvent.type === "error") {
+    throw new Error(serverEvent.payload?.message ?? "An error occurred");
+  }
+
+  if (serverEvent.type === "done") return { sent: sentSoFar, done: true };
+
+  if (
+    serverEvent.type !== "component_state_change" ||
+    serverEvent.payload?.component_id !== PROMPT_NODE_ID
+  ) {
+    return { sent: sentSoFar, done: false };
+  }
+
+  const state = serverEvent.payload.execution_state;
+  if (!state) return { sent: sentSoFar, done: false };
+
+  const delta = deltaFrom({
+    outputs: state.outputs,
+    outputConfigs,
+    alreadySent: sentSoFar,
+  });
+  if (delta?.text) send({ type: "delta", content: delta.text });
+
+  if (state.error) throw new Error(state.error);
+
+  return {
+    sent: delta?.total ?? sentSoFar,
+    done: state.status === "success",
+  };
+}
+
+/** Runs one execution, reporting it on the SSE stream. */
+async function streamPromptExecution({
+  stream,
+  projectId,
+  preparedEvent,
+  traceId,
+  outputConfigs,
+}: {
+  stream: SSEStreamingApi;
+  projectId: string;
+  preparedEvent: StudioClientEvent;
+  traceId: string;
+  outputConfigs: ReturnType<typeof outputConfigsFor>;
+}): Promise<void> {
+  let aborted = false;
+  stream.onAbort(() => {
+    aborted = true;
+  });
+
+  const send = (event: PlaygroundStreamEvent) =>
+    void stream.writeSSE({ data: JSON.stringify(event) });
+
+  let sentSoFar = "";
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    send({ type: "done" });
+  };
+
+  send({ type: "start", messageId: traceId, traceId });
+
+  try {
+    await studioBackendPostEvent({
+      projectId,
+      message: preparedEvent,
+      isAborted: () => Promise.resolve(aborted),
+      onEvent: (serverEvent: StudioServerEvent) => {
+        const result = handleEngineEvent({
+          serverEvent,
+          outputConfigs,
+          sentSoFar,
+          send,
+        });
+        sentSoFar = result.sent;
+        if (result.done) finish();
+      },
+    });
+  } catch (error) {
+    logger.error({ error, projectId }, "prompt execution failed");
+    send({
+      type: "error",
+      error: parseLLMError(
+        error instanceof Error ? error.message : String(error),
+      ),
+    });
+  } finally {
+    finish();
+  }
+}
 
 secured
   .access(
@@ -141,82 +278,15 @@ secured
       return c.json({ error: (error as Error).message }, { status: 500 });
     }
 
-    const outputConfigs = outputConfigsFor(formValues);
-
-    return streamSSE(c, async (stream) => {
-      let aborted = false;
-      stream.onAbort(() => {
-        aborted = true;
-      });
-
-      const send = (event: PlaygroundStreamEvent) =>
-        stream.writeSSE({ data: JSON.stringify(event) });
-
-      let lastOutput = "";
-      let finished = false;
-
-      const finish = async () => {
-        if (finished) return;
-        finished = true;
-        await send({ type: "done" });
-      };
-
-      await send({ type: "start", messageId: traceId, traceId });
-
-      try {
-        await studioBackendPostEvent({
-          projectId,
-          message: preparedEvent,
-          isAborted: () => Promise.resolve(aborted),
-          onEvent: (serverEvent: StudioServerEvent) => {
-            if (
-              serverEvent.type === "component_state_change" &&
-              serverEvent.payload?.component_id === PROMPT_NODE_ID
-            ) {
-              const state = serverEvent.payload.execution_state;
-              if (!state) return;
-
-              const current = extractStreamableOutput(
-                state.outputs,
-                outputConfigs,
-              );
-              // Only ever grows; a shorter value is a different field winning a
-              // race, not the model retracting what it already said.
-              if (
-                current !== undefined &&
-                current.length >= lastOutput.length
-              ) {
-                const delta = current.slice(lastOutput.length);
-                if (delta) void send({ type: "delta", content: delta });
-                lastOutput = current;
-              }
-
-              if (state.error) throw new Error(state.error);
-              if (state.status === "success") void finish();
-              return;
-            }
-
-            if (serverEvent.type === "error") {
-              throw new Error(
-                serverEvent.payload?.message ?? "An error occurred",
-              );
-            }
-
-            if (serverEvent.type === "done") void finish();
-          },
-        });
-      } catch (error) {
-        logger.error({ error, projectId }, "prompt execution failed");
-        await send({
-          type: "error",
-          error: parseLLMError(
-            error instanceof Error ? error.message : String(error),
-          ),
-        });
-      } finally {
-        await finish();
-      }
-    });
+    return streamSSE(c, (stream) =>
+      streamPromptExecution({
+        stream,
+        projectId,
+        preparedEvent,
+        traceId,
+        outputConfigs: outputConfigsFor(formValues),
+      }),
+    );
   });
 
 export const app = secured.hono;
