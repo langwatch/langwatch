@@ -384,8 +384,8 @@ describe("RoleBindingService applyGroupEdits", () => {
       // The mock call orders are process-wide monotonic counters, so a lower
       // number on the revoke than on the membership delete is proof the
       // ledger command really ran first, not just that both ran.
-      expect(revokeBindings.mock.invocationCallOrder[0]).toBeLessThan(
-        groupMembershipDeleteMany.mock.invocationCallOrder[0],
+      expect(revokeBindings.mock.invocationCallOrder[0]!).toBeLessThan(
+        groupMembershipDeleteMany.mock.invocationCallOrder[0]!,
       );
     });
 
