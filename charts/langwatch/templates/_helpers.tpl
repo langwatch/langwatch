@@ -1369,7 +1369,13 @@ app_rollout_done() {
   IFS='|'
   set -- $state
   IFS=$old_ifs
-  generation="${1:-}"; observed="${2:-}"; want="${3:-}"; updated="${4:-}"; current="${5:-}"; available="${6:-}"
+  # The three status counters default to 0, because the API omits a zero-valued
+  # one and an app parked at replicaCount 0 is a finished rollout, not one that
+  # never starts. The desired count stays mandatory: with it missing there is
+  # nothing to compare against. Defaulting the counters does not weaken the
+  # check, since a rollout that has not produced its pods yet reports 0 against
+  # a desired count above 0 and still reads as unfinished.
+  generation="${1:-}"; observed="${2:-}"; want="${3:-}"; updated="${4:-0}"; current="${5:-0}"; available="${6:-0}"
   is_number "$generation" || return 1
   is_number "$observed" || return 1
   is_number "$want" || return 1

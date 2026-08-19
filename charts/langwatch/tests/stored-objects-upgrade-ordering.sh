@@ -373,7 +373,9 @@ new pod created but not yet available;5|5|1|1|1||;waiting
 nothing reported at all;||||||;waiting
 kubectl returned nothing;;waiting
 two replicas, only one updated;5|5|2|1|2|2|;waiting
-two replicas, both updated and available;5|5|2|2|2|2|;done'
+two replicas, one updated and no old pod left;5|5|2|1|1|1|;waiting
+two replicas, both updated and available;5|5|2|2|2|2|;done
+an app parked at zero replicas;5|5|0|||;done'
 
   while IFS=';' read -r label state want; do
     [ -z "$label" ] && continue
