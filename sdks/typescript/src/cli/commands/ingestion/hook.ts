@@ -63,6 +63,7 @@ import {
 } from "@/cli/utils/governance/hook-state";
 import {
   buildSessionContextLogPayload,
+  explicitSessionTitleFromEnv,
   parseOtlpHeaders,
   parseTraceparent,
   sessionContextFingerprint,
@@ -217,8 +218,13 @@ async function runHook({
 
   const projectDir = spec.projectDirVar ? env[spec.projectDirVar] : undefined;
   const directory = firstNonEmpty(projectDir, input.cwd) ?? process.cwd();
-  const context = readSessionContext({ directory, runGit });
-  if (!context) {
+  const explicitTitle = explicitSessionTitleFromEnv(env);
+  // Outside a repository the record can still carry the orchestrator's
+  // declared name, and the name alone is worth a post: it is what lets a
+  // fleet's launcher label the session before its first prompt. With
+  // neither identity nor a declaration there is nothing to say.
+  const context = readSessionContext({ directory, runGit }) ?? {};
+  if (!context.repository && !explicitTitle) {
     debug({
       message: `no git repository with an origin remote at ${directory}`,
       env,
@@ -226,7 +232,7 @@ async function runHook({
     return;
   }
 
-  const fingerprint = sessionContextFingerprint(context);
+  const fingerprint = sessionContextFingerprint(context, { explicitTitle });
   pruneStaleState({ stateDir, now });
 
   const stateFile = stateFilePath({ stateDir, agent, sessionId });
@@ -243,6 +249,7 @@ async function runHook({
     timeUnixNano: `${now()}000000`,
     scopeVersion: LANGWATCH_SDK_VERSION,
     trace: parseTraceparent(env.TRACEPARENT),
+    explicitTitle,
   });
 
   const posted = await postSessionContext({

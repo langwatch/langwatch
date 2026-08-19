@@ -9,6 +9,7 @@ import {
   normalizeEventName,
   normalizeMetricName,
   parseMcpToolName,
+  SESSION_TITLE_EXPLICIT_FACT_KEY,
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
 } from "./coding-agent-normalization";
@@ -154,6 +155,7 @@ const LANGWATCH = {
     WORKTREE: "vcs.worktree.name",
     TITLE: SESSION_TITLE_FACT_KEY,
     TITLE_FALLBACK: SESSION_TITLE_FALLBACK_FACT_KEY,
+    TITLE_EXPLICIT: SESSION_TITLE_EXPLICIT_FACT_KEY,
   },
 } as const;
 
@@ -247,6 +249,7 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     gitBranches: [],
     gitWorktree: null,
     title: null,
+    titleExplicit: null,
 
     modelCalls: 0,
     toolCalls: 0,
@@ -906,6 +909,11 @@ export function applyLogToCodingAgentSession({
         // withholds prompt text from its own events). Fill-if-empty, same as
         // the prompt-derived name: a generated title outranks it.
         title: base.title ?? str(attrs[LANGWATCH.ATTR.TITLE]),
+        // The orchestrator-declared name. Last-non-empty-wins, so renaming
+        // the launcher renames the session, and the read ranks it above
+        // both derived titles.
+        titleExplicit:
+          str(attrs[LANGWATCH.ATTR.TITLE_EXPLICIT]) ?? base.titleExplicit,
       };
     }
 

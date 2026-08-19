@@ -24,6 +24,7 @@ import {
 } from "./hook-state";
 import {
   buildSessionContextLogPayload,
+  explicitSessionTitleFromEnv,
   parseGitRemoteUrl,
   type SessionContext,
   sessionContextFingerprint,
@@ -374,14 +375,27 @@ export async function postCodexSessionContext(args: {
 }): Promise<boolean> {
   const { meta, nowMs, logsEndpoint, token, stateDir, fetchImpl } = args;
   if (!logsEndpoint) return false;
-  if (!meta?.sessionId || !meta.gitRepositoryUrl) return false;
-  const repository = parseGitRemoteUrl(meta.gitRepositoryUrl);
-  if (!repository) return false;
+  if (!meta?.sessionId) return false;
+  const repository = meta.gitRepositoryUrl
+    ? parseGitRemoteUrl(meta.gitRepositoryUrl)
+    : null;
+  const title = meta.firstUserMessage
+    ? sessionTitleFromPrompt(meta.firstUserMessage)
+    : null;
+  const explicitTitle = explicitSessionTitleFromEnv();
+  // A codex session appears in the sessions screen only through this
+  // record, so a session outside any repository still posts one as long
+  // as there is a name to carry. With no identity and no name there is
+  // nothing to say.
+  if (!repository && !title && !explicitTitle) return false;
   const context: SessionContext = {
-    repository,
+    ...(repository ? { repository } : {}),
     ...(meta.gitBranch ? { branch: meta.gitBranch } : {}),
   };
-  const fingerprint = sessionContextFingerprint(context);
+  const fingerprint = sessionContextFingerprint(context, {
+    title,
+    explicitTitle,
+  });
   const stateFile = stateFilePath({
     stateDir: stateDir ?? defaultStateDir(),
     agent: "codex",
@@ -395,10 +409,10 @@ export async function postCodexSessionContext(args: {
     timeUnixNano: `${nowMs}000000`,
     scopeVersion: LANGWATCH_SDK_VERSION,
     // Codex generates no session title and withholds prompt text from its
-    // own events, so the transcript's first typed prompt names the session.
-    title: meta.firstUserMessage
-      ? sessionTitleFromPrompt(meta.firstUserMessage)
-      : null,
+    // own events, so the transcript's first typed prompt names the session,
+    // and the orchestrator's declared name outranks it.
+    title,
+    explicitTitle,
   });
   const doFetch = fetchImpl ?? fetch;
   const controller = new AbortController();

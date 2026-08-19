@@ -721,6 +721,95 @@ describe("CodingAgentSessionFoldProjection", () => {
       );
       expect(state.title).toBe("Read notes.txt and summarize it");
     });
+
+    /** @scenario "An explicit title outranks the generated one" */
+    /** @scenario "An explicit title outranks the prompt-derived name" */
+    it("keeps the declared title apart, so it outranks both derived names on read", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "claude_code",
+            "langwatch.session.title_explicit": "pr-reviewer",
+          },
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: promptFacts("Good morning. Use the review skill."),
+          timeMs: 2_000,
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "claude_code.api_response_body",
+            "langwatch.session.title": "Review the open pull requests",
+          },
+          timeMs: 3_000,
+        }),
+        state,
+      );
+
+      expect(state.titleExplicit).toBe("pr-reviewer");
+      // The derived names still fold on their own terms.
+      expect(state.title).toBe("Review the open pull requests");
+    });
+
+    /** @scenario "A renamed orchestrator renames the session" */
+    it("lets a later declared title replace the previous one", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      const declared = (title: string) =>
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "claude_code",
+            "langwatch.session.title_explicit": title,
+          },
+        });
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        declared("pr-reviewer"),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        declared("pr-hound"),
+        state,
+      );
+
+      expect(state.titleExplicit).toBe("pr-hound");
+    });
+
+    /** @scenario "A context record with no repository still folds its titles" */
+    it("folds a context that names no repository", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "codex",
+            "langwatch.session.title": "Read notes.txt",
+            "langwatch.session.title_explicit": "pr-reviewer",
+          },
+          agent: "codex",
+        }),
+        state,
+      );
+
+      expect(state.repositoryHost).toBeNull();
+      expect(state.repositoryName).toBeNull();
+      expect(state.title).toBe("Read notes.txt");
+      expect(state.titleExplicit).toBe("pr-reviewer");
+    });
   });
 
   describe("when a session sends only metrics", () => {

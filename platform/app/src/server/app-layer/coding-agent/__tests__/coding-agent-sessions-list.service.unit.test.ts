@@ -40,6 +40,7 @@ function sessionRow(
     gitBranch: "feat/two",
     gitBranches: ["feat/one", "feat/two"],
     title: "Add the sessions screen",
+    titleExplicit: "",
     ...over,
   });
 }
@@ -163,6 +164,21 @@ describe("CodingAgentSessionsListService", () => {
       expect(rows[0]?.title).toBe("Add the sessions screen");
       // Nothing to show reads as nothing, never as an empty string, so the
       // page renders its own words for an untitled session.
+      expect(rows[1]?.title).toBeNull();
+    });
+
+    /** @scenario "An explicit title outranks the generated one" */
+    it("names a row by the orchestrator-declared title over the derived one", async () => {
+      const { service } = serviceWith({
+        rows: [
+          sessionRow({ titleExplicit: "pr-reviewer" }),
+          sessionRow({ sessionId: "session-b", title: "", titleExplicit: "" }),
+        ],
+      });
+
+      const rows = await service.listForProject({ projectId: PROJECT });
+
+      expect(rows[0]?.title).toBe("pr-reviewer");
       expect(rows[1]?.title).toBeNull();
     });
   });

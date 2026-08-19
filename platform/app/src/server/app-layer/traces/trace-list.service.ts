@@ -1311,7 +1311,7 @@ function presentMediaRefs(
   return refs.length > 0 ? refs : undefined;
 }
 
-function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
+export function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
   const status = deriveTraceStatus(row);
 
   const totalTokens =
@@ -1319,7 +1319,10 @@ function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
 
   return {
     traceId: row.traceId,
-    timestamp: row.occurredAt,
+    // The span timing baseline where the trace has one, otherwise the
+    // storage anchor (ADR-087): a log-only trace has no span start, and the
+    // raw baseline of 0 rendered its row as "20684d ago".
+    timestamp: row.occurredAt > 0 ? row.occurredAt : (row.storageAnchorMs ?? 0),
     name: row.attributes["langwatch.span.name"] ?? row.traceId.slice(0, 8),
     serviceName: row.attributes["service.name"] ?? "",
     durationMs: row.totalDurationMs,

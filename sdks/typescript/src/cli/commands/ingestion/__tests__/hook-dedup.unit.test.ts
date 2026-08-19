@@ -79,6 +79,19 @@ describe("the session context hook's per-session fingerprint", () => {
     });
   });
 
+  describe("given a declared title that changed between runs", () => {
+    /** @scenario "A changed declared title re-posts" */
+    it("posts again carrying the new title", async () => {
+      await hook.runHook({ env: { LANGWATCH_SESSION_TITLE: "pr-reviewer" } });
+      await hook.runHook({ env: { LANGWATCH_SESSION_TITLE: "pr-hound" } });
+
+      expect(posted).toHaveLength(2);
+      expect(attributesOf(posted[1]!)).toMatchObject({
+        "langwatch.session.title_explicit": "pr-hound",
+      });
+    });
+  });
+
   describe("given a post that does not land", () => {
     it("records nothing when the collector cannot be reached", async () => {
       await hook.runHook({ fetchImpl: unreachableCollector });

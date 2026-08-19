@@ -34,6 +34,23 @@ const SERVICE_NAME = "langwatch-cli";
  * agent-generated title outrank it.
  */
 const SESSION_TITLE_ATTR = "langwatch.session.title";
+const SESSION_TITLE_EXPLICIT_ATTR = "langwatch.session.title_explicit";
+
+/**
+ * The title the session's orchestrator declared, from
+ * LANGWATCH_SESSION_TITLE in the session's environment. A launcher that
+ * runs a fleet exports it per agent, so every capture seam that posts a
+ * session-context record carries it and the platform ranks it above the
+ * generated and prompt-derived names. Whitespace is no declaration, and
+ * the value is capped the way the derived titles are.
+ */
+export function explicitSessionTitleFromEnv(
+	env: NodeJS.ProcessEnv = process.env,
+): string | null {
+	const raw = env.LANGWATCH_SESSION_TITLE?.trim();
+	if (!raw) return null;
+	return raw.length > 120 ? raw.slice(0, 120) : raw;
+}
 
 /** The most of a prompt that becomes a session's name. */
 const MAX_PROMPT_TITLE_CHARS = 120;
@@ -65,7 +82,12 @@ export interface RepositoryIdentity {
 
 /** The git identity of one session at one moment. */
 export interface SessionContext {
-	repository: RepositoryIdentity;
+	/**
+	 * Absent when the session ran outside any git repository. The record is
+	 * still worth posting then: it is what creates the session row for agents
+	 * whose own telemetry cannot (codex), and what carries the titles.
+	 */
+	repository?: RepositoryIdentity;
 	/** Absent on a detached HEAD. */
 	branch?: string;
 	/** Absent unless the checkout is a linked worktree. */
@@ -165,12 +187,17 @@ function identityFrom(
  * Every field that can change mid-session is in it, so a branch switch or a
  * move to another worktree re-posts while a quiet session stays quiet.
  */
-export function sessionContextFingerprint({
-	repository,
-	branch,
-	worktree,
-}: SessionContext): string {
-	return `${repository.host}/${repository.owner}/${repository.name}@${branch ?? ""}#${worktree ?? ""}`;
+export function sessionContextFingerprint(
+	{ repository, branch, worktree }: SessionContext,
+	titles?: { title?: string | null; explicitTitle?: string | null },
+): string {
+	const repo = repository
+		? `${repository.host}/${repository.owner}/${repository.name}`
+		: "";
+	// The titles are part of the identity on purpose: a renamed orchestrator
+	// (a changed LANGWATCH_SESSION_TITLE) must re-post, or the rename never
+	// reaches the platform.
+	return `${repo}@${branch ?? ""}#${worktree ?? ""}!${titles?.title ?? ""}~${titles?.explicitTitle ?? ""}`;
 }
 
 /**
@@ -227,6 +254,7 @@ export function buildSessionContextLogPayload({
 	scopeVersion,
 	trace,
 	title,
+	explicitTitle,
 }: {
 	sessionId: string;
 	agent: string;
@@ -236,15 +264,24 @@ export function buildSessionContextLogPayload({
 	trace?: TraceContext | null;
 	/** The session's name, for agents whose telemetry cannot carry one. */
 	title?: string | null;
+	/** The orchestrator-declared name; outranks every derived title. */
+	explicitTitle?: string | null;
 }): OtlpLogsPayload {
 	const attributes: OtlpKeyValue[] = [
 		attribute({ key: "event.name", value: SESSION_CONTEXT_EVENT_NAME }),
 		attribute({ key: "session.id", value: sessionId }),
 		attribute({ key: "coding_agent.name", value: agent }),
-		attribute({ key: "vcs.repository.host", value: context.repository.host }),
-		attribute({ key: "vcs.repository.owner", value: context.repository.owner }),
-		attribute({ key: "vcs.repository.name", value: context.repository.name }),
 	];
+	if (context.repository) {
+		attributes.push(
+			attribute({ key: "vcs.repository.host", value: context.repository.host }),
+			attribute({
+				key: "vcs.repository.owner",
+				value: context.repository.owner,
+			}),
+			attribute({ key: "vcs.repository.name", value: context.repository.name }),
+		);
+	}
 	if (context.branch) {
 		attributes.push(
 			attribute({ key: "vcs.ref.head.name", value: context.branch }),
@@ -257,6 +294,11 @@ export function buildSessionContextLogPayload({
 	}
 	if (title) {
 		attributes.push(attribute({ key: SESSION_TITLE_ATTR, value: title }));
+	}
+	if (explicitTitle) {
+		attributes.push(
+			attribute({ key: SESSION_TITLE_EXPLICIT_ATTR, value: explicitTitle }),
+		);
 	}
 
 	return {

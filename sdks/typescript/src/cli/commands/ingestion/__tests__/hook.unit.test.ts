@@ -81,6 +81,37 @@ describe("the session context hook", () => {
     });
   });
 
+  describe("given an orchestrator that declared the session's title", () => {
+    /** @scenario "A declared title rides the context record" */
+    it("carries the explicit title alongside the git identity", async () => {
+      await hook.runHook({ env: { LANGWATCH_SESSION_TITLE: "pr-reviewer" } });
+
+      expect(attributesOf(posted[0]!)).toMatchObject({
+        "vcs.repository.name": "langwatch",
+        "langwatch.session.title_explicit": "pr-reviewer",
+      });
+    });
+
+    /** @scenario "A declared title posts even outside a git repository" */
+    it("posts the session id and the title with no repository attributes", async () => {
+      await hook.runHook({
+        git: {},
+        env: { LANGWATCH_SESSION_TITLE: "pr-reviewer" },
+      });
+
+      expect(posted).toHaveLength(1);
+      const attributes = attributesOf(posted[0]!);
+      expect(attributes).toMatchObject({
+        "session.id": SESSION_ID,
+        "langwatch.session.title_explicit": "pr-reviewer",
+      });
+      expect(attributes).not.toHaveProperty("vcs.repository.host");
+      expect(attributes).not.toHaveProperty("vcs.repository.owner");
+      expect(attributes).not.toHaveProperty("vcs.repository.name");
+      expect(hook.exits).toEqual([]);
+    });
+  });
+
   describe("given a seam other than Claude Code's", () => {
     /** @scenario "The record declares the agent whose seam invoked it" */
     it.each([

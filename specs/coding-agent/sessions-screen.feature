@@ -74,6 +74,38 @@ Rule: The page lists my sessions with their context economics
     When the user opens their Sessions page
     Then the page says no sessions have been recorded yet
 
+Rule: A session row exists once the session says something
+
+  A coding agent that starts and then dies before its first prompt still
+  emits lifecycle telemetry: session start, auth errors, config reads. A
+  fleet of agents resuming at boot with expired credentials produced twelve
+  such rows in one morning, every one untitled with a dash in every column.
+  A row that can never say what the session did or even what it was asked
+  is noise, so it is not created; the session's records stay stored and the
+  row appears the moment a real signal arrives.
+
+  @unit
+  Scenario: Lifecycle-only telemetry creates no session row
+    Given a session that emitted only lifecycle and error events
+    And it never carried a prompt, a model call, a title or a repository
+    When its telemetry is folded
+    Then no session row is stored
+
+  @unit
+  Scenario: The first real signal creates the row
+    Given a session whose lifecycle telemetry created no row
+    When its first user prompt arrives
+    Then the session row is stored
+    And it is named by that prompt
+
+  @unit
+  Scenario: A session announced with a name is a row from the start
+    Given a session whose orchestrator declared an explicit title for it
+    When the session-context record arrives before any prompt
+    Then the session row is stored under that title
+    # An orchestrator's agent that wedges before its first prompt still
+    # shows up, attributable by name, rather than vanishing entirely.
+
 Rule: A session is named by its generated title, else by its first prompt
 
   Most agents rarely generate a title, so a title-only session list reads as
@@ -117,6 +149,33 @@ Rule: A session is named by its generated title, else by its first prompt
     Given a session whose agent never generated a title or received a prompt
     When the user reads its row
     Then the row names it as an untitled session
+
+Rule: An explicit title from the session's orchestrator outranks every derived name
+
+  A fleet of scheduled agents all opening with the same scripted greeting
+  reads as a page of identical prompt-derived names. The orchestrator that
+  launched the session knows what the session IS, so it can declare the
+  name: the launcher exports LANGWATCH_SESSION_TITLE, the capture carries
+  it on the session-context record, and the row wears it over anything the
+  agent generated or the user typed.
+
+  @unit
+  Scenario: An explicit title outranks the generated one
+    Given a session whose context record carries an explicit title
+    When the agent later generates its own title
+    Then the row keeps the explicit title
+
+  @unit
+  Scenario: An explicit title outranks the prompt-derived name
+    Given a session whose context record carries an explicit title
+    When a prompt event arrives carrying a name candidate
+    Then the row keeps the explicit title
+
+  @unit
+  Scenario: A renamed orchestrator renames the session
+    Given a session titled explicitly
+    When a later context record carries a different explicit title
+    Then the row wears the newest explicit title
 
 Rule: A session lists every pull request it drove
 

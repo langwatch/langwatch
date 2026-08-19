@@ -104,6 +104,15 @@ export interface CodingAgentSessionData {
   gitBranches: string[];
   gitWorktree: string | null;
   title: string | null;
+  /**
+   * The title the session's ORCHESTRATOR declared, carried on the companion
+   * event from LANGWATCH_SESSION_TITLE in the session's environment. Its own
+   * field rather than a source flag on `title`, because the fold's state is
+   * decoded back from the row and a merged field cannot say whether a later
+   * generated title may replace it. LAST-NON-EMPTY-WINS, and the read
+   * coalesces it over `title`.
+   */
+  titleExplicit: string | null;
 
   // ── Shape ─────────────────────────────────────────────────────────────
   modelCalls: number;

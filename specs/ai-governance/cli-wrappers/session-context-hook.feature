@@ -163,11 +163,48 @@ Rule: The hook reports the git identity of the session
     When another agent reports the same session id
     Then the second agent posts rather than reading the first one's fingerprint
 
+Rule: The orchestrator that launched the session can name it
+
+  A scheduled fleet's sessions all open with the same scripted greeting, so
+  prompt-derived names collapse into one repeated line. The launcher knows
+  the session's identity, so it declares it: LANGWATCH_SESSION_TITLE in the
+  session's environment rides the context record as an explicit title, which
+  the platform ranks above generated and prompt-derived names.
+
+  @unit
+  Scenario: A declared title rides the context record
+    Given LANGWATCH_SESSION_TITLE is set in the hook's environment
+    And a hook invocation inside a git worktree
+    When the hook runs
+    Then the record carries the explicit title alongside the git identity
+
+  @unit
+  Scenario: A declared title posts even outside a git repository
+    Given LANGWATCH_SESSION_TITLE is set in the hook's environment
+    And a hook invocation in a directory that is not a git repository
+    When the hook runs
+    Then one record is posted carrying the session id and the explicit title
+    And it carries no repository attributes
+
+  @unit
+  Scenario: A changed declared title re-posts
+    Given a session whose context was already posted with one explicit title
+    When the hook runs again with a different LANGWATCH_SESSION_TITLE
+    Then a new record is posted carrying the new title
+
+  @unit
+  Scenario: A blank declared title is no declaration
+    Given LANGWATCH_SESSION_TITLE is set to whitespace
+    And a hook invocation in a directory that is not a git repository
+    When the hook runs
+    Then nothing is posted and the exit code is zero
+
 Rule: The hook never disturbs the session
 
   @unit
-  Scenario: Outside a git repository the hook sends nothing and exits zero
+  Scenario: Outside a git repository with nothing to declare the hook sends nothing and exits zero
     Given a hook invocation in a directory that is not a git repository
+    And no explicit session title is declared in the environment
     When the hook runs
     Then nothing is posted and the exit code is zero
 

@@ -413,6 +413,8 @@ export interface CodingAgentSessionRow {
   gitBranches: string[];
   gitWorktree: string;
   title: string;
+  /** The orchestrator-declared title (00083); outranks `title` on read. */
+  titleExplicit: string;
 
   modelCalls: number;
   toolCalls: number;
@@ -649,6 +651,7 @@ function gitContextColumns(state: CodingAgentSessionState): {
   gitBranches: string[];
   gitWorktree: string;
   title: string;
+  titleExplicit: string;
 } {
   return {
     repositoryHost: state.repositoryHost ?? "",
@@ -658,6 +661,7 @@ function gitContextColumns(state: CodingAgentSessionState): {
     gitBranches: state.gitBranches,
     gitWorktree: state.gitWorktree ?? "",
     title: state.title ?? "",
+    titleExplicit: state.titleExplicit ?? "",
   };
 }
 
@@ -722,6 +726,7 @@ export function codingAgentSessionStateFromRow(
     gitBranches: row.gitBranches,
     gitWorktree: nullIfEmpty(row.gitWorktree),
     title: nullIfEmpty(row.title),
+    titleExplicit: nullIfEmpty(row.titleExplicit),
 
     modelCalls: row.modelCalls,
     toolCalls: row.toolCalls,

@@ -34,6 +34,10 @@ function makeState(
     createdAt: 1_000,
     updatedAt: 1_000,
     LastEventOccurredAt: 1_000,
+    // One prompt, so the state passes the persist gate: a session that never
+    // said anything stores no row, and these suites are about what a stored
+    // row carries, not about the gate.
+    prompts: 1,
     ...over,
   };
 }
@@ -120,6 +124,75 @@ const context = (
   aggregateId: "session-1",
   tenantId,
   ...over,
+});
+
+describe("the session persist gate", () => {
+  describe("given a session that emitted only lifecycle and error telemetry", () => {
+    /** @scenario "Lifecycle-only telemetry creates no session row" */
+    it("stores no row", async () => {
+      const repo = new FakeRepo();
+      const store = new CodingAgentSessionStore(repo);
+
+      await store.store(
+        makeState({ prompts: 0, apiErrors: 4 }),
+        context({ appliedEventIds: ["e1"] }),
+      );
+
+      expect(repo.upsertCalls).toEqual([]);
+    });
+
+    it("drops such entries from a batch and keeps the rest", async () => {
+      const repo = new FakeRepo();
+      const store = new CodingAgentSessionStore(repo);
+
+      await store.storeBatch([
+        { state: makeState({ prompts: 0, apiErrors: 4 }), context: context() },
+        { state: makeState(), context: context() },
+      ]);
+
+      expect(repo.batchEntries).toHaveLength(1);
+      expect(repo.batchEntries[0]!.row.prompts).toBe(1);
+    });
+  });
+
+  describe("given the session's first real signal", () => {
+    /** @scenario "The first real signal creates the row" */
+    it("a prompt stores the row", async () => {
+      const repo = new FakeRepo();
+      const store = new CodingAgentSessionStore(repo);
+
+      await store.store(makeState({ prompts: 1 }), context());
+
+      expect(repo.upsertCalls).toHaveLength(1);
+    });
+
+    /** @scenario "A session announced with a name is a row from the start" */
+    it("an orchestrator-declared title stores the row before any prompt", async () => {
+      const repo = new FakeRepo();
+      const store = new CodingAgentSessionStore(repo);
+
+      await store.store(
+        makeState({ prompts: 0, titleExplicit: "pr-reviewer" }),
+        context(),
+      );
+
+      expect(repo.upsertCalls).toHaveLength(1);
+      expect(repo.upsertCalls[0]!.row.titleExplicit).toBe("pr-reviewer");
+    });
+
+    /** @scenario "a session that sent only metrics still appears" */
+    it("a metrics-only session with tokens stores the row", async () => {
+      const repo = new FakeRepo();
+      const store = new CodingAgentSessionStore(repo);
+
+      await store.store(
+        makeState({ prompts: 0, inputTokens: 1_200, outputTokens: 90 }),
+        context(),
+      );
+
+      expect(repo.upsertCalls).toHaveLength(1);
+    });
+  });
 });
 
 describe("CodingAgentSessionStore durable dedup", () => {

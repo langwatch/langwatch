@@ -499,9 +499,27 @@ describe("harvestCodexThread", () => {
 	});
 
 	describe("given a session with no repository in its transcript", () => {
-		describe("when the session is harvested", () => {
-			/** @scenario "A session outside any repository posts its conversation and no context" */
+		const typedPrompt = (message: string) => ({
+			type: "event_msg",
+			payload: { type: "user_message", message },
+		});
+		const contextAttrsOf = (bodies: any[], urls: string[]) => {
+			const log =
+				bodies[urls.indexOf("https://e/v1/logs")].resourceLogs[0].scopeLogs[0]
+					.logRecords[0];
+			return Object.fromEntries(
+				log.attributes.map((a: any) => [a.key, a.value?.stringValue]),
+			);
+		};
+
+		afterEach(() => {
+			vi.unstubAllEnvs();
+		});
+
+		describe("when the session is harvested with nothing to name it", () => {
+			/** @scenario "A session with no remote, no prompt and no declared title posts no context" */
 			it("posts the conversation and no context record", async () => {
+				vi.stubEnv("LANGWATCH_SESSION_TITLE", "");
 				writeRollout(THREAD, [
 					sessionMeta(),
 					taskStarted(TRACE),
@@ -521,6 +539,73 @@ describe("harvestCodexThread", () => {
 				});
 
 				expect(urls).toEqual(["https://e/v1/traces"]);
+			});
+		});
+
+		describe("when the transcript carries a typed prompt", () => {
+			/** @scenario "A session outside any repository still posts a context that names it" */
+			it("posts a context carrying the title and no repository attributes", async () => {
+				vi.stubEnv("LANGWATCH_SESSION_TITLE", "");
+				writeRollout(THREAD, [
+					sessionMeta(),
+					taskStarted(TRACE),
+					typedPrompt("Fix the flaky login test"),
+					userMessage("Fix the flaky login test"),
+					agentFinal("done"),
+				]);
+				const { bodies, urls, impl } = recordingFetch();
+
+				await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					logsEndpoint: "https://e/v1/logs",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					fetchImpl: impl,
+				});
+
+				expect(urls).toContain("https://e/v1/logs");
+				const attributes = contextAttrsOf(bodies, urls);
+				expect(attributes["session.id"]).toBe(THREAD);
+				expect(attributes["langwatch.session.title"]).toBe(
+					"Fix the flaky login test",
+				);
+				expect(attributes["vcs.repository.host"]).toBeUndefined();
+				expect(attributes["vcs.repository.name"]).toBeUndefined();
+			});
+		});
+
+		describe("when the orchestrator declared the session's title", () => {
+			/** @scenario "An orchestrator-declared title rides the codex context record" */
+			it("carries the explicit title beside the derived one", async () => {
+				vi.stubEnv("LANGWATCH_SESSION_TITLE", "pr-reviewer");
+				writeRollout(THREAD, [
+					sessionMeta(),
+					taskStarted(TRACE),
+					typedPrompt("Fix the flaky login test"),
+					userMessage("Fix the flaky login test"),
+					agentFinal("done"),
+				]);
+				const { bodies, urls, impl } = recordingFetch();
+
+				await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					logsEndpoint: "https://e/v1/logs",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					fetchImpl: impl,
+				});
+
+				const attributes = contextAttrsOf(bodies, urls);
+				expect(attributes["langwatch.session.title_explicit"]).toBe(
+					"pr-reviewer",
+				);
+				expect(attributes["langwatch.session.title"]).toBe(
+					"Fix the flaky login test",
+				);
 			});
 		});
 	});

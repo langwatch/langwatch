@@ -185,7 +185,13 @@ export function mapTraceSummaryToHeader(
 
   return {
     traceId: summary.traceId,
-    timestamp: summary.occurredAt,
+    // The span timing baseline where the trace has one, otherwise the
+    // storage anchor (ADR-087): a log-only trace has no span start, and the
+    // raw baseline of 0 rendered its row as "20684d ago".
+    timestamp:
+      summary.occurredAt > 0
+        ? summary.occurredAt
+        : (summary.storageAnchorMs ?? 0),
     name:
       summary.attributes["langwatch.span.name"] ?? summary.traceId.slice(0, 8),
     serviceName: summary.attributes["service.name"] ?? "",

@@ -378,7 +378,15 @@ function toListRow(
 ): CodingAgentSessionListRow {
   return {
     sessionId: row.sessionId,
-    title: row.title === "" ? null : row.title,
+    // The orchestrator-declared name outranks the derived one: the launcher
+    // knows what the session IS, while `title` is whatever the agent
+    // generated or the user first typed.
+    title:
+      row.titleExplicit !== ""
+        ? row.titleExplicit
+        : row.title === ""
+          ? null
+          : row.title,
     agent: row.agent,
     agentVersion: row.agentVersion,
     repositoryHost: row.repositoryHost,

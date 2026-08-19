@@ -142,6 +142,20 @@ Rule: The session title lifts from the generated conversation title
     Then no session title fact is stamped
     And the contribution otherwise proceeds
 
+  @unit
+  Scenario: The explicit title lifts from the session context record
+    Given a session context event carrying an explicit title attribute
+    When the coding-agent log facts are dispatched
+    Then the explicit title fact carries it
+    And the fold stores it beside the derived title
+
+  @unit
+  Scenario: A context record with no repository still folds its titles
+    Given a session context event carrying titles and no repository attributes
+    When the contribution folds
+    Then the session keeps no repository identity
+    And the titles fold as they would with one
+
 Rule: The session row stores and reads back the git context
 
   @integration

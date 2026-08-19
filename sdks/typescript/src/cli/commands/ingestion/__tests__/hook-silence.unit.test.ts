@@ -30,12 +30,23 @@ const oversizedWrite = () => {
 
 describe("the session context hook's silence", () => {
   describe("given a directory that is not a git repository", () => {
-    /** @scenario "Outside a git repository the hook sends nothing and exits zero" */
+    /** @scenario "Outside a git repository with nothing to declare the hook sends nothing and exits zero" */
     it("posts nothing, records nothing and exits zero", async () => {
       await hook.runHook({ git: {} });
 
       expect(posted).toEqual([]);
       expect(hook.stdout).toEqual([]);
+      expect(hook.exits).toEqual([]);
+    });
+
+    /** @scenario "A blank declared title is no declaration" */
+    it("treats a whitespace LANGWATCH_SESSION_TITLE as nothing to say", async () => {
+      await hook.runHook({
+        git: {},
+        env: { LANGWATCH_SESSION_TITLE: "   " },
+      });
+
+      expect(posted).toEqual([]);
       expect(hook.exits).toEqual([]);
     });
 
