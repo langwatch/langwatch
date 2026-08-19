@@ -1,14 +1,9 @@
-import { Box, HStack, Image, Text, VStack } from "@chakra-ui/react";
+import { VStack } from "@chakra-ui/react";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
-import { getDisplayRoleVisuals } from "~/features/traces-v2/components/TraceDrawer/scenarioRoles";
-import { ToolPairCard } from "~/features/traces-v2/components/TraceDrawer/transcript/ToolBlocks";
-import { Bubble } from "~/features/traces-v2/components/TraceTable/registry/addons/conversation/Bubble";
-import { MediaPart } from "../simulations/MediaPart";
+import type { AudioPlaybackProps } from "../simulations/useSequentialAudioPlayback";
 import { useSequentialAudioPlayback } from "../simulations/useSequentialAudioPlayback";
-import { RenderInputOutput } from "../traces/RenderInputOutput";
-import { ErrorMessage } from "./ErrorMessage";
 import { groupIntoTurns } from "./flattenMessages";
-import { tryParseJson } from "./structuredOutput";
+import { ErrorPart, ImagePart, MediaRow, TextPart, ToolPart } from "./parts";
 import { TurnSeparator } from "./TurnSeparator";
 import type { DisplayPart } from "./types";
 
@@ -53,11 +48,53 @@ interface ConversationThreadProps {
   structuredOutput?: boolean;
 }
 
-const alignForRole = (role?: string): "flex-start" | "flex-end" =>
-  role === "assistant" ? "flex-start" : "flex-end";
-
-const textAlignForRole = (role?: string): "left" | "right" =>
-  role === "assistant" ? "left" : "right";
+/** Dispatches one part to the component that knows how to draw it. */
+function ConversationPart({
+  part,
+  compact,
+  roleMode,
+  projectId,
+  structuredOutput,
+  actions,
+  audioPlayback,
+}: {
+  part: DisplayPart;
+  compact: boolean;
+  roleMode: "chat" | "scenario";
+  projectId: string;
+  structuredOutput: boolean;
+  actions?: ReactNode;
+  audioPlayback?: AudioPlaybackProps;
+}) {
+  switch (part.kind) {
+    case "text":
+      return (
+        <TextPart
+          part={part}
+          compact={compact}
+          roleMode={roleMode}
+          structuredOutput={structuredOutput}
+          actions={actions}
+        />
+      );
+    case "image":
+      return <ImagePart part={part} />;
+    case "media":
+      return (
+        <MediaRow
+          part={part}
+          projectId={projectId}
+          audioPlayback={audioPlayback}
+        />
+      );
+    case "tool":
+      return <ToolPart part={part} compact={compact} />;
+    case "error":
+      return <ErrorPart part={part} />;
+    default:
+      return null;
+  }
+}
 
 export function ConversationThread({
   parts,
@@ -96,142 +133,22 @@ export function ConversationThread({
     orderedIds: orderedAudioIds,
   });
 
-  const renderPart = (part: DisplayPart) => {
-    switch (part.kind) {
-      case "text": {
-        const structured =
-          structuredOutput && part.role === "assistant"
-            ? tryParseJson(part.content)
-            : undefined;
-        if (structured) {
-          return (
-            <VStack key={part.id} align="flex-start" width="100%" gap={1}>
-              <Box
-                as="pre"
-                borderRadius="6px"
-                padding={4}
-                borderWidth="1px"
-                borderColor="border.emphasized"
-                width="full"
-                whiteSpace="pre-wrap"
-              >
-                <RenderInputOutput value={structured} showTools />
-              </Box>
-              {renderPartActions?.(part)}
-            </VStack>
-          );
-        }
-
-        const visuals = getDisplayRoleVisuals(
-          part.role === "assistant" ? "assistant" : "user",
-          { isScenario: roleMode === "scenario" },
-        );
-        const RoleIcon = visuals.Icon;
-        return (
-          <VStack
-            key={part.id}
-            align={alignForRole(part.role)}
-            data-align={alignForRole(part.role)}
-            gap={1}
-            width="100%"
-          >
-            <Bubble
-              side={visuals.displayRole === "user" ? "left" : "right"}
-              tone={visuals.displayRole}
-              label={visuals.bubbleLabel}
-              icon={<RoleIcon />}
-              text={part.content}
-              reasoning={part.reasoning}
-              size={compact ? "compact" : "regular"}
-              maxChars={compact ? 320 : 800}
-            />
-            {renderPartActions?.(part)}
-          </VStack>
-        );
+  const renderPart = (part: DisplayPart) => (
+    <ConversationPart
+      key={part.id}
+      part={part}
+      compact={compact}
+      roleMode={roleMode}
+      projectId={projectId}
+      structuredOutput={structuredOutput}
+      actions={renderPartActions?.(part)}
+      audioPlayback={
+        part.kind === "media" && part.part.type === "audio"
+          ? getAudioProps(part.id)
+          : undefined
       }
-
-      case "image":
-        return (
-          <VStack
-            key={part.id}
-            align={alignForRole(part.role)}
-            data-align={alignForRole(part.role)}
-          >
-            <Image src={part.src} maxH="200px" borderRadius="md" />
-          </VStack>
-        );
-
-      case "media": {
-        // Players stretch to the container; attachment chips hug the side the
-        // message came from, the way a bubble would. Mirrored into
-        // `data-media-align` because jsdom cannot read compiled flex styles.
-        const innerAlign =
-          part.part.type === "binary"
-            ? alignForRole(part.role)
-            : ("stretch" as const);
-        return (
-          <VStack
-            key={part.id}
-            align={alignForRole(part.role)}
-            data-align={alignForRole(part.role)}
-            width="100%"
-          >
-            <VStack
-              align={innerAlign}
-              data-media-align={innerAlign}
-              gap={1}
-              width={{ base: "100%", md: "min(420px, 95%)" }}
-            >
-              <MediaPart
-                part={part.part}
-                projectId={projectId}
-                audioPlayback={
-                  part.part.type === "audio"
-                    ? getAudioProps(part.id)
-                    : undefined
-                }
-              />
-              {part.transcript && (
-                <Text
-                  fontSize="xs"
-                  color="fg.muted"
-                  fontStyle="italic"
-                  paddingX={2}
-                  textAlign={textAlignForRole(part.role)}
-                >
-                  {part.transcript}
-                </Text>
-              )}
-            </VStack>
-          </VStack>
-        );
-      }
-
-      case "tool":
-        return (
-          <HStack key={part.id} align="flex-start" width="100%">
-            <Box width="full" maxW={compact ? "100%" : "85%"}>
-              <ToolPairCard
-                name={part.name}
-                input={part.arguments}
-                id={part.toolCallId}
-                result={part.result ?? null}
-              />
-            </Box>
-          </HStack>
-        );
-
-      case "error":
-        return (
-          <Box key={part.id} width="100%">
-            <ErrorMessage error={part.error} />
-          </Box>
-        );
-
-      default:
-        return null;
-    }
-  };
+    />
+  );
 
   return (
     <VStack

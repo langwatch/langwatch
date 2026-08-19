@@ -39,6 +39,27 @@ export interface FetchSSEOptions<T> {
 }
 
 /**
+ * Reads the sentence a refused request came back with.
+ *
+ * Our routes answer with `{ error }` — a dataset still normalising (425), a
+ * node with no model (422) — and that sentence is the one telling the user
+ * what to fix. Falling back to `statusText` reduced every one of them to
+ * "Unprocessable Entity".
+ */
+async function describeRefusal(response: Response): Promise<string> {
+  const body = (await response
+    .clone()
+    .json()
+    .catch(() => null)) as { error?: unknown } | null;
+
+  if (typeof body?.error === "string") return body.error;
+
+  return response.status >= 500
+    ? `Server error: ${response.status} ${response.statusText}`
+    : response.statusText;
+}
+
+/**
  * Fetches data from an endpoint using SSE (Server-Sent Events)
  * and processes events through callbacks
  */
@@ -60,15 +81,11 @@ export async function fetchSSE<T>({
     let timeoutId: NodeJS.Timeout | undefined;
     let isSettled = false;
 
-    if (signal) {
-      if (signal.aborted) {
-        resolve();
-        return;
-      }
-      signal.addEventListener("abort", () => controller.abort(), {
-        once: true,
-      });
+    if (signal?.aborted) {
+      resolve();
+      return;
     }
+    signal?.addEventListener("abort", () => controller.abort(), { once: true });
 
     const cleanup = () => {
       controller.abort();
@@ -121,26 +138,7 @@ export async function fetchSSE<T>({
           return;
         }
 
-        // Our routes answer a refused request with `{ error }` — a dataset
-        // still normalising (425), a node with no model (422). Reading it
-        // keeps the sentence that tells the user what to fix; statusText
-        // alone reduced every one of them to "Unprocessable Entity".
-        const body = await response
-          .clone()
-          .json()
-          .catch(() => null);
-        const detail =
-          body && typeof body === "object" && typeof body.error === "string"
-            ? body.error
-            : null;
-
-        const error = new Error(
-          detail ??
-            (response.status >= 500
-              ? `Server error: ${response.status} ${response.statusText}`
-              : response.statusText),
-        );
-        handleError(error);
+        handleError(new Error(await describeRefusal(response)));
       },
 
       onmessage(ev) {

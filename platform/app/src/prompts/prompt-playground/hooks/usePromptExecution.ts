@@ -6,10 +6,10 @@
  * the shared renderer already reads — so there is no message class to convert
  * into and back out of.
  *
- * Deltas are buffered and flushed on an animation frame. The previous
- * arrangement re-rendered per token AND re-persisted the whole conversation to
- * localStorage per token, which is what the old component's dedup-key comment
- * was working around.
+ * Deltas are buffered and flushed on an animation frame (`useDeltaBuffer`). The
+ * previous arrangement re-rendered per token AND re-persisted the whole
+ * conversation to localStorage per token, which is what the old component's
+ * dedup-key comment was working around.
  */
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -20,6 +20,8 @@ import type { PromptConfigFormValues } from "~/prompts/types";
 import type { ChatMessage } from "~/server/tracer/types";
 import type { ParsedLLMError } from "~/utils/formatLLMError";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
+import { useConversationState } from "./useConversationState";
+import { useDeltaBuffer } from "./useDeltaBuffer";
 
 /** A conversation entry as the playground holds and persists it. */
 export type PlaygroundMessage = ChatMessage & { id: string; trace_id?: string };
@@ -46,6 +48,64 @@ export interface PromptExecution {
   setMessages: (messages: PlaygroundMessage[]) => void;
 }
 
+const describe = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+/**
+ * The conversation as the server wants it: role and text only.
+ *
+ * A message whose content is not a string is one the server has no template
+ * slot for — an image turn loaded from a trace — so it is left out rather than
+ * stringified into the prompt.
+ */
+function toWireHistory(
+  messages: PlaygroundMessage[],
+): Array<{ role: string; content: string }> {
+  return messages
+    .filter((message) => typeof message.content === "string")
+    .map((message) => ({
+      role: message.role ?? "user",
+      content: message.content as string,
+    }));
+}
+
+/**
+ * Opens the execution stream and reports what arrives.
+ *
+ * Kept outside the hook so the transport is readable on its own, and so the
+ * hook is left holding only React state.
+ */
+async function streamExecution({
+  payload,
+  signal,
+  onStart,
+  onDelta,
+  onFailure,
+}: {
+  payload: unknown;
+  signal: AbortSignal;
+  onStart: (event: { messageId: string; traceId: string }) => void;
+  onDelta: (content: string) => void;
+  onFailure: (error: ParsedLLMError) => void;
+}): Promise<void> {
+  await fetchSSE<PlaygroundStreamEvent>({
+    endpoint: "/api/prompt-playground/execute",
+    signal,
+    timeout: 20_000,
+    payload,
+    onEvent: (event) => {
+      if (event.type === "start") {
+        onStart({ messageId: event.messageId, traceId: event.traceId });
+      } else if (event.type === "delta") {
+        onDelta(event.content);
+      } else if (event.type === "error") {
+        onFailure(event.error);
+      }
+    },
+    shouldStopProcessing: (event) => event.type === "done",
+  });
+}
+
 export function usePromptExecution({
   projectId,
   formValues,
@@ -53,14 +113,20 @@ export function usePromptExecution({
   initialMessages,
   onMessagesChange,
 }: UsePromptExecutionArgs): PromptExecution {
-  const [messages, setMessagesState] =
-    useState<PlaygroundMessage[]>(initialMessages);
-  const [errors, setErrors] = useState<Record<string, ParsedLLMError>>({});
+  const conversation = useConversationState({
+    initialMessages,
+    onMessagesChange,
+  });
   const [isRunning, setIsRunning] = useState(false);
-
   const abortRef = useRef<AbortController | null>(null);
-  const frameRef = useRef<number | null>(null);
-  const bufferRef = useRef<{ id: string; content: string } | null>(null);
+
+  const buffer = useDeltaBuffer(({ id, content }) =>
+    conversation.update((current) =>
+      current.map((message) =>
+        message.id === id ? { ...message, content } : message,
+      ),
+    ),
+  );
 
   // The form is read at send time, not at render time: a user who edits the
   // prompt mid-stream should not retroactively change the run in flight.
@@ -69,192 +135,135 @@ export function usePromptExecution({
   const variablesRef = useRef(variables);
   variablesRef.current = variables;
 
-  useEffect(() => {
-    return () => {
-      abortRef.current?.abort();
-      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
-    };
-  }, []);
+  useEffect(() => () => abortRef.current?.abort(), []);
 
-  const commit = useCallback(
-    (next: PlaygroundMessage[]) => {
-      setMessagesState(next);
-      onMessagesChange(next);
-    },
-    [onMessagesChange],
-  );
-
-  /**
-   * Folds buffered deltas into the streaming message on the next frame.
-   *
-   * Persistence deliberately does not run here — a partial reply is not worth a
-   * localStorage write per frame, and the run's final flush covers a refresh.
-   */
-  const scheduleFlush = useCallback(() => {
-    if (frameRef.current !== null) return;
-    frameRef.current = requestAnimationFrame(() => {
-      frameRef.current = null;
-      const buffered = bufferRef.current;
-      if (!buffered) return;
-      setMessagesState((current) =>
-        current.map((message) =>
-          message.id === buffered.id
-            ? { ...message, content: buffered.content }
-            : message,
-        ),
-      );
-    });
-  }, []);
+  const run = useRunPrompt({ projectId, formValuesRef, variablesRef });
 
   const send = useCallback(
     async (content: string) => {
       if (!projectId || !content.trim() || isRunning) return;
 
       const history: PlaygroundMessage[] = [
-        ...messages,
+        ...conversation.messages,
         { id: `user_${nanoid(8)}`, role: "user", content },
       ];
-      commit(history);
+      conversation.commit(history);
       setIsRunning(true);
 
       const controller = new AbortController();
       abortRef.current = controller;
 
-      let assistantId: string | null = null;
-      let accumulated = "";
-
-      const wireHistory = history
-        .filter((message) => typeof message.content === "string")
-        .map((message) => ({
-          role: message.role ?? "user",
-          content: message.content as string,
-        }));
-
       try {
-        await fetchSSE<PlaygroundStreamEvent>({
-          endpoint: "/api/prompt-playground/execute",
-          signal: controller.signal,
-          timeout: 20_000,
-          payload: {
-            projectId,
-            formValues: formValuesRef.current,
-            variables: variablesRef.current ?? [],
-            messages: wireHistory,
-          },
-          onEvent: (event) => {
-            switch (event.type) {
-              case "start": {
-                assistantId = event.messageId;
-                accumulated = "";
-                bufferRef.current = { id: event.messageId, content: "" };
-                setMessagesState((current) => [
-                  ...current,
-                  {
-                    id: event.messageId,
-                    role: "assistant",
-                    content: "",
-                    trace_id: event.traceId,
-                  },
-                ]);
-                return;
-              }
-              case "delta": {
-                if (!assistantId) return;
-                accumulated += event.content;
-                bufferRef.current = { id: assistantId, content: accumulated };
-                scheduleFlush();
-                return;
-              }
-              case "error": {
-                if (assistantId) {
-                  setErrors((current) => ({
-                    ...current,
-                    [assistantId!]: event.error,
-                  }));
-                }
-                return;
-              }
-              case "done":
-                return;
-            }
-          },
-          shouldStopProcessing: (event) => event.type === "done",
-        });
-      } catch (error) {
-        // The stream never opened, or died mid-flight. `parseLLMError` is not
-        // reached in this path, so classify it as unknown and let the error
-        // registry write the sentence.
-        const id = assistantId ?? `assistant_${nanoid(8)}`;
-        if (!assistantId) {
-          setMessagesState((current) => [
-            ...current,
-            { id, role: "assistant", content: "" },
-          ]);
-        }
-        setErrors((current) => ({
-          ...current,
-          [id]: {
-            type: "unknown",
-            message: error instanceof Error ? error.message : String(error),
-          },
-        }));
+        await run({ history, signal: controller.signal, conversation, buffer });
       } finally {
-        if (frameRef.current !== null) {
-          cancelAnimationFrame(frameRef.current);
-          frameRef.current = null;
-        }
+        buffer.cancel();
         abortRef.current = null;
         setIsRunning(false);
-
-        // One persist for the run, with whatever arrived — including a partial
-        // reply from a stopped run, which the user asked to keep by stopping
-        // rather than deleting.
-        setMessagesState((current) => {
-          const settled = assistantId
-            ? current.map((message) =>
-                message.id === assistantId
-                  ? { ...message, content: accumulated }
-                  : message,
-              )
-            : current;
-          onMessagesChange(settled);
-          return settled;
-        });
       }
     },
-    [projectId, messages, isRunning, commit, scheduleFlush, onMessagesChange],
+    [projectId, isRunning, conversation, buffer, run],
   );
 
-  const stop = useCallback(() => {
-    abortRef.current?.abort();
-  }, []);
+  const stop = useCallback(() => abortRef.current?.abort(), []);
 
   const reset = useCallback(() => {
     abortRef.current?.abort();
-    setErrors({});
-    commit([]);
-  }, [commit]);
-
-  const deleteMessage = useCallback(
-    (id: string) => {
-      setErrors((current) => {
-        if (!(id in current)) return current;
-        const { [id]: _removed, ...rest } = current;
-        return rest;
-      });
-      commit(messages.filter((message) => message.id !== id));
-    },
-    [commit, messages],
-  );
+    conversation.clear();
+  }, [conversation]);
 
   return {
-    messages,
-    errors,
+    messages: conversation.messages,
+    errors: conversation.errors,
     isRunning,
     send,
     stop,
     reset,
-    deleteMessage,
-    setMessages: commit,
+    deleteMessage: conversation.deleteMessage,
+    setMessages: conversation.commit,
   };
+}
+
+/**
+ * One run, from opening the stream to settling the reply.
+ *
+ * Returned as a callback rather than inlined so `usePromptExecution` reads as
+ * what it is — state, plus a thing you can start.
+ */
+function useRunPrompt({
+  projectId,
+  formValuesRef,
+  variablesRef,
+}: {
+  projectId: string | undefined;
+  formValuesRef: { current: PromptConfigFormValues };
+  variablesRef: { current: z.infer<typeof runtimeInputsSchema> | undefined };
+}) {
+  return useCallback(
+    async ({
+      history,
+      signal,
+      conversation,
+      buffer,
+    }: {
+      history: PlaygroundMessage[];
+      signal: AbortSignal;
+      conversation: ReturnType<typeof useConversationState>;
+      buffer: ReturnType<typeof useDeltaBuffer>;
+    }) => {
+      let assistantId: string | null = null;
+      let accumulated = "";
+
+      const openReply = ({
+        messageId,
+        traceId,
+      }: {
+        messageId: string;
+        traceId: string;
+      }) => {
+        assistantId = messageId;
+        accumulated = "";
+        buffer.begin(messageId);
+        conversation.update((current) => [
+          ...current,
+          { id: messageId, role: "assistant", content: "", trace_id: traceId },
+        ]);
+      };
+
+      try {
+        await streamExecution({
+          signal,
+          payload: {
+            projectId,
+            formValues: formValuesRef.current,
+            variables: variablesRef.current ?? [],
+            messages: toWireHistory(history),
+          },
+          onStart: openReply,
+          onDelta: (delta) => {
+            if (!assistantId) return;
+            accumulated += delta;
+            buffer.set(accumulated);
+          },
+          onFailure: (failure) => {
+            if (assistantId) conversation.recordFailure(assistantId, failure);
+          },
+        });
+      } catch (error) {
+        // The stream never opened, or died mid-flight. `parseLLMError` never
+        // ran on this path, so it is unknown and the error registry writes the
+        // sentence. A run that failed before `start` has no turn to attach to,
+        // so one is opened to hold the failure.
+        if (!assistantId) {
+          openReply({ messageId: `assistant_${nanoid(8)}`, traceId: "" });
+        }
+        conversation.recordFailure(assistantId!, {
+          type: "unknown",
+          message: describe(error),
+        });
+      } finally {
+        conversation.settle({ assistantId, content: accumulated });
+      }
+    },
+    [projectId, formValuesRef, variablesRef],
+  );
 }
