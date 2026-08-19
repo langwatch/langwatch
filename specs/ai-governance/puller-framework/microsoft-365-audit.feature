@@ -377,6 +377,26 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
     And returns a cursor whose blobQueue holds exactly the undrained blobs
 
   # ---------------------------------------------------------------------------
+  # Response-supplied URL boundary
+  #
+  # Found in review (PR #7142, review 4970629365), not in planning. contentUri
+  # and the nextpageuri response header are both copied out of the API's own
+  # response — and nextpageuri is persisted into the cursor — then used as the
+  # next fetch target with the Management Activity OAuth bearer token
+  # attached. Without a host/path check, a malformed response — or a cursor
+  # poisoned before this check existed — turns the poller into a
+  # token-forwarding primitive for whatever URL it names.
+  # ---------------------------------------------------------------------------
+
+  @unit @regression
+  Scenario: A response-supplied URL outside the trusted host is refused
+    Given a contentUri, a nextpageuri response header, or a persisted cursor
+      field naming a URL outside https://manage.office.com/api/v1.0
+    When the adapter would otherwise fetch it with the bearer token attached
+    Then it throws rather than sending the token to that URL
+    And nothing is ever fetched from the untrusted URL
+
+  # ---------------------------------------------------------------------------
   # Event mapping
   # Four identity traps, all documented in issue #7137.
   # ---------------------------------------------------------------------------
