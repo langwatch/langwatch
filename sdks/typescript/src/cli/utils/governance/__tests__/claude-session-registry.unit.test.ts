@@ -111,5 +111,15 @@ describe("the claude session registry", () => {
 				join(".claude", "sessions"),
 			);
 		});
+
+		it("falls back to the home directory when the variable is blank", () => {
+			// A variable set to whitespace names no directory. Reading it as one
+			// would root the registry at the filesystem root.
+			for (const CLAUDE_CONFIG_DIR of ["", "   "]) {
+				expect(defaultClaudeSessionRegistryDir({ CLAUDE_CONFIG_DIR })).toContain(
+					join(".claude", "sessions"),
+				);
+			}
+		});
 	});
 });

@@ -36,7 +36,8 @@ export function defaultClaudeSessionRegistryDir(
 	env: NodeJS.ProcessEnv = process.env,
 ): string {
 	const configDir = env.CLAUDE_CONFIG_DIR?.trim();
-	return join(configDir || join(homedir(), ".claude"), "sessions");
+	if (configDir) return join(configDir, "sessions");
+	return join(homedir(), ".claude", "sessions");
 }
 
 /**
