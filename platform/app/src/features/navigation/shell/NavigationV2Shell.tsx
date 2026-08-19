@@ -165,10 +165,16 @@ function ShellContentRow({
           borderTopWidth="1px"
           borderLeftWidth="1px"
           borderStyle="solid"
-          borderColor="border.muted"
+          // In light mode `border.muted` is the same grey as `bg.page`, so the
+          // panel edge needs the stronger token to read at all. Dark keeps the
+          // muted one, which already contrasts against the page there.
+          borderColor="border"
           borderTopRightRadius={langyDockInset > 0 ? "xl" : 0}
           borderRightWidth={langyDockInset > 0 ? "1px" : 0}
-          _dark={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)" }}
+          _dark={{
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
+            borderColor: "border.muted",
+          }}
           overflow="auto"
           display="flex"
           minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
