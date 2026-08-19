@@ -181,7 +181,7 @@
     "nodemailer": "^9.0.3",
     "numeral": "^2.0.6",
     "ohm-js": "^17.5.0",
-    "openai": "^6.45.0",
+    "openai": "^7.4.0",
     "openapi-fetch": "^0.17.0",
     "papaparse": "^5.5.4",
     "pg": "^8.22.0",
