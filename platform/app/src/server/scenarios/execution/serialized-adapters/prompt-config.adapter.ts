@@ -93,6 +93,17 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
       ...(templateUsesConversation ? [] : input.messages),
     ];
 
+    // AI SDK 7 requires `messages` to be non-empty, even when the whole
+    // conversation lives in `instructions` — v6 always had the system
+    // message itself to fall back on, but v7 hoisted that out. When the
+    // template has taken over the history and there's no template message
+    // either, fall back to just this turn's new message so the model still
+    // has something to reply to, without re-showing the history the
+    // template already rendered.
+    if (messages.length === 0) {
+      messages.push(...input.newMessages);
+    }
+
     const model = createModelFromParams({
       litellmParams: this.litellmParams,
       nlpServiceUrl: this.nlpServiceUrl,

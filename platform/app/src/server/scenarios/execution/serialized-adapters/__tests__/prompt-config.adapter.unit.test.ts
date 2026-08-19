@@ -320,8 +320,11 @@ describe("SerializedPromptConfigAdapter", () => {
         content: string;
       }>;
 
-      // Instructions only - input.messages not appended because template handles it
-      expect(messages).toHaveLength(0);
+      // input.messages not appended because the template handles it, but AI
+      // SDK 7 rejects an empty `messages` array — falls back to just this
+      // turn's new message so the model has something to reply to.
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toEqual({ role: "user", content: "How are you?" });
       expect(callArgs.instructions).toContain("How are you?");
     });
 
@@ -373,10 +376,12 @@ describe("SerializedPromptConfigAdapter", () => {
           content: string;
         }>;
 
-        // Instructions only. The template already carries the turn, so an
-        // appended input.messages would show the model the same turn twice —
-        // and every prior turn twice on turn three.
-        expect(messages).toHaveLength(0);
+        // The template already carries the turn, so appending the full
+        // input.messages would show the model the same turn twice — and
+        // every prior turn twice on turn three. AI SDK 7 still rejects an
+        // empty `messages` array, so just this turn's new message is used.
+        expect(messages).toHaveLength(1);
+        expect(messages[0]).toEqual({ role: "user", content: "How are you?" });
         expect(callArgs.instructions).toContain("How are you?");
       });
     });
