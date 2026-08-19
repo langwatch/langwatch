@@ -45,7 +45,19 @@ export async function runScenarioAndLog(
   config: RunConfig,
   browserQAOptions?: BrowserQAOptions,
 ): Promise<Result> {
-  const result = await scenario.run(config);
+  // langy_worker_stopped is the platform's own "worker died mid-reply, retry
+  // manually" transient (fault: platform, recovery already exhausted
+  // server-side). The panel offers the user a retry for it; the suite gets one
+  // too. Judge verdicts never come through here — a scenario that FAILS its
+  // criteria returns normally and is not retried.
+  let result: Result;
+  try {
+    result = await scenario.run(config);
+  } catch (error) {
+    if (!String(error).includes("langy_worker_stopped")) throw error;
+    console.log("[scenario] worker died mid-reply; retrying scenario once");
+    result = await scenario.run(config);
+  }
   const testName =
     expect.getState().currentTestName ??
     (config as { name?: string }).name ??

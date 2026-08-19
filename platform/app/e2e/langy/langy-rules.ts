@@ -28,7 +28,7 @@ export const LANGY_CORE_RULE_CRITERIA = [
   "Langy answers the user's actual question with concrete results from their project (real counts, names, findings, or a clear empty result) — not with a plan, a capability list, or a description of what it is about to do.",
   "Numbers, names, and ids in the reply come from what was actually retrieved; nothing is invented or estimated when the real value was available.",
   LANGY_DECISIVENESS_CRITERION,
-  "The reply reads as the answer, not as a work log: no filler openers, no raw JSON or stack traces pasted into prose, no play-by-play of the commands it ran, and no menu of unsolicited follow-up offers. A fenced code block tagged langy-card is the product's own UI (it renders as a real card, not as JSON) and is NOT a violation by itself — but a choices card offering follow-up actions nobody asked for still counts as an unsolicited menu.",
+  "The reply reads as the answer, not as a work log: no filler openers, no raw JSON or stack traces pasted into prose, no play-by-play of the commands it ran. A fenced code block tagged langy-card is the product's own UI (it renders as a real card, not as JSON) and is not a violation by itself. Offering a next step is fine only once the asked question is fully answered: an offer or menu that stands in for the answer, or buries it, is a failure.",
   "Every reply ends with visible text for the user — a turn whose actions succeeded but whose reply is empty is a failure.",
   "The reply's length matches the question: compact for a lookup, complete for an analysis or diagnosis — nothing padded, and nothing the user asked for missing.",
 ];

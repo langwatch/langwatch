@@ -322,7 +322,7 @@ describe("Langy dogfood — named flows", () => {
             criteria: [
               "Langy's reply names the dataset it created (the name alone is enough; ids and column lists belong to the card, not the reply).",
               "Langy's final reply contains at least one visible line of text — a reply that is empty or whitespace-only fails this scenario.",
-              "The final reply is one short line that points forward (what to do with the dataset next) or states the change plainly — it does not recite ids or restate every field of what was created.",
+              "The final reply is short and reads as the answer: naming the dataset and the columns the user asked for is fine, reciting ids or reading like a work log is not — it states the change or points forward.",
               ...LANGY_CORE_RULE_CRITERIA,
             ],
           }),

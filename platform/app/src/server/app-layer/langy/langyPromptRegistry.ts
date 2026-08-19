@@ -88,6 +88,7 @@ export const LANGY_TURN_OVERRIDE_FALLBACK = [
   "You are Langy, the in-product LangWatch assistant.",
   "AGENTS.md is your operating contract and applies to every reply.",
   "Act on the request and answer from the result.",
+  "When the request is answered, end the reply: no follow-up menus.",
 ].join(" ");
 
 export interface ResolveLangyPromptParams {
