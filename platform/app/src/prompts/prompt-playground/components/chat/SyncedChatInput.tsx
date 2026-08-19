@@ -1,5 +1,4 @@
 import { Box, HStack } from "@chakra-ui/react";
-import type { InputProps } from "@copilotkit/react-ui";
 import { useEffect, useRef, useState } from "react";
 import { useIsTabActive } from "../../hooks/useIsTabActive";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
@@ -19,12 +18,21 @@ import { ChatTextArea } from "./ui/ChatTextArea";
  * - Hover UI: Sync checkbox only visible on hover for clean interface
  * - Keyboard shortcuts: Enter to submit, Shift+Enter for new line
  */
+export interface ChatInputProps {
+  /** A run is in flight: the send button is held and Enter does nothing. */
+  inProgress: boolean;
+  onSend: (message: string) => void | Promise<void>;
+  /** Cancels the run in flight. */
+  onStop?: () => void;
+  isVisible?: boolean;
+}
+
 export function SyncedChatInput({
   inProgress,
   onSend,
   isVisible = true,
   onStop: _onStop,
-}: InputProps) {
+}: ChatInputProps) {
   const {
     syncedInput,
     setSyncedInput,
@@ -74,7 +82,7 @@ export function SyncedChatInput({
     if (!isTabActive) return;
 
     // Submit the message
-    void onSend(submitTrigger.message).catch((error) => {
+    void Promise.resolve(onSend(submitTrigger.message)).catch((error) => {
       console.error("Failed to send synced message:", error);
     });
   }, [submitTrigger, isSynced, onSend, isTabActive]);

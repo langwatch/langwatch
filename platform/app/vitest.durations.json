@@ -78,7 +78,6 @@
   "src/app/api/api-keys/__tests__/api-keys-security.integration.test.ts": 350,
   "src/app/api/api-keys/__tests__/pats-rest-api.integration.test.ts": 241,
   "src/app/api/coding-agent/__tests__/pull-request-usage-api.integration.test.ts": 209,
-  "src/app/api/copilotkit/[[...route]]/service-adapter.test.ts": 47,
   "src/app/api/dashboards/__tests__/dashboard-rest-api.integration.test.ts": 2218,
   "src/app/api/dataset/__tests__/dataset-rest-api.integration.test.ts": 3385,
   "src/app/api/dataset/__tests__/dataset-upload-api.integration.test.ts": 3867,

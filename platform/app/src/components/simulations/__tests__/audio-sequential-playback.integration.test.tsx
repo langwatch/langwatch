@@ -31,7 +31,7 @@ import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-e
 import { ScenarioMessageRenderer } from "../ScenarioMessageRenderer";
 
 // ---------------------------------------------------------------------------
-// tRPC / TraceMessage mocks (keep renderer lightweight in jsdom)
+// tRPC / turn-separator mocks (keep renderer lightweight in jsdom)
 // ---------------------------------------------------------------------------
 
 vi.mock("~/utils/api", () => ({
@@ -44,8 +44,8 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("../../copilot-kit/TraceMessage", () => ({
-  TraceMessage: ({ traceId }: { traceId: string }) => (
+vi.mock("../../conversation/TurnSeparator", () => ({
+  TurnSeparator: ({ traceId }: { traceId: string }) => (
     <button data-testid="trace-message" data-trace-id={traceId}>
       View Trace
     </button>
