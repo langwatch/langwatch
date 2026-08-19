@@ -24,18 +24,12 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-// RunTurnSeparator internally calls useOrganizationTeamProject() and
+// TurnSeparator internally calls useOrganizationTeamProject() and
 // api.traces.getById.useQuery, neither of which is available in this jsdom
 // harness — mock the module so the renderer's grouping contract (one
 // separator per traced turn) is what these tests exercise.
-vi.mock("../RunTurnSeparator", () => ({
-  RunTurnSeparator: ({
-    index,
-    traceId,
-  }: {
-    index: number;
-    traceId: string;
-  }) => (
+vi.mock("../../conversation/TurnSeparator", () => ({
+  TurnSeparator: ({ index, traceId }: { index: number; traceId: string }) => (
     <div data-testid="run-turn-separator" data-trace-id={traceId}>
       Turn {index}
     </div>
@@ -153,7 +147,7 @@ describe("<ScenarioMessageRenderer/>", () => {
     });
   });
 
-  // The trace binding below is partial: RunTurnSeparator owns the fetch +
+  // The trace binding below is partial: TurnSeparator owns the fetch +
   // click handler (useTraceDetailsDrawer().openTraceDetailsDrawer), so these
   // jsdom tests only assert the renderer's responsibility — mounting one
   // separator per traced turn with the correct traceId. The drawer-open

@@ -61,9 +61,9 @@ export const UNPUBLISHED = [
     why: "server-sent event channels the dashboard subscribes to, with no stable per-message contract to publish",
   },
   {
-    match: "/api/copilotkit",
+    match: "/api/prompt-playground",
     category: "internal",
-    why: "AG-UI runtime endpoint owned by the CopilotKit client in our own frontend",
+    why: "browser SSE stream for the prompt playground, with no stable per-message contract to publish",
   },
   {
     match: "/api/playground",

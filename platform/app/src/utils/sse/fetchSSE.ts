@@ -30,6 +30,12 @@ export interface FetchSSEOptions<T> {
 
   /** Error handler */
   onError?: (error: Error) => void;
+
+  /**
+   * Cancels the stream from the outside — a Stop button, or a component
+   * unmounting mid-run. The server treats the disconnect as the cancel signal.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -45,6 +51,7 @@ export async function fetchSSE<T>({
   chunkTimeout = 480_000,
   headers = {},
   onError,
+  signal,
 }: FetchSSEOptions<T>): Promise<void> {
   // Wrap in a Promise so timeout errors can properly reject
   // instead of becoming unhandled exceptions
@@ -52,6 +59,16 @@ export async function fetchSSE<T>({
     const controller = new AbortController();
     let timeoutId: NodeJS.Timeout | undefined;
     let isSettled = false;
+
+    if (signal) {
+      if (signal.aborted) {
+        resolve();
+        return;
+      }
+      signal.addEventListener("abort", () => controller.abort(), {
+        once: true,
+      });
+    }
 
     const cleanup = () => {
       controller.abort();
@@ -104,10 +121,24 @@ export async function fetchSSE<T>({
           return;
         }
 
+        // Our routes answer a refused request with `{ error }` — a dataset
+        // still normalising (425), a node with no model (422). Reading it
+        // keeps the sentence that tells the user what to fix; statusText
+        // alone reduced every one of them to "Unprocessable Entity".
+        const body = await response
+          .clone()
+          .json()
+          .catch(() => null);
+        const detail =
+          body && typeof body === "object" && typeof body.error === "string"
+            ? body.error
+            : null;
+
         const error = new Error(
-          response.status >= 500
-            ? `Server error: ${response.status} ${response.statusText}`
-            : response.statusText,
+          detail ??
+            (response.status >= 500
+              ? `Server error: ${response.status} ${response.statusText}`
+              : response.statusText),
         );
         handleError(error);
       },
