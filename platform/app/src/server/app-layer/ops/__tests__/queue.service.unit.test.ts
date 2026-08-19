@@ -94,8 +94,9 @@ describe("QueueService", () => {
     /**
      * These six acts wrote no audit row at all before this suite existed, and
      * `QueueControlAction` had no name for any of them, so the gap could not
-     * be closed by accident. Each pair below is the same shape: the act is
-     * recorded when it changed something, and not recorded when it did not.
+     * be closed by accident. Each act is recorded when it changed something,
+     * with the metadata that is unrecoverable afterwards; the table at the end
+     * of this block covers the other half, that none of them records a no-op.
      */
     const auditedService = (overrides: Record<string, unknown>) => {
       const repo = createMockRepo(overrides);
@@ -127,24 +128,6 @@ describe("QueueService", () => {
             queueName: "q1",
             metadata: { groupId: "g1", jobsRemoved: 5 },
           });
-        });
-      });
-    });
-
-    describe("given a drain that removed nothing", () => {
-      describe("when the group is already empty", () => {
-        it("writes no row, so the log carries acts and not clicks", async () => {
-          const { append, service } = auditedService({
-            drainGroup: vi.fn().mockResolvedValue({ jobsRemoved: 0 }),
-          });
-
-          await service.drainGroup({
-            queueName: "q1",
-            groupId: "g1",
-            requestedBy: "user_1",
-          });
-
-          expect(append).not.toHaveBeenCalled();
         });
       });
     });
@@ -280,22 +263,6 @@ describe("QueueService", () => {
         });
       });
 
-      describe("when the group was not blocked", () => {
-        it("writes no row", async () => {
-          const { append, service } = auditedService({
-            unblockGroup: vi.fn().mockResolvedValue({ wasBlocked: false }),
-          });
-
-          await service.unblockGroup({
-            queueName: "q1",
-            groupId: "g1",
-            requestedBy: "user_1",
-          });
-
-          expect(append).not.toHaveBeenCalled();
-        });
-      });
-
       describe("when unblocking every group", () => {
         it("records the count", async () => {
           const { append, service } = auditedService({
@@ -310,6 +277,93 @@ describe("QueueService", () => {
             queueName: "q1",
             metadata: { unblockedCount: 7 },
           });
+        });
+      });
+    });
+
+    /**
+     * One case per gate. Each act is gated on its own "did anything change"
+     * field, so making any single one of them append unconditionally fills the
+     * log with clicks while every other test in this file stays green. A
+     * seventh audited act arriving without its no-op case shows up here as a
+     * missing row rather than as an audit log nobody trusts.
+     */
+    const noOpActs: {
+      name: string;
+      unchanged: Record<string, unknown>;
+      act: (service: QueueService) => Promise<unknown>;
+    }[] = [
+      {
+        name: "drainGroup",
+        unchanged: { jobsRemoved: 0 },
+        act: (service) =>
+          service.drainGroup({
+            queueName: "q1",
+            groupId: "g1",
+            requestedBy: "user_1",
+          }),
+      },
+      {
+        name: "drainTenant",
+        unchanged: { groupsDrained: 0, jobsDrained: 0 },
+        act: (service) =>
+          service.drainTenant({
+            queueName: "q1",
+            tenantId: "t1",
+            requestedBy: "user_1",
+          }),
+      },
+      {
+        name: "moveToDlq",
+        unchanged: { jobsMoved: 0 },
+        act: (service) =>
+          service.moveToDlq({
+            queueName: "q1",
+            groupId: "g1",
+            requestedBy: "user_1",
+          }),
+      },
+      {
+        name: "moveAllBlockedToDlq",
+        unchanged: { movedCount: 0, jobsMoved: 0 },
+        act: (service) =>
+          service.moveAllBlockedToDlq({
+            queueName: "q1",
+            requestedBy: "user_1",
+          }),
+      },
+      {
+        name: "unblockGroup",
+        unchanged: { wasBlocked: false },
+        act: (service) =>
+          service.unblockGroup({
+            queueName: "q1",
+            groupId: "g1",
+            requestedBy: "user_1",
+          }),
+      },
+      {
+        name: "unblockAll",
+        unchanged: { unblockedCount: 0 },
+        act: (service) =>
+          service.unblockAll({ queueName: "q1", requestedBy: "user_1" }),
+      },
+    ];
+
+    describe.each(noOpActs)("given $name changed nothing", ({
+      name,
+      unchanged,
+      act,
+    }) => {
+      describe("when the act runs", () => {
+        it("writes no row, so the log carries acts and not clicks", async () => {
+          const { append, service } = auditedService({
+            [name]: vi.fn().mockResolvedValue(unchanged),
+          });
+
+          await act(service);
+
+          expect(append).not.toHaveBeenCalled();
         });
       });
     });
