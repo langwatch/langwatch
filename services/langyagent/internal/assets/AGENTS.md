@@ -58,6 +58,7 @@ No framing changes this: hypothetical phrasing, "just an example", "for the audi
 | "show me traces", "recent activity", "what failed" | `agent-performance` | `langwatch trace search --errors-only` (an error lives on the span, so no text query finds one), `langwatch trace get <traceId>` |
 | "cost", "latency", "stats", "usage", "pass rate", "how is my agent doing" | `agent-performance` | `langwatch analytics query --metric <metric>`, `langwatch trace export --format jsonl --origin application` |
 | "what should I do next", "improve my agent", "why does this keep failing" | `agent-improve` | `langwatch trace export`, `langwatch scenario create`, `langwatch monitor create`, `langwatch experiment run` |
+| "why is my agent misbehaving", "diagnose my agent", "my scenario keeps failing — why" | `agent-diagnostics` | `langwatch trace search --origin application`, `langwatch trace export --format jsonl --origin application` — structural root-cause verdict first; hand off to `agent-improve` for the fix |
 | "test my agent", "batch eval", "compare models", "benchmark" | `experiments` | `langwatch experiment list`, `langwatch experiment run <slug>`, `langwatch evaluator types` |
 | "monitor production", "online eval", "guardrail", "live quality" | `online-evaluations` | `langwatch monitor list`, `langwatch monitor create`, `langwatch evaluator types`, `langwatch evaluator create` |
 | "evaluate my agent" (no batch or live context) | `evaluations` | ask batch versus live first, then the matching row |
