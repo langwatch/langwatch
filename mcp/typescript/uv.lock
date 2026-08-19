@@ -1016,7 +1016,7 @@ requires-dist = [
     { name = "pksuid", specifier = ">=1.1.2" },
     { name = "pydantic", specifier = ">=2" },
     { name = "pytest", marker = "extra == 'tests'", specifier = ">=9.1.1,<10.0.0" },
-    { name = "pytest-asyncio", marker = "extra == 'tests'", specifier = ">=0.21.1,<1.5.0" },
+    { name = "pytest-asyncio", marker = "extra == 'tests'", specifier = ">=1.4.0,<1.5.0" },
     { name = "python-liquid", specifier = ">=2.2.0" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "retry", specifier = ">=0.9.2" },
@@ -1068,7 +1068,7 @@ examples = [
 ]
 tests = [
     { name = "factory-boy", specifier = ">=3.3.3" },
-    { name = "pytest-asyncio", specifier = ">=0.21.2" },
+    { name = "pytest-asyncio", specifier = ">=1.4.0" },
     { name = "python-dotenv", specifier = "==1.2.2" },
 ]
 
