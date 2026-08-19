@@ -20,3 +20,10 @@ Feature: Langy minimal harness
   Scenario: The prompt fits its size budget
     When the prompt asset is checked
     Then its size is under the enforced byte ceiling
+
+  @unit
+  Scenario: The prompt names every trace origin the platform stamps
+    Given the trace origins listed in Langy's prompt
+    When they are compared with the origins the platform stamps
+    Then the prompt names all of them and invents none
+    And an origin the prompt never learned cannot silently return zero rows
