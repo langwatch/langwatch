@@ -378,7 +378,7 @@ describe("Langy dogfood — named flows", () => {
             criteria: [
               "Langy's reply to the bare 'thanks!' is visible text — an empty reply fails this scenario.",
               "The acknowledgment is one short friendly line, without starting new work the user did not ask for.",
-              'Langy does NOT answer the thanks with a refusal such as "Can\'t do that yet."',
+              "Langy does NOT decline the thanks, in any wording, and does not tell the user it is out of scope.",
             ],
           }),
         ],

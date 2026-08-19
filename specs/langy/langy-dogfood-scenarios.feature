@@ -41,7 +41,7 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     When the scenario runs against Langy
     Then Langy replies with one short friendly line that introduces it as Langy
     And the reply names a few things Langy can help with
-    And the judge confirms Langy did not reply "Can't do that yet." to the greeting
+    And the judge confirms Langy did not decline the greeting, in any wording
     And a follow-up "who are you?" gets the same friendly treatment, not a refusal
 
   @e2e
