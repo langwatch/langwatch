@@ -48,7 +48,10 @@ beforeEach(() => {
     organization: { id: "org_1" },
     isLoading: false,
   });
-  useNavigationModeStore.setState({ storedMode: null, lastKnownFlag: null });
+  useNavigationModeStore.setState({
+    storedMode: null,
+    isLastKnownFlagEnabled: null,
+  });
 });
 
 describe("useNavigationMode", () => {
@@ -67,7 +70,7 @@ describe("useNavigationMode", () => {
   });
 
   describe("when the device picked nothing and the flag has not answered", () => {
-    /** @scenario "A device with no stored preference and the flag off keeps the old navigation" */
+    /** @scenario "A device with no stored preference keeps the old navigation until the flag answers" */
     it("resolves to legacy without a loading screen", () => {
       useFeatureFlagMock.mockReturnValue({ enabled: false, isLoading: true });
 
@@ -78,7 +81,7 @@ describe("useNavigationMode", () => {
 
     /** @scenario "A device that saw the flag on paints the new navigation first" */
     it("resolves to the product switcher when the flag was on last time", () => {
-      useNavigationModeStore.setState({ lastKnownFlag: true });
+      useNavigationModeStore.setState({ isLastKnownFlagEnabled: true });
       useFeatureFlagMock.mockReturnValue({ enabled: false, isLoading: true });
 
       const { result } = renderHook(() => useNavigationMode());
@@ -97,7 +100,9 @@ describe("useNavigationMode", () => {
       renderHook(() => useNavigationMode());
 
       expect(localStorage.getItem(FLAG_STORAGE_KEY)).toBe("on");
-      expect(useNavigationModeStore.getState().lastKnownFlag).toBe(true);
+      expect(useNavigationModeStore.getState().isLastKnownFlagEnabled).toBe(
+        true,
+      );
     });
   });
 

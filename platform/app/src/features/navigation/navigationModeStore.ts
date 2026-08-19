@@ -29,12 +29,15 @@ const FLAG_STORAGE_KEY = "langwatch:navigation-mode-flag:v1";
  *
  * The store keeps two values. `storedMode` is the reader's own pick and
  * is null until they make one, so "never picked" and "picked the old
- * navigation" stay different answers. `lastKnownFlag` is the last answer
- * the flag gave on this device, which lets a device with no pick paint
- * its mode on the first frame instead of waiting for the flag query. It
- * is a device-wide hint, so a reader who belongs to one organization with
- * the flag on and one with it off may paint the previous organization's
- * answer for the one frame before the query lands.
+ * navigation" stay different answers. `isLastKnownFlagEnabled` is the
+ * last answer the flag gave on this device, which lets a device with no
+ * pick paint its mode on the first frame instead of waiting for the flag
+ * query. It is a device-wide hint, so a reader who belongs to one
+ * organization with the flag on and one with it off may paint the
+ * previous organization's answer for the one frame before the query
+ * lands. Subscribe to the store to read it, never read it once: the
+ * query answer lands in the store, and a device the flag turns off for
+ * must follow it.
  *
  * Spec: specs/navigation/navigation-modes.feature
  */
@@ -67,7 +70,7 @@ export function loadLastKnownNavigationFlag(): boolean | null {
   return null;
 }
 
-function persist(key: string, value: string): void {
+function persist({ key, value }: { key: string; value: string }): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(key, value);
@@ -78,7 +81,7 @@ function persist(key: string, value: string): void {
 
 interface NavigationModeState {
   storedMode: NavigationMode | null;
-  lastKnownFlag: boolean | null;
+  isLastKnownFlagEnabled: boolean | null;
   setStoredMode: (mode: NavigationMode) => void;
   rememberFlag: (isEnabled: boolean) => void;
 }
@@ -86,15 +89,15 @@ interface NavigationModeState {
 export const useNavigationModeStore = create<NavigationModeState>(
   (set, get) => ({
     storedMode: loadStoredNavigationMode(),
-    lastKnownFlag: loadLastKnownNavigationFlag(),
+    isLastKnownFlagEnabled: loadLastKnownNavigationFlag(),
     setStoredMode: (mode) => {
-      persist(STORAGE_KEY, mode);
+      persist({ key: STORAGE_KEY, value: mode });
       set({ storedMode: mode });
     },
     rememberFlag: (isEnabled) => {
-      if (get().lastKnownFlag === isEnabled) return;
-      persist(FLAG_STORAGE_KEY, isEnabled ? "on" : "off");
-      set({ lastKnownFlag: isEnabled });
+      if (get().isLastKnownFlagEnabled === isEnabled) return;
+      persist({ key: FLAG_STORAGE_KEY, value: isEnabled ? "on" : "off" });
+      set({ isLastKnownFlagEnabled: isEnabled });
     },
   }),
 );

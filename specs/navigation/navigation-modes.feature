@@ -31,7 +31,7 @@ Feature: Navigation modes behind one flag
     Then the mode is "product-switcher"
 
   @integration
-  Scenario: A device with no stored preference and the flag off keeps the old navigation
+  Scenario: A device with no stored preference keeps the old navigation until the flag answers
     Given my device has no stored navigation mode
     And the navigation flag check has not answered yet
     When the app shell resolves the navigation mode

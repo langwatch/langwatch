@@ -24,7 +24,7 @@ describe("resolveNavigationMode", () => {
         expect(
           resolveNavigationMode({
             storedMode: "legacy",
-            lastKnownFlag: true,
+            isLastKnownFlagEnabled: true,
             flag: pending,
           }),
         ).toEqual({ status: "ready", mode: "legacy" });
@@ -36,7 +36,7 @@ describe("resolveNavigationMode", () => {
         expect(
           resolveNavigationMode({
             storedMode: "legacy",
-            lastKnownFlag: true,
+            isLastKnownFlagEnabled: true,
             flag: on,
           }),
         ).toEqual({ status: "ready", mode: "legacy" });
@@ -50,7 +50,7 @@ describe("resolveNavigationMode", () => {
         expect(
           resolveNavigationMode({
             storedMode: "icon-rail",
-            lastKnownFlag: true,
+            isLastKnownFlagEnabled: true,
             flag: pending,
           }),
         ).toEqual({ status: "loading" });
@@ -62,7 +62,7 @@ describe("resolveNavigationMode", () => {
         expect(
           resolveNavigationMode({
             storedMode: "icon-rail",
-            lastKnownFlag: null,
+            isLastKnownFlagEnabled: null,
             flag: on,
           }),
         ).toEqual({ status: "ready", mode: "icon-rail" });
@@ -74,7 +74,7 @@ describe("resolveNavigationMode", () => {
         expect(
           resolveNavigationMode({
             storedMode: "icon-rail",
-            lastKnownFlag: true,
+            isLastKnownFlagEnabled: true,
             flag: off,
           }),
         ).toEqual({ status: "ready", mode: "legacy" });
@@ -88,7 +88,7 @@ describe("resolveNavigationMode", () => {
         expect(
           resolveNavigationMode({
             storedMode: null,
-            lastKnownFlag: null,
+            isLastKnownFlagEnabled: null,
             flag: on,
           }),
         ).toEqual({ status: "ready", mode: "product-switcher" });
@@ -100,7 +100,7 @@ describe("resolveNavigationMode", () => {
         expect(
           resolveNavigationMode({
             storedMode: null,
-            lastKnownFlag: true,
+            isLastKnownFlagEnabled: true,
             flag: off,
           }),
         ).toEqual({ status: "ready", mode: "legacy" });
@@ -112,7 +112,7 @@ describe("resolveNavigationMode", () => {
         expect(
           resolveNavigationMode({
             storedMode: null,
-            lastKnownFlag: null,
+            isLastKnownFlagEnabled: null,
             flag: pending,
           }),
         ).toEqual({ status: "ready", mode: "legacy" });
@@ -124,7 +124,7 @@ describe("resolveNavigationMode", () => {
         expect(
           resolveNavigationMode({
             storedMode: null,
-            lastKnownFlag: true,
+            isLastKnownFlagEnabled: true,
             flag: pending,
           }),
         ).toEqual({ status: "ready", mode: "product-switcher" });
@@ -137,10 +137,16 @@ describe("isLegacyNavigationDevice", () => {
   describe("when the reader picked nothing and the flag never answered on", () => {
     it("counts the device as legacy", () => {
       expect(
-        isLegacyNavigationDevice({ storedMode: null, lastKnownFlag: null }),
+        isLegacyNavigationDevice({
+          storedMode: null,
+          isLastKnownFlagEnabled: null,
+        }),
       ).toBe(true);
       expect(
-        isLegacyNavigationDevice({ storedMode: null, lastKnownFlag: false }),
+        isLegacyNavigationDevice({
+          storedMode: null,
+          isLastKnownFlagEnabled: false,
+        }),
       ).toBe(true);
     });
   });
@@ -148,12 +154,15 @@ describe("isLegacyNavigationDevice", () => {
   describe("when the device runs a new mode", () => {
     it("does not count the device as legacy", () => {
       expect(
-        isLegacyNavigationDevice({ storedMode: null, lastKnownFlag: true }),
+        isLegacyNavigationDevice({
+          storedMode: null,
+          isLastKnownFlagEnabled: true,
+        }),
       ).toBe(false);
       expect(
         isLegacyNavigationDevice({
           storedMode: "product-switcher",
-          lastKnownFlag: null,
+          isLastKnownFlagEnabled: null,
         }),
       ).toBe(false);
     });

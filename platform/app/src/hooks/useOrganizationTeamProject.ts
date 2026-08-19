@@ -475,6 +475,14 @@ export const useOrganizationTeamProject = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDemo, organization, project, team, router.query.project]);
 
+  // Subscribed, not read once. The store holds the last flag answer this
+  // device saw, which is device-wide: a reader who leaves an organization
+  // with the new navigation on for one with it off starts as a v2 device
+  // and becomes a legacy one when the flag answers. The redirect effect
+  // below must run again on that answer, so it reads a subscribed value.
+  // Spec: specs/navigation/navigation-v2-landing.feature
+  const isLegacyNavigation = useNavigationModeStore(isLegacyNavigationDevice);
+
   useEffect(() => {
     if (
       projectQueryParam &&
@@ -543,10 +551,9 @@ export const useOrganizationTeamProject = (
       teamsWithProjectsOnAnyOrg.length > 0 &&
       // In the navigation-v2 modes the org switch and the landing resolver
       // own cross-organization destinations; this teleport to another
-      // org's project would fight them mid-navigation. Read fresh from the
-      // store (not subscribed) so legacy devices stay on the exact current
-      // code path. Spec: specs/navigation/navigation-v2-landing.feature
-      isLegacyNavigationDevice(useNavigationModeStore.getState())
+      // org's project would fight them mid-navigation.
+      // Spec: specs/navigation/navigation-v2-landing.feature
+      isLegacyNavigation
     ) {
       // Personal workspaces are never a valid project-home target — only
       // redirect when a shared team's project exists (ADR-038 v6).
@@ -584,6 +591,7 @@ export const useOrganizationTeamProject = (
     }
   }, [
     isDemo,
+    isLegacyNavigation,
     organization,
     organizations.data,
     finalProject,

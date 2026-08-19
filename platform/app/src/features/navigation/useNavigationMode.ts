@@ -34,7 +34,9 @@ export type { NavigationModeResolution };
  */
 export function useNavigationMode(): NavigationModeResolution {
   const storedMode = useNavigationModeStore((state) => state.storedMode);
-  const lastKnownFlag = useNavigationModeStore((state) => state.lastKnownFlag);
+  const isLastKnownFlagEnabled = useNavigationModeStore(
+    (state) => state.isLastKnownFlagEnabled,
+  );
   const rememberFlag = useNavigationModeStore((state) => state.rememberFlag);
   const isFlagNeeded = storedMode !== "legacy";
 
@@ -68,7 +70,7 @@ export function useNavigationMode(): NavigationModeResolution {
 
   return resolveNavigationMode({
     storedMode,
-    lastKnownFlag,
+    isLastKnownFlagEnabled,
     flag: isFlagAnswered
       ? { status: "answered", isEnabled: isFlagEnabled }
       : { status: "pending" },

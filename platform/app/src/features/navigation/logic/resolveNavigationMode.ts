@@ -15,7 +15,7 @@ export interface NavigationModeInputs {
   /** The mode the reader picked, null when they never picked one. */
   storedMode: NavigationMode | null;
   /** The last release_ui_navigation_v2_enabled answer on this device. */
-  lastKnownFlag: boolean | null;
+  isLastKnownFlagEnabled: boolean | null;
   flag: NavigationFlagAnswer;
 }
 
@@ -36,7 +36,7 @@ export interface NavigationModeInputs {
  */
 export function resolveNavigationMode({
   storedMode,
-  lastKnownFlag,
+  isLastKnownFlagEnabled,
   flag,
 }: NavigationModeInputs): NavigationModeResolution {
   if (storedMode === "legacy") return { status: "ready", mode: "legacy" };
@@ -50,7 +50,7 @@ export function resolveNavigationMode({
 
   return {
     status: "ready",
-    mode: lastKnownFlag ? DEFAULT_NAVIGATION_MODE : "legacy",
+    mode: isLastKnownFlagEnabled ? DEFAULT_NAVIGATION_MODE : "legacy",
   };
 }
 
@@ -61,11 +61,14 @@ export function resolveNavigationMode({
  */
 export function isLegacyNavigationDevice({
   storedMode,
-  lastKnownFlag,
-}: Pick<NavigationModeInputs, "storedMode" | "lastKnownFlag">): boolean {
+  isLastKnownFlagEnabled,
+}: Pick<
+  NavigationModeInputs,
+  "storedMode" | "isLastKnownFlagEnabled"
+>): boolean {
   const resolution = resolveNavigationMode({
     storedMode,
-    lastKnownFlag,
+    isLastKnownFlagEnabled,
     flag: { status: "pending" },
   });
   return resolution.status === "ready" && resolution.mode === "legacy";
