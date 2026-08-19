@@ -301,12 +301,11 @@ export class ProjectService {
 
     try {
       const names = productionLangWatchQLNames({ connection });
-      // Same mode-aware qualification as the deploy-time task: DEFAULT/SaaS
-      // mode's key-map table is migration 00084's, under the app's own
-      // ClickHouse database — not `names.database`. See
-      // `lwqlKeyMapTableQualifiedName`'s doc comment.
+      // Same qualification as the deploy-time task: the key-map table is
+      // always migration 00084's, under the app's own ClickHouse database —
+      // not `names.database`. See `lwqlKeyMapTableQualifiedName`'s doc
+      // comment.
       const { database: sourceDatabase } = parseConnectionUrl();
-      const isFullMode = process.env.LWQL_PROVISION_ACCESS_MODEL === "true";
       const row: LwqlKeyMapRow = {
         KeyHash: lwqlTenantCapability({ secret: project.lwqlKey }),
         TenantId: project.id,
@@ -315,7 +314,6 @@ export class ProjectService {
         table: lwqlKeyMapTableQualifiedName({
           names,
           sourceDatabase,
-          isFullMode,
         }),
         row,
       });
