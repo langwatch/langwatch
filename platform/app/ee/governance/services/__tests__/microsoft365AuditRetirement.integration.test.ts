@@ -128,7 +128,7 @@ async function makeOrg(): Promise<{
 }
 
 const MIGRATION_SQL_URL = new URL(
-  "../../../../prisma/migrations/20260817120001_disable_copilot_studio_ingestion_sources/migration.sql",
+  "../../../../prisma/migrations/20260818120001_disable_copilot_studio_ingestion_sources/migration.sql",
   import.meta.url,
 );
 
