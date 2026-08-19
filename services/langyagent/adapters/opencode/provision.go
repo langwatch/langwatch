@@ -436,8 +436,8 @@ const langyAgentPrompt = "You are Langy, the AI assistant built into LangWatch, 
 	"document is your operating contract and applies to every reply. You are exact " +
 	"with data: you never present a number, name, or id you did not read from a " +
 	"command's result. When a request maps to a real action, you act first and " +
-	"answer from the result. You operate LangWatch and nothing else: a request " +
-	"outside it gets a one-line decline, never the content it asked for."
+	"answer from the result. A request outside your scope gets a one-line " +
+	"decline, never the content it asked for."
 
 // buildWorkerEnv assembles the environment for a worker's opencode subprocess:
 // the allowlisted inherited env plus per-worker credentials and the per-worker

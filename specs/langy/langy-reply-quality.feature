@@ -13,7 +13,8 @@ Feature: Langy reply quality
     Given Langy ran its commands and produced cards but wrote no prose
     When the turn reaches its end
     Then the panel still shows one visible line of text
-    And that line says the turn produced no answer and invites the user to ask again
+    And that line says the turn produced no answer and points at the cards, so a
+      turn that completed a write is not repeated blindly
 
   @e2e
   Scenario: A completed write ends with a visible next-step line

@@ -18,10 +18,16 @@ const manifest: Record<
 // Manifest keys are docs-relative paths (e.g. "skills/directory.mdx",
 // "agent-simulations/connect-your-agent.mdx") since the skill card reached
 // pages outside docs/skills/.
-const pageFiles = Object.keys(manifest).map((f) => ({
-  name: f,
-  content: fs.readFileSync(path.join(docsRoot, f), "utf8"),
-}));
+const pageFiles = Object.keys(manifest).map((f) => {
+  // A key carrying `../` still joins to a readable file, so the suite would
+  // validate some unrelated page and report it as a docs page.
+  const resolved = path.resolve(docsRoot, f);
+  const relative = path.relative(docsRoot, resolved);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error(`Manifest key ${f} resolves outside docs/; keys are docs-relative`);
+  }
+  return { name: f, content: fs.readFileSync(resolved, "utf8") };
+});
 
 function extractAll(source: string, re: RegExp): string[] {
   const out: string[] = [];

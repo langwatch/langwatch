@@ -108,14 +108,27 @@ async function seedFailingApplicationTraces(): Promise<void> {
     }
   }
   // The collector queues into the async pipeline; the traces only exist for
-  // Langy once the workers have projected them.
-  await new Promise((resolve) => setTimeout(resolve, 15_000));
+  // Langy once the workers have projected them. Poll for that rather than
+  // sleeping a fixed interval: projection is usually quick, but on a loaded
+  // machine it can outlast any constant, and the failing-trace scenarios then
+  // run against data that is not searchable yet.
+  const deadline = Date.now() + 45_000;
+  while (Date.now() < deadline) {
+    const projected = await Promise.all(
+      fixtures.map((f) => traceExists(f.traceId)),
+    );
+    if (projected.every(Boolean)) return;
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+  }
+  throw new Error(
+    "Seeded fixture traces were still not searchable after 45s: the collector pipeline is behind, so the failing-trace scenarios would grade Langy against missing data",
+  );
 }
 
 describe("Langy dogfood — named flows", () => {
   beforeAll(async () => {
     await seedFailingApplicationTraces();
-  }, 60_000);
+  }, 90_000);
 
   describe("when the user just says hi", () => {
     /** @scenario A greeting gets a friendly hello, never a refusal */
@@ -358,7 +371,10 @@ describe("Langy dogfood — named flows", () => {
       const after = await listDatasets();
       const created = after.find((d) => !beforeIds.has(d.id));
       console.log(`Layer 2 dataset: ${created ? created.name : "NOT FOUND"}`);
-      expect(created).toBeTruthy();
+      // The name matters, not just that something appeared: a dataset under any
+      // other name means Langy wrote the wrong thing, or a concurrent run wrote
+      // it, and either way this scenario did not prove what it claims.
+      expect(created?.name).toBe("langy-dogfood-reply-check");
     });
   });
 

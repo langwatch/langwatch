@@ -277,7 +277,9 @@ async function streamTurnText({
   if (buf.trim()) handleFrame(buf);
 
   if (streamError) throw new Error(`Langy turn error: ${streamError}`);
-  if (assistantText) return assistantText;
+  // Whitespace is truthy, so a turn whose only deltas were blank lines would
+  // otherwise be handed to the judge as a reply the user cannot see.
+  if (assistantText.trim()) return assistantText;
 
   // No text. WHICH no-text this is decides whether a judge should ever see it,
   // and the two used to be indistinguishable behind a literal "(no response)"

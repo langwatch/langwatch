@@ -172,52 +172,95 @@ describe("LangyTokenBuffer hybrid flush", () => {
   });
 
   describe("given a turn ends without the agent writing any text", () => {
-    /** @scenario A turn never ends silently */
-    it("emits a visible fallback line before the terminal marker", async () => {
-      const { redis, entries } = makeRedis();
-      const buffer = new LangyTokenBuffer({ redis });
+    describe("when the turn reaches its terminal marker", () => {
+      /** @scenario A turn never ends silently */
+      it("emits a visible fallback line before the terminal marker", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = new LangyTokenBuffer({ redis });
 
-      // Tool cards but no prose: the exact shape of the blank replies seen in
-      // production, where the turn succeeds and the panel shows nothing.
-      await buffer.appendTool({
-        ...ids,
-        id: "call_1",
-        name: "bash",
-        phase: "end",
+        // Tool cards but no prose: the exact shape of the blank replies seen in
+        // production, where the turn succeeds and the panel shows nothing.
+        await buffer.appendTool({
+          ...ids,
+          id: "call_1",
+          name: "bash",
+          phase: "end",
+        });
+        await buffer.markEnd(ids);
+
+        expect(deltas(entries)).toEqual([
+          { type: "delta", text: LANGY_EMPTY_TURN_FALLBACK },
+        ]);
+        expect(entries.at(-1)?.type).toBe("end");
       });
-      await buffer.markEnd(ids);
 
-      expect(deltas(entries)).toEqual([
-        { type: "delta", text: LANGY_EMPTY_TURN_FALLBACK },
-      ]);
-      expect(entries.at(-1)?.type).toBe("end");
+      /** @scenario A turn never ends silently */
+      it("counts a whitespace-only delta as no text at all", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = new LangyTokenBuffer({ redis });
+
+        // Whitespace is truthy, so this used to satisfy the has-written check
+        // while the panel still rendered nothing the user could read.
+        await buffer.appendChunk({ ...ids, text: "\n\n  " });
+        await buffer.markEnd(ids);
+
+        expect(
+          deltas(entries)
+            .map((entry) => entry.text)
+            .join(""),
+        ).toContain(LANGY_EMPTY_TURN_FALLBACK);
+      });
     });
+  });
 
-    it("stays out of the way when the agent did write something", async () => {
-      const { redis, entries } = makeRedis();
-      const buffer = new LangyTokenBuffer({ redis });
+  describe("given a turn where the agent did write text", () => {
+    describe("when the turn reaches its terminal marker", () => {
+      it("stays out of the way", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = new LangyTokenBuffer({ redis });
 
-      await buffer.appendChunk({ ...ids, text: "Found 3 failing traces." });
-      await buffer.markEnd(ids);
+        await buffer.appendChunk({ ...ids, text: "Found 3 failing traces." });
+        await buffer.markEnd(ids);
 
-      expect(deltas(entries)).toEqual([
-        { type: "delta", text: "Found 3 failing traces." },
-      ]);
+        expect(deltas(entries)).toEqual([
+          { type: "delta", text: "Found 3 failing traces." },
+        ]);
+      });
+
+      it("keeps the whitespace that separates two words", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = new LangyTokenBuffer({ redis });
+
+        await buffer.appendChunk({ ...ids, text: "Found" });
+        await buffer.appendChunk({ ...ids, text: " " });
+        await buffer.appendChunk({ ...ids, text: "3 traces." });
+        await buffer.markEnd(ids);
+
+        expect(
+          deltas(entries)
+            .map((entry) => entry.text)
+            .join(""),
+        ).toBe("Found 3 traces.");
+      });
     });
+  });
 
-    it("emits the fallback again on a later silent turn of the same conversation", async () => {
-      const { redis, entries } = makeRedis();
-      const buffer = new LangyTokenBuffer({ redis });
+  describe("given an earlier turn of the conversation answered", () => {
+    describe("when a later turn ends silently", () => {
+      it("emits the fallback again", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = new LangyTokenBuffer({ redis });
 
-      await buffer.appendChunk({ ...ids, text: "First answer." });
-      await buffer.markEnd(ids);
+        await buffer.appendChunk({ ...ids, text: "First answer." });
+        await buffer.markEnd(ids);
 
-      const second = { conversationId: "conv_1", turnId: "turn_2" };
-      await buffer.markEnd(second);
+        const second = { conversationId: "conv_1", turnId: "turn_2" };
+        await buffer.markEnd(second);
 
-      expect(deltas(entries).at(-1)).toEqual({
-        type: "delta",
-        text: LANGY_EMPTY_TURN_FALLBACK,
+        expect(deltas(entries).at(-1)).toEqual({
+          type: "delta",
+          text: LANGY_EMPTY_TURN_FALLBACK,
+        });
       });
     });
   });

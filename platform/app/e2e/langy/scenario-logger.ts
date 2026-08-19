@@ -52,6 +52,14 @@ export async function runScenarioAndLog(
   // machine was too loaded to answer inside the adapter's retry budget.
   // Judge verdicts never come through here — a scenario that FAILS its criteria
   // returns normally and is not retried.
+  //
+  // The retry replays the WHOLE scenario, and the worker can die after Langy
+  // finished a create. So every scenario reaching this helper has to tolerate
+  // its writes happening twice: the platform accepts a repeated name and gives
+  // it a fresh id, and each Layer 2 check reads back the resource it asked for
+  // rather than counting how many appeared. A scenario whose write cannot be
+  // repeated must not run through here until the library can resume a single
+  // turn instead of the whole script.
   const transient = ["langy_worker_stopped", "never settled"];
   let result: Result;
   try {

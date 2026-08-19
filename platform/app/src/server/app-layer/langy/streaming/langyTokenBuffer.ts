@@ -85,10 +85,12 @@ export type LangyStreamEntry =
 /**
  * What the panel says when a turn finishes without the agent writing anything.
  * Names the state and hands the user their next move, rather than apologising
- * for an internal detail they cannot act on.
+ * for an internal detail they cannot act on. It points at the cards instead of
+ * inviting a blind repeat, because a silent turn can still have completed a
+ * write, and the cards are where that write is visible.
  */
 export const LANGY_EMPTY_TURN_FALLBACK =
-  "I finished this turn without writing a reply. Ask me again and I will tell you what I found.";
+  "I finished this turn without writing a reply. Check the cards above for what ran before you ask again.";
 
 /** An entry paired with the Redis stream id it was read at. */
 export interface LangyStreamRead {
@@ -151,6 +153,13 @@ export class LangyTokenBuffer {
   private readonly tokenCounts = new Map<string, number>();
   /** Turns whose FIRST delta already flushed (time-to-first-token done). */
   private readonly firstFlushDone = new Set<string>();
+  /**
+   * Turns that emitted at least one delta with a non-whitespace character.
+   * Separate from `firstFlushDone` because a delta of pure whitespace still
+   * has to be buffered (it is the space between two words) while leaving the
+   * panel with nothing the user can read.
+   */
+  private readonly sawVisibleText = new Set<string>();
   /** Per-turn time-arm timers: flush pending text FLUSH_AFTER_MS after the first pending token. */
   private readonly flushTimers = new Map<
     string,
@@ -223,6 +232,7 @@ export class LangyTokenBuffer {
   }): Promise<void> {
     if (!text) return;
     const pk = this.pendingKey(conversationId, turnId);
+    if (text.trim()) this.sawVisibleText.add(pk);
     this.pending.set(pk, (this.pending.get(pk) ?? "") + text);
     // Cheap word-count proxy — we do not tokenize here.
     const count =
@@ -495,15 +505,16 @@ export class LangyTokenBuffer {
     // indistinguishable from the product being broken, even when every command
     // in the turn succeeded. The agent is told to always end with visible text;
     // this is the backstop for when it does not, because silence is the one
-    // outcome the panel cannot render. `firstFlushDone` carries the answer
-    // already: it is set by the turn's first delta and cleared just below.
-    if (!this.firstFlushDone.has(this.pendingKey(conversationId, turnId))) {
+    // outcome the panel cannot render. A turn of pure whitespace reads to the
+    // user exactly like a turn of nothing, so it takes the fallback too.
+    if (!this.sawVisibleText.has(this.pendingKey(conversationId, turnId))) {
       await this.append(conversationId, turnId, {
         type: "delta",
         text: LANGY_EMPTY_TURN_FALLBACK,
       });
     }
     this.firstFlushDone.delete(this.pendingKey(conversationId, turnId));
+    this.sawVisibleText.delete(this.pendingKey(conversationId, turnId));
     await this.append(conversationId, turnId, { type: "end" });
   }
 
@@ -520,6 +531,7 @@ export class LangyTokenBuffer {
     await this.flush({ conversationId, turnId });
     await this.flushReasoning({ conversationId, turnId });
     this.firstFlushDone.delete(this.pendingKey(conversationId, turnId));
+    this.sawVisibleText.delete(this.pendingKey(conversationId, turnId));
     await this.append(conversationId, turnId, { type: "error", error });
   }
 

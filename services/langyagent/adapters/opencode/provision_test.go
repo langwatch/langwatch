@@ -519,13 +519,20 @@ func TestProvision_ConfiguresLangyBuildAgent(t *testing.T) {
 			t.Errorf("agent.build.permission[%q] = %q, want %q — the tool is outside Langy's role", tool, got, "deny")
 		}
 	}
-	// bash and edit stay OFF the deny list: the CLI, the GitHub skill's repo
-	// work and dataset file preparation run on them (an edit deny would also
-	// remove write and apply_patch).
-	for _, tool := range []string{"bash", "edit"} {
+	// bash, edit, skill and todowrite stay OFF the deny list: the CLI, the
+	// GitHub skill's repo work, dataset file preparation and the plan panel run
+	// on them (an edit deny would also remove write and apply_patch).
+	for _, tool := range []string{"bash", "edit", "skill", "todowrite"} {
 		if got, present := cfg.Agent.Build.Permission[tool]; present && got == "deny" {
 			t.Errorf("agent.build.permission[%q] = deny — this tool is part of Langy's role", tool)
 		}
+	}
+	// Those three are the whole deny list. Without this, a later deny added for
+	// a tool the role needs passes every check above, since a name absent from
+	// the loop is never looked at.
+	if len(cfg.Agent.Build.Permission) != 3 {
+		t.Errorf("agent.build.permission has %d entries, want exactly 3 (webfetch, task, question); got %v",
+			len(cfg.Agent.Build.Permission), cfg.Agent.Build.Permission)
 	}
 }
 
