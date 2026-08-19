@@ -20,11 +20,24 @@ git fetch -q origin main
 git checkout -qf main
 git reset -q --hard origin/main
 
-cd langwatch
+# app package location: platform/app since the repo restructure, langwatch/ before
+if [ -d platform/app ]; then APP_DIR=platform/app; else APP_DIR=langwatch; fi
+
+# carry the machine's .env across the restructure (it is not in the image repo)
+if [ ! -f "$APP_DIR/.env" ] && [ -f langwatch/.env ]; then
+  cp langwatch/.env "$APP_DIR/.env"
+fi
+
+cd "$APP_DIR"
 pnpm install
-pnpm prisma migrate deploy
+if grep -q '"prisma:migrate"' package.json; then
+  pnpm run prisma:migrate
+else
+  pnpm prisma migrate deploy
+fi
 
 # restart the dev stack (patterns exclude this script itself)
+pkill -f "dev-superviso[r]" 2>/dev/null || true
 pkill -f "bin/pnpm de[v]" 2>/dev/null || true
 pkill -f "concurrentl[y]" 2>/dev/null || true
 sleep 3
