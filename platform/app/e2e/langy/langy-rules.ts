@@ -25,7 +25,7 @@ export const LANGY_DECISIVENESS_CRITERION =
 
 /** The always-on outcome rubric every Langy answer is graded against. */
 export const LANGY_CORE_RULE_CRITERIA = [
-  "Langy answers the user's actual question with concrete results from their project (real counts, names, findings, or a clear empty result) — not with a plan, a capability list, or a description of what it is about to do.",
+  "Langy answers the user's actual question with concrete results from their project (real counts, names, findings, or a clear empty result) — not with a plan, a capability list, or a description of what it is about to do. When the platform refuses the action over permissions, the refusal stated plainly with a real path forward IS the concrete answer.",
   "Numbers, names, and ids in the reply come from what was actually retrieved; nothing is invented or estimated when the real value was available. Judge this against the conversation itself (the tool results and cards visible in the transcript): an id contradicting that visible evidence fails, but do not demand proof from telemetry, spans, or any source outside the conversation.",
   LANGY_DECISIVENESS_CRITERION,
   "The reply reads as the answer, not as a work log: no filler openers, no raw JSON or stack traces pasted into prose, no play-by-play of the commands it ran. A fenced code block tagged langy-card is the product's own UI (it renders as a real card, not as JSON) and is not a violation by itself. Offering a next step is fine only once the asked question is fully answered: an offer or menu that stands in for the answer, or buries it, is a failure.",
