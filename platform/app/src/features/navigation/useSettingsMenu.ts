@@ -58,11 +58,18 @@ export interface SettingsMenuItem {
    */
   alsoActiveAt?: string[];
   icon: LucideIcon;
-  /** Enterprise-plan entry; renders the violet pill. */
+  /** Enterprise-plan entry; renders the quiet grey pill. */
   isEnterprise?: boolean;
 }
 
 export interface SettingsMenuGroup {
+  /**
+   * Identifies the group in the collapse-state storage key, so a copy edit to
+   * `label` never drops a reader's open and closed sections. The `settings-`
+   * prefix keeps it clear of the product sidebar sections, which share that
+   * key space and already claim plain names like `ops`.
+   */
+  id: string;
   label: string;
   items: SettingsMenuItem[];
 }
@@ -82,6 +89,7 @@ function organizationGroup({
   isLiteMember,
 }: SettingsMenuGates): SettingsMenuGroup {
   return {
+    id: "settings-organization",
     label: "Organization",
     items: [
       {
@@ -129,6 +137,7 @@ function accessGroup({
   isLiteMember,
 }: SettingsMenuGates): SettingsMenuGroup {
   return {
+    id: "settings-access",
     label: "Access",
     items: [
       {
@@ -183,6 +192,7 @@ function aiInfrastructureGroup({
   isLiteMember,
 }: SettingsMenuGates): SettingsMenuGroup {
   return {
+    id: "settings-ai-infrastructure",
     label: "AI Infrastructure",
     items: [
       {
@@ -202,6 +212,7 @@ function dataControlsGroup({
   hasPermission,
 }: SettingsMenuGates): SettingsMenuGroup {
   return {
+    id: "settings-data-controls",
     label: "Data Controls",
     items: [
       {
@@ -225,6 +236,7 @@ function dataControlsGroup({
 
 function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
   return {
+    id: "settings-project",
     label: "Project",
     items: [
       {
@@ -256,6 +268,7 @@ function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
  */
 export function opsGroup(): SettingsMenuGroup {
   return {
+    id: "settings-ops",
     label: "Ops",
     items: [
       {
@@ -291,6 +304,7 @@ export function opsGroup(): SettingsMenuGroup {
 
 export function backofficeGroup(): SettingsMenuGroup {
   return {
+    id: "settings-backoffice",
     label: "Backoffice",
     items: [
       {

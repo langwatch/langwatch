@@ -1,6 +1,5 @@
 import { useBreakpointValue } from "@chakra-ui/react";
 import { useLayoutEffect } from "react";
-import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "~/components/MainMenu";
 import {
   LANGY_DOCK_GAP,
   LANGY_DOCKED_OFFSET,
@@ -16,6 +15,10 @@ import { useRouter } from "~/utils/compat/next-router";
 import { findCurrentRoute } from "~/utils/routes";
 import { resolveShellRoute, type ShellRoute } from "../logic/resolveShellRoute";
 import type { ProductId } from "../products";
+import {
+  SHELL_SIDEBAR_WIDTH_COMPACT,
+  SHELL_SIDEBAR_WIDTH_EXPANDED,
+} from "./shellLayout";
 
 type OrganizationTeamProject = ReturnType<typeof useOrganizationTeamProject>;
 type AppSession = ReturnType<typeof useRequiredSession>["data"];
@@ -144,7 +147,9 @@ function toReadyState({
     isSettingsRoute: route.isSettingsRoute,
     isDevelopment,
     isCompactSidebar,
-    menuWidth: isCompactSidebar ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED,
+    menuWidth: isCompactSidebar
+      ? SHELL_SIDEBAR_WIDTH_COMPACT
+      : SHELL_SIDEBAR_WIDTH_EXPANDED,
     showPresenceMenuItem: pathname.startsWith("/[project]/traces"),
     langyDockInset,
   };

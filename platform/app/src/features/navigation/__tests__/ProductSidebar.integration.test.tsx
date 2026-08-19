@@ -9,7 +9,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -146,7 +146,9 @@ vi.mock("~/utils/tracking", () => ({
   trackEvent: (...args: unknown[]) => trackEventMock(...args),
 }));
 
+import { MENU_WIDTH_EXPANDED } from "~/components/MainMenu";
 import { ProductSidebar } from "../shell/ProductSidebar";
+import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../shell/shellLayout";
 
 function renderSidebar(surface: "me" | "llm-ops" | "gateway" | "governance") {
   return render(
@@ -166,6 +168,9 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  // jsdom has no scrollIntoView; the deep-link test installs one.
+  delete (window.HTMLElement.prototype as { scrollIntoView?: unknown })
+    .scrollIntoView;
 });
 
 describe("the product sidebar", () => {
@@ -251,6 +256,29 @@ describe("the product sidebar", () => {
     });
   });
 
+  describe("when a page is opened by its address", () => {
+    /** @scenario "Opening a page by its address reveals its sidebar entry" */
+    it("brings that page's entry into view", async () => {
+      const scrolledInto: HTMLElement[] = [];
+      (
+        window.HTMLElement.prototype as unknown as {
+          scrollIntoView: (options?: ScrollIntoViewOptions) => void;
+        }
+      ).scrollIntoView = function (this: HTMLElement) {
+        scrolledInto.push(this);
+      };
+
+      mockPathname = "/gateway/virtual-keys";
+      renderSidebar("gateway");
+
+      await waitFor(() => {
+        expect(
+          scrolledInto.some((el) => el.textContent?.includes("Virtual Keys")),
+        ).toBe(true);
+      });
+    });
+  });
+
   describe("when the sidebar bottom block renders", () => {
     /** @scenario The sidebar bottom block keeps usage, settings, support and theme */
     it("holds the usage indicator, Settings, Support and the theme control", () => {
@@ -266,6 +294,44 @@ describe("the product sidebar", () => {
       expect(
         screen.getByRole("radiogroup", { name: "Theme" }),
       ).toBeInTheDocument();
+    });
+
+    /** @scenario "A rule separates the bottom block from the pages above it" */
+    it("draws a rule above the block", () => {
+      renderSidebar("governance");
+
+      const block = screen.getByTestId("sidebar-bottom-block");
+      expect(block).toContainElement(
+        screen.getByRole("radiogroup", { name: "Theme" }),
+      );
+      expect(block).toHaveStyle({ borderTopWidth: "1px" });
+    });
+  });
+
+  describe("when the sidebar column renders", () => {
+    /** @scenario "The sidebar draws its menu one step smaller" */
+    it("is wider than the current chrome's menu", () => {
+      renderSidebar("llm-ops");
+
+      expect(Number.parseInt(SHELL_SIDEBAR_WIDTH_EXPANDED, 10)).toBeGreaterThan(
+        Number.parseInt(MENU_WIDTH_EXPANDED, 10),
+      );
+      expect(screen.getByTestId("product-sidebar")).toHaveStyle({
+        width: SHELL_SIDEBAR_WIDTH_EXPANDED,
+      });
+    });
+
+    /** @scenario "The search key cap reads as a quiet hint" */
+    it("gives the Quick Search key cap grey type and a hairline border", () => {
+      renderSidebar("llm-ops");
+
+      const cap = screen
+        .getByRole("button", { name: "Quick Search" })
+        .querySelector("kbd");
+      // The hairline border is pinned on the shared chip style itself,
+      // which jsdom can read where a CSS variable it cannot resolve is
+      // out of reach: quietChipStyle.unit.test.ts.
+      expect(cap).toHaveStyle({ color: "var(--chakra-colors-gray-400)" });
     });
   });
 });
