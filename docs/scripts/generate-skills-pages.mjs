@@ -79,7 +79,7 @@ function cmdBox({ copyValue, code, track, trackProps }) {
 }
 
 function renderAccordion(entry) {
-  const { title, boldPrefix, skill, slashCommand, promptFile } = entry;
+  const { title, boldPrefix, skill, slashCommand, promptFile, static: isStatic } = entry;
   const prompt = fs.readFileSync(path.join(compiledDir, promptFile), "utf8");
   const installCmd = skill ? `npx skills add ${skill}` : null;
   const skillPath = skill ? skill.replace("langwatch/skills/", "") : null;
@@ -88,11 +88,20 @@ function renderAccordion(entry) {
     : escapeText(title);
 
   const lines = [];
-  lines.push(`<div className="lw-accordion">`);
-  lines.push(`  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">`);
-  lines.push(`    <span className="lw-accordion-title">${titleHtml}</span>`);
-  lines.push(`    ${ICONS.chevron}`);
-  lines.push(`  </div>`);
+  if (isStatic) {
+    // A static card is always open: no toggle affordance, and posthog.js
+    // skips .lw-accordion-static in its header click handler.
+    lines.push(`<div className="lw-accordion lw-accordion-static" data-open="true">`);
+    lines.push(`  <div className="lw-accordion-header">`);
+    lines.push(`    <span className="lw-accordion-title">${titleHtml}</span>`);
+    lines.push(`  </div>`);
+  } else {
+    lines.push(`<div className="lw-accordion">`);
+    lines.push(`  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">`);
+    lines.push(`    <span className="lw-accordion-title">${titleHtml}</span>`);
+    lines.push(`    ${ICONS.chevron}`);
+    lines.push(`  </div>`);
+  }
   lines.push(`  <div className="lw-accordion-body">`);
 
   if (installCmd) {

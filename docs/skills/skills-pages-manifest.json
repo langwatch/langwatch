@@ -149,7 +149,8 @@
         "title": "Connect my agent to LangWatch simulations",
         "skill": "langwatch/skills/connect-agent",
         "slashCommand": "/connect-agent",
-        "promptFile": "connect-agent.docs.txt"
+        "promptFile": "connect-agent.docs.txt",
+        "static": true
       }
     ]
   }

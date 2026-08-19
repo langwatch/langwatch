@@ -314,6 +314,10 @@ code {
 }
 .lw-accordion[data-open] .lw-accordion-body { display: block; }
 
+/* Static variant: always open, header is a plain title bar. */
+.lw-accordion-static .lw-accordion-header { cursor: default; }
+.lw-accordion-static .lw-accordion-header:hover { background: transparent; }
+
 /* Server-rendered prompt text backing the "Copy Full Prompt" action.
    Kept in the DOM (crawlable, copyable via posthog.js) but never shown. */
 .lw-prompt-source { display: none; }
@@ -435,6 +439,7 @@ code {
 /* Dark mode — accordion */
 .dark .lw-accordion { border-color: #374151; }
 .dark .lw-accordion-header:hover { background: rgba(255, 255, 255, 0.03); }
+.dark .lw-accordion-static .lw-accordion-header:hover { background: transparent; }
 .dark .lw-accordion-body { border-top-color: #374151; }
 .dark .lw-accordion-cmd-box { background: rgba(255, 255, 255, 0.05); border-color: #374151; }
 .dark .lw-accordion-cmd-box:hover { border-color: #6b7280; }

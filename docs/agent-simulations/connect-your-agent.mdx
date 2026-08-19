@@ -1,6 +1,6 @@
 ---
 title: Connect Your Agent
-sidebarTitle: Connect your agent
+sidebarTitle: Overview
 keywords: langwatch, agent simulations, http agent, black box testing, traceparent, trace propagation, scenario suite, coding agent prompt
 description: Register your agent's HTTP endpoint as a simulation target, so your team runs scenario suites from the platform and the judge verifies behavior against the agent's own traces.
 ---
@@ -11,10 +11,9 @@ The fastest path is the connect-agent skill. Install it in your coding agent (Cl
 
 {/* lw-generated:connect-agent:start */}
 
-<div className="lw-accordion">
-  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+<div className="lw-accordion lw-accordion-static" data-open="true">
+  <div className="lw-accordion-header">
     <span className="lw-accordion-title">Connect my agent to LangWatch simulations</span>
-    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
   </div>
   <div className="lw-accordion-body">
     <div className="lw-accordion-commands">
@@ -353,6 +352,16 @@ The agent must report its traces to the same LangWatch project that runs the sce
 
 In the platform, create the agent on the **Agents** page: type **HTTP**, then the URL, authentication, body template and output path from the steps above. The same registration is available as `POST /api/agents`.
 
+<Frame>
+<img className="block" src="/images/agent-simulations/register-http-agent.png" alt="The HTTP agent editor with the endpoint URL, request body template and output path" />
+</Frame>
+
+The **Test** tab of the agent editor sends one real request to your endpoint with the current configuration. Use it to confirm the endpoint answers and the output path extracts the reply text before you run any scenario:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/agent-test-request.png" alt="The Test tab showing a 200 response from the agent endpoint and the extracted reply" />
+</Frame>
+
 With the CLI:
 
 ```bash
@@ -383,6 +392,20 @@ Open the run in the **Simulations** section of your project. A connected setup s
 - The conversation transcript, with the reply text your `outputPath` extracted.
 - A trace link on each turn in the run detail, opening the agent's own spans for that turn.
 - Judge reasoning that cites spans, naming the tool call or lookup that satisfied a criterion.
+
+<Frame>
+<img className="block" src="/images/agent-simulations/run-detail-conversation.png" alt="The run detail with the conversation transcript and a View trace link on the turn" />
+</Frame>
+
+<Frame>
+<img className="block" src="/images/agent-simulations/run-detail-verdict.png" alt="The run results with the verdict and the judge reasoning citing a tool call span from the trace" />
+</Frame>
+
+The trace link on a turn opens the full trace: the simulation's own steps first, then your agent's spans for that turn, adopted through the `traceparent` header. This is the evidence the judge reads:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/run-trace.png" alt="The trace waterfall with the simulation spans and the agent's own spans in one trace" />
+</Frame>
 
 A trace-dependent criterion that comes back inconclusive means the traces did not arrive; see the failures below.
 
