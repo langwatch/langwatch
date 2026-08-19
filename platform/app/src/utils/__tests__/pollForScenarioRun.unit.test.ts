@@ -97,8 +97,10 @@ describe("pollForScenarioRun", () => {
     }
   });
 
-  it("returns error when run has FAILED status", async () => {
-    // Given: a scenario run exists with FAILED status
+  it("distinguishes a run that did not pass from a run that could not execute", async () => {
+    // Given: a run that executed to completion and did not pass. The judge
+    // reached a verdict, or the runner stopped it at its turn budget — either
+    // way the run produced an outcome, which an execution error never does.
     fetchBatchRunData.mockResolvedValue({
       changed: true,
       runs: [{ scenarioRunId: "run_123", status: "FAILED", messages: [] }],
@@ -109,11 +111,33 @@ describe("pollForScenarioRun", () => {
     await vi.advanceTimersByTimeAsync(0);
     const result = await resultPromise;
 
-    // Then: it returns failure with error "run_error"
+    // Then: it reports "run_failed", NOT "run_error". The caller shows the
+    // outcome; telling the user execution errored would send them to debug
+    // infrastructure that never broke.
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe("run_failed");
+      // And: includes the run id so the caller can offer to open the results
+      expect(result.scenarioRunId).toBe("run_123");
+    }
+  });
+
+  it("returns run_error when the run was cancelled", async () => {
+    // Given: a run cancelled before it could produce an outcome
+    fetchBatchRunData.mockResolvedValue({
+      changed: true,
+      runs: [{ scenarioRunId: "run_123", status: "CANCELLED", messages: [] }],
+    });
+
+    // When: pollForScenarioRun fetches the batch run data
+    const resultPromise = pollForScenarioRun(fetchBatchRunData, baseParams);
+    await vi.advanceTimersByTimeAsync(0);
+    const result = await resultPromise;
+
+    // Then: it stays on the error path — no outcome exists to show
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error).toBe("run_error");
-      // And: includes scenarioRunId "run_123"
       expect(result.scenarioRunId).toBe("run_123");
     }
   });

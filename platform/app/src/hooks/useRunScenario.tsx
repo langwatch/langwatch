@@ -79,7 +79,19 @@ export function useRunScenario({
 
         setIsPolling(true);
         const result = await pollForScenarioRun(
-          utils.scenarios.getBatchRunData.fetch,
+          // The poll asks for the same input up to 60 times over 30s. Under the
+          // app-wide staleTime (30_000, see utils/api.tsx) every call after the
+          // first would be answered from the first one's cached result, so the
+          // loop would never see the run start and would always time out.
+          // retry:false is equally load-bearing — fetchQuery only defaults
+          // retry off when it is undefined, and the app defines it globally, so
+          // one failing request would otherwise burn the entire budget on
+          // backoff inside a single attempt.
+          (pollParams) =>
+            utils.scenarios.getBatchRunData.fetch(pollParams, {
+              staleTime: 0,
+              retry: false,
+            }),
           {
             projectId,
             scenarioSetId: returnedSetId,
@@ -87,30 +99,46 @@ export function useRunScenario({
           },
         );
 
+        /** Toast action that opens the run, omitted when there is no run to open. */
+        const buildViewRunAction = (
+          label: string,
+          scenarioRunId: string | undefined,
+        ) =>
+          scenarioRunId
+            ? {
+                label,
+                onClick: () =>
+                  onRunFailed?.({
+                    scenarioRunId,
+                    setId: returnedSetId,
+                    batchRunId: returnedBatchRunId,
+                  }),
+              }
+            : undefined;
+
         if (result.success) {
           onRunComplete?.({
             scenarioRunId: result.scenarioRunId,
             setId: returnedSetId,
             batchRunId: returnedBatchRunId,
           });
+        } else if (result.error === "run_failed") {
+          // The run executed and did not pass. That is a result, not a fault:
+          // no error framing, and the user decides whether to open it rather
+          // than being navigated there.
+          toaster.create({
+            title: "Scenario did not pass",
+            description:
+              "The run finished. Open it to see the criteria and the reasoning.",
+            type: "warning",
+            action: buildViewRunAction("View run", result.scenarioRunId),
+          });
         } else if (result.error === "run_error") {
-          const runResult = result.scenarioRunId
-            ? {
-                scenarioRunId: result.scenarioRunId,
-                setId: returnedSetId,
-                batchRunId: returnedBatchRunId,
-              }
-            : null;
           toaster.create({
             title: "Scenario run failed",
             description: "The scenario encountered an error during execution.",
             type: "error",
-            action: runResult
-              ? {
-                  label: "View failed run",
-                  onClick: () => onRunFailed?.(runResult),
-                }
-              : undefined,
+            action: buildViewRunAction("View failed run", result.scenarioRunId),
           });
         } else {
           toaster.create({
