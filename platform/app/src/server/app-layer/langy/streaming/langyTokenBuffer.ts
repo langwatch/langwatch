@@ -82,6 +82,14 @@ export type LangyStreamEntry =
   | { type: "end" }
   | { type: "error"; error: string };
 
+/**
+ * What the panel says when a turn finishes without the agent writing anything.
+ * Names the state and hands the user their next move, rather than apologising
+ * for an internal detail they cannot act on.
+ */
+export const LANGY_EMPTY_TURN_FALLBACK =
+  "I finished this turn without writing a reply. Ask me again and I will tell you what I found.";
+
 /** An entry paired with the Redis stream id it was read at. */
 export interface LangyStreamRead {
   id: string;
@@ -482,6 +490,19 @@ export class LangyTokenBuffer {
   }): Promise<void> {
     await this.flush({ conversationId, turnId });
     await this.flushReasoning({ conversationId, turnId });
+    // A turn that completes without ever emitting a text delta leaves the user
+    // staring at a finished spinner and nothing else — the failure mode is
+    // indistinguishable from the product being broken, even when every command
+    // in the turn succeeded. The agent is told to always end with visible text;
+    // this is the backstop for when it does not, because silence is the one
+    // outcome the panel cannot render. `firstFlushDone` carries the answer
+    // already: it is set by the turn's first delta and cleared just below.
+    if (!this.firstFlushDone.has(this.pendingKey(conversationId, turnId))) {
+      await this.append(conversationId, turnId, {
+        type: "delta",
+        text: LANGY_EMPTY_TURN_FALLBACK,
+      });
+    }
     this.firstFlushDone.delete(this.pendingKey(conversationId, turnId));
     await this.append(conversationId, turnId, { type: "end" });
   }

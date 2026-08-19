@@ -13,7 +13,11 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LANGY_STREAMING } from "../langy.streaming.constants";
-import { type LangyStreamRedis, LangyTokenBuffer } from "../langyTokenBuffer";
+import {
+  LANGY_EMPTY_TURN_FALLBACK,
+  type LangyStreamRedis,
+  LangyTokenBuffer,
+} from "../langyTokenBuffer";
 
 interface RecordedEntry {
   type: string;
@@ -164,6 +168,57 @@ describe("LangyTokenBuffer hybrid flush", () => {
         { type: "reasoning", text: "I will inspect this." },
       ]);
       expect(entries.at(-1)?.type).toBe("end");
+    });
+  });
+
+  describe("given a turn ends without the agent writing any text", () => {
+    /** @scenario A turn never ends silently */
+    it("emits a visible fallback line before the terminal marker", async () => {
+      const { redis, entries } = makeRedis();
+      const buffer = new LangyTokenBuffer({ redis });
+
+      // Tool cards but no prose: the exact shape of the blank replies seen in
+      // production, where the turn succeeds and the panel shows nothing.
+      await buffer.appendTool({
+        ...ids,
+        id: "call_1",
+        name: "bash",
+        phase: "completed",
+      });
+      await buffer.markEnd(ids);
+
+      expect(deltas(entries)).toEqual([
+        { type: "delta", text: LANGY_EMPTY_TURN_FALLBACK },
+      ]);
+      expect(entries.at(-1)?.type).toBe("end");
+    });
+
+    it("stays out of the way when the agent did write something", async () => {
+      const { redis, entries } = makeRedis();
+      const buffer = new LangyTokenBuffer({ redis });
+
+      await buffer.appendChunk({ ...ids, text: "Found 3 failing traces." });
+      await buffer.markEnd(ids);
+
+      expect(deltas(entries)).toEqual([
+        { type: "delta", text: "Found 3 failing traces." },
+      ]);
+    });
+
+    it("emits the fallback again on a later silent turn of the same conversation", async () => {
+      const { redis, entries } = makeRedis();
+      const buffer = new LangyTokenBuffer({ redis });
+
+      await buffer.appendChunk({ ...ids, text: "First answer." });
+      await buffer.markEnd(ids);
+
+      const second = { conversationId: "conv_1", turnId: "turn_2" };
+      await buffer.markEnd(second);
+
+      expect(deltas(entries).at(-1)).toEqual({
+        type: "delta",
+        text: LANGY_EMPTY_TURN_FALLBACK,
+      });
     });
   });
 });
