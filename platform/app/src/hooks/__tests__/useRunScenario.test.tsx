@@ -319,7 +319,7 @@ describe("useRunScenario()", () => {
     });
   });
 
-  describe("the batch-run fetch handed to the poll", () => {
+  describe("when the poll asks the server for batch-run data", () => {
     it("asks for fresh data and does not retry", async () => {
       const { result } = renderHook(() =>
         useRunScenario({

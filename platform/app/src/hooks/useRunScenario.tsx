@@ -28,6 +28,34 @@ interface RunScenarioParams {
   batchRunId?: string;
 }
 
+/**
+ * Builds the toast action that opens a finished run.
+ *
+ * Returns undefined when there is no run to open, and when the caller supplied
+ * no `onRunFailed` handler — a button that does nothing when clicked is worse
+ * than no button. `ScenarioFormDrawer` is such a caller.
+ */
+function buildViewRunAction({
+  label,
+  scenarioRunId,
+  setId,
+  batchRunId,
+  onRunFailed,
+}: {
+  label: string;
+  scenarioRunId: string | undefined;
+  setId: string;
+  batchRunId: string;
+  onRunFailed: ((result: RunCompleteResult) => void) | undefined;
+}) {
+  if (!scenarioRunId || !onRunFailed) return undefined;
+
+  return {
+    label,
+    onClick: () => onRunFailed({ scenarioRunId, setId, batchRunId }),
+  };
+}
+
 export function useRunScenario({
   projectId,
   projectSlug,
@@ -99,23 +127,6 @@ export function useRunScenario({
           },
         );
 
-        /** Toast action that opens the run, omitted when there is no run to open. */
-        const buildViewRunAction = (
-          label: string,
-          scenarioRunId: string | undefined,
-        ) =>
-          scenarioRunId
-            ? {
-                label,
-                onClick: () =>
-                  onRunFailed?.({
-                    scenarioRunId,
-                    setId: returnedSetId,
-                    batchRunId: returnedBatchRunId,
-                  }),
-              }
-            : undefined;
-
         if (result.success) {
           onRunComplete?.({
             scenarioRunId: result.scenarioRunId,
@@ -131,14 +142,26 @@ export function useRunScenario({
             description:
               "The run finished. Open it to see the criteria and the reasoning.",
             type: "warning",
-            action: buildViewRunAction("View run", result.scenarioRunId),
+            action: buildViewRunAction({
+              label: "View run",
+              scenarioRunId: result.scenarioRunId,
+              setId: returnedSetId,
+              batchRunId: returnedBatchRunId,
+              onRunFailed,
+            }),
           });
         } else if (result.error === "run_error") {
           toaster.create({
             title: "Scenario run failed",
             description: "The scenario encountered an error during execution.",
             type: "error",
-            action: buildViewRunAction("View failed run", result.scenarioRunId),
+            action: buildViewRunAction({
+              label: "View failed run",
+              scenarioRunId: result.scenarioRunId,
+              setId: returnedSetId,
+              batchRunId: returnedBatchRunId,
+              onRunFailed,
+            }),
           });
         } else {
           toaster.create({
