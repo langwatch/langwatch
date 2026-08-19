@@ -1,10 +1,10 @@
-import { createClient } from "@clickhouse/client";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import type { Project } from "~/generated/prisma/client";
 import { lwqlTenantCapability } from "~/server/analytics/lwql/capability";
 import { lwqlConnectionFromEnv } from "~/server/analytics/lwql/executor";
+import { insertLwqlKeyMapRow } from "~/server/analytics/lwql/lwqlKeyMap.repository";
 import {
   type LwqlKeyMapRow,
   lwqlKeyMapTableQualifiedName,
@@ -299,7 +299,6 @@ export class ProjectService {
       return;
     }
 
-    const client = createClient({ url: process.env.CLICKHOUSE_URL });
     try {
       const names = productionLangWatchQLNames({ connection });
       // Same mode-aware qualification as the deploy-time task: DEFAULT/SaaS
@@ -312,15 +311,13 @@ export class ProjectService {
         KeyHash: lwqlTenantCapability({ secret: project.lwqlKey }),
         TenantId: project.id,
       };
-      await client.insert({
+      await insertLwqlKeyMapRow({
         table: lwqlKeyMapTableQualifiedName({
           names,
           sourceDatabase,
           fullMode,
         }),
-        values: [row],
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        row,
       });
     } catch (error) {
       logger.error(
@@ -330,8 +327,6 @@ export class ProjectService {
       captureException(new Error("Failed to sync lwql key-map row"), {
         extra: { projectId: project.id, error },
       });
-    } finally {
-      await client.close();
     }
   }
 
