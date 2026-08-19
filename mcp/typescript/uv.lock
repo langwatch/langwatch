@@ -1036,7 +1036,7 @@ examples = [
     { name = "haystack-ai", specifier = ">=2.13.2,<4.0.0" },
     { name = "json-repair", specifier = ">=0.42.0" },
     { name = "jupyter", specifier = ">=1.0.0,<2.0.0" },
-    { name = "jupyterlab", specifier = ">=4.5.6" },
+    { name = "jupyterlab", specifier = ">=4.6.3" },
     { name = "langchain", specifier = ">=1.0.0,<2.0.0" },
     { name = "langchain-community", specifier = ">=0.4.2,<1.0.0" },
     { name = "langchain-google-vertexai", specifier = ">=2.0.0,<4.0.0" },
