@@ -149,10 +149,11 @@ Create reusable criteria for your domain:
 
 1. Run boundary scenarios first to verify basic compliance
 2. Run red team tests to verify adversarial resilience
-3. When a test fails, find the layer that owns the failure before you edit anything: the agent's tool configuration, its code path, its knowledge content, its prompt, or the test itself. The prompt is the last resort, not the first. If the fix is "the agent must never do X", prefer removing the capability in configuration over writing a rule about it
+3. When a test fails, find the layer that owns the failure before you edit anything: the agent's tool configuration, its code path, its knowledge content, its prompt, or the test itself. Read the trace of the failing run first, since it shows the assembled input (system prompt, injected tool schemas, retrieved context) and every tool call. The prompt is the last resort, not the first. If the fix is "the agent must never do X", prefer removing the capability in configuration over writing a rule about it
 4. Fix the class of failure, never the failing conversation. Do not paste the failing transcript into the system prompt: state the one general principle that makes the whole class impossible, then re-run with varied wording to prove the fix is not tied to the exact phrasing that failed
 5. Pair every new boundary rule with a scenario for the nearby legitimate request, so the fix cannot silently turn into over-refusal of what the agent should answer
 6. When all tests pass, refactor under green: merge overlapping prompt rules, delete rules a newer principle already covers, and re-run everything. Track the prompt's size across changes; a compliance prompt that only ever grows is accumulating patches, not protection
+7. Treat these steps as a starting point: no universal playbook can say "for X, fix Y" for all setups. Your harness, codebase and model define which levers exist and what a clean fix looks like on each
 
 ## Common Mistakes
 
