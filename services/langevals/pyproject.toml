@@ -128,14 +128,16 @@ override-dependencies = [
     "torch>=2.13.0",
     #
     # NOT fixed here, deliberately:
-    #   langchain / langchain-openai / langchain-text-splitters / langchain-community
+    #   langchain / langchain-openai / langchain-community
     #     — this workspace is on the 0.3.x line and every patched version is on
     #       1.x, so clearing those alerts is a breaking major upgrade of the
     #       evaluator surface, not a floor bump. langchain-community additionally
-    #       can't move independently of the other three (see the pin above) until
-    #       ragas fixes its vertexai import. Tracked separately. langchain-core is
-    #       not in this list: its floor above (0.3.86) already carries the
-    #       GHSA-pjwx-r37v-7724 fix (patched at 0.3.85).
+    #       can't move independently of the other two (see the pin above) until
+    #       ragas fixes its vertexai import. Tracked separately. langchain-core
+    #       and langchain-text-splitters are not in this list: their floors
+    #       above (0.3.86 and 0.3.11) already carry the GHSA-pjwx-r37v-7724 fix
+    #       (patched at 0.3.85) and the GHSA-m42m-m8cr-8m58 fix (patched at
+    #       0.3.9) respectively.
     #   ragas, diskcache — no patched release exists upstream yet.
 ]
 
