@@ -1,6 +1,6 @@
 import { NotFoundError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
-import { TRPCError } from "@trpc/server";
+import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import {
   Prisma,
@@ -21,18 +21,25 @@ import type {
 } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import {
   CannotRemoveSelfAsLastAdminError,
-  PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
   PersonalWorkspaceNotManagedHereError,
   TeamLastAdminRequiredError,
 } from "~/server/app-layer/teams/team.service";
 import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
+import { RoleNotFoundError } from "~/server/role/errors/role-not-found.error";
+import {
+  CustomRoleIdRequiredError,
+  CustomRoleNotAssignableError,
+} from "~/server/role-bindings/errors";
 import {
   computeEffectiveAdminUserIds,
   projectAdminUserIdsAfterDirectEdit,
   projectAdminUserIdsWithoutDirectRole,
 } from "~/server/teams/effective-team-admins";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
+
+const logger = createLogger("langwatch:teams:team.service");
 
 // When a user holds multiple bindings on one team, the most privileged is the
 // one the settings page displays (and the binding team.update edits).
@@ -740,10 +747,15 @@ export class TeamService {
   }): Promise<{ success: true }> {
     const teamRecord = await this.prisma.team.findUnique({
       where: { id: teamId },
-      select: { organizationId: true, isPersonal: true, ownerUserId: true },
+      select: {
+        name: true,
+        organizationId: true,
+        isPersonal: true,
+        ownerUserId: true,
+      },
     });
     if (!teamRecord) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
+      throw new NotFoundError("team_not_found", "Team", teamId);
     }
     const { organizationId } = teamRecord;
 
@@ -791,7 +803,11 @@ export class TeamService {
     teamRecord,
     members,
   }: {
-    teamRecord: { isPersonal: boolean; ownerUserId: string | null };
+    teamRecord: {
+      name: string;
+      isPersonal: boolean;
+      ownerUserId: string | null;
+    };
     members: MemberInput[];
   }): void {
     if (!teamRecord.isPersonal) return;
@@ -801,10 +817,7 @@ export class TeamService {
         members[0]!.userId === teamRecord.ownerUserId &&
         members[0]!.role === TeamUserRole.ADMIN);
     if (!keepsProvisionedMembership) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
-      });
+      throw new PersonalWorkspaceNotManagedHereError(teamRecord.name);
     }
   }
 
@@ -987,13 +1000,10 @@ export class TeamService {
     await this.assertCustomRolesBelongToOrganization({
       organizationId,
       members,
-      // The creation path has always named an invalid custom role a bad
-      // request rather than a missing one, and says so in one sentence.
+      // The creation path has always named an invalid custom role one way,
+      // whether it is missing or belongs to another organization.
       onInvalid: (customRoleId) =>
-        new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Custom role ${customRoleId} is invalid for this team`,
-        }),
+        new CustomRoleNotAssignableError(customRoleId),
     });
 
     const memberBindings = members.map((member) => ({
@@ -1006,10 +1016,7 @@ export class TeamService {
     }));
 
     if (!memberBindings.some((b) => b.role === TeamUserRole.ADMIN)) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Team must have at least one admin",
-      });
+      throw new TeamLastAdminRequiredError(name);
     }
 
     const team = await this.prisma.team.create({
@@ -1090,10 +1097,7 @@ export class TeamService {
   }): Promise<void> {
     for (const member of members.filter((m) => isCustomRole(m.role))) {
       if (!member.customRoleId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `customRoleId is required when role is a custom role for user ${member.userId}`,
-        });
+        throw new CustomRoleIdRequiredError();
       }
       const customRoleId = member.customRoleId;
       const customRole = await this.prisma.customRole.findUnique({
@@ -1101,21 +1105,12 @@ export class TeamService {
         select: { organizationId: true, kind: true },
       });
       if (customRole?.kind !== "custom") {
-        throw (
-          onInvalid?.(customRoleId) ??
-          new TRPCError({
-            code: "NOT_FOUND",
-            message: `Custom role ${customRoleId} not found`,
-          })
-        );
+        throw onInvalid?.(customRoleId) ?? new RoleNotFoundError(customRoleId);
       }
       if (customRole.organizationId !== organizationId) {
         throw (
           onInvalid?.(customRoleId) ??
-          new TRPCError({
-            code: "FORBIDDEN",
-            message: `Custom role ${customRoleId} does not belong to team's organization`,
-          })
+          new CustomRoleNotAssignableError(customRoleId)
         );
       }
     }
@@ -1233,7 +1228,50 @@ export class TeamService {
       reason: "removed from team",
     });
 
+    await this.warnIfTeamLeftWithoutAdmin({
+      organizationId: removal.organizationId,
+      teamId,
+    });
+
     return { success: true, removedUserId: userId };
+  }
+
+  /**
+   * The last-admin guard inside `removeMember`'s transaction reads the
+   * team's admin grants BEFORE this removal's own revocation lands — a
+   * ledger append cannot join the Prisma transaction, so the revoke happens
+   * after commit. A concurrent demote racing that gap can legitimately count
+   * the departing member as still administering the team and let a real
+   * admin go too, leaving the team with none once both revocations land.
+   *
+   * Closing this fully needs the demote path to serialize against this one
+   * across two separate transactions, which is a bigger seam than one
+   * removal call can close on its own. Until then this re-checks the team
+   * immediately after its own revoke and surfaces the inconsistency loudly
+   * instead of leaving it silent. It does not compensate: by the time this
+   * runs the requested removal has already committed and been reported to
+   * the caller as a success, so re-inserting an admin nobody asked for would
+   * be a second surprise on top of the first.
+   */
+  private async warnIfTeamLeftWithoutAdmin({
+    organizationId,
+    teamId,
+  }: {
+    organizationId: string;
+    teamId: string;
+  }): Promise<void> {
+    const effectiveAdminUserIds = await computeEffectiveAdminUserIds({
+      tx: this.prisma,
+      organizationId,
+      teamId,
+    });
+    if (effectiveAdminUserIds.size > 0) return;
+
+    const error = new Error(
+      "team left without an admin: a concurrent removal and demote raced the post-commit grant-revoke gap",
+    );
+    logger.error({ organizationId, teamId }, error.message);
+    captureException(error, { extra: { organizationId, teamId } });
   }
 
   /**

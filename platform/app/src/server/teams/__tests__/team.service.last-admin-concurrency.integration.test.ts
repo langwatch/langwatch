@@ -113,9 +113,19 @@ describe("TeamService.removeMember", () => {
         ]);
 
         const refused = outcomes.filter(
-          (outcome) => outcome.status === "rejected",
+          (outcome): outcome is PromiseRejectedResult =>
+            outcome.status === "rejected",
         );
         expect(refused).toHaveLength(1);
+        // The refusal is Postgres's own serialization failure (40001,
+        // surfaced by Prisma as P2034), not a domain error the service
+        // decided on — the two transactions both read two admins and both
+        // pass the in-transaction guard; it is the team row's write-write
+        // conflict that stops the second from committing. Asserting the
+        // code, not just that something rejected, is what catches a
+        // regression that lets an unrelated failure (a deadlock, a leaked
+        // connection error) pass this test for the wrong reason.
+        expect(refused[0]!.reason).toMatchObject({ code: "P2034" });
 
         const adminsLeft = await prisma.roleBinding.count({
           where: {
@@ -125,7 +135,10 @@ describe("TeamService.removeMember", () => {
             role: TeamUserRole.ADMIN,
           },
         });
-        expect(adminsLeft).toBeGreaterThanOrEqual(1);
+        // Exactly one, not merely "at least one": that also passes if the
+        // "winning" removal silently failed to remove anyone and both
+        // admins are still standing.
+        expect(adminsLeft).toBe(1);
       });
     });
   });

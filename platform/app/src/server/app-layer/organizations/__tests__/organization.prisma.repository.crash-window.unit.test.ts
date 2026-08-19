@@ -113,7 +113,7 @@ describe("given a member whose removal is under way", () => {
           userId: "user_a",
           actingUserId: "user_b",
         }),
-      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      ).rejects.toMatchObject({ code: "member_not_found" });
 
       expect(revokeBindingsWhere).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -142,6 +142,55 @@ describe("given a member whose removal is under way", () => {
 
       expect(revokeBindingsWhere).not.toHaveBeenCalled();
       expect(memberDelete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the transaction's locked re-check refuses a removal the advisory pre-check let through", () => {
+    it("puts back the grants it just revoked, so the survivor keeps their access", async () => {
+      memberFindUnique.mockResolvedValue({
+        role: OrganizationUserRole.ADMIN,
+        disabledAt: null,
+      });
+      // The unlocked pre-check outside the transaction sees two admins...
+      memberCount.mockResolvedValue(2);
+      // ...but a concurrent removal of the organization's other admin has
+      // already committed by the time this one takes its locked read.
+      queryRaw.mockResolvedValue([{ userId: "user_a" }]);
+      roleBindingFindMany.mockResolvedValue([
+        {
+          id: "rb_1",
+          role: "ADMIN",
+          customRoleId: null,
+          scopeType: "ORGANIZATION",
+          scopeId: "org_1",
+        },
+      ]);
+
+      await expect(
+        repository.deleteMember({
+          organizationId: "org_1",
+          userId: "user_a",
+          actingUserId: "user_b",
+        }),
+      ).rejects.toMatchObject({ code: "cannot_remove_last_admin" });
+
+      expect(memberDelete).not.toHaveBeenCalled();
+      expect(attachBindings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "org_1",
+          bindings: [
+            expect.objectContaining({
+              bindingId: "rb_1",
+              principal: { userId: "user_a" },
+              role: "ADMIN",
+              customRoleId: null,
+              scopeType: "ORGANIZATION",
+              scopeId: "org_1",
+            }),
+          ],
+          onDuplicate: "skip",
+        }),
+      );
     });
   });
 });

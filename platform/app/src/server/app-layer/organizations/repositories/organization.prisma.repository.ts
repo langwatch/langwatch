@@ -1,6 +1,6 @@
+import type { LedgerActor } from "@langwatch/authz-server";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
-import { TRPCError } from "@trpc/server";
 import type { User } from "~/generated/prisma/client";
 import {
   type Currency,
@@ -15,7 +15,6 @@ import {
 import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
-  type LedgerActor,
   type LedgerBindingAttach,
 } from "~/server/app-layer/authz/ledger";
 import { ledgerActorFor } from "~/server/app-layer/authz/ledger-actor";
@@ -31,15 +30,19 @@ import {
 import { GROWTH_SEAT_PLAN_TYPES } from "../../../../../ee/billing/utils/growthSeatEvent";
 import { isCustomRole } from "../../../api/enterprise";
 import { revokeAllSessionsForUser } from "../../../better-auth/revokeSessions";
+import { CustomRoleNotAssignableError } from "../../../role-bindings/errors";
 import {
   CannotRemoveSelfAsLastAdminError,
   LiteMemberViewerOnlyError,
   TeamLastAdminRequiredError,
+  TeamMembershipNotFoundError,
+  TeamNotFoundError,
 } from "../../teams/team.service";
 import {
   CannotDemoteLastAdminError,
   CannotDisableLastAdminError,
   CannotRemoveLastAdminError,
+  MemberNotFoundError,
   OrganizationSlugTakenError,
 } from "../errors";
 import type {
@@ -1024,10 +1027,27 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       // refusing outright left them orphaned, and a re-invite reactivated
       // them.
       await revokeTheirGrants();
-      throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+      throw new MemberNotFoundError(userId);
     }
 
     await this.assertRemovalKeepsAnActiveAdmin({ organizationId, member });
+
+    // Snapshotted before the revoke below so a refusal inside the
+    // transaction — the locked re-check is the one two concurrent removals
+    // of the last two admins can actually trip, the advisory check above
+    // passes for both — can put back exactly what this call is about to take
+    // away, rather than leaving a member who keeps their seat and loses
+    // every grant it should carry.
+    const grantsBeforeRevoke = await this.prisma.roleBinding.findMany({
+      where: { organizationId, userId },
+      select: {
+        id: true,
+        role: true,
+        customRoleId: true,
+        scopeType: true,
+        scopeId: true,
+      },
+    });
 
     // Grants go before the membership, not after. A ledger append cannot join
     // the Prisma transaction, so one of the two writes is always exposed to a
@@ -1036,10 +1056,34 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     // order left grants nobody could reach any more.
     await revokeTheirGrants();
 
-    await this.prisma.$transaction(async (tx) => {
-      await this.deleteMembershipRow({ tx, organizationId, userId });
-      await this.archivePersonalWorkspaces({ tx, organizationId, userId });
-    });
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await this.deleteMembershipRow({ tx, organizationId, userId });
+        await this.archivePersonalWorkspaces({ tx, organizationId, userId });
+      });
+    } catch (error) {
+      // The locked re-check inside `deleteMembershipRow` refused this
+      // removal — a concurrent removal of the organization's other admin
+      // committed first. The grants above are already gone by then, so
+      // without this the survivor keeps their seat and holds nothing. Put
+      // back exactly the rows just revoked.
+      if (grantsBeforeRevoke.length > 0) {
+        await this.writer.attachBindings({
+          organizationId,
+          bindings: grantsBeforeRevoke.map((binding) => ({
+            bindingId: binding.id,
+            principal: { userId },
+            role: binding.role,
+            customRoleId: binding.customRoleId,
+            scopeType: binding.scopeType,
+            scopeId: binding.scopeId,
+          })),
+          actor,
+          onDuplicate: "skip",
+        });
+      }
+      throw error;
+    }
   }
 
   /**
@@ -1094,7 +1138,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
 
     if (!stillAMember) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+      throw new MemberNotFoundError(userId);
     }
 
     if (
@@ -1174,7 +1218,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       });
 
       if (!member) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+        throw new MemberNotFoundError(userId);
       }
 
       // Same guard as demoting the last admin: an organization with no admin
@@ -1233,10 +1277,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       });
 
       if (!currentMember) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Member not found",
-        });
+        throw new MemberNotFoundError(userId);
       }
 
       if (
@@ -1490,10 +1531,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       });
 
       if (finalAdminCount === 0) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Operation would result in no admins for this organization",
-        });
+        throw new CannotDemoteLastAdminError();
       }
 
       return currentMember.role;
@@ -1540,10 +1578,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           select: { organizationId: true, name: true },
         });
         if (!team) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Team not found",
-          });
+          throw new TeamNotFoundError(teamId);
         }
         const customRole = await tx.customRole.findUnique({
           where: { id: storedCustomRoleId },
@@ -1553,10 +1588,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           customRole?.kind !== "custom" ||
           customRole.organizationId !== team.organizationId
         ) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Role does not belong to team's organization",
-          });
+          throw new CustomRoleNotAssignableError(storedCustomRoleId);
         }
 
         const orgMembership = await tx.organizationUser.findUnique({
@@ -1583,10 +1615,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
 
         if (!targetUserBinding) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "User is not a member of this team",
-          });
+          throw new TeamMembershipNotFoundError(userId);
         }
 
         const isTargetUserAdmin = targetUserBinding.role === TeamUserRole.ADMIN;
@@ -1642,10 +1671,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           select: { organizationId: true, name: true },
         });
         if (!team) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Team not found",
-          });
+          throw new TeamNotFoundError(teamId);
         }
 
         const orgMembership = await tx.organizationUser.findUnique({
@@ -1679,10 +1705,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
 
         if (!targetUserBinding) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "User is not a member of this team",
-          });
+          throw new TeamMembershipNotFoundError(userId);
         }
 
         const isTargetUserAdmin = targetUserBinding.role === TeamUserRole.ADMIN;

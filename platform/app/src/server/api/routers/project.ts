@@ -16,7 +16,6 @@ import type { Session } from "~/server/auth";
 import { TeamService } from "~/server/teams/team.service";
 import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { slugify } from "~/utils/slugify";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
 import {
   checkOrganizationPermission,
