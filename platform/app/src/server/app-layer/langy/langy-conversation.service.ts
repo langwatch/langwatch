@@ -45,6 +45,7 @@ import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing/stores/rehydratio
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   LangyConversationNotFoundError,
+  LangyConversationIdUnadoptableError,
   LangyConversationNotOwnedError,
 } from "./errors";
 import {
@@ -193,6 +194,15 @@ export interface LangyConversationCommands {
 function newConversationId(): string {
   return generate(KSUID_RESOURCES.LANGY_CONVERSATION).toString();
 }
+
+/**
+ * Shape gate for ADOPTED conversation ids (`ensureConversation` with
+ * `adoptUnknownId`). Caller-chosen ids become aggregate keys, so keep them to
+ * the same alphabet our own KSUID-prefixed ids use; long enough to make
+ * accidental cross-caller collisions implausible, short enough for every index
+ * they land in. A scenario `threadId` (`scenariothread_<ksuid>`) fits.
+ */
+const ADOPTABLE_CONVERSATION_ID = /^[A-Za-z0-9_-]{6,120}$/;
 
 function newMessageId(): string {
   return generate(KSUID_RESOURCES.LANGY_MESSAGE).toString();
@@ -510,15 +520,26 @@ export class LangyConversationService {
    * Resolve the conversation id for a chat turn. Does NOT write — the aggregate
    * is created by the first `message_recorded`. Verifies ownership against the fold;
    * a stale/archived/unknown id yields a fresh conversation.
+   *
+   * With `adoptUnknownId`, an id that never existed is ADOPTED — returned as a
+   * new conversation under the caller's chosen id instead of a minted one. This
+   * is how a caller that binds continuity to an externally-chosen id (a
+   * scenario run's `{{ threadId }}`, fixed once per run) gets a stable
+   * conversation across turns: turn 1 adopts, turns 2+ find it `owned`.
+   * Adoption never falls back to minting — an id that cannot be adopted
+   * (bad shape, archived collision) fails the turn loudly, because a silently
+   * minted fresh id degrades a multi-turn run to single-turn with no signal.
    */
   async ensureConversation({
     projectId,
     userId,
     conversationId,
+    adoptUnknownId = false,
   }: {
     projectId: string;
     userId: string;
     conversationId?: string | null;
+    adoptUnknownId?: boolean;
   }): Promise<{ id: string; isNew: boolean }> {
     if (conversationId) {
       // Resolve straight from the repo (not the share-aware getById): visibility
@@ -533,6 +554,24 @@ export class LangyConversationService {
       }
       if (ownership === "other") {
         throw new LangyConversationNotOwnedError(conversationId);
+      }
+      if (adoptUnknownId) {
+        // The id becomes an aggregate key, so gate its shape before anything
+        // durable is written under it. Archived is a refusal, not a resume:
+        // adopting would append fresh events to a closed aggregate.
+        if (!ADOPTABLE_CONVERSATION_ID.test(conversationId)) {
+          throw new LangyConversationIdUnadoptableError(
+            conversationId,
+            "invalid_shape",
+          );
+        }
+        if (ownership === "archived") {
+          throw new LangyConversationIdUnadoptableError(
+            conversationId,
+            "archived",
+          );
+        }
+        return { id: conversationId, isNew: true };
       }
       // Archived / never existed: fall through and mint a fresh id — a stale id
       // is legitimate client state, unlike one owned by another user.

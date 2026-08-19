@@ -354,6 +354,11 @@ const registry = {
       "Shared conversations can be viewed but only the owner can continue them — start a new conversation instead",
     ],
   },
+  langy_conversation_id_unadoptable: {
+    tips: [
+      "Check `meta.reason`: `invalid_shape` means the id must be 6-120 characters from [A-Za-z0-9_-]; `archived` means the id collides with an archived conversation — pick a different id",
+    ],
+  },
   langy_model_not_configured: {
     tips: ["Pick a model in the project's model settings, then retry"],
   },

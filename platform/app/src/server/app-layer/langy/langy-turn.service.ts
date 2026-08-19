@@ -271,6 +271,13 @@ export interface StartConversationTurnInput {
   session: Session;
   /** The client-supplied conversation id, or null to mint a fresh one. */
   requestedConversationId: string | null;
+  /**
+   * Adopt `requestedConversationId` as a NEW conversation when it does not
+   * exist yet, instead of minting a fresh id. Opt-in continuity for callers
+   * that key on an externally-chosen id (scenario runs); an id that cannot be
+   * adopted fails the turn loudly rather than falling back to a mint.
+   */
+  adoptConversationId?: boolean;
   messages: LangyChatMessageInput[];
   modelOverride?: string;
   /** A regenerate re-drives the last turn against the message already on record. */
@@ -470,6 +477,7 @@ export class LangyTurnService {
       idempotencyKey,
       session,
       requestedConversationId,
+      adoptConversationId,
       messages,
       modelOverride,
       isRetry,
@@ -515,6 +523,7 @@ export class LangyTurnService {
         userId,
         session,
         requestedConversationId,
+        ...(adoptConversationId ? { adoptConversationId } : {}),
         ...(modelOverride ? { modelOverride } : {}),
       });
 

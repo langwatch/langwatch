@@ -44,7 +44,7 @@ export interface LangyConversationRepository {
     id: string;
     projectId: string;
     userId: string;
-  }): Promise<"owned" | "other" | "missing">;
+  }): Promise<"owned" | "other" | "archived" | "missing">;
 
   findAllForUser(params: {
     projectId: string;

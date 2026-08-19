@@ -157,6 +157,17 @@ const turnBodySchema = z.object({
   messages: z.array(messageSchema).min(1),
   idempotencyKey: z.string().min(1),
   modelOverride: z.string().min(1).optional(),
+  /**
+   * Adopt the path's conversation id as a NEW conversation when it does not
+   * exist yet, instead of minting a fresh one. This is how a caller that keys
+   * continuity on an externally-chosen id — a scenario run POSTing every turn
+   * to `/conversations/{{ threadId }}/messages` — gets one stable conversation
+   * across turns: turn 1 adopts the id, turns 2+ find it owned and resume with
+   * the durable history. Without it, an unknown id silently yields a fresh
+   * conversation per turn, which degrades every multi-turn run to single-turn
+   * (#7187). Only meaningful on the `/:conversationId/messages` route.
+   */
+  adoptConversationId: z.boolean().optional(),
 });
 
 /**
@@ -283,11 +294,25 @@ async function startTurn({
   if (!parsed.success)
     throw new LangyApiRequestInvalidError(parsed.error.issues);
 
+  // Adoption without an id in the path is a caller mistake, and the silent
+  // reading (ignore the flag, mint fresh) is exactly the ghost-conversation
+  // failure the flag exists to prevent — refuse it instead.
+  if (parsed.data.adoptConversationId && !conversationId) {
+    throw new LangyApiRequestInvalidError([
+      {
+        path: ["adoptConversationId"],
+        message:
+          "adoptConversationId requires the conversation id in the path: POST /conversations/:conversationId/messages",
+      },
+    ]);
+  }
+
   const result = await getApp().langy.turns.startConversationTurn({
     projectId: auth.projectId,
     idempotencyKey: parsed.data.idempotencyKey,
     session: auth.session,
     requestedConversationId: conversationId,
+    ...(parsed.data.adoptConversationId ? { adoptConversationId: true } : {}),
     messages: parsed.data.messages as LangyChatMessageInput[],
     ...(parsed.data.modelOverride
       ? { modelOverride: parsed.data.modelOverride }
