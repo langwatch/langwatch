@@ -147,7 +147,7 @@ function CadenceFrequencyPicker({
   emitParts: (next: Partial<PullCadenceParts>) => void;
   onPickChoice: (choice: string) => void;
 }) {
-  const wantsTimeOfDay =
+  const isTimeOfDayVisible =
     parts.frequency === "daily" || parts.frequency === "weekly";
   return (
     <VStack align="stretch" gap={3}>
@@ -176,7 +176,7 @@ function CadenceFrequencyPicker({
           />
         ) : null}
 
-        {wantsTimeOfDay ? (
+        {isTimeOfDayVisible ? (
           <CadenceTimeField parts={parts} emitParts={emitParts} />
         ) : null}
       </HStack>
@@ -244,7 +244,7 @@ export function PullCadenceField({
   const effectiveCron = value.trim() || recommended || "";
   // A cron the picker can't say opens the cron editor so the value stays
   // editable instead of being clobbered by picker defaults.
-  const [cronMode, setCronMode] = useState(
+  const [isCronMode, setIsCronMode] = useState(
     () => effectiveCron !== "" && partsFromPullCron(effectiveCron) === null,
   );
 
@@ -266,23 +266,23 @@ export function PullCadenceField({
     onChange(cronFromPullParts({ ...parts, ...next }));
   };
 
-  const onToggleCronMode = (toCronMode: boolean) => {
+  const onToggleCronMode = (isEnteringCronMode: boolean) => {
     // Entering cron mode makes the schedule explicit so the editor holds a
     // real value; leaving it with an unparseable cron re-syncs to the
     // friendly parts so the picker and the value can't disagree.
-    if (toCronMode && value.trim() === "") {
+    if (isEnteringCronMode && value.trim() === "") {
       onChange(effectiveCron);
     }
-    if (!toCronMode && partsFromPullCron(effectiveCron) === null) {
+    if (!isEnteringCronMode && partsFromPullCron(effectiveCron) === null) {
       onChange(cronFromPullParts(parts));
     }
-    setCronMode(toCronMode);
+    setIsCronMode(isEnteringCronMode);
   };
 
   // Blank means "the recommended schedule" and is always saveable; only a
   // typed cron can be one the scheduler would refuse.
   const cronError =
-    cronMode && value.trim() !== "" ? pullCadenceCronError(value) : null;
+    isCronMode && value.trim() !== "" ? pullCadenceCronError(value) : null;
 
   return (
     <VStack align="stretch" gap={3}>
@@ -296,14 +296,14 @@ export function PullCadenceField({
           </Text>
           <Switch
             size="sm"
-            checked={cronMode}
+            checked={isCronMode}
             onCheckedChange={({ checked }) => onToggleCronMode(checked)}
             inputProps={{ "aria-label": "Edit as a cron expression" }}
           />
         </HStack>
       </HStack>
 
-      {cronMode ? (
+      {isCronMode ? (
         <CadenceCronEditor
           value={value}
           recommended={recommended}
