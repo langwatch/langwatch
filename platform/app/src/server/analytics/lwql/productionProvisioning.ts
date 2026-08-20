@@ -33,7 +33,9 @@ import {
   type LangWatchQLNames,
   qualified,
 } from "./provisioning";
+import { postgresLiteral, postgresQuoted } from "./sqlText";
 import {
+  lwqlApprovedPostgresViewNames,
   lwqlPostgresApprovedViewStatements,
   lwqlViewStatement,
   SHIPPED_LWQL_DEDUP,
@@ -167,6 +169,66 @@ export function productionPostgresApprovedViewStatements({
     schema,
     views,
   });
+}
+
+/**
+ * The PostgreSQL role the ClickHouse named collection dials as. Provisioned
+ * out of band (terraform in the cloud, self-provisioning elsewhere); this
+ * module only ever grants it read access to views it just created.
+ */
+export const LWQL_POSTGRES_READER_ROLE = "lwql_ro";
+
+/**
+ * Grants the reader role SELECT on every approved view, to be run straight
+ * after {@link productionPostgresApprovedViewStatements} creates them.
+ *
+ * This exists because the two halves are provisioned by different systems on
+ * different schedules. Out-of-band provisioning grants the role whatever
+ * views exist *at the moment it runs*, and re-runs only when its own inputs
+ * change — so a view this task adds later (a new catalog dataset, a first
+ * deploy that lands before the grant job) is created with no grant on it, and
+ * every query touching it fails `ACCESS_DENIED` until someone re-runs the
+ * grant job by hand. Re-granting here on every boot makes the app converge
+ * its own views and removes the ordering dependency entirely.
+ *
+ * Grants only — never `CREATE ROLE`, never a password. This code path holds
+ * no reader credential and must not invent one: if the role is absent the
+ * whole block is a no-op, so a deployment that has not provisioned the reader
+ * yet is unaffected rather than broken.
+ */
+export function productionPostgresReaderGrantStatements({
+  schema = LWQL_POSTGRES_SCHEMA,
+  role = LWQL_POSTGRES_READER_ROLE,
+  views = LWQL_VIEW_CATALOG,
+}: {
+  schema?: string;
+  role?: string;
+  views?: readonly LangWatchQLViewDefinition[];
+} = {}): string[] {
+  const approvedViews = lwqlApprovedPostgresViewNames(views);
+  if (approvedViews.length === 0) return [];
+
+  const quotedSchema = postgresQuoted(schema);
+  const quotedRole = postgresQuoted(role);
+  const grants = [
+    `GRANT USAGE ON SCHEMA ${quotedSchema} TO ${quotedRole}`,
+    ...approvedViews.map(
+      (view) =>
+        `GRANT SELECT ON ${quotedSchema}.${postgresQuoted(view)} TO ${quotedRole}`,
+    ),
+  ];
+
+  // One guarded block rather than a probe followed by grants: the check and
+  // the grants have to be the same statement, or a role dropped between them
+  // turns a no-op into a failed deploy.
+  return [
+    `DO $$\nBEGIN\n` +
+      `  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${postgresLiteral(role)}) THEN\n` +
+      grants
+        .map((grant) => `    EXECUTE ${postgresLiteral(grant)};\n`)
+        .join("") +
+      `  END IF;\nEND\n$$`,
+  ];
 }
 
 /** One project's key-map row candidate. */

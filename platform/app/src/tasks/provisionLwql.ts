@@ -30,6 +30,7 @@ import {
   productionClickHouseObjectStatements,
   productionLangWatchQLNames,
   productionPostgresApprovedViewStatements,
+  productionPostgresReaderGrantStatements,
   withTenancyOptOut,
 } from "../server/analytics/lwql/productionProvisioning";
 import {
@@ -172,13 +173,27 @@ export default async function execute() {
     "provisioning LangWatchQL objects — the ClickHouse access model and PostgreSQL-mapped views are provisioned by infra, out of band",
   );
 
+  // The schema the tables actually live in (Prisma's `?schema=` URL
+  // parameter), not a hardcoded `public` — the SaaS cloud deploys with
+  // `schema=langwatch_db`, where `public."Annotation"` does not exist.
+  const postgresSchema = lwqlPostgresSchemaFromDatabaseUrl(
+    process.env.DATABASE_URL,
+  );
+
   try {
     await runPostgresStatements(
-      productionPostgresApprovedViewStatements({
-        // The schema the tables actually live in (Prisma's `?schema=` URL
-        // parameter), not a hardcoded `public` — the SaaS cloud deploys with
-        // `schema=langwatch_db`, where `public."Annotation"` does not exist.
-        schema: lwqlPostgresSchemaFromDatabaseUrl(process.env.DATABASE_URL),
+      productionPostgresApprovedViewStatements({ schema: postgresSchema }),
+    );
+    // Immediately after creation, in the same step: the reader role is
+    // provisioned out of band and its grants were issued against whatever
+    // views existed then, so a view added by this deploy would otherwise have
+    // no grant on it and every query touching it would fail ACCESS_DENIED
+    // until someone re-ran the out-of-band job by hand. A no-op where the
+    // role does not exist.
+    await runPostgresStatements(
+      productionPostgresReaderGrantStatements({
+        schema: postgresSchema,
+        role: process.env.LWQL_POSTGRES_READER_ROLE,
       }),
     );
   } catch (error) {
@@ -210,19 +225,20 @@ export default async function execute() {
       }
     }
 
-    // Non-fatal by design: the backfill is convergent — project creation
-    // writes new rows inline (`project.service.ts`) and the next run of this
-    // task picks up anything missed — so a slow or briefly unavailable
-    // key-map table must not block the whole deploy. The views above ARE
-    // fatal: without them every LangWatchQL query fails.
-    try {
-      await backfillKeyMap({ client, names, sourceDatabase });
-    } catch (error) {
-      logger.error(
-        { error: errorMessage(error) },
-        "lwql key-map backfill failed — continuing; project creation syncs rows inline and the next deploy retries the rest",
-      );
-    }
+    // Fatal, exactly like the views above. The inline sync on project
+    // creation only ever covers projects created *after* a failure, so a
+    // backfill that fails on the first deploy leaves every pre-existing
+    // project without a key-map row until some later deploy happens to
+    // re-run this task. That state is not a degraded LangWatchQL, it is a
+    // silently wrong one: the row policies resolve an absent hash to an
+    // empty tenant set, so queries return zero rows with HTTP 200 rather
+    // than `lwql_unavailable`, and nothing in the request path detects it.
+    //
+    // Failing the deploy costs nothing extra in availability terms: this
+    // runs on the same admin client as the ClickHouse objects above, so any
+    // outage able to fail the backfill has already failed those and aborted
+    // the deploy one step earlier.
+    await backfillKeyMap({ client, names, sourceDatabase });
   });
 
   logger.info("LangWatchQL provisioning complete");
