@@ -32,12 +32,33 @@ function readProject(name: string): Record<string, any> {
   return JSON.parse(text.replace(/^\s*\/\/.*$/gm, ""));
 }
 
+/**
+ * The compiler, skipping the check queue where that is possible.
+ *
+ * `dev/scripts/install-check-shims.mjs` renames the real binary to `tsc.real`
+ * and puts a queueing shim at `tsc`, so on a developer machine `tsc.real` is
+ * what runs a program without taking a machine-wide slot. The installer stands
+ * down when `CI` is set, so there the plain name is the real binary and
+ * `tsc.real` does not exist at all.
+ */
+function compilerBin(): string {
+  const real = resolve(APP_ROOT, "node_modules/.bin/tsc.real");
+  return existsSync(real) ? real : resolve(APP_ROOT, "node_modules/.bin/tsc");
+}
+
 /** The set of files a project puts in its program. */
 function programFiles(project: string): Set<string> {
   const stdout = execFileSync(
-    resolve(APP_ROOT, "node_modules/.bin/tsc.real"),
+    compilerBin(),
     ["--noEmit", "--project", `./${project}`, "--listFilesOnly"],
-    { cwd: APP_ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+    {
+      cwd: APP_ROOT,
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
+      // A queueing shim would otherwise serialise the three loads behind
+      // whatever else holds a slot, and it exports this to its own children.
+      env: { ...process.env, CHECK_SLOTS: "0" },
+    },
   );
   return new Set(stdout.split("\n").filter((line) => line.trim() !== ""));
 }
