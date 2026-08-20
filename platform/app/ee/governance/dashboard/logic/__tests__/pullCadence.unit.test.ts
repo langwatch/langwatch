@@ -1,0 +1,186 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * Pure round-trip contract for the pull-cadence picker's cron mapping.
+ * Spec: specs/ai-gateway/governance/ingestion-sources.feature
+ *
+ * The whole reason this module exists (instead of reusing the automations
+ * reportSchedule parts) is that the pull adapters' recommended schedules are
+ * step ("*\/15") and hourly ("0 * * * *") crons the report picker refuses to
+ * parse. So the load-bearing test is: every recommended schedule round-trips.
+ */
+import { describe, expect, it } from "vitest";
+import {
+  cronFromPullParts,
+  MINUTE_INTERVALS,
+  partsFromPullCron,
+  pullCadenceCronError,
+  summarizePullCadence,
+} from "../pullCadence";
+
+/** Mirrors PULL_SCHEDULE_DEFAULTS in ingestion-sources.tsx — restated here
+ *  so a default added there without picker support fails loudly. */
+const RECOMMENDED_SCHEDULES = ["*/15 * * * *", "0 * * * *"];
+
+describe("given the pull-cadence cron mapping", () => {
+  describe("when a recommended adapter schedule arrives", () => {
+    /** @scenario "The picker speaks every recommended schedule" */
+    it("round-trips every recommended schedule through the friendly parts", () => {
+      for (const cron of RECOMMENDED_SCHEDULES) {
+        const parts = partsFromPullCron(cron);
+        expect(parts, `picker cannot speak ${cron}`).not.toBeNull();
+        expect(cronFromPullParts(parts!)).toBe(cron);
+      }
+    });
+
+    /** @scenario "The picker speaks every recommended schedule" */
+    it("maps */15 to the every-15-minutes frequency", () => {
+      expect(partsFromPullCron("*/15 * * * *")).toMatchObject({
+        frequency: "minutes",
+        everyMinutes: 15,
+      });
+    });
+
+    /** @scenario "The picker speaks every recommended schedule" */
+    it("maps 0 * * * * to hourly on the hour", () => {
+      expect(partsFromPullCron("0 * * * *")).toMatchObject({
+        frequency: "hourly",
+        minute: 0,
+      });
+    });
+  });
+
+  describe("when the friendly parts emit a cron", () => {
+    it("emits the four shapes the picker offers", () => {
+      expect(
+        cronFromPullParts({
+          frequency: "minutes",
+          everyMinutes: 30,
+          minute: 0,
+          hour: 0,
+          dayOfWeek: 1,
+        }),
+      ).toBe("*/30 * * * *");
+      expect(
+        cronFromPullParts({
+          frequency: "hourly",
+          everyMinutes: 15,
+          minute: 5,
+          hour: 0,
+          dayOfWeek: 1,
+        }),
+      ).toBe("5 * * * *");
+      expect(
+        cronFromPullParts({
+          frequency: "daily",
+          everyMinutes: 15,
+          minute: 0,
+          hour: 9,
+          dayOfWeek: 1,
+        }),
+      ).toBe("0 9 * * *");
+      expect(
+        cronFromPullParts({
+          frequency: "weekly",
+          everyMinutes: 15,
+          minute: 0,
+          hour: 9,
+          dayOfWeek: 1,
+        }),
+      ).toBe("0 9 * * 1");
+    });
+
+    it("only offers minute intervals it can parse back", () => {
+      for (const everyMinutes of MINUTE_INTERVALS) {
+        const cron = cronFromPullParts({
+          frequency: "minutes",
+          everyMinutes,
+          minute: 0,
+          hour: 0,
+          dayOfWeek: 1,
+        });
+        expect(partsFromPullCron(cron)).toMatchObject({
+          frequency: "minutes",
+          everyMinutes,
+        });
+      }
+    });
+  });
+
+  describe("when a cron is outside the picker's four shapes", () => {
+    /** @scenario "Cron editing is still there for schedules the picker cannot say" */
+    it("returns null so the caller falls back to cron editing", () => {
+      // monthly, cron the report picker DOES speak but this one hands off
+      expect(partsFromPullCron("0 9 1 * *")).toBeNull();
+      // step outside the offered intervals
+      expect(partsFromPullCron("*/7 * * * *")).toBeNull();
+      // lists, ranges, six fields, junk
+      expect(partsFromPullCron("0,30 * * * *")).toBeNull();
+      expect(partsFromPullCron("0 9-17 * * *")).toBeNull();
+      expect(partsFromPullCron("0 * * * * *")).toBeNull();
+      expect(partsFromPullCron("every so often")).toBeNull();
+    });
+  });
+
+  describe("when the cron editor validates before create", () => {
+    /** @scenario "Cron editing is still there for schedules the picker cannot say" */
+    it("refuses an empty or impossible cron with a message, accepts runnable ones", () => {
+      expect(pullCadenceCronError("")).not.toBeNull();
+      expect(pullCadenceCronError("not a cron")).not.toBeNull();
+      expect(pullCadenceCronError("99 * * * *")).not.toBeNull();
+      expect(pullCadenceCronError("*/15 * * * *")).toBeNull();
+      // Shapes the picker can't say must still be saveable from cron mode.
+      expect(pullCadenceCronError("0 9 1 * *")).toBeNull();
+    });
+  });
+
+  describe("when the summary sentence renders", () => {
+    /** @scenario "The Cadence section opens on a friendly picker, prefilled" */
+    it("states each shape in plain words", () => {
+      expect(
+        summarizePullCadence({
+          frequency: "minutes",
+          everyMinutes: 15,
+          minute: 0,
+          hour: 0,
+          dayOfWeek: 1,
+        }),
+      ).toBe("Checks for new activity every 15 minutes");
+      expect(
+        summarizePullCadence({
+          frequency: "hourly",
+          everyMinutes: 15,
+          minute: 0,
+          hour: 0,
+          dayOfWeek: 1,
+        }),
+      ).toBe("Checks for new activity every hour, on the hour");
+      expect(
+        summarizePullCadence({
+          frequency: "hourly",
+          everyMinutes: 15,
+          minute: 5,
+          hour: 0,
+          dayOfWeek: 1,
+        }),
+      ).toBe("Checks for new activity every hour at 5 minutes past");
+      expect(
+        summarizePullCadence({
+          frequency: "daily",
+          everyMinutes: 15,
+          minute: 0,
+          hour: 9,
+          dayOfWeek: 1,
+        }),
+      ).toBe("Checks for new activity every day at 09:00 UTC");
+      expect(
+        summarizePullCadence({
+          frequency: "weekly",
+          everyMinutes: 15,
+          minute: 0,
+          hour: 9,
+          dayOfWeek: 1,
+        }),
+      ).toBe("Checks for new activity every Monday at 09:00 UTC");
+    });
+  });
+});

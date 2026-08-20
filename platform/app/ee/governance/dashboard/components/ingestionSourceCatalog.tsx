@@ -136,7 +136,7 @@ export const SOURCE_TYPE_OPTIONS = [
     label: "Databricks AI/BI Genie",
     mode: "pull",
     blurb:
-      "Records who asked what in Genie and the SQL it ran against your warehouse. Needs a workspace token with Can Manage on every Genie space you want covered — anything less returns only that token's own conversations.",
+      "Records who asked what in Genie and the SQL it ran against your warehouse. Sign in with a Databricks service principal holding Can Manage on every Genie space you want covered — anything less returns only its own conversations.",
     icon: <Databricks />,
   },
   {
