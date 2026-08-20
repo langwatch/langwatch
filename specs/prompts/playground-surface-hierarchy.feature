@@ -37,6 +37,12 @@ Feature: Prompt playground surface hierarchy
     And it draws that rule whether the panes sit side by side or stacked
 
   @integration
+  Scenario: The tab of the prompt on screen is attached to the card it opens
+    When I view a prompt in the playground
+    Then its tab sits on the page above the card rather than inside it
+    And no rule runs between that tab and the prompt below it
+
+  @integration
   Scenario: The drag divider sits above the sub-tab bar when the panes are stacked
     When I view a prompt with the editor stacked above the conversation
     Then the handle that resizes the prompt sits between the prompt and the tab bar
