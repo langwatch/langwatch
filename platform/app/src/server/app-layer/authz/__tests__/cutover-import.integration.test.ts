@@ -231,7 +231,8 @@ describe("given an organization whose legacy facts live outside its bindings", (
     // reader with a legitimate claim to every organization's rows at once.
     const strayPlatformGrants = await prisma.$queryRaw<
       Array<{ count: bigint }>
-    >`SELECT COUNT(*)::bigint AS count FROM "Grant"
+    >`-- @tenancy: fleet invariant - platform-scoped cutover grants may exist for no organization
+      SELECT COUNT(*)::bigint AS count FROM "Grant"
       WHERE source = 'cutover-import' AND "scopeType" = 'PLATFORM'`;
     expect(Number(strayPlatformGrants[0]?.count ?? -1)).toBe(0);
 
