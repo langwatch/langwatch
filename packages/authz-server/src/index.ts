@@ -13,8 +13,8 @@
  * No storage engine lives here, and no environment read either: every knob
  * arrives as a closure through a service's options. The app implements the
  * repository interfaces with Prisma
- * (platform/app/src/server/authz/repositories/) and composes everything
- * once in its runtime (platform/app/src/server/authz/runtime.ts). The pure
+ * (platform/app/src/server/app-layer/authz/repositories/) and composes everything
+ * once in its runtime (platform/app/src/server/app-layer/authz/runtime.ts). The pure
  * half (registry, roles, decide()) is `@langwatch/authz`.
  */
 export { AuthzCollectorService } from "./authz-collector.service";
@@ -24,6 +24,7 @@ export {
   type BindingPrincipalWhere,
   DuplicateBindingError,
   type AuthzGrantsRepository,
+  type LedgerActor,
   type OffboardCounts,
   type RoleBindingWrite,
 } from "./authz-grants.repository";
@@ -35,10 +36,15 @@ export type {
   ShareLinkRow,
 } from "./authz-read.repository";
 export type {
+  AuthzGenesisRepository,
   AuthzMigrationRepository,
   ExistingTeamBinding,
+  LegacyBindingRow,
+  LegacyRoleRow,
   LegacyTeamRow,
+  OrganizationMemberFact,
   OrganizationScopeInventory,
+  RoleHeadRow,
   TeamBindingWrite,
 } from "./authz-migration.repository";
 export { AuthzShadowService } from "./authz-shadow.service";
@@ -48,7 +54,7 @@ export type {
   AuthzEpochReader,
   AuthzServiceOptions,
 } from "./authz.service";
-export { GrantValidationError } from "./grant-validation";
+export { DuplicateGrantError, GrantValidationError } from "./grant-validation";
 export { GrantsService } from "./grants.service";
 export type {
   AuthzAuditWriter,
@@ -74,6 +80,14 @@ export type {
   GrantScopeTypeDb,
   RoleRowShape,
 } from "./ledger/projection-mapping";
+// Grant identity derivation is deliberately NOT re-exported here: it imports
+// `node:crypto`, and this root entry is browser-evaluable by construction
+// (see the header of ./migration.ts). The values live on
+// `@langwatch/authz-server/migration`; only the erased types stay.
+export type {
+  BindingIdentityInput,
+  BindingIdentityPrincipal,
+} from "./ledger/grant-identity";
 export {
   emptyGrantsLedgerState,
   reduceGrantsLedger,
@@ -81,6 +95,7 @@ export {
 export type {
   GrantEventSource,
   GrantFact,
+  GrantRevocationSelector,
   GrantsLedgerActor,
   GrantsLedgerCutover,
   GrantsLedgerEvent,

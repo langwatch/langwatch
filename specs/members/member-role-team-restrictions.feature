@@ -286,6 +286,13 @@ Feature: Member Role Team Restrictions
     Then the change is refused
     And the refusal names the team
 
+  @integration
+  Scenario: Two team admins removed at the same time cannot both succeed
+    Given a team whose only two admins are being removed concurrently
+    When both removals race each other
+    Then at most one of them commits
+    And the team keeps at least one admin
+
   # "Has an admin" counts people. A group given the Admin role on a team
   # administers it through every one of its members, so a change the group can
   # absorb is not taking the team's last admin away, and a team administered

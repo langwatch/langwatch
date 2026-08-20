@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { authz, authzCollector } from "~/server/authz/runtime";
+import { authz, authzCollector } from "~/server/app-layer/authz/runtime";
 import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 

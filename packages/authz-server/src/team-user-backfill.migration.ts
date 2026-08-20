@@ -46,8 +46,12 @@ import type {
   LegacyTeamRow,
 } from "./authz-migration.repository";
 import type { AuthzAuditWriter, AuthzEpochBumper } from "./grants.service";
-import { deriveGrantId } from "./ledger/grant-identity";
-import type { GrantFact, GrantsLedgerActor } from "./ledger/grants-ledger.reducer";
+import { bindingIdentityKey, deriveGrantId } from "./ledger/grant-identity";
+import type {
+  GrantFact,
+  GrantsLedgerActor,
+  RoleFact,
+} from "./ledger/grants-ledger.reducer";
 import { TEAM_USER_BACKFILL_MIGRATION_NAME } from "./team-user-backfill.name";
 
 /** The audit trail's actor for writes no human performed. */
@@ -73,6 +77,14 @@ export type ParityDiff = {
  *  system actor that authored it. */
 export type BackfillGrantEmission = GrantFact & { actor: GrantsLedgerActor };
 
+/** One compensating revocation the genesis import's deny-direction sweep
+ *  asks the ledger to apply. Named by id only - the import always knows the
+ *  exact head fact it is retracting, never a selector to resolve. */
+export type GenesisRevocationEmission = {
+  grantId: string;
+  reason?: string;
+};
+
 /**
  * The migration's door into the grants ledger. The app binds these to the
  * `authz_grants` pipeline's command senders; the package never sees the
@@ -84,6 +96,43 @@ export type GrantsLedgerEmitter = {
     organizationId: string;
     commandId: string;
     grants: BackfillGrantEmission[];
+  }) => Promise<void>;
+  /**
+   * Role definitions for one organization. A `RoleFact` IS the command's
+   * role entry (same six fields), so the app maps the batch straight onto
+   * the payload. The actor rides at the command level here rather than per
+   * entry, because that is where the `role_defined` command carries it.
+   */
+  defineRoles: (args: {
+    organizationId: string;
+    commandId: string;
+    roles: RoleFact[];
+    actor: GrantsLedgerActor;
+  }) => Promise<void>;
+  /**
+   * The deny-direction half of the genesis import: compensating
+   * `grant_revoked` facts for head grants whose legacy row is gone. Batched
+   * like `attachGrants`, on the same `revokeGrantsCommandDataSchema` the
+   * live revoke path already uses.
+   */
+  revokeGrants: (args: {
+    organizationId: string;
+    commandId: string;
+    revocations: GenesisRevocationEmission[];
+    actor: GrantsLedgerActor;
+    occurredAtMs: number;
+  }) => Promise<void>;
+  /**
+   * One stale custom role's compensating `role_deleted` fact. Singular
+   * because `deleteRoleCommandDataSchema` on the wire takes one roleId, not
+   * a batch - unlike every other genesis command, one call per role.
+   */
+  deleteRole: (args: {
+    organizationId: string;
+    commandId: string;
+    roleId: string;
+    actor: GrantsLedgerActor;
+    occurredAtMs: number;
   }) => Promise<void>;
   proveMigrationParity: (args: {
     organizationId: string;
@@ -409,15 +458,13 @@ function legacyRowToEmission({
 }
 
 /**
- * Identity as the DATABASE defines it - which is two keys, not one. The
- * partial unique indexes (migration
- * 20260410120000_fix_role_binding_unique_custom_role) key a built-in binding
- * on its role and a custom one on its custom role id, so a custom binding's
- * `role` column is not part of its identity at all.
- *
- * Keying on both would call an existing custom binding "missing" whenever its
- * role happened to differ, and the emission that followed would attach a
- * grant for a fact that already has one.
+ * Identity as the DATABASE defines it, via `bindingIdentityKey`
+ * (@langwatch/authz-server/ledger/grant-identity) - a built-in binding is
+ * keyed on its role, a custom one on its custom role id, so a custom
+ * binding's `role` column is not part of its identity at all. Keying on both
+ * would call an existing custom binding "missing" whenever its role happened
+ * to differ, and the emission that followed would attach a grant for a fact
+ * that already has one.
  *
  * Built-in rows key on the ROLE KEY, not on the raw enum value, because this
  * function is asked to compare two populations written in different
@@ -427,7 +474,8 @@ function legacyRowToEmission({
  * as `VIEWER`. Keyed on the raw enum those two never match: the row is
  * emitted, its projection is never recognized, and `awaitCompatRows` times
  * the organization out into `parked` on every pass, forever. Normalizing
- * both sides through the same mapping is what makes the comparison honest.
+ * both sides through the same mapping (here, before the shared key function
+ * ever sees the role) is what makes the comparison honest.
  */
 function bindingKey(row: {
   userId: string;
@@ -435,7 +483,12 @@ function bindingKey(row: {
   role: TeamUserRole;
   customRoleId: string | null;
 }): string {
-  return row.customRoleId === null
-    ? `${row.userId}::${row.teamId}::builtin::${roleKeyForTeamRole(row.role)}`
-    : `${row.userId}::${row.teamId}::custom::${row.customRoleId}`;
+  return bindingIdentityKey({
+    principal: { userId: row.userId },
+    scopeType: "TEAM",
+    scopeId: row.teamId,
+    role:
+      row.customRoleId === null ? roleKeyForTeamRole(row.role) : row.role,
+    customRoleId: row.customRoleId,
+  });
 }

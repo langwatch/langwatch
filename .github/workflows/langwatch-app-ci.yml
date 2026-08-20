@@ -1372,6 +1372,13 @@ jobs:
       - name: Test notify-slack-release.sh
         run: bash .github/scripts/__tests__/notify-slack-release.test.sh
 
+      # Lives here rather than in deployment-impact-check.yml because that
+      # workflow filters `on.paths` down to deployment surface, which
+      # .github/** is not — so it would never start for a change to its own
+      # guard. This job's gate already lists `.github/scripts/**`.
+      - name: Test guard-deployment-impact.ts
+        run: node --test --experimental-strip-types .github/scripts/guard-deployment-impact.test.ts
+
   ci-self-test:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'

@@ -31,7 +31,7 @@ const baseEvent: NormalizedPullEvent = {
   actor: "alice@acme.test",
   action: "completion",
   target: "gpt-5-mini",
-  cost_usd: 0.0023,
+  cost_usd: "0.0023",
   tokens_input: 50,
   tokens_output: 12,
   raw_payload: '{"id":"evt-123","raw":"data"}',

@@ -19,8 +19,10 @@ import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { getHexColorForString } from "~/utils/rotatingColors";
 
-const fmtUsd = (n: number) =>
-  n === 0 ? "$0.00" : numeral(n).format("$0,0.00");
+const fmtUsd = (n: number | string) => {
+  const v = typeof n === "string" ? Number(n) : n;
+  return v === 0 ? "$0.00" : numeral(v).format("$0,0.00");
+};
 
 const fmtRelative = (date: Date | string | null): string => {
   if (!date) return "—";

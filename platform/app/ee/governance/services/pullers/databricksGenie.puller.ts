@@ -1672,7 +1672,7 @@ export class DatabricksGeniePuller
       // Genie bills nothing per message. See the file header: the warehouse
       // DBUs the generated SQL burns are billed elsewhere and are not on this
       // API, so the record says zero and declines to call it the full invoice.
-      cost_usd: 0,
+      cost_usd: "0",
       tokens_input: 0,
       tokens_output: 0,
       raw_payload: JSON.stringify(message),

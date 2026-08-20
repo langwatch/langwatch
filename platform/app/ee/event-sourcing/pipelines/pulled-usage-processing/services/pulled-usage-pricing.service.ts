@@ -42,8 +42,8 @@ export interface PulledUsageQuantities {
  */
 interface ProviderReportedPrice {
   basis: typeof PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED;
-  /** The provider's amount in USD. A string keeps every digit it published. */
-  costUsd: string | number;
+  /** The provider's amount in USD as a decimal string. */
+  costUsd: string;
   costStatus: PulledUsageCostStatus;
   // No `quantities`. This path never reads them — the provider already priced
   // the item — and requiring them made every caller hand over data the
@@ -90,7 +90,7 @@ export interface PulledUsagePrice {
  * publishing a quietly rounded one is the failure this whole path exists to
  * prevent.
  */
-function providerCostToNanoUsd(costUsd: string | number): number {
+function providerCostToNanoUsd(costUsd: string): number {
   const exact = usdToNanoUsd(costUsd);
   if (
     exact > BigInt(Number.MAX_SAFE_INTEGER) ||
