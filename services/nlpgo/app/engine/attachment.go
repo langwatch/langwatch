@@ -401,8 +401,6 @@ func messagesForTracing(messages []app.ChatMessage) []app.ChatMessage {
 
 // partForTracing carries one content part into the trace, summarizing its
 // inline bytes only when they do not fit. Every other part shape is untouched.
-// Each shape has its own function, and each returns the part unchanged when it
-// carries no inline bytes or when the budget still has room for them.
 func partForTracing(p any, budget *traceAttachmentBudget) any {
 	block, ok := p.(map[string]any)
 	if !ok {
