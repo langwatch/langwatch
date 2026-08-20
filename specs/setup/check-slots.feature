@@ -251,7 +251,7 @@ Feature: Machine-wide slots for whole-repo checks
   Scenario: An interrupt that arrives as the command starts is forwarded
     Given a contributor interrupts a check in the instant its command starts
     Then the interrupt reaches the command
-    And the wrapper stays alive to report how the command ended
+    And the check still reports how the command ended
 
   # --- The bin shims: the package scripts are not the only way in ---
 
