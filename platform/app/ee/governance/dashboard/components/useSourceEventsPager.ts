@@ -51,14 +51,20 @@ type PagerState<R extends PagerRow> = {
   /** Bumped on every reset; a fetch started before a reset landed in a
    * world that no longer exists and its result is discarded. */
   generation: number;
+  /** The walk whose outcome still counts: the one the latest start
+   * issued. Overlapping walks share a generation, not an id. */
+  activeWalkId: number;
 };
+
+/** What a settled walk must match to still be the current one. */
+type WalkOutcome = { generation: number; walkId: number };
 
 type PagerAction<R extends PagerRow> =
   | { type: "reset" }
   | { type: "resize"; pageSize: number }
-  | { type: "fetchStart" }
-  | { type: "fetchLanded"; generation: number; rows: R[]; hasMore: boolean }
-  | { type: "fetchFailed"; generation: number; error: unknown }
+  | { type: "fetchStart"; walkId: number }
+  | ({ type: "fetchLanded"; rows: R[]; hasMore: boolean } & WalkOutcome)
+  | ({ type: "fetchFailed"; error: unknown } & WalkOutcome)
   | { type: "show"; page: number };
 
 const initPagerState = <R extends PagerRow>(
@@ -71,6 +77,7 @@ const initPagerState = <R extends PagerRow>(
   error: null,
   isFetching: false,
   generation: 0,
+  activeWalkId: 0,
 });
 
 function landFetch<R extends PagerRow>({
@@ -98,15 +105,21 @@ function landFetch<R extends PagerRow>({
 
 /**
  * A landing only counts while its walk is still the current one: same
- * generation AND a fetch still marked in flight. The second guard makes
- * a duplicated start (StrictMode's double effect run) harmless — the
- * first landing clears `isFetching`, so the echo is dropped instead of
- * appended as a phantom page.
+ * generation, and the id the latest start issued. Duplicated starts
+ * (StrictMode's double effect run) share a generation but not an id, so
+ * the newest walk wins whichever settles first — an older walk's
+ * outcome is dropped whether it succeeded or failed, instead of
+ * appending a phantom page or stranding the pager in error.
  */
-const isCurrentWalk = <R extends PagerRow>(
-  state: PagerState<R>,
-  generation: number,
-) => generation === state.generation && state.isFetching;
+const isCurrentWalk = <R extends PagerRow>({
+  state,
+  action,
+}: {
+  state: PagerState<R>;
+  action: WalkOutcome;
+}) =>
+  action.generation === state.generation &&
+  action.walkId === state.activeWalkId;
 
 function pagerReducer<R extends PagerRow>(
   state: PagerState<R>,
@@ -126,13 +139,18 @@ function pagerReducer<R extends PagerRow>(
     case "fetchStart":
       // Starting a walk is also the retry: a failure from the previous
       // attempt stops being true the moment a new fetch is in flight.
-      return { ...state, isFetching: true, error: null };
+      return {
+        ...state,
+        isFetching: true,
+        error: null,
+        activeWalkId: action.walkId,
+      };
     case "fetchLanded":
-      return isCurrentWalk(state, action.generation)
+      return isCurrentWalk({ state, action })
         ? landFetch({ state, rows: action.rows, hasMore: action.hasMore })
         : state;
     case "fetchFailed":
-      return isCurrentWalk(state, action.generation)
+      return isCurrentWalk({ state, action })
         ? { ...state, error: action.error, isFetching: false }
         : state;
     case "show":
@@ -224,9 +242,13 @@ export function useSourceEventsPager<R extends PagerRow>({
     initPagerState<R>,
   );
 
+  // Issued per walk rather than per render: two walks started from the
+  // same snapshot must still be told apart when they settle.
+  const walkIdRef = useRef(0);
   const startFetch = useCallback(
-    (snapshot: PagerState<R>) => {
-      dispatch({ type: "fetchStart" });
+    ({ snapshot }: { snapshot: PagerState<R> }) => {
+      const walkId = ++walkIdRef.current;
+      dispatch({ type: "fetchStart", walkId });
       walkOnePage({
         pageSize: snapshot.pageSize,
         displayedRows: snapshot.pages?.flat() ?? [],
@@ -236,6 +258,7 @@ export function useSourceEventsPager<R extends PagerRow>({
           dispatch({
             type: "fetchLanded",
             generation: snapshot.generation,
+            walkId,
             rows,
             hasMore,
           }),
@@ -243,6 +266,7 @@ export function useSourceEventsPager<R extends PagerRow>({
           dispatch({
             type: "fetchFailed",
             generation: snapshot.generation,
+            walkId,
             error,
           }),
       );
@@ -265,7 +289,7 @@ export function useSourceEventsPager<R extends PagerRow>({
   useEffect(() => {
     const untouched =
       state.pages === null && state.error === null && !state.isFetching;
-    if (enabled && untouched) startFetch(state);
+    if (enabled && untouched) startFetch({ snapshot: state });
   }, [enabled, state, startFetch]);
 
   const goToPage = useCallback(
@@ -274,7 +298,7 @@ export function useSourceEventsPager<R extends PagerRow>({
       if (target <= state.pages.length) {
         dispatch({ type: "show", page: target });
       } else if (target === state.pages.length + 1 && state.hasMore) {
-        startFetch(state);
+        startFetch({ snapshot: state });
       }
     },
     [state, startFetch],
