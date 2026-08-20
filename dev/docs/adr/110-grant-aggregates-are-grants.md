@@ -1,8 +1,25 @@
-# ADR-101: A grant aggregate is a grant, not an organization
+# ADR-110: A grant aggregate is a grant, not an organization
 
 **Date:** 2026-08-20
 
 **Status:** Proposed
+
+**Supersedes:** the aggregate choice in ADR-092 §13 (`aggregateId =
+organizationId`). The rest of ADR-092 — the engine, the fork, the cutover
+sequencing — stands unchanged.
+
+**Builds on:** ADR-100 (the aggregate-scoped lane; once the grant is the
+aggregate, per-grant mutual exclusion and cross-grant concurrency are what
+that lane already gives, so this decision adds no group-key override of its
+own), ADR-105 (an aggregate is one declaration, from which events, commands
+and types are derived — the two new aggregates are declared that way rather
+than hand-written across `constants.ts` and `events.ts`).
+
+**Related:** ADR-103 (a run's totals are a query, not maintained counters —
+the same instinct applied to run-shaped work: stop maintaining what can be
+derived), ADR-057 (one-share-per-resource dropped; the token is the
+credential's own identity, which is why resource grants carry no cross-grant
+invariant).
 
 ## Context
 
@@ -169,9 +186,12 @@ fold writes only what its own events say. The deny direction — revoking a head
 fact whose legacy row is gone — moves into the migration's reconciliation
 pass, which reads the projection and sends explicit per-grant revoke commands.
 
-**We will key the queue group on the aggregate, not the tenant**, so grants
-belonging to one organization fold concurrently while events for a single
-grant stay strictly ordered.
+**We will not override the group key.** ADR-100's aggregate-scoped lane
+already gives mutual exclusion per aggregate, so once the grant IS the
+aggregate, one organization's grants fold concurrently and a single grant's
+events stay mutually excluded — for free, and without this pipeline holding a
+special case. The per-organization serialization we are removing was never a
+lane decision; it was a consequence of every grant sharing one aggregate.
 
 **We will not preserve backwards compatibility.** Every grant, role and event
 written under the old scheme is deleted, and the rollout restarts from a clean
@@ -243,6 +263,15 @@ accident of when a fact arrived; what the entity *is* does not change.
 ## References
 
 - Supersedes the aggregate decision in [ADR-092](092-unified-authorization-engine.md) §13
+- [ADR-100](100-dispatch-plane-group-keys.md) — the aggregate-scoped lane this relies on
+- [ADR-103](103-runs-aggregates-are-queries.md) — the sibling decision for run-shaped work
+- [ADR-105](105-defining-an-aggregate.md) — how the two new aggregates are declared
 - [ADR-057](057-token-gated-trace-sharing.md) — one-share-per-resource dropped; the token is the credential's identity
-- Spec: `specs/rbac/unified-authorization-engine.feature`, `specs/rbac/in-place-authz-migration.feature`
+- Spec: `specs/rbac/grant-aggregate-boundary.feature`
+- Also: `specs/rbac/unified-authorization-engine.feature`, `specs/rbac/in-place-authz-migration.feature`
 - Incident: organization `HXECRq2mRfSQpxTiSCcsS`, 2026-08-20 — genesis and cutover both parked all day
+
+Note on numbering: 100–109 were all claimed by in-flight branches at the time
+of writing (the event-sourcing corpus and the identity platform redesign), so
+this record takes 110. ADR-100, -103 and -105 above are part of that corpus and
+were not yet on `main` when this was written.

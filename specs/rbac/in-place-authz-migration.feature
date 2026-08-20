@@ -619,19 +619,29 @@ Feature: In-place authorization data migration
     Then that user holds an organization-scoped admin grant
     And a member with no bindings gains nothing beyond the floor
 
-  @unit
-  Scenario: The convergence wait grows with the size of the import
-    Given "acme"'s genesis import states more facts than the base wait could fold
-    When the import waits for the projection to land its facts
-    Then the wait's deadline scales with the number of facts it is waiting on
-    And an organization within the ceiling's budget is never parked for being large
+  # The convergence wait is gone (ADR-110). It scaled its deadline with the
+  # import's size and then capped it, which meant every organization past the
+  # ceiling got the same 20 minutes however many facts it had — and the fold
+  # slowed as the head grew, so each retry was further from finishing than the
+  # last. The promise that such an organization "parks and finishes on a later
+  # pass" was measured false: 326 facts over six hours, parking every time.
+  # The migration now states its facts and checks once. See
+  # specs/rbac/grant-aggregate-boundary.feature for the replacement.
 
   @unit
-  Scenario: The convergence wait's budget has a ceiling
-    Given an organization whose import is larger than the ceiling's budget
-    When the import waits for the projection
-    Then the wait stops growing at the ceiling, so one organization cannot hold the pass indefinitely
-    And past it the organization parks and finishes on a later pass, as every organization did before
+  Scenario: The import states its facts and checks once rather than waiting
+    Given "acme"'s genesis import states more facts than one pass can fold
+    When the import runs
+    Then it emits every fact and reads the heads once
+    And it does not wait on the projection
+
+  @unit
+  Scenario: An import whose facts have not folded yet is held, not parked
+    Given "acme"'s import has emitted every fact
+    When the heads do not yet hold them
+    Then "acme" is held with the outstanding count in its report
+    And it is not reported as an error
+    And a later pass finalizes it once the heads are complete
 
   @unit
   Scenario: Running the genesis import twice states the same facts
@@ -640,14 +650,16 @@ Feature: In-place authorization data migration
     Then the same fact ids are emitted, so the import converges rather than
       duplicating
 
+  # Chunks are gone with the batched command (ADR-110): one command states one
+  # grant, so there is no position for a row to shift into. The property the
+  # chunk-hash defended is now structural — a fact's command names the fact.
+
   @unit
-  Scenario: A shifted chunk never reuses a previous pass's idempotency key
-    Given "acme"'s legacy rows changed which one occupies a chunk's position
-      since the last pass
+  Scenario: A row that moves in the source order still states its own fact
+    Given "acme"'s legacy rows are read in a different order than last pass
     When the genesis import runs again for "acme"
-    Then that chunk's fact carries a different idempotency key than the
-      earlier pass did
-    And the newly positioned row is not deduped away as if it were the old
+    Then each row's command names that row's own grant
+    And no row is deduped away as if it were another
       one
 
   @unit

@@ -1,5 +1,5 @@
 /**
- * The grants ledger's two aggregates (ADR-101).
+ * The grants ledger's two aggregates (ADR-110).
  *
  * The organization is the TENANT on both — it is the isolation and routing
  * boundary, what the ClickHouse client resolver places and what tenant

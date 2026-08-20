@@ -4,6 +4,12 @@
 
 **Status:** Proposed (supersedes ADR-001 when accepted)
 
+**Partially superseded:** §13's aggregate choice — one aggregate per
+organization, `aggregateId = organizationId` — is replaced by
+[ADR-110](110-grant-aggregates-are-grants.md), which makes a grant its own
+aggregate and leaves only roles, the cutover flag and migration tenant state
+on the organization. Everything else here stands.
+
 ## Decision, in one paragraph
 
 We will collapse LangWatch authorization into one three-layer module in the

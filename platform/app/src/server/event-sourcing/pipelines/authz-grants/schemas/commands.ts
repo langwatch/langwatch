@@ -34,7 +34,7 @@ const commandIdentitySchema = z.object({
  * Every command payload in this ledger carries the identity block AND the
  * invariant that makes it one ledger: `tenantId === organizationId`.
  *
- * The organization is the TENANT of both aggregates (ADR-101) — the stream
+ * The organization is the TENANT of both aggregates (ADR-110) — the stream
  * an event is persisted under and the routing key that places it. It is the
  * AGGREGATE of only `authz_org_policy`; a grant command's aggregate is its
  * own grant id. A caller that wired tenantId and organizationId to different
@@ -78,7 +78,7 @@ export const attachGrantEntrySchema = z
 export type AttachGrantEntry = z.infer<typeof attachGrantEntrySchema>;
 
 /**
- * One command, one grant, one aggregate (ADR-101). The batched form this
+ * One command, one grant, one aggregate (ADR-110). The batched form this
  * replaces emitted an event per entry onto a single organization-wide
  * aggregate; with the grant as the aggregate a batch would have to straddle
  * hundreds of them, so the import sends one of these per grant instead. They
@@ -128,7 +128,7 @@ export const revokeGrantEntrySchema = z
 export type RevokeGrantEntry = z.infer<typeof revokeGrantEntrySchema>;
 
 /**
- * One revocation, one aggregate (ADR-101). A revoke names its grant id and
+ * One revocation, one aggregate (ADR-110). A revoke names its grant id and
  * nothing else: a selector cannot address an aggregate, so resolving "every
  * grant this principal holds at this scope" into ids is the caller's job now.
  *
