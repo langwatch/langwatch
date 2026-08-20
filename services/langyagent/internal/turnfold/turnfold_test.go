@@ -69,6 +69,33 @@ func TestAccumulator_AssemblesToolCallsInOrder(t *testing.T) {
 	}
 }
 
+func TestAccumulator_DropsPreToolNarration(t *testing.T) {
+	acc := New()
+	feed(acc,
+		ff(frames.Delta("Running the analytics query now…")),
+		ff(frames.ToolStart("a", "run", "", "", nil)),
+		ff(frames.ToolEnd("a", "run", nil, false, "ok", 0)),
+		ff(frames.Delta("p95 latency doubled yesterday.")),
+	)
+	text, _ := acc.Result()
+	if text != "p95 latency doubled yesterday." {
+		t.Errorf("text = %q, want only the post-tool answer", text)
+	}
+}
+
+func TestAccumulator_KeepsFullTextWhenSilentAfterLastTool(t *testing.T) {
+	acc := New()
+	feed(acc,
+		ff(frames.Delta("Annotation added.")),
+		ff(frames.ToolStart("a", "annotate", "", "", nil)),
+		ff(frames.ToolEnd("a", "annotate", nil, false, "ok", 0)),
+	)
+	text, _ := acc.Result()
+	if text != "Annotation added." {
+		t.Errorf("text = %q, want full concatenation fallback", text)
+	}
+}
+
 func TestAccumulator_IgnoresNonAccumulatingFrames(t *testing.T) {
 	acc := New()
 	feed(acc,
