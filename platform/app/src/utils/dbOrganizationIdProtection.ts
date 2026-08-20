@@ -268,7 +268,34 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     extraBound: ({ clause }) =>
       typeof clauseField(clause, "token") === "string",
   },
+  // ShareService's view accounting for resource grants (delivery-plan
+  // decision 22). Keyed by grantId - a ledger-derived id, globally unique
+  // and resolving to exactly one organization - which is also the only
+  // predicate the per-view increment can name, since the viewer arrives
+  // with a share token and nothing else.
+  GrantUsage: {
+    // A single grant id resolves to exactly one organization; a LIST of them
+    // is only as tenant-scoped as its weakest entry, so the list shape is
+    // admitted only alongside the organization it claims to be about.
+    extraBound: ({ clause }) =>
+      typeof clauseField(clause, "grantId") === "string" ||
+      (isNonEmptyStringList(clauseField(clause, "grantId")) &&
+        typeof clauseField(clause, "organizationId") === "string"),
+  },
   Role: {},
+  // Which organizations the in-place migration runner processes on cloud
+  // (specs/rbac/in-place-authz-migration.feature, the enrollment scenarios).
+  // The runner's per-pass read and the ops listing are platform-scope by
+  // design - they list one STAGE across organizations, the same posture as
+  // the ops rollup over SystemMigrationTenantState - so a stage-string
+  // predicate is admitted for reads only. Writes stay bounded to one
+  // organization: enroll carries organizationId in its data, withdraw names
+  // the compound (organizationId, stage) key, and a stage-wide bulk write
+  // (which would withdraw every organization at once) has no admitted shape.
+  SystemMigrationEnrollment: {
+    extraBound: ({ clause, action }) =>
+      action === "findMany" && typeof clauseField(clause, "stage") === "string",
+  },
   AuthzProjectionCursor: {},
   AuthzCutoverProjection: {},
   AiToolEntry: {},

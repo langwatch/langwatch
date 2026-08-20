@@ -15,13 +15,19 @@
  * the organization; the retry finds the events already appended and only
  * waits again.
  *
- * The sweep is unchanged: collect-once, decide-twice, one CollectedGrants
- * snapshot per member, the pure engine answering every (permission x scope)
- * pair with and without the legacy rows. A clean sweep is recorded as a
- * `migration_parity_proved` fact before the organization finalizes. Honest
- * disagreements (the legacy org-level union quirk) HOLD the organization
- * (`migrated`), behaviour unchanged, diffs in its report - no proof fact is
- * recorded for an unfinished argument.
+ * The sweep: collect-once, decide-twice, one CollectedGrants snapshot per
+ * member, the pure engine answering every (permission x scope) pair with and
+ * without the legacy rows — over the TEAM and PROJECT scopes the promoted
+ * bindings replace one for one. The ORGANIZATION scope is out of the sweep
+ * on purpose: there the rows act through the org-level union quirk, whose
+ * replacement (the genesis-minted org-member floor grant) stays dormant
+ * until contract while the engine keeps inferring the union from the rows on
+ * both heads — so an org-scope sweep leg demanded a replacement nothing
+ * pre-cutover could show, and parked every organization with an ordinary
+ * member. A clean sweep is recorded as a `migration_parity_proved` fact
+ * before the organization finalizes. Honest disagreements at the swept
+ * scopes HOLD the organization (`migrated`), behaviour unchanged, diffs in
+ * its report - no proof fact is recorded for an unfinished argument.
  *
  * The Redis epoch bump stays exactly as before (decision 19): the ledger
  * cursor is added alongside it, not instead of it.
@@ -140,6 +146,21 @@ export type GrantsLedgerEmitter = {
     diffs: string[];
     occurredAtMs: number;
   }) => Promise<void>;
+  /**
+   * The cutover's last emission: the organization is served by the engine
+   * from the moment the fold lands this fact on its projection. It is a
+   * plain queued send like the others — the migration observes the flip
+   * through the repository, never through this return. Its counterpart,
+   * `rollBackCutover`, is deliberately NOT here: rolling back is an
+   * operator action, wired to the ops rollback path, not something a
+   * migration may decide.
+   */
+  completeCutover: (args: {
+    organizationId: string;
+    commandId: string;
+    actor: GrantsLedgerActor;
+    occurredAtMs: number;
+  }) => Promise<void>;
 };
 
 export type TeamUserBackfillDeps = {
@@ -161,6 +182,9 @@ const DEFAULT_POLL = { intervalMs: 500, timeoutMs: 120_000 };
 
 export class TeamUserBackfillMigration implements SystemMigration {
   readonly name = TEAM_USER_BACKFILL_MIGRATION_NAME;
+  // Shipped and soaked: self-hosted installations have run this backfill
+  // automatically since it landed, and it changes nothing about who decides.
+  readonly runsAutomaticallyOnSelfHosted = true;
   private readonly engine = new AuthzEngine();
 
   constructor(private readonly deps: TeamUserBackfillDeps) {}
@@ -356,14 +380,20 @@ export class TeamUserBackfillMigration implements SystemMigration {
         legacyTeamMemberships: [],
       };
 
-      // Legacy rows can only influence scopes whose chain contains their
-      // team - the team itself, its projects, and the organization (through
-      // the org-level union step). Sweep exactly those.
+      // Sweep the scopes the backfilled bindings replace ONE FOR ONE: the
+      // row's team and that team's projects. The organization scope is
+      // deliberately NOT swept — there the legacy rows act through the
+      // org-level union quirk, whose replacement is not a team binding but
+      // the org-member floor grant the genesis mints, and that fact stays
+      // dormant until contract (the engine keeps inferring the union from
+      // the rows on BOTH heads until the rows die). Sweeping the org scope
+      // here demanded a replacement no pre-cutover reader could see, which
+      // parked every organization holding an ordinary member — the cutover
+      // then waited on this finalization forever.
       const legacyTeamIds = new Set(
         grants.legacyTeamMemberships.map((row) => row.teamId),
       );
       const scopes: AuthzScopeRef[] = [
-        { type: "organization", id: organizationId },
         ...inventory.teamIds
           .filter((teamId) => legacyTeamIds.has(teamId))
           .map(

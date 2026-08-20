@@ -283,6 +283,55 @@ Feature: Unified authorization engine
     And dave's own session is granted "project:delete" on project "chatbot"
 
   # ============================================================================
+  # The per-organization fork (delivery plan PR 3)
+  # ============================================================================
+  # The engine does not become the decider everywhere on a deploy. It becomes
+  # the decider one organization at a time, after that organization's own
+  # parity proof came back clean, and the switch is a fact in the ledger that
+  # the running fleet picks up by itself.
+  #
+  # Every scenario below is built so the two resolvers CANNOT agree: the
+  # access exists as a grant and as nothing else. Which answer comes back is
+  # therefore proof of which resolver decided it, rather than a coincidence
+  # of both saying yes.
+
+  @unit
+  Scenario: A cut-over organization is decided by the engine
+    Given "acme" has been cut over to the engine
+    And user "alice" holds a grant at project "chatbot" that no binding records
+    When alice's permission "traces:view" is checked on project "chatbot"
+    Then the check is granted on the engine's answer
+    And the answer does not wait for the legacy resolver
+
+  @unit
+  Scenario: Legacy runs behind the engine as the reverse-shadow comparison
+    Given "acme" has been cut over to the engine
+    When a check runs that the legacy resolver would have answered differently
+    Then the disagreement is logged as a warning naming the engine as primary
+    And the answer the caller received is unaffected
+
+  @unit
+  Scenario: An organization that has not cut over is unchanged
+    Given "acme" has not been cut over
+    When a permission check runs for a member of "acme"
+    Then the legacy resolver's answer is the one returned
+    And the engine still shadows that answer for comparison
+
+  @unit
+  Scenario: Rolling back returns an organization to the legacy path within the gate's cache window
+    Given "acme" is being served by the engine
+    When "acme" is rolled back onto the legacy path
+    Then checks in "acme" stop consulting the engine within the gate's cache window
+    And nothing is deployed or restarted for that to hold
+
+  @unit
+  Scenario: A cut-over organization's checks read the ledger's own head
+    Given "acme" has been cut over to the engine
+    When grants are collected for a member of "acme"
+    Then they come from the grants the ledger itself records
+    And the legacy binding tables are not read
+
+  # ============================================================================
   # The resource tier (ADR-092 §8) — sharing is a grant on the tree
   # ============================================================================
   #

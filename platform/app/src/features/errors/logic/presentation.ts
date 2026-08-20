@@ -158,6 +158,23 @@ const MIGRATION_STATUS_LABELS: Record<string, string> = {
   rolled_back: "already rolled back",
 };
 
+/** Enrollment stages, in the operator's words rather than the column's. */
+const ENROLLMENT_STAGE_LABELS: Record<string, string> = {
+  migrations: "migration",
+  cutover: "cutover",
+};
+
+/**
+ * The migrations another migration's rollback can be blocked by, as the
+ * operator should read them. Registered migration names are stable
+ * identifiers (renaming one orphans its state rows), so keying copy on them
+ * is safe; an unmapped name falls back to the generic sentence rather than
+ * leaking the identifier.
+ */
+const BLOCKING_MIGRATION_LABELS: Record<string, string> = {
+  "authz-grants-cutover": "authorization cutover",
+};
+
 /**
  * Whether any code in the error's reason chain (depth-first, nested included)
  * is one of `codes`.
@@ -999,10 +1016,50 @@ const presentations = {
     describe: () =>
       "Free a seat by disabling a membership, or upgrade the plan to add more.",
   },
+  migration_enrollment_already_exists: {
+    title: "This organization is already enrolled",
+    describe: (error) => {
+      const stage = label(ENROLLMENT_STAGE_LABELS, str(error, "stage", ""));
+      return stage
+        ? `It is already enrolled for ${stage}, so the next pass will process it. Nothing to do.`
+        : "It is already enrolled for that stage, so the next pass will process it. Nothing to do.";
+    },
+  },
+  migration_enrollment_cloud_only: {
+    title: "Enrollment does not apply to this installation",
+    describe: () =>
+      "Self-hosted installations run released migrations automatically for every organization, so there is nothing to enroll or withdraw.",
+  },
+  migration_enrollment_not_found: {
+    title: "This organization is not enrolled",
+    describe: (error) => {
+      const stage = label(ENROLLMENT_STAGE_LABELS, str(error, "stage", ""));
+      return stage
+        ? `There is no ${stage} enrollment for this organization to withdraw. Check the organization id and the stage.`
+        : "There is no enrollment for this organization to withdraw. Check the organization id and the stage.";
+    },
+  },
   migration_state_not_found: {
     title: "No migration state for that organization",
     describe: () =>
       "Check the organization id — only organizations a migration has already processed have state to act on.",
+  },
+  migration_rollback_blocked_by_dependent: {
+    title: "Another migration still stands on this one",
+    describe: (error) => {
+      const blocking = label(
+        BLOCKING_MIGRATION_LABELS,
+        str(error, "blockingMigration", ""),
+      );
+      return blocking
+        ? `This organization's ${blocking} is still in force and depends on this migration's data. Roll the ${blocking} back first, then retry.`
+        : "A migration that depends on this one is still in force. Roll that one back first, then retry.";
+    },
+  },
+  migration_rollback_cutover_not_started: {
+    title: "This organization has not been cut over",
+    describe: () =>
+      "It is still waiting to cut over, so there is nothing to roll back. It stays on the legacy path until the cutover runs.",
   },
   migration_rollback_requires_migrated_or_finalized: {
     title: "Only a migrated or finalized organization can be rolled back",

@@ -10,6 +10,7 @@ import {
   OPS_BLOB_SORTS,
 } from "~/server/app-layer/ops/types";
 import { systemMigrationsService } from "~/server/app-layer/system-migrations/runtime";
+import { MIGRATION_ENROLLMENT_STAGES } from "~/server/app-layer/system-migrations/system-migrations.service";
 import {
   resolveHotDays,
   TABLE_TTL_CONFIG,
@@ -1466,9 +1467,79 @@ export const opsRouter = createTRPCRouter({
     .query(() => systemMigrationsService.getOverview()),
 
   /**
+   * The cloud rollout's enrollment listing: which organizations are enrolled
+   * for the preparation work ("migrations") and which for the flip onto the
+   * engine ("cutover"), with the names the operator recognizes. Carries
+   * `isSaaS` so the page can say honestly that a self-hosted installation
+   * has nothing to enroll.
+   */
+  listMigrationEnrollments: protectedProcedure
+    .use(opsViewPermission)
+    .query(({ ctx }) =>
+      systemMigrationsService.getEnrollments({
+        requestedBy: ctx.session.user.id,
+      }),
+    ),
+
+  /**
+   * Enroll one organization for one stage of the in-place migration rollout.
+   * Takes effect on the next pass - enrollment is read fresh each time. The
+   * service refuses duplicates, unknown organizations, and any enrollment on
+   * a self-hosted installation, each with a handled error the page renders.
+   */
+  enrollMigrationTenant: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        organizationId: z.string().min(1).max(200),
+        stage: z.enum(MIGRATION_ENROLLMENT_STAGES),
+        // Typed confirmation for the cutover stage, same reasoning as the
+        // rollback's: enrolling an organization for cutover is what lets the
+        // next pass flip which tables answer every permission check for it.
+        confirm: z.literal("ENROLL").optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // The `migrations` stage is behavior-neutral (backfill and genesis
+      // change nothing about who decides); the cutover stage has the
+      // rollback's blast radius, so it takes the rollback's guard.
+      if (input.stage === "cutover") {
+        requireDestructiveOpsAuth(ctx, input.confirm);
+      }
+      await systemMigrationsService.enroll({
+        organizationId: input.organizationId,
+        stage: input.stage,
+        actorUserId: ctx.session.user.id,
+      });
+      return { enrolled: true };
+    }),
+
+  /**
+   * Withdraw an enrollment: later passes stop processing the organization
+   * for that stage. State already recorded stays exactly as it is - pausing
+   * the rollout is this action's whole job; undoing it is the rollback's.
+   */
+  withdrawMigrationTenant: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        organizationId: z.string().min(1).max(200),
+        stage: z.enum(MIGRATION_ENROLLMENT_STAGES),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await systemMigrationsService.withdraw({
+        organizationId: input.organizationId,
+        stage: input.stage,
+        actorUserId: ctx.session.user.id,
+      });
+      return { withdrawn: true };
+    }),
+
+  /**
    * Kick a migration pass now instead of waiting for the next worker boot -
-   * the lever for widening a cloud cohort or re-verifying held tenants
-   * after remediation. Fire-and-forget: the fleet-wide lease already
+   * the lever for processing a fresh enrollment right away or re-verifying
+   * held tenants after remediation. Fire-and-forget: the fleet-wide lease already
    * guarantees a single driver, so the worst case for a double click is a
    * pass that stands down immediately.
    */
@@ -1481,10 +1552,12 @@ export const opsRouter = createTRPCRouter({
 
   /**
    * The operator rollback: pin a migrated or finalized organization back
-   * onto its legacy path. Only `migrated` or `finalized` rolls back — both
-   * are already live on the ledger; the service refuses anything else with
-   * a handled error. Rolled-back tenants are terminal for the runner —
-   * later passes leave them alone.
+   * onto its legacy path. Both are already live on the ledger; the service
+   * refuses anything else with a handled error. An already `rolled_back`
+   * organization RETRIES — calling this again re-applies the rollback's
+   * effects against the standing pin, which is how a rollback whose effect
+   * died halfway is finished. Rolled-back tenants are terminal for the
+   * runner — later passes leave them alone.
    */
   rollBackSystemMigrationTenant: protectedProcedure
     .use(opsManagePermission)

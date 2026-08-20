@@ -137,6 +137,10 @@ export type GenesisImportDeps = {
 
 export class GrantsGenesisImportMigration implements SystemMigration {
   readonly name = GRANTS_GENESIS_IMPORT_MIGRATION_NAME;
+  // Dark by construction - the import states facts and proves them against
+  // the rows it started from without changing who decides - so self-hosted
+  // runs it automatically, as it has since it shipped.
+  readonly runsAutomaticallyOnSelfHosted = true;
 
   constructor(private readonly deps: GenesisImportDeps) {}
 
@@ -654,9 +658,19 @@ function organizationFacts({
   }
 
   // Decision 20: an ADMIN with no binding ANYWHERE is served today by the
-  // legacy admin fallback, which reads the membership row. That inference
-  // becomes an explicit org-scoped grant; an admin who also holds bindings
-  // is already represented by them.
+  // legacy admin fallback. That inference becomes a stored org-scoped fact;
+  // an admin who also holds bindings is already represented by them.
+  //
+  // `legacy-admin`, NOT `admin`, and the difference is load-bearing: the
+  // collector translates `admin` into a live ORGANIZATION-scope binding, and
+  // the legacy heads have no counterpart row (this fact is Grant-head-only
+  // by design) — so an `admin` key made the engine grant the full admin bag
+  // where the legacy resolver grants the fallback's much narrower one, and
+  // the cutover parity proof rightly refused every organization holding such
+  // an admin. An untranslatable key is how this family stays dormant (the
+  // same mechanism as `lite-member`): the fact is stored with its own
+  // business time, today's collector skips it, and contract gives it the
+  // bag the fallback actually grants when the fallback retires.
   const boundUserIds = new Set(
     bindingRows.flatMap((row) => (row.userId === null ? [] : [row.userId])),
   );
@@ -673,7 +687,7 @@ function organizationFacts({
         occurredAtMs: member.createdAtMs,
       }),
       principal,
-      roleKey: "admin",
+      roleKey: "legacy-admin",
       scope,
       source: "genesis-import",
       occurredAtMs: member.createdAtMs,

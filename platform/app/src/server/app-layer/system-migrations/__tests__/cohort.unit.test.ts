@@ -1,49 +1,67 @@
 import { describe, expect, it } from "vitest";
-import { cohortIncludes } from "../cohort";
+import {
+  migrationRunsOnThisInstallation,
+  organizationMigrates,
+} from "../cohort";
 
-describe("cohortIncludes", () => {
+describe("organizationMigrates", () => {
   describe("when the installation is self-hosted", () => {
     /** @scenario "A self-hosted installation migrates every organization automatically" */
-    it("includes every organization with no configuration", () => {
-      expect(
-        cohortIncludes({ isSaaS: false, cohort: undefined, tenantId: "any" }),
-      ).toBe(true);
-      expect(
-        cohortIncludes({ isSaaS: false, cohort: "none", tenantId: "any" }),
-      ).toBe(true);
+    it("includes every organization, enrolled or not", () => {
+      expect(organizationMigrates({ isSaaS: false, enrolled: false })).toBe(
+        true,
+      );
+      expect(organizationMigrates({ isSaaS: false, enrolled: true })).toBe(
+        true,
+      );
     });
   });
 
   describe("when the installation is cloud", () => {
-    it("includes nothing by default", () => {
-      expect(
-        cohortIncludes({ isSaaS: true, cohort: undefined, tenantId: "org1" }),
-      ).toBe(false);
-      expect(
-        cohortIncludes({ isSaaS: true, cohort: "", tenantId: "org1" }),
-      ).toBe(false);
-      expect(
-        cohortIncludes({ isSaaS: true, cohort: "none", tenantId: "org1" }),
-      ).toBe(false);
-    });
-
-    it('includes everything on "all"', () => {
-      expect(
-        cohortIncludes({ isSaaS: true, cohort: "all", tenantId: "org1" }),
-      ).toBe(true);
-    });
-
-    it("includes exactly the listed organizations", () => {
-      const cohort = "org1, org2";
-      expect(cohortIncludes({ isSaaS: true, cohort, tenantId: "org1" })).toBe(
-        true,
-      );
-      expect(cohortIncludes({ isSaaS: true, cohort, tenantId: "org2" })).toBe(
-        true,
-      );
-      expect(cohortIncludes({ isSaaS: true, cohort, tenantId: "org3" })).toBe(
+    /** @scenario "Cloud rollout processes only enrolled organizations" */
+    it("includes exactly the enrolled organizations", () => {
+      expect(organizationMigrates({ isSaaS: true, enrolled: true })).toBe(true);
+      expect(organizationMigrates({ isSaaS: true, enrolled: false })).toBe(
         false,
       );
+    });
+  });
+});
+
+describe("migrationRunsOnThisInstallation", () => {
+  describe("when the installation is cloud", () => {
+    /** @scenario "Cloud rollout is unaffected by the self-hosted release declaration" */
+    it("runs every registered migration whatever it declares", () => {
+      expect(
+        migrationRunsOnThisInstallation({
+          isSaaS: true,
+          runsAutomaticallyOnSelfHosted: false,
+        }),
+      ).toBe(true);
+      expect(
+        migrationRunsOnThisInstallation({
+          isSaaS: true,
+          runsAutomaticallyOnSelfHosted: true,
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("when the installation is self-hosted", () => {
+    /** @scenario "A migration not yet released for self-hosting never runs there" */
+    it("runs only the migrations released for self-hosting", () => {
+      expect(
+        migrationRunsOnThisInstallation({
+          isSaaS: false,
+          runsAutomaticallyOnSelfHosted: false,
+        }),
+      ).toBe(false);
+      expect(
+        migrationRunsOnThisInstallation({
+          isSaaS: false,
+          runsAutomaticallyOnSelfHosted: true,
+        }),
+      ).toBe(true);
     });
   });
 });

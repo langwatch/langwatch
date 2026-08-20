@@ -26,6 +26,19 @@ function entry(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ * One resource grant's full terms. The schema requires the resource's own
+ * identity - what the shared thing is, and which project it lives in -
+ * alongside the terms, so a fixture carrying only token and permission is
+ * refused before any test here reaches the rule it is actually about.
+ */
+const SHARE_TERMS = {
+  kind: "trace",
+  projectId: "proj_chatbot",
+  token: "tok_1",
+  permission: "traces:view",
+} as const;
+
 function parse(overrides: Record<string, unknown> = {}, entryOverrides = {}) {
   return attachGrantsCommandDataSchema.safeParse({
     tenantId: ORG,
@@ -49,7 +62,7 @@ describe("the grants ledger's wire boundary", () => {
           principal: { type: "anyone", id: null },
           roleKey: null,
           scope: { type: "RESOURCE", id: "trace_t1" },
-          resource: { token: "tok_1", permission: "traces:view" },
+          resource: SHARE_TERMS,
         },
       );
       expect(result.success).toBe(true);
@@ -77,7 +90,7 @@ describe("the grants ledger's wire boundary", () => {
             principal: { type: "anyone", id: "user_alice" },
             roleKey: null,
             scope: { type: "RESOURCE", id: "trace_t1" },
-            resource: { token: "tok_1", permission: "traces:view" },
+            resource: SHARE_TERMS,
           },
         ).success,
       ).toBe(false);
@@ -86,10 +99,7 @@ describe("the grants ledger's wire boundary", () => {
 
   describe("when resource terms and scope disagree", () => {
     it("refuses share terms on a team-wide grant", () => {
-      expect(
-        parse({}, { resource: { token: "tok_1", permission: "traces:view" } })
-          .success,
-      ).toBe(false);
+      expect(parse({}, { resource: SHARE_TERMS }).success).toBe(false);
     });
 
     it("refuses a resource grant with no terms", () => {
@@ -117,10 +127,50 @@ describe("the grants ledger's wire boundary", () => {
             principal: { type: "anyone", id: null },
             roleKey: "member",
             scope: { type: "RESOURCE", id: "trace_t1" },
-            resource: { token: "tok_1", permission: "traces:view" },
+            resource: SHARE_TERMS,
           },
         ).success,
       ).toBe(false);
+    });
+  });
+
+  describe("when resource terms cannot say what they open", () => {
+    function resourceGrant(resource: Record<string, unknown>) {
+      return parse(
+        {},
+        {
+          principal: { type: "anyone", id: null },
+          roleKey: null,
+          scope: { type: "RESOURCE", id: "trace_t1" },
+          resource,
+        },
+      );
+    }
+
+    it("refuses terms that name no kind", () => {
+      const { kind: _kind, ...withoutKind } = SHARE_TERMS;
+      expect(resourceGrant(withoutKind).success).toBe(false);
+    });
+
+    it("refuses a kind outside the stored vocabulary", () => {
+      expect(resourceGrant({ ...SHARE_TERMS, kind: "dataset" }).success).toBe(
+        false,
+      );
+    });
+
+    it("refuses terms that name no project", () => {
+      const { projectId: _projectId, ...withoutProject } = SHARE_TERMS;
+      expect(resourceGrant(withoutProject).success).toBe(false);
+    });
+
+    it("refuses an empty token, project or permission", () => {
+      for (const empty of [
+        { token: "" },
+        { projectId: "" },
+        { permission: "" },
+      ]) {
+        expect(resourceGrant({ ...SHARE_TERMS, ...empty }).success).toBe(false);
+      }
     });
   });
 
@@ -140,11 +190,44 @@ describe("the grants ledger's wire boundary", () => {
       ).toBe(false);
     });
 
-    it("refuses a `project` principal outside RESOURCE scope", () => {
+    it("refuses a `project` principal at TEAM scope", () => {
       expect(
         parse({}, { principal: { type: "project", id: "proj_chatbot" } })
           .success,
       ).toBe(false);
+    });
+
+    it("refuses a `project` principal on a FOREIGN project", () => {
+      // A project principal on someone else's project would be a standing
+      // cross-project credential nobody holds. Only the self-grant is legal.
+      expect(
+        parse(
+          {},
+          {
+            principal: { type: "project", id: "proj_chatbot" },
+            roleKey: "admin",
+            scope: { type: "PROJECT", id: "proj_agents" },
+          },
+        ).success,
+      ).toBe(false);
+    });
+
+    it("accepts the project-credential self-grant", () => {
+      // The one non-RESOURCE placement a project principal has: its own
+      // project's scope - `Project.apiKey` acting as the project it belongs
+      // to, imported by the cutover and dormant until the contract PR's edge
+      // identity resolves credentials through it.
+      expect(
+        parse(
+          {},
+          {
+            principal: { type: "project", id: "proj_chatbot" },
+            roleKey: "admin",
+            scope: { type: "PROJECT", id: "proj_chatbot" },
+            source: "cutover-import",
+          },
+        ).success,
+      ).toBe(true);
     });
   });
 

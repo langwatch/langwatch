@@ -132,6 +132,7 @@ import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 import { createAnalyticsService } from "./analytics";
 import { LegacyAnalyticsBackendClickHouseRepository } from "./analytics/repositories/legacy-analytics-backend.clickhouse.repository";
 import { App, getApp, globalForApp, initializeApp } from "./app";
+import { GrantsLedgerWriter, grantsLedgerWriter } from "./authz/ledger";
 import { PrismaAuthzAuditTrailRepository } from "./authz/repositories/authz-audit-trail.prisma.repository";
 import { PrismaAuthzGrantsProjectionRepository } from "./authz/repositories/authz-grants-projection.prisma.repository";
 import { EmailSuppressionService } from "./automations/emailSuppression.service";
@@ -283,6 +284,7 @@ import {
 } from "./scheduler/scheduled-job.repository";
 import { schedulerRegistry } from "./scheduler/scheduler.registry";
 import { SchedulerService } from "./scheduler/scheduler.service";
+import { LedgerShareRepository } from "./share/repositories/share.ledger.repository";
 import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
 import { ShareService } from "./share/share.service";
 import { createShareViewDedupeService } from "./share/share-view-dedupe.service";
@@ -722,7 +724,14 @@ export function initializeDefaultApp(options?: {
   // service can ask "is this trace still shared?" without depending on
   // ShareService — that would close the cycle: ShareService already depends
   // on PinnedTraceService for auto(un)pin.
-  const shareRepo = new PrismaShareRepository(prisma);
+  // A cut-over organization's links are written through the grants ledger and
+  // read off the same compat row as ever (ADR-092 PR 3); everyone else gets
+  // the Prisma repository byte for byte.
+  const shareRepo = new LedgerShareRepository({
+    legacy: new PrismaShareRepository(prisma),
+    prisma,
+    writer: () => grantsLedgerWriter(),
+  });
   const pinnedTraceService = new PinnedTraceService(
     pinnedTraceRepo,
     async ({ projectId, traceId }) => {
@@ -2283,7 +2292,18 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       metering: new StorageMeterService({ resolveClickHouseClient: null }),
     },
     share: new ShareService(
-      new PrismaShareRepository(testPrisma),
+      // The same repository the real preset wires, so a test organization
+      // that has been cut over exercises the ledger path rather than a shape
+      // only tests see. The writer is built over `testPrisma` explicitly
+      // (rather than `grantsLedgerWriter()`, which always reaches for the
+      // app's Prisma singleton) - today the two are the same client
+      // (`testPrisma = globalPrisma`, presets.ts above), but a test preset
+      // should say what it depends on rather than rely on that coincidence.
+      new LedgerShareRepository({
+        legacy: new PrismaShareRepository(testPrisma),
+        prisma: testPrisma,
+        writer: () => new GrantsLedgerWriter(testPrisma),
+      }),
       testPinnedTraceService,
       {
         isTraceSharingEnabled: async (projectId) => {

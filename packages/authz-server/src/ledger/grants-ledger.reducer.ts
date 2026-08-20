@@ -36,14 +36,18 @@ export type LedgerScopeType =
   | "PLATFORM";
 
 /** Which writer emitted the event. Backfill sources are skipped by the
- *  audit subscriber's when-guard; the reducer treats all sources alike. */
+ *  audit subscriber's when-guard; the reducer treats all sources alike.
+ *  `cutover-import` is the composite per-org cutover migration's source —
+ *  share links, lite members, project credentials and platform operators
+ *  arriving as backdated history, so it is skipped like the others. */
 export type GrantEventSource =
   | "grants-service"
   | "scim"
   | "invite"
   | "backfill-b"
   | "genesis-import"
-  | "read-through-mint";
+  | "read-through-mint"
+  | "cutover-import";
 
 export interface LedgerPrincipal {
   type: LedgerPrincipalType;
@@ -56,10 +60,25 @@ export interface LedgerScope {
   id: string;
 }
 
-/** Resource-tier columns (ShareLink heritage, ADR-057 possession intact). */
+/**
+ * Resource-tier columns (ShareLink heritage, ADR-057 possession intact).
+ *
+ * `scope.id` is the shared resource's id and nothing else, so the fact has
+ * to carry the rest of that resource's identity itself: which KIND of thing
+ * the id names, and which project it sits in. Both are what the compat
+ * ShareLink head projects into its own columns, and what the possession
+ * read fences on — a token resolves to one row, but the row still has to
+ * prove which project it belongs to. `createdByUserId` is the person who
+ * minted the link (absent when nobody did).
+ */
 export interface ResourceGrantTerms {
+  /** The ledger's lowercase spelling; the stored column keeps ShareLink's
+   *  uppercase one (TRACE / THREAD). */
+  kind: "trace" | "thread";
+  projectId: string;
   token: string;
   permission: string;
+  createdByUserId?: string;
   expiresAtMs?: number;
   maxViews?: number;
 }
@@ -225,6 +244,16 @@ export interface GrantsLedgerCutover {
   provedAtMs: number | null;
   parityDiffs: string[];
   /**
+   * Why the last `cutover_completed` fact did NOT put this organization on
+   * the engine, or null when none was refused.
+   *
+   * The fold is a pure reducer, so a refusal cannot be logged where it
+   * happens; it is STATE instead, which is strictly better — the projection
+   * carries it to the operator surface, and a replay reproduces it. See
+   * `cutoverCompletionRefusal` for what may refuse.
+   */
+  completionRefusedReason: string | null;
+  /**
    * Business time of the newest cutover fact folded so far, and the reducer's
    * own monotonic guard. Unlike the grant and role heads — absolute writes
    * keyed by a deterministic id, where re-applying an old fact is a no-op —
@@ -257,6 +286,7 @@ export function emptyGrantsLedgerState({
       onEngine: false,
       provedAtMs: null,
       parityDiffs: [],
+      completionRefusedReason: null,
       changedAtMs: null,
     },
     migrationStates: {},
@@ -346,19 +376,45 @@ export function reduceGrantsLedger({
           ...state.cutover,
           provedAtMs: event.occurredAtMs,
           parityDiffs: event.diffs,
+          // A fresh proof retires whatever the last refusal said: the state
+          // it complained about no longer holds.
+          completionRefusedReason: null,
           changedAtMs: event.occurredAtMs,
         },
       };
-    case "cutover_completed":
+    case "cutover_completed": {
       if (isStaleCutoverFact({ state, event })) return state;
+      // The precondition lives HERE and nowhere else. Command handlers on
+      // this aggregate are pure appends with no state to check against, and
+      // the migration's own ordering is a convention a second writer (an ops
+      // action, a replayed script, a future caller) is not bound by. Making
+      // the FOLD refuse means no path can put an organization on the engine
+      // without a clean proof standing behind it, replay included.
+      const refusal = cutoverCompletionRefusal(state.cutover);
+      if (refusal !== null) {
+        // A refusal is a non-event to the monotonic guard: it flips nothing
+        // the guard protects, so `changedAtMs` stays put and a proof whose
+        // business time trails the refused completion (a slower writer, a
+        // skewed clock) still folds instead of being dropped as stale -
+        // advancing the guard here would park the organization forever.
+        // Only the reason is recorded, for the operator. `onEngine` is left
+        // untouched for the same discipline: taking an organization OFF the
+        // engine is `cutover_rolled_back`'s decision, never a side effect.
+        return {
+          ...state,
+          cutover: { ...state.cutover, completionRefusedReason: refusal },
+        };
+      }
       return {
         ...state,
         cutover: {
           ...state.cutover,
           onEngine: true,
+          completionRefusedReason: null,
           changedAtMs: event.occurredAtMs,
         },
       };
+    }
     case "cutover_rolled_back":
       if (isStaleCutoverFact({ state, event })) return state;
       return {
@@ -366,6 +422,10 @@ export function reduceGrantsLedger({
         cutover: {
           ...state.cutover,
           onEngine: false,
+          // A rollback is a decision, not a refusal: whatever a previous
+          // completion could not do is no longer the reason this
+          // organization is on legacy.
+          completionRefusedReason: null,
           changedAtMs: event.occurredAtMs,
         },
       };
@@ -384,6 +444,30 @@ export function reduceGrantsLedger({
       };
     }
   }
+}
+
+/** The refusal codes a `cutover_completed` fact can fold to. Stable strings:
+ *  they reach an operator through the projection, and a test asserts the
+ *  code, never prose. */
+export const CUTOVER_COMPLETION_REFUSALS = {
+  UNPROVEN: "parity_unproven",
+  DIFFS: "parity_diffs_outstanding",
+} as const;
+
+/**
+ * Why this organization may not go onto the engine yet, or null when it may.
+ *
+ * Two ways: no parity proof has been folded at all, or the newest one found
+ * disagreements. Both are the same rule from the ADR — the flip is only ever
+ * earned by a proof that came back empty — expressed where every writer,
+ * every retry and every replay has to pass through it.
+ */
+function cutoverCompletionRefusal(cutover: GrantsLedgerCutover): string | null {
+  if (cutover.provedAtMs === null) return CUTOVER_COMPLETION_REFUSALS.UNPROVEN;
+  if (cutover.parityDiffs.length > 0) {
+    return CUTOVER_COMPLETION_REFUSALS.DIFFS;
+  }
+  return null;
 }
 
 /**

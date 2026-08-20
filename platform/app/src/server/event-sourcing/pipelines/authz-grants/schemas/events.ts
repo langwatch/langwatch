@@ -88,6 +88,7 @@ export const grantEventSourceSchema = z.enum([
   "backfill-b",
   "genesis-import",
   "read-through-mint",
+  "cutover-import",
 ]);
 
 export const grantsLedgerActorSchema = z.object({
@@ -95,9 +96,17 @@ export const grantsLedgerActorSchema = z.object({
   id: z.string().nullable(),
 });
 
+/** `kind` and `projectId` are required, not optional-tolerant: nothing has
+ *  ever emitted resource terms, so there is no stored event these fields
+ *  could be missing from, and a resource fact without them cannot say which
+ *  thing it opens or where that thing lives. `createdByUserId` is genuinely
+ *  optional — a link nobody minted by hand has no author. */
 export const resourceGrantTermsSchema = z.object({
+  kind: z.enum(["trace", "thread"]),
+  projectId: z.string().min(1),
   token: z.string().min(1),
   permission: z.string().min(1),
+  createdByUserId: z.string().min(1).optional(),
   expiresAtMs: z.number().int().nonnegative().optional(),
   maxViews: z.number().int().nonnegative().optional(),
 });
@@ -116,27 +125,41 @@ export const resourceGrantTermsSchema = z.object({
  * team-wide grant, which is a public credential for a scope no share link is
  * ever supposed to reach.
  *
- * The `anyone` and `project` principals are resource-tier only (delivery plan,
- * the `Grant` shape: "project | anyone -- last two: resource tier only"). That
- * one is a security boundary rather than a tidiness rule: `anyone` names no
- * subject, so an `anyone` grant at ORGANIZATION or TEAM scope is a standing
- * public grant over the whole tenant, held by nobody and revocable by no
- * principal. It is only meaningful paired with a token, and tokens exist at
- * RESOURCE scope alone.
+ * The `anyone` principal is resource-tier only (delivery plan, the `Grant`
+ * shape). That one is a security boundary rather than a tidiness rule:
+ * `anyone` names no subject, so an `anyone` grant at ORGANIZATION or TEAM
+ * scope is a standing public grant over the whole tenant, held by nobody and
+ * revocable by no principal. It is only meaningful paired with a token, and
+ * tokens exist at RESOURCE scope alone.
+ *
+ * The `project` principal has exactly two legal placements: the resource tier
+ * (a share link whose audience is "members who can see this project"), and
+ * its OWN project's PROJECT scope — the project-credential self-grant the
+ * cutover imports, `Project.apiKey` acting as the project it belongs to. The
+ * self-grant is the contract the edge will resolve a project credential
+ * against once bare column comparison retires; it is dormant until then (no
+ * collector returns PROJECT-principal rows for a user or an api key). Any
+ * other placement — a project principal on a foreign project, a team, or the
+ * organization — would be a standing cross-scope credential nobody holds, and
+ * is refused.
  */
-const RESOURCE_ONLY_PRINCIPALS = new Set(["anyone", "project"]);
-
 export const grantShapeRefinement = {
   check: (grant: {
-    principal: { type: string };
+    principal: { type: string; id: string | null };
     roleKey: string | null;
-    scope: { type: string };
+    scope: { type: string; id: string };
     resource?: unknown;
   }): boolean => {
     const isResourceScope = grant.scope.type === "RESOURCE";
+    if (grant.principal.type === "anyone" && !isResourceScope) {
+      return false;
+    }
+    const isOwnProjectCredential =
+      grant.scope.type === "PROJECT" && grant.principal.id === grant.scope.id;
     if (
-      RESOURCE_ONLY_PRINCIPALS.has(grant.principal.type) &&
-      !isResourceScope
+      grant.principal.type === "project" &&
+      !isResourceScope &&
+      !isOwnProjectCredential
     ) {
       return false;
     }
@@ -146,7 +169,7 @@ export const grantShapeRefinement = {
     );
   },
   message:
-    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms, and the `anyone` and `project` principals exist only at RESOURCE scope",
+    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; `anyone` principals exist only at RESOURCE scope, and a `project` principal exists at RESOURCE scope or as its own project's credential (a PROJECT scope whose id is the principal's)",
   path: ["resource"] as const,
 };
 

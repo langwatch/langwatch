@@ -202,6 +202,31 @@ describe("collector at the resource tier", () => {
       });
     });
 
+    /** @scenario "The resource-tier collect never pins an organization's head beyond one read" */
+    it("collects share links on a pass-scoped reader, never on the root reader", async () => {
+      // The composition root holds ONE collector for the process's
+      // lifetime, and a routed reader memoizes its head decision per
+      // instance. Reading on the root instance would pin the organization's
+      // head until the pod restarted — the binding tier already opens a
+      // pass per snapshot, and the resource tier must hold the same line.
+      const passReader = makeReader({
+        findShareLinks: vi.fn().mockResolvedValue([liveShareLinkRow]),
+      });
+      const rootReader = makeReader();
+      const reader = { ...rootReader, beginPass: vi.fn(() => passReader) };
+
+      const grants = await new AuthzCollectorService(
+        reader,
+      ).collectResourceGrants({
+        scope: traceScope({ shareTokens: ["tok-1"] }),
+      });
+
+      expect(reader.beginPass).toHaveBeenCalledTimes(1);
+      expect(passReader.findShareLinks).toHaveBeenCalledTimes(1);
+      expect(rootReader.findShareLinks).not.toHaveBeenCalled();
+      expect(grants).toHaveLength(1);
+    });
+
     /** @scenario "Expired and view-exhausted share links grant nothing" */
     it("drops expired and view-exhausted links before the engine sees them", async () => {
       const reader = makeReader({

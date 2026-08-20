@@ -85,6 +85,13 @@ export async function offboardUserFromOrganization({
  * key-held grants cannot survive for this user: memberships are gone, and a
  * personal key is ceilinged by an owner who now resolves to nothing
  * (AuthzService applies that ceiling on every check).
+ *
+ * WHICH head the re-collect reads is the repository's business, not this
+ * function's, and since the per-organization cutover (delivery-plan PR 3) the
+ * app binds a cutover-aware reader to the transaction so the proof is made
+ * against the head the organization is actually served from. It means the same
+ * thing either way: a revocation names GRANT ids, and the compat row shares
+ * the grant's id, so removing one head removes both.
  */
 async function proveNothingResolves({
   collector,

@@ -160,6 +160,7 @@ describe("authz audit trail subscriber", () => {
       "genesis-import",
       "backfill-b",
       "read-through-mint",
+      "cutover-import",
     ])("writes no row for %s", async (source) => {
       const store = recordingStore();
       await deliver(store, attached({ source }));
@@ -332,6 +333,9 @@ describe("authz audit trail subscriber", () => {
 
       expect(
         subscriber.when?.(attached({ source: "genesis-import" }), context),
+      ).toBe(false);
+      expect(
+        subscriber.when?.(attached({ source: "cutover-import" }), context),
       ).toBe(false);
       expect(subscriber.when?.(attached(), context)).toBe(true);
     });

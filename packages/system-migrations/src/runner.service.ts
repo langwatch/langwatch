@@ -3,7 +3,7 @@ import type { MigrationLeaseRepository } from "./lease.repository";
 import type { SystemMigrationStateRepository } from "./state.repository";
 import type { SystemMigration } from "./system-migration";
 import type { TenantSource } from "./tenant-source";
-import type { MigrationPassSummary } from "./types";
+import { isTerminalTenantStatus, type MigrationPassSummary } from "./types";
 
 const logger = createLogger("langwatch:system-migrations");
 
@@ -17,10 +17,11 @@ const DEFAULT_LEASE_RENEW_INTERVAL_MS = 20_000;
 /**
  * Which tenants a pass may touch. The app composes this: self-hosted
  * installations answer true for every tenant (migration just happens, in
- * the background, no configuration), cloud reads the rollout cohort from
- * the environment. A tenant outside the cohort is skipped without even a
- * state record - "not started" and "not in the cohort yet" are the same
- * pending state, which is what lets the cohort widen later.
+ * the background, no configuration), cloud answers from the organizations
+ * operators have enrolled, read fresh each pass. A tenant outside the
+ * cohort is skipped without even a state record - "not started" and "not
+ * enrolled yet" are the same pending state, which is what lets the rollout
+ * widen later.
  */
 export type MigrationCohort = (tenantId: string) => boolean | Promise<boolean>;
 
@@ -192,14 +193,11 @@ export class SystemMigrationRunnerService {
       migrationName: migration.name,
       tenantId,
     });
-    // The two terminal states: `finalized` is the one-way latch, and
-    // `rolled_back` is the operator's pin holding a tenant on its legacy
-    // path. Re-running either would undo the operator's decision on the
-    // very next boot.
-    if (
-      existing?.status === "finalized" ||
-      existing?.status === "rolled_back"
-    ) {
+    // Terminal states (`isTerminalTenantStatus`): `finalized` is the
+    // one-way latch, and `rolled_back` is the operator's pin holding a
+    // tenant on its legacy path. Re-running either would undo the
+    // operator's decision on the very next boot.
+    if (isTerminalTenantStatus(existing?.status)) {
       summary.skipped += 1;
       return;
     }
@@ -212,12 +210,25 @@ export class SystemMigrationRunnerService {
         // its last attempt died, so it can finish work the crash stranded.
         previous: existing,
       });
-      await state.upsertRecord({
+      // Compare-and-set, not a blind upsert: an operator may have pinned the
+      // row `rolled_back` while `migrateTenant` ran, and that pin outranks
+      // anything this pass concluded. A refused write is the pin winning -
+      // terminal for this tenant this pass; the row stays exactly as the
+      // operator left it.
+      const wasWritten = await state.upsertRecordUnlessRolledBack({
         migrationName: migration.name,
         tenantId,
         status: outcome.status,
         report: outcome.report ?? null,
       });
+      if (!wasWritten) {
+        summary.skipped += 1;
+        logger.warn(
+          { migration: migration.name, tenantId, outcome: outcome.status },
+          "an operator rolled the tenant back mid-pass; the pass's outcome is discarded",
+        );
+        return;
+      }
       if (outcome.status === "finalized") summary.finalized += 1;
       else if (outcome.status === "migrated") summary.held += 1;
       else summary.parked += 1;
@@ -231,7 +242,12 @@ export class SystemMigrationRunnerService {
       // not stop the fleet.
       summary.parked += 1;
       try {
-        await state.upsertRecord({
+        // The same compare-and-set as the outcome write: a `parked` row that
+        // replaced an operator's `rolled_back` pin would be retried on the
+        // next pass and re-finalized, undoing the rollback. A refused park
+        // costs nothing - the pin already keeps the tenant off every later
+        // pass.
+        await state.upsertRecordUnlessRolledBack({
           migrationName: migration.name,
           tenantId,
           status: "parked",

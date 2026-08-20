@@ -100,6 +100,51 @@ describe("grants ledger reducer", () => {
     });
   });
 
+  describe("given a resource-tier grant carrying its share terms", () => {
+    const share = grantFact({
+      principal: { type: "anyone", id: null },
+      roleKey: null,
+      scope: { type: "RESOURCE", id: "trace_t1" },
+      resource: {
+        kind: "trace",
+        projectId: "proj_chatbot",
+        token: "tok_1",
+        permission: "traces:view",
+        createdByUserId: "user_alice",
+      },
+      source: "cutover-import",
+      grantId: deriveGrantId({
+        organizationId: ORG,
+        principal: { type: "anyone", id: null },
+        scope: { type: "RESOURCE", id: "trace_t1" },
+        resourceToken: "tok_1",
+        occurredAtMs: OCCURRED_AT,
+      }),
+    });
+
+    describe("when it is attached and later revoked", () => {
+      it("folds and departs like any other fact, terms intact", () => {
+        const attached = apply([
+          { kind: "grant_attached", grant: share, actor: ACTOR },
+        ]);
+        expect(attached.grants[share.grantId]).toEqual(share);
+
+        const revoked = apply(
+          [
+            {
+              kind: "grant_revoked",
+              grantId: share.grantId,
+              actor: ACTOR,
+              occurredAtMs: OCCURRED_AT + 1_000,
+            },
+          ],
+          attached,
+        );
+        expect(revoked.grants[share.grantId]).toBeUndefined();
+      });
+    });
+  });
+
   describe("given a ledger holding a grant", () => {
     const grant = grantFact();
     const attached: GrantsLedgerEvent[] = [
