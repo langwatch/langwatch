@@ -247,7 +247,7 @@ export function mapAuditRecord(record: AuditRecord): NormalizedPullEvent {
     actor: nonHuman ? "" : asString(record.UserId),
     action: asString(record.Operation),
     target: asString(record.AgentId),
-    cost_usd: 0,
+    cost_usd: "0",
     tokens_input: 0,
     tokens_output: 0,
     raw_payload: JSON.stringify(record),

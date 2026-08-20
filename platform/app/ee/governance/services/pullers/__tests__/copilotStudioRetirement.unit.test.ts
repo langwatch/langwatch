@@ -36,21 +36,23 @@ describe("copilot_studio retirement", () => {
 
   /** @scenario "The two known-false copy strings are gone" */
   it("no longer claims a Purview API it never called, nor hashing it never did", () => {
-    const composer = read(
-      "platform/app/ee/governance/dashboard/pages/ingestion-sources.tsx",
+    // The source-type catalog (label/blurb copy) — extracted out of the page
+    // component since this test was first written.
+    const catalog = read(
+      "platform/app/ee/governance/dashboard/components/ingestionSourceCatalog.tsx",
     );
 
     // Claimed the source polls the Purview Audit API. No code ever called it.
-    expect(composer).not.toContain("Polls Microsoft Purview Audit API");
+    expect(catalog).not.toContain("Polls Microsoft Purview Audit API");
     // Claimed the client secret is hashed server-side. Nothing hashed it, and
     // nothing could: the puller has to present the real value to Microsoft.
-    expect(composer).not.toContain(
+    expect(catalog).not.toContain(
       "We hash this server-side; only the hash is persisted.",
     );
 
     // What replaced them names the API that is actually called.
-    expect(composer).toContain("Office 365 Management Activity API");
-    expect(composer).toContain("ActivityFeed.Read");
+    expect(catalog).toContain("Office 365 Management Activity API");
+    expect(catalog).toContain("ActivityFeed.Read");
   });
 
   /** @scenario "Documentation stops describing a poller that has not shipped" */
@@ -105,17 +107,21 @@ describe("copilot_studio retirement", () => {
 describe("ingestion-source picker", () => {
   /** @scenario "copilot_studio can no longer be selected in the picker" */
   it("offers microsoft_365_audit and not the retired source type", () => {
-    const composer = read(
-      "platform/app/ee/governance/dashboard/pages/ingestion-sources.tsx",
+    // The composer builds its picker from SOURCE_TYPE_OPTIONS in the catalog,
+    // so an entry that is not there cannot be selected.
+    const catalog = read(
+      "platform/app/ee/governance/dashboard/components/ingestionSourceCatalog.tsx",
     );
+    expect(catalog).not.toContain('value: "copilot_studio"');
+    expect(catalog).toContain('value: "microsoft_365_audit"');
 
-    // The composer builds its picker from SOURCE_TYPE_OPTIONS, so an entry
-    // that is not there cannot be selected.
-    expect(composer).not.toContain('value: "copilot_studio"');
-    expect(composer).toContain('value: "microsoft_365_audit"');
-
-    // And it is gone from the union type, so a stale value would not typecheck.
-    expect(composer).not.toContain('| "copilot_studio"');
-    expect(composer).toContain('| "microsoft_365_audit"');
+    // And it is gone from the union type, so a stale value would not
+    // typecheck. The union itself lives server-side; the catalog only
+    // re-exports its type.
+    const sourceType = read(
+      "platform/app/ee/governance/services/activity-monitor/ingestionSource.service.ts",
+    );
+    expect(sourceType).not.toContain('| "copilot_studio"');
+    expect(sourceType).toContain('| "microsoft_365_audit"');
   });
 });
