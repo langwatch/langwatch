@@ -144,12 +144,12 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
                 does the same): a `space-between` chip stretched to whatever
                 room the header had, which made the model read as the loudest
                 thing in the editor. `minHeight` keeps it on the same baseline
-                as the size="sm" action buttons beside it.
+                as the action buttons beside it.
               */}
               <HStack
                 gap={1.5}
-                minHeight="32px"
-                paddingY={1}
+                minHeight="24px"
+                paddingY={0.5}
                 paddingX={2}
                 borderRadius="md"
                 border="1px solid"

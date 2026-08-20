@@ -1,6 +1,5 @@
-import { HStack } from "@chakra-ui/react";
+import { Box, HStack, IconButton } from "@chakra-ui/react";
 import { LuColumns2 } from "react-icons/lu";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { AddPromptButton } from "../sidebar/AddPromptButton";
@@ -96,57 +95,67 @@ export function PromptPlaygroundBrowser() {
                 handleTabChange({ windowId: tabbedWindow.id, tabId })
               }
             />
-            {tabbedWindow.id === activeWindowId && (
-              <>
-                <HStack
-                  flexShrink={0}
-                  paddingLeft={1}
-                  position="relative"
-                  _before={{
-                    content: '""',
-                    position: "absolute",
-                    left: "-10px",
-                    top: 0,
-                    bottom: 0,
-                    width: "10px",
-                    height: "50px",
-                    background:
-                      "linear-gradient(to right, transparent, var(--chakra-colors-bg-panel))",
-                    zIndex: 10,
-                    pointerEvents: "none",
-                  }}
+            {/* Strip chrome, not a toolbar: these are secondary to the tabs
+                they sit beside, so they run at the strip's own button scale
+                rather than the editor toolbar's. Opening another prompt is the
+                strip's own gesture and gets the browser's "+" next to the last
+                tab; splitting the pane and starting an experiment act on what
+                is open, so they sit past a hairline, and only the one that
+                leaves the playground keeps a word on it.
+
+                Every pane carries the same set. Showing them on the active pane
+                only made two panes that are otherwise identical disagree about
+                what they can do, and left the user hunting for the controls
+                after clicking into the other one. Pointer-down claims the pane
+                before the button's own click runs, so "+" opens the prompt in
+                the strip the user actually reached for. */}
+            <HStack
+              flexShrink={0}
+              gap={1}
+              paddingRight={2}
+              onPointerDownCapture={() =>
+                setActiveWindow({ windowId: tabbedWindow.id })
+              }
+            >
+              <AddPromptButton iconOnly size="xs" variant="ghost" />
+              <Box
+                width="1px"
+                height="16px"
+                background="border.muted"
+                marginX={0.5}
+              />
+              <Tooltip content="Compare prompts side by side">
+                <IconButton
+                  aria-label="Compare prompts side by side"
+                  size="xs"
+                  variant="ghost"
+                  onClick={() =>
+                    tabbedWindow.activeTabId &&
+                    handleSplit(tabbedWindow.activeTabId)
+                  }
+                  disabled={!tabbedWindow.activeTabId}
                 >
-                  <ExperimentFromPlaygroundButton
-                    iconOnly={windows.length > 1}
-                  />
-                  <Tooltip content="Compare" disabled={windows.length <= 1}>
-                    <PageLayout.HeaderButton
-                      onClick={() =>
-                        tabbedWindow.activeTabId &&
-                        handleSplit(tabbedWindow.activeTabId)
-                      }
-                      disabled={!tabbedWindow.activeTabId}
-                      title="Split tab to compare prompts side by side"
-                    >
-                      <LuColumns2 size="18px" />
-                      {windows.length <= 1 && "Compare"}
-                    </PageLayout.HeaderButton>
-                  </Tooltip>
-                  <AddPromptButton iconOnly={windows.length > 1} />
-                </HStack>
-              </>
-            )}
+                  <LuColumns2 size={14} />
+                </IconButton>
+              </Tooltip>
+              <ExperimentFromPlaygroundButton
+                iconOnly={windows.length > 1}
+                size="xs"
+                variant="outline"
+              />
+            </HStack>
           </DraggableTabsBrowser.TabBar>
           {tabbedWindow.tabs.map((tab) => (
             <TabIdProvider key={tab.id} tabId={tab.id}>
+              {/* The frame — border, radius, surface — belongs to the window
+                  that holds both the strip and this content, so the content
+                  only claims the room inside it. */}
               <DraggableTabsBrowser.Content
                 value={tab.id}
                 height="full"
-                borderRadius="lg"
-                boxShadow="md"
-                background="bg.panel"
                 padding={0}
                 minHeight="0"
+                overflow="hidden"
               >
                 <PromptBrowserWindowContent />
               </DraggableTabsBrowser.Content>

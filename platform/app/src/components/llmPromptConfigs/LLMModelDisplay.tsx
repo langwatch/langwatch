@@ -1,7 +1,10 @@
 import { Box, HStack, type StackProps, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
 
-import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
+import {
+  type modelProviderIcons,
+  ProviderIconGlyph,
+} from "~/components/modelProviders/iconsMap";
 import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { Tooltip } from "../ui/tooltip";
@@ -44,22 +47,21 @@ export function LLMModelDisplay({
     !isLoading &&
     groupedByProvider.length > 0 &&
     !groupedByProvider.some((g) => g.provider === providerKey);
-  // Use a stable provider-icon lookup for the invalid case so the
-  // trigger still shows the right brand mark when the provider row is
-  // gone (modelOption?.icon is null when the provider isn't in the
-  // selector's option list).
-  const iconNode =
-    modelOption?.icon ??
-    (isProviderMissing
-      ? modelProviderIcons[providerKey as keyof typeof modelProviderIcons]
-      : undefined);
+  // The mark is drawn from the model's own provider key rather than from
+  // `modelOption?.icon`, which is the bare SVG: those marks are flat black, so
+  // on the dark theme they landed all but invisible. `ProviderIconGlyph` is the
+  // shared wrapper that inverts the monochrome ones and leaves brand-coloured
+  // marks alone, and it is the same lookup, so it also keeps showing the right
+  // mark when the provider row is gone (`modelOption` is null then).
+  const hasIcon = !!modelOption?.icon || isProviderMissing;
 
   const stack = (
     <HStack align="center" gap={2} {...props}>
-      {iconNode && (
-        <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
-          {iconNode}
-        </Box>
+      {hasIcon && (
+        <ProviderIconGlyph
+          provider={providerKey as keyof typeof modelProviderIcons}
+          size={MODEL_ICON_SIZE}
+        />
       )}
       <VStack gap={0} align="start">
         <OverflownTextWithTooltip

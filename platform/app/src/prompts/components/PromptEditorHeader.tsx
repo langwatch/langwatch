@@ -66,9 +66,15 @@ export function PromptEditorHeader({
     >
       <ModelSelectFieldMini />
       {variant === "full" && (
+        // A compact row. These are the prompt's management actions — publish
+        // it, call it, save a version — and they sat at the same weight as the
+        // prompt itself, which is what the pane is actually for. One primary
+        // (the save) with the rest as quiet outlines, all on the strip's own
+        // button scale.
         <HStack gap={1.5} flexShrink={0}>
           {configId && onVersionRestore && (
             <VersionHistoryButton
+              triggerSize="xs"
               configId={configId}
               currentVersionId={formMethods.watch("versionMetadata")?.versionId}
               onRestoreSuccess={onVersionRestore}
@@ -78,7 +84,7 @@ export function PromptEditorHeader({
           )}
           {configId && handle && project?.id && (
             <>
-              <Button variant="outline" size="sm" onClick={deployDialog.onOpen}>
+              <Button variant="outline" size="xs" onClick={deployDialog.onOpen}>
                 Deploy
               </Button>
               <DeployPromptDialog
@@ -95,7 +101,7 @@ export function PromptEditorHeader({
             apiKey={project?.apiKey}
           >
             <GeneratePromptApiSnippetDialog.Trigger>
-              <GenerateApiSnippetButton hasHandle={!!handle} />
+              <GenerateApiSnippetButton hasHandle={!!handle} size="xs" />
             </GeneratePromptApiSnippetDialog.Trigger>
           </GeneratePromptApiSnippetDialog>
           <SavePromptButton
@@ -103,6 +109,7 @@ export function PromptEditorHeader({
             hasUnsavedChanges={hasUnsavedChanges}
             isValid={isValid}
             isSaving={isSaving}
+            size="xs"
           />
         </HStack>
       )}
