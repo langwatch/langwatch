@@ -300,24 +300,23 @@ describe("selfHostedClickHouseProvisioningStatements", () => {
   // stays green when a single view or its grant goes missing, which is the
   // one failure this test exists to catch. `it.each` so the report names the
   // view that regressed rather than "provisions every catalog view".
-  it.each(LWQL_VIEW_CATALOG.map((view) => [view.name, view] as const))(
-    "provisions the %s view with its own grant",
-    (_name, view) => {
-      const statements = selfHostedStatements();
-      const target = qualified(NAMES, view.name);
+  it.each(
+    LWQL_VIEW_CATALOG.map((view) => [view.name, view] as const),
+  )("provisions the %s view with its own grant", (_name, view) => {
+    const statements = selfHostedStatements();
+    const target = qualified(NAMES, view.name);
 
-      expect(
-        statements.filter(
-          (statement) =>
-            statement.startsWith("CREATE OR REPLACE VIEW") &&
-            statement.includes(target),
-        ),
-      ).toHaveLength(1);
-      expect(statements).toContain(
-        `GRANT SELECT ON ${target} TO ${NAMES.restrictedUser}`,
-      );
-    },
-  );
+    expect(
+      statements.filter(
+        (statement) =>
+          statement.startsWith("CREATE OR REPLACE VIEW") &&
+          statement.includes(target),
+      ),
+    ).toHaveLength(1);
+    expect(statements).toContain(
+      `GRANT SELECT ON ${target} TO ${NAMES.restrictedUser}`,
+    );
+  });
 });
 
 describe("selfHostedPostgresReaderStatements", () => {

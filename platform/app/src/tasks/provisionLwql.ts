@@ -355,7 +355,10 @@ export default async function execute() {
   await withAdminClickHouseClient(async (client) => {
     await runClickHouseStatements({
       client,
-      statements: productionClickHouseObjectStatements({ names, sourceDatabase }),
+      statements: productionClickHouseObjectStatements({
+        names,
+        sourceDatabase,
+      }),
     });
 
     // Fatal, exactly like the views above. The inline sync on project

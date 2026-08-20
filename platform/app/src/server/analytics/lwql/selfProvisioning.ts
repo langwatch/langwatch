@@ -90,6 +90,36 @@ export interface LwqlSelfProvisionEnv {
  * outage, the exact class of misconfiguration self-provisioning exists to
  * remove.
  */
+/**
+ * Whether an explicitly-set `LWQL_CLICKHOUSE_URL` names a different server than
+ * the one self-provisioning derived, which is refused for the same reason
+ * `LWQL_DATABASE` is: provisioning creates the access model on the derived
+ * server, so querying another would find none of it.
+ *
+ * Compared by origin rather than by string — the derived URL is normalised
+ * (trailing slash, credentials and path stripped) and an operator's value
+ * usually is not, so equal servers rarely spell the same. An unparseable value
+ * disagrees with everything, which is the safe direction.
+ */
+function disagreesWithDerivedServer(
+  explicitUrl: string | undefined,
+  derivedOrigin: string,
+): boolean {
+  if (!explicitUrl) return false;
+  let explicitOrigin: string | null = null;
+  try {
+    explicitOrigin = new URL(explicitUrl).origin;
+  } catch {
+    explicitOrigin = null;
+  }
+  if (explicitOrigin === derivedOrigin) return false;
+  logger.error(
+    { derivedOrigin },
+    "LWQL_SELF_PROVISION cannot target a ClickHouse other than CLICKHOUSE_URL's own: provisioning would create the access model on one server while queries ran against another. Unset LWQL_CLICKHOUSE_URL, or configure the five LWQL_* variables explicitly without LWQL_SELF_PROVISION",
+  );
+  return true;
+}
+
 export function lwqlDerivedConnectionFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): LangWatchQLConnection | null {
@@ -143,25 +173,8 @@ export function lwqlDerivedConnectionFromEnv(
   url.pathname = "/";
   url.search = "";
 
-  // Same refusal as `LWQL_DATABASE` above, for the same reason: provisioning
-  // creates the access model on this derived server, so querying a different
-  // one would find none of it. Compared by origin, because the derived URL is
-  // normalised (trailing slash, no credentials) and an operator's value
-  // usually is not.
-  if (env.LWQL_CLICKHOUSE_URL) {
-    let explicitOrigin: string | null = null;
-    try {
-      explicitOrigin = new URL(env.LWQL_CLICKHOUSE_URL).origin;
-    } catch {
-      explicitOrigin = null;
-    }
-    if (explicitOrigin !== url.origin) {
-      logger.error(
-        { derivedOrigin: url.origin },
-        "LWQL_SELF_PROVISION cannot target a ClickHouse other than CLICKHOUSE_URL's own: provisioning would create the access model on one server while queries ran against another. Unset LWQL_CLICKHOUSE_URL, or configure the five LWQL_* variables explicitly without LWQL_SELF_PROVISION",
-      );
-      return null;
-    }
+  if (disagreesWithDerivedServer(env.LWQL_CLICKHOUSE_URL, url.origin)) {
+    return null;
   }
 
   return {
