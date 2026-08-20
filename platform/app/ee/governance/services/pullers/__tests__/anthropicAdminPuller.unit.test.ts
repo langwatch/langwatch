@@ -594,6 +594,31 @@ describe("the Anthropic Admin puller", () => {
       );
     });
 
+    it("never rewinds FORWARD: a backlogged watermark older than the configured start survives", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(USAGE_PAGE));
+
+      await new AnthropicAdminPuller().runOnce(
+        {
+          ...RUN_OPTIONS,
+          // A source that fell behind: legacy cursor, watermark months old.
+          // No configured startingAt, so the rewind target would default to
+          // ~24h ago — snapping forward would silently skip the backlog.
+          cursor: '{"startingAt":"2026-06-01T00:00:00Z","page":null}',
+        },
+        {
+          adapter: "anthropic_admin",
+          report: "usage",
+          bucketWidth: "1d",
+          schedule: "0 * * * *",
+        },
+      );
+
+      const url = String(fetchMock.mock.calls[0]?.[0]);
+      expect(url).toContain(
+        `starting_at=${encodeURIComponent("2026-06-01T00:00:00Z")}`,
+      );
+    });
+
     it("rewinds a drained cost cursor from the 100x era so restatement can repair it", async () => {
       fetchMock.mockResolvedValue(jsonResponse(COST_PAGE));
 

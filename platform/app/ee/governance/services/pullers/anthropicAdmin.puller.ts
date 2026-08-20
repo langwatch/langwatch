@@ -159,12 +159,25 @@ function parseCursor({
       // Also covers cursors minted before query-binding existed (`query`
       // null): this change itself widened the group_by set and fixed the
       // cents→USD conversion, so everything those cursors certify was
-      // written by the old code. Fall through to the configured start —
-      // see the cursorSchema doc for why the watermark must not survive.
+      // written by the old code. Rewind — see the cursorSchema doc for why
+      // the watermark must not survive.
       logger.warn(
         { adapter: ANTHROPIC_ADMIN_ADAPTER_ID, report: config.report },
-        "anthropic admin cursor was minted under a different query; discarding it and re-reading from the configured start",
+        "anthropic admin cursor was minted under a different query; discarding it and re-reading from the start",
       );
+      const configuredStart =
+        config.startingAt ?? defaultStartingAt(config.report);
+      // The EARLIER of the stored watermark and the configured start: the
+      // rewind must never move the watermark FORWARD. A source that fell
+      // behind (paused, erroring) holds a watermark older than the default
+      // window, and snapping it to `configuredStart` would silently skip
+      // everything in between.
+      const watermarkMs = Date.parse(parsed.startingAt);
+      const rewoundStart =
+        Number.isNaN(watermarkMs) || Date.parse(configuredStart) <= watermarkMs
+          ? configuredStart
+          : parsed.startingAt;
+      return { startingAt: rewoundStart, page: null };
     } catch {
       logger.warn(
         { cursor },
