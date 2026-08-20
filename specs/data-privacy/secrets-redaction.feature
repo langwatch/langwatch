@@ -262,6 +262,24 @@ Feature: Redacting secrets from traces
     When the text is redacted
     Then the sentence is left as written
 
+  # `key` names a map entry at least as often as a credential, and JSON
+  # payloads, OTLP attributes and config dictionaries are full of `key` fields
+  # holding ids and hashes. Treating the bare word as proof of a credential
+  # destroyed those values at ingestion, and destroyed them only there: the same
+  # id on its own was correctly kept.
+
+  @unit
+  Scenario: A bare key field holding an identifier is left alone
+    Given a map entry whose name is key and whose value is an identifier
+    When the text is redacted
+    Then the identifier is left as written
+
+  @unit
+  Scenario: A qualified key name is still a credential
+    Given a credential word qualifying key, followed by key material
+    When the text is redacted
+    Then the credential is replaced
+
   # Span content arrives JSON-encoded, so a literal two-character escape sits
   # inside the text. A value allowed to run through one crossed logical lines
   # and slipped past the guards that recognise an environment reference.

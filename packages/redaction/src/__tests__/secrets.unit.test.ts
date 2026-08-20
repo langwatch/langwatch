@@ -597,7 +597,35 @@ describe("redactSecretsInText, given text that only looks like secrets", () => {
       "prose about an authorization header",
       "the Authorization header is attacker-controlled and can be killed",
     ],
+    // A bare `key` field. JSON payloads, OTLP attributes and config
+    // dictionaries all name a map entry `key`, so reading the word itself as
+    // proof of a credential blanked ids and hashes at ingestion. Each of these
+    // is a value the corpus above already keeps on its own, which is what made
+    // the cue the only thing destroying them.
+    ["a key field holding a content hash", `{"key":"${"a1b2c3d4e5f6".repeat(3)}"}`],
+    [
+      "a key field holding a UUID",
+      '{"key":"550e8400-e29b-41d4-a716-446655440000"}',
+    ],
+    ["a key field holding a record id", `{"key":"project_${BODY.slice(0, 29)}"}`],
+    ["a key entry in an OTLP attribute pair", '{"key":"gen_ai.usage.input_tokens"}'],
+    ["a key field in YAML holding a commit", `key: ${"9f8e7d6c5b4a3928".repeat(2)}`],
   ];
+
+  /** @scenario "A bare key field holding an identifier is left alone" */
+  it("keeps a key field whose value is an identifier, on its own and in a map", () => {
+    const hash = "a1b2c3d4e5f6".repeat(3);
+    expect(redact(`{"key":"${hash}"}`).text).toBe(`{"key":"${hash}"}`);
+    expect(redact(`key: ${hash}`).text).toBe(`key: ${hash}`);
+  });
+
+  /** @scenario "A qualified key name is still a credential" */
+  it("still redacts once a credential word qualifies the key", () => {
+    const material = "a1b2c3d4e5f6".repeat(3);
+    for (const name of ["api_key", "secret_key", "apiKey", "x-api-key"]) {
+      expect(redact(`${name}: ${material}`).text).toBe(`${name}: [SECRET]`);
+    }
+  });
 
   /** @scenario "Ordinary identifiers are never mistaken for secrets" */
   it("leaves every one of them exactly as written", () => {

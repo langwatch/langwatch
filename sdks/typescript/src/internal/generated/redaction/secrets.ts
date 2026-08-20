@@ -463,11 +463,51 @@ function isKeyMaterial(value: string): boolean {
 }
 
 /**
+ * Words that turn a bare `key` into a credential. Shared by the name rule and
+ * the free-text cue below, so the two cannot drift: they disagreed once, and
+ * the cue treating an unqualified `key` as proof of a credential meant a map
+ * entry like `{"key":"<content hash>"}` was destroyed at ingestion while the
+ * same value on its own was correctly kept.
+ */
+const CREDENTIAL_QUALIFIERS = new Set([
+  "master",
+  "encryption",
+  "signing",
+  "private",
+  "access",
+  "api",
+  "auth",
+  "secret",
+  "refresh",
+  "session",
+  "bearer",
+  "verification",
+  "webhook",
+  "client",
+  "service",
+  "personal",
+  "root",
+  "admin",
+]);
+
+const QUALIFIER_ALTERNATION = [...CREDENTIAL_QUALIFIERS].join("|");
+
+/**
  * Words that introduce a credential, allowing the compound spellings that show
  * up in prose, environment files and JSON alike (`api key`, `API_KEY`,
  * `x-api-key`, `client_secret`).
+ *
+ * `key` is the one noun that needs a qualifier in front of it. Every other noun
+ * here names a credential on its own, but `key` names a map entry at least as
+ * often as a secret, and JSON, OTLP attributes and config dictionaries are full
+ * of `key` fields holding ids and hashes.
  */
-const CREDENTIAL_KEYWORD = String.raw`(?:x[_.\- ]?)?(?:api|access|auth|client|private|refresh|session|personal|service)?[_.\- ]?(?:api[_.\- ]?)?(?:key|token|secret|password|passwd|pwd|credentials?|authorization|cookie)`;
+const CREDENTIAL_KEYWORD =
+  String.raw`(?:x[_.\- ]?)?(?:` +
+  String.raw`(?:${QUALIFIER_ALTERNATION})[_.\- ]?(?:api[_.\- ]?)?key` +
+  String.raw`|(?:${QUALIFIER_ALTERNATION})?[_.\- ]?(?:api[_.\- ]?)?` +
+  String.raw`(?:token|secret|password|passwd|pwd|credentials?|authorization|cookie)` +
+  String.raw`)`;
 
 /**
  * A base64 payload after `Basic `, as opposed to the English word that follows
@@ -713,32 +753,6 @@ const CREDENTIAL_NOUNS = new Set([
   "credential",
   "credentials",
   "cookie",
-]);
-
-/**
- * Words that turn a bare `key` or `token` into a credential. Without one,
- * `key` and `token` stay ordinary: this is what separates `encryptionKey` and
- * `AccessKeyId` from `idempotency_key` and `cacheKey`.
- */
-const CREDENTIAL_QUALIFIERS = new Set([
-  "master",
-  "encryption",
-  "signing",
-  "private",
-  "access",
-  "api",
-  "auth",
-  "secret",
-  "refresh",
-  "session",
-  "bearer",
-  "verification",
-  "webhook",
-  "client",
-  "service",
-  "personal",
-  "root",
-  "admin",
 ]);
 
 /**
