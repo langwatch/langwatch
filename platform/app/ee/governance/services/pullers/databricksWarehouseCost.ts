@@ -447,11 +447,15 @@ type PricedTotals = {
 };
 
 /** Fold one priced line into its statement's running totals. */
-function foldPricedLine(
-  into: Map<string, PricedTotals>,
-  row: WarehouseCostRow,
-  share: { nanoUsd: bigint; hourNanoUsd: bigint; hourTotalMs: bigint },
-): void {
+function foldPricedLine({
+  into,
+  row,
+  share,
+}: {
+  into: Map<string, PricedTotals>;
+  row: WarehouseCostRow;
+  share: { nanoUsd: bigint; hourNanoUsd: bigint; hourTotalMs: bigint };
+}): void {
   const entry = into.get(row.statementId);
   if (entry) {
     entry.costNanoUsd += share.nanoUsd;
@@ -492,11 +496,18 @@ export function allocateWarehouseCost({
   const owedHours = new Map<string, Set<string>>();
   const pricedHours = new Map<string, Set<string>>();
 
-  const noteHour = (
-    into: Map<string, Set<string>>,
-    statementId: string,
-    usageHour: string,
-  ): void => {
+  // Named on purpose: the two maps this writes to are the same type and mean
+  // opposite things, and a swapped first argument would hold every settled
+  // statement and settle every held one without failing to compile.
+  const noteHour = ({
+    into,
+    statementId,
+    usageHour,
+  }: {
+    into: Map<string, Set<string>>;
+    statementId: string;
+    usageHour: string;
+  }): void => {
     const hours = into.get(statementId);
     if (hours) hours.add(usageHour);
     else into.set(statementId, new Set([usageHour]));
@@ -506,7 +517,11 @@ export function allocateWarehouseCost({
     const share = shareOf(row);
     if (share === "free" || share === "idle") continue;
     if (share === "owed") {
-      noteHour(owedHours, row.statementId, row.usageHour);
+      noteHour({
+        into: owedHours,
+        statementId: row.statementId,
+        usageHour: row.usageHour,
+      });
       continue;
     }
 
@@ -523,8 +538,12 @@ export function allocateWarehouseCost({
       continue;
     }
 
-    noteHour(pricedHours, row.statementId, row.usageHour);
-    foldPricedLine(nanoByStatementId, row, share);
+    noteHour({
+      into: pricedHours,
+      statementId: row.statementId,
+      usageHour: row.usageHour,
+    });
+    foldPricedLine({ into: nanoByStatementId, row, share });
   }
 
   return {
