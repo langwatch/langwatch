@@ -71,13 +71,15 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
-          CHANGED_FILES=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename')
-          export CHANGED_FILES
-          echo "Changed files:"
-          printf '%s\n' "$CHANGED_FILES"
+          # JSON, not newline-delimited names. A path may legally contain a
+          # newline, and splitting on lines would turn one such path into two
+          # records that classify independently — so the file list never
+          # crosses a line-delimited boundary at all.
+          gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate --slurp \
+            > "${RUNNER_TEMP}/changed-files.json"
           echo "Author: $PR_AUTHOR"
           node --experimental-strip-types .github/scripts/guard-deployment-impact.ts \
-            | tee -a "$GITHUB_OUTPUT"
+            "${RUNNER_TEMP}/changed-files.json" | tee -a "$GITHUB_OUTPUT"
 
       - name: Verify deployment-impact section in PR description
         if: steps.manifest-only.outputs.requires_writeup == 'true'

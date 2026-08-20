@@ -5,6 +5,7 @@ import {
   classify,
   isDependencyBot,
   kindOf,
+  parseChangedFiles,
   requiresWriteup,
 } from "./guard-deployment-impact.ts";
 
@@ -93,6 +94,62 @@ describe("given a pull request the deployment-impact check would normally gate",
       });
       assert.equal(requiresWriteup({ files, author: BOT }), true);
       assert.equal(requiresWriteup({ files, author: HUMAN }), true);
+    });
+  });
+});
+
+describe("given a path with unusual but legal whitespace", () => {
+  describe("when a name ends in a space", () => {
+    it("does not let it borrow a lockfile's exemption", () => {
+      // "Chart.lock " is a different file from "Chart.lock". Trimming the two
+      // together would exempt a PR that changed an unrecognised file.
+      assert.equal(kindOf("charts/gateway/Chart.lock "), "other");
+      assert.equal(
+        requiresWriteup({ files: ["charts/gateway/Chart.lock "], author: BOT }),
+        true,
+      );
+    });
+  });
+
+  describe("when a name contains a newline", () => {
+    it("classifies it whole rather than as two records", () => {
+      // Line-delimited transport would split this into "evil" and
+      // "uv.lock"; the second half alone would look exempt.
+      assert.equal(kindOf("services/evil\nuv.lock"), "other");
+      assert.equal(
+        requiresWriteup({ files: ["services/evil\nuv.lock"], author: BOT }),
+        true,
+      );
+    });
+  });
+});
+
+describe("given the JSON the workflow hands the guard", () => {
+  describe("when it is well-formed paginated output", () => {
+    it("flattens the pages and keeps every name byte-exact", () => {
+      const json = JSON.stringify([
+        [{ filename: "services/langevals/uv.lock" }],
+        [{ filename: "charts/gateway/Chart.lock " }],
+      ]);
+      assert.deepEqual(parseChangedFiles(json), [
+        "services/langevals/uv.lock",
+        "charts/gateway/Chart.lock ",
+      ]);
+    });
+  });
+
+  describe("when it is malformed", () => {
+    it("throws rather than waving the pull request through", () => {
+      assert.throws(() => parseChangedFiles("not json"), /did not parse/);
+      assert.throws(() => parseChangedFiles('{"files":[]}'), /not an array/);
+      assert.throws(
+        () => parseChangedFiles(JSON.stringify([[{ sha: "abc" }]])),
+        /no usable filename/,
+      );
+      assert.throws(
+        () => parseChangedFiles(JSON.stringify([[{ filename: "" }]])),
+        /no usable filename/,
+      );
     });
   });
 });
