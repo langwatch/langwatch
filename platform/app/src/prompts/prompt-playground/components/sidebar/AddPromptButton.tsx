@@ -1,3 +1,4 @@
+import type { ButtonProps } from "@chakra-ui/react";
 import { LuPlus } from "react-icons/lu";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -5,7 +6,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
 import { useCreateDraftPrompt } from "../../hooks/useCreateDraftPrompt";
 
-interface AddPromptButtonProps {
+interface AddPromptButtonProps extends ButtonProps {
   iconOnly?: boolean;
 }
 
@@ -15,7 +16,10 @@ interface AddPromptButtonProps {
  * Checks RBAC permissions first; if the check fails, shows the
  * restriction modal instead of creating the draft.
  */
-export function AddPromptButton({ iconOnly }: AddPromptButtonProps) {
+export function AddPromptButton({
+  iconOnly,
+  ...buttonProps
+}: AddPromptButtonProps) {
   const { createDraftPrompt } = useCreateDraftPrompt();
   const { hasPermission } = useOrganizationTeamProject();
   const openLiteMemberRestriction = useUpgradeModalStore(
@@ -31,8 +35,12 @@ export function AddPromptButton({ iconOnly }: AddPromptButtonProps) {
   };
 
   return (
-    <Tooltip content="New Prompt" disabled={!iconOnly}>
-      <PageLayout.HeaderButton onClick={handleClick}>
+    <Tooltip content="New prompt" disabled={!iconOnly}>
+      <PageLayout.HeaderButton
+        onClick={handleClick}
+        aria-label="New prompt"
+        {...buttonProps}
+      >
         <LuPlus size={14} />
         {!iconOnly && "New Prompt"}
       </PageLayout.HeaderButton>

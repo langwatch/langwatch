@@ -85,7 +85,11 @@ export function ResizableDivider({
       alignItems="center"
       justifyContent="center"
       flexShrink={0}
-      marginTop={-2.5}
+      // A band of the pane's own surface, not a transparent strip pulled up
+      // over its neighbours. It used to sit on a negative margin with no
+      // background, so the row showed a few pixels of the bar above it and then
+      // whatever surface was below, with the grip straddling the two.
+      background="bg.panel"
       _before={{
         content: '""',
         position: "absolute",

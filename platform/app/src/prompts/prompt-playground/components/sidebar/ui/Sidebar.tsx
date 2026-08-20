@@ -209,25 +209,34 @@ function SidebarItem({
   }
 
   return (
+    // Selection is a filled row, one step up from the ground the rail sits on,
+    // with the label at full weight. The previous treatment only changed the
+    // text colour, which left the list with no answer to "which one am I
+    // looking at?". Neutral rather than branded: a coloured fill on a list this
+    // dense shouts, and the fill alone already reads as selected. Hover is the
+    // fainter fill, so the two never look alike.
     <Box
       fontSize="sm"
-      color={active ? "blue.fg" : "fg"}
-      bg={active ? "blue.subtle" : "transparent"}
+      color="fg"
+      fontWeight={active ? "medium" : "normal"}
+      bg={active ? "bg.muted" : "transparent"}
       borderRadius="md"
       cursor="pointer"
-      _hover={{ bg: active ? "blue.muted" : "bg.muted" }}
+      _hover={{ bg: active ? "bg.muted" : "bg.subtle" }}
       onClick={onClick}
       display="flex"
       alignItems="center"
       gap={2}
       width="full"
+      paddingX={2}
+      paddingY={1}
       {...props}
     >
       {icon && (
         <Box
           width="16px"
+          height="16px"
           borderRadius="full"
-          bg="bg.muted"
           display="flex"
           alignItems="center"
           justifyContent="center"

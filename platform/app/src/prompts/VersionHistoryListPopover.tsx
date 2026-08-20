@@ -3,6 +3,7 @@ import {
   Box,
   type BoxProps,
   Button,
+  type ButtonProps,
   HStack,
   Separator,
   Spinner,
@@ -305,14 +306,19 @@ function VersionHistoryList({
 function VersionHistoryTrigger({
   onClick,
   label,
+  size = "sm",
 }: {
   onClick?: () => void;
   label?: string;
+  size?: ButtonProps["size"];
 }) {
   return (
     <Popover.Trigger asChild onClick={onClick}>
+      {/* Sized with the row it lives in — the unsized default stood a notch
+          taller than everything beside it. */}
       <Button
         variant="ghost"
+        size={size}
         color="fg.muted"
         minWidth={0}
         data-testid="version-history-button"
@@ -372,6 +378,7 @@ function VersionHistoryPopover({
   hasUnsavedChanges,
   currentVersionId,
   label,
+  triggerSize,
 }: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -381,10 +388,11 @@ function VersionHistoryPopover({
   hasUnsavedChanges?: boolean;
   currentVersionId?: string;
   label?: string;
+  triggerSize?: ButtonProps["size"];
 }) {
   return (
     <Popover.Root open={isOpen} onOpenChange={({ open }) => onOpenChange(open)}>
-      <VersionHistoryTrigger label={label} />
+      <VersionHistoryTrigger label={label} size={triggerSize} />
       {isOpen && (
         <VersionHistoryContent
           onRestore={onRestore}
@@ -408,6 +416,7 @@ export function VersionHistoryListPopover({
   hasUnsavedChanges,
   label,
   initialOpen,
+  triggerSize,
 }: {
   configId: string;
   /** The versionId of the version currently being edited. If not provided, defaults to latest. */
@@ -417,6 +426,8 @@ export function VersionHistoryListPopover({
   label?: string;
   /** When true the popover opens automatically on first render. */
   initialOpen?: boolean;
+  /** Matches the button row the trigger sits in. */
+  triggerSize?: ButtonProps["size"];
 }) {
   const { open, setOpen, onClose } = useDisclosure();
 
@@ -489,6 +500,7 @@ export function VersionHistoryListPopover({
       hasUnsavedChanges={hasUnsavedChanges}
       currentVersionId={currentVersionId}
       label={label}
+      triggerSize={triggerSize}
     />
   );
 }
