@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { env } from "~/env.mjs";
 /**
  * CliBootstrapService - shared logic for the login-completion ceremony.
  * Returns the member's available AI tools (coding assistants they can run),
@@ -21,8 +22,6 @@
  * personal workspace yet (fresh login flow, no VK provisioning yet).
  */
 import type { PrismaClient } from "~/generated/prisma/client";
-
-import { env } from "~/env.mjs";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import {
   type BudgetOverviewForUser,

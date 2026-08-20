@@ -419,7 +419,8 @@ export async function teardownBudgetOverviewFixture(): Promise<void> {
       });
     }
   }
-  if (redisConnection) await redisConnection.del(`lwcli:access:${ACCESS_TOKEN}`);
+  if (redisConnection)
+    await redisConnection.del(`lwcli:access:${ACCESS_TOKEN}`);
   await prisma.gatewayBudget.deleteMany({
     where: { organizationId: ORG_ID },
   });

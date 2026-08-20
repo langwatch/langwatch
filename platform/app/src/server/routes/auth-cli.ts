@@ -1259,7 +1259,10 @@ secured.access(CLI_POLICY).get("/budget-overview", async (c: Context) => {
       401,
     );
   }
-  const service = BudgetOverviewService.create(prisma, getApp().gateway.budgets);
+  const service = BudgetOverviewService.create(
+    prisma,
+    getApp().gateway.budgets,
+  );
   const result = await service.overviewForUser({
     userId: tokenRecord.user_id,
     organizationId: tokenRecord.organization_id,
