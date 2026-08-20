@@ -73,11 +73,6 @@ import type {
   OrganizationMemberFact,
   RoleHeadRow,
 } from "./authz-migration.repository";
-import {
-  type ConvergencePoll,
-  convergenceTimeoutMs,
-  DEFAULT_CONVERGENCE_POLL,
-} from "./convergence-poll";
 import { GRANTS_GENESIS_IMPORT_MIGRATION_NAME } from "./genesis-import.name";
 import { deriveGrantId } from "./ledger/grant-identity";
 import type {
@@ -134,8 +129,6 @@ export type GenesisImportDeps = {
   repository: AuthzGenesisRepository;
   ledger: GrantsLedgerEmitter;
   now: () => number;
-  /** How long to wait for the projection to land the import before parking. */
-  poll?: ConvergencePoll;
 };
 
 export class GrantsGenesisImportMigration implements SystemMigration {
@@ -202,12 +195,6 @@ export class GrantsGenesisImportMigration implements SystemMigration {
       roles,
       bindingGrants,
       orgFacts,
-      signal,
-    });
-    await this.awaitConvergence({
-      organizationId,
-      grantIds: [...expectedGrantIds],
-      roleIds: roles.map((role) => role.roleId),
       signal,
     });
     await this.reconcileRevocations({
@@ -305,9 +292,10 @@ export class GrantsGenesisImportMigration implements SystemMigration {
    * roles get the same treatment against the Role head; `system_api_key`
    * roles are never legacy-sourced and are left alone.
    *
-   * Runs after `awaitConvergence` so the just-emitted attaches have already
-   * landed - reading the head before that would misread work in flight as
-   * drift and revoke facts this very pass just asked for.
+   * Safe without waiting on the projection: it revokes only ids the head
+   * ALREADY carries and this pass's legacy rows no longer name. A fact
+   * emitted moments ago is not in the head yet, so work in flight is never
+   * mistaken for a stale row — it is simply not a candidate.
    */
   private async reconcileRevocations({
     organizationId,
@@ -360,106 +348,6 @@ export class GrantsGenesisImportMigration implements SystemMigration {
         actor: GENESIS_ACTOR,
         occurredAtMs,
       });
-    }
-    await this.awaitRevocationConvergence({
-      organizationId,
-      staleGrantIds,
-      staleRoleIds,
-      signal,
-    });
-  }
-
-  /**
-   * Block until the head no longer carries the facts just revoked - the
-   * deny-direction twin of `awaitConvergence`, waiting for absence rather
-   * than presence. Timing out throws: the tenant parks, and the proof would
-   * otherwise report the still-landing revocation as fresh drift.
-   */
-  private async awaitRevocationConvergence({
-    organizationId,
-    staleGrantIds,
-    staleRoleIds,
-    signal,
-  }: {
-    organizationId: string;
-    staleGrantIds: string[];
-    staleRoleIds: string[];
-    signal?: AbortSignal;
-  }): Promise<void> {
-    if (staleGrantIds.length === 0 && staleRoleIds.length === 0) return;
-    const poll = this.deps.poll ?? DEFAULT_CONVERGENCE_POLL;
-    const timeoutMs = convergenceTimeoutMs({
-      poll,
-      factCount: staleGrantIds.length + staleRoleIds.length,
-    });
-    const deadline = this.deps.now() + timeoutMs;
-    for (;;) {
-      this.assertNotAborted(signal);
-      const [genesisGrantIds, roleHeads] = await Promise.all([
-        this.deps.repository.findGenesisOwnedGrantHeadIds({ organizationId }),
-        this.deps.repository.findRoleHeads({ organizationId }),
-      ]);
-      const grants = new Set(genesisGrantIds);
-      const roles = new Set(roleHeads.map((head) => head.id));
-      if (
-        staleGrantIds.every((id) => !grants.has(id)) &&
-        staleRoleIds.every((id) => !roles.has(id))
-      ) {
-        return;
-      }
-      if (this.deps.now() >= deadline) {
-        throw new Error(
-          `grants projection did not clear ${staleGrantIds.length + staleRoleIds.length} stale genesis fact(s) for ${organizationId} within ${timeoutMs}ms; tenant parked for retry`,
-        );
-      }
-      await new Promise((resolve) => setTimeout(resolve, poll.intervalMs));
-    }
-  }
-
-  /**
-   * Block until every emitted fact is in the heads. The proof reads the
-   * compat rows the fold writes, so sweeping early would report drift for
-   * work that is merely in flight. Timing out throws: the tenant parks, and
-   * the next pass waits again against events that are already durable.
-   */
-  private async awaitConvergence({
-    organizationId,
-    grantIds,
-    roleIds,
-    signal,
-  }: {
-    organizationId: string;
-    grantIds: string[];
-    roleIds: string[];
-    signal?: AbortSignal;
-  }): Promise<void> {
-    if (grantIds.length === 0 && roleIds.length === 0) return;
-    const poll = this.deps.poll ?? DEFAULT_CONVERGENCE_POLL;
-    const timeoutMs = convergenceTimeoutMs({
-      poll,
-      factCount: grantIds.length + roleIds.length,
-    });
-    const deadline = this.deps.now() + timeoutMs;
-    for (;;) {
-      this.assertNotAborted(signal);
-      const [presentGrantIds, roleHeads] = await Promise.all([
-        this.deps.repository.findGrantHeadIds({ organizationId }),
-        this.deps.repository.findRoleHeads({ organizationId }),
-      ]);
-      const grants = new Set(presentGrantIds);
-      const roles = new Set(roleHeads.map((head) => head.id));
-      if (
-        grantIds.every((id) => grants.has(id)) &&
-        roleIds.every((id) => roles.has(id))
-      ) {
-        return;
-      }
-      if (this.deps.now() >= deadline) {
-        throw new Error(
-          `grants projection did not land the genesis import for ${organizationId} within ${timeoutMs}ms; tenant parked for retry`,
-        );
-      }
-      await new Promise((resolve) => setTimeout(resolve, poll.intervalMs));
     }
   }
 

@@ -34,12 +34,13 @@ const commandIdentitySchema = z.object({
  * Every command payload in this ledger carries the identity block AND the
  * invariant that makes it one ledger: `tenantId === organizationId`.
  *
- * The two are not interchangeable downstream — the emitted event takes its
- * `tenantId` from the command envelope and its `aggregateId` from
- * `organizationId` — so a caller that wired them to different values would
- * persist the event under one tenant's stream and fold it into a different
- * organization's projection. Nothing later in the pipeline can detect that,
- * which is why it is refused at the wire boundary.
+ * The organization is the TENANT of both aggregates (ADR-101) — the stream
+ * an event is persisted under and the routing key that places it. It is the
+ * AGGREGATE of only `authz_org_policy`; a grant command's aggregate is its
+ * own grant id. A caller that wired tenantId and organizationId to different
+ * values would persist the event under one tenant's stream and fold it into
+ * a different organization's projection, and nothing later in the pipeline
+ * can detect that, which is why it is refused at the wire boundary.
  */
 function commandDataSchema<Shape extends z.ZodRawShape>(shape: Shape) {
   return commandIdentitySchema
@@ -76,11 +77,18 @@ export const attachGrantEntrySchema = z
   });
 export type AttachGrantEntry = z.infer<typeof attachGrantEntrySchema>;
 
-export const attachGrantsCommandDataSchema = commandDataSchema({
-  grants: z.array(attachGrantEntrySchema).min(1),
+/**
+ * One command, one grant, one aggregate (ADR-101). The batched form this
+ * replaces emitted an event per entry onto a single organization-wide
+ * aggregate; with the grant as the aggregate a batch would have to straddle
+ * hundreds of them, so the import sends one of these per grant instead. They
+ * are independent and fold concurrently, which is the point.
+ */
+export const attachGrantCommandDataSchema = commandDataSchema({
+  grant: attachGrantEntrySchema,
 });
-export type AttachGrantsCommandData = z.infer<
-  typeof attachGrantsCommandDataSchema
+export type AttachGrantCommandData = z.infer<
+  typeof attachGrantCommandDataSchema
 >;
 
 export const changeGrantRoleCommandDataSchema = commandDataSchema({
@@ -119,13 +127,27 @@ export const revokeGrantEntrySchema = z
   );
 export type RevokeGrantEntry = z.infer<typeof revokeGrantEntrySchema>;
 
-export const revokeGrantsCommandDataSchema = commandDataSchema({
-  revocations: z.array(revokeGrantEntrySchema).min(1),
+/**
+ * One revocation, one aggregate (ADR-101). A revoke names its grant id and
+ * nothing else: a selector cannot address an aggregate, so resolving "every
+ * grant this principal holds at this scope" into ids is the caller's job now.
+ *
+ * Two things make that safe rather than a hole. Grant ids are derived from
+ * content, so a caller that knows the fact can derive its id without reading
+ * the lagging projection at all. And where the set genuinely is not known —
+ * offboarding — the deny is enforced synchronously against the projection
+ * before the call returns (the sanctioned direct write, ADR-092 decision 7),
+ * so access ends immediately and these events are the durable record rather
+ * than the mechanism.
+ */
+export const revokeGrantCommandDataSchema = commandDataSchema({
+  grantId: z.string().min(1),
+  reason: z.string().min(1).optional(),
   actor: grantsLedgerActorSchema,
   occurredAtMs: z.number().int().nonnegative(),
 });
-export type RevokeGrantsCommandData = z.infer<
-  typeof revokeGrantsCommandDataSchema
+export type RevokeGrantCommandData = z.infer<
+  typeof revokeGrantCommandDataSchema
 >;
 
 export const defineRoleEntrySchema = z.object({

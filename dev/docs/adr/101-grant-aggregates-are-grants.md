@@ -165,10 +165,26 @@ none of them needs atomicity to be correct:
 
 - A grant naming a role that no longer exists resolves to the empty permission
   list, which grants nothing. The unsafe direction is denied by construction.
-- Offboarding fans out into one revoke command per grant. It was never a
-  single atomic fact; it was a loop that happened to run inside one aggregate.
 - The deny sweep is a reconciliation over a read model. It is a query and a
   set of compensating commands, which is what it already was in substance.
+- Offboarding fans out into one revoke command per grant.
+
+Offboarding needs care, because the organization aggregate was carrying a
+safety property that is easy to drop by accident. `offboardMember` documents
+it: *"The fold sweeps by principal, so an incomplete list cannot leave the
+member holding access."* A caller that missed a grant was still safe, because
+the fold held the whole organization's state and swept it. Per-grant
+aggregates have no organization-wide state to sweep, so that guarantee does
+not survive the split on its own.
+
+We keep it by moving the guarantee to where it was always strongest: the
+synchronous projection write. ADR-092 decision 7 already sanctions exactly one
+direct projection write for revocation, so that the deny holds before the call
+returns even with the queue stopped. Offboarding uses it, sweeping by
+principal against the projection, and the ledger events become the durable
+record rather than the enforcement mechanism. Access ends synchronously; the
+history catches up. Anything less would trade a security property for a
+performance one.
 
 What we give up is the ability to enforce a cross-grant invariant
 transactionally, should one ever appear. That is a real loss and we take it
