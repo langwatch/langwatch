@@ -148,6 +148,30 @@ function isStoredObjectUrl(url: string): boolean {
   return url.startsWith("/api/files/") && !url.includes("..");
 }
 
+/**
+ * `[image/png, 12345 bytes]` is what an engine writes in place of an attachment
+ * it decided not to carry into the trace, most often because the payload was
+ * too large for the collector's body limit.
+ *
+ * Reading it matters because the alternative is worse than saying nothing: the
+ * summary sits where a URL belongs, fails the scheme allowlist, and renders as
+ * "no longer available", which sends the reader looking for bytes that were
+ * never stored. Recognising the shape lets the renderer say what actually
+ * happened, and it does so for traces already captured as well as new ones.
+ */
+export interface NotCapturedMedia {
+  mediaType: string;
+  sizeBytes: number;
+}
+
+const NOT_CAPTURED_SUMMARY = /^\[([^,\]]+),\s*(\d+)\s*bytes\]$/;
+
+export function parseNotCapturedMedia(value: string): NotCapturedMedia | null {
+  const match = NOT_CAPTURED_SUMMARY.exec(value.trim());
+  if (!match?.[1] || !match[2]) return null;
+  return { mediaType: match[1], sizeBytes: Number(match[2]) };
+}
+
 /** Map a single raw content part to `MediaPartData`, or null when it is not media. */
 export function mediaPartToMediaData(part: unknown): MediaPartData | null {
   const result = visitContentPart<MediaPartData | null>(part, {

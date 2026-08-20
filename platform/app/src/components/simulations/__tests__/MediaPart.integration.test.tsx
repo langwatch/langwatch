@@ -290,6 +290,35 @@ describe("<MediaPart/>", () => {
     });
   });
 
+  describe("when the part holds a size summary instead of the media", () => {
+    /** @scenario Media the pipeline chose not to capture says so, and says how large it was */
+    it("says the media was not captured, and how large it was", () => {
+      render(
+        <MediaPart
+          part={{
+            type: "image",
+            source: {
+              type: "url",
+              // What an engine writes in place of an attachment it decided was
+              // too large to carry into the trace.
+              value: "[image/jpeg, 2624 bytes]",
+            },
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const placeholder = screen.getByTestId("media-part-not-captured");
+      expect(placeholder).toHaveTextContent("was too large to capture");
+      expect(placeholder).toHaveTextContent("2.56KB");
+      // "no longer available" would send the reader looking for bytes that
+      // were never stored.
+      expect(
+        screen.queryByTestId("media-part-missing"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe("when the tRPC probe returns status: 'not_found' (row never existed)", () => {
     /** @scenario "A recording whose bytes are gone shows an unavailable state, not a dead player" */
     it("renders a missing-badge placeholder (same UX as blob-gone)", async () => {

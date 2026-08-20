@@ -10,6 +10,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import type { TraceMediaRef } from "~/shared/traces/media-refs";
 import { IOPreview } from "../IOPreview";
 
 // Compact vs comfortable is gated by the density store; force compact so
@@ -24,10 +25,19 @@ vi.mock("../../../hooks/useDensityTokens", () => ({
   useDensityTokens: () => ({ ioFontSize: "11px" }),
 }));
 
-function renderPreview(input: string | null, output: string | null) {
+function renderPreview(
+  input: string | null,
+  output: string | null,
+  mediaRefs?: { input?: TraceMediaRef[]; output?: TraceMediaRef[] },
+) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <IOPreview input={input} output={output} />
+      <IOPreview
+        input={input}
+        output={output}
+        inputMediaRefs={mediaRefs?.input}
+        outputMediaRefs={mediaRefs?.output}
+      />
     </ChakraProvider>,
   );
 }
@@ -117,6 +127,42 @@ describe("IOPreview media badges", () => {
       expect(
         text.compareDocumentPosition(thumb) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
+    });
+  });
+
+  describe("given summary refs and the flattened text a real row carries", () => {
+    /** @scenario "The trace list shows the thumbnail when only a child span carries the image" */
+    it("draws the thumbnail from the refs", () => {
+      // What the list actually receives: ComputedInput is flattened text with
+      // the media parts already stripped, so the refs the fold derived are the
+      // only thing that can put a thumbnail on the row. The image itself lives
+      // on a child model-call span the list never loads.
+      const { getByTestId } = renderPreview("what is this?", null, {
+        input: [{ kind: "image", url: "/api/files/p1/child-img", role: "user" }],
+      });
+
+      expect(getByTestId("io-preview-thumbnail")).toHaveAttribute(
+        "src",
+        "/api/files/p1/child-img",
+      );
+    });
+
+    it("marks audio and attachments from the refs too", () => {
+      const { getByTestId } = renderPreview("listen to this", null, {
+        input: [
+          { kind: "audio", url: "/api/files/p1/a1", role: "user" },
+          {
+            kind: "file",
+            url: "/api/files/p1/f1",
+            filename: "report.pdf",
+            mimeType: "application/pdf",
+            role: "user",
+          },
+        ],
+      });
+
+      expect(getByTestId("io-preview-audio")).toBeInTheDocument();
+      expect(getByTestId("io-preview-attachment")).toBeInTheDocument();
     });
   });
 

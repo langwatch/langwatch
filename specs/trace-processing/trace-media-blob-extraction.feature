@@ -124,6 +124,17 @@ Feature: Trace media blob extraction at the ingestion edge
     And no second copy is written to storage
 
   @integration
+  Scenario: The same bytes in two attributes of one span are stored once
+    Given a span that carries the same image both in its chat content and in a
+      prompt-variables attribute, as a managed-prompt run does
+    When the span is ingested
+    Then both attributes reference the same stored object id
+    And only one copy is written to storage
+    # The engine compiles the prompt from the dataset value and then sends the
+    # message, so the same picture legitimately appears twice in one span. It
+    # must cost one object, not two.
+
+  @integration
   Scenario: Extraction before the spool check keeps the queue light
     Given a span whose only oversized content is a 2 MB inline audio part
     When the span is ingested with the ADR-022 spool also enabled
