@@ -1,0 +1,446 @@
+/**
+ * Unit tests for EvaluatorService field computation logic.
+ *
+ * Tests the service layer's ability to compute fields for:
+ * - Built-in evaluators (from AVAILABLE_EVALUATORS)
+ * - Workflow evaluators (from workflow DSL)
+ */
+
+import { describe, expect, it, vi } from "vitest";
+import type { Evaluator, PrismaClient } from "~/generated/prisma/client";
+import type { EvaluatorRepository } from "../evaluator.repository";
+import {
+  EvaluatorService,
+  STANDARD_EVALUATOR_OUTPUT_FIELDS,
+} from "../evaluator.service";
+
+// Mock AVAILABLE_EVALUATORS
+vi.mock("~/server/evaluations/evaluators", () => ({
+  AVAILABLE_EVALUATORS: {
+    "langevals/exact_match": {
+      name: "Exact Match",
+      requiredFields: ["output", "expected_output"],
+      optionalFields: [],
+      result: {
+        passed: { description: "True if output matches expected" },
+      },
+    },
+    "langevals/llm_boolean": {
+      name: "LLM Boolean",
+      requiredFields: [],
+      optionalFields: ["input", "output", "contexts"],
+      result: {
+        passed: { description: "The verdict given by the LLM" },
+      },
+    },
+    "ragas/response_relevancy": {
+      name: "Answer Relevancy",
+      requiredFields: ["input", "output"],
+      optionalFields: ["contexts", "expected_contexts"],
+      result: {
+        score: { description: "Relevancy score" },
+      },
+    },
+    "presidio/pii_detection": {
+      name: "PII Detection",
+      requiredFields: ["input"],
+      optionalFields: ["conversation"],
+      result: {
+        score: { description: "Number of PII entities found" },
+        passed: { description: "Whether PII was detected" },
+        label: { description: "Types of PII found" },
+      },
+    },
+  },
+}));
+
+describe("STANDARD_EVALUATOR_OUTPUT_FIELDS", () => {
+  it("does not include details (regression: sticky details bug #2514)", () => {
+    const identifiers = STANDARD_EVALUATOR_OUTPUT_FIELDS.map(
+      (f) => f.identifier,
+    );
+    expect(identifiers).not.toContain("details");
+  });
+
+  it("includes passed, score, and label only", () => {
+    expect(STANDARD_EVALUATOR_OUTPUT_FIELDS).toEqual([
+      { identifier: "passed", type: "bool" },
+      { identifier: "score", type: "float" },
+      { identifier: "label", type: "str" },
+    ]);
+  });
+});
+
+describe("EvaluatorService", () => {
+  describe("field computation for built-in evaluators", () => {
+    it("computes required fields correctly", async () => {
+      const mockPrisma = {} as PrismaClient;
+      const mockRepository = {
+        findById: vi.fn().mockResolvedValue({
+          id: "eval-1",
+          type: "evaluator",
+          config: { evaluatorType: "langevals/exact_match" },
+        } as unknown as Evaluator),
+      } as unknown as EvaluatorRepository;
+
+      const service = new EvaluatorService(mockPrisma, mockRepository);
+      const result = await service.getByIdWithFields({
+        id: "eval-1",
+        projectId: "proj-1",
+      });
+
+      expect(result).not.toBeNull();
+      expect(result!.fields).toEqual([
+        { identifier: "output", type: "str" },
+        { identifier: "expected_output", type: "str" },
+      ]);
+    });
+
+    it("computes optional fields with optional flag", async () => {
+      const mockPrisma = {} as PrismaClient;
+      const mockRepository = {
+        findById: vi.fn().mockResolvedValue({
+          id: "eval-2",
+          type: "evaluator",
+          config: { evaluatorType: "langevals/llm_boolean" },
+        } as unknown as Evaluator),
+      } as unknown as EvaluatorRepository;
+
+      const service = new EvaluatorService(mockPrisma, mockRepository);
+      const result = await service.getByIdWithFields({
+        id: "eval-2",
+        projectId: "proj-1",
+      });
+
+      expect(result).not.toBeNull();
+      expect(result!.fields).toEqual([
+        { identifier: "input", type: "str", optional: true },
+        { identifier: "output", type: "str", optional: true },
+        { identifier: "contexts", type: "list", optional: true },
+      ]);
+    });
+
+    it("maps contexts and expected_contexts to list type", async () => {
+      const mockPrisma = {} as PrismaClient;
+      const mockRepository = {
+        findById: vi.fn().mockResolvedValue({
+          id: "eval-3",
+          type: "evaluator",
+          config: { evaluatorType: "ragas/response_relevancy" },
+        } as unknown as Evaluator),
+      } as unknown as EvaluatorRepository;
+
+      const service = new EvaluatorService(mockPrisma, mockRepository);
+      const result = await service.getByIdWithFields({
+        id: "eval-3",
+        projectId: "proj-1",
+      });
+
+      expect(result).not.toBeNull();
+      expect(result!.fields).toEqual([
+        { identifier: "input", type: "str" },
+        { identifier: "output", type: "str" },
+        { identifier: "contexts", type: "list", optional: true },
+        { identifier: "expected_contexts", type: "list", optional: true },
+      ]);
+    });
+
+    it("maps conversation to list type", async () => {
+      const mockPrisma = {} as PrismaClient;
+      const mockRepository = {
+        findById: vi.fn().mockResolvedValue({
+          id: "eval-4",
+          type: "evaluator",
+          config: { evaluatorType: "presidio/pii_detection" },
+        } as unknown as Evaluator),
+      } as unknown as EvaluatorRepository;
+
+      const service = new EvaluatorService(mockPrisma, mockRepository);
+      const result = await service.getByIdWithFields({
+        id: "eval-4",
+        projectId: "proj-1",
+      });
+
+      expect(result).not.toBeNull();
+      expect(result!.fields).toContainEqual({
+        identifier: "conversation",
+        type: "list",
+        optional: true,
+      });
+    });
+
+    it("returns empty fields for unknown evaluator type", async () => {
+      const mockPrisma = {} as PrismaClient;
+      const mockRepository = {
+        findById: vi.fn().mockResolvedValue({
+          id: "eval-5",
+          type: "evaluator",
+          config: { evaluatorType: "unknown/evaluator" },
+        } as unknown as Evaluator),
+      } as unknown as EvaluatorRepository;
+
+      const service = new EvaluatorService(mockPrisma, mockRepository);
+      const result = await service.getByIdWithFields({
+        id: "eval-5",
+        projectId: "proj-1",
+      });
+
+      expect(result).not.toBeNull();
+      expect(result!.fields).toEqual([]);
+    });
+
+    it("computes output fields with only passed for exact_match (no sticky details)", async () => {
+      const mockPrisma = {} as PrismaClient;
+      const mockRepository = {
+        findById: vi.fn().mockResolvedValue({
+          id: "eval-1",
+          type: "evaluator",
+          config: { evaluatorType: "langevals/exact_match" },
+        } as unknown as Evaluator),
+      } as unknown as EvaluatorRepository;
+
+      const service = new EvaluatorService(mockPrisma, mockRepository);
+      const result = await service.getByIdWithFields({
+        id: "eval-1",
+        projectId: "proj-1",
+      });
+
+      expect(result!.outputFields).toEqual([
+        { identifier: "passed", type: "bool" },
+      ]);
+    });
+
+    it("computes output fields with only score for ragas (no sticky details)", async () => {
+      const mockPrisma = {} as PrismaClient;
+      const mockRepository = {
+        findById: vi.fn().mockResolvedValue({
+          id: "eval-3",
+          type: "evaluator",
+          config: { evaluatorType: "ragas/response_relevancy" },
+        } as unknown as Evaluator),
+      } as unknown as EvaluatorRepository;
+
+      const service = new EvaluatorService(mockPrisma, mockRepository);
+      const result = await service.getByIdWithFields({
+        id: "eval-3",
+        projectId: "proj-1",
+      });
+
+      expect(result!.outputFields).toEqual([
+        { identifier: "score", type: "float" },
+      ]);
+    });
+
+    it("computes output fields for PII detection (score + passed + label, no sticky details)", async () => {
+      const mockPrisma = {} as PrismaClient;
+      const mockRepository = {
+        findById: vi.fn().mockResolvedValue({
+          id: "eval-4",
+          type: "evaluator",
+          config: { evaluatorType: "presidio/pii_detection" },
+        } as unknown as Evaluator),
+      } as unknown as EvaluatorRepository;
+
+      const service = new EvaluatorService(mockPrisma, mockRepository);
+      const result = await service.getByIdWithFields({
+        id: "eval-4",
+        projectId: "proj-1",
+      });
+
+      expect(result!.outputFields).toEqual([
+        { identifier: "score", type: "float" },
+        { identifier: "passed", type: "bool" },
+        { identifier: "label", type: "str" },
+      ]);
+    });
+
+    it("falls back to standard output fields for unknown evaluator type", async () => {
+      const mockPrisma = {} as PrismaClient;
+      const mockRepository = {
+        findById: vi.fn().mockResolvedValue({
+          id: "eval-5",
+          type: "evaluator",
+          config: { evaluatorType: "unknown/evaluator" },
+        } as unknown as Evaluator),
+      } as unknown as EvaluatorRepository;
+
+      const service = new EvaluatorService(mockPrisma, mockRepository);
+      const result = await service.getByIdWithFields({
+        id: "eval-5",
+        projectId: "proj-1",
+      });
+
+      expect(result!.outputFields).toEqual([
+        { identifier: "passed", type: "bool" },
+        { identifier: "score", type: "float" },
+        { identifier: "label", type: "str" },
+      ]);
+    });
+
+    it("returns null for non-existent evaluator", async () => {
+      const mockPrisma = {} as PrismaClient;
+      const mockRepository = {
+        findById: vi.fn().mockResolvedValue(null),
+      } as unknown as EvaluatorRepository;
+
+      const service = new EvaluatorService(mockPrisma, mockRepository);
+      const result = await service.getByIdWithFields({
+        id: "non-existent",
+        projectId: "proj-1",
+      });
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("field computation for workflow evaluators", () => {
+    it("computes fields from workflow entry node outputs", async () => {
+      const findFirst = vi.fn().mockResolvedValue({
+        id: "wf-1",
+        currentVersion: {
+          dsl: {
+            nodes: [
+              {
+                id: "entry",
+                type: "entry",
+                data: {
+                  outputs: [
+                    { identifier: "question", type: "str" },
+                    { identifier: "context", type: "str" },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      });
+      const mockPrisma = {
+        workflow: {
+          findFirst,
+        },
+      } as unknown as PrismaClient;
+
+      const mockRepository = {
+        findById: vi.fn().mockResolvedValue({
+          id: "eval-wf",
+          projectId: "proj-1",
+          type: "workflow",
+          workflowId: "wf-1",
+          config: {},
+        } as unknown as Evaluator),
+      } as unknown as EvaluatorRepository;
+
+      const service = new EvaluatorService(mockPrisma, mockRepository);
+      const result = await service.getByIdWithFields({
+        id: "eval-wf",
+        projectId: "proj-1",
+      });
+
+      expect(result).not.toBeNull();
+      // Workflow fields are all required (no optional flag)
+      expect(result!.fields).toEqual([
+        { identifier: "question", type: "str" },
+        { identifier: "context", type: "str" },
+      ]);
+      expect(findFirst).toHaveBeenCalledWith({
+        where: {
+          id: "wf-1",
+          projectId: "proj-1",
+          archivedAt: null,
+        },
+        include: { currentVersion: true },
+      });
+    });
+
+    it("returns empty fields for workflow without DSL", async () => {
+      const mockPrisma = {
+        workflow: {
+          findFirst: vi.fn().mockResolvedValue({
+            id: "wf-2",
+            currentVersion: null,
+          }),
+        },
+      } as unknown as PrismaClient;
+
+      const mockRepository = {
+        findById: vi.fn().mockResolvedValue({
+          id: "eval-wf-2",
+          projectId: "proj-1",
+          type: "workflow",
+          workflowId: "wf-2",
+          config: {},
+        } as unknown as Evaluator),
+      } as unknown as EvaluatorRepository;
+
+      const service = new EvaluatorService(mockPrisma, mockRepository);
+      const result = await service.getByIdWithFields({
+        id: "eval-wf-2",
+        projectId: "proj-1",
+      });
+
+      expect(result).not.toBeNull();
+      expect(result!.fields).toEqual([]);
+    });
+
+    it("returns empty fields for non-existent workflow", async () => {
+      const mockPrisma = {
+        workflow: {
+          findFirst: vi.fn().mockResolvedValue(null),
+        },
+      } as unknown as PrismaClient;
+
+      const mockRepository = {
+        findById: vi.fn().mockResolvedValue({
+          id: "eval-wf-3",
+          projectId: "proj-1",
+          type: "workflow",
+          workflowId: "non-existent-wf",
+          config: {},
+        } as unknown as Evaluator),
+      } as unknown as EvaluatorRepository;
+
+      const service = new EvaluatorService(mockPrisma, mockRepository);
+      const result = await service.getByIdWithFields({
+        id: "eval-wf-3",
+        projectId: "proj-1",
+      });
+
+      expect(result).not.toBeNull();
+      expect(result!.fields).toEqual([]);
+    });
+  });
+
+  describe("getAllWithFields", () => {
+    it("enriches all evaluators with fields", async () => {
+      const mockPrisma = {} as PrismaClient;
+      const mockRepository = {
+        findAll: vi.fn().mockResolvedValue([
+          {
+            id: "eval-1",
+            type: "evaluator",
+            config: { evaluatorType: "langevals/exact_match" },
+          },
+          {
+            id: "eval-2",
+            type: "evaluator",
+            config: { evaluatorType: "langevals/llm_boolean" },
+          },
+        ] as unknown as Evaluator[]),
+      } as unknown as EvaluatorRepository;
+
+      const service = new EvaluatorService(mockPrisma, mockRepository);
+      const results = await service.getAllWithFields({ projectId: "proj-1" });
+
+      expect(results).toHaveLength(2);
+      expect(results[0]!.fields).toEqual([
+        { identifier: "output", type: "str" },
+        { identifier: "expected_output", type: "str" },
+      ]);
+      expect(results[1]!.fields).toEqual([
+        { identifier: "input", type: "str", optional: true },
+        { identifier: "output", type: "str", optional: true },
+        { identifier: "contexts", type: "list", optional: true },
+      ]);
+    });
+  });
+});

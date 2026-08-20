@@ -213,6 +213,81 @@ func TestGroup_graceful_timeout_enforced(t *testing.T) {
 	}
 }
 
+// The drain delay is time spent making the pod unroutable, so it must be
+// charged on top of the graceful budget rather than out of it. A service's
+// Stop has to see the full configured budget however long the drain took,
+// or the number an operator configures is not the number a request gets.
+func TestGroup_graceful_budget_is_not_consumed_by_the_drain_delay(t *testing.T) {
+	const (
+		graceful   = 300 * time.Millisecond
+		drainDelay = 200 * time.Millisecond
+	)
+
+	var (
+		stopCalledAt time.Time
+		deadline     time.Time
+		hadDeadline  bool
+	)
+	probe := &mockSvc{
+		name:    "probe",
+		startFn: func(context.Context) error { return nil },
+		stopFn: func(ctx context.Context) error {
+			stopCalledAt = time.Now()
+			deadline, hadDeadline = ctx.Deadline()
+			return nil
+		},
+	}
+
+	g := New(WithGraceful(graceful), WithDrainDelay(drainDelay))
+	g.Add(probe)
+
+	ctx, cancel := context.WithCancel(nopCtx())
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		cancel()
+	}()
+
+	start := time.Now()
+	if err := g.Run(ctx); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !hadDeadline {
+		t.Fatal("Stop received a context with no deadline, so the graceful budget is unbounded")
+	}
+
+	// The drain really happened before the stop, so this cannot pass by
+	// skipping the wait the budget is supposed to exclude.
+	if waited := stopCalledAt.Sub(start); waited < drainDelay {
+		t.Errorf("stop ran %v after the signal, expected at least the %v drain delay", waited, drainDelay)
+	}
+
+	// Scheduling slack only. Before the fix this budget was
+	// graceful-minus-drainDelay, so 100ms rather than 300ms.
+	const slack = 60 * time.Millisecond
+	if budget := deadline.Sub(stopCalledAt); budget < graceful-slack {
+		t.Errorf("stop got a %v budget, want the full configured %v", budget, graceful)
+	}
+}
+
+func TestGroup_ServiceNames_reports_start_order(t *testing.T) {
+	rec := &recorder{}
+	g := New()
+	g.Add(rec.worker("a"), rec.worker("b"))
+	g.Add(rec.worker("c"))
+
+	want := []string{"a", "b", "c"}
+	got := g.ServiceNames()
+	if len(got) != len(want) {
+		t.Fatalf("names = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("name[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
 // --- test helpers ---
 
 type mockSvc struct {

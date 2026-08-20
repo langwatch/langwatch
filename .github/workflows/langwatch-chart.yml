@@ -2,6 +2,10 @@ name: langwatch-chart
 
 on:
   pull_request:
+    # ready_for_review is NOT a default activity type, and the two heaviest
+    # jobs below skip on a draft. Without it, taking a PR out of draft fires
+    # no event at all and they would never get their non-draft run.
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "charts/langwatch/**"
       - "charts/clickhouse-serverless/**"
@@ -9,6 +13,26 @@ on:
       - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
+      # The shutdown budget is the one place where a code constant and a
+      # chart value must agree: the pod's terminationGracePeriodSeconds is
+      # sized from the same numbers budget.ts derives. Without this path a
+      # change to those constants never runs the workers-shutdown job, and
+      # the chart would keep asserting a margin the code no longer uses.
+      - "platform/app/src/server/shutdown/**"
+      # This job is the only thing in CI that builds the app image and runs a
+      # stack against it — publish-docker-app fires on `release: published`, so
+      # on a pull request nothing else touches the Dockerfile at all. Without
+      # these paths a change to how the image is assembled reaches a release
+      # unvalidated, which is exactly how a broken one nearly shipped: moving
+      # the pnpm install root left every dependency symlink in the runtime
+      # stage dangling, the build stayed green, and the container would have
+      # died on its first import.
+      - "infra/docker/Dockerfile"
+      - "infra/docker/Dockerfile.go_service"
+      - ".dockerignore"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "package.json"
   push:
     branches: [main]
     paths:
@@ -18,59 +42,215 @@ on:
       - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
+      # The shutdown budget is the one place where a code constant and a
+      # chart value must agree: the pod's terminationGracePeriodSeconds is
+      # sized from the same numbers budget.ts derives. Without this path a
+      # change to those constants never runs the workers-shutdown job, and
+      # the chart would keep asserting a margin the code no longer uses.
+      - "platform/app/src/server/shutdown/**"
+      # This job is the only thing in CI that builds the app image and runs a
+      # stack against it — publish-docker-app fires on `release: published`, so
+      # on a pull request nothing else touches the Dockerfile at all. Without
+      # these paths a change to how the image is assembled reaches a release
+      # unvalidated, which is exactly how a broken one nearly shipped: moving
+      # the pnpm install root left every dependency symlink in the runtime
+      # stage dangling, the build stayed green, and the container would have
+      # died on its first import.
+      - "infra/docker/Dockerfile"
+      - "infra/docker/Dockerfile.go_service"
+      - ".dockerignore"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "package.json"
+
+# The e2e jobs here are the most expensive in the repo — `e2e: infra` runs to
+# 697s and `e2e: overlays` to 348s — and without a group every push to a chart
+# PR left its predecessors running to completion alongside it. Same rule as
+# langwatch-app-ci: supersede on a PR branch, never on main, because every
+# commit that lands on main has to keep its own validation.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  lint-template:
-    name: "template (${{ matrix.name }})"
+  # One runner renders every published preset and runs every rendered-output
+  # assertion. This used to be seventeen jobs — a twelve-leg `helm template`
+  # matrix plus five single-script jobs — and each one spent ~17s installing
+  # helm and building chart dependencies to do 1-5s of real work. Every leg
+  # measured under 30s end to end, so the runner lease, not the rendering,
+  # was what this workflow actually cost.
+  #
+  # Diagnostic parity with the old matrix is deliberate and load-bearing. A
+  # `fail-fast: false` matrix named every preset that broke in one run; a
+  # naive loop would stop at the first. So the render step keeps going after a
+  # failure and reports them together at the end, and each assertion step
+  # carries `if: '!cancelled()'` so one failing assertion does not hide the
+  # next four.
+  render:
+    name: "render + assertions"
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: charts/langwatch
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Overlays
-          - name: default
-            flags: "--set autogen.enabled=true"
-          - name: dev+nodeport
-            flags: "--set autogen.enabled=true -f examples/overlays/size-dev.yaml -f examples/overlays/access-nodeport.yaml"
-          - name: minimal+nodeport
-            flags: "--set autogen.enabled=true -f examples/overlays/size-minimal.yaml -f examples/overlays/access-nodeport.yaml"
-          - name: prod+ingress
-            flags: "--set autogen.enabled=true -f examples/overlays/size-prod.yaml -f examples/overlays/access-ingress.yaml"
-          - name: ha+ingress+replicated
-            flags: "--set autogen.enabled=true -f examples/overlays/size-ha.yaml -f examples/overlays/access-ingress.yaml -f examples/overlays/clickhouse-replicated.yaml"
-          - name: langy-gvisor
-            flags: "--set autogen.enabled=true -f examples/overlays/langy-gvisor.yaml"
-          - name: langy-disabled
-            flags: "--set autogen.enabled=true -f examples/overlays/langy-disabled.yaml"
-          - name: prod+external-ch
-            flags: "--set autogen.enabled=true -f examples/overlays/size-prod.yaml -f examples/overlays/clickhouse-external.yaml"
-          - name: prod+ext-pg+ext-redis
-            flags: "--set autogen.enabled=true -f examples/overlays/size-prod.yaml -f examples/overlays/access-ingress.yaml -f examples/overlays/postgres-external.yaml -f examples/overlays/redis-external.yaml"
-          # Profiles
-          - name: local
-            flags: "-f examples/values-local.yaml"
-          - name: hosted-prod
-            flags: "-f examples/values-hosted-prod.yaml"
-          - name: scalable-prod
-            flags: "-f examples/values-scalable-prod.yaml"
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
       - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
       - run: helm repo add langwatch https://langwatch.github.io/langwatch
       - run: helm dependency build .
-      - name: "helm template (${{ matrix.name }})"
-        run: helm template lw . ${{ matrix.flags }} > /dev/null
+
+      # `set +e` is deliberate and load-bearing. Actions runs `run:` steps with
+      # `-e` already on, and `set -uo pipefail` does not clear it — so without
+      # this line a preset that fails to render would abort the ones after it,
+      # and a chart broken in three places would report one. The `if` around
+      # the helm call below is exempt from `-e` on its own, but that exemption
+      # is a property of `if`, not of this step: the next unguarded command
+      # anyone adds would silently reintroduce fail-fast.
+      - name: "render every published preset"
+        run: |
+          set +e
+          set -uo pipefail
+          failed=()
+          render() {
+            local name="$1"
+            shift
+            if helm template lw . "$@" >/dev/null 2>"${RUNNER_TEMP}/${name}.err"; then
+              echo "ok    ${name}"
+            else
+              echo "FAIL  ${name}"
+              sed 's/^/        /' "${RUNNER_TEMP}/${name}.err"
+              failed+=("${name}")
+            fi
+          }
+
+          # Overlays
+          render default --set autogen.enabled=true
+          render dev+nodeport --set autogen.enabled=true -f examples/overlays/size-dev.yaml -f examples/overlays/access-nodeport.yaml
+          render minimal+nodeport --set autogen.enabled=true -f examples/overlays/size-minimal.yaml -f examples/overlays/access-nodeport.yaml
+          render prod+ingress --set autogen.enabled=true -f examples/overlays/size-prod.yaml -f examples/overlays/access-ingress.yaml
+          render ha+ingress+replicated --set autogen.enabled=true -f examples/overlays/size-ha.yaml -f examples/overlays/access-ingress.yaml -f examples/overlays/clickhouse-replicated.yaml
+          render langy-gvisor --set autogen.enabled=true -f examples/overlays/langy-gvisor.yaml
+          render langy-disabled --set autogen.enabled=true -f examples/overlays/langy-disabled.yaml
+          render prod+external-ch --set autogen.enabled=true -f examples/overlays/size-prod.yaml -f examples/overlays/clickhouse-external.yaml
+          render prod+ext-pg+ext-redis --set autogen.enabled=true -f examples/overlays/size-prod.yaml -f examples/overlays/access-ingress.yaml -f examples/overlays/postgres-external.yaml -f examples/overlays/redis-external.yaml
+
+          # Profiles
+          render local -f examples/values-local.yaml
+          render hosted-prod -f examples/values-hosted-prod.yaml
+          render scalable-prod -f examples/values-scalable-prod.yaml
+
+          if [ "${#failed[@]}" -gt 0 ]; then
+            echo
+            echo "presets that failed to render: ${failed[*]}"
+            exit 1
+          fi
+
+      # The render step above only proves the YAML parses. This asserts the
+      # numbers that reach the pod: the worker count the chart computed from
+      # the CPU allowance, and a memory ceiling that count can live within.
+      - name: "assert rendered worker count and memory ceiling"
+        if: "!cancelled()"
+        run: ./tests/langevals-sizing.sh
+
+      # Static on purpose, and helm being installed here changes nothing.
+      # Every `lookup` in the render step runs against no cluster and so
+      # returns empty, which is exactly what a lookup the installer is
+      # FORBIDDEN to make does not do — that one aborts the render. The
+      # templates have to be read to see it.
+      - name: "assert no template needs cluster-scoped read access"
+        if: "!cancelled()"
+        run: ./tests/restricted-rbac.sh
+
+      # The overlays above never enable email, so nothing there would notice a
+      # gateway that reaches only one Deployment. This renders both and compares
+      # them, and checks that an unconfigurable provider stops the render.
+      - name: "assert rendered email configuration"
+        if: "!cancelled()"
+        run: ./tests/email-gateway.sh
+
+      # A provider can be documented in the README and validated in the helpers
+      # while the Deployment never emits its variables, which looks exactly like
+      # the provider not being supported. Only rendering the container shows it.
+      - name: "assert rendered SSO provider configuration"
+        if: "!cancelled()"
+        run: ./tests/sso-providers.sh
+
+      # Workers drain in-flight queue jobs and their ClickHouse writes on
+      # SIGTERM. Too short a grace period turns that drain into a SIGKILL,
+      # which severs in-flight statements — invisible in the template source,
+      # visible only in the rendered value.
+      - name: "assert workers get long enough to drain"
+        if: "!cancelled()"
+        run: ./tests/workers-shutdown.sh
+
+      # In local-filesystem mode the app and the workers mount one ReadWriteOnce
+      # PVC, and a helm upgrade rolls both Deployments at once. The pre-upgrade
+      # hook that orders them is a template over several values, so which
+      # installs it renders for, how long it waits, and what it may touch are
+      # only visible in the rendered output.
+      - name: "assert stored-objects upgrades move one volume consumer at a time"
+        if: "!cancelled()"
+        run: ./tests/stored-objects-upgrade-ordering.sh
+
+  # The render job above proves the chart PARSES; these vitest suites
+  # assert on what it EMITS (env selection per provider, identity guards,
+  # migration postures, validation failures). They normally run inside the
+  # app CI's integration shards, but that workflow deliberately does not
+  # trigger on charts/** — so without this job a chart-only edit could break
+  # every behavioral guarantee while CI stays green.
+  behavioral:
+    name: "behavioral (rendered-output assertions)"
+    # Skipped on a draft, like the e2e legs below. This workflow has no
+    # `changes` gate to read `heavy` from, so the draft check is inline.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platform/app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: v3.12.0
+      - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      - run: helm repo add langwatch https://langwatch.github.io/langwatch
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "@langwatch/web..."
+      - name: Generate required files
+        run: pnpm start:prepare:files
+      # The integration config's globalSetup runs ClickHouse migrations via
+      # goose before any test file executes, helm-backed or not.
+      - name: Install Goose migration tool
+        working-directory: .
+        run: bash .github/scripts/install-goose.sh
+      - name: Run helm behavioral suites
+        env:
+          # Turns a silent helm-unavailable skip into a hard failure — this
+          # job exists precisely so these suites cannot quietly not run.
+          REQUIRE_HELM_TESTS: "1"
+        run: |
+          pnpm test:unit run src/server/stored-objects/__tests__/helm-and-docs-shape.unit.test.ts
+          pnpm test:integration run src/server/stored-objects/__tests__/helm-azure-identity.integration.test.ts
 
   e2e:
     name: "e2e: ${{ matrix.name }}"
+    # These two legs are the most expensive jobs in the repository — `e2e:
+    # infra` runs to 697s and `e2e: overlays` to 348s, both building images and
+    # standing up a kind cluster — so a draft releases the slots and they come
+    # back on ready_for_review.
+    #
+    # This matters most for the release-please pull requests, which touch
+    # `charts/**` and `package.json` on every merge to main and so fire this
+    # workflow every time. Twelve workflows already skip their heavy jobs on a
+    # draft via detect-changes' `heavy` output; this one has no gate job to
+    # read it from, which left it the last heavy thing running on a version
+    # bump.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    needs: lint-template
+    needs: render
     strategy:
       fail-fast: false
       matrix:
@@ -87,12 +267,12 @@ jobs:
       run:
         working-directory: charts/langwatch
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
       - name: Build clickhouse-serverless image
-        run: docker build -t langwatch/clickhouse-serverless:next ../../clickhouse-serverless/
+        run: docker build -t langwatch/clickhouse-serverless:next ../../infra/clickhouse-serverless/
       - name: Resolve app image
         if: matrix.build_app
         run: |
@@ -101,12 +281,12 @@ jobs:
           echo "APP_IMAGE=${APP_REPO}:${APP_TAG}" >> "$GITHUB_ENV"
       - name: Build app image
         if: matrix.build_app
-        run: docker build -t "$APP_IMAGE" ../..
+        run: docker build -t "$APP_IMAGE" -f ../../infra/docker/Dockerfile ../..
       # The gateway image isn't published to ghcr yet — build it locally so
       # the chart e2e can install. values-e2e.yaml overrides
       # gateway.image.{repository,tag,pullPolicy} to match.
       - name: Build gateway image
-        run: docker build -t langwatch/ai-gateway:e2e -f ../../Dockerfile.go_service ../..
+        run: docker build -t langwatch/ai-gateway:e2e -f ../../infra/docker/Dockerfile.go_service ../..
       - uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1
         with:
           cluster_name: ${{ matrix.cluster }}

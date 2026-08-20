@@ -6,6 +6,11 @@ on:
       - published
   workflow_dispatch:
 
+# A publish run drains — see publish-docker-app.
+concurrency:
+  group: sdk-python-cd-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
@@ -15,8 +20,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
 
@@ -27,19 +32,19 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd python-sdk
+          cd sdks/python
           make install
           uv pip install build
 
       - name: Build package
         run: |
-          cd python-sdk
+          cd sdks/python
           uv run python -m build
 
       - name: Publish package
-        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
         with:
-          packages_dir: python-sdk/dist/
+          packages_dir: sdks/python/dist/
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
 
@@ -49,7 +54,7 @@ jobs:
           if [ "${{ github.event_name }}" = "release" ]; then
             VERSION=${GITHUB_REF#refs/tags/python-sdk@v}
           else
-            VERSION=$(cat .github/.release-please-manifest.json | jq -r '."python-sdk"')
+            VERSION=$(cat .github/.release-please-manifest.json | jq -r '."sdks/python"')
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
@@ -58,6 +63,6 @@ jobs:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
         run: |
           bash .github/scripts/notify-slack-release.sh \
-            python-sdk/CHANGELOG.md \
+            sdks/python/CHANGELOG.md \
             "Python SDK" \
             "${{ steps.get_version.outputs.version }}"

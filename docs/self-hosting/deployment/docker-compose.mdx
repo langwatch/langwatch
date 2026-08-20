@@ -15,10 +15,10 @@ Docker Compose is the quickest way to try LangWatch locally. It runs the full st
 ```bash
 # Clone the repository
 git clone https://github.com/langwatch/langwatch.git
-cd langwatch
+cd platform/app
 
 # Copy the example environment file
-cp langwatch/.env.example langwatch/.env
+cp platform/app/.env.example platform/app/.env
 
 # Start all services
 docker compose up
@@ -46,7 +46,7 @@ Docker Compose starts the following services:
 
 ## Configuration
 
-Edit `langwatch/.env` to customize your deployment. Key variables:
+Edit `platform/app/.env` to customize your deployment. Key variables:
 
 ```bash
 # Required: generate a secret for each
@@ -99,7 +99,7 @@ docker compose up
 
 ### Disable optional services
 
-If you don't need NLP or evaluators, comment them out in `compose.yml`:
+If you don't need NLP or evaluators, comment them out in `infra/compose.yml`:
 
 ```yaml
 services:

@@ -20,7 +20,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/langwatch/langwatch/sdk-go/prompts"
+	"github.com/langwatch/langwatch/sdks/go/prompts"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/agentblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
@@ -167,8 +167,26 @@ type NodeState struct {
 	Stderr     string         `json:"stderr,omitempty"`
 	Cost       float64        `json:"cost,omitempty"`
 	Metrics    *NodeMetrics   `json:"metrics,omitempty"`
+	HTTP       *NodeHTTP      `json:"http,omitempty"`
 	DurationMS int64          `json:"duration_ms,omitempty"`
 	Error      *NodeError     `json:"error,omitempty"`
+}
+
+// NodeHTTP is what an HTTP node saw on the wire, surfaced so whoever is
+// configuring the endpoint can read its actual answer instead of guessing from
+// a status code. Diagnostics only: no downstream node binds to any of it, the
+// same way NodeMetrics carries an LLM node's counts without being workflow
+// data.
+//
+// RenderedBody is the request body the engine sent after templating. It is
+// safe to surface because the body template is deliberately the one field
+// secrets are NOT resolved into (see runHTTP), precisely so it can be shown.
+type NodeHTTP struct {
+	StatusCode      int               `json:"status_code,omitempty"`
+	StatusText      string            `json:"status_text,omitempty"`
+	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
+	RenderedBody    string            `json:"rendered_body,omitempty"`
+	Warnings        []string          `json:"warnings,omitempty"`
 }
 
 // NodeMetrics carries an LLM node's token usage + resolved model so the
@@ -297,6 +315,39 @@ func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner
 	wg.Wait()
 }
 
+// nodeRun bundles the per-execution context the sandbox-backed node runners
+// need beyond the node definition itself: the resolved inputs, the state the
+// run reports into, and the workflow-level values user code reads as
+// namespaces (`secrets.NAME` and `params.NAME`).
+type nodeRun struct {
+	inputs  map[string]any
+	ns      *NodeState
+	secrets map[string]string
+	params  map[string]any
+}
+
+// newNodeRun assembles the context for one node execution from the request
+// that carries the workflow-level values.
+func newNodeRun(req ExecuteRequest, inputs map[string]any, ns *NodeState) nodeRun {
+	return nodeRun{
+		inputs:  inputs,
+		ns:      ns,
+		secrets: req.Workflow.Secrets,
+		params:  req.Workflow.Params,
+	}
+}
+
+// storeOutput records what the sandbox printed, scrubbed of resolved secret
+// values first. Stored stdout/stderr ride along on execution events, traces
+// and logs exactly as node errors do, so a `print(secrets.TOKEN)` leaks the
+// credential just as surely as an error string that echoes it. Run parameters
+// are not credentials and are left intact, so an author can still print one to
+// see what a run was given.
+func (r nodeRun) storeOutput(stdout, stderr string) {
+	r.ns.Stdout = redactSecrets(stdout, r.secrets)
+	r.ns.Stderr = redactSecrets(stderr, r.secrets)
+}
+
 // dispatch routes a node to its executor and returns its declared
 // outputs (already filtered to the node's `outputs` declaration so
 // downstream nodes get exactly what the workflow author requested).
@@ -307,7 +358,7 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 	case dsl.ComponentEnd:
 		return inputs, nil
 	case dsl.ComponentCode:
-		return e.runCode(ctx, node, inputs, ns, req.Workflow.Secrets)
+		return e.runCode(ctx, node, newNodeRun(req, inputs, ns))
 	case dsl.ComponentHTTP:
 		return e.runHTTP(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case dsl.ComponentSignature:
@@ -323,7 +374,7 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 	case dsl.ComponentCustom:
 		return e.runCustom(ctx, req, node, inputs, ns)
 	case dsl.ComponentIfElse:
-		return e.runIfElse(ctx, node, inputs, ns, req.Workflow.Secrets)
+		return e.runIfElse(ctx, node, newNodeRun(req, inputs, ns))
 	default:
 		return nil, &NodeError{Type: "unsupported_node_kind", Message: "node kind not supported on Go engine: " + string(node.Type)}
 	}
@@ -339,9 +390,9 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 // a Liquid boolean expression over the inputs; "python" runs the
 // `code` parameter through the code-block sandbox and requires its
 // execute() to return True or False.
-func (e *Engine) runIfElse(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {
+func (e *Engine) runIfElse(ctx context.Context, node *dsl.Node, run nodeRun) (map[string]any, *NodeError) {
 	if paramString(node.Data.Parameters, "condition_language") == "python" {
-		return e.runIfElsePython(ctx, node, inputs, ns, secrets)
+		return e.runIfElsePython(ctx, node, run)
 	}
 	condition := paramString(node.Data.Parameters, "condition")
 	// Coerce string inputs to their declared types first, so a dataset/form
@@ -350,7 +401,7 @@ func (e *Engine) runIfElse(ctx context.Context, node *dsl.Node, inputs map[strin
 	// autoparse the python condition and code paths apply.
 	result, err := template.EvaluateCondition(
 		condition,
-		autoparseInputs(inputs, node.Data.Inputs),
+		autoparseInputs(run.inputs, node.Data.Inputs),
 	)
 	if err != nil {
 		return nil, &NodeError{Type: "invalid_condition", Message: err.Error()}
@@ -427,7 +478,7 @@ func codeBlockMessage(err *codeblock.Error) string {
 	return err.Type + ": " + err.Message
 }
 
-func (e *Engine) runIfElsePython(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {
+func (e *Engine) runIfElsePython(ctx context.Context, node *dsl.Node, run nodeRun) (map[string]any, *NodeError) {
 	if e.code == nil {
 		return nil, &NodeError{Type: "code_runner_unavailable", Message: "no code runner configured"}
 	}
@@ -437,15 +488,15 @@ func (e *Engine) runIfElsePython(ctx context.Context, node *dsl.Node, inputs map
 	}
 	res, err := e.code.Execute(ctx, codeblock.Request{
 		Code:            code + conditionResultAdapter,
-		Inputs:          autoparseInputs(inputs, node.Data.Inputs),
+		Inputs:          autoparseInputs(run.inputs, node.Data.Inputs),
 		DeclaredOutputs: []string{"result"},
-		Secrets:         secrets,
+		Secrets:         run.secrets,
+		Params:          run.params,
 	})
 	if err != nil {
 		return nil, &NodeError{Type: "code_runner_error", Message: err.Error()}
 	}
-	ns.Stdout = res.Stdout
-	ns.Stderr = res.Stderr
+	run.storeOutput(res.Stdout, res.Stderr)
 	if res.Error != nil {
 		return nil, nodeErrorFromCodeBlock(res.Error)
 	}
@@ -493,7 +544,7 @@ func (e *Engine) runEntry(node *dsl.Node, req ExecuteRequest) (map[string]any, *
 	return map[string]any{}, nil
 }
 
-func (e *Engine) runCode(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {
+func (e *Engine) runCode(ctx context.Context, node *dsl.Node, run nodeRun) (map[string]any, *NodeError) {
 	if e.code == nil {
 		return nil, &NodeError{Type: "code_runner_unavailable", Message: "no code runner configured"}
 	}
@@ -501,15 +552,15 @@ func (e *Engine) runCode(ctx context.Context, node *dsl.Node, inputs map[string]
 	declared := outputNames(node.Data.Outputs)
 	res, err := e.code.Execute(ctx, codeblock.Request{
 		Code:            code,
-		Inputs:          autoparseInputs(inputs, node.Data.Inputs),
+		Inputs:          autoparseInputs(run.inputs, node.Data.Inputs),
 		DeclaredOutputs: declared,
-		Secrets:         secrets,
+		Secrets:         run.secrets,
+		Params:          run.params,
 	})
 	if err != nil {
 		return nil, &NodeError{Type: "code_runner_error", Message: err.Error()}
 	}
-	ns.Stdout = res.Stdout
-	ns.Stderr = res.Stderr
+	run.storeOutput(res.Stdout, res.Stderr)
 	if res.Error != nil {
 		return nil, nodeErrorFromCodeBlock(res.Error)
 	}
@@ -535,6 +586,17 @@ func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]
 		Inputs:       inputs,
 	}
 	res, err := e.http.Execute(ctx, req)
+	// Recorded before the error check: a non-2xx still carries the status and
+	// headers, and that failing case is the one the author most needs to read.
+	if res != nil {
+		ns.HTTP = &NodeHTTP{
+			StatusCode:      res.StatusCode,
+			StatusText:      res.StatusText,
+			ResponseHeaders: res.ResponseHeaders,
+			RenderedBody:    res.RenderedBody,
+			Warnings:        res.Warnings,
+		}
+	}
 	if err != nil {
 		// Redact resolved secret values from the error message: Go HTTP
 		// errors embed the request URL, so a `{{ secrets.X }}` in the
@@ -543,6 +605,15 @@ func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]
 		var ue *httpblock.UpstreamError
 		if errors.As(err, &ue) {
 			return nil, &NodeError{Type: "upstream_http_error", Message: msg, Status: ue.Status}
+		}
+		// A refused destination is its own failure, not a failure to reach one.
+		// Reported as http_error it presented as "couldn't reach the agent,
+		// check the URL and that the service is running" — advice that sends
+		// the author to debug an endpoint which is running and was never
+		// dialed. The code has copy of its own saying the address is not
+		// permitted.
+		if errors.Is(err, httpblock.ErrSSRFBlocked) {
+			return nil, &NodeError{Type: "ssrf_blocked", Message: msg}
 		}
 		return nil, &NodeError{Type: "http_error", Message: msg}
 	}
@@ -554,7 +625,6 @@ func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]
 		// Workflow-author chose a single output name — bind there.
 		out = map[string]any{outs[0]: res.Output}
 	}
-	_ = ns
 	return out, nil
 }
 
@@ -902,7 +972,7 @@ func (e *Engine) runEvaluator(ctx context.Context, req ExecuteRequest, node *dsl
 	}
 
 	// Evaluator slug lives on the typed `data.evaluator` field in the
-	// canonical Studio shape (langwatch/src/optimization_studio/types/
+	// canonical Studio shape (platform/app/src/optimization_studio/types/
 	// dsl.ts → `evaluator?: EvaluatorTypes | "custom/<id>" | "evaluators/<id>"`).
 	// Older workflows may have stuffed it into parameters[]; honor both
 	// so existing user workflows keep evaluating.
@@ -1001,7 +1071,7 @@ func (e *Engine) runAgent(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 	case "http":
 		return e.runHTTP(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case "code":
-		return e.runCode(ctx, node, inputs, ns, req.Workflow.Secrets)
+		return e.runCode(ctx, node, newNodeRun(req, inputs, ns))
 	case "workflow":
 		return e.runAgentWorkflow(ctx, req, node, inputs, ns)
 	case "":

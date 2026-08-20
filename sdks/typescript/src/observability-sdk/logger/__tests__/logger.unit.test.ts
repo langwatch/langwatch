@@ -1,0 +1,537 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { getLangWatchLogger, getLangWatchLoggerFromProvider, setLangWatchLoggerProvider, createLangWatchLogger } from "..";
+import { logs, createNoopLogger } from "@opentelemetry/api-logs";
+import { type LangWatchLogRecord } from "../types";
+import { resetObservabilitySdkConfig, initializeObservabilitySdkConfig } from "../../config";
+
+vi.mock("@opentelemetry/api-logs", () => ({
+  logs: {
+    getLoggerProvider: vi.fn(),
+  },
+  // `NoopLoggerProvider` was dropped from the package's public exports;
+  // `createNoopLogger` is its replacement.
+  createNoopLogger: vi.fn().mockReturnValue({
+    emit: vi.fn(),
+    enabled: vi.fn().mockReturnValue(false),
+  }),
+}));
+
+describe("LangWatchLoggerInternal enabled()", () => {
+  it("delegates enabled state to the wrapped logger", () => {
+    const wrappedLogger = {
+      emit: vi.fn(),
+      enabled: vi.fn().mockReturnValue(true),
+    };
+    const logger = createLangWatchLogger(wrappedLogger as any);
+
+    expect(logger.enabled()).toBe(true);
+    expect(wrappedLogger.enabled).toHaveBeenCalledWith(undefined);
+  });
+});
+
+
+
+describe("LangWatch Logger", () => {
+  let mockLogger: any;
+  let mockLoggerProvider: any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetObservabilitySdkConfig();
+
+    // Create fresh mocks for each test
+    mockLogger = {
+      emit: vi.fn(),
+    };
+
+    mockLoggerProvider = {
+      getLogger: vi.fn().mockReturnValue(mockLogger),
+    };
+
+    // Set up the mock return values
+    (logs.getLoggerProvider as any).mockReturnValue(mockLoggerProvider);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    resetObservabilitySdkConfig();
+  });
+
+  describe("setLangWatchLoggerProvider", () => {
+    it("sets the logger provider for LangWatch logging", () => {
+      const customLoggerInstance = {
+        emit: vi.fn(),
+      };
+      const customProvider = {
+        getLogger: vi.fn().mockReturnValue(customLoggerInstance),
+      };
+
+      setLangWatchLoggerProvider(customProvider as any);
+
+      // Verify that subsequent logger calls use the custom provider
+      const logger = getLangWatchLogger("test-logger");
+      expect(customProvider.getLogger).toHaveBeenCalledWith("test-logger", undefined);
+
+      // Verify that the logger returned uses the custom instance
+      logger.emit({
+        severityNumber: 9,
+        severityText: "INFO",
+        body: "test message",
+      });
+      expect(customLoggerInstance.emit).toHaveBeenCalled();
+    });
+  });
+
+  describe("getLangWatchLogger", () => {
+    it("creates a logger with the given name", () => {
+      const logger = getLangWatchLogger("test-logger");
+
+      expect(logger).toBeDefined();
+      // Should use the current logger provider (NoOp by default)
+      expect(logger).toBeInstanceOf(Object);
+      expect(typeof logger.emit).toBe("function");
+    });
+
+    it("creates a logger with name and version", () => {
+      const logger = getLangWatchLogger("test-logger", "1.0.0");
+
+      expect(logger).toBeDefined();
+      expect(logger).toBeInstanceOf(Object);
+      expect(typeof logger.emit).toBe("function");
+    });
+
+    it("returns a LangWatchLogger instance", () => {
+      const logger = getLangWatchLogger("test-logger");
+
+      expect(logger).toBeInstanceOf(Object);
+      expect(typeof logger.emit).toBe("function");
+    });
+
+    it("uses NoOp logger when no provider is set", () => {
+      // An earlier test in this suite calls `setLangWatchLoggerProvider`, which
+      // mutates module-level state that `resetObservabilitySdkConfig` doesn't
+      // touch. Reset it explicitly here so this test actually exercises the
+      // NoOp path instead of a leftover custom provider.
+      setLangWatchLoggerProvider({
+        getLogger: () => createNoopLogger(),
+      });
+
+      const logger = getLangWatchLogger("test-logger");
+
+      expect(logger).toBeDefined();
+      expect(typeof logger.emit).toBe("function");
+    });
+  });
+
+  describe("getLangWatchLoggerFromProvider", () => {
+    it("creates a logger from a specific provider", () => {
+      const customProvider = {
+        getLogger: vi.fn().mockReturnValue(mockLogger),
+      };
+
+      const logger = getLangWatchLoggerFromProvider(
+        customProvider as any,
+        "custom-logger"
+      );
+
+      expect(logger).toBeDefined();
+      expect(customProvider.getLogger).toHaveBeenCalledWith("custom-logger", undefined);
+    });
+
+    it("creates a logger with name and version from provider", () => {
+      const customProvider = {
+        getLogger: vi.fn().mockReturnValue(mockLogger),
+      };
+
+      const logger = getLangWatchLoggerFromProvider(
+        customProvider as any,
+        "custom-logger",
+        "2.0.0"
+      );
+
+      expect(logger).toBeDefined();
+      expect(customProvider.getLogger).toHaveBeenCalledWith("custom-logger", "2.0.0");
+    });
+  });
+
+  describe("LangWatchLogger emit functionality", () => {
+    it("emits log records with LangWatch attributes", () => {
+      const logger = getLangWatchLogger("test-logger");
+
+      const logRecord: LangWatchLogRecord = {
+        severityText: "INFO",
+        severityNumber: 9,
+        body: "Test log message",
+        attributes: {
+          "langwatch.service": "test-service",
+          "langwatch.environment": "test",
+        },
+      };
+
+      logger.emit(logRecord);
+
+      // Since we're using NoOp logger by default, this won't actually emit
+      // but it should not throw
+      expect(() => logger.emit(logRecord)).not.toThrow();
+    });
+
+    it("emits log records without attributes", () => {
+      const logger = getLangWatchLogger("test-logger");
+
+      const logRecord: LangWatchLogRecord = {
+        severityText: "ERROR",
+        severityNumber: 17,
+        body: "Error message",
+      };
+
+      expect(() => logger.emit(logRecord)).not.toThrow();
+    });
+
+    it("emits log records with complex attributes", () => {
+      const logger = getLangWatchLogger("test-logger");
+
+      const logRecord: LangWatchLogRecord = {
+        severityText: "WARN",
+        severityNumber: 13,
+        body: "Warning message",
+        attributes: {
+          "langwatch.service": "test-service",
+          "langwatch.environment": "test",
+          "langwatch.operation": "test-operation",
+          "langwatch.user_id": "user-123",
+          "custom.attribute": "custom-value",
+        },
+      };
+
+      expect(() => logger.emit(logRecord)).not.toThrow();
+    });
+  });
+
+  describe("Data capture functionality", () => {
+    it("preserves log record body when output capture is enabled", () => {
+      // Initialize config with output capture enabled
+      initializeObservabilitySdkConfig({
+        logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+        dataCapture: "all", // This enables output capture
+      });
+
+      const logger = createLangWatchLogger(mockLogger);
+      const originalBody = "Test log message";
+
+      const logRecord: LangWatchLogRecord = {
+        severityText: "INFO",
+        severityNumber: 9,
+        body: originalBody,
+        attributes: { "test": "value" },
+      };
+
+      logger.emit(logRecord);
+
+      // Verify the log record body was preserved
+      expect(mockLogger.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: originalBody,
+        })
+      );
+    });
+
+    it("removes log record body when output capture is disabled", () => {
+      // Initialize config with output capture disabled
+      initializeObservabilitySdkConfig({
+        logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+        dataCapture: "input", // This disables output capture
+      });
+
+      const logger = createLangWatchLogger(mockLogger);
+      const originalBody = "Test log message";
+
+      const logRecord: LangWatchLogRecord = {
+        severityText: "INFO",
+        severityNumber: 9,
+        body: originalBody,
+        attributes: { "test": "value" },
+      };
+
+      logger.emit(logRecord);
+
+      // Verify the log record body was removed (set to undefined)
+      expect(mockLogger.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: undefined,
+        })
+      );
+    });
+
+    it("preserves log record body when output capture is set to 'output'", () => {
+      // Initialize config with output capture enabled
+      initializeObservabilitySdkConfig({
+        logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+        dataCapture: "output", // This enables output capture
+      });
+
+      const logger = createLangWatchLogger(mockLogger);
+      const originalBody = "Test log message";
+
+      const logRecord: LangWatchLogRecord = {
+        severityText: "INFO",
+        severityNumber: 9,
+        body: originalBody,
+        attributes: { "test": "value" },
+      };
+
+      logger.emit(logRecord);
+
+      // Verify the log record body was preserved
+      expect(mockLogger.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: originalBody,
+        })
+      );
+    });
+
+    it("removes log record body when output capture is set to 'none'", () => {
+      // Initialize config with output capture disabled
+      initializeObservabilitySdkConfig({
+        logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+        dataCapture: "none", // This disables output capture
+      });
+
+      const logger = createLangWatchLogger(mockLogger);
+      const originalBody = "Test log message";
+
+      const logRecord: LangWatchLogRecord = {
+        severityText: "INFO",
+        severityNumber: 9,
+        body: originalBody,
+        attributes: { "test": "value" },
+      };
+
+      logger.emit(logRecord);
+
+      // Verify the log record body was removed
+      expect(mockLogger.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: undefined,
+        })
+      );
+    });
+
+    it("preserves log record body when no data capture config is set", () => {
+      // Initialize config without data capture (defaults to "all")
+      initializeObservabilitySdkConfig({
+        logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      });
+
+      const logger = createLangWatchLogger(mockLogger);
+      const originalBody = "Test log message";
+
+      const logRecord: LangWatchLogRecord = {
+        severityText: "INFO",
+        severityNumber: 9,
+        body: originalBody,
+        attributes: { "test": "value" },
+      };
+
+      logger.emit(logRecord);
+
+      // Verify the log record body was preserved (defaults to "all")
+      expect(mockLogger.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: originalBody,
+        })
+      );
+    });
+
+    it("preserves other log record properties when output capture is disabled", () => {
+      // Initialize config with output capture disabled
+      initializeObservabilitySdkConfig({
+        logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+        dataCapture: "input", // This disables output capture
+      });
+
+      const logger = createLangWatchLogger(mockLogger);
+
+      const logRecord: LangWatchLogRecord = {
+        severityText: "ERROR",
+        severityNumber: 17,
+        body: "Test log message",
+        attributes: { "test": "value", "custom": "attribute" },
+        timestamp: new Date(),
+      };
+
+      logger.emit(logRecord);
+
+      // Verify other properties are preserved
+      expect(mockLogger.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severityText: "ERROR",
+          severityNumber: 17,
+          body: undefined, // Only body should be modified
+          attributes: { "test": "value", "custom": "attribute" },
+          timestamp: expect.any(Date),
+        })
+      );
+    });
+
+    it("handles log records without body when output capture is disabled", () => {
+      // Initialize config with output capture disabled
+      initializeObservabilitySdkConfig({
+        logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+        dataCapture: "input",
+      });
+
+      const logger = createLangWatchLogger(mockLogger);
+
+      const logRecord: LangWatchLogRecord = {
+        severityText: "INFO",
+        severityNumber: 9,
+        // No body property
+        attributes: { "test": "value" },
+      };
+
+      logger.emit(logRecord);
+
+      // Verify the log record is emitted without body
+      expect(mockLogger.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: undefined,
+        })
+      );
+    });
+
+    it("handles log records with null body when output capture is disabled", () => {
+      // Initialize config with output capture disabled
+      initializeObservabilitySdkConfig({
+        logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+        dataCapture: "input",
+      });
+
+      const logger = createLangWatchLogger(mockLogger);
+
+      const logRecord: LangWatchLogRecord = {
+        severityText: "INFO",
+        severityNumber: 9,
+        body: null as any,
+        attributes: { "test": "value" },
+      };
+
+      logger.emit(logRecord);
+
+      // Verify the log record body is set to undefined
+      expect(mockLogger.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: undefined,
+        })
+      );
+    });
+
+    it("handles log records with empty string body when output capture is disabled", () => {
+      // Initialize config with output capture disabled
+      initializeObservabilitySdkConfig({
+        logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+        dataCapture: "input",
+      });
+
+      const logger = createLangWatchLogger(mockLogger);
+
+      const logRecord: LangWatchLogRecord = {
+        severityText: "INFO",
+        severityNumber: 9,
+        body: "",
+        attributes: { "test": "value" },
+      };
+
+      logger.emit(logRecord);
+
+      // Verify the log record body is set to undefined
+      expect(mockLogger.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: undefined,
+        })
+      );
+    });
+  });
+
+  describe("Logger naming and versioning", () => {
+    it("handles different logger names", () => {
+      const loggers = [
+        getLangWatchLogger("app-logger"),
+        getLangWatchLogger("database-logger"),
+        getLangWatchLogger("api-logger"),
+      ];
+
+      expect(loggers).toHaveLength(3);
+      loggers.forEach(logger => {
+        expect(logger).toBeDefined();
+        expect(typeof logger.emit).toBe("function");
+      });
+    });
+
+    it("handles different versions", () => {
+      const loggers = [
+        getLangWatchLogger("test-logger", "1.0.0"),
+        getLangWatchLogger("test-logger", "2.0.0"),
+        getLangWatchLogger("test-logger", "latest"),
+      ];
+
+      expect(loggers).toHaveLength(3);
+      loggers.forEach(logger => {
+        expect(logger).toBeDefined();
+        expect(typeof logger.emit).toBe("function");
+      });
+    });
+  });
+
+  describe("Integration with OpenTelemetry logs API", () => {
+    it("uses the current logger provider by default", () => {
+      getLangWatchLogger("test-logger");
+
+      // Should not throw when getting logger
+      expect(() => getLangWatchLogger("test-logger")).not.toThrow();
+    });
+
+    it("uses the provided logger provider when specified", () => {
+      const customProvider = {
+        getLogger: vi.fn().mockReturnValue(mockLogger),
+      };
+
+      getLangWatchLoggerFromProvider(customProvider as any, "test-logger");
+
+      expect(customProvider.getLogger).toHaveBeenCalledWith("test-logger", undefined);
+    });
+  });
+
+  describe("Error handling", () => {
+    it("handles undefined version gracefully", () => {
+      const logger = getLangWatchLogger("test-logger", undefined);
+
+      expect(logger).toBeDefined();
+      expect(typeof logger.emit).toBe("function");
+    });
+
+    it("handles empty string version", () => {
+      const logger = getLangWatchLogger("test-logger", "");
+
+      expect(logger).toBeDefined();
+      expect(typeof logger.emit).toBe("function");
+    });
+  });
+
+  describe("Type safety", () => {
+    it("maintains LangWatchLogger type", () => {
+      const logger = getLangWatchLogger("test-logger");
+
+      // TypeScript should recognize this as LangWatchLogger
+      expect(logger).toHaveProperty("emit");
+
+      // Should be able to call emit with LangWatchLogRecord
+      const logRecord: LangWatchLogRecord = {
+        severityText: "INFO",
+        severityNumber: 9,
+        body: "Test",
+      };
+
+      expect(() => logger.emit(logRecord)).not.toThrow();
+    });
+  });
+});

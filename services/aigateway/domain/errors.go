@@ -49,8 +49,12 @@ func (e *UpstreamError) Error() string {
 
 // Gateway-specific error codes.
 const (
-	ErrInvalidAPIKey    = herr.Code("invalid_api_key")
-	ErrBudgetExceeded   = herr.Code("budget_exceeded")
+	ErrInvalidAPIKey  = herr.Code("invalid_api_key")
+	ErrBudgetExceeded = herr.Code("budget_exceeded")
+	// A per-end-user budget template is active on this key and the request
+	// carried no end-user id: fail closed, a cap evadable by omitting a
+	// field is not a cap.
+	ErrEndUserRequired  = herr.Code("end_user_required")
 	ErrRateLimited      = herr.Code("rate_limited")
 	ErrGuardrailBlocked = herr.Code("guardrail_blocked")
 	// ErrGuardrailUpstreamUnavailable means the guardrail could not be
@@ -59,16 +63,36 @@ const (
 	ErrGuardrailUpstreamUnavailable = herr.Code("guardrail_upstream_unavailable")
 	ErrPolicyViolation              = herr.Code("policy_violation")
 	ErrModelNotAllowed              = herr.Code("model_not_allowed")
-	ErrProviderError                = herr.Code("provider_error")
-	ErrPayloadTooLarge              = herr.Code("payload_too_large")
-	ErrBadRequest                   = herr.Code("bad_request")
-	ErrNotFound                     = herr.Code("not_found")
-	ErrInternal                     = herr.Code("internal_error")
-	ErrChainExhausted               = herr.Code("chain_exhausted")
-	ErrCircuitOpen                  = herr.Code("circuit_open")
-	ErrProviderTimeout              = herr.Code("provider_timeout")
-	ErrKeyRevoked                   = herr.Code("virtual_key_revoked")
-	ErrAuthUpstream                 = herr.Code("auth_upstream_unavailable")
+	// ErrProviderNotBound means the request names a provider (explicit
+	// "provider/model" prefix or alias) that has no credential slot on
+	// this VK. Dispatching anyway would hand a mismatched credential to
+	// the provider selected by the model prefix, which surfaces as opaque
+	// provider-config errors ("deployments not set", HTML error pages).
+	ErrProviderNotBound = herr.Code("model_provider_not_bound")
+	ErrProviderError    = herr.Code("provider_error")
+	ErrPayloadTooLarge  = herr.Code("payload_too_large")
+	ErrBadRequest       = herr.Code("bad_request")
+	// ErrMissingModel is a request-shape error with its own stable identity so
+	// clients and rejection metrics do not have to infer it from prose.
+	ErrMissingModel    = herr.Code("missing_model")
+	ErrNotFound        = herr.Code("not_found")
+	ErrInternal        = herr.Code("internal_error")
+	ErrChainExhausted  = herr.Code("chain_exhausted")
+	ErrCircuitOpen     = herr.Code("circuit_open")
+	ErrProviderTimeout = herr.Code("provider_timeout")
+	ErrKeyRevoked      = herr.Code("virtual_key_revoked")
+	// ErrKeyDisabled is the REVERSIBLE stop: the key material is intact and
+	// an administrator can re-enable it. Distinct from revoked (one-way)
+	// so tenant tooling can branch on which one it is.
+	ErrKeyDisabled = herr.Code("virtual_key_disabled")
+	// ErrKeyExpired is the stop nobody pressed: the key carries an
+	// expiration date and that date has passed. The key material is intact
+	// and the key is still ACTIVE in the control plane, so the fix is a new
+	// date rather than a new secret. Distinct from revoked and disabled so a
+	// tenant can tell "extend it" from "ask an administrator" from "mint a
+	// new one".
+	ErrKeyExpired   = herr.Code("virtual_key_expired")
+	ErrAuthUpstream = herr.Code("auth_upstream_unavailable")
 	// ErrNoProviderConfigured means the virtual key's bundle carries zero
 	// provider credentials — the organization has no ModelProvider configured.
 	// Without this guard the dispatcher would hand Bifrost a zero-value
@@ -86,3 +110,9 @@ const (
 	// parameter rejections so SDK error handling stays familiar.
 	ErrUnsupportedParameter = herr.Code("unsupported_parameter")
 )
+
+// KeyExpiredMessage is what a tenant reads when a key's expiration date has
+// passed. One string in one place: the control plane's 403 and the auth
+// cache's own check are the same answer to the same person, and two copies of
+// it drift.
+const KeyExpiredMessage = "This key has expired. Extend its expiration date, or create a new key."

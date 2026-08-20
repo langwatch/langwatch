@@ -16,7 +16,7 @@ Feature: Microsoft Copilot Studio reference puller (built on HttpPollingPullerAd
     And the process outbox picks up the first scheduled run within ~15 min
 
   Scenario: Reference config is locked + auditable
-    Given the copilot_studio reference puller exists at `langwatch/ee/governance/services/pullers/copilotStudio.puller.ts`
+    Given the copilot_studio reference puller exists at `platform/app/ee/governance/services/pullers/copilotStudio.puller.ts`
     Then it exports a constant `COPILOT_STUDIO_PULL_CONFIG` defining: URL (Microsoft's audit-log endpoint), authMode ("oauth2_microsoft"), cursorJsonPath, eventsJsonPath, eventMapping per Microsoft's response shape
     And admins cannot override the URL / auth shape (only credentials) — the reference impl is the trusted shape
 
@@ -36,7 +36,7 @@ Feature: Microsoft Copilot Studio reference puller (built on HttpPollingPullerAd
   Scenario: Microsoft 401 surfaces as actionable
     Given Microsoft returns 401 (credentials expired)
     Then the puller fails with `errorCount = 1` + cursor unchanged
-    And the IngestionSource UI shows "Microsoft authentication failed — please re-authorize at /settings/governance/ingestion-sources/<id>"
+    And the IngestionSource UI shows "Microsoft authentication failed. Re-authorize at /governance/ingestion-sources/<id>"
     And the next pull won't fire until the admin re-authenticates (back-off + alert; not infinite retry)
 
   Scenario: Future pullers follow the same pattern

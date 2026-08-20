@@ -10,10 +10,10 @@ instead of the 3-minute K8s cron. Two pieces move together:
 1. **ADR-039 outbox heartbeat primitive.** A framework-level
    Redis-locked, worker-only, leader-elected timer. Registered entries
    return `OutboxEnqueueRequest[]` and dispatch through the same
-   `dispatchOutboxEnqueues` helper event-driven reactors use, so
+   `dispatchOutboxEnqueues` helper event-driven subscribers use, so
    downstream dedup / retry / audit / handler are byte-identical.
-2. **ADR-034 Phase 5 graph trigger reactor.** A `.withOutbox(...)`
-   reactor on the trace pipeline that debounces per `(trigger, project)`
+2. **ADR-034 Phase 5 graph trigger subscriber.** A `.withOutbox(...)`
+   subscriber on the trace pipeline that debounces per `(trigger, project)`
    5s and dispatches breach events in real time. The heartbeat covers
    absence cases (no-data alerts, resolve-when-traffic-stops) real-time
    can't see; 30s cadence, one canonical `evaluateGraphTrigger` handler
@@ -29,9 +29,9 @@ them and the outbox path takes over.
 |---|---|---|---|
 | `release_es_graph_triggers_firing` | Per-project. Moves custom-graph threshold alerts off the K8s cron onto the outbox + heartbeat path. Cron flag-checks per trigger's project and skips flagged ones. Coexistence is safe — a project is on the cron OR the new path, never both. | PostHog ON for canary project(s). Local: `FEATURE_FLAG_FORCE_ENABLE=release_es_graph_triggers_firing`. | Default OFF. K8s cron handles graph triggers as today. |
 
-Neither the heartbeat nor the reactor has a top-level kill switch. To
+Neither the heartbeat nor the subscriber has a top-level kill switch. To
 disable an individual heartbeat consumer, use the ES kill-switch family
-`es-<aggregate>-<component>-<name>-killswitch`. (The reactor lives on the
+`es-<aggregate>-<component>-<name>-killswitch`. (The subscriber lives on the
 trace pipeline; the generated key is emitted by `killSwitch.ts` and
 visible in the ES audit log at boot.)
 
@@ -39,7 +39,7 @@ visible in the ES audit log at boot.)
 
 ```bash
 make quickstart all-local          # local CH + PG + Redis + app + workers
-pnpm dev                            # from langwatch/
+pnpm dev                            # from platform/app/
 ```
 
 - Workers must be running (outbox + heartbeat live under
@@ -70,7 +70,7 @@ pnpm dev                            # from langwatch/
 1. Enable `release_es_graph_triggers_firing`.
 2. Ingest a trace whose value pushes the metric over threshold.
 3. Within seconds (bounded by the 5s per-(trigger, project) debounce) the
-   outbox reactor fires. Alert email / Slack post lands.
+   outbox subscriber fires. Alert email / Slack post lands.
 4. Cron log this tick: `graphTriggerCron skipped project=<X>
    flag=release_es_graph_triggers_firing`. No double-fire.
 
@@ -108,7 +108,7 @@ pnpm dev                            # from langwatch/
 - **Outbox runtime attached.** Same as PR #4498 — no `outbox runtime
   attached` at boot means every graphEval enqueue silently fails. This PR
   extends the outbox setup path; `presets.ts` must call `attachOutbox()`
-  after the outbox is built. Signature: reactor's `decide` returns
+  after the outbox is built. Signature: subscriber's `decide` returns
   enqueues, no `ReactorOutbox` row written, no dispatch.
 - **Heartbeat lock TTL & shutdown wait.** Kill a worker mid-tick; within
   `max(intervalMs * 2, 30s)` the lock releases and the next worker picks
@@ -118,10 +118,10 @@ pnpm dev                            # from langwatch/
   start()`. Registered entries' `decide(ctx)` gets a FRESH `AbortSignal`
   — the old one is gone. Regression = decides fire on an already-aborted
   signal and skip work.
-- **`.withOutbox` reactor name matches its handler name.** Eval reactor's
+- **`.withOutbox` subscriber name matches its handler name.** Eval subscriber's
   `definition.name` regressed to `"graphTriggerEvaluation:evaluation"` in
   a draft; the static pipeline builder threw at boot with "unknown outbox
-  reactor name". Handler name is `"graphTriggerEvaluation"` — no
+  subscriber name". Handler name is `"graphTriggerEvaluation"` — no
   `:evaluation` suffix.
 - **Cron flag check is per-trigger's project.** The
   `release_es_graph_triggers_firing` check in
@@ -136,7 +136,7 @@ pnpm dev                            # from langwatch/
 - **`graphEval` outbox stage doesn't fit the (trigger, trace) shape.**
   Graph evals have no traceId — they're per-trigger. `payload.ts` has a
   `graphEval` stage discriminator distinct from settle/cadence. A settle
-  payload built with a graph-alert reactor's dedup key fails silently.
+  payload built with a graph-alert subscriber's dedup key fails silently.
 - **Single handler serves both wake sources.** `evaluateGraphTrigger` is
   the ONE dispatch handler whether the event pipeline or the heartbeat
   woke it. Two versions = the exact duplication ADR-039 prevents.
@@ -158,7 +158,7 @@ pnpm dev                            # from langwatch/
   sustained rate → Redis contention or lock never releasing.
 - CloudWatch grep: `graphTriggerCron skipped project=<X>` where `<X>` is
   a project you did NOT flag → per-project flag check regressed.
-- Sentry: `unknown outbox reactor name` at worker boot → reactor
+- Sentry: `unknown outbox subscriber name` at worker boot → subscriber
   registration regressed. Worker won't accept traffic.
 - CloudWatch grep: `no-data alert fired` more frequent than configured
   cadence → heartbeat firing more than once per `intervalMs`. Usually

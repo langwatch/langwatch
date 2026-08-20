@@ -168,9 +168,8 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
 
   # ---------------------------------------------------------------------------
   # Persona 4 — governance_admin — /governance bird's-eye
-  # (canonical Overview path; /settings/governance is registered as a
-  #  back-compat alias per langwatch/src/routes.tsx — both routes serve
-  #  the same page until the alias is removed in a future cleanup)
+  # (canonical Overview path; the legacy /settings/governance address
+  #  redirects there per specs/navigation/gateway-url-move.feature)
   # ---------------------------------------------------------------------------
 
   @bdd @ui @persona-content @persona-4

@@ -36,14 +36,6 @@ export type FeatureToggles = {
    * should not tax every install that never runs it.
    */
   isLinguaEnabled: boolean;
-  /**
-   * The deprecated legacy evaluators (the old Ragas API surface). They exist
-   * only so evaluations saved years ago keep running, and while they share
-   * most of their weight with the current Ragas family, deprecated things
-   * should vanish rather than nag. Default OFF; an install that needs them
-   * says so, everyone else never sees them.
-   */
-  isLegacyEvaluatorsEnabled: boolean;
 };
 
 const TRUE = new Set(["1", "true", "yes", "on"]);
@@ -74,7 +66,6 @@ function toggle({
 export const LANGY_ENV_KEY = "LANGWATCH_ENABLE_LANGY";
 export const PRESIDIO_ENV_KEY = "LANGWATCH_ENABLE_PRESIDIO";
 export const LINGUA_ENV_KEY = "LANGWATCH_ENABLE_LINGUA";
-export const LEGACY_EVALUATORS_ENV_KEY = "LANGWATCH_ENABLE_LEGACY_EVALUATORS";
 
 export function resolveFeatures(
   env: Record<string, string | undefined> = process.env,
@@ -83,11 +74,6 @@ export function resolveFeatures(
     isLangyEnabled: toggle({ env, key: LANGY_ENV_KEY, defaultEnabled: true }),
     isPresidioEnabled: toggle({ env, key: PRESIDIO_ENV_KEY, defaultEnabled: false }),
     isLinguaEnabled: toggle({ env, key: LINGUA_ENV_KEY, defaultEnabled: false }),
-    isLegacyEvaluatorsEnabled: toggle({
-      env,
-      key: LEGACY_EVALUATORS_ENV_KEY,
-      defaultEnabled: false,
-    }),
   };
 }
 
@@ -105,7 +91,6 @@ export function featureEnv(features: FeatureToggles): Record<string, string> {
     [LANGY_ENV_KEY]: String(features.isLangyEnabled),
     [PRESIDIO_ENV_KEY]: String(features.isPresidioEnabled),
     [LINGUA_ENV_KEY]: String(features.isLinguaEnabled),
-    [LEGACY_EVALUATORS_ENV_KEY]: String(features.isLegacyEvaluatorsEnabled),
   };
 }
 

@@ -13,15 +13,21 @@ import (
 
 type fakeSupervisor struct {
 	shells []string
+	dirs   []string
 	envs   [][]string
 	err    error
 	// errOn, when non-empty, fails only the shell containing this substring —
 	// so a test can break the seed while letting the prepare pass.
 	errOn string
+	// waited records every URL WaitReady was asked about; notReady makes it
+	// report "gave up" instead, the way a canceled context does.
+	waited   []string
+	notReady bool
 }
 
-func (f *fakeSupervisor) RunOnce(_ context.Context, _, _, shell string, env []string) error {
+func (f *fakeSupervisor) RunOnce(_ context.Context, _, dir, shell string, env []string) error {
 	f.shells = append(f.shells, shell)
+	f.dirs = append(f.dirs, dir)
 	f.envs = append(f.envs, env)
 	if f.errOn != "" {
 		if strings.Contains(shell, f.errOn) {
@@ -35,6 +41,10 @@ func (f *fakeSupervisor) RunOnceBounded(_ context.Context, _, _, shell string, e
 	return f.RunOnce(context.Background(), "", "", shell, env)
 }
 func (f *fakeSupervisor) Supervise(context.Context, []Child) {}
+func (f *fakeSupervisor) WaitReady(_ context.Context, _, url string) bool {
+	f.waited = append(f.waited, url)
+	return !f.notReady
+}
 
 type portSystem struct {
 	fakeSystem

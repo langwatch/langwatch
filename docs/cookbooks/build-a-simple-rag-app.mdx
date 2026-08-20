@@ -65,7 +65,7 @@ def calculate_mrr(predictions: list[str], ground_truth: list[str]):
     return mrr
 ```
 
-If you retrieve a large number of documents (e.g., 100) and only a few are relevant, you have **high recall but low precision**: forcing the LLM to sift through noise. If you retrieve very few documents and miss many relevant ones, you have **high precision but low recall**: limiting the LLM’s ability to generate good answers. Assuming LLMs improve at selecting relevant information, recall becomes more and more important. That's why most practitioners focus on optimizing recall. MRR is helpful when displaying citations to users. If citation quality isn’t critical for your app, focusing on precision and recall is often enough.
+If you retrieve a large number of documents (e.g., 100) and only a few are relevant, you have **high recall but low precision**: forcing the LLM to sift through noise. If you retrieve very few documents and miss many relevant ones, you have **high precision but low recall**: limiting the LLM’s ability to generate good answers. Assuming LLMs improve at selecting relevant information, recall becomes more and more important. That's why recall is usually the metric to optimize. MRR is helpful when displaying citations to users. If citation quality isn’t critical for your app, focusing on precision and recall is often enough.
 
 ## Generating Synthetic Data
 
@@ -151,7 +151,7 @@ print(f"Created collection large with {large_collection.count()} documents.")
 
 ## Parametrizing our Retrieval Pipeline
 
-The key to running quick experiments is to parametrize the retrieval pipeline. This makes it easy to swap different retrieval methods as your RAG system evolves. In this example, we’ll compare a small and large embedding model based on recall and MRR. We’ll also vary the number of retrieved documents (k) to see how performance changes.
+The key to running quick experiments is to parametrize the retrieval pipeline. This lets you swap different retrieval methods as your RAG system evolves. In this example, we’ll compare a small and large embedding model based on recall and MRR. We’ll also vary the number of retrieved documents (k) to see how performance changes.
 
 First, we’ll define a function to retrieve documents.
 

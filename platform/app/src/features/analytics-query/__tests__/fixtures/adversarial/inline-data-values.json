@@ -1,0 +1,12 @@
+{
+	"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+	"data": {
+		"values": [
+			{
+				"model": "a",
+				"total": 1
+			}
+		]
+	},
+	"mark": "bar"
+}

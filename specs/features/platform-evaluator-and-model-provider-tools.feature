@@ -115,6 +115,25 @@ Feature: Platform MCP tools for evaluators and model providers
     Then I receive all providers for the project
     And all API key values are masked
 
+  # A project API key reaches this endpoint, and customers deploy that key
+  # into their own applications and CI. The response therefore reports which
+  # credential fields are set, never what they hold.
+  @integration
+  Scenario: GET /api/model-providers returns no credential value for any provider
+    Given a provider stores credentials whose field names are not "API key"
+    When I send a GET request to /api/model-providers
+    Then every credential field comes back as the masked placeholder
+    And no stored credential value appears anywhere in the response
+    And the field names still show which credentials are set
+
+  @unit
+  Scenario: Credential fields are secret unless the registry declares them public
+    Given a provider adds a credential field to its key schema
+    When the field is not named in the public credential list
+    Then it is classified as a secret
+    And every read path masks it
+    And a write that omits it keeps the stored value
+
   @integration
   Scenario: PUT /api/model-providers/:provider upserts provider config
     When I send a PUT request with provider name and customKeys

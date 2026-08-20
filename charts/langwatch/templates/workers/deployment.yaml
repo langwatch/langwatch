@@ -63,13 +63,25 @@ spec:
         {{- if .Values.workers.pod.labels }}
         {{- toYaml .Values.workers.pod.labels | nindent 8 }}
         {{- end }}
+        {{- with (include "langwatch.cloudIdentityPodLabels" .) }}
+        {{- . | nindent 8 }}
+        {{- end }}
       annotations:
         {{- with (coalesce .Values.workers.pod.annotations .Values.global.podAnnotations) }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
       # Workers do not call the Kubernetes API, so don't mount the SA token.
+      {{- with (include "langwatch.serviceAccountName" .) }}
+      serviceAccountName: {{ . }}
+      {{- end }}
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
+      # SIGTERM starts a real drain here, unlike a stateless web pod: the
+      # GroupQueue stops dispatching and waits for in-flight jobs to finish
+      # their ClickHouse writes. The helper refuses to render when this is too
+      # short for workers.shutdownDrainSeconds, because a missed grace period
+      # is a SIGKILL — the abrupt shutdown that severs in-flight statements.
+      terminationGracePeriodSeconds: {{ include "langwatch.terminationGracePeriod" (dict "component" .Values.workers "name" "workers") }}
       securityContext:
         {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.workers) | nindent 8 }}
 
@@ -118,11 +130,12 @@ spec:
             {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.workers) | nindent 12 }}
           image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
           imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
-          workingDir: /app/langwatch
+          workingDir: /app/platform/app
           command: ['pnpm']
           args: ['run', 'start:workers']
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
+            {{- include "langwatch.shutdownEnv" (dict "component" .Values.workers "name" "workers") | nindent 12 }}
 
             # See the app deployment — named per role so worker telemetry is
             # separable from the app's.

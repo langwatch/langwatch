@@ -261,12 +261,10 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 
 	// PromptTokens includes any cached tokens; the span reports the fresh,
 	// non-cached input separately from the cache-read/cache-write counts so the
-	// cost calc prices each bucket once. Fall back to the full prompt if a
-	// provider ever reports cache counts that aren't folded into PromptTokens.
-	freshInput := params.Usage.PromptTokens - params.Usage.CacheReadTokens - params.Usage.CacheCreationTokens
-	if freshInput < 0 {
-		freshInput = params.Usage.PromptTokens
-	}
+	// cost calc prices each bucket once. The spend record reports the same
+	// remainder from the same helper, which is what keeps a trace and its bill
+	// on one number.
+	freshInput := params.Usage.BillableInputTokens()
 
 	attrs := []attribute.KeyValue{
 		semconv.GenAIProviderNameKey.String(string(params.ProviderID)),
@@ -276,11 +274,28 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 		attrTotalUsage.Int(params.Usage.TotalTokens),
 		attrCost.Int64(params.Usage.CostMicroUSD),
 	}
+	if params.RequestedModel != "" {
+		attrs = append(attrs, attribute.String(AttrRequestedModel, params.RequestedModel))
+	}
+	// Audio tokens ride beside the text totals, not inside them, so the cost
+	// pipeline can price them at the audio rate. Reporting them inside
+	// gen_ai.usage.input_tokens instead priced an eight-times-dearer token at
+	// the text rate, which is why a trace and its budget disagreed on every
+	// audio call.
+	if params.Usage.InputAudioTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageInputAudioTokens, params.Usage.InputAudioTokens))
+	}
+	if params.Usage.OutputAudioTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageOutputAudioTokens, params.Usage.OutputAudioTokens))
+	}
 	if params.Usage.CacheReadTokens > 0 {
 		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheRead, params.Usage.CacheReadTokens))
 	}
 	if params.Usage.CacheCreationTokens > 0 {
 		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheCreate, params.Usage.CacheCreationTokens))
+	}
+	if params.Usage.CacheCreation1hTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheCreate1h, params.Usage.CacheCreation1hTokens))
 	}
 	// Audio usage: TTS reports the characters synthesized, STT the seconds
 	// transcribed. Character- and duration-priced audio models have no token
@@ -316,6 +331,17 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	// traces group under a stable thread instead of having no thread id at all.
 	if sessionID := clientSessionID(ctx, params); sessionID != "" {
 		attrs = append(attrs, attribute.String(AttrGenAIConversationID, sessionID))
+	}
+	// External end-user attribution: the header-resolved id (middleware) wins,
+	// else the OpenAI `user` body param. The trace fold copies this into
+	// per-request spend events and attributed-user budget buckets key on it.
+	if endUser := endUserID(ctx, params); endUser != "" {
+		attrs = append(attrs, attribute.String(AttrEndUserID, endUser))
+	}
+	// The caller's metadata echo, validated at the edge; round-tripped
+	// verbatim into billing spend events as their join key.
+	if md := RequestMetadataJSON(ctx); md != "" {
+		attrs = append(attrs, attribute.String(AttrRequestMetadata, md))
 	}
 
 	// When the request failed upstream, stamp the provider's HTTP status +
@@ -365,9 +391,14 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	// calls that structurally never carry completion tokens or extracted
 	// output: TTS spans (binary audio response), duration-priced STT spans
 	// (scribe reports seconds, not tokens), and embeddings.
+	// Audio tokens count as output here even though they are carried out of
+	// the completion total: an audio-native model answers entirely in audio
+	// tokens, so reading the completion field alone would drop a real answer
+	// as an empty probe.
+	answeredTokens := params.Usage.CompletionTokens + params.Usage.OutputAudioTokens
 	isProbeShape := params.RequestType == domain.RequestTypeChat ||
 		params.RequestType == domain.RequestTypeMessages
-	if !isError && isProbeShape && params.Usage.CompletionTokens == 0 && params.Usage.CostMicroUSD == 0 && output == "" {
+	if !isError && isProbeShape && answeredTokens == 0 && params.Usage.CostMicroUSD == 0 && output == "" {
 		span.SetAttributes(attrDrop.Bool(true))
 	}
 
@@ -459,6 +490,39 @@ func parseTraceparent(tp string) (traceID []byte, spanID []byte) {
 		return nil, nil
 	}
 	return tid, sid
+}
+
+// endUserID resolves the external end-user id for attribution: the
+// middleware-lifted header value wins (already sanitized), else the OpenAI
+// `user` body param on the request shapes that carry one. Both paths land in
+// SanitizeEndUserID so the stamped value is source-independent.
+func endUserID(ctx context.Context, params domain.AITraceParams) string {
+	if id := EndUserID(ctx); id != "" {
+		return id
+	}
+	switch params.RequestType {
+	case domain.RequestTypeChat, domain.RequestTypeEmbeddings,
+		domain.RequestTypeResponses, domain.RequestTypeSpeech:
+		return EndUserIDFromBody(params.RequestBody)
+	case domain.RequestTypeMessages, domain.RequestTypePassthrough,
+		domain.RequestTypeTranscription:
+		// No OpenAI-wire `user` field to read on these shapes: the Anthropic
+		// messages body carries attribution under metadata.user_id, passthrough
+		// bodies are provider-shaped and forwarded verbatim, and transcription
+		// arrives as multipart form data rather than JSON.
+	}
+	return ""
+}
+
+// EndUserIDFromBody reads the OpenAI-wire top-level `user` string (the
+// abuse-attribution param, forwarded upstream unchanged) and sanitizes it.
+// Shared by the span emitter and the spend emitter so both attribute the
+// same request to the same id.
+func EndUserIDFromBody(body []byte) string {
+	if user := gjson.GetBytes(body, "user").String(); user != "" {
+		return SanitizeEndUserID(user)
+	}
+	return ""
 }
 
 // clientSessionID resolves the wrapped tool's own session / conversation id.

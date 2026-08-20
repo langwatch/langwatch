@@ -4,13 +4,15 @@
 # Trigger policy:
 # - `release.published` whose tag starts with `langwatch@` (the main langwatch
 #   release tag — release-please uses `<component>@<version>`). Releases for
-#   other components (sdk-go@*, typescript-sdk@*, mcp-server@*, etc.) are
-#   filtered out by the `if:` guard on the publish job.
+#   other components (typescript-sdk@*, mcp-server@*, etc.) are
+#   filtered out by the `if:` guard on the publish job. The Go SDK is the one
+#   exception to the `<component>@<version>` shape: Go requires a submodule's
+#   tag to be `<subdir>/vX.Y.Z`, so it tags as `sdks/go/v*`.
 # - `workflow_dispatch` from main for break-glass / first publish / beta
 #   bumps. The dispatched run reads the version from package.json — it does
 #   NOT require a release tag.
 #
-# Version lock: root package.json and langwatch/package.json must match.
+# Version lock: root package.json and platform/app/package.json must match.
 # Both are auto-bumped in lockstep by release-please-config.json (the `.`
 # package's extra-files list). The pre-publish step verifies it.
 #
@@ -36,6 +38,13 @@ on:
     types: [published]
   workflow_dispatch:
 
+# A publish run drains — see publish-docker-app. This job uploads monobinaries
+# onto the GitHub release AND publishes to npm, so a cancelled run can leave a
+# release carrying a partial set of assets that nothing reconciles.
+concurrency:
+  group: npx-server-publish-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write # for creating/updating GH release with aigateway monobinaries
   id-token: write # for npm provenance + Trusted Publishers OIDC exchange
@@ -50,14 +59,14 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           run_install: false
 
@@ -66,10 +75,10 @@ jobs:
         run: |
           set -e
           pkg_version="$(node -p "require('./package.json').version")"
-          app_version="$(node -p "require('./langwatch/package.json').version")"
+          app_version="$(node -p "require('./platform/app/package.json').version")"
           tag="${GITHUB_REF_NAME:-}"
           echo "package.json version:           $pkg_version"
-          echo "langwatch/package.json version: $app_version"
+          echo "platform/app/package.json version: $app_version"
           echo "release tag (if any):           $tag"
 
           if [ "$pkg_version" != "$app_version" ]; then
@@ -106,7 +115,7 @@ jobs:
       - name: Install pnpm dependencies (workspace)
         run: pnpm install --frozen-lockfile
 
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
           cache: true
@@ -163,22 +172,22 @@ jobs:
       - name: Build @langwatch/server CLI
         run: pnpm --filter @langwatch/server-cli build
 
-      # Pre-build the langwatch app (vite client + scenario-child-process +
+      # Pre-build the langwatch app (vite client + the dist/server bundles +
       # mcp-server) so the published tarball ships dist/ artifacts. Without
       # this, end users see vite chunder past at startup on first run —
       # exactly the bureaucracy we're trying to eliminate.
       #
-      # langwatch/ is its own pnpm workspace (not in the root pnpm-workspace
-      # `packages/*` glob), so we install + build it explicitly here.
-      # node_modules/ is excluded from the tarball by langwatch/.npmignore,
-      # so end users still run `pnpm install` once on first start (which
-      # generates the platform-specific Prisma client via prisma's
-      # postinstall hook).
-      - name: Install langwatch app deps
-        run: pnpm -C langwatch install --frozen-lockfile --prod=false
-
+      # No separate app install: since ADR-076 langwatch/ is a member of the
+      # single root workspace, so "Install pnpm dependencies (workspace)"
+      # above already covers it and a filtered re-install here would only
+      # re-resolve the same lockfile for a subset.
+      #
+      # node_modules/ never reaches the tarball (dev/scripts/pack-npm.sh excludes
+      # it), so end users still run `pnpm install` once on first start, which
+      # is what generates the platform-specific Prisma client via prisma's
+      # postinstall hook — see packages/server/src/services/node-deps.ts.
       - name: Build langwatch app (vite + scenario + mcp + generated types)
-        run: pnpm -C langwatch run build
+        run: pnpm --filter "@langwatch/web..." run build
         env:
           NODE_ENV: production
 
@@ -186,7 +195,7 @@ jobs:
         id: pack
         run: |
           mkdir -p _pack
-          bash scripts/pack-npm.sh --pack-destination "$GITHUB_WORKSPACE/_pack"
+          bash dev/scripts/pack-npm.sh --pack-destination "$GITHUB_WORKSPACE/_pack"
           tarball="$(ls "$GITHUB_WORKSPACE/_pack"/langwatch-server-*.tgz | head -n1)"
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
           echo "tarball size:"; ls -lh "$tarball"
@@ -198,56 +207,84 @@ jobs:
         run: |
           set -e
           tarball="${{ steps.pack.outputs.tarball }}"
+          # Everything lives under package/app/ since ADR-076: the artifact is
+          # staged one level down so the workspace root is NOT the package
+          # root, which is the only way npm will carry pnpm-lock.yaml.
           required=(
-            "package/packages/server/dist/cli.cjs"
-            "package/langwatch/package.json"
-            "package/langwatch/dist/client/index.html"
-            "package/langwatch/dist/scenario-child-process.js"
-            "package/langevals/pyproject.toml"
+            "package/app/packages/server/dist/cli.cjs"
+            # The lockfile and workspace definition. npm deletes a lockfile at
+            # the package ROOT unconditionally, so these two paths existing is
+            # the whole reason for the staged layout — assert them, or a future
+            # layout change silently returns the end-user install to
+            # non-reproducible.
+            "package/app/pnpm-lock.yaml"
+            "package/app/pnpm-workspace.yaml"
+            "package/app/package.json"
+            "package/app/platform/app/package.json"
+            "package/app/platform/app/dist/client/index.html"
+            # The server bundles. `start:app` and `start:workers` execute these
+            # directly on plain node, and the published tree has no tsx to fall
+            # back to, so a tarball missing any of them is a server that cannot
+            # boot. `task.cjs` runs the migrations, and the scenario bundle is
+            # what keeps simulation cold-starts to seconds.
+            "package/app/platform/app/dist/server/server.cjs"
+            "package/app/platform/app/dist/server/workers.cjs"
+            "package/app/platform/app/dist/server/task.cjs"
+            "package/app/platform/app/dist/server/scenario-child-process.cjs"
+            # goose reads the ClickHouse migrations from ${__dirname}/migrations,
+            # which in the bundle is dist/server/migrations.
+            "package/app/platform/app/dist/server/migrations"
+            "package/app/services/langevals/pyproject.toml"
             # langevals resolves the python SDK as a local path dependency,
-            # so the tarball must ship python-sdk/pyproject.toml + src/.
-            "package/python-sdk/pyproject.toml"
-            "package/python-sdk/src"
-            # langwatch's pnpm-workspace.yaml lists "../mcp-server" as a
-            # workspace package; without the prebuilt dist the langwatch app
-            # crashes loading "@langwatch/mcp-server/create-mcp-server".
-            "package/mcp-server/package.json"
-            "package/mcp-server/dist/create-mcp-server.js"
+            # so the tarball must ship sdks/python/pyproject.toml + src/.
+            "package/app/sdks/python/pyproject.toml"
+            "package/app/sdks/python/src"
+            # mcp/typescript is a workspace dependency of the app; without the
+            # prebuilt dist the langwatch app crashes loading
+            # "@langwatch/mcp-server/create-mcp-server".
+            "package/app/mcp/typescript/package.json"
+            "package/app/mcp/typescript/dist/create-mcp-server.js"
             # Langy reads the platform feature map at runtime
-            # (langwatch/src/shared/langy/featureMap.ts imports it from the
+            # (platform/app/src/shared/langy/featureMap.ts imports it from the
             # repo root).
-            "package/feature-map.json"
+            "package/app/feature-map.json"
             # The app's prepare step imports the skills front-matter helper
             # (scripts/generate-langy-skills.ts) when a tree rebuilds. The
             # source is .ts (tsx resolves the .js import specifier back to
             # it); the tarball never ships a compiled .js, so asserting .js
             # here always failed even on a correctly packaged tarball.
-            "package/skills/_lib/frontmatter.ts"
+            "package/app/skills/_lib/frontmatter.ts"
           )
           # Every workspace package in the checkout must ship: a missing one
           # leaves dangling pnpm links in the installed tree and the app dies
           # with MODULE_NOT_FOUND at first boot; 3.6.0 shipped exactly that
-          # way (.npmignore still excluded langwatch/packages/ after runtime
-          # packages moved in). Both root packages/* and langwatch/packages/*
+          # way (.npmignore still excluded the app's packages/ after runtime
+          # packages moved in). The root packages/* members
           # are derived from a directory listing rather than named one by one,
           # so a new package on either side is covered by this gate the day
           # it appears, with nothing to remember to add here.
-          for pkgdir in langwatch/packages/*/ packages/*/; do
+          # packages/server is no longer skipped: since ADR-076 it is a member
+          # of the single workspace, so `--frozen-lockfile` on the end user's
+          # machine checks the lockfile against its manifest and fails without
+          # it. Every member's package.json must ship, this one included.
+          for pkgdir in packages/*/; do
             pkgdir="${pkgdir%/}"
             [ -f "$pkgdir/package.json" ] || continue
-            # packages/server is this CLI itself, not a workspace dependency
-            # the app imports (langwatch's pnpm-workspace.yaml lists .,
-            # packages/*, ../mcp-server, ../packages/handled-error,
-            # ../packages/langy — never packages/server). Its package.json
-            # is deliberately excluded from files[]; only dist/ + templates/
-            # ship, already covered by the cli.cjs required path above.
-            [ "$pkgdir" = "packages/server" ] && continue
-            required+=("package/$pkgdir/package.json")
+            required+=("package/app/$pkgdir/package.json")
+          done
+          # The remaining members carry no source into the tarball, only the
+          # manifest the workspace needs to stay coherent.
+          for member in sdks/typescript tests/agentic-e2e; do
+            required+=("package/app/$member/package.json")
           done
           forbidden=(
-            "package/langwatch/node_modules"
-            "package/langwatch/.next/cache"
-            "package/.env"
+            "package/app/platform/app/node_modules"
+            "package/app/platform/app/.next/cache"
+            "package/app/.env"
+            # The lockfile must be under app/, never at the package root —
+            # npm would delete it there and the guard above would still pass
+            # if someone re-added it in both places.
+            "package/pnpm-lock.yaml"
           )
           listing="$(mktemp)"
           tar -tzf "$tarball" > "$listing"

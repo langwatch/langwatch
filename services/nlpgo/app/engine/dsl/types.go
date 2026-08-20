@@ -270,7 +270,7 @@ type Component struct {
 	Evaluator *string `json:"evaluator,omitempty"`
 
 	// Signature/Prompt-specific — forwarded from the TS signatureComponentSchema
-	// (langwatch/src/optimization_studio/types/dsl.ts:414) so the engine can
+	// (platform/app/src/optimization_studio/types/dsl.ts:414) so the engine can
 	// stamp the PromptApiService.get + Prompt.compile span identity attrs.
 	// PromptDraft is true when the executed config diverges from the saved
 	// version (user edited inline without persisting); base configId / handle /
@@ -283,7 +283,7 @@ type Component struct {
 }
 
 // PromptVersionMetadata mirrors signatureComponentSchema.versionMetadata
-// (langwatch/src/optimization_studio/types/dsl.ts:417-422). Kept as a
+// (platform/app/src/optimization_studio/types/dsl.ts:417-422). Kept as a
 // nested struct rather than three flat fields so the JSON round-trip
 // matches the TS wire format byte-for-byte.
 type PromptVersionMetadata struct {
@@ -366,6 +366,10 @@ type Workflow struct {
 	EnableTracing   *bool             `json:"enable_tracing,omitempty"`
 	WorkflowType    *string           `json:"workflow_type,omitempty"`
 	Secrets         map[string]string `json:"secrets,omitempty"`
+	// Params are the run's user-defined parameters. Unlike secrets they keep
+	// their JSON types, so a number stays a number and a boolean stays a
+	// boolean by the time user code reads params.NAME.
+	Params map[string]any `json:"params,omitempty"`
 }
 
 // ParseWorkflow deserializes a Workflow from JSON, returning a wrapped

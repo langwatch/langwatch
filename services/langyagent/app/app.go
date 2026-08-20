@@ -98,7 +98,7 @@ func WithTelemetry(t *telemetry.Telemetry) Option { return func(a *App) { a.tele
 
 // WithFinalizer injects the durable turn-result poster. Optional: when absent
 // (tests, or a deployment with no internal secret) the app skips the durable
-// HTTP-final and relies on the relay + liveness reactor alone.
+// HTTP-final and relies on the relay + liveness subscriber alone.
 func WithFinalizer(f TurnFinalizer) Option { return func(a *App) { a.finalizer = f } }
 
 // WithFrameRelay injects the control-plane relay push client. Optional: when
@@ -232,7 +232,7 @@ func (a *App) StartTurn(ctx context.Context, req ChatRequest) (func(context.Cont
 	switch worker.ClaimTurn(req.TurnID) {
 	case ClaimAlreadyHandled:
 		// Nothing claimed, nothing to drive; the transport answers 202 so the
-		// re-driving reactor treats it as accepted, not a failure.
+		// re-driving subscriber treats it as accepted, not a failure.
 		return func(context.Context) {}, nil
 	case ClaimBusy:
 		// Expected hot-path control-flow outcome — no stack capture needed.
@@ -387,9 +387,14 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		failureMessage := "the agent hit an error before finishing"
 		if llmErr, ok := worker.LastLLMError(); ok {
 			reasons = append(reasons, llmErr)
-			// The captured cause's message is the provider's own error text
-			// (client-facing by design) — the trace should name the real
-			// failure, not the generic wrapper.
+			// The captured cause's message is OURS by the time it gets
+			// here: the relay keeps a gateway-authored message only when
+			// the response marker proved we wrote it, and strips it back
+			// off the codes that merely relay provider text (see
+			// scrubUpstreamRelayedProse). So this names the real failure
+			// rather than the generic wrapper, without putting a
+			// provider's sentence — written for whoever holds the API
+			// key, which on a mediated call is us — into the turn.
 			if m, _ := llmErr.Meta["message"].(string); m != "" {
 				failureMessage = m
 			}
@@ -474,7 +479,7 @@ func emitError(ctx context.Context, sink *frameSink, message, code string) {
 
 // finalizeCompletedTurn posts the accumulated final for a successful turn. It is
 // detached from the request ctx and fire-and-forget with a panic guard: a dropped
-// final is recoverable via the ingest's idempotency and the liveness reactor
+// final is recoverable via the ingest's idempotency and the liveness subscriber
 // backstop, so it must never block or fail the turn.
 func (a *App) finalizeCompletedTurn(ctx context.Context, req ChatRequest, sink *frameSink) {
 	if a.finalizer == nil || req.TurnID == "" {
@@ -493,7 +498,7 @@ func (a *App) finalizeCompletedTurn(ctx context.Context, req ChatRequest, sink *
 			Text:           text,
 			ToolCalls:      toolCalls,
 		}); err != nil {
-			clog.Get(detached).Warn("durable turn finalize failed; liveness reactor is the backstop", zap.Error(err))
+			clog.Get(detached).Warn("durable turn finalize failed; liveness subscriber is the backstop", zap.Error(err))
 		}
 	}()
 }

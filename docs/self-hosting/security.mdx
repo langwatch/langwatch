@@ -3,13 +3,13 @@ title: Security
 description: "Security model, encryption, secrets management, and hardening for LangWatch"
 ---
 
-This page covers the security features and best practices for self-hosted LangWatch deployments.
+Self-hosted LangWatch authenticates users, encrypts stored credentials, isolates tenants at the query layer, and hardens every pod it authors by default. Three bundled components cannot meet [strict admission control](#strict-admission-control) and must be disabled or replaced there.
 
 ## Authentication & Authorization
 
-**NextAuth.js** handles user authentication with support for:
+LangWatch handles user authentication with support for:
 - Email/password (default)
-- SSO providers: Azure AD, Okta, Auth0, AWS Cognito, Google, GitHub, GitLab
+- SSO providers: Azure AD, Okta, Auth0, Google, GitHub, GitLab
 
 See [SSO Configuration](/self-hosting/configuration/sso) for setup guides.
 
@@ -94,7 +94,7 @@ The Helm chart's `secretKeyRef` pattern works with any Kubernetes Secret, regard
 
 ### Private control-plane paths are blocked at the ingress
 
-Everything under `/api/internal/*` is the app's private control plane — the Langy
+Everything under `/api/internal/*` is the app's private control plane: the Langy
 agent's callbacks and the AI gateway's usage callbacks. Those routes authenticate
 with a shared secret, but they are never meant to be reachable from the internet.
 
@@ -111,16 +111,16 @@ ingress:
     - /api/cron   # only if you do NOT drive cron from an external scheduler
 ```
 
-Things worth knowing before you change it:
+Before you change it:
 
 - **Blocked requests answer 503** on ingress-nginx. The exact code is
   controller-dependent (the Ingress API does not specify what a backend with no
-  endpoints returns), and this is verified against ingress-nginx only — if you
+  endpoints returns), and this is verified against ingress-nginx only. If you
   run a different controller, confirm it answers 5xx rather than falling through
   to another rule before relying on the block. Expect a low background rate in
-  your ingress 5xx metrics from scanners — that is the block working, not the
+  your ingress 5xx metrics from scanners: that is the block working, not the
   app faulting.
-- **In-cluster callers are unaffected** — the agent, gateway and CronJobs use the
+- **In-cluster callers are unaffected.** The agent, gateway and CronJobs use the
   internal Service.
 - **It covers this ingress only.** If you publish the app another way (NodePort,
   LoadBalancer, your own Ingress), restrict these paths where that route ends.
@@ -134,13 +134,13 @@ Things worth knowing before you change it:
   - a regex `pathType: ImplementationSpecific` path, which ingress-nginx ranks
     *above* prefix rules
   - the `nginx.ingress.kubernetes.io/default-backend` annotation, which is
-    defined as the handler for a backend with no endpoints — exactly what the
-    blackhole is, so it converts the block into a proxy
+    defined as the handler for a backend with no endpoints (exactly what the
+    blackhole is), so it converts the block into a proxy
   - a host whose `http.paths` list is empty, which would leave an Ingress whose
     only rules are blackholes
-- **The block depends on nobody being able to create an EndpointSlice named for
-  the blackhole Service.** It is selector-less, so endpoints can only arrive by
-  hand — restrict `discovery.k8s.io/endpointslices: create` in this namespace if
+- **The block depends on no principal being able to create an EndpointSlice named
+  for the blackhole Service.** It is selector-less, so endpoints can only arrive by
+  hand. Restrict `discovery.k8s.io/endpointslices: create` in this namespace if
   that is not already the case.
 - **AWS LBC (default `target-type: instance`) and GKE without NEG** reject a
   ClusterIP backend and stop reconciling the Ingress. Set
@@ -149,7 +149,7 @@ Things worth knowing before you change it:
 - **To disable**, set `blockedPaths: []` in a values file or use `--set-json`;
   plain `--set` assigns a string and is rejected.
 - **Gateway or Langy agent running outside the cluster?** Their callbacks arrive
-  over the public ingress and will be blocked — narrow the list rather than
+  over the public ingress and are blocked. Narrow the list rather than
   emptying it.
 
 ### Kubernetes Network Policies
@@ -194,7 +194,7 @@ spec:
 
 ## Pod Security
 
-Every LangWatch pod — app, workers, NLP, LangEvals, gateway, and the cron pods — and every bundled datastore — PostgreSQL, Redis, ClickHouse, Keeper — runs hardened. The defaults the first-party services inherit:
+Every LangWatch pod (app, workers, NLP, LangEvals, gateway, and the cron pods) and every bundled datastore (PostgreSQL, Redis, ClickHouse, Keeper) runs hardened. The defaults the first-party services inherit:
 
 ```yaml
 # Pod-level (global.podSecurityContext)
@@ -212,11 +212,11 @@ capabilities:
   drop: [ALL]
 ```
 
-The bundled datastores carry the same posture but keep their image's own uid — PostgreSQL and Redis run 999, ClickHouse and Keeper 101, the gateway 65532, and Keeper's init container 65534. If you write a Gatekeeper `MustRunAs` constraint, allow all of those, not just 1000: a constraint that misses the init container's 65534 denies the whole Keeper pod. (The bundled Prometheus also runs 65534, though `strict-admission` removes it.)
+The bundled datastores carry the same posture but keep their image's own uid: PostgreSQL and Redis run 999, ClickHouse and Keeper 101, the gateway 65532, and Keeper's init container 65534. If you write a Gatekeeper `MustRunAs` constraint, allow all of those, not only 1000: a constraint that misses the init container's 65534 denies the whole Keeper pod. (The bundled Prometheus also runs 65534, though `strict-admission` removes it.)
 
 `runAsNonRoot` is deliberately set at both pod and container level. Kubernetes inherits the pod-level value, but some Gatekeeper constraints read the container-level field directly and deny pods that only carry it on the pod.
 
-No LangWatch pod mounts a ServiceAccount token (`global.automountServiceAccountToken: false`); none of these services talk to the Kubernetes API. The bundled Prometheus does mount one — it is an upstream subchart, and `strict-admission` removes it.
+No LangWatch pod mounts a ServiceAccount token (`global.automountServiceAccountToken: false`); none of these services talk to the Kubernetes API. The bundled Prometheus does mount one. It is an upstream subchart, and `strict-admission` removes it.
 
 The root filesystem is read-only on every one of those pods. Anything a process writes at runtime (the app's `/tmp`, ClickHouse's server logs and `/tmp`, Postgres' socket directory) lands on an `emptyDir` mounted over that path; persistent data stays on its PVC. The image layer is never writable.
 
@@ -231,11 +231,11 @@ helm install lw . \
   -f examples/overlays/strict-admission.yaml
 ```
 
-A **default** install does not pass on its own. Everything LangWatch authors already complies — read-only root, non-root at both levels, dropped capabilities, `RuntimeDefault` seccomp, no privilege escalation, no automounted token, CPU + memory requests and limits — but three bundled components cannot, and the overlay turns all three off:
+A **default** install does not pass on its own. Everything LangWatch authors already complies (read-only root, non-root at both levels, dropped capabilities, `RuntimeDefault` seccomp, no privilege escalation, no automounted token, CPU + memory requests and limits), but three bundled components cannot, and the overlay turns all three off:
 
 - **Prometheus** (`prometheus.chartManaged`) is an upstream subchart LangWatch doesn't control. Its pods carry no `readOnlyRootFilesystem`, no seccomp profile, and no resource limits on the config-reload sidecar. Bring your own, or disable metrics.
-- **The Langy assistant** (`langyagent.chartManaged`) runs its manager as root with `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID` and `SETGID`. That is by design: the manager gives every assistant worker a distinct UID, and without those capabilities sibling workers share a UID and can read each other's credentials. Don't force it non-root — deploy it on a cluster that allows it, or run without the assistant.
-- **The ClickHouse preflight Job** (`clickhouse.preflight.enabled`) shells out to `kubectl` to check your Secret's keys, so it needs both an automounted token and a writable root for kubectl's discovery cache. It only renders when you supply the ClickHouse Secret yourself rather than using autogen — which is the production path, so the overlay pins it off.
+- **The Langy assistant** (`langyagent.chartManaged`) runs its manager as root with `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID` and `SETGID`. That is by design: the manager gives every assistant worker a distinct UID, and without those capabilities sibling workers share a UID and can read each other's credentials. Don't force it non-root. Deploy it on a cluster that allows it, or run without the assistant.
+- **The ClickHouse preflight Job** (`clickhouse.preflight.enabled`) shells out to `kubectl` to check your Secret's keys, so it needs both an automounted token and a writable root for kubectl's discovery cache. It only renders when you supply the ClickHouse Secret yourself rather than using autogen, which is the production path, so the overlay pins it off.
 
 One more toggle in the overlay isn't an admission failure but an unmet dependency:
 
@@ -307,7 +307,7 @@ The `langwatch` npm package is published with [npm provenance attestations](http
 - [ ] Monitoring and alerting configured
 - [ ] Secret rotation procedure documented
 - [ ] Pod security contexts verified (non-root, read-only filesystem, `RuntimeDefault` seccomp, no automounted token)
-- [ ] On strict admission clusters: apply `examples/overlays/strict-admission.yaml` (`prometheus.chartManaged: false`, `langyagent.chartManaged: false`, and — without a custom metrics API — `gateway.autoscaling.enabled: false`)
+- [ ] On strict admission clusters: apply `examples/overlays/strict-admission.yaml` (`prometheus.chartManaged: false`, `langyagent.chartManaged: false`, and, without a custom metrics API, `gateway.autoscaling.enabled: false`)
 - [ ] Ingress rate limiting configured
 - [ ] Audit logs enabled (Enterprise)
 - [ ] Image signatures verified at pull time (admission controller or `cosign verify` in CI)

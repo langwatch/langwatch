@@ -42,7 +42,7 @@ Feature: langwatch CLI — virtual-keys subcommands (multi-scope)
     When I run `langwatch virtual-keys list`
     Then the exit code is 0
     And stdout shows a table with columns "ID, Name, Env, Status, Prefix, Scopes, Last used"
-    And the `Scopes` column renders `ORG:acme`, `TEAM:platform`, `PROJECT:demo` respectively
+    And the `Scopes` column renders `org:acme`, `team:platform`, `project:demo` respectively
     And the table has 3 rows
 
   @integration @cli @unimplemented
@@ -65,7 +65,7 @@ Feature: langwatch CLI — virtual-keys subcommands (multi-scope)
     And stdout contains `Created virtual key "prod-key"`
     And stdout displays the full secret in a highlighted box
     And stdout warns that the secret will not be shown again
-    And the created VK has `organization_id="acme"` and `scopes=[{ORGANIZATION, "acme"}]` and `routing_policy_id=null`
+    And the created VK has `organization_id="acme"` and `scopes=[{organization, "acme"}]` and `routing_policy_id=null`
     And the VK uses the org's default RoutingPolicy ordering at dispatch time
 
   @integration @cli @unimplemented
@@ -73,7 +73,7 @@ Feature: langwatch CLI — virtual-keys subcommands (multi-scope)
     Given my token has `virtualKeys:manage` at TEAM "platform" AND TEAM "data-sci"
     When I run `langwatch virtual-keys create --name cross-team --scope TEAM:platform --scope TEAM:data-sci`
     Then the exit code is 0
-    And the created VK has `scopes=[{TEAM,"platform"},{TEAM,"data-sci"}]`
+    And the created VK has `scopes=[{team,"platform"},{team,"data-sci"}]`
     And the eligible-MP set is the union of MPs visible from both teams (see vk-scope-inheritance.feature)
 
   @integration @cli @unimplemented
@@ -81,7 +81,7 @@ Feature: langwatch CLI — virtual-keys subcommands (multi-scope)
     Given a RoutingPolicy "rp_demo_priority" exists at ORG "acme" with model_provider_ids `[openai, anthropic]`
     When I run `langwatch virtual-keys create --name demo-key --scope PROJECT:demo --routing-policy rp_demo_priority`
     Then the exit code is 0
-    And the created VK has `routing_policy_id="rp_demo_priority"` and `scopes=[{PROJECT,"demo"}]`
+    And the created VK has `routing_policy_id="rp_demo_priority"` and `scopes=[{project,"demo"}]`
 
   @integration @cli @unimplemented
   Scenario: Create a personal VK (principal-attributed)
@@ -100,7 +100,7 @@ Feature: langwatch CLI — virtual-keys subcommands (multi-scope)
   Scenario: Create with JSON output for scripts
     When I run `langwatch virtual-keys create --name prod --scope ORG:acme --format json`
     Then stdout is a single-line JSON object with keys `virtual_key` and `secret`
-    And `virtual_key.scopes` is `[{"scope_type":"ORGANIZATION","scope_id":"acme"}]`
+    And `virtual_key.scopes` is `[{"scope_type":"organization","scope_id":"acme"}]`
     And `secret` contains the full key (only shown in this one response)
 
   @integration @cli @unimplemented
@@ -108,7 +108,7 @@ Feature: langwatch CLI — virtual-keys subcommands (multi-scope)
     When I run `langwatch virtual-keys create --name x`
     Then the exit code is 1
     And stderr contains `at least one --scope <TYPE:id> is required`
-    And stderr shows examples: `--scope ORG:acme`, `--scope TEAM:platform`, `--scope PROJECT:demo`
+    And stderr shows examples: `--scope org:acme`, `--scope team:platform`, `--scope project:demo`
 
   @integration @cli @unimplemented
   Scenario: Malformed scope value
@@ -120,7 +120,7 @@ Feature: langwatch CLI — virtual-keys subcommands (multi-scope)
   Scenario: Unknown scope type
     When I run `langwatch virtual-keys create --name x --scope WORKSPACE:acme`
     Then the exit code is 1
-    And stderr names the allowed types: `ORG | ORGANIZATION | TEAM | PROJECT`
+    And stderr names the allowed types: `org | organization | team | project`
 
   # ============================================================================
   # update
@@ -198,7 +198,7 @@ Feature: langwatch CLI — virtual-keys subcommands (multi-scope)
   Scenario: Get a VK's config
     Given I know the id of VK "prod-key"
     When I run `langwatch virtual-keys get prod-key`
-    Then stdout shows: id, name, environment, status, prefix, principal, scopes (formatted as `TYPE:id, …`), routing policy id (or `(default)`), created/last-used/revoked timestamps, view-in-UI link `/settings/gateway/virtual-keys/<id>`, and the config JSON
+    Then stdout shows: id, name, environment, status, prefix, principal, scopes (formatted as `TYPE:id, …`), routing policy id (or `(default)`), created/last-used/revoked timestamps, view-in-UI link `/gateway/virtual-keys/<id>`, and the config JSON
 
   # ============================================================================
   # Errors

@@ -1,0 +1,70 @@
+import { createLogger } from "@langwatch/observability";
+
+import { getLangyRateLimitCounter } from "~/server/metrics";
+import { tryGetApp } from "../app-layer/app";
+
+const logger = createLogger("langwatch:langy:rate-limit");
+
+export const LANGY_MESSAGES_PER_MINUTE = 30;
+
+export type RateLimitResult = {
+  allowed: boolean;
+  remaining: number;
+  retryAfterSeconds?: number;
+};
+
+/**
+ * Sliding-window-ish rate limit using Redis INCR + EXPIRE on a per-minute key.
+ * No-ops (always allows) when Redis is unavailable to keep dev/test usable.
+ */
+export async function checkLangyMessageRateLimit({
+  userId,
+  projectId,
+  limit = LANGY_MESSAGES_PER_MINUTE,
+}: {
+  userId: string;
+  projectId: string;
+  limit?: number;
+}): Promise<RateLimitResult> {
+  const connection = tryGetApp()?.redis ?? null;
+  if (!connection) {
+    return { allowed: true, remaining: limit };
+  }
+  const bucket = Math.floor(Date.now() / 60_000);
+  const key = `langy:rl:msg:${projectId}:${userId}:${bucket}`;
+  let count: number;
+  try {
+    count = await (connection as { incr: (k: string) => Promise<number> }).incr(
+      key,
+    );
+    if (count === 1) {
+      await (
+        connection as { expire: (k: string, s: number) => Promise<number> }
+      ).expire(key, 65);
+    }
+  } catch (error) {
+    // Redis hiccup — fail open rather than 500 the chat request, matching the
+    // no-connection branch above. Metered + logged: a sustained fail_open rate
+    // means the limit is effectively off fleet-wide (Redis outage).
+    getLangyRateLimitCounter("fail_open").inc();
+    logger.warn(
+      { error, projectId, userId },
+      "langy rate limit failing open on redis error",
+    );
+    return { allowed: true, remaining: limit };
+  }
+  const remaining = Math.max(0, limit - count);
+  if (count > limit) {
+    getLangyRateLimitCounter("rejected").inc();
+    const nextBucket = (bucket + 1) * 60_000;
+    return {
+      allowed: false,
+      remaining: 0,
+      retryAfterSeconds: Math.max(
+        1,
+        Math.ceil((nextBucket - Date.now()) / 1000),
+      ),
+    };
+  }
+  return { allowed: true, remaining };
+}

@@ -149,7 +149,7 @@ If neither `http_polling` nor `s3_polling` fits your source, you can
 ship a custom adapter:
 
 ```ts
-// langwatch/ee/governance/services/pullers/myCustom.puller.ts
+// platform/app/ee/governance/services/pullers/myCustom.puller.ts
 import { PullerAdapter, PullResult } from "./PullerAdapter";
 import { z } from "zod";
 
@@ -181,8 +181,8 @@ auto-discover it; no other glue code needed.
 
 The Copilot Studio reference puller wraps `http_polling` with a
 locked-down config matching Microsoft's documented audit-log API
-shape. Admins enable it at **Settings → Governance → Ingestion
-sources → Add → Microsoft Copilot Studio**, enter their tenant
+shape. Admins enable it at **Governance → Ingestion Sources → Add →
+Microsoft Copilot Studio**, enter their tenant
 credentials, and the framework handles the rest. URL + auth shape are
 fixed (only credentials are admin-editable).
 
@@ -196,5 +196,5 @@ The same one-click pattern applies for `openai_compliance` and
   store
 - [CLI debugging](/ai-governance/cli-debug): `langwatch ingest tail`
   for live inspection of pulled events
-- [Compliance architecture](/ai-governance/compliance-architecture) —
+- [Compliance architecture](/ai-governance/compliance-architecture):
   how pulled events flow through the unified observability substrate

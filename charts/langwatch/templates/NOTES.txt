@@ -95,19 +95,26 @@ dev's Personal Workspace at https://<your-host>/me .
     normal runtime, so a worker that escapes its container faces the node
     kernel. Hardening that last step is a sandboxed RuntimeClass:
       https://docs.langwatch.ai/self-hosting/langy/setup#hardening-a-sandboxed-runtime
-{{- /* Non-blocking hint: only when the cluster already offers a sandboxed class
-       that this install is not using. `lookup` is empty during `helm template`
-       and GitOps renders, so this stays silent there rather than guessing. */}}
-{{- $sandboxed := list }}
-{{- range (lookup "node.k8s.io/v1" "RuntimeClass" "" "").items }}
-{{- if or (eq .handler "runsc") (hasPrefix "kata" .handler) }}
-{{- $sandboxed = append $sandboxed .metadata.name }}
-{{- end }}
-{{- end }}
-{{- if $sandboxed }}
-    → This cluster already offers {{ join ", " $sandboxed }}. To use it:
-      langyagent.runtimeClassName={{ first $sandboxed }}  langyagent.acceptUnsandboxedRuntime=false
-{{- end }}
+{{- /* Deliberately NO `lookup` here, and do not reintroduce one. Naming the
+       cluster's own sandboxed classes would take a cluster-scoped list of
+       RuntimeClass, and `lookup` reports an RBAC denial as a template error
+       rather than as an empty result. Where the installer may not list
+       cluster-scoped resources, that turned this optional hint into a hard
+       UPGRADE FAILED, and a Go template cannot recover from it. So the
+       operator runs the check instead, where a denial costs them nothing.
+       No `helm template` catches a regression here: with no cluster behind
+       the render every lookup returns empty. ./tests/restricted-rbac.sh does. */}}
+    To see whether this cluster already offers one:
+      kubectl get runtimeclass
+    If that is denied, nothing is broken: it is a cluster-scoped read, which
+    is exactly what a namespace-scoped operator does not have. Langy keeps
+    running as it is — ask whoever administers the cluster whether a class
+    exists to pin.
+    gVisor reports a handler of runsc; Kata ships under several, such as
+    kata-qemu or kata-mshv-vm-isolation. Handler names are runtime- and
+    platform-specific, so confirm against your platform's documentation
+    rather than the name alone. To pin Langy to a class:
+      langyagent.runtimeClassName=<class>  langyagent.acceptUnsandboxedRuntime=false
 {{- end }}
 {{- if (index .Values "langyagent").enableForAllUsers }}
     It is available to everyone in this install. Give it a model to talk to
@@ -179,6 +186,36 @@ backend for you:
         clusters). Expect a brief downtime per upgrade; set app/workers
         deployment.strategy explicitly to override. Zero-downtime
         upgrades require S3-backed stored objects instead of local-FS.
+{{- if and .Values.workers.enabled .Values.app.storedObjects.localFilesystem.serializeUpgrades }}
+      • That rollout is per Deployment, and a helm upgrade rolls both at
+        once. So two hook Jobs keep the workers off the volume while the
+        app rolls: a pre-upgrade Job scales the workers to 0 and waits
+        for their pods to go away, and a post-upgrade Job holds them at 0
+        until the app rollout finishes, then scales them back to
+        workers.replicaCount. Without the second Job the new workers pod
+        follows the still-terminating old app pod back to the old node
+        and wedges the new app pod there. The Jobs need a ServiceAccount
+        token and a small namespaced Role (get on the app and the workers
+        Deployments, patch on the workers' scale, read on pods). Turn
+        them off with
+        app.storedObjects.localFilesystem.serializeUpgrades=false if you
+        order the rollout yourself or your cluster forbids that RBAC. If
+        the pre-upgrade Job fails, the upgrade stops and the workers stay
+        at 0: read the Job logs, then run the upgrade again to bring them
+        back.
+      • Both Jobs run on `helm rollback` too. They cannot cover a
+        rollback to a chart version from before they existed, because
+        helm runs the TARGET revision's hooks: scale
+        {{ .Release.Name }}-workers to 0 by hand before such a downgrade
+        and back up after it.
+{{- else if .Values.workers.enabled }}
+      • Upgrade ordering is OFF
+        (app.storedObjects.localFilesystem.serializeUpgrades=false), and
+        the app and the workers both mount this volume. Scale the workers
+        to 0 yourself before every upgrade and back up after it, or the
+        two rollouts can wedge each other on an RWO multi-attach error on
+        a cluster with more than one node.
+{{- end }}
       • GitOps (ArgoCD / Flux): the dataset-migration hook maps to a
         PostSync hook, which already waits for the rollout to be healthy;
         plain Helm should upgrade with --wait when crossing the ADR-032

@@ -8,7 +8,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   See _shared/contract.md §7.
 
-  # The feature-parity checker (langwatch/scripts/check-feature-parity.ts) has a
+  # The feature-parity checker (platform/app/scripts/check-feature-parity.ts) has a
   # Go walker, so scenarios here bind to Go tests via a `@scenario` comment above
   # the test func. The execution-semantics scenarios are bound to
   # services/nlpgo/tests/integration (code_block_spec_test.go and
@@ -152,6 +152,19 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When the engine invokes the node
       Then the node's status is "error"
       And the error message contains "secrets"
+
+    # Stored stdout and stderr ride along on execution events, traces and
+    # logs exactly as node errors do, so a printed credential is exposed as
+    # widely as one echoed in an error message.
+    @unit
+    Scenario: Secret values are scrubbed from stored code node stdout and stderr
+      Given the workflow carries secret "API_TOKEN" = "sk-live-abc123"
+      And the run carries parameter "REGION" = "eu-central"
+      And a code node whose body prints both to stdout, and the secret to stderr
+      When the engine invokes the node
+      Then the stored stdout shows the secret value as "[redacted]"
+      And the stored stderr shows the secret value as "[redacted]"
+      And the stored stdout still contains "eu-central", because a run parameter is not a credential
 
   # The former "identical outputs on Go and Python" parity scenario was removed:
   # the Python langwatch_nlp engine has been removed (see _shared/contract.md —

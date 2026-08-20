@@ -15,6 +15,10 @@ import (
 type Set struct {
 	Name      string
 	Directory string
+	// PreviousDirectories are paths this set lived at before a repo
+	// restructure. Entries found there on the base branch are merged history —
+	// a branch that moves them is not adding them.
+	PreviousDirectories []string
 	// Key extracts the numeric ordering key from an entry name; its first
 	// capture group must be the digits the entries sort by.
 	Key *regexp.Regexp
@@ -27,20 +31,22 @@ type Set struct {
 // Sets are the ordered migration directories in this repository.
 var Sets = []Set{
 	{
-		Name:      "Prisma",
-		Directory: "langwatch/prisma/migrations",
-		Key:       regexp.MustCompile(`^(\d{14})_`),
-		Format:    "YYYYMMDDHHMMSS_name",
+		Name:                "Prisma",
+		Directory:           "platform/app/prisma/migrations",
+		PreviousDirectories: []string{"langwatch/prisma/migrations"},
+		Key:                 regexp.MustCompile(`^(\d{14})_`),
+		Format:              "YYYYMMDDHHMMSS_name",
 		// A literal key rather than a $(date) expansion: free keys count up from
 		// the newest timestamp in play, so twins renamed from one comment get
 		// distinct names instead of colliding on the same second.
 		Render: func(key int64) string { return fmt.Sprintf("%014d", key) },
 	},
 	{
-		Name:      "ClickHouse",
-		Directory: "langwatch/src/server/clickhouse/migrations",
-		Key:       regexp.MustCompile(`^(\d{5})_.*\.sql$`),
-		Format:    "NNNNN_name.sql",
-		Render:    func(key int64) string { return fmt.Sprintf("%05d", key) },
+		Name:                "ClickHouse",
+		Directory:           "platform/app/src/server/clickhouse/migrations",
+		PreviousDirectories: []string{"langwatch/src/server/clickhouse/migrations"},
+		Key:                 regexp.MustCompile(`^(\d{5})_.*\.sql$`),
+		Format:              "NNNNN_name.sql",
+		Render:              func(key int64) string { return fmt.Sprintf("%05d", key) },
 	},
 }

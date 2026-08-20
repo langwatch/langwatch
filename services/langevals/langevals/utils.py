@@ -1,0 +1,177 @@
+import importlib
+import importlib.metadata
+import math
+import os
+import pkgutil
+import re
+import textwrap
+from typing import Optional, Type, get_args
+
+from langevals_core.base_evaluator import (
+    BaseEvaluator,
+    EvaluationResult,
+    EvaluatorEntry,
+)
+from pydantic import BaseModel
+
+
+def load_evaluator_packages():
+    evaluators = {}
+    for distribution in importlib.metadata.distributions():
+        normalized_name = distribution.metadata["Name"].replace("-", "_")
+        if normalized_name == "langevals_core":
+            continue
+        if normalized_name.startswith("langevals_"):
+            try:
+                evaluators[normalized_name] = importlib.import_module(normalized_name)
+            except ImportError:
+                pass
+    return evaluators
+
+
+def get_evaluator_classes(evaluator_package):
+    evaluator_classes: list[BaseEvaluator] = []
+    package_path = evaluator_package.__path__
+    for _, module_name, _ in pkgutil.walk_packages(package_path):
+        print(f"Loading {evaluator_package.__name__}.{module_name}")
+        module = importlib.import_module(f"{evaluator_package.__name__}.{module_name}")
+        for name, cls in module.__dict__.items():
+            if (
+                isinstance(cls, type)
+                and issubclass(cls, BaseEvaluator)
+                and cls is not BaseEvaluator
+            ):
+                evaluator_classes.append(cls)  # type: ignore
+
+    return evaluator_classes
+
+
+class EvaluatorDefinitions(BaseModel):
+    module_name: str
+    evaluator_name: str
+    entry_type: Type[EvaluatorEntry]
+    settings_type: Type[BaseModel]
+    result_type: Type[EvaluationResult]
+    name: str
+    description: str
+    docs_url: Optional[str]
+    env_vars: list[str]
+    is_guardrail: bool
+    category: str
+
+
+def get_evaluator_definitions(evaluator_cls: BaseEvaluator):
+    fields = evaluator_cls.model_fields
+
+    settings_type = fields["settings"].annotation
+    entry_type = get_args(fields["entry"].annotation)[0]
+    result_type = get_args(fields["result"].annotation)[0]
+
+    namespaces = evaluator_cls.__module__.split(".", 1)
+    if len(namespaces) == 2:
+        module_name, evaluator_name = namespaces
+        module_name = module_name.split("langevals_")[1]
+    else:
+        module_name = ""
+        evaluator_name = evaluator_cls.__class__.__name__
+        # CamelCase to snake_case
+        evaluator_name = re.sub(r"(?<!^)(?=[A-Z])", "_", evaluator_name).lower()
+
+    if getattr(evaluator_cls, "name", None) is None:
+        raise ValueError(f"Missing name attribute in {evaluator_cls}")
+
+    name = evaluator_cls.name
+    docs_url = evaluator_cls.docs_url
+    description = textwrap.dedent(evaluator_cls.__doc__ or "")
+    docs_url = evaluator_cls.docs_url
+    env_vars = evaluator_cls.env_vars
+    is_guardrail = evaluator_cls.is_guardrail
+    category = evaluator_cls.category
+
+    return EvaluatorDefinitions(
+        module_name=module_name,
+        evaluator_name=evaluator_name,
+        entry_type=entry_type,
+        settings_type=settings_type,  # type: ignore
+        result_type=result_type,
+        name=name,
+        description=description,
+        docs_url=docs_url,
+        env_vars=env_vars,
+        is_guardrail=is_guardrail,
+        category=category,
+    )
+
+
+def positive_int_or_none(value: Optional[str]) -> Optional[int]:
+    """Read a worker-count override, or None when it cannot be used.
+
+    An operator who writes `CPU_COUNT: ""` in a manifest, or a typo, must not
+    take the server down. Anything that is not a positive whole number is
+    treated the same as leaving the variable unset.
+    """
+    if value is None or not value.strip():
+        return None
+    try:
+        count = int(value)
+    except ValueError:
+        return None
+    return count if count > 0 else None
+
+
+def positive_float_or_none(value: Optional[str]) -> Optional[float]:
+    """Read a duration override, or None when it cannot be used.
+
+    Same contract as `positive_int_or_none`, for knobs that accept fractional
+    values. The float parser also accepts `nan` and `inf`, and both make a
+    timeout meaningless (`nan` compares false with every deadline, `inf`
+    never fires), so they read as unset too.
+    """
+    if value is None or not value.strip():
+        return None
+    try:
+        number = float(value)
+    except ValueError:
+        return None
+    return number if math.isfinite(number) and number > 0 else None
+
+
+def get_cpu_count():
+    """CPU budget for sizing the server's worker count.
+
+    Container CPU limits do not shrink `os.cpu_count()` or the scheduler
+    affinity, so on a limited pod those report the host's cores and the
+    server forks one heavy worker per host core. The cgroup files are the
+    only place the actual limit is visible; read them first.
+
+    Every source is best-effort and falls through to the next one: a bad
+    override, a cgroup file that cannot be read, and a quota that does not
+    parse all take the next source instead of raising. This runs while the
+    server boots, so raising here would stop the pod from starting at all.
+    """
+    for var in ("CPU_COUNT", "WEB_CONCURRENCY"):
+        count = positive_int_or_none(os.getenv(var))
+        if count is not None:
+            return count
+    try:
+        # cgroup v2 (any current Kubernetes or Docker): "<quota> <period>",
+        # or "max <period>" when the pod has no CPU limit.
+        with open("/sys/fs/cgroup/cpu.max") as f:
+            quota, period = f.read().split()
+        if quota != "max" and int(period) > 0:
+            return max(1, math.ceil(int(quota) / int(period)))
+    except (OSError, ValueError):
+        pass
+    try:
+        # cgroup v1
+        with open("/sys/fs/cgroup/cpu/cpu.shares") as f:
+            cpu_shares = int(f.read().strip())
+        return max(1, math.ceil(cpu_shares / 1024))
+    except (OSError, ValueError):
+        pass
+    try:
+        # Local for UNIX
+        return len(os.sched_getaffinity(0))
+    except AttributeError:
+        # Local fallback
+        return os.cpu_count() or 4

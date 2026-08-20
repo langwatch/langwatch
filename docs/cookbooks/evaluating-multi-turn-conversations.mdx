@@ -1,6 +1,6 @@
 ---
 title: Multi-Turn Conversations
-description: Learn how to implement a simulation-based approach for evaluating multi-turn customer support agents using success criteria focused on outcomes rather than specific steps.
+description: A simulation-based approach for evaluating multi-turn customer support agents, with success criteria on outcomes rather than specific steps.
 keywords:
   [
     multi-turn evaluation,
@@ -433,7 +433,7 @@ async def simulate_conversation(ticket: Dict[str, Any], criteria: List[str], max
 
             # Check if conversation should end
             if "update_ticket_status" in tool_names:
-                print("\n✅ Ticket resolved — update_ticket_status was called.")
+                print("\n✅ Ticket resolved: update_ticket_status was called.")
 
                 # Log resolution to LangWatch
                 evaluation.log("conversation_resolved", index=turns, score=1.0, data={"turns_to_resolution": turns, "ticket_id": ticket["id"]})
@@ -563,7 +563,7 @@ Thank you for reaching out. I wanted to inform you that your ticket with the ID 
 Best regards,
 [Your Name]
 
-✅ Ticket resolved — update_ticket_status was called.
+✅ Ticket resolved: update_ticket_status was called.
 
 📊 Evaluating conversation...
 

@@ -28,6 +28,12 @@ func runPlay(ctx context.Context, d deps, inv invocation) error {
 	if _, err := exec.LookPath("gh"); err != nil {
 		return fmt.Errorf("the GitHub CLI `gh` is required - install it (https://cli.github.com) and run `gh auth login`")
 	}
+	// The preset is checked before the PR is even resolved: a typo should cost a
+	// line of output, not a checkout, a container set, and a trust prompt.
+	preset := inv.value("--seed")
+	if err := app.ValidateSeedPreset(preset); err != nil {
+		return err
+	}
 	ref := ""
 	if len(inv.args) > 0 {
 		ref = inv.args[0]
@@ -123,12 +129,16 @@ func runPlay(ctx context.Context, d deps, inv invocation) error {
 	// plain streaming; Ctrl-C (or the driver killing us) ends it and the
 	// deferred teardown still destroys everything.
 	if d.isAgent || !stdoutIsTTY() {
-		if err := d.orch.PlayLaunch(ctx, pr.Number, checkout, filepath.Join(checkout, "langwatch")); err != nil && ctx.Err() == nil {
+		sandbox := app.PlaySandbox{
+			Number: pr.Number, Checkout: checkout,
+			LwDir: filepath.Join(checkout, "platform", "app"), Preset: preset,
+		}
+		if err := d.orch.PlayLaunch(ctx, sandbox); err != nil && ctx.Err() == nil {
 			return err
 		}
 		return teardown()
 	}
-	child, err := startPlayLaunch(pr.Number, checkout, rec.Slug)
+	child, err := startPlayLaunch(rec, preset)
 	if err != nil {
 		return err
 	}
@@ -196,22 +206,23 @@ type playChild struct {
 	pid int
 }
 
-// startPlayLaunch backgrounds the hidden `haven play-launch <n>` in the play
-// checkout, streaming its combined output to the slug's log file - the same
-// launcher shape as `haven up`'s detached mode, so the attached viewer and
-// `haven logs` read it identically.
-func startPlayLaunch(number int, checkout, slug string) (playChild, error) {
-	logPath := stackLogPath(slug)
+// startPlayLaunch backgrounds the hidden `haven play-launch <n> [preset]` in
+// the play checkout, streaming its combined output to the slug's log file - the
+// same launcher shape as `haven up`'s detached mode, so the attached viewer and
+// `haven logs` read it identically. It takes the sandbox record rather than its
+// fields so the child can never be pointed at a different sandbox than the one
+// teardown will destroy.
+func startPlayLaunch(rec app.PlayRecord, preset string) (playChild, error) {
+	logPath := stackLogPath(rec.Slug)
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
 		return playChild{}, err
 	}
-	// haven's own source comes from the trusted checkout, never from `checkout`:
-	// that is the PR's tree, and it contains a cmd/haven of its own.
+	// haven's own source comes from the trusted checkout, never from the
+	// sandbox's: that is the PR's tree, and it contains a cmd/haven of its own.
 	root := trustedRepoRoot()
-	argv := selfArgv(root, "play-launch")
-	argv = append(argv, strconv.Itoa(number))
+	argv := append(selfArgv(root, "play-launch"), playLaunchArgs(rec.Number, preset)...)
 	cmd := exec.Command(argv[0], argv[1:]...)
-	cmd.Dir = checkout
+	cmd.Dir = rec.Checkout
 	cmd.Env = childEnvWithTrustedRoot(root)
 	// Owner-only: the combined log captures seed output (admin password, tokens).
 	f, ferr := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
@@ -233,14 +244,37 @@ func startPlayLaunch(number int, checkout, slug string) (playChild, error) {
 	return playChild{pid: cmd.Process.Pid}, nil
 }
 
-// runPlayLaunchCmd is the hidden `haven play-launch <n>`: the sandbox's
-// backgrounded launcher process, spawned by `haven play` with cwd set to the
-// play checkout. Internal - it is dispatchable but absent from help, like
-// `daemon`.
+// playLaunchArgs is the launcher's argument list. An empty preset is left off
+// entirely rather than passed as "", so the launcher's own parse sees exactly
+// what `haven play` was given.
+func playLaunchArgs(number int, preset string) []string {
+	argv := []string{strconv.Itoa(number)}
+	if preset != "" {
+		argv = append(argv, preset)
+	}
+	return argv
+}
+
+// runPlayLaunchCmd is the hidden `haven play-launch <n> [preset]`: the
+// sandbox's backgrounded launcher process, spawned by `haven play` with cwd set
+// to the play checkout. Internal - it is dispatchable but absent from help,
+// like `daemon`.
 func runPlayLaunchCmd(ctx context.Context, d deps, inv invocation) error {
+	// The parser enforces a maximum number of positionals, never a minimum, and
+	// this command is dispatchable by hand — so a bare `haven play-launch` would
+	// index into an empty slice.
+	if len(inv.args) == 0 {
+		return fmt.Errorf("haven play-launch: a PR number is required")
+	}
 	number, err := strconv.Atoi(inv.args[0])
 	if err != nil || number <= 0 {
 		return fmt.Errorf("haven play-launch: %q is not a PR number", inv.args[0])
 	}
-	return d.orch.PlayLaunch(ctx, number, d.worktree, d.lwDir)
+	preset := ""
+	if len(inv.args) > 1 {
+		preset = inv.args[1]
+	}
+	return d.orch.PlayLaunch(ctx, app.PlaySandbox{
+		Number: number, Checkout: d.worktree, LwDir: d.lwDir, Preset: preset,
+	})
 }

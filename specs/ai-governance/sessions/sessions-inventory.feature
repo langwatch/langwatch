@@ -22,7 +22,7 @@ Feature: AI Governance — CLI sessions inventory + revoke
 
   @bdd @phase-8 @sessions @list
   Scenario: First-time login creates one session card
-    When alice opens /me/devices
+    When alice opens the devices tab on /me/configure
     Then she sees exactly one session card
     And the card displays "Mac (MacBook-Pro.local)" as the device label
     And the card shows last-seen "just now"
@@ -31,14 +31,14 @@ Feature: AI Governance — CLI sessions inventory + revoke
   Scenario: Logging in from a second machine creates a second session card
     Given alice ran `langwatch login` from "MacBook-Pro.local" yesterday
     When alice runs `langwatch login` from "alice-thinkpad" on linux
-    And opens /me/devices
+    And opens the devices tab on /me/configure
     Then she sees two session cards
     And the cards are sorted by last-seen-desc (thinkpad first)
 
   @bdd @phase-8 @sessions @list
   Scenario: Pre-Phase-8 sessions (no client_info) render as "Unknown device"
     Given alice's CLI session was minted before this slice (no client_info captured)
-    When she opens /me/devices
+    When she opens the devices tab on /me/configure
     Then she sees the session with deviceLabel="Unknown device"
     # Backwards-compat: old sessions stay visible + revocable, just
     # without a friendly label.

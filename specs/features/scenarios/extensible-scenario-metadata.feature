@@ -6,7 +6,7 @@ Feature: Extensible metadata on scenario run events
   Background:
     Given a project with scenarios configured
 
-  @integration @unimplemented
+  @integration
   Scenario: Custom metadata passes through from ingestion to read projection
     Given a SCENARIO_RUN_STARTED event with metadata:
       | name        | Login flow  |
@@ -44,7 +44,7 @@ Feature: Extensible metadata on scenario run events
       | targetType        | prompt        |
       | simulationSuiteId | suite_789     |
 
-  # Bound: langwatch/src/server/scenarios/schemas/__tests__/extensible-metadata.unit.test.ts
+  # Bound: platform/app/src/server/scenarios/schemas/__tests__/extensible-metadata.unit.test.ts
   @unit
   Scenario: Event parsing preserves additional metadata fields
     Given a SCENARIO_RUN_STARTED event with extra metadata fields

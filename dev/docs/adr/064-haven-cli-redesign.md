@@ -180,7 +180,7 @@ to change what ran are refused: `WORKERS_IN_PROCESS=1` is still how plain
 child, so it must not block a stack. `START_WORKERS=false` has no replacement —
 the worker stack is part of the app now, and `+workers` only moves it into its
 own lane. Repo scripts
-(`pnpm dev:haven`, `pnpm dev:workers:haven`) are rewritten to the new flags in
+(the since-removed `pnpm dev:haven` / `pnpm dev:workers:haven`) are rewritten to the new flags in
 the same change. Machine-level opt-outs of haven managing a shared server
 (`LANGWATCH_HAVEN_CH=0` and friends) are rare, deliberate, and stay env vars.
 
@@ -350,6 +350,19 @@ The rules it adds, and how they honour the constitution:
 - **A hard death is recoverable.** The sandbox is recorded before any
   resource exists; `haven clean` reaps any sandbox whose owning process is
   gone by finishing the same teardown.
+- **`--seed <preset>` reads the same registry as `db seed`.** A sandbox's
+  databases are born empty, so a PR about anything past onboarding opens on
+  the wrong screen. The presets are not duplicated for play and there is no
+  play-only variant — one list, one meaning, per the flag rule above. Where
+  each half lands differs by necessity: the preset's switches go to the
+  sandbox's own seed, before its services start, while data that travels
+  through the collector can only land once the sandbox is serving, so it runs
+  in a lane beside the supervised set that waits on the sandbox's own
+  `/api/health`. That lane is a warning path end to end — a failed ingest
+  names the step and the command that retries it and leaves the sandbox
+  running, because a PR that broke the collector is precisely one worth
+  watching — but teardown still waits for it to stop, rather than racing a
+  `docker volume rm` against a process still writing.
 
 Spec: `specs/setup/haven-play.feature`.
 
@@ -388,7 +401,7 @@ story, including post-mortem reads after a crash.
   `haven-cli-surface.feature`, `haven-service-selection.feature`,
   `haven-automatic-prep.feature`, and `haven-logs.feature` are new and
   normative.
-- `make haven <cmd>` passthrough, `pnpm dev:haven`, and the boxd/quickstart
+- `make haven <cmd>` passthrough and the boxd/quickstart
   docs are updated to the new spellings in the same change.
 - Anyone's shell history breaks once, with a pointer.
 

@@ -10,7 +10,7 @@ LangWatch RBAC has two layers, two surfaces, and one stitching mechanism:
 - **Two surfaces**: `/settings/roles` (the role catalog: pre-built + custom) and `/settings/role-bindings` (who is bound to what role at what scope).
 - **One stitching mechanism**: a `RoleBinding` row glues a *user* to a *role* at a *scope* (organization, team, project, or governance subscope).
 
-Most orgs never touch this page. The pre-built roles cover the common cases. You only land here when you need to delegate `aiTools:manage` without granting full `organization:manage`, or when an audit asks "who can read the audit log" and you want a screen instead of a Slack thread.
+The pre-built roles cover the common cases. You only land here when you need to delegate `aiTools:manage` without granting full `organization:manage`, or when an audit asks "who can read the audit log" and you want a screen instead of a Slack thread.
 
 <Info>**Pairs with:** [Members & invites](/ai-governance/members-and-invites) (assigning roles when inviting), [Audit log](/ai-governance/audit-log) (every role binding mutation records a row), and [AI Gateway → RBAC](/ai-gateway/rbac) (the gateway-side enforcement of permissions).</Info>
 
@@ -22,9 +22,46 @@ The three pre-built org roles. Each user in the org has exactly one.
 |---|---|---|
 | **ADMIN** | First user to sign in becomes admin | `organization:view`, `organization:manage`, `organization:delete`; the full governance surface (`governance:view`, `governance:manage`, `ingestionSources:*`, `anomalyRules:*`, `complianceExport:view`, `activityMonitor:view`); `aiTools:view` + `aiTools:manage`. |
 | **MEMBER** | Default for invitees | `organization:view`, `aiTools:view`. **No** governance permissions, **no** member-list reads, **no** audit log access by default. The team-role (below) is what gives them anything beyond `/me`. |
-| **EXTERNAL** | Lite-member shape, opt-in via the invite drawer | Same as MEMBER. EXTERNAL also has stricter team-level defaults: even when on a team they default to view-only on most resources. |
+| **EXTERNAL** | Lite-member shape, opt-in via the invite drawer | Same as MEMBER. EXTERNAL also has stricter team-level defaults: even when on a team they default to view-only, apart from annotations (see [Seats](#seats)). |
 
 The minimum-privilege default is intentional: an `ORGANIZATION` role binding for a MEMBER does **not** grant team-level access. Team-level permissions come from team-role bindings (next).
+
+## Seats
+
+Paid plans meter seats, and there are two kinds. Which one a person occupies follows from what they can do, not from a separate billing switch:
+
+- A **full seat** is someone who can change things.
+- A **lite seat** is someone who can only look at what the team produces.
+
+ADMIN and MEMBER are always full seats. EXTERNAL is a lite seat on its built-in permissions.
+
+Assign a **custom role** to an EXTERNAL member and that role decides the seat instead: if it grants anything beyond viewing, they can change things and count as a full seat from then on. The rule reads the custom role, not the built-in defaults, which is why annotations below stay part of a lite seat while a custom role granting only `annotations:create` would make the same person a full one. If you want a reviewer who annotates, leave them on the built-in lite role rather than building a custom role for it.
+
+### What a lite member can do
+
+They can open the projects they are invited to and read what the team produces there:
+
+| They can see | They cannot |
+|---|---|
+| Traces, including the detail view | See costs |
+| Analytics | Create, edit or delete projects, datasets, prompts, evaluations, workflows or experiments |
+| Evaluations and their results | Invite anyone or change roles |
+| Scenario runs | Manage the gateway, virtual keys or budgets |
+| Datasets, prompts, workflows and experiments | Reach any project they were not invited to |
+| Their own team | |
+| The names of the project's secrets, never their values | |
+
+Annotations are the exception: on the built-in lite role a member can leave and edit them, so reviewers can mark up what they read without needing a full seat.
+
+These are permissions, not screens, so they hold wherever the data is reached. A lite member using the [MCP server](/integration/mcp) with their own account, or the API with their own credentials, sees exactly what they see in the app.
+
+<Note>
+Trace **viewing** is included in a lite seat. If you want someone who cannot open a trace at all, build a custom role that withholds `traces:view` and bind it to them.
+</Note>
+
+### Choosing between them
+
+The question to ask about a person is whether they need to change anything. Someone who reviews output, watches dashboards and comments on what they find is a lite seat. Someone who builds prompts, runs experiments, edits datasets, or configures the gateway is a full seat.
 
 ## Team roles
 
@@ -33,7 +70,7 @@ The four pre-built team roles. A user can have **different** team roles on diffe
 | Team role | What it grants by default |
 |---|---|
 | **ADMIN** | The full team-scoped permission set: `project:create/update`, `analytics:manage`, `traces:create`, `virtualKeys:create/update/rotate/manage`, `gatewayBudgets:view/manage`, `gatewayProviders:view/update/manage`, `routingPolicies:view/manage`, `gatewayGuardrails:view/attach/detach/manage`, `gatewayLogs:view`, `auditLog:view`, `gatewayUsage:view`, `gatewayCacheRules:*`. |
-| **MEMBER** | Same shape minus the `*:manage` permissions. Read + create + update on most resources; can't delete or reconfigure providers, policies. |
+| **MEMBER** | The team-scoped working set: `project:view/create/update`, `analytics:manage`, `traces:create/update/share`, and `*:manage` on annotations, evaluations, workflows, experiments, datasets, triggers, prompts, scenarios and secrets. On the gateway it runs its own keys (`virtualKeys:view/create/update/rotate`) and reads the rest (`gatewayBudgets:view`, `gatewayProviders:view`, `routingPolicies:view`, `gatewayGuardrails:view`, `gatewayLogs:view`, `auditLog:view`, `gatewayUsage:view`, `gatewayCacheRules:view`), so it can't delete or reconfigure providers and policies. |
 | **VIEWER** | View-only across the team. No create, update, delete on anything. The right shape for stakeholders who need read access to a team's traces but should never reconfigure anything. |
 | **CUSTOM** | Empty by default. Permissions come from the `CustomRolePermissions` JSON column on the `RoleBinding` row, see [Custom roles](#custom-roles) below. |
 
@@ -51,7 +88,7 @@ Every gate in the codebase is a string of the shape `<resource>:<verb>`. The ful
 
 ## What `organization:manage` gates today
 
-After this PR's RBAC defense-in-depth pass, the legacy `/settings/{audit-log, teams, members, roles, groups}` pages all require `organization:manage` (admins only). Underlying tRPC procedures match, `role.getAll`, `organization.getAllOrganizationMembers`, `organization.getOrganizationPendingInvites`, `team.getTeamsWithRoleBindings`, `organization.getMemberById`, `group.getById`, `group.listForMember`, `group.listAll`, `limits.checkAndSendUsageLimitNotification` are all gated to `organization:manage` server-side.
+The legacy `/settings/{audit-log, teams, members, roles, groups}` pages all require `organization:manage` (admins only). Underlying tRPC procedures match, `role.getAll`, `organization.getAllOrganizationMembers`, `organization.getOrganizationPendingInvites`, `team.getTeamsWithRoleBindings`, `organization.getMemberById`, `group.getById`, `group.listForMember`, `group.listAll`, `limits.checkAndSendUsageLimitNotification` are all gated to `organization:manage` server-side.
 
 Picker procedures (`team.getTeamsWithMembers`, `team.getTeamWithMembers`, `organization.getOrganizationWithMembersAndTheirTeams`) intentionally stay on `organization:view` so non-admin pickers (the AddAutomationDrawer, GroupBindingInputRow, project pickers, onboarding flows) continue working, but they redact other members' email addresses to `null` for non-admin callers and strip other users' [Personal Workspaces](/ai-governance/workspaces#personal-workspace-privacy) from the result entirely.
 

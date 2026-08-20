@@ -1,6 +1,6 @@
 version: 2
 
-# The npm workspaces enforce pnpm's minimumReleaseAge (7 days) and the uv
+# The npm workspace enforces pnpm's minimumReleaseAge (7 days) and the uv
 # projects enforce exclude-newer = "7 days", so dependabot must not propose
 # versions younger than that: the package manager would refuse to resolve
 # them and the update run would fail. The cooldowns below keep candidate
@@ -11,10 +11,13 @@ version: 2
 #     predictable batch rather than a daily trickle.
 #   - Coordinated dependency families that release in lockstep (@aws-sdk/*,
 #     @opentelemetry/*, @ai-sdk/*, @copilotkit/*, vitest, react, ...) are each
-#     grouped into ONE PR via `patterns`. Because the three JS packages share
-#     one entry through `directories`, a family (or any shared dependency) is
-#     bumped across langwatch, typescript-sdk and mcp-server together instead
-#     of one PR per package per dependency.
+#     grouped into ONE PR via `patterns`. Since ADR-076 the repo is a single
+#     pnpm workspace, so one npm entry at `/` covers every JS project and a
+#     family (or any shared dependency) is bumped across all of them together
+#     instead of one PR per project per dependency.
+#     This also closed a coverage gap: while the repo had six install roots,
+#     only three of them were listed here, so skills/, agentic-e2e-tests/,
+#     packages/* was never scanned at all.
 #   - Everything left over is caught by a `minor-and-patch` group, so the long
 #     tail of trivial version bumps is a single PR. Major bumps of ungrouped
 #     dependencies stay individual for deliberate review.
@@ -33,10 +36,9 @@ version: 2
 #     supply-chain safeguard and is intentionally left in place.
 updates:
   - package-ecosystem: "npm"
-    directories:
-      - "/langwatch"
-      - "/typescript-sdk"
-      - "/mcp-server"
+    # The workspace root. dependabot reads pnpm-workspace.yaml and covers
+    # every member from here, so members must NOT also be listed individually.
+    directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -79,10 +81,10 @@ updates:
           - "react"
           - "react-dom"
           - "react-is"
-      typescript-native-preview:
+      typescript:
         applies-to: version-updates
         patterns:
-          - "@typescript/native-preview"
+          - "typescript"
       types:
         applies-to: version-updates
         patterns:
@@ -96,6 +98,17 @@ updates:
         patterns:
           - "posthog-js"
           - "posthog-node"
+      langchain:
+        # Real coupled-release family (sdks/typescript depends on langchain +
+        # @langchain/core + @langchain/langgraph + @langchain/openai together).
+        # Bumping them independently is what produced #6804/#7207: two
+        # separate PRs each moved part of the family out of lockstep and each
+        # broke imports on its own. A group only opens once every member
+        # resolves together, which is the actual fix, not just fewer PRs.
+        applies-to: version-updates
+        patterns:
+          - "langchain"
+          - "@langchain/*"
       minor-and-patch:
         applies-to: version-updates
         patterns:
@@ -105,7 +118,7 @@ updates:
           - "patch"
 
   - package-ecosystem: "uv"
-    directory: "/python-sdk"
+    directory: "/sdks/python"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -122,6 +135,49 @@ updates:
         applies-to: version-updates
         patterns:
           - "langchain*"
+      minor-and-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # services/langevals was missing here, so it never got scheduled version
+  # updates and its lock only ever moved when an advisory-triggered security
+  # PR fired — which for services/langevals was never: it had accrued 47 open
+  # alerts, two of them critical, with zero dependabot PRs raised in the
+  # project's history. A lock that never moves also drifts far enough that a
+  # single security bump stops resolving cleanly, which is how the backlog
+  # became self-sustaining. Same shape as /sdks/python above.
+  #
+  # Deliberately NOT covering /mcp/typescript. Its uv.lock exists only to
+  # typecheck Python fixture files under tests/fixtures/ for the MCP server's
+  # instrumentation-codegen — nothing in CI installs or executes it. A first
+  # scheduled sweep here on 2026-08-19 dumped 24 individual PRs (bump one dev
+  # fixture's transitive typing dep, repeat) for zero coverage gain and
+  # meaningfully added to the org's ~76-slot concurrent-job ceiling. If this
+  # directory starts being actually installed/run, re-add the entry then.
+  - package-ecosystem: "uv"
+    directory: "/services/langevals"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 50
+    cooldown:
+      default-days: 8
+    groups:
+      langchain:
+        applies-to: version-updates
+        patterns:
+          - "langchain*"
+      arize:
+        # arize-phoenix today; grouped pre-emptively because upstream ships
+        # sibling packages (arize-phoenix-otel/-evals/-client) that release in
+        # step with it and would otherwise fragment the same way once used.
+        applies-to: version-updates
+        patterns:
+          - "arize*"
       minor-and-patch:
         applies-to: version-updates
         patterns:

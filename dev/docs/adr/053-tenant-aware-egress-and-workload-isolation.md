@@ -261,9 +261,18 @@ The executor:
   the fleet;
 - emits a result event that the process manager folds into delivery state.
 
-SQS is the preferred SaaS transport because it separates IAM authority and
-provides durable retry/dead-letter semantics. The existing outbox remains the
-transactional source of truth; publishing is idempotent.
+Durable delivery is provided by the transactional outbox and its delivery
+process manager, which is the source of truth for what has been sent and what
+is owed. An internal SQS transport underneath it is rejected: a self-hosted
+deployment must not require an AWS account to deliver a webhook, and the outbox
+already supplies the durability, ordering-independence and dead-lettering the
+transport would have been chosen for.
+
+SQS does exist in the product, as a customer-facing DESTINATION KIND: an
+organization may point a webhook endpoint at its own queue, and the platform
+writes each batch there with the same body and signature an HTTPS receiver
+would get. That is a delivery target a customer chooses, in a customer's AWS
+account, not a transport of ours.
 
 ### Track C: isolate AI provider egress
 
@@ -485,7 +494,7 @@ special-case outbound path appears.
 - Application: add a dedicated egress domain package beside services/aigateway
   dispatcher code; migrate services/aigateway/adapters/providers/bifrost.go to
   the client interface; reuse, but do not duplicate, the resolution semantics
-  in langwatch/src/utils/ssrfProtection.ts.
+  in platform/app/src/utils/ssrfProtection.ts.
 - Infrastructure: introduce a dedicated egress namespace, service account,
   workload security group, KMS key, queue identities, dashboards, alerts, and
   VPC flow logs. Keep these resources outside the general worker identity.
@@ -674,7 +683,7 @@ isolation boundaries.
 |---|---|---|---|
 | Egress isolation domain | Separate egress VPC or cluster | It removes a route to core workloads rather than relying on a shared-cluster policy alone | Before Workstream 3 |
 | Egress transport | Streaming internal HTTP/2 or gRPC with mTLS | Provider responses and cancellations must be forwarded safely | Before Workstream 1 |
-| Durable webhook transport | SQS plus existing transactional outbox | Separates worker authority and has native retry/dead-letter behavior | Before Workstream 2 |
+| Durable webhook transport | The existing transactional outbox and its process manager | Settled: it already gives durability and dead-lettering, and needs no cloud account, which an internal SQS transport would have imposed on every self-hosted deployment. SQS ships instead as a per-endpoint destination kind a customer points at its own queue | Settled |
 | Sandbox runtime | gVisor pod per Langy conversation and code invocation where Lambda is unsuitable | RuntimeClass isolates a pod, not sibling processes | Before Workstream 4 |
 | Private endpoint model | Tenant-bound connector IDs | Prevents hostname suffixes from becoming authorization | Before Workstream 3 |
 | Hosted compatibility policy | SaaS always fail-closed; self-hosted opts into private egress deliberately | Avoids making SaaS safety depend on a permissive legacy default | Before Workstream 0 |

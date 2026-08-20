@@ -158,7 +158,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		return nil, err
 	}
 
-	// Coercion is scoped to the default langevals/* string-input path,
+	// Coercion is scoped to the default services/langevals/* string-input path,
 	// where the receiving Pydantic schema declares every field as `str`
 	// and would reject a raw bool/number with "Expected string, received
 	// boolean". Saved (`evaluators/*`) and workflow (`custom/*`)
@@ -211,7 +211,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 
 	// Propagate W3C trace context + baggage on the outbound call so the
 	// receiving service sees us as the parent span and inherits our
-	// causality_depth. The reactor in langwatch/app uses this to skip
+	// causality_depth. The subscriber in langwatch/app uses this to skip
 	// re-dispatching evaluations on spans we emit. See
 	// specs/monitors/online-evaluator-loop-prevention.feature.
 	otelapi.GetTextMapPropagator().Inject(reqCtx, propagation.HeaderCarrier(httpReq.Header))

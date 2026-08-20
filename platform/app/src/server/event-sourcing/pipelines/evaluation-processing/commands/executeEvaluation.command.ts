@@ -1,0 +1,690 @@
+import { HandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
+import { extractErrorMessage } from "../../../../../utils/captureError";
+import {
+  AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
+  isAzureEvaluatorType,
+} from "../../../../app-layer/evaluations/azure-safety-env";
+import { getAzureSafetyEnvFromProject } from "../../../../app-layer/evaluations/azure-safety-env.server";
+import type { EvaluationCostRecorder } from "../../../../app-layer/evaluations/evaluation-cost.recorder";
+import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
+import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
+import {
+  buildPreconditionTraceDataFromCommand,
+  checkEvaluatorRequiredFields,
+  evaluatePreconditions,
+  preconditionsNeedEvents,
+} from "../../../../evaluations/preconditions";
+import type { CheckPreconditions } from "../../../../evaluations/types";
+import type { PreconditionTraceData } from "../../../../filters/precondition-matchers";
+import type { MappingState } from "../../../../tracer/tracesMapping";
+import type { ElasticSearchEvent, Span } from "../../../../tracer/types";
+import type { Command, CommandHandler } from "../../../";
+import {
+  type createTenantId,
+  defineCommandSchema,
+  EventUtils,
+} from "../../../";
+import type { ExecuteEvaluationCommandData } from "../schemas/commands";
+import { executeEvaluationCommandDataSchema } from "../schemas/commands";
+import {
+  EVALUATION_REPORTED_EVENT_TYPE,
+  EVALUATION_REPORTED_EVENT_VERSION_LATEST,
+  EXECUTE_EVALUATION_COMMAND_TYPE,
+} from "../schemas/constants";
+import type {
+  EvaluationProcessingEvent,
+  EvaluationReportedEvent,
+} from "../schemas/events";
+import { verdictPassedOf, verdictScoreOf } from "../verdictGate";
+
+const logger = createLogger(
+  "langwatch:evaluation-processing:execute-evaluation",
+);
+
+/**
+ * A failure the customer can resolve themselves (provider disabled, missing
+ * credentials, an oversized evaluator payload) rather than one we have to fix.
+ *
+ * Keyed on `HandledError.fault` — the repo's own classification, mirrored in
+ * `services/aigateway/adapters/httpapi/faults.go`.
+ *
+ * It is deliberately NOT `HandledError.isHandled(error)`: that is the whole
+ * base class, which also covers `EvaluatorExecutionError` (`fault: "platform"`,
+ * raised when langevals times out, is unreachable, or returns 5xx).
+ * Downgrading those would hide an outage behind a benign skip.
+ * `fault: "provider"` likewise stays an error — a third-party outage is not
+ * something the customer can act on.
+ *
+ * Know the failure mode before adding an error type under `executeForTrace`:
+ * `fault` **defaults to `"customer"`** (`HandledError`), so this predicate is
+ * opt-out, not opt-in. An error class whose author never thought about
+ * classification lands on the skip path and stops producing error telemetry.
+ * That is a deliberate trade — the alternative, a hand-kept allowlist, goes
+ * stale silently in the other direction — but it means any new
+ * `HandledError` on this path that represents *our* failure has to declare
+ * `fault: "platform"` explicitly. The base class says as much for 5xx-ish
+ * errors; this call site is what makes ignoring it expensive.
+ */
+function isCustomerFixable(error: unknown): error is HandledError {
+  return HandledError.isHandled(error) && error.fault === "customer";
+}
+
+export interface ExecuteEvaluationCommandDeps {
+  monitors: MonitorService;
+  spanStorage: {
+    getSpansByTraceId(params: {
+      tenantId: string;
+      traceId: string;
+      occurredAtMs?: number;
+    }): Promise<Span[]>;
+  };
+  traceEvents: {
+    getEventsByTraceId(params: {
+      tenantId: string;
+      traceId: string;
+    }): Promise<ElasticSearchEvent[]>;
+  };
+  evaluationExecution: EvaluationExecutionService;
+  costRecorder: EvaluationCostRecorder;
+  /**
+   * Resolves Azure Content Safety credentials from the per-project
+   * `azure_safety` model provider. Returns null when no credentials are
+   * configured — the command then emits a "skipped" status instead of
+   * running the evaluator. Injected for testability.
+   */
+  azureSafetyEnvResolver?: (
+    projectId: string,
+  ) => Promise<Record<string, string> | null>;
+  /**
+   * Emergency rollback for the langwatch#6397 settings recovery
+   * (`ops_evaluator_settings_recovery_disabled`, SYSTEM scope). Absent means
+   * recovery is ACTIVE — the shipped default. Injected so the command stays
+   * testable without a flag service. Wired in `pipelineRegistry.ts`; leaving it
+   * unwired makes the operator switch inert rather than failing loudly.
+   */
+  isSettingsRecoveryDisabled?: () => Promise<boolean>;
+  /**
+   * Offloads oversized evaluator inputs to durable object storage before the
+   * event is built, so `event_log.EventPayload` and the fold stay bounded
+   * (ADR-040). Returns the inputs unchanged (inline) or a stored-object
+   * marker. Flag-gated and fail-open at the composition root; absent here
+   * means today's behavior (inputs flow inline; the repository belt-and-braces
+   * cap is the only bound).
+   */
+  offloadInputs?: (args: {
+    projectId: string;
+    evaluationId: string;
+    inputs: Record<string, unknown> | null;
+  }) => Promise<Record<string, unknown> | null>;
+}
+
+const SCHEMA = defineCommandSchema(
+  EXECUTE_EVALUATION_COMMAND_TYPE,
+  executeEvaluationCommandDataSchema,
+  "Command to execute a single evaluation",
+);
+
+/**
+ * Keys that live alongside an evaluator's settings inside `config` but are
+ * metadata about the evaluator rather than input to the judge.
+ */
+const CONFIG_METADATA_KEYS = new Set(["evaluatorType", "settings"]);
+
+/**
+ * Where the settings handed to the judge came from.
+ *
+ * `top-level-recovery` is the langwatch#6397 case: the prompt the previous rule
+ * dropped. It is reported at the call site because AC0d asks for the PREVALENCE
+ * of affected evaluator configs, and this is the only place that knows an
+ * individual config was in the losing shape.
+ */
+export type EvaluatorSettingsSource =
+  | "config-settings"
+  | "top-level-recovery"
+  | "monitor-parameters";
+
+/**
+ * Resolves the settings sent to the judge for an online (monitor-driven) evaluation.
+ *
+ * Nothing guarantees `config.settings` exists: `EvaluatorService.create`/`.update` are raw
+ * passthroughs, and the copy/replicate tRPC flows write `config` straight through Prisma, so an
+ * evaluator can be stored with its prompt at the TOP LEVEL of `config`. The previous rule
+ * (`config.settings ?? parameters`) silently dropped that prompt and forwarded `monitor.parameters`
+ * — empty for newer monitors, per `schema.prisma`'s "new monitors may have empty" — at which point
+ * langevals applies its own strict default prompt and scores the trace 0. That is langwatch#6397:
+ * the customer saw 0 on every trace while the same prompt passed in the playground, because the
+ * playground posts the prompt from the form and never has to read it back.
+ *
+ * Precedence is deliberate: the evaluator's own config wins over `monitor.parameters`. The reverse
+ * ordering satisfies every other acceptance criterion identically while leaving the bug live for
+ * any monitor with populated `parameters`.
+ */
+export function resolveEvaluatorSettingsWithSource({
+  config,
+  parameters,
+  evaluatorRecordType,
+  recoveryDisabled = false,
+}: {
+  config: Record<string, unknown> | null | undefined;
+  parameters: Record<string, unknown> | null | undefined;
+  /**
+   * `Evaluator.type` of the linked record. REQUIRED, and deliberately not
+   * defaulted: an optional dependency that defaults to the safe value fails
+   * silently when a call site forgets it, which is exactly how this command's
+   * rollback flag shipped inert earlier in langwatch#6397. Making it required
+   * turns the same mistake into a compile error.
+   */
+  evaluatorRecordType: string | null | undefined;
+  /**
+   * Operator rollback (`ops_evaluator_settings_recovery_disabled`). Defaults to
+   * false so every caller that does not know about the flag — and the shipped
+   * configuration — gets the recovery.
+   */
+  recoveryDisabled?: boolean;
+}): {
+  settings: Record<string, unknown> | null | undefined;
+  source: EvaluatorSettingsSource;
+} {
+  if (!config) {
+    return { settings: parameters, source: "monitor-parameters" };
+  }
+
+  // An EMPTY `settings` is not a usable payload — it is the exact thing that
+  // scored every trace 0, since langevals substitutes its own strict default
+  // prompt for `{}`. It must not shadow a recoverable top-level prompt, and the
+  // shape is reachable from the customer's own UI: the evaluator editor loads
+  // `settings: config?.settings ?? {}` and saves that back, so the P1 reporter
+  // opening their evaluator to confirm the fix would otherwise re-break the row
+  // permanently. Emptiness is tested the same way here as on the recovery
+  // branch below — one rule, not two.
+  const nested = config.settings;
+  if (
+    nested &&
+    typeof nested === "object" &&
+    Object.keys(nested as Record<string, unknown>).length > 0
+  ) {
+    return {
+      settings: nested as Record<string, unknown>,
+      source: "config-settings",
+    };
+  }
+
+  if (recoveryDisabled) {
+    return { settings: parameters, source: "monitor-parameters" };
+  }
+
+  // Only "evaluator" (built-in) can have LOST settings. `evaluatorTypeSchema`
+  // in the evaluators router enumerates three, and the other two own their
+  // `config` shape outright: a code evaluator's is a VALID top-level
+  // `{ code, inputs, outputs }` per `codeEvaluatorConfigSchema`, and a workflow
+  // evaluator's is empty. Recovering from those hands a correct config to the
+  // judge as settings and counts healthy rows as affected.
+  //
+  // An allowlist, not a `!== "code"` denylist: a type added later gets the
+  // previous, safe behaviour rather than silently inheriting a recovery rule
+  // written before it existed. Compared inline, matching how this same file
+  // reads `type === "workflow"` at the call site below.
+  //
+  // Scope of the change, precisely: recovery is what this gates. The empty-
+  // `settings` rule above sits UPSTREAM of it and still applies to every type,
+  // so a non-built-in evaluator carrying `settings: {}` now falls back to
+  // `monitor.parameters` where the old rule returned the empty object.
+  if (evaluatorRecordType !== "evaluator") {
+    return { settings: parameters, source: "monitor-parameters" };
+  }
+
+  const recovered = Object.fromEntries(
+    Object.entries(config).filter(([key]) => !CONFIG_METADATA_KEYS.has(key)),
+  );
+
+  return Object.keys(recovered).length > 0
+    ? { settings: recovered, source: "top-level-recovery" }
+    : { settings: parameters, source: "monitor-parameters" };
+}
+
+/**
+ * Command handler for executing evaluations.
+ *
+ * Sampling + preconditions + execution -> emits a single EvaluationReportedEvent.
+ * Results are persisted to CH via the evaluationRun fold projection.
+ * Deduped by traceId + evaluatorId (makeJobId), delayed 30s.
+ *
+ * Uses constructor DI — instantiate with deps and pass via `.withCommandInstance()`.
+ */
+export class ExecuteEvaluationCommand
+  implements
+    CommandHandler<
+      Command<ExecuteEvaluationCommandData>,
+      EvaluationProcessingEvent
+    >
+{
+  static readonly schema = SCHEMA;
+
+  constructor(private readonly deps: ExecuteEvaluationCommandDeps) {}
+
+  static getAggregateId(payload: ExecuteEvaluationCommandData): string {
+    return payload.evaluationId;
+  }
+
+  static getSpanAttributes(
+    payload: ExecuteEvaluationCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.evaluation.id": payload.evaluationId,
+      "payload.evaluator.id": payload.evaluatorId,
+      "payload.evaluator.type": payload.evaluatorType,
+      "payload.trace.id": payload.traceId,
+    };
+  }
+
+  static makeJobId(payload: ExecuteEvaluationCommandData): string {
+    if (
+      payload.threadIdleTimeout &&
+      payload.threadIdleTimeout > 0 &&
+      payload.threadId
+    ) {
+      return `exec:${payload.tenantId}:thread:${payload.threadId}:${payload.evaluatorId}`;
+    }
+    return `exec:${payload.tenantId}:${payload.traceId}:${payload.evaluatorId}`;
+  }
+
+  /**
+   * Reads the emergency rollback flag, failing open to the shipped default
+   * (recovery ACTIVE).
+   *
+   * The lookup is resolved before `handle`'s try block, so an unguarded
+   * rejection would escape `handle()` entirely — no `skipped` and no `error`
+   * event for the trace. That would invert the flag's purpose: a safety valve
+   * would become a new way for every evaluation to fail. Catches synchronous
+   * throws as well as rejections, since `deps` is injected.
+   */
+  private async readSettingsRecoveryFlag(): Promise<boolean> {
+    try {
+      return (await this.deps.isSettingsRecoveryDisabled?.()) ?? false;
+    } catch (error) {
+      // Message only. The pino error serializer for...in-copies every enumerable
+      // property off a thrown error, so an HTTP or DB client error would print
+      // its request config / connection detail in cleartext. Same idiom as
+      // featureFlagStore.postgres.ts.
+      logger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        "Settings-recovery rollback flag could not be read — leaving recovery active",
+      );
+      return false;
+    }
+  }
+
+  async handle(
+    command: Command<ExecuteEvaluationCommandData>,
+  ): Promise<EvaluationProcessingEvent[]> {
+    const { tenantId, data } = command;
+
+    logger.debug(
+      {
+        tenantId: tenantId,
+        evaluationId: data.evaluationId,
+        evaluatorId: data.evaluatorId,
+        traceId: data.traceId,
+      },
+      "Handling execute evaluation command",
+    );
+
+    // 1. Fetch monitor via service
+    const monitor = await this.deps.monitors.getMonitorById({
+      projectId: tenantId,
+      monitorId: data.evaluatorId,
+    });
+    if (!monitor) {
+      logger.warn(
+        { tenantId: tenantId, evaluatorId: data.evaluatorId },
+        "Monitor not found — skipping evaluation",
+      );
+      return emitReported(data, tenantId, {
+        status: "skipped",
+        details: "Monitor not found",
+      });
+    }
+
+    // 1a. Azure Safety BYOK gate — hard cutover to per-project credentials.
+    // If the monitor uses an Azure evaluator and the project has no
+    // azure_safety provider configured, skip with a clear configure message
+    // so the customer can self-serve the fix from the UI.
+    if (isAzureEvaluatorType(monitor.checkType)) {
+      const azureEnvResolver =
+        this.deps.azureSafetyEnvResolver ?? getAzureSafetyEnvFromProject;
+      const azureEnv = await azureEnvResolver(tenantId);
+      if (!azureEnv) {
+        logger.warn(
+          {
+            tenantId,
+            evaluatorId: data.evaluatorId,
+            evaluatorType: monitor.checkType,
+          },
+          "Azure Safety provider not configured — skipping evaluation",
+        );
+        return emitReported(data, tenantId, {
+          status: "skipped",
+          details: AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
+        });
+      }
+    }
+
+    // 2. Sampling
+    if (Math.random() > monitor.sample) {
+      logger.debug(
+        {
+          tenantId: tenantId,
+          evaluatorId: data.evaluatorId,
+          sample: monitor.sample,
+        },
+        "Evaluation excluded by sampling",
+      );
+      return [];
+    }
+
+    // 3. Read spans from CH, check evaluator required fields + preconditions.
+    // Pass the event's occurredAt so the span read can prune stored_spans to the
+    // trace's weekly partition instead of cold-scanning every partition on S3
+    // (the read falls back to an unconstrained scan if the window misses).
+    const spans = await this.deps.spanStorage.getSpansByTraceId({
+      tenantId,
+      traceId: data.traceId,
+      occurredAtMs: data.occurredAt,
+    });
+
+    // Check evaluator required fields first
+    const requiredFieldsMet = checkEvaluatorRequiredFields({
+      evaluatorType: monitor.checkType,
+      spans,
+    });
+    if (!requiredFieldsMet) {
+      logger.debug(
+        {
+          tenantId: tenantId,
+          evaluatorId: data.evaluatorId,
+          traceId: data.traceId,
+        },
+        "Evaluator required fields not met — skipping evaluation",
+      );
+      return [];
+    }
+
+    // Then check user-configured preconditions
+    const preconditions = (monitor.preconditions ?? []) as CheckPreconditions;
+
+    // Fetch events on demand if any preconditions reference event fields
+    let events: PreconditionTraceData["events"] = null;
+    if (preconditionsNeedEvents(preconditions)) {
+      const traceEvents = await this.deps.traceEvents.getEventsByTraceId({
+        tenantId,
+        traceId: data.traceId,
+      });
+      events = traceEvents.map((e) => ({
+        event_type: e.event_type,
+        metrics: e.metrics ?? [],
+        event_details: e.event_details ?? [],
+      }));
+    }
+
+    const traceData = buildPreconditionTraceDataFromCommand({
+      data,
+      spans,
+      events,
+    });
+    const preconditionsMet = evaluatePreconditions({
+      traceData,
+      preconditions,
+    });
+
+    if (!preconditionsMet) {
+      logger.debug(
+        {
+          tenantId: tenantId,
+          evaluatorId: data.evaluatorId,
+          traceId: data.traceId,
+        },
+        "Preconditions not met — skipping evaluation",
+      );
+      return []; // No events — preconditions didn't match
+    }
+
+    // 4. Run evaluation via app-layer service
+    const { settings, source: settingsSource } =
+      resolveEvaluatorSettingsWithSource({
+        config: monitor.evaluator?.config as Record<string, unknown> | null,
+        parameters: monitor.parameters as Record<string, unknown> | null,
+        evaluatorRecordType: monitor.evaluator?.type,
+        recoveryDisabled: await this.readSettingsRecoveryFlag(),
+      });
+
+    // AC0d wants the PREVALENCE of configs in the losing shape, and a prod SQL
+    // read was never available. This is the same number from the running system.
+    // Emitted at info so it survives production log levels.
+    //
+    // NO KEY NAMES. `config` is written through `z.record(z.unknown())` — the
+    // evaluator router validates nothing for the `evaluator` type, and the
+    // copy/replicate flows validate nothing at all — so top-level key NAMES are
+    // customer-controlled strings, not a fixed vocabulary. Echoing them into the
+    // shared log pipeline would be an exfiltration path for whatever a
+    // misconfigured integration wrote as a key. A count plus "did the prompt
+    // come back" answers AC0d without inspecting customer content at all.
+    //
+    // Volume, stated honestly: this fires once per affected EVALUATION, not once
+    // per affected evaluator, and write-side normalisation was NOT shipped (see
+    // the spec), so nothing converts these rows — it does not decay on its own.
+    // If it proves noisy, the operator lever is the rollback flag, which stops
+    // the recovery and the reporting together.
+    if (settingsSource === "top-level-recovery") {
+      logger.info(
+        {
+          tenantId,
+          // The monitor id: `getMonitorById(data.evaluatorId)` above. Distinct
+          // values of this pair ARE the prevalence count.
+          evaluatorId: data.evaluatorId,
+          traceId: data.traceId,
+          recoveredKeyCount: Object.keys(settings ?? {}).length,
+          recoveredPrompt: Object.hasOwn(settings ?? {}, "prompt"),
+        },
+        "Recovered evaluator settings from the top level of config — langwatch#6397 affected config",
+      );
+    }
+
+    const workflowId =
+      monitor.evaluator?.type === "workflow"
+        ? monitor.evaluator.workflowId
+        : undefined;
+
+    try {
+      const result = await this.deps.evaluationExecution.executeForTrace({
+        projectId: tenantId,
+        traceId: data.traceId,
+        evaluatorType: data.evaluatorType,
+        settings: settings as Record<string, any>,
+        mappings: monitor.mappings as MappingState | null,
+        level: monitor.level as "trace" | "thread",
+        workflowId,
+      });
+
+      // A trace the service could not evaluate (no thread_id for a thread-based
+      // monitor, errored trace with no I/O, etc.) comes back as "skipped". Drop
+      // it with no event, like an unmet precondition: a skipped run has no
+      // score to fold, and a bulk re-evaluation over non-evaluatable traces
+      // would otherwise emit thousands of results, each paying the heavy
+      // evaluation-projection read. Config skips (monitor not found, provider
+      // not configured) are emitted earlier via their own path — or, when the
+      // failure is thrown from inside execution, by the customer-fault branch
+      // in the catch below — and still surface in the UI.
+      //
+      // DECIDED (#6835): this invisibility is intended. The trade-off is that
+      // a monitor whose traces are all non-evaluatable looks like it never ran
+      // rather than "ran and found nothing to evaluate" — but a per-trace
+      // skipped event would multiply event volume by every monitor × every
+      // non-matching trace, which bulk re-evaluations turn into thousands of
+      // rows that carry no verdict. If skip visibility is ever needed, add an
+      // aggregated counter (per monitor per interval), not per-trace events.
+      if (result.status === "skipped") {
+        logger.debug(
+          {
+            tenantId,
+            evaluatorId: data.evaluatorId,
+            traceId: data.traceId,
+            details: result.details,
+          },
+          "Trace not evaluatable — skipping with no result event",
+        );
+        return [];
+      }
+
+      // 5. Record cost via service
+      let costId: string | null = null;
+      if (result.status === "processed" && result.cost) {
+        costId = await this.deps.costRecorder.recordCost({
+          projectId: tenantId,
+          isGuardrail: !!data.isGuardrail,
+          evaluatorName: data.evaluatorName ?? data.evaluatorType,
+          evaluatorId: data.evaluatorId,
+          traceId: data.traceId,
+          amount: result.cost.amount,
+          currency: result.cost.currency,
+        });
+      }
+
+      // 6. Emit single reported event — fold projection persists to CH.
+      // For error results, lift `details` into `error` if the service didn't
+      // already set it, so the real failure message always lands in the
+      // event's error field where the UI reads from.
+      const isError = result.status === "error";
+      const errorField = isError
+        ? (result.error ?? result.details ?? "Evaluator failed")
+        : result.error;
+
+      return await emitReported(
+        data,
+        tenantId,
+        {
+          status: result.status,
+          // The service's happy-path mapping gates verdicts, but its error
+          // paths spread the raw evaluator result and override status
+          // (`{ ...result, status: "error" }`), so a stray verdict can reach
+          // this emit. Gate here too — the command boundary is the last
+          // producer-side chance to keep an errored run's verdict out of
+          // evaluation_runs (#6833).
+          score: verdictScoreOf(result) ?? undefined,
+          passed: verdictPassedOf(result) ?? undefined,
+          label: result.status === "processed" ? result.label : undefined,
+          details: isError ? undefined : result.details,
+          error: errorField,
+          errorDetails: result.errorDetails ?? null,
+          inputs: result.inputs ?? null,
+          costId,
+        },
+        this.deps.offloadInputs,
+      );
+    } catch (error) {
+      // Customer-fixable errors (see isCustomerFixable above) are skipped,
+      // not errored — mirrors the pre-execution config gates above.
+      if (isCustomerFixable(error)) {
+        logger.info(
+          {
+            // `meta` first so the fixed identifiers below always win: `meta`
+            // is free-form per subclass and can itself carry a `traceId`.
+            ...error.meta,
+            code: error.code,
+            tenantId,
+            evaluationId: data.evaluationId,
+            evaluatorId: data.evaluatorId,
+            traceId: data.traceId,
+            error: error.message,
+          },
+          // Neutral wording on purpose: this branch also catches oversized
+          // payloads and non-evaluatable traces, neither of which is a
+          // misconfiguration. `code` in the payload says which it was.
+          "Customer-fixable evaluator failure — skipping evaluation",
+        );
+
+        return emitReported(data, tenantId, {
+          status: "skipped",
+          details: error.message,
+        });
+      }
+
+      logger.error(
+        {
+          tenantId: tenantId,
+          evaluationId: data.evaluationId,
+          evaluatorId: data.evaluatorId,
+          traceId: data.traceId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Evaluation execution failed",
+      );
+
+      return emitReported(data, tenantId, {
+        status: "error",
+        error: extractErrorMessage(error),
+        errorDetails: error instanceof Error ? (error.stack ?? null) : null,
+      });
+    }
+  }
+}
+
+async function emitReported(
+  data: ExecuteEvaluationCommandData,
+  tenantId: ReturnType<typeof createTenantId>,
+  result: {
+    status: "processed" | "error" | "skipped";
+    score?: number;
+    passed?: boolean;
+    label?: string;
+    details?: string;
+    inputs?: Record<string, unknown> | null;
+    error?: string;
+    errorDetails?: string | null;
+    costId?: string | null;
+  },
+  offloadInputs?: ExecuteEvaluationCommandDeps["offloadInputs"],
+): Promise<EvaluationProcessingEvent[]> {
+  // ADR-040: offload oversized inputs to durable object storage BEFORE the
+  // event is created, so the S3 PUT precedes the event_log append (matching
+  // the PUT-then-row ordering used by stored-objects) and the event carries
+  // only the bounded marker. No-op when the hook is absent (flag off) or when
+  // there are no inputs.
+  const inputs =
+    offloadInputs && result.inputs
+      ? await offloadInputs({
+          projectId: tenantId,
+          evaluationId: data.evaluationId,
+          inputs: result.inputs,
+        })
+      : (result.inputs ?? null);
+
+  const event = EventUtils.createEvent<EvaluationReportedEvent>({
+    aggregateType: "evaluation",
+    aggregateId: data.evaluationId,
+    tenantId,
+    type: EVALUATION_REPORTED_EVENT_TYPE,
+    version: EVALUATION_REPORTED_EVENT_VERSION_LATEST,
+    data: {
+      evaluationId: data.evaluationId,
+      evaluatorId: data.evaluatorId,
+      evaluatorType: data.evaluatorType,
+      evaluatorName: data.evaluatorName,
+      traceId: data.traceId,
+      isGuardrail: data.isGuardrail,
+      status: result.status,
+      score: result.score ?? null,
+      passed: result.passed ?? null,
+      label: result.label ?? null,
+      details: result.details ?? null,
+      inputs,
+      error: result.error ?? null,
+      errorDetails: result.errorDetails ?? null,
+      costId: result.costId ?? null,
+    },
+    occurredAt: data.occurredAt,
+    idempotencyKey: `${data.tenantId}:${data.evaluationId}:reported`,
+  });
+
+  return [event];
+}

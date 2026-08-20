@@ -1,0 +1,102 @@
+# Path-gated in `on:`, with no gate job and no aggregator. This workflow has
+# no required status check, which is what makes that safe — GitHub evaluates
+# `on.paths` before allocating anything, so an irrelevant PR costs zero runner
+# slots instead of two (a gate job to decide, and an aggregator to report the
+# decision). A filtered-out workflow never reports at all, so a workflow whose
+# `*-complete` IS required must keep the always-run pattern; see #3223 and the
+# ones that still do.
+#
+# What it guards: the plugin is published as a directory of hand-authored JSON
+# plus one bundled script, so nothing about it is checked by any other job. Its
+# manifests are read by two clients that both fail quietly (an Agent Plugins
+# client rejects a manifest that violates the closed schema; Claude Code loads a
+# plugin whose hooks point at a file that is not there), and the bundle is only
+# ever exercised by spawning it.
+name: agent-plugin-ci
+
+on:
+  # Only `pull_request` is filtered. "Push to main always runs all workflows"
+  # (specs/ci/path-filters.feature) — every commit that lands on main keeps its
+  # own validation, which is the same reason `cancel-in-progress` is off there.
+  push:
+    branches:
+      - main
+  pull_request:
+    # ready_for_review is NOT a default pull_request activity type. Without
+    # it, taking a PR out of draft fires no event at all, so the job's draft
+    # guard below would never get its first non-draft run.
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      # The hook script is bundled from the SDK sources below, so a change to
+      # any of them changes what the published plugin runs.
+      - "plugins/**"
+      - "sdks/typescript/src/cli/plugin/**"
+      - "sdks/typescript/src/cli/commands/ingestion/**"
+      - "sdks/typescript/src/internal/endpoint.ts"
+      - "sdks/typescript/tsup.plugin-hook.config.ts"
+      - "sdks/typescript/package.json"
+      # The single lockfile, workspace definition, root manifest and hoist
+      # config live at the repo root since ADR-076; a dependency or override
+      # change touches only these.
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "package.json"
+      - ".npmrc"
+      - ".github/workflows/agent-plugin-ci.yml"
+      - ".github/actions/setup-pnpm-node/**"
+  merge_group:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  # Supersede an outdated run on a PR branch, never on main: every commit
+  # that lands on main has to keep its own validation, and cancelling here
+  # would let a merge silently void the run for the commit before it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build_and_test:
+    # Draft PRs release the runner slot entirely; the work returns on
+    # ready_for_review and in the merge queue. This was `needs.changes.outputs
+    # .heavy`, which cost a whole gate job to compute the same expression.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      # Two filters, so the shared action's single-filter input cannot express
+      # it: the build needs the SDK the hook is bundled from, and the tests need
+      # the plugin package's own vitest.
+      - uses: ./.github/actions/setup-pnpm-node
+
+      - name: Install dependencies
+        run: >
+          CI=true pnpm install --frozen-lockfile
+          --filter "langwatch..."
+          --filter "@langwatch/agent-plugin..."
+
+      - name: Typecheck
+        run: pnpm --filter @langwatch/agent-plugin run typecheck
+
+      - name: Build the plugin
+        run: pnpm --filter @langwatch/agent-plugin run build
+
+      # Unit tests read the manifests; integration tests spawn the bundle
+      # against a local collector and a scratch git checkout. Both need only
+      # node and git, which the runner already has.
+      - name: Run tests
+        run: pnpm --filter @langwatch/agent-plugin run test
+
+  # `agent-plugin-complete` used to sit here. It existed only so branch
+  # protection had one stable check to require while the real job skipped —
+  # but it was never added to the ruleset, so it was reporting to nobody at
+  # the cost of a runner lease on every push. If this workflow is ever
+  # promoted to a required check, the aggregator AND the always-run trigger
+  # have to come back together: `on.paths` and a required check are mutually
+  # exclusive, because a filtered-out workflow never reports at all.

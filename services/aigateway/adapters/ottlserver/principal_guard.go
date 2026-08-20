@@ -35,12 +35,12 @@ import (
 // MUST NOT be rewritten by OTTL.
 //
 // Keep in sync with the TS-side registry at
-// langwatch/ee/governance/services/governanceAttributeKeys.ts —
+// platform/app/ee/governance/services/governanceAttributeKeys.ts —
 // every key the governance pipeline treats as principal-binding
 // belongs here.
 var protectedAttributeKeys = []string{
 	// Origin discriminator + IngestionSource identity (governance
-	// reactors filter on these to decide whether to fold + into
+	// subscribers filter on these to decide whether to fold + into
 	// which projection bucket).
 	"langwatch.origin.kind",
 	"langwatch.ingestion_source.id",

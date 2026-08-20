@@ -5,25 +5,38 @@ keywords: langwatch, agent simulations, agent testing, agent development, voice 
 ---
 
 <Tip>
-  **Quick setup?** [Copy the scenarios prompt](/skills/code-prompts#add-scenario-tests) into your coding agent to add simulation tests automatically.
+  **Quick setup?** Paste the [Connect your agent prompt](/agent-simulations/connect-your-agent) into your coding agent to connect your agent's HTTP endpoint and run a first suite, or the [scenarios prompt](/skills/code-prompts#add-scenario-tests) to add code-first simulation tests.
 </Tip>
 
 # What are Agent Simulations?
 
-Agent simulations are a powerful approach to testing AI agents that goes beyond traditional evaluation methods. Unlike static input-output testing, simulations test your agent's behavior in realistic, multi-turn conversations that mimic how real users would interact with your system.
+Agent simulations test your agent's behavior in realistic, multi-turn conversations that mimic how real users would interact with your system, instead of the static input-output pairs a dataset evaluation uses.
 
-Powered by the open-source **[Scenario](https://github.com/langwatch/scenario)** framework — the same `scenario.run()` entrypoint and judge work across text, voice, and adversarial testing.
+Simulations run on the open-source **[Scenario](https://github.com/langwatch/scenario)** framework: the same `scenario.run()` entrypoint and judge work across text, voice, and adversarial testing.
 
 <img src="/images/simulations-hero.gif" alt="Agent Simulations" />
+
+## Two ways to run simulations
+
+Both share the same simulated user, the same judge, and the same results pages. They differ in where the scenarios live and who runs them.
+
+<CardGroup cols={2}>
+  <Card title="Run from the platform" icon="globe" href="/agent-simulations/connect-your-agent">
+    Connect your agent over HTTP and run scenario suites from the platform. Product people create, edit and run the tests, and the judge reads your agent's own traces. No test code in your repository.
+  </Card>
+  <Card title="Write scenarios in code" icon="code" href="/agent-simulations/getting-started">
+    Write scenarios with the Scenario SDK in Python or TypeScript, run them with your test runner and in CI, and see every run in LangWatch.
+  </Card>
+</CardGroup>
 
 ## What you can test
 
 <CardGroup cols={2}>
   <Card title="Conversational agents" icon="comments" href="/agent-simulations/getting-started">
-    Simulate real users across multi-turn conversations and judge behavior at any step — tool calls, recovery, and end-to-end outcomes.
+    Simulate real users across multi-turn conversations and judge behavior at any step: tool calls, recovery, and end-to-end outcomes.
   </Card>
   <Card title="Voice agents" icon="microphone" href="/agent-simulations/voice-agents">
-    Test over real audio through ElevenLabs, OpenAI Realtime, Twilio, Pipecat and more — with background noise, interruptions, and latency metrics.
+    Test over real audio through ElevenLabs, OpenAI Realtime, Twilio, Pipecat, and Gemini Live, with background noise, interruptions, and latency metrics.
   </Card>
   <Card title="Red teaming" icon="shield-halved" href="/agent-simulations/red-teaming">
     Run multi-turn adversarial attacks (Crescendo escalation, refusal detection, backtracking) to find security gaps before attackers do.
@@ -47,7 +60,7 @@ Simulations complement evaluations by testing the **agent as a whole system** ra
 
 ## Why Traditional Evaluation Isn't Enough for Agents
 
-Most evaluations are based on dataset, with a static set of cases, those are hard to get specially when you are just getting started, they often require a great amount of examples to be valuable, and an expected answer to be provided, but more than anything, they are static, like input to output, or query to expected_contexts.
+Dataset evaluations are based on a static set of cases. Those cases are hard to get, especially when you are just getting started: they need many examples to be valuable, and an expected answer for each one. Above all they are static, like input to output, or query to expected_contexts.
 
 Agents, however, aren't simple input-output functions. They are processes. An agent behaves like a program, executing a sequence of operations, using tools, and maintaining state.
 
@@ -95,19 +108,21 @@ script=[
 
 ## Why Use LangWatch Scenario?
 
+{/* Founder decision: this sentence keeps the marketing superlative on purpose, so it is indexed as such. Do not rewrite it to plain language. */}
 [Scenario](https://langwatch.ai/scenario/) is the most advanced agent testing framework available. It provides:
 
-- **Powerful simulations** - Test real agent behavior by simulating users in different scenarios and edge cases
+- **Simulations** - Test real agent behavior by simulating users in different scenarios and edge cases
 - **Flexible evaluations** - Judge agent behavior at any point in conversations, combine with evals, test error recovery, and complex workflows
-- **Voice testing** - Test voice agents end-to-end over real audio (ElevenLabs, OpenAI Realtime, Twilio, Pipecat) — [see Voice Agents](/agent-simulations/voice-agents)
-- **Red teaming** - Run multi-turn adversarial attacks to uncover security vulnerabilities — [see Red Teaming](/agent-simulations/red-teaming)
+- **Trace-informed judging** - The judge reads your agent's own traces before its verdict, so it verifies tool calls and writes as evidence. [See Remote Traces](/agent-simulations/remote-traces)
+- **Voice testing** - Test voice agents end-to-end over real audio (ElevenLabs, OpenAI Realtime, Twilio, Pipecat). [See Voice Agents](/agent-simulations/voice-agents)
+- **Red teaming** - Run multi-turn adversarial attacks to uncover security vulnerabilities. [See Red Teaming](/agent-simulations/red-teaming)
 - **Framework agnostic** - Works with any AI agent framework
 - **Simple integration** - Just implement one `call()` method
 - **Multi-language support** - Python, TypeScript, and Go
 
 ## Visualizing Simulations in LangWatch
 
-Once you've set up your agent tests with Scenario, LangWatch provides powerful visualization tools to:
+Once you've set up your agent tests with Scenario, LangWatch provides visualization tools to:
 
 - **Organize simulations** into sets and batches
 - **Debug agent behavior** by stepping through conversations
@@ -124,7 +139,9 @@ See [the LangWatch Simulations visualizer](https://langwatch.ai/scenario/visuali
 
 ## Next Steps
 
-- [Getting Started](/agent-simulations/getting-started) - Set up your first simulation
+- [Connect your agent](/agent-simulations/connect-your-agent) - Run scenario suites from the platform against your agent's HTTP endpoint
+- [Write scenarios in code](/agent-simulations/getting-started) - Set up your first code-first simulation
+- [Remote traces](/agent-simulations/remote-traces) - How the judge reads your agent's traces
 - [Voice Agents](/agent-simulations/voice-agents) - Test voice agents end-to-end over real audio
 - [Red Teaming](/agent-simulations/red-teaming) - Run adversarial attacks against your agent
 - [Scenario Documentation](https://langwatch.ai/scenario/) - Deep dive into the testing framework

@@ -25,7 +25,7 @@ Read the codebase to understand what your agent processes:
 Use the `langwatch` CLI to fetch the right pages:
 
 ```bash
-langwatch scenario-docs                            # Index — locate multimodal pages
+langwatch scenario-docs                            # Index: locate multimodal pages
 langwatch scenario-docs multimodal/audio-to-text   # Audio testing patterns
 langwatch scenario-docs multimodal/multimodal-files # Generic file analysis patterns
 langwatch docs                                     # LangWatch docs index
@@ -33,7 +33,7 @@ langwatch docs evaluations/experiments/sdk         # Experiment SDK basics
 langwatch docs evaluations/evaluators/list         # Browse evaluator types
 ```
 
-For PDF evaluation specifically, reference the pattern from `python-sdk/examples/pdf_parsing_evaluation.ipynb`:
+For PDF evaluation specifically, reference the pattern from `sdks/python/examples/pdf_parsing_evaluation.ipynb`:
 
 - Download/load documents
 - Define extraction pipeline
@@ -114,8 +114,8 @@ Run the evaluation, review results, fix issues, re-run until quality is acceptab
 
 ## Common Mistakes
 
-- Do NOT evaluate multimodal agents with text-only metrics — use image-aware judges
-- Do NOT skip testing with real file formats — synthetic descriptions aren't enough
+- Do NOT evaluate multimodal agents with text-only metrics. Use image-aware judges
+- Do NOT skip testing with real file formats. Synthetic descriptions aren't enough
 - Do NOT forget to handle file loading errors in evaluations
-- Do NOT use generic test images — use domain-specific ones matching the agent's purpose
+- Do NOT use generic test images. Use domain-specific ones matching the agent's purpose
 - Always read the relevant `langwatch scenario-docs ...` page for the modality before writing code; multimodal patterns differ a lot from text-only ones

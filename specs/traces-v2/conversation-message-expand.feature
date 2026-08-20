@@ -1,11 +1,11 @@
 # Conversation view — per-message expand + expand all
 #
 # Implementation:
-#   langwatch/src/features/traces-v2/components/TraceDrawer/conversationView/ConversationView.tsx
-#   langwatch/src/features/traces-v2/components/TraceDrawer/conversationView/ChatTurnRow.tsx        (ThreadMessage)
-#   langwatch/src/features/traces-v2/components/TraceTable/registry/addons/conversation/Bubble.tsx  (shared bubble)
-#   langwatch/src/features/traces-v2/components/TraceDrawer/conversationView/expandContext.ts
-#   langwatch/src/features/traces-v2/components/TraceDrawer/conversationView/MessageExpandToggle.tsx
+#   platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/ConversationView.tsx
+#   platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/ChatTurnRow.tsx        (ThreadMessage)
+#   platform/app/src/features/traces-v2/components/TraceTable/registry/addons/conversation/Bubble.tsx  (shared bubble)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/expandContext.ts
+#   platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/MessageExpandToggle.tsx
 #
 # Motivation (round 5): long messages in the conversation view are
 # truncated with a bare "…" and no way to read the rest in place. Replace
@@ -54,7 +54,7 @@ Rule: An "Expand all" toolbar control expands every message
     Then every message returns to its truncated form
 
   Scenario: Expand-all is only offered for the message layouts
-    Given the conversation is in markdown or annotations mode
+    Given the conversation is in markdown mode
     Then no expand-all control is shown
 
 Rule: The table's compact preview is unaffected

@@ -27,8 +27,9 @@ do not re-derive them.
   Terminal tab shortcut is not `M`.
 - **Codex ignores `OTEL_*` env** (needs `config.toml [otel]`); Codex
   `total` and Gemini `tool` token buckets are non-additive — never sum them.
-- **No reactors** in the new pipeline: subscribers, projections, one process
-  manager. Origin gating is a predicate, not a gate reactor.
+- **Post-event work is subscribers, projections and one process manager** in
+  the new pipeline — there is no third primitive (ADR-098). Origin gating is a
+  predicate, not a gate subscriber.
 - Per-repo rules that bite here: `projectId`/TenantId first in every query;
   repositories `findAll/findById`, services `getAll/getById`; no re-exports;
   no inline `import()`; focused tests over full typecheck.
@@ -79,10 +80,10 @@ do not re-derive them.
 7. **Personal usage.** `/me` card off `listByUser` (+ the
    `PersonalTracesEmptyState` / `IngestionTemplateInstallDrawer` diffs).
 8. **Retire legacy + aftercare.** Delete from main:
-   `claudeCodeSpanSync.reactor.ts`, `claude-code-log-to-span.ts`, their
+   `claudeCodeSpanSync.subscriber.ts`, `claude-code-log-to-span.ts`, their
    pipeline registration + tests, `specs/traces-v2/claude-code-log-conversion.feature`,
    and any `CLAUDE_CODE_LOG_RETENTION_DAYS` floor. Port dogfood matrix
-   (`scripts/dogfood/coding-agent-matrix.sh`, `e2e/capture-coding-agent-matrix.ts`)
+   (`dev/scripts/dogfood/coding-agent-matrix.sh`, `e2e/capture-coding-agent-matrix.ts`)
    and run it end-to-end. Release note: log-only installs must re-run
    `langwatch claude`. Close #5708, delete its branch.
 
@@ -115,7 +116,7 @@ files. Full dogfood only at slice 8.
   minus the `CLAUDE_CODE_KIND_ATTR` marking block
 - misc fixes: `scripts/seed-local-admin.ts`, `workers.ts` (`.env.portless`
   overlay), `.gitignore`, `sdk-javascript-ci.yml`,
-  `typescript-sdk` installer diffs (`install.ts`, `wrapper-mode.ts`)
+  `sdks/typescript` installer diffs (`install.ts`, `wrapper-mode.ts`)
 - specs to port into `specs/coding-agent/`:
   `coding-agent-terminal-view.feature`, `coding-agent-trace-fidelity.feature`
   (from old `specs/trace-processing/`), plus diffs to
@@ -124,7 +125,7 @@ files. Full dogfood only at slice 8.
   behavioural contract only),
   `specs/ai-gateway/governance/ingestion-templates-catalog.feature`
 - docs: `dev/docs/claude-code-terminal-view.md`; media assets
-- dogfood: `scripts/dogfood/coding-agent-matrix.sh`, `e2e/capture-coding-agent-matrix.ts` (slice 8)
+- dogfood: `dev/scripts/dogfood/coding-agent-matrix.sh`, `e2e/capture-coding-agent-matrix.ts` (slice 8)
 
 ### ADAPT / REWRITE into the new pipeline (slices 1–4, 6)
 - `projections/services/coding-agent-normalization.ts` → pipeline services (slice 1)
@@ -166,7 +167,7 @@ files. Full dogfood only at slice 8.
   by ADR-056 + this plan)
 
 ### DELETE from main (slice 8)
-- `trace-processing/reactors/claudeCodeSpanSync.reactor.ts` (+ registration, tests)
+- `trace-processing/subscribers/claudeCodeSpanSync.subscriber.ts` (+ registration, tests)
 - `app-layer/traces/claude-code-log-to-span.ts`
 - `specs/traces-v2/claude-code-log-conversion.feature`
 - any remaining `CLAUDE_CODE_LOG_RETENTION_DAYS` floor

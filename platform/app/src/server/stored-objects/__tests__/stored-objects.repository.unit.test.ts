@@ -1,0 +1,209 @@
+/**
+ * @vitest-environment node
+ *
+ * Unit tests for StoredObjectsRepository — verifies that queries are
+ * project-scoped and that insert/findById delegate to the ClickHouse
+ * client with the expected shape.
+ */
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// ---------------------------------------------------------------------------
+// Hoisted mocks
+// ---------------------------------------------------------------------------
+
+const { mockInsert, mockQuery, mockQueryResult } = vi.hoisted(() => {
+  const mockQueryResult = {
+    json: vi.fn().mockResolvedValue([]),
+  };
+  return {
+    mockInsert: vi.fn().mockResolvedValue(undefined),
+    mockQuery: vi.fn().mockResolvedValue(mockQueryResult),
+    mockQueryResult,
+  };
+});
+
+vi.mock("~/server/app-layer/app", () => {
+  const app = () => ({
+    clickhouse: {
+      enabled: true,
+      resolveClient: () =>
+        Promise.resolve({ insert: mockInsert, query: mockQuery }),
+      resolveOrganizationClient: async () => {
+        throw new Error("no organization client in this suite");
+      },
+      allInstances: async () => [],
+    },
+  });
+  return { getApp: app, tryGetApp: app };
+});
+
+vi.mock("langwatch", () => ({
+  getLangWatchTracer: () => ({
+    withActiveSpan: (_name: string, ...args: unknown[]) => {
+      const fn = args.length === 1 ? args[0] : args[1];
+      const span: { setAttribute: ReturnType<typeof vi.fn> } = {
+        setAttribute: vi.fn(),
+      };
+      return (fn as (s: typeof span) => Promise<unknown>)(span);
+    },
+  }),
+}));
+
+vi.mock("~/server/db", () => ({
+  prisma: {},
+}));
+
+// ---------------------------------------------------------------------------
+// Imports after mocks
+// ---------------------------------------------------------------------------
+
+import type { StoredObject } from "../stored-object";
+import { StoredObjectsRepository } from "../stored-objects.repository";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function makeRow(): StoredObject {
+  return {
+    id: "test-id",
+    project_id: "proj-1",
+    purpose: "trace_content",
+    owner_kind: "span",
+    owner_id: "owner-1",
+    media_type: "text/plain",
+    size_bytes: 5,
+    sha256: "abc123",
+    storage_uri: "file:///var/lib/langwatch/objects/proj-1/abc123",
+    created_at: new Date("2025-01-01T00:00:00Z"),
+    inserted_at: new Date("2025-01-01T00:00:00Z"),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("StoredObjectsRepository", () => {
+  let repo: StoredObjectsRepository;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockQueryResult.json.mockResolvedValue([]);
+    repo = new StoredObjectsRepository();
+  });
+
+  describe("insert", () => {
+    describe("when called with a projectId and row", () => {
+      it("calls client.insert with the expected table and values", async () => {
+        const row = makeRow();
+
+        await repo.insert({ projectId: "proj-1", row });
+
+        expect(mockInsert).toHaveBeenCalledOnce();
+        const call = mockInsert.mock.calls[0]![0];
+        expect(call.table).toBe("stored_objects");
+        expect(call.format).toBe("JSONEachRow");
+        expect(call.values).toHaveLength(1);
+        expect(call.values[0]).toMatchObject({
+          id: row.id,
+          project_id: row.project_id,
+          sha256: row.sha256,
+          storage_uri: row.storage_uri,
+        });
+      });
+    });
+  });
+
+  describe("findById", () => {
+    describe("when the row exists in ClickHouse", () => {
+      it("returns the parsed StoredObject with project_id scoping", async () => {
+        const rawRow = {
+          id: "test-id",
+          project_id: "proj-1",
+          purpose: "trace_content",
+          owner_kind: "span",
+          owner_id: "owner-1",
+          media_type: "text/plain",
+          size_bytes: "5",
+          sha256: "abc123",
+          storage_uri: "file:///var/lib/langwatch/objects/proj-1/abc123",
+          created_at: "2025-01-01 00:00:00.000",
+          inserted_at: "2025-01-01 00:00:00.000",
+        };
+        mockQueryResult.json.mockResolvedValue([rawRow]);
+
+        const result = await repo.findById({
+          projectId: "proj-1",
+          id: "test-id",
+        });
+
+        expect(mockQuery).toHaveBeenCalledOnce();
+        const call = mockQuery.mock.calls[0]![0];
+        // Query must be project-scoped
+        expect(call.query_params).toMatchObject({
+          projectId: "proj-1",
+          id: "test-id",
+        });
+        expect(call.query).toContain("project_id");
+
+        expect(result).not.toBeNull();
+        expect(result!.id).toBe("test-id");
+        expect(result!.project_id).toBe("proj-1");
+        expect(result!.size_bytes).toBe(5);
+      });
+    });
+
+    describe("when no row matches", () => {
+      it("returns null", async () => {
+        mockQueryResult.json.mockResolvedValue([]);
+
+        const result = await repo.findById({
+          projectId: "proj-1",
+          id: "missing-id",
+        });
+
+        expect(result).toBeNull();
+      });
+    });
+  });
+
+  describe("findLiveRowsByProjectPage", () => {
+    it("returns parsed latest rows from a project-scoped query", async () => {
+      mockQueryResult.json.mockResolvedValue([
+        {
+          ...makeRow(),
+          size_bytes: "5",
+          created_at: "2025-01-01 00:00:00.000",
+          inserted_at: "2025-01-02 00:00:00.000",
+        },
+      ]);
+
+      const result = await repo.findLiveRowsByProjectPage({
+        projectId: "proj-1",
+        afterId: "previous-id",
+        limit: 250,
+      });
+
+      expect(mockQuery).toHaveBeenCalledOnce();
+      const call = mockQuery.mock.calls[0]![0];
+      expect(call.query_params).toEqual({
+        projectId: "proj-1",
+        afterId: "previous-id",
+        limit: 250,
+      });
+      expect(call.query).toContain("max(inserted_at)");
+      expect(call.query).toContain("WHERE t.project_id = {projectId:String}");
+      expect(call.query).toContain("t.id > {afterId:String}");
+      expect(call.query).toContain("LIMIT {limit:UInt32}");
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        project_id: "proj-1",
+        size_bytes: 5,
+      });
+      expect(result[0]?.inserted_at).toEqual(
+        new Date("2025-01-02 00:00:00.000"),
+      );
+    });
+  });
+});

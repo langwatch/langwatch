@@ -6,13 +6,13 @@ icon: terminal
 keywords: go, golang, sdk, api, reference, documentation, langwatch, opentelemetry, tracer, span
 ---
 
-This reference provides detailed documentation for all public APIs in the LangWatch Go SDK and its associated instrumentation packages.
+The LangWatch Go SDK and its instrumentation packages expose the public APIs below.
 
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go
-go get github.com/langwatch/langwatch/sdk-go/instrumentation/openai
+go get github.com/langwatch/langwatch/sdks/go
+go get github.com/langwatch/langwatch/sdks/go/instrumentation/openai
 ```
 
 <Tip>
@@ -261,7 +261,7 @@ The `LangWatchSpan` interface embeds the standard `trace.Span` and adds several 
 
 ## OpenAI Instrumentation
 
-The `github.com/langwatch/langwatch/sdk-go/instrumentation/openai` package provides middleware for the official `openai-go` client.
+The `github.com/langwatch/langwatch/sdks/go/instrumentation/openai` package provides middleware for the official `openai-go` client.
 
 <Tip>
 For step-by-step instructions on setting up OpenAI instrumentation, see the [OpenAI integration guide](/integration/go/integrations/open-ai).
@@ -571,8 +571,8 @@ import (
 	"os"
 	"time"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"

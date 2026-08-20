@@ -1,4 +1,4 @@
-# Bindings target langwatch/src/server/experiments-v3/execution/__tests__/.
+# Bindings target platform/app/src/server/experiments-v3/execution/__tests__/.
 # The two scenarios still tagged @unimplemented need full orchestrator + nlpgo
 # coverage (multi-row run continuation and cross-row trace linkage); they are
 # proven by the end-to-end dogfood rather than the cell-level test.

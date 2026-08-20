@@ -1,14 +1,14 @@
 Feature: Anomaly detection — evaluate AnomalyRules + dispatch alerts (event-sourced)
   Once admins author AnomalyRules
   (specs/ai-gateway/governance/anomaly-rules.feature) the detection
-  reactor evaluates each active rule **as new events arrive** through
+  subscriber evaluates each active rule **as new events arrive** through
   the activity-monitor event-sourcing pipeline (modeled on PR #3351's
   alertTrigger pattern — event sourcing is the one true way per
   rchaves's 2026-04-27 directive). NO cron polling, NO worker —
   evaluation is reactive: receiver appends `ActivityEventReceived`
   to event_log → activity-monitor pipeline projects to
   `gateway_activity_events` and folds rolling windows → anomaly
-  reactor reads fold state, evaluates active rules, persists
+  subscriber reads fold state, evaluates active rules, persists
   `AnomalyAlert` and dispatches.
 
   Triggered rules persist to `AnomalyAlert` so the admin oversight
@@ -24,19 +24,19 @@ Feature: Anomaly detection — evaluate AnomalyRules + dispatch alerts (event-so
 
   Sliced delivery (per @master_orchestrator's C0/C1/C2/C3):
     - C0: this spec + activity-monitor event-sourcing architecture note
-    - C1: receiver → event_log append → projection reactor → CH row
-    - C2: AnomalyAlert schema + anomaly reactor for ONE rule type
+    - C1: receiver → event_log append → projection subscriber → CH row
+    - C2: AnomalyAlert schema + anomaly subscriber for ONE rule type
     - C3: dispatch destinations beyond log-only
 
   Spec: this file
   Pairs with: anomaly-rules.feature (configuration entity)
               docs/ai-gateway/governance/architecture.md
               (Activity-monitor event sourcing section)
-  Backend: langwatch/src/server/event-sourcing/pipelines/activity-monitor-processing/
+  Backend: platform/app/src/server/event-sourcing/pipelines/activity-monitor-processing/
 
   Background:
     Given the org admin has authored at least one active AnomalyRule
-      (via api.anomalyRules.create from the /settings/governance/anomaly-rules UI)
+      (via api.anomalyRules.create from the /governance/anomaly-rules UI)
     And the IngestionSource for that rule's scope has been emitting
       events for the past 30 days
 
@@ -112,16 +112,16 @@ Feature: Anomaly detection — evaluate AnomalyRules + dispatch alerts (event-so
       waiting for a real event to arrive
     When they call `api.anomalyRules.evaluateNow({ id: <ruleId> })`
     Then a synthetic ActivityEventReceived event is appended to event_log
-      against the rule's scope (the production code path — the reactor
+      against the rule's scope (the production code path — the subscriber
       processes it identically to a real ingest)
     And the call returns { triggered: boolean, alertId?: string }
     And subsequent UI poll of `recentAnomalies` reflects the result
     And this is explicitly NOT the production architecture: production
-      evaluation is reactor-on-event-append, never poller-on-cron.
+      evaluation is subscriber-on-event-append, never poller-on-cron.
 
   Scenario: disabled rules are not evaluated
     Given a rule with status="disabled"
-    When the anomaly-detection reactor fires for an event in the rule's scope
+    When the anomaly-detection subscriber fires for an event in the rule's scope
     Then the rule is skipped during the in-memory active-rules loop
     And no alert is generated even if the underlying data would trigger
 
@@ -135,7 +135,7 @@ Feature: Anomaly detection — evaluate AnomalyRules + dispatch alerts (event-so
   Scenario: Backend keeps evaluating when UI is gated off
     Given a customer org doesn't have the governance preview flag enabled
     When their AnomalyRules still have status="active"
-    Then the anomaly-detection reactor still fires on every
+    Then the anomaly-detection subscriber still fires on every
       ActivityEventReceived event
     And alerts persist as usual
     And dispatch destinations still receive notifications

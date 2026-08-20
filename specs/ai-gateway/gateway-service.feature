@@ -107,6 +107,235 @@ Feature: Gateway service — public HTTP surface and operational basics
       Then it boots normally
       And a warning is logged
 
+  Rule: Auth-cache stale-while-error knobs are configurable in plain seconds
+
+    # SoftBump/HardGrace/ConfigTTL were time.Duration fields parsed from
+    # strings like "5m"/"6h" — per review feedback on #5977, converted to
+    # plain int64 seconds (LW_GATEWAY_AUTH_CACHE_*_SECONDS) to match this
+    # service's existing GracefulSeconds/DrainDelaySeconds convention rather
+    # than fixing the string-parsing path in place.
+    # Bindings: services/aigateway/config_test.go
+
+    @integration @regression
+    Scenario: AuthCache seconds-suffixed env vars reach AuthCacheConfig
+      Given LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS=300, _HARD_GRACE_SECONDS=21600, _CONFIG_TTL_SECONDS=90
+      When the gateway loads its configuration
+      Then AuthCache.SoftBumpSeconds is 300
+      And AuthCache.HardGraceSeconds is 21600
+      And AuthCache.ConfigTTLSeconds is 90
+
+  Rule: Graceful shutdown window is actually configurable, and checked against the heartbeat interval and the longest legitimate stream
+
+    # shutdown.preDrainWaitSeconds and shutdown.timeoutSeconds reach the
+    # container as SERVER_DRAIN_DELAY_SECONDS / SERVER_GRACEFUL_SECONDS,
+    # and serve.go passes both to pkg/lifecycle. Distinct from the "Graceful
+    # SIGTERM drain (iter 24)" rule below, which describes a fuller 4-phase
+    # mechanism this does not claim to fully verify.
+    #
+    # That the two values actually reach the rendered ConfigMap is verified
+    # in .github/workflows/go-services.yaml's `helm` job, a rendered-template
+    # grep assertion, the same pattern this file already uses for
+    # NetworkPolicy. Not written as a Scenario here because the
+    # feature-parity checker only scans Go/TS/Python/Bats test files, not CI
+    # YAML steps: there would be no way to bind it, and @unimplemented would
+    # falsely claim it isn't tested when it is, just not in a format the
+    # checker recognizes.
+    #
+    # Two bounds are checked, because a request can be legitimately slow for
+    # two unrelated reasons. The heartbeat interval is the chosen boundary
+    # between a fast non-streaming response and a slow but legitimate one.
+    # The upstream provider timeout is the only thing that bounds a stream at
+    # all: the HTTP server sets ReadHeaderTimeout and neither a WriteTimeout
+    # nor an IdleTimeout, so a stream can legitimately run for the full
+    # 14 minutes, and a graceful window under that severs it on every rolling
+    # deploy, node drain and scale-down.
+    #
+    # A warning marks a deployment that narrowed its graceful window, never
+    # one that took the Go defaults, which clear both bounds by construction:
+    # a warning every stock install emits is noise, not a signal. The gateway
+    # chart is the deliberate exception. Its timeoutSeconds of 60 trips the
+    # stream bound, which is the correct signal for a 75s pod grace period;
+    # raising it is a pod sizing decision rather than a defaulting one.
+
+    @unit @regression
+    Scenario: stock defaults clear the graceful-vs-heartbeat check
+      Given GracefulSeconds is left at the stock default
+      And the effective non-streaming heartbeat interval is 45s (the stock default)
+      When the gateway starts
+      Then no graceful_shutdown_shorter_than_heartbeat_interval warning is emitted
+      And no graceful_shutdown_shorter_than_max_stream_duration warning is emitted
+
+    @unit @regression
+    Scenario: a graceful window narrowed below the heartbeat interval warns
+      Given GracefulSeconds is set to 10
+      And the effective non-streaming heartbeat interval is 45s (the stock default)
+      When the gateway starts
+      Then a WARN log "graceful_shutdown_shorter_than_heartbeat_interval" is emitted
+      And it reports the 10s graceful window and the 45s heartbeat interval
+
+    @unit @regression
+    Scenario: graceful window at or above the heartbeat interval does not warn
+      Given GracefulSeconds is at least the effective heartbeat interval
+      When the gateway starts
+      Then no graceful_shutdown_shorter_than_heartbeat_interval warning is emitted
+
+    @unit @regression
+    Scenario: disabled heartbeating skips the check entirely
+      Given the non-streaming heartbeat interval is negative (disabled)
+      And GracefulSeconds is very small
+      When the gateway starts
+      Then no graceful_shutdown_shorter_than_heartbeat_interval warning is emitted
+
+    @unit @regression
+    Scenario: an explicit zero-or-negative graceful window skips the check
+      Given GracefulSeconds is 0 or negative
+      When the gateway starts
+      Then no graceful_shutdown_shorter_than_heartbeat_interval warning is emitted
+
+    @unit @regression
+    Scenario: an unset heartbeat interval resolves to the default before comparing
+      Given the non-streaming heartbeat interval is unset (zero)
+      And GracefulSeconds is below the resolved default heartbeat interval
+      When the gateway starts
+      Then the warning compares against the resolved 45s default, not literal zero
+
+    @unit @regression
+    Scenario: a graceful window below the upstream stream ceiling warns
+      Given GracefulSeconds is set to 60, which is above the 45s heartbeat interval
+      When the gateway starts
+      Then no graceful_shutdown_shorter_than_heartbeat_interval warning is emitted
+      But a WARN log "graceful_shutdown_shorter_than_max_stream_duration" is emitted
+      And it reports the 60s graceful window and the upstream stream ceiling
+
+    @unit @regression
+    Scenario: a graceful window at or above the upstream stream ceiling stays quiet
+      Given GracefulSeconds equals the upstream provider request timeout
+      When the gateway starts
+      Then no graceful_shutdown_shorter_than_max_stream_duration warning is emitted
+      And a window above that ceiling stays quiet too
+
+    @unit @regression
+    Scenario: disabled heartbeating still checks the stream ceiling
+      Given the non-streaming heartbeat interval is negative (disabled)
+      And GracefulSeconds is very small
+      When the gateway starts
+      Then no graceful_shutdown_shorter_than_heartbeat_interval warning is emitted
+      But a graceful_shutdown_shorter_than_max_stream_duration warning is emitted
+
+    @unit @regression
+    Scenario: SERVER_DRAIN_DELAY_SECONDS reaches Server.DrainDelaySeconds
+      Given env SERVER_DRAIN_DELAY_SECONDS=7
+      When the gateway loads its configuration
+      Then Server.DrainDelaySeconds is 7
+
+    @unit @regression
+    Scenario: the default graceful window outlasts the heartbeat interval
+      Given no shutdown environment variables are set
+      When the gateway loads its configuration
+      Then Server.GracefulSeconds exceeds the 45s non-streaming heartbeat interval
+
+  Rule: A request that finishes during shutdown still has its spend recorded
+
+    # An operator sees this as money, not as ordering: a request billed on the
+    # way out of a rolling deploy must still be charged. It is worth stating
+    # because the failure is silent. Spool.Append counts and discards every
+    # record handed to it after Close, so a spend pipeline torn down before
+    # the listener has drained loses the spend of every request that finishes
+    # during the drain. Such a request has already had its admitSpend shipped,
+    # which leaves an admitted spend that is never confirmed.
+    #
+    # Two things produce the behavior: the listener is stopped before the
+    # spend pipeline, and stopping the drainer waits for a drain already in
+    # flight rather than only asking it to stop. Telemetry is torn down last,
+    # so the shutdown itself is still traced.
+    #
+    # The unit bindings assert those mechanisms, since the ordering is what a
+    # regression would change; the end-to-end behavior was verified against a
+    # real gateway binary, where reverting the order alone lost a confirmSpend.
+    # Bindings: services/aigateway/serve_test.go,
+    # services/aigateway/adapters/spendemitter/drainer_lifecycle_test.go
+
+    @unit @regression
+    Scenario: the listener drains before the spend spool and drainer
+      Given a gateway shutting down with spend recording configured
+      When a request completes during the drain
+      Then its spend is still recorded rather than dropped
+      And the shutdown itself is still traced
+
+    @unit @regression
+    Scenario: an absent spend pipeline still leaves the listener draining first
+      Given a gateway running with no spend recording configured
+      When it shuts down
+      Then in-flight requests are still drained before anything else stops
+
+    @unit @regression
+    Scenario: a drain already in flight finishes before the spool closes
+      Given a spend drain is mid-flight when shutdown begins
+      When the drainer is stopped
+      Then the in-flight drain finishes before the spool it reads from closes
+      And a shipper that ignores cancellation costs the shutdown budget rather than hanging shutdown
+
+  Rule: Seconds-valued configuration is range-checked before it becomes a duration
+
+    # Every seconds field is turned into a time.Duration by multiplying by a
+    # billion, so a nanosecond count pasted into a seconds field wraps int64
+    # into a negative duration, which consumers read as "disabled" or as an
+    # instant timeout. A ten-year ceiling is orders of magnitude past any
+    # legitimate setting and keeps the multiplication far from overflow.
+    # Bindings: services/aigateway/config_test.go
+
+    @unit @regression
+    Scenario: an absurd seconds value is refused instead of overflowing a duration
+      Given a seconds-valued env var is set to a nanosecond-scale number
+      When the gateway loads its configuration
+      Then it refuses to start and names the offending variable
+
+    @unit @regression
+    Scenario: a legitimate large seconds value is still accepted
+      Given LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS is one year in seconds
+      When the gateway loads its configuration
+      Then AuthCache.HardGraceSeconds is 31536000
+
+    @unit @regression
+    Scenario: the largest in-range seconds value is accepted and the next one is not
+      Given a seconds-valued env var is set to the largest supported value
+      When the gateway loads its configuration
+      Then it starts, and the value is still a positive time span
+      But one second more is refused
+
+    # A wait cannot be run backwards. Where other seconds fields read a
+    # negative number as "disabled", the shutdown budget and the drain delay
+    # are time the gateway spends waiting, so a negative there would answer
+    # SIGTERM by dropping every in-flight request at once. Zero already says
+    # "do not wait".
+    @unit @regression
+    Scenario: a negative shutdown budget is refused instead of draining nothing
+      Given SERVER_GRACEFUL_SECONDS or SERVER_DRAIN_DELAY_SECONDS is negative
+      When the gateway loads its configuration
+      Then it refuses to start and names the offending variable
+
+    @unit @regression
+    Scenario: zero is accepted as an explicit no-wait
+      Given SERVER_DRAIN_DELAY_SECONDS is 0
+      When the gateway loads its configuration
+      Then it starts with no drain delay at all
+
+  Rule: The retired duration-string variables stop a boot rather than being ignored
+
+    # Nothing reads LW_GATEWAY_AUTH_CACHE_SOFT_BUMP / _HARD_GRACE / _CONFIG_TTL
+    # any more. A deployment that still carries one would boot on the default
+    # instead, so an operator who had set the hard grace to hard-fail at JWT
+    # exp would come back up serving stale bundles for six hours with nothing
+    # to tell them their setting had stopped applying.
+    # Bindings: services/aigateway/config_test.go
+
+    @unit @regression
+    Scenario: a retired duration-string variable stops startup and names its replacement
+      Given LW_GATEWAY_AUTH_CACHE_HARD_GRACE is still set in the environment
+      When the gateway loads its configuration
+      Then it refuses to start
+      And the error names LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS as the variable to use
+
   Rule: Request body size cap (iter 23, `79b46bf`)
 
     # The gateway enforces a per-request body size limit BEFORE auth / dispatch
@@ -151,8 +380,8 @@ Feature: Gateway service — public HTTP surface and operational basics
     # user is signed in with an OpenAI account. Every stage past the transport
     # (model peek, stream detection, guardrails, the provider adapters) reads
     # JSON, so the compressed bytes have to be decoded at the edge. Reading
-    # them raw finds no top-level `model` and fails the turn with a 400
-    # "missing model field" before any provider is contacted.
+    # them raw finds no top-level `model` and fails the turn with a 400 for a
+    # missing model field before any provider is contacted.
 
     @integration
     Scenario Outline: a compressed body is decoded on every dispatch lane
@@ -218,27 +447,67 @@ Feature: Gateway service — public HTTP surface and operational basics
       And error.type equals "payload_too_large"
       And no provider dispatch occurs
 
+  Rule: A request with no model says where THAT surface expects one
+
+    # This is the gateway's largest single source of 400s, and for five days it
+    # was one virtual key posting bodies with no top-level `model` round the
+    # clock, retrying against a rejection that read, in full, "missing model
+    # field". That names no field, no body and no endpoint, so the operator on
+    # the other end had nothing to correct and the loop never stopped. The
+    # handled error therefore carries a stable `missing_model` code plus
+    # the request surface in metadata; operators and clients need not infer
+    # this high-volume rejection from prose. Resolution still runs before the
+    # request is labeled with a model, so the request counter records
+    # model="unknown".
+    #
+    # Model resolution is unconditional, so every surface reaches this
+    # rejection - and the surfaces disagree about where a model comes from.
+    # Three read a top-level JSON field, transcription reads a multipart form
+    # part, and the Gemini passthrough reads the URL path. A single message
+    # naming the JSON endpoints is not merely vague at the other four, it is
+    # wrong: it sends a caller to fix a request shape they are not using.
+    #
+    # See dev/docs/adr/045-domain-errors-handled-boundary.md for the handled-
+    # error contract this rule follows.
+    #
+    # Bindings: services/aigateway/adapters/modelresolver/resolver_test.go
+
+    @unit
+    Scenario: a request with no model is rejected with a message the client can act on
+      Given a valid VK
+      When a request arrives naming no model
+      Then the rejection has handled error code "missing_model"
+      And its metadata names the request surface
+      And the rejection names the endpoint the caller actually used
+      And it says where that endpoint takes its model from
+      And it shows what a correct request looks like
+      And it never names a request shape the caller is not using
+      And the failure is attributed to the caller rather than to the platform
+
   Rule: Graceful SIGTERM drain (iter 24, `ea167ca`)
 
     # Four-phase shutdown guarantees in-flight requests complete before pod exit.
     # Preserves streaming connections (no mid-stream 5xx from drain).
+    # Bindings: charts/gateway/tests/shutdown-values.sh, run by the `helm` job
+    # in .github/workflows/go-services.yaml. The phase scenarios below describe
+    # the running gateway's own drain behaviour and are not covered there.
 
     Scenario: SIGTERM phase 1 — readiness probe flips to 503 draining
       When the gateway receives SIGTERM
       Then within 100ms GET /readyz returns 503
       And the body JSON contains {"status": "draining"}
       And GET /healthz still returns 200 (liveness unchanged)
-      And structured log "gateway_draining" is emitted with preDrainWait duration
+      And structured log "gateway_draining" is emitted with preDrainWaitSeconds duration
 
-    Scenario: SIGTERM phase 2 — preDrainWait lets load balancer propagate the 503
-      Given Helm values.shutdown.preDrainWait = 5s
+    Scenario: SIGTERM phase 2 — preDrainWaitSeconds lets load balancer propagate the 503
+      Given Helm values.shutdown.preDrainWaitSeconds = 5
       When the gateway receives SIGTERM
       Then the gateway waits 5s for LB endpoint removal BEFORE stopping accept
-      And new requests continue landing during preDrainWait (LB still routes)
+      And new requests continue landing during preDrainWaitSeconds (LB still routes)
       And each new request is still served correctly (no rejection)
 
-    Scenario: SIGTERM phase 3 — server.Shutdown(timeout) drains in-flight handlers
-      Given Helm values.shutdown.timeout = 15s
+    Scenario: SIGTERM phase 3 — server.Shutdown(timeoutSeconds) drains in-flight handlers
+      Given Helm values.shutdown.timeoutSeconds = 60
       When the gateway has 20 in-flight streaming requests at SIGTERM
       Then the server stops accepting new connections
       And in-flight requests complete naturally (up to 15s)
@@ -246,10 +515,30 @@ Feature: Gateway service — public HTTP surface and operational basics
       And structured log "gateway_shutting_down" is emitted at shutdown start
       And structured log "gateway_stopped" is emitted when drain completes
 
-    Scenario: preDrainWait + timeout MUST be within terminationGracePeriodSeconds
-      Given Helm values.shutdown.preDrainWait = 5s + timeout = 15s + slack = 10s
-      Then terminationGracePeriodSeconds must be ≥ 30s (5+15+10)
+    @unit @regression
+    Scenario: preDrainWaitSeconds + timeoutSeconds MUST be within terminationGracePeriodSeconds
+      Given Helm values.shutdown.preDrainWaitSeconds = 5 + timeoutSeconds = 60 + slack = 10
+      Then terminationGracePeriodSeconds must be ≥ 75 (5+60+10)
       And chart helm-template validation asserts this invariant
+
+    @unit @regression
+    Scenario: the duration-string shutdown keys are refused by the chart
+      Given a values file sets shutdown.preDrainWait or shutdown.timeout
+      Then helm template fails and names the Seconds-suffixed key to use instead
+      And no release installs with drain timing that silently ignores those values
+
+    @unit @regression
+    Scenario: the drain timing an operator sets is what the pod runs with
+      Given a values file sets shutdown.preDrainWaitSeconds and shutdown.timeoutSeconds
+      When the release is rendered
+      Then the pod receives exactly those two numbers as its drain delay and shutdown budget
+      And a release that took the defaults receives the defaults
+
+    @unit @regression
+    Scenario: a drain budget wider than the pod's grace period is refused
+      Given a values file widens the drain past what terminationGracePeriodSeconds allows
+      Then helm template fails and names the grace period the drain would need
+      And raising terminationGracePeriodSeconds to that number renders
 
     Scenario: stuck handler beyond timeout is force-killed
       Given a handler that blocks past the shutdown timeout
@@ -328,3 +617,19 @@ Feature: Gateway service — public HTTP surface and operational basics
       Then response header "X-Langwatch-Gateway-Version" is set to the gateway version string
       And the header is present on 200, 401, 403, 429, 413, 500, 503 — every path
       And operators can cross-ref customer-reported issues to specific gateway builds
+
+  Rule: One inbound body cap, stated once
+
+    # The cap is named in the code every deployment falls back to, in the
+    # Helm value the chart renders into the container, and in the operator
+    # docs a pod gets sized from. Three sources, one number: when they
+    # disagree an operator provisions for the cap the docs promise and the
+    # gateway enforces a different one, and the only symptom is a 413 on a
+    # payload the docs said would fit.
+
+    @unit
+    Scenario: the body cap is the same number in the code, the chart and the docs
+      Given the gateway's default inbound body cap
+      When the Helm chart's rendered value and the self-hosting docs are read
+      Then all three state the same number of bytes
+      And changing any one of them alone fails the build

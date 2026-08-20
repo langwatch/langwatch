@@ -24,7 +24,7 @@ type ProviderRouter interface {
 }
 
 // BudgetChecker validates spending pre-flight. Cost recording is handled
-// by the trace-fold reactor on the control plane (folds OTel span usage
+// by the trace-fold subscriber on the control plane (folds OTel span usage
 // into the ClickHouse budget ledger), not on the gateway hot path.
 type BudgetChecker interface {
 	Precheck(ctx context.Context, bundle *domain.Bundle) (domain.BudgetDecision, error)
@@ -45,8 +45,15 @@ type RateLimiter interface {
 }
 
 // PolicyMatcher checks request content against policy rules.
+//
+// Two entry points because the two halves know different things. Check runs
+// on the body as sent, before anything is resolved, and covers tools, MCP
+// identifiers and URLs. CheckModel runs after the model resolver and judges
+// the model that will actually be dispatched, which is the only reading of a
+// model rule an alias cannot walk around.
 type PolicyMatcher interface {
 	Check(ctx context.Context, rules []domain.PolicyRule, body []byte) error
+	CheckModel(ctx context.Context, rules []domain.PolicyRule, resolved domain.ResolvedModel) error
 }
 
 // CacheEvaluator evaluates cache rules for a request.
@@ -54,9 +61,12 @@ type CacheEvaluator interface {
 	Evaluate(ctx context.Context, rules []domain.CacheRule, eval domain.CacheEvalContext) *domain.CacheDecision
 }
 
-// ModelResolver resolves a raw model string against bundle config.
+// ModelResolver resolves a request's model against bundle config. It takes
+// the request rather than the bare model string so a rejection can name the
+// surface the caller used: the endpoints disagree about where the model comes
+// from (JSON body, multipart form part, URL path).
 type ModelResolver interface {
-	Resolve(ctx context.Context, rawModel string, config domain.BundleConfig) (*domain.ResolvedModel, error)
+	Resolve(ctx context.Context, req *domain.Request, config domain.BundleConfig) (*domain.ResolvedModel, error)
 }
 
 // AITraceEmitter exports AI completion data to the customer's project.

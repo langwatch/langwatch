@@ -13,9 +13,9 @@ Feature: Governance visibility rides a single feature flag
 
   Spec scope: the gating contract itself — what's hidden, when, and how
   operators control it. The default lives in
-  `langwatch/src/server/featureFlag/registry.ts`; frontend exposure in
-  `langwatch/src/server/featureFlag/frontendFeatureFlags.ts`; the CLI
-  device-login gate in `langwatch/src/server/routes/auth-cli.ts`
+  `platform/app/src/server/featureFlag/registry.ts`; frontend exposure in
+  `platform/app/src/server/featureFlag/frontendFeatureFlags.ts`; the CLI
+  device-login gate in `platform/app/src/server/routes/auth-cli.ts`
   (ADR-038 Decision 7 pins the registry default and the gate fallback as
   a pair that moves together).
 
@@ -40,7 +40,7 @@ Feature: Governance visibility rides a single feature flag
       | surface                            | path                              |
       | My Workspace dashboard             | /me                               |
       | My Workspace settings              | /me/settings                      |
-      | Admin Routing Policies             | /settings/routing-policies        |
+      | Admin Routing Policies             | /gateway/routing-policies         |
       | Admin Activity Monitor             | /settings/activity-monitor        |
       | Admin Provider Catalog             | /settings/providers               |
       | Admin IngestionSource setup        | /settings/ingestion-sources       |
@@ -81,7 +81,7 @@ Feature: Governance visibility rides a single feature flag
   Scenario: Gating contract documented for downstream contributors
     Given a contributor is adding a new governance UI page
     When they read `dev/docs/adr/038-intent-forked-onboarding-governance-vs-llmops.md`
-      and the flag's entry in `langwatch/src/server/featureFlag/registry.ts`
+      and the flag's entry in `platform/app/src/server/featureFlag/registry.ts`
     Then they explain:
       | concern                                                        |
       | which flag to use (release_ui_ai_governance_enabled, not gateway) |

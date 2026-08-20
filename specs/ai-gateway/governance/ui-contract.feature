@@ -24,7 +24,8 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
 
   Background:
     Given user "admin@acme.com" is signed in to organization "acme"
-    And the user has the "organization:manage" permission
+    And the user has the "governance:view" permission
+    And the user has the "activityMonitor:view" permission
     And the feature flag "release_ui_ai_governance_enabled" is enabled
     And Sergey's data-layer cutover has landed (api.activityMonitor.*
       procedures read from governance_kpis fold + recorded_spans/log_records
@@ -47,7 +48,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   @bdd @ui @ui-contract @single-surface
   Scenario: Per-source detail page renders ONE unified events feed
     Given an IngestionSource "Cowork Production" exists
-    When the admin navigates to "/settings/governance/ingestion-sources/<id>"
+    When the admin navigates to "/governance/ingestion-sources/<id>"
     Then the page renders the source's metadata (name, type, status,
       recent volume)
     And the events tab below renders a single events feed mixing
@@ -154,7 +155,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
     Then it filters out kind == "internal_governance" rows
     And any leak of the hidden project to a user surface is treated
       as a bug (regression test in
-      langwatch/src/components/__tests__/projectFilter.invariant.test.ts
+      platform/app/src/components/__tests__/projectFilter.invariant.test.ts
       asserts every Project consumer applies the filter)
 
   # ---------------------------------------------------------------------------
@@ -165,7 +166,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   Scenario: The IngestionSource composer does NOT show a Project
             selection field
     When the admin opens the "Create ingestion source" composer at
-      "/settings/governance/ingestion-sources/new"
+      "/governance/ingestion-sources/new"
     Then the composer asks for: name, source type, per-platform config
     And the composer does NOT ask the admin to select or assign a
       Project (the hidden Governance Project routing is done by the
@@ -247,9 +248,9 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   @bdd @ui @ui-contract @anomaly-rules
   Scenario: The anomaly rule composer's scope picker still works against
             IngestionSource IDs after the cutover
-    Given Sergey's anomaly reactor has rebased on governance_kpis fold
+    Given Sergey's anomaly subscriber has rebased on governance_kpis fold
     When the admin opens the AnomalyRule composer at
-      "/settings/governance/anomaly-rules/new"
+      "/governance/anomaly-rules/new"
     And selects scope = "source"
     Then the scope-id picker dropdown lists active IngestionSources
       by name + type (e.g. "Cowork Prod (claude_cowork)")
@@ -271,7 +272,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
     Then the page renders with the heading "Governance Overview"
     And a single CTA tile reads "Set up your first ingestion source
       to start collecting events from third-party AI platforms"
-    And the CTA links to "/settings/governance/ingestion-sources/new"
+    And the CTA links to "/governance/ingestion-sources/new"
 
   @bdd @ui @ui-contract @empty-state
   Scenario: Per-source detail empty state when source has no events yet
@@ -293,7 +294,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
             viewer (does NOT build a bespoke event renderer)
     When the admin navigates to a per-source detail page with events
     Then the events feed reuses the existing
-      langwatch/src/components/messages/MessagesList component
+      platform/app/src/components/messages/MessagesList component
       (or the equivalent feed renderer used at /messages)
     And NO bespoke "EventsTable" / "GovernanceEventRow" component
       exists for governance — the existing components handle
@@ -323,7 +324,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   Scenario: Lane-B test suite asserts every Project consumer filters
             kind=internal_governance
     When the test suite runs
-      langwatch/src/components/__tests__/projectFilter.invariant.test.ts
+      platform/app/src/components/__tests__/projectFilter.invariant.test.ts
     Then it enumerates every component / API / hook / repository
       method that loads or renders Projects
     And for each, asserts that a Project with kind="internal_governance"

@@ -94,6 +94,84 @@ helm upgrade lw . -f examples/overlays/size-dev.yaml -f examples/overlays/access
 helm uninstall lw
 ```
 
+#### Upgrades with local-filesystem stored objects
+
+This is the default mode, where the app and the workers mount one
+`ReadWriteOnce` PVC. A `ReadWriteOnce` volume attaches to one node, so every
+pod that mounts it has to run on that node. Both Deployments already use a
+kill-then-start rollout for this reason, but a `helm upgrade` rolls both at the
+same time. On a cluster with more than one node, the new pod of one Deployment
+can be scheduled on a fresh node while the old pod of the other still holds the
+attachment on the old node, and both then wedge in `ContainerCreating` with a
+multi-attach error.
+
+The chart orders them for you, with two hook Jobs:
+
+1. A **drain** Job (`pre-upgrade`, `pre-rollback`) scales the workers to 0 and
+   waits for their pods to go away, so the old workers pod cannot hold the
+   volume on the old node while Helm rolls the app.
+2. A **restore** Job (`post-upgrade`, `post-rollback`) scales the workers to 0
+   again, waits for the app rollout to finish, and then scales them back to
+   `workers.replicaCount`.
+
+The second step is not redundant. Helm's apply restores the replica count from
+the manifest, so a new workers pod is created at the same instant as the new app
+pod. Its required `podAffinity` matches the old app pod, which is still
+terminating on the old node, so the scheduler puts the workers back on the node
+the app is leaving, where they take over the attachment and wedge the new app
+pod for good. Holding the workers at 0 until the app rollout finishes is what
+makes them follow the new app pod.
+
+Expect a worker outage that covers the app rollout, on top of the brief app
+outage the kill-then-start rollout already carries.
+
+The hooks need a ServiceAccount token and a namespaced Role: `get` on the app
+and the workers Deployments, `patch` on the workers' scale subresource, and read
+access to the pods of the release namespace. They render only in this mode. With
+`app.dataplane` (S3 / Azure) there is no shared volume, so they never render.
+
+If the drain Job fails, the upgrade stops and the workers stay at 0. That is
+deliberate: it is safer than a wedged rollout. Read the Job logs, fix the cause,
+then run the upgrade again, which scales the workers back up. The restore Job
+never fails the release over a slow or broken app: if the rollout does not
+finish in time it says so and brings the workers back anyway.
+
+**Rollbacks.** `helm rollback` moves both Deployments the same way an upgrade
+does, so both Jobs are registered for the rollback events too and a rollback is
+ordered the same way. One case the chart cannot cover: on a rollback Helm runs
+the hooks stored in the **target** revision, so a rollback to a chart version
+from before these Jobs existed runs no Jobs at all. Before such a downgrade,
+scale the workers down by hand and bring them back after it:
+
+```bash
+kubectl -n <namespace> scale deployment <release>-workers --replicas=0
+kubectl -n <namespace> rollout status deployment <release>-workers --timeout=2m
+helm rollback <release> <old-revision>
+kubectl -n <namespace> scale deployment <release>-workers --replicas=1
+```
+
+To order the rollout yourself, or on a cluster that forbids that RBAC:
+
+```yaml
+app:
+  storedObjects:
+    localFilesystem:
+      serializeUpgrades: false
+```
+
+For an air-gapped install, mirror the hook image and point
+`app.storedObjects.localFilesystem.serializeUpgradesImage` at your copy. It
+needs `sh` and `kubectl`, and it accepts a digest reference. If your registry
+needs credentials, name the pull secrets in
+`app.storedObjects.localFilesystem.serializeUpgradesPullSecrets`: the hook
+Jobs run under their own ServiceAccount, so secrets you attached to the
+namespace's `default` ServiceAccount do not reach them.
+
+The image tag names the kubectl version. `kubectl` supports one minor version of
+skew either way, so change it if your cluster is far from 1.34. The hooks only
+call `get deployment`, `patch deployment --subresource=scale` and `wait
+--for=delete pod`, which have been stable for many releases.
+
 ### Secrets
 
 Use `secretKeyRef` to reference existing Kubernetes Secrets instead of inlining values:
@@ -134,12 +212,13 @@ dropped capabilities, `RuntimeDefault` seccomp, no mounted SA token, and
 resource requests/limits on every container.
 
 A default install does **not** clear Pod Security Admission `restricted` on its
-own: three bundled components can't comply. On clusters that enforce it, add
+own: four bundled components can't comply. On clusters that enforce it, add
 `examples/overlays/strict-admission.yaml`, which turns off the upstream
 Prometheus subchart, the Langy assistant (whose manager must run as root to
-give each worker its own UID — never force it non-root), and the ClickHouse
-preflight Job (it runs kubectl, so it needs a token and a writable root), plus
-the custom-metrics gateway HPA. Full details in
+give each worker its own UID, never force it non-root), the ClickHouse
+preflight Job and the stored-objects upgrade hooks (both run kubectl, so they
+need a token and a writable root), plus the custom-metrics gateway HPA. Full
+details in
 [Security → Pod Security](https://docs.langwatch.ai/self-hosting/security#pod-security).
 
 ### Regenerate this table
@@ -204,6 +283,8 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `app.otel`                                                   | OpenTelemetry identity for the app.                                                                                                                                                                                                                                                 |                              |
 | `app.otel.serviceName`                                       | Service name reported in traces and logs.                                                                                                                                                                                                                                           | `langwatch-app`              |
 | `app.replicaCount`                                           | Number of application replicas.                                                                                                                                                                                                                                                     | `1`                          |
+| `app.shutdownDrainSeconds`                | Seconds the queue may spend draining in-flight jobs on shutdown.                                                                                                                                                        | `25`                |
+| `app.terminationGracePeriodSeconds`       | Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.                                                                                                                                                     | `55`                |
 | `app.service`                                                | Service configuration for the app.                                                                                                                                                                                                                                                  |                              |
 | `app.service.type`                                           | Service type.                                                                                                                                                                                                                                                                       | `ClusterIP`                  |
 | `app.service.port`                                           | Service port.                                                                                                                                                                                                                                                                       | `5560`                       |
@@ -277,22 +358,41 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `app.storedObjects.localFilesystem.path`                     | Mount point that the LocalFilesystemDriver writes under.                                                                                                                                                                                                                            | `/var/lib/langwatch/objects` |
 | `app.storedObjects.localFilesystem.size`                     | PVC size for the stored-objects volume.                                                                                                                                                                                                                                             | `10Gi`                       |
 | `app.storedObjects.localFilesystem.storageClassName`         | PVC storageClassName (cluster default if empty).                                                                                                                                                                                                                                    | `""`                         |
+| `app.storedObjects.localFilesystem.serializeUpgrades`        | Hold the workers at 0 replicas while the app rolls, so only one pod holds the shared RWO volume.                                                                                                                                                                                    | `true`                       |
+| `app.storedObjects.localFilesystem.serializeUpgradesImage`   | Image the upgrade hooks run. Needs sh and kubectl. A digest reference works too.                                                                                                                                                                                                    | `alpine/k8s:1.34.9`          |
+| `app.storedObjects.localFilesystem.serializeUpgradesPullSecrets` | Pull secrets for that image. The hook Jobs use their own ServiceAccount, so secrets on the namespace default ServiceAccount do not reach them.                                                                                                                                      | `[]`                         |
 | `app.email`                                                  | Email provider configuration.                                                                                                                                                                                                                                                       |                              |
-| `app.email.enabled`                                          | Enable email notifications.                                                                                                                                                                                                                                                         | `false`                      |
 | `app.email.defaultFrom`                                      | Default "from" address.                                                                                                                                                                                                                                                             | `""`                         |
-| `app.email.provider`                                         | Email provider.                                                                                                                                                                                                                                                                     | `sendgrid`                   |
+| `app.email.provider`                                         | Email provider. Empty sends no email.                                                                                                                                                                                                                                               | `""`                         |
 | `app.email.providers.sendgrid`                               | Sendgrid provider configuration.                                                                                                                                                                                                                                                    |                              |
 | `app.email.providers.sendgrid.apiKey.value`                  | Sendgrid API key.                                                                                                                                                                                                                                                                   | `""`                         |
 | `app.email.providers.sendgrid.apiKey.secretKeyRef`           | Secret ref for SendGrid API key.                                                                                                                                                                                                                                                    | `{}`                         |
+| `app.email.providers.ses`                                    | AWS SES provider configuration.                                                                                                                                                                                                                                                     |                              |
+| `app.email.providers.ses.region`                             | AWS region for SES.                                                                                                                                                                                                                                                                 | `""`                         |
+| `app.email.providers.ses.endpoint`                           | Override the SES endpoint (VPC endpoint or egress relay).                                                                                                                                                                                                                           | `""`                         |
+| `app.email.providers.smtp`                                   | SMTP relay configuration.                                                                                                                                                                                                                                                           |                              |
+| `app.email.providers.smtp.url.value`                         | Full SMTP connection URL. Takes precedence over the discrete settings.                                                                                                                                                                                                              | `""`                         |
+| `app.email.providers.smtp.host`                              | SMTP host, when not using a URL.                                                                                                                                                                                                                                                    | `""`                         |
+| `app.email.providers.smtp.port`                              | SMTP port. Defaults to 587.                                                                                                                                                                                                                                                         | `""`                         |
+| `app.email.providers.smtp.secure`                            | Force implicit TLS ("true") or STARTTLS ("false"). Defaults to true on port 465.                                                                                                                                                                                                    | `""`                         |
+| `app.email.providers.smtp.user`                              | Username. Omit for an unauthenticated internal relay.                                                                                                                                                                                                                               | `""`                         |
+| `app.email.providers.smtp.url.secretKeyRef`                  | Secret ref for the SMTP URL.                                                                                                                                                                                                                                                        | `{}`                         |
+| `app.email.providers.smtp.password.value`                    | SMTP password.                                                                                                                                                                                                                                                                      | `""`                         |
+| `app.email.providers.smtp.password.secretKeyRef`             | Secret ref for the SMTP password.                                                                                                                                                                                                                                                   | `{}`                         |
+| `app.email.providers.resend`                                 | Resend provider configuration.                                                                                                                                                                                                                                                      |                              |
+| `app.email.providers.resend.apiKey.value`                    | Resend API key.                                                                                                                                                                                                                                                                     | `""`                         |
+| `app.email.providers.resend.apiKey.secretKeyRef`             | Secret ref for the Resend API key.                                                                                                                                                                                                                                                  | `{}`                         |
+| `app.license`                                                | Enterprise license configuration.                                                                                                                                                                                                                                                   |                              |
+| `app.license.key.value`                                      | License key issued by LangWatch.                                                                                                                                                                                                                                                    | `""`                         |
+| `app.license.key.secretKeyRef`                               | Secret ref holding the license key.                                                                                                                                                                                                                                                 | `{}`                         |
+| `app.license.publicKey.value`                                | Verification key, only for a private signing chain.                                                                                                                                                                                                                                 | `""`                         |
+| `app.license.publicKey.secretKeyRef`                         | Secret ref holding the verification key.                                                                                                                                                                                                                                            | `{}`                         |
 | `app.nextAuth`                                               | NextAuth configuration and providers.                                                                                                                                                                                                                                               |                              |
 | `app.nextAuth.provider`                                      | Default auth provider.                                                                                                                                                                                                                                                              | `email`                      |
 | `app.nextAuth.secret.value`                                  | NextAuth secret value (not recommended inline for production).                                                                                                                                                                                                                      | `""`                         |
 | `app.nextAuth.secret.secretKeyRef`                           | Secret ref for NextAuth secret.                                                                                                                                                                                                                                                     | `{}`                         |
 | `app.nextAuth.providers`                                     | OAuth providers configuration.                                                                                                                                                                                                                                                      |                              |
 | `app.nextAuth.providers.auth0`                               | Auth0 OAuth configuration.                                                                                                                                                                                                                                                          |                              |
-| `app.nextAuth.providers.auth0.clientId.value`                | Auth0 client ID.                                                                                                                                                                                                                                                                    | `""`                         |
-| `app.nextAuth.providers.auth0.clientSecret.value`            | Auth0 client secret.                                                                                                                                                                                                                                                                | `""`                         |
-| `app.nextAuth.providers.auth0.issuer.value`                  | Auth0 issuer URL.                                                                                                                                                                                                                                                                   | `""`                         |
 | `app.nextAuth.providers.auth0.clientId.value`                | Auth0 client ID.                                                                                                                                                                                                                                                                    | `""`                         |
 | `app.nextAuth.providers.auth0.clientId.secretKeyRef`         | Secret ref for Auth0 client ID.                                                                                                                                                                                                                                                     | `{}`                         |
 | `app.nextAuth.providers.auth0.clientSecret.value`            | Auth0 client secret.                                                                                                                                                                                                                                                                | `""`                         |
@@ -335,6 +435,20 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `app.nextAuth.providers.okta.clientSecret.secretKeyRef`      | Secret ref for Okta client secret.                                                                                                                                                                                                                                                  | `{}`                         |
 | `app.nextAuth.providers.okta.issuer.value`                   | Okta issuer URL.                                                                                                                                                                                                                                                                    | `""`                         |
 | `app.nextAuth.providers.okta.issuer.secretKeyRef`            | Secret ref for Okta issuer URL.                                                                                                                                                                                                                                                     | `{}`                         |
+| `app.nextAuth.providers.onelogin`                            | OneLogin OAuth configuration.                                                                                                                                                                                                                                                       |                              |
+| `app.nextAuth.providers.onelogin.clientId.value`             | OneLogin client ID.                                                                                                                                                                                                                                                                 | `""`                         |
+| `app.nextAuth.providers.onelogin.clientId.secretKeyRef`      | Secret ref for OneLogin client ID.                                                                                                                                                                                                                                                  | `{}`                         |
+| `app.nextAuth.providers.onelogin.clientSecret.value`         | OneLogin client secret.                                                                                                                                                                                                                                                             | `""`                         |
+| `app.nextAuth.providers.onelogin.clientSecret.secretKeyRef`  | Secret ref for OneLogin client secret.                                                                                                                                                                                                                                              | `{}`                         |
+| `app.nextAuth.providers.onelogin.issuer.value`               | OneLogin issuer URL.                                                                                                                                                                                                                                                                | `""`                         |
+| `app.nextAuth.providers.onelogin.issuer.secretKeyRef`        | Secret ref for OneLogin issuer URL.                                                                                                                                                                                                                                                 | `{}`                         |
+| `app.nextAuth.providers.oidc`                                | Generic OpenID Connect configuration.                                                                                                                                                                                                                                               |                              |
+| `app.nextAuth.providers.oidc.clientId.value`                 | OIDC client ID.                                                                                                                                                                                                                                                                     | `""`                         |
+| `app.nextAuth.providers.oidc.clientId.secretKeyRef`          | Secret ref for OIDC client ID.                                                                                                                                                                                                                                                      | `{}`                         |
+| `app.nextAuth.providers.oidc.clientSecret.value`             | OIDC client secret.                                                                                                                                                                                                                                                                 | `""`                         |
+| `app.nextAuth.providers.oidc.clientSecret.secretKeyRef`      | Secret ref for OIDC client secret.                                                                                                                                                                                                                                                  | `{}`                         |
+| `app.nextAuth.providers.oidc.issuer.value`                   | OIDC issuer URL.                                                                                                                                                                                                                                                                    | `""`                         |
+| `app.nextAuth.providers.oidc.issuer.secretKeyRef`            | Secret ref for OIDC issuer URL.                                                                                                                                                                                                                                                     | `{}`                         |
 | `app.telemetry`                                              | Telemetry configuration.                                                                                                                                                                                                                                                            |                              |
 | `app.telemetry.usage`                                        | Usage analytics.                                                                                                                                                                                                                                                                    |                              |
 | `app.telemetry.usage.enabled`                                | Enable anonymous usage analytics.                                                                                                                                                                                                                                                   | `true`                       |
@@ -390,6 +504,8 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `workers.otel.serviceName`                | Service name reported in traces and logs.                                                                                                                                                                               | `langwatch-workers` |
 | `workers.enabled`                         | Deploy the workers Deployment + PDB.                                                                                                                                                                                    | `true`              |
 | `workers.replicaCount`                    | Number of worker replicas.                                                                                                                                                                                              | `1`                 |
+| `workers.shutdownDrainSeconds`            | Seconds the queue may spend draining in-flight jobs on shutdown.                                                                                                                                                        | `25`                |
+| `workers.terminationGracePeriodSeconds`   | Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.                                                                                                                                                     | `55`                |
 | `workers.resources`                       | Resource requests and limits for workers.                                                                                                                                                                               |                     |
 | `workers.resources.requests.cpu`          | Requested CPU.                                                                                                                                                                                                          | `250m`              |
 | `workers.resources.requests.memory`       | Requested memory.                                                                                                                                                                                                       | `2Gi`               |
@@ -432,6 +548,9 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `langwatch_nlp.service`                         | Service configuration for NLP.                                                                                                                                                                                          |                 |
 | `langwatch_nlp.service.type`                    | Service type.                                                                                                                                                                                                           | `ClusterIP`     |
 | `langwatch_nlp.service.port`                    | Service port.                                                                                                                                                                                                           | `5561`          |
+| `langwatch_nlp.security`                        | Outbound request policy for workflow HTTP nodes.                                                                                                                                                                        |                 |
+| `langwatch_nlp.security.blockLocalHTTPCalls`    | Refuse workflow HTTP requests to private, loopback and link-local addresses. Keep false for self-hosted installs that call internal services; set true for multi-tenant deployments.                                      | `false`         |
+| `langwatch_nlp.security.allowedProxyHosts`      | Hostnames reachable even when blockLocalHTTPCalls is on. Matched literally, case-insensitive, port ignored. Cloud metadata is never allow-listed.                                                                        | `[]`            |
 | `langwatch_nlp.resources`                       | Resource requests and limits.                                                                                                                                                                                           |                 |
 | `langwatch_nlp.resources.requests.cpu`          | Requested CPU.                                                                                                                                                                                                          | `250m`          |
 | `langwatch_nlp.resources.requests.memory`       | Requested memory.                                                                                                                                                                                                       | `256Mi`         |

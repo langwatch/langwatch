@@ -189,12 +189,18 @@ func extractSpeechUsage(resp *bfschemas.BifrostSpeechResponse) domain.Usage {
 	if resp == nil || resp.Usage == nil {
 		return domain.Usage{}
 	}
-	return domain.Usage{
+	u := domain.Usage{
 		PromptTokens:     resp.Usage.InputTokens,
 		CompletionTokens: resp.Usage.OutputTokens,
 		TotalTokens:      resp.Usage.TotalTokens,
 		InputChars:       resp.Usage.InputChars,
 	}
+	var split domain.AudioTokenSplit
+	if d := resp.Usage.InputTokenDetails; d != nil {
+		split.InputAudio = d.AudioTokens
+		split.InputText = d.TextTokens
+	}
+	return u.SplitAudioTokens(split)
 }
 
 // extractTranscriptionUsage maps Bifrost transcription usage onto the domain
@@ -223,6 +229,17 @@ func extractTranscriptionUsage(resp *bfschemas.BifrostTranscriptionResponse) dom
 	}
 	if resp.Usage.Seconds != nil {
 		u.AudioSeconds = float64(*resp.Usage.Seconds)
+	}
+	// The gpt-4o transcribe family states how much of the input was audio
+	// ("input_token_details":{"text_tokens":0,"audio_tokens":65}). Taking the
+	// audio out of the prompt total is what lets a caller see the measure the
+	// model actually consumed, and prices it at the audio rate where the
+	// provider charges one.
+	if d := resp.Usage.InputTokenDetails; d != nil {
+		u = u.SplitAudioTokens(domain.AudioTokenSplit{
+			InputAudio: d.AudioTokens,
+			InputText:  d.TextTokens,
+		})
 	}
 	return u
 }

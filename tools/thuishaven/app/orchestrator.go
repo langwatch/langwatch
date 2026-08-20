@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -29,12 +31,56 @@ type Orchestrator struct {
 	// container is the colima VM the langyagent worker runs on in its container
 	// tiers (see domain.LangyTier). May be nil in tests that never launch it.
 	container ContainerRuntime
-	log       *zap.Logger
+	// janitor sweeps leaked testcontainers off that same VM. Nil in tests that
+	// never reap.
+	janitor ContainerJanitor
+	// claude edits Claude Code's own settings, which only `haven setup` does.
+	// Nil everywhere else, including in tests that never install a feature.
+	claude ClaudeSettings
+	log    *zap.Logger
+
+	// isGoverning guards the slow half of a pressure tick, which runs off the
+	// tick so publishing stays bounded. governance is what a caller waits on to
+	// know that half has finished.
+	isGoverning atomic.Bool
+	governance  sync.WaitGroup
+
+	// procActivity is the process watch's cross-tick idle clock (ADR-095),
+	// touched only from the daemon's monitor loop. procTel ships the watch's
+	// observations to the local observability stack; nil means unobserved.
+	procActivity map[int]tsgoSeen
+	procTel      ProcTelemetry
+}
+
+// Deps is the injected object graph. A struct rather than a positional
+// parameter list, because thirteen positional dependencies is a call nobody can
+// read and one whose neighbors can be transposed without the compiler noticing.
+type Deps struct {
+	Cfg       Config
+	Proxy     Proxy
+	Store     Store
+	Sup       Supervisor
+	Sys       System
+	CH        ClickHouse
+	PG        Postgres
+	RDS       Redis
+	Obs       Observability
+	Hyg       Hygiene
+	Sem       Semaphore
+	Container ContainerRuntime
+	Janitor   ContainerJanitor
+	ProcTel   ProcTelemetry
+	Claude    ClaudeSettings
+	Log       *zap.Logger
 }
 
 // New builds an Orchestrator from its injected dependencies.
-func New(cfg Config, proxy Proxy, store Store, sup Supervisor, sys System, ch ClickHouse, pg Postgres, rds Redis, obs Observability, hyg Hygiene, sem Semaphore, container ContainerRuntime, log *zap.Logger) *Orchestrator {
-	return &Orchestrator{cfg: cfg, proxy: proxy, store: store, sup: sup, sys: sys, ch: ch, pg: pg, rds: rds, obs: obs, hyg: hyg, sem: sem, container: container, log: log}
+func New(d Deps) *Orchestrator {
+	return &Orchestrator{
+		cfg: d.Cfg, proxy: d.Proxy, store: d.Store, sup: d.Sup, sys: d.Sys,
+		ch: d.CH, pg: d.PG, rds: d.RDS, obs: d.Obs, hyg: d.Hyg, sem: d.Sem,
+		container: d.Container, janitor: d.Janitor, procTel: d.ProcTel, claude: d.Claude, log: d.Log,
+	}
 }
 
 // UpParams identify the worktree `up` runs in (resolved by the composition root).
@@ -104,9 +150,19 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	// ports[0..nSvc-1] back the routed services (app/gateway/nlp/langyagent, in
 	// PerWorktreeServices order); ports[nSvc] is the API backend behind app's /api,
 	// ports[nSvc+1] the worker metrics endpoint.
+	redisDB, exclusive := o.allocateRedisDB(slug)
+	if !exclusive {
+		fmt.Printf(
+			"  warning: all %d Redis databases are in use, so %q shares db %d with another stack.\n"+
+				"  They will share a job queue while writing to separate ClickHouse databases,\n"+
+				"  which lands work in the wrong stack. Take a stack down before continuing.\n",
+			domain.RedisDBCount, slug, redisDB,
+		)
+	}
+
 	st := domain.Stack{
 		Slug: slug, WorktreeDir: p.WorktreeDir, Branch: p.Branch,
-		LauncherPID: o.sys.Getpid(), RedisDB: domain.RedisDBForSlug(slug),
+		LauncherPID: o.sys.Getpid(), RedisDB: redisDB,
 		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
 		// Mirror planChildren: a separate `workers` lane exists only when workers
 		// are requested AND not hosted in-process. Persist it so restart targets
@@ -114,6 +170,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		HasStandaloneWorkers: opts.Selection.Workers,
 		LangyTier:            opts.LangyTier,
 		LangyImage:           opts.langyImageTag,
+		DisableGoogleDLP:     o.cfg.ShouldDisableGoogleDLP,
 	}
 	for i, r := range domain.PerWorktreeServices {
 		svc := domain.Service{
@@ -193,7 +250,7 @@ func (o *Orchestrator) heartbeat(ctx context.Context, st domain.Stack) {
 	}
 }
 
-// Up is the launcher hook `pnpm dev:haven` runs in portless mode.
+// Up is the launcher hook `make haven up` runs in portless mode.
 func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) error {
 	// Bootstrap is part of up, not a command: a fresh machine installs portless,
 	// trusts the CA, and starts the proxy right here (each step idempotent).
@@ -260,7 +317,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	// are suppressed for an untrusted one — `haven pr` sanitises the fork install
 	// it runs itself, and reaches this path immediately afterwards, so the two
 	// have to agree or the guard is void.
-	if err := o.ensureDeps(ctx, p.LwDir, !p.UntrustedCheckout); err != nil {
+	if err := o.ensureDeps(ctx, p.WorktreeDir, !p.UntrustedCheckout); err != nil {
 		return err
 	}
 	// DOTENV_CONFIG_QUIET drops dotenv v17's promo line for any one-shot script
@@ -605,7 +662,7 @@ func (o *Orchestrator) runIngestScript(ctx context.Context, p UpParams, retryCmd
 
 // liveSeedEnv returns the running stack's complete environment overlay plus a
 // loopback collector endpoint. The complete overlay matters for seeders that
-// write both Postgres and ClickHouse; inheriting langwatch/.env would silently
+// write both Postgres and ClickHouse; inheriting platform/app/.env would silently
 // target the primary checkout instead of this worktree's isolated databases.
 func (o *Orchestrator) liveSeedEnv(p UpParams, retryCmd string) ([]string, error) {
 	slug, err := o.resolveSlug(p)
@@ -680,4 +737,39 @@ func (o *Orchestrator) printStack(st domain.Stack) {
 	}
 	scheme, port := o.proxy.Endpoint()
 	fmt.Printf("    %-10s %s\n\n", "hub", o.cfg.Naming.URL(domain.HubService, "", scheme, port))
+}
+
+// allocateRedisDB picks this stack's Redis database, keeping the one it already
+// holds when it has one and otherwise avoiding every database a live stack is
+// using.
+//
+// Reusing the registered value is what makes the assignment stable across
+// restarts: the slug's hash is only a starting point, so a stack that had to
+// probe away from it once must not drift back on the next `up`.
+func (o *Orchestrator) allocateRedisDB(slug string) (int, bool) {
+	taken := map[int]bool{}
+	stacks := o.store.Stacks()
+	for i := range stacks {
+		if stacks[i].Slug == slug {
+			return stacks[i].RedisDB, true
+		}
+		taken[stacks[i].RedisDB] = true
+	}
+	return domain.AllocateRedisDB(slug, taken)
+}
+
+// redisDBFor reports the Redis database a slug's stack uses, preferring the
+// value recorded when it was provisioned.
+//
+// Recomputing the hash here instead would report a different database than the
+// stack actually runs on, for any stack that had to probe away from its
+// preferred index — which is precisely the stacks a collision affected.
+func (o *Orchestrator) redisDBFor(slug string) int {
+	stacks := o.store.Stacks()
+	for i := range stacks {
+		if stacks[i].Slug == slug {
+			return stacks[i].RedisDB
+		}
+	}
+	return domain.RedisDBForSlug(slug)
 }
