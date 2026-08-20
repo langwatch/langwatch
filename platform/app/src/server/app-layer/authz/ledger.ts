@@ -54,6 +54,7 @@ import {
 // bundle reaches it through the shadow fork). See the header of
 // `@langwatch/authz-server/migration`.
 import { bindingIdentityKey } from "@langwatch/authz-server/migration";
+import { liveGrants } from "./repositories/live-rows";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -908,8 +909,8 @@ export class GrantsLedgerWriter {
     to: string;
     actor: LedgerActor;
   }): Promise<void> {
-    const known = await this.prisma.grant.findFirst({
-      where: { revokedAt: null, id: bindingId, organizationId },
+    const known = await liveGrants(this.prisma).findFirst({
+      where: { id: bindingId, organizationId },
       select: { id: true },
     });
     if (!known) {

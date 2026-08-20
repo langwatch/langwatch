@@ -4,7 +4,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/cutover-gate";
+import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/engine-gate";
 import { PrismaRoleBindingRepository } from "../repositories/role-binding.prisma.repository";
 
 /** These reads now go through the per-organization fork, so the double has to

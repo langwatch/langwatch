@@ -1,69 +1,76 @@
 /** @vitest-environment node */
 
 /**
- * A revoke MARKS its row; it does not delete it. That is what stops a
- * redelivered `attached` resurrecting a grant nothing was left to contradict
- * — and it means every read that decides access has to say so, because an
- * unfiltered one now authorizes a grant that was revoked.
+ * A revoke marks its row rather than deleting it, so a read that forgets to
+ * exclude the marked ones authorizes revoked access — a mistake that fails
+ * OPEN and is invisible in a diff.
  *
- * The filter is one clause and easy to leave out of a new query, and leaving
- * it out fails open. So it is checked here rather than trusted: this reads
- * the repositories' source and refuses a grant or role query that does not
- * fence on the mark.
- *
- * Deliberately out of scope: the migration repository, whose job is to
- * inventory what an organization HAS held, ended or not.
+ * `liveGrants` / `liveRoles` make it unwriteable: they are the only way these
+ * repositories reach the tables, and the fence is inside them. This checks
+ * the one thing that could undo that — someone reaching past them.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { liveGrants, liveRoles } from "../live-rows";
 
 const REPOSITORIES = path.join(import.meta.dirname, "..");
 
-/** The repositories whose reads answer, or list, live access. */
+/** The repositories whose reads answer, or list, live access. Deliberately
+ *  excludes the migration repository: its job is to inventory what an
+ *  organization has held, ended or not. */
 const ACCESS_READING_SOURCES = [
   "authz-read.grants.repository.ts",
   "access-listing.grants.repository.ts",
 ];
 
-/** `prisma.grant.findMany({ where: { … } })` and friends, with their clause. */
-const QUERY = /prisma\.(grant|role)\.(findMany|findFirst|findUnique)\(\{\s*\n?\s*where:\s*\{([^}]*)/g;
-
-function unfencedQueriesIn(file: string): string[] {
-  const source = readFileSync(path.join(REPOSITORIES, file), "utf8");
-  const unfenced: string[] = [];
-
-  for (const match of source.matchAll(QUERY)) {
-    const [, model, method, clause = ""] = match;
-    const fence = model === "grant" ? "revokedAt: null" : "deletedAt: null";
-    if (clause.includes(fence)) continue;
-    // `findUnique` by primary key cannot carry the fence in its own where —
-    // its callers filter on the row they read back.
-    if (method === "findUnique") continue;
-    const line = source.slice(0, match.index).split("\n").length;
-    unfenced.push(`${file}:${line} ${model}.${method} does not fence on ${fence}`);
-  }
-
-  return unfenced;
-}
+const DIRECT_READ = /prisma\.(grant|role)\.(findMany|findFirst)\(/g;
 
 describe("authorization reads", () => {
-  describe("given a revoke marks its row rather than deleting it", () => {
+  describe("given the fence lives in the accessor", () => {
     /** @scenario "A revoked grant authorizes nothing" */
-    it("fences every access-deciding query on the mark", () => {
-      const unfenced = ACCESS_READING_SOURCES.flatMap(unfencedQueriesIn).sort();
+    it("applies it to a grant query that names no where clause at all", async () => {
+      const calls: unknown[] = [];
+      const prisma = {
+        grant: { findMany: async (args: unknown) => (calls.push(args), []) },
+      };
 
-      expect(unfenced).toEqual([]);
+      await liveGrants(prisma as never).findMany({});
+
+      expect(calls[0]).toEqual({ where: { revokedAt: null } });
     });
 
-    /** @scenario "The sweep reads queries that actually exist" */
-    it("finds queries to check, so a passing result means something", () => {
-      const source = readFileSync(
-        path.join(REPOSITORIES, "authz-read.grants.repository.ts"),
-        "utf8",
-      );
+    /** @scenario "A deleted role grants nothing" */
+    it("applies it to a role query alongside the caller's own clause", async () => {
+      const calls: unknown[] = [];
+      const prisma = {
+        role: { findFirst: async (args: unknown) => (calls.push(args), null) },
+      };
 
-      expect([...source.matchAll(QUERY)].length).toBeGreaterThan(3);
+      await liveRoles(prisma as never).findFirst({
+        where: { organizationId: "org_1" },
+      });
+
+      expect(calls[0]).toEqual({
+        where: { organizationId: "org_1", deletedAt: null },
+      });
+    });
+  });
+
+  describe("given a repository could reach past the accessor", () => {
+    /** @scenario "Every access-deciding read goes through the fence" */
+    it("finds no direct table read in the repositories that decide access", () => {
+      const direct = ACCESS_READING_SOURCES.flatMap((file) => {
+        const source = readFileSync(path.join(REPOSITORIES, file), "utf8");
+        return [...source.matchAll(DIRECT_READ)]
+          .filter((match) => !match[0].startsWith("liveGrants"))
+          .map((match) => {
+            const line = source.slice(0, match.index).split("\n").length;
+            return `${file}:${line} reads ${match[1]} without the fence`;
+          });
+      }).sort();
+
+      expect(direct).toEqual([]);
     });
   });
 });

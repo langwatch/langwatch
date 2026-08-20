@@ -1,21 +1,19 @@
 /**
- * The legacy TeamUser fallback at the resolver seam
- * (specs/rbac/in-place-authz-migration.feature): the fallback participates
- * for EVERY organization - pending, migrated, parked, or finalized - until
- * the contract change deletes the rows themselves. Stage B's finalization
- * proves the promoted bindings answer identically at the scopes they
- * replace; it does NOT switch the rows off. A per-organization switch used
- * to live here and did exactly that, which made the legacy resolver
- * disagree with the engine (whose readers keep inferring from the same
- * rows on both heads, the dormant-fact principle) the moment an
- * organization finalized.
+ * The legacy TeamUser fallback at the resolver seam.
+ *
+ * An organization that has not finished its migration is answered by the
+ * legacy walk, and the TeamUser rows are part of that walk for as long as it
+ * is the one answering. Nothing switches them off per-organization: a
+ * per-organization switch used to live here and did exactly that, which made
+ * the legacy resolver disagree with the engine the moment an organization
+ * finalized.
  *
  * A unit test, and named one: every Prisma delegate below is a stub, so it
  * opens no socket and needs no datastore.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
-import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/cutover-gate";
+import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/engine-gate";
 import { type Permission, resolveTeamPermission } from "../rbac";
 
 const mockPrisma = {
@@ -26,6 +24,9 @@ const mockPrisma = {
   groupMembership: { findMany: vi.fn() },
   roleBinding: { findMany: vi.fn() },
   systemMigrationTenantState: { findUnique: vi.fn() },
+  // The engine's own head, for the one case where the migration finished.
+  grant: { findMany: vi.fn().mockResolvedValue([]) },
+  role: { findMany: vi.fn().mockResolvedValue([]) },
 } as any;
 
 const mockSession = {
@@ -59,31 +60,48 @@ describe("legacy TeamUser fallback at the resolver seam", () => {
     mockPrisma.teamUser.findMany.mockResolvedValue([]);
   });
 
-  describe.each([
-    "pending",
-    "migrated",
-    "parked",
-    "finalized",
-  ] as const)("when the organization's backfill is %s", (state) => {
-    /** @scenario "The legacy team rows keep answering until contract deletes them" */
-    it("keeps the legacy fallback participating exactly as today", async () => {
-      mockPrisma.systemMigrationTenantState.findUnique.mockResolvedValue(
-        state === "pending" ? null : { status: state },
-      );
+  describe.each(["pending", "parked"] as const)(
+    "when the organization's migration is %s",
+    (status) => {
+      /** @scenario "The legacy team rows keep answering until the migration finishes" */
+      it("answers from the legacy row, whatever the migration is doing", async () => {
+        mockPrisma.systemMigrationTenantState.findUnique.mockResolvedValue(
+          status === "pending" ? null : { status },
+        );
 
-      const result = await resolveTeamPermission(
+        const result = await resolveTeamPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "team-1",
+          "team:manage" as Permission,
+        );
+
+        expect(result.permitted).toBe(true);
+        expect(mockPrisma.teamUser.findFirst).toHaveBeenCalled();
+      });
+    },
+  );
+
+  describe("when the migration has finished", () => {
+    /**
+     * Finishing IS the switch (ADR-110), so the engine answers and the
+     * legacy rows are not consulted at all. This is the half the old
+     * four-state matrix could not express: it predated a world where any
+     * status moved the organization off this path.
+     *
+     * @scenario "A migrated organization is decided by the engine"
+     */
+    it("stops consulting the legacy row", async () => {
+      mockPrisma.systemMigrationTenantState.findUnique.mockResolvedValue({
+        status: "migrated",
+      });
+
+      await resolveTeamPermission(
         { prisma: mockPrisma, session: mockSession },
         "team-1",
         "team:manage" as Permission,
       );
 
-      expect(result.permitted).toBe(true);
-      expect(mockPrisma.teamUser.findFirst).toHaveBeenCalled();
-      // No migration-state read stands between a permission check and the
-      // rows: the fallback is unconditional until contract.
-      expect(
-        mockPrisma.systemMigrationTenantState.findUnique,
-      ).not.toHaveBeenCalled();
+      expect(mockPrisma.teamUser.findFirst).not.toHaveBeenCalled();
     });
   });
 });

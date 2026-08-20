@@ -41,6 +41,7 @@ import type {
   TeamScopedMemberBinding,
 } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import { CUSTOM_ROLE_KIND } from "../../../role/role-kind";
+import { liveGrants, liveRoles } from "./live-rows";
 import type {
   AccessListingBindingRow,
   AccessListingRepository,
@@ -334,8 +335,8 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
       orgIds,
     });
 
-    const rows = await this.prisma.grant.findMany({
-      where: { revokedAt: null,
+    const rows = await liveGrants(this.prisma).findMany({
+      where: {
         organizationId: { in: [...orgIds] },
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
         AND: [LISTABLE_ROLE_KEY_WHERE],
@@ -447,8 +448,8 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
   }: {
     organizationId: string;
   }): Promise<CustomRole[]> {
-    const roles = await this.prisma.role.findMany({
-      where: { deletedAt: null, organizationId, kind: CUSTOM_ROLE_KIND.CUSTOM },
+    const roles = await liveRoles(this.prisma).findMany({
+      where: { organizationId, kind: CUSTOM_ROLE_KIND.CUSTOM },
       orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
     });
     return roles.map((role) => toCustomRoleShape(role));
@@ -466,8 +467,8 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
     organizationId: string;
     where: Prisma.GrantWhereInput;
   }): Promise<GrantListRow[]> {
-    return this.prisma.grant.findMany({
-      where: { revokedAt: null,
+    return liveGrants(this.prisma).findMany({
+      where: {
         organizationId,
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
         principalType: { in: [...BINDING_PRINCIPAL_TYPES] },
@@ -489,8 +490,8 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
     roleIds: readonly string[];
   }): Promise<CustomRole[]> {
     if (roleIds.length === 0) return [];
-    const roles = await this.prisma.role.findMany({
-      where: { deletedAt: null, id: { in: [...roleIds] }, organizationId },
+    const roles = await liveRoles(this.prisma).findMany({
+      where: { id: { in: [...roleIds] }, organizationId },
     });
     return roles.map((role) => toCustomRoleShape(role));
   }

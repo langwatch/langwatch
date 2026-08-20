@@ -25,6 +25,7 @@ import {
   shareVisibilityAudience,
 } from "@langwatch/authz-server";
 import { nanoid } from "nanoid";
+import { liveGrants } from "../../authz/repositories/live-rows";
 import type {
   Prisma,
   PrismaClient,
@@ -519,8 +520,8 @@ export class LedgerShareRepository implements ShareRepository {
     resourceKind?: ShareResourceType;
     resourceId?: string;
   }): Promise<string[]> {
-    const rows = await this.prisma.grant.findMany({
-      where: { revokedAt: null,
+    const rows = await liveGrants(this.prisma).findMany({
+      where: {
         // organizationId on every grant read (the org guard's requirement,
         // and the tenancy the lineage read already established).
         organizationId,
