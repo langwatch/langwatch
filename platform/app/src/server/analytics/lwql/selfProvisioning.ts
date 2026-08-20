@@ -39,6 +39,7 @@ import {
   postgresNamedCollectionStatements,
   postgresReaderRoleStatements,
 } from "./postgresMapping";
+import { LWQL_POSTGRES_READER_ROLE } from "./productionProvisioning";
 import {
   type LangWatchQLNames,
   lwqlClickHouseSetupStatements,
@@ -65,7 +66,7 @@ const logger = createLogger("langwatch:analytics:lwql:selfProvisioning");
 export const LWQL_SELF_PROVISION_DEFAULTS = {
   restrictedUser: "langwatch_lwql",
   tenantSetting: "custom_api_key_hash",
-  postgresReaderRole: "lwql_ro",
+  postgresReaderRole: LWQL_POSTGRES_READER_ROLE,
   namedCollection: "lwql_postgres",
 } as const;
 
