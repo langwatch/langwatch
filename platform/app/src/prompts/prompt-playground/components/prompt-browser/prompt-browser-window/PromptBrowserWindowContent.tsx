@@ -17,13 +17,14 @@ import {
 } from "~/prompts/prompt-playground/prompt-playground-store/DraggableTabsBrowserStore";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { useTabId } from "../ui/TabContext";
+import { PromptAuthoringSections } from "./PromptAuthoringSections";
 import { PromptBrowserHeader } from "./PromptBrowserHeader";
+import { PromptConversationSection } from "./PromptConversationSection";
 import { PromptMessagesEditor } from "./PromptMessagesEditor";
-import { PromptTabbedSection } from "./PromptTabbedSection";
 import { PANE_BAR_MIN_HEIGHT } from "./paneBar";
 
-/** Height of the sub-tab bar (PANE_BAR_MIN_HEIGHT) + the drag divider (16px) */
-const TABS_AND_DIVIDER_HEIGHT = 56;
+/** Height of the conversation's bar (PANE_BAR_MIN_HEIGHT) + the drag divider (16px) */
+const PANE_BAR_AND_DIVIDER_HEIGHT = 56;
 const MIN_CHAT_AREA = 200;
 
 /**
@@ -186,7 +187,10 @@ function PromptBrowserWindowInner(props: {
     // Leave space for tabs header + divider + minimum chat area
     const maxAllowed = Math.max(
       0,
-      containerHeight - headerHeight - TABS_AND_DIVIDER_HEIGHT - MIN_CHAT_AREA,
+      containerHeight -
+        headerHeight -
+        PANE_BAR_AND_DIVIDER_HEIGHT -
+        MIN_CHAT_AREA,
     );
     if (maxAllowed == 0) return;
     return maxAllowed;
@@ -314,13 +318,17 @@ function PromptBrowserWindowInner(props: {
                 minHeight={0}
               >
                 <PromptMessagesEditor />
+                {/* What the prompt declares, below the messages that use it. */}
+                <Box flexShrink={0} paddingX={3}>
+                  <PromptAuthoringSections />
+                </Box>
               </Box>
             </Box>
 
-            {/* Right panel: Tabbed section (conversation/variables). It starts
-                flush with the left panel's toolbar — the padding that used to
-                sit here pushed its tab strip down so the two panes disagreed
-                about where the pane began. */}
+            {/* Right panel: the conversation. It starts flush with the left
+                panel's toolbar — the padding that used to sit here pushed its
+                bar down so the two panes disagreed about where the pane
+                began. */}
             <Box
               flex={1}
               display="flex"
@@ -328,7 +336,7 @@ function PromptBrowserWindowInner(props: {
               overflow="hidden"
               minWidth={0}
             >
-              <PromptTabbedSection
+              <PromptConversationSection
                 layoutMode="horizontal"
                 isPromptExpanded={true}
                 // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-ops for read-only display
@@ -406,11 +414,13 @@ function PromptBrowserWindowInner(props: {
               paddingX={3}
             >
               <PromptMessagesEditor />
+              {/* What the prompt declares, below the messages that use it. */}
+              <PromptAuthoringSections />
             </Box>
           </Box>
 
-          {/* Tabbed section with divider */}
-          <PromptTabbedSection
+          {/* The conversation, with the handle that resizes the prompt above it */}
+          <PromptConversationSection
             layoutMode="vertical"
             isPromptExpanded={isPromptExpanded}
             onPositionChange={handlePositionChange}

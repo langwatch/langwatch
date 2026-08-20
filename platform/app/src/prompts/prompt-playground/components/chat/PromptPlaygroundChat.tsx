@@ -25,10 +25,18 @@ import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/Drag
 import { useTabId } from "../prompt-browser/ui/TabContext";
 import { playgroundConversationLabels } from "./conversationLabels";
 import { SyncedChatInput } from "./SyncedChatInput";
+import type { ChatVariableField } from "./ui/ChatVariableFields";
 
 interface PromptPlaygroundChatProps extends BoxProps {
   formValues: PromptConfigFormValues;
   variables?: z.infer<typeof runtimeInputsSchema>;
+  /**
+   * The variables the message box offers a field for — everything the run
+   * substitutes except `input`, whose field is the message box itself.
+   */
+  composerVariables?: ChatVariableField[];
+  /** Sets one variable's value for the next run, from the message box. */
+  onVariableValueChange?: (identifier: string, value: string) => void;
 }
 
 /**
@@ -54,7 +62,13 @@ const PromptPlaygroundChat = forwardRef<
   PromptPlaygroundChatRef,
   PromptPlaygroundChatProps
 >(function PromptPlaygroundChat(props, ref) {
-  const { formValues, variables, ...boxProps } = props;
+  const {
+    formValues,
+    variables,
+    composerVariables,
+    onVariableValueChange,
+    ...boxProps
+  } = props;
   const { project } = useOrganizationTeamProject();
   const { data: session } = useRequiredSession();
   const tabId = useTabId();
@@ -171,7 +185,13 @@ const PromptPlaygroundChat = forwardRef<
           pendingReply={isRunning && !hasStreamingReply}
         />
       </Box>
-      <SyncedChatInput inProgress={isRunning} onSend={send} onStop={stop} />
+      <SyncedChatInput
+        inProgress={isRunning}
+        onSend={send}
+        onStop={stop}
+        variables={composerVariables}
+        onVariableValueChange={onVariableValueChange}
+      />
     </Box>
   );
 });

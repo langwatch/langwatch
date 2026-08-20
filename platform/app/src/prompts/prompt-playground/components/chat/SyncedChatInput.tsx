@@ -7,6 +7,10 @@ import { usePromptPlaygroundChatSync } from "./PromptPlaygroundChatContext";
 import { ChatSendButton } from "./ui/ChatSendButton";
 import { ChatSyncCheckbox } from "./ui/ChatSyncCheckbox";
 import { ChatTextArea } from "./ui/ChatTextArea";
+import {
+  type ChatVariableField,
+  ChatVariableFields,
+} from "./ui/ChatVariableFields";
 
 /**
  * Custom chat input with sync across tabs functionality.
@@ -28,6 +32,9 @@ export interface ChatInputProps {
   /** Cancels the run in flight. */
   onStop?: () => void;
   isVisible?: boolean;
+  /** The variables this run will substitute, `input` excluded. */
+  variables?: ChatVariableField[];
+  onVariableValueChange?: (identifier: string, value: string) => void;
 }
 
 export function SyncedChatInput({
@@ -35,6 +42,8 @@ export function SyncedChatInput({
   onSend,
   isVisible = true,
   onStop,
+  variables = [],
+  onVariableValueChange,
 }: ChatInputProps) {
   const {
     syncedInput,
@@ -166,6 +175,16 @@ export function SyncedChatInput({
         margin="0 auto"
         overflow="hidden"
       >
+        {/* What this run will substitute, above the field that starts it. The
+            prompt's variables are declared in the editor beside the messages
+            that reference them; what they are worth for one run is set here. */}
+        {onVariableValueChange && (
+          <ChatVariableFields
+            variables={variables}
+            onValueChange={onVariableValueChange}
+          />
+        )}
+
         {/* The field and the button are siblings on one row, bottom-aligned, so
             the action stays beside the last line as the field grows. They were
             previously an absolutely-positioned button over an empty flex row

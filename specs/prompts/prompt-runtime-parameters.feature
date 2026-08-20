@@ -84,27 +84,31 @@ Feature: Prompt runtime parameters
     Then the sync result reports a conflict
     And the conflict payload includes the remote parameters {"remote": true}
 
-  # --- UI: Editable Parameters Tab (mirrors Variables tab pattern) ---
+  # --- UI: Editable parameters in the prompt editor ---
+  #
+  # Parameters are saved onto the prompt version and handed back to whatever
+  # fetches the prompt; nothing about a playground run reads them. So they are
+  # part of writing the prompt, and they sit in the editor beside the messages
+  # rather than behind a tab on the conversation, where they were both hidden
+  # and implied to affect the run.
 
   @integration
-  Scenario: Parameters tab shows explanation text distinguishing parameters from variables
+  Scenario: The editor explains what parameters are, apart from variables
     When I view "search-agent" in the prompt playground
-    Then the Parameters tab shows a description explaining that parameters are arbitrary configurations used outside the prompt itself
-    And the Variables tab shows a description explaining that variables are used as part of the prompt template
+    Then the parameters section describes them as arbitrary configurations used outside the prompt itself
+    And the variables section describes them as substituted into the prompt template
 
   @integration
-  Scenario: Parameters tab shows "+ Add" button and allows adding key-value parameters
+  Scenario: Parameters can be added as key-value pairs
     When I view "search-agent" in the prompt playground
-    And I click the Parameters tab
-    Then the Parameters tab displays a header with a "+ Add" button
-    When I click "+ Add"
+    Then the parameters section offers an Add control
+    When I add a parameter
     Then a new parameter row appears with an editable key field and value field
 
   @integration
   Scenario: User edits parameter key and value inline
     Given prompt "search-agent" has parameters {"environment": "production"}
     When I view "search-agent" in the prompt playground
-    And I click the Parameters tab
     Then the parameter "environment" is displayed with value "production"
     And I can edit the key and value inline
 
@@ -112,17 +116,15 @@ Feature: Prompt runtime parameters
   Scenario: User deletes a parameter via the remove button
     Given prompt "search-agent" has parameters {"old_key": "old_value", "keep": "this"}
     When I view "search-agent" in the prompt playground
-    And I click the Parameters tab
     And I click the remove button on parameter "old_key"
     Then only parameter "keep" remains
 
   @integration
-  Scenario: Parameters tab shows empty state when no parameters are defined
+  Scenario: The parameters section shows an empty state when none are defined
     Given prompt "search-agent" has parameters {}
     When I view "search-agent" in the prompt playground
-    And I click the Parameters tab
-    Then the Parameters tab shows "No parameters defined"
-    And the "+ Add" button is visible
+    Then the parameters section shows "No parameters defined"
+    And the Add control is visible
 
   @unit @unimplemented
   Scenario: Runtime parameters validation accepts object JSON values

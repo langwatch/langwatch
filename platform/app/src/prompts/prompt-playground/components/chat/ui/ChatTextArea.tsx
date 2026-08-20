@@ -23,7 +23,10 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
       <Textarea
         {...props}
         ref={ref}
-        placeholder="Type your message here. Shift+Enter for new line."
+        // The message is the prompt's input: a template that writes {{input}}
+        // renders whatever is typed here, so the placeholder says so rather
+        // than leaving people looking for a separate field for it.
+        placeholder="Write the message to run this prompt with. Shift+Enter for a new line."
         resize="none"
         rows={1}
         // Tall enough to read as somewhere you write a message rather than a

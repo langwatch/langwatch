@@ -46,11 +46,11 @@ Feature: Default input variable
     When I view the Variables section
     Then the "input" variable does not show a mapping dropdown
     And the "input" variable shows an info icon
-    And hovering shows "This value comes from the Conversation tab input"
+    And hovering shows "Set by the message you send in the conversation."
 
   Scenario: Playground conversation provides input value
     Given I am in the Playground with a prompt
-    When I type "Hello world" in the conversation input
+    When I type "Hello world" in the message box
     And I send the message
     Then the "input" variable is populated with "Hello world"
     And the user message "{{input}}" becomes "Hello world"
