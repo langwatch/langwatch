@@ -246,7 +246,12 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
         height="calc(100vh - 60px)"
         background="bg.page"
         transition="width 0.15s ease-in-out"
-        overflow="hidden"
+        // `clip` rather than `hidden`, because an `overflow: hidden` box is
+        // still a scroll container: the active entry's `scrollIntoView` on
+        // mount scrolls this box sideways to bring the expanded-width entry
+        // into it, which drags the collapsed menu's icons against its left
+        // edge until the first hover widens the box and resets the scroll.
+        overflow="clip"
       >
         <VStack
           paddingX={2}

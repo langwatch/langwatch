@@ -34,6 +34,17 @@ interface ConversationThreadProps {
    * test. `scenario` swaps the sides so the agent reads as the subject.
    */
   roleMode?: "chat" | "scenario";
+  /**
+   * Names the two sides of the conversation, keyed by the role the message was
+   * sent with. A surface supplies this when it knows who is actually speaking:
+   * the playground labels one side with the reader's own name and the other
+   * with the model under test, because "User" and "Assistant" name neither of
+   * the two parties the reader is comparing.
+   *
+   * A side left unset keeps the label its role already carries, which is what
+   * a scenario run depends on to read as "User Simulator" and "Agent".
+   */
+  labels?: { user?: string; assistant?: string };
   /** Owns the stored objects behind any media parts. */
   projectId: string;
   /** Rendered after each part, keyed by part id — hover actions, delete. */
@@ -81,6 +92,7 @@ function ConversationPart({
   part,
   compact,
   roleMode,
+  labels,
   projectId,
   structuredOutput,
   actions,
@@ -89,6 +101,7 @@ function ConversationPart({
   part: DisplayPart;
   compact: boolean;
   roleMode: "chat" | "scenario";
+  labels?: { user?: string; assistant?: string };
   projectId: string;
   structuredOutput: boolean;
   actions?: ReactNode;
@@ -101,6 +114,7 @@ function ConversationPart({
           part={part}
           compact={compact}
           roleMode={roleMode}
+          labels={labels}
           structuredOutput={structuredOutput}
           actions={actions}
         />
@@ -129,6 +143,7 @@ export function ConversationThread({
   parts,
   variant = "regular",
   roleMode = "chat",
+  labels,
   projectId,
   renderPartActions,
   autoScroll = true,
@@ -138,13 +153,20 @@ export function ConversationThread({
   live = false,
 }: ConversationThreadProps) {
   const compact = variant === "compact";
-  const endRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const turns = useMemo(() => groupIntoTurns(parts, { live }), [parts, live]);
 
   useEffect(() => {
     if (!autoScroll) return;
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = scrollRef.current;
+    if (!container) return;
+    // The thread's own box is scrolled directly rather than asking the last
+    // element to bring itself into view. `scrollIntoView` walks up and scrolls
+    // EVERY ancestor scroll container it finds, so the thread re-mounting —
+    // switching away from this tab and back — dragged the whole editor beside
+    // it to the top and then back down again.
+    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
     // `pendingReply` is a dependency because the waiting state is the newest
     // thing in the thread the moment it appears, and it appears before any
     // part of the reply does.
@@ -174,6 +196,7 @@ export function ConversationThread({
       part={part}
       compact={compact}
       roleMode={roleMode}
+      labels={labels}
       projectId={projectId}
       structuredOutput={structuredOutput}
       actions={renderPartActions?.(part)}
@@ -204,6 +227,7 @@ export function ConversationThread({
       // section fills the box it was handed and scrolls inside it.
       height={panel ? undefined : "100%"}
       overflowY={panel ? undefined : "auto"}
+      ref={panel ? undefined : scrollRef}
     >
       {compact
         ? parts.map(renderPart)
@@ -216,7 +240,6 @@ export function ConversationThread({
             </VStack>
           ))}
       {pendingReply && <PendingReply compact={compact} roleMode={roleMode} />}
-      <div ref={endRef} />
     </VStack>
   );
 
@@ -225,7 +248,7 @@ export function ConversationThread({
   // the text.
   if (!panel) return body;
   return (
-    <Box width="100%" height="100%" overflowY="auto">
+    <Box ref={scrollRef} width="100%" height="100%" overflowY="auto">
       {body}
     </Box>
   );

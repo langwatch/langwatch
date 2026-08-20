@@ -45,12 +45,14 @@ export function TextPart({
   part,
   compact,
   roleMode,
+  labels,
   structuredOutput,
   actions,
 }: {
   part: Extract<DisplayPart, { kind: "text" }>;
   compact: boolean;
   roleMode: "chat" | "scenario";
+  labels?: { user?: string; assistant?: string };
   structuredOutput: boolean;
   actions?: ReactNode;
 }) {
@@ -78,19 +80,23 @@ export function TextPart({
     );
   }
 
-  const visuals = getDisplayRoleVisuals(
-    part.role === "assistant" ? "assistant" : "user",
-    { isScenario: roleMode === "scenario" },
-  );
+  const sourceRole = part.role === "assistant" ? "assistant" : "user";
+  const visuals = getDisplayRoleVisuals(sourceRole, {
+    isScenario: roleMode === "scenario",
+  });
   const RoleIcon = visuals.Icon;
   const align = alignForRole(part.role, roleMode);
+  // Keyed by the role the message was sent with rather than the side it is
+  // drawn on, so a caller names the speakers it knows about without having to
+  // know which edge of the thread `roleMode` will put them against.
+  const label = labels?.[sourceRole] ?? visuals.bubbleLabel;
 
   return (
     <VStack align={align} data-align={align} gap={1} width="100%">
       <Bubble
         side={visuals.displayRole === "user" ? "left" : "right"}
         tone={visuals.displayRole}
-        label={visuals.bubbleLabel}
+        label={label}
         icon={<RoleIcon />}
         text={part.content}
         reasoning={part.reasoning}

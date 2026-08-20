@@ -14,6 +14,7 @@ import { flattenMessages } from "~/components/conversation/flattenMessages";
 import type { DisplayPart } from "~/components/conversation/types";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useRequiredSession } from "~/hooks/useRequiredSession";
 import type { runtimeInputsSchema } from "~/prompts/schemas/field-schemas";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import {
@@ -22,6 +23,7 @@ import {
 } from "../../hooks/usePromptExecution";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { useTabId } from "../prompt-browser/ui/TabContext";
+import { playgroundConversationLabels } from "./conversationLabels";
 import { SyncedChatInput } from "./SyncedChatInput";
 
 interface PromptPlaygroundChatProps extends BoxProps {
@@ -54,7 +56,20 @@ const PromptPlaygroundChat = forwardRef<
 >(function PromptPlaygroundChat(props, ref) {
   const { formValues, variables, ...boxProps } = props;
   const { project } = useOrganizationTeamProject();
+  const { data: session } = useRequiredSession();
   const tabId = useTabId();
+
+  // The conversation is between this person and the model they picked, so it
+  // says so. The label follows the picker, which means it names the model the
+  // next reply will come from: a message carries no record of which model
+  // wrote it, so switching models mid-session re-labels the replies already in
+  // the thread as well.
+  const model = formValues.version.configData.llm.model;
+  const labels = useMemo(
+    () =>
+      playgroundConversationLabels({ userName: session?.user?.name, model }),
+    [session?.user?.name, model],
+  );
 
   const { getTabById, updateTabData } = useDraggableTabsBrowserStore(
     (state) => ({
@@ -145,6 +160,7 @@ const PromptPlaygroundChat = forwardRef<
       <Box flex={1} minHeight={0} width="full">
         <ConversationThread
           parts={parts}
+          labels={labels}
           projectId={project?.id ?? ""}
           renderPartActions={renderPartActions}
           structuredOutput

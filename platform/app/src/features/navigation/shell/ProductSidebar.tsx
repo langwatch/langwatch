@@ -406,6 +406,7 @@ export function ProductSidebar({
         onMouseLeave={() => isCompact && setIsHovered(false)}
       >
         <Box
+          data-testid="product-sidebar-column"
           position={isCompact ? "absolute" : "relative"}
           zIndex={isCompact ? 100 : "auto"}
           top={0}
@@ -418,7 +419,13 @@ export function ProductSidebar({
           height={fullHeight}
           background="bg.page"
           transition="width 0.15s ease-in-out"
-          overflow="hidden"
+          // `clip` rather than `hidden`, because an `overflow: hidden` box is
+          // still a scroll container: the active entry's `scrollIntoView` on
+          // mount scrolls this box sideways to bring the expanded-width entry
+          // into it, which drags the collapsed rail's icons against its left
+          // edge until the first hover widens the box and resets the scroll.
+          // `clip` cuts the content off without ever scrolling.
+          overflow="clip"
         >
           <SidebarContent surface={surface} showExpanded={showExpanded} />
         </Box>

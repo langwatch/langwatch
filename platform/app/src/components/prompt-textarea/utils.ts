@@ -149,8 +149,12 @@ export const getCaretCoordinates = ({
   };
 };
 
-/** Line height for borderless mode (used for paragraph calculations) */
-export const BORDERLESS_LINE_HEIGHT = 28;
+/**
+ * Line height for borderless mode, in pixels. Both the textarea's own style
+ * and the paragraph grip/highlight overlay read it from here — they have to
+ * agree or the grips drift off their lines.
+ */
+export const BORDERLESS_LINE_HEIGHT = 24;
 
 /**
  * Replace textarea content in an undo-able way using execCommand.

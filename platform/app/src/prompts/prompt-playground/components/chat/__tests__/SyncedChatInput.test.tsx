@@ -3,6 +3,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearStoreInstances,
@@ -197,18 +198,25 @@ describe("SyncedChatInput", () => {
       expect(buttons.length).toBeGreaterThan(0);
     });
 
-    it("disables send button when inProgress", () => {
+    it("offers stop instead of send while a run is in flight", async () => {
       store.getState().addTab({ data: createTabData() });
       const tabId = store.getState().windows[0]?.tabs[0]?.id;
 
-      renderSyncedChatInput({ tabId: tabId!, inProgress: true });
+      const { onStop } = renderSyncedChatInput({
+        tabId: tabId!,
+        inProgress: true,
+      });
 
-      // Find the button (there's only one button when no checkbox)
-      const buttons = screen.getAllByRole("button");
-      const sendButton = buttons.find(
-        (btn) => btn.getAttribute("type") === "button",
-      );
-      expect(sendButton).toBeDisabled();
+      // There is no queue, so "send" has nothing to mean while a reply is
+      // arriving; the one action the composer offers is stopping it. Enabled
+      // on purpose — a disabled Stop is a run you cannot cancel, which is
+      // what the playground shipped with before.
+      expect(screen.queryByRole("button", { name: "Send message" })).toBeNull();
+      const stop = screen.getByRole("button", { name: "Stop generating" });
+      expect(stop).toBeEnabled();
+
+      await userEvent.click(stop);
+      expect(onStop).toHaveBeenCalledOnce();
     });
   });
 });
