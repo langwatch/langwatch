@@ -20,9 +20,53 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
   Scenario: Admin lands on the IngestionSources index
     When the admin navigates to "/governance/ingestion-sources"
     Then a list shows every configured source with: name, source type,
-      ingestion mode (push/pull/s3), last event timestamp, status
+      last event timestamp, status
     And each row links to a per-source detail page with health metrics
     And the page has an "Add source" button surfacing all supported types
+
+  @integration
+  Scenario: Add source menu lists every type by vendor, grouped in plain language
+    When the admin clicks "Add source"
+    Then a menu opens listing every supported source type with its vendor logo
+    And the types sit under exactly two group headings: "Real-time streams"
+      for sources that send events to LangWatch as they happen, and
+      "Synced on a schedule" for sources LangWatch fetches on a cadence,
+      including cloud-storage audit drops
+    And no group heading shows the internal mode words push, pull, or s3
+    And menu items no longer carry a technical mode suffix such as "· push"
+      (a service name inside a type's own label, like "Custom S3 audit log",
+      is not a mode word)
+
+  @integration
+  Scenario: Non-enterprise plans see locked source types they cannot pick
+    Given the org is on a non-enterprise plan
+    When the admin opens the "Add source" menu
+    Then every source type beyond Generic OpenTelemetry is visible but locked
+    And each locked entry says it needs an Enterprise plan
+    And picking a locked entry does not open the composer
+
+  @unit
+  Scenario: The composer and the menu share one plan gate
+    Given the org is on a non-enterprise plan
+    Then the only source type the gate allows is Generic OpenTelemetry
+    And the gate never locks Generic OpenTelemetry on any plan
+    And both the Add source menu and the composer derive from that one gate,
+      so a locked type is unreachable through either
+
+  @integration
+  Scenario: Picking a type opens the composer committed to it
+    When the admin picks "Databricks AI/BI Genie" from the Add source menu
+    Then the composer opens showing the Databricks logo and name as a fixed header
+    And the composer offers no source-type dropdown
+    And the composer starts from a blank configuration for the picked type,
+      even when a different type was being composed moments before
+
+  @unit
+  Scenario: The configured-source list groups under the same two headings
+    Given configured sources of push, pull, and s3 modes exist
+    When the admin views the list
+    Then push-mode sources appear under "Real-time streams"
+    And pull-mode and s3-mode sources appear together under "Synced on a schedule"
 
   Scenario Outline: Admin adds a source by type
     When the admin clicks "Add source"
