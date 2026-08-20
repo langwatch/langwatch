@@ -80,7 +80,7 @@ import { prisma as appPrisma } from "../../db";
 import { RoleDuplicateNameError } from "../../role/errors/role-duplicate-name.error";
 import { tryGetApp } from "../app";
 import { bumpAuthzEpoch } from "./epoch";
-import { isOrgOnLedgerWrites } from "./ledger-write-gate";
+import { organizationOnAuthzEngine } from "./engine-gate";
 import { PrismaAuthzGrantsProjectionRepository } from "./repositories/authz-grants-projection.prisma.repository";
 
 const logger = createLogger("langwatch:authz:ledger");
@@ -327,9 +327,10 @@ export class GrantsLedgerWriter {
 
   /** Whether THIS organization's grant writes go through the ledger yet. */
   private onLedger(organizationId: string): Promise<boolean> {
-    return (this.deps.onLedgerWrites ?? isOrgOnLedgerWrites)({
-      organizationId,
-    });
+    if (this.deps.onLedgerWrites) {
+      return this.deps.onLedgerWrites({ organizationId });
+    }
+    return organizationOnAuthzEngine({ prisma: appPrisma, organizationId });
   }
 
   /**
@@ -860,7 +861,7 @@ export class GrantsLedgerWriter {
    * The ledger-side role change. A compat row can exist with no fact behind
    * it in the fold's head: it was written imperatively during the write
    * gate's negative-cache window (an organization the gate briefly, wrongly,
-   * read as legacy — see `ledger-write-gate.ts`) or during the genesis
+   * read as legacy — see `engine-gate.ts`) or during the genesis
    * snapshot -> flip gap, and `finalized` genesis passes never revisit it.
    * Sending `grant_role_changed` for such an id targets a grantId the
    * reducer has never seen; it no-ops silently there

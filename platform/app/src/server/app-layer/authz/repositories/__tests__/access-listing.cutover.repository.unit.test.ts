@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Prisma } from "~/generated/prisma/client";
 import {
-  CUTOVER_GATE_CACHE_TTL_MS,
-  resetCutoverGateForTesting,
-} from "../../cutover-gate";
+  ENGINE_GATE_CACHE_TTL_MS,
+  resetAuthzEngineGateForTesting,
+} from "../../engine-gate";
 import { CutoverAwareAccessListingRepository } from "../access-listing.cutover.repository";
 import type { AccessListingRepository } from "../access-listing.repository";
 
@@ -67,10 +67,10 @@ const repositoryFor = (onEngineByOrg: Record<string, boolean>) => {
 
 describe("CutoverAwareAccessListingRepository", () => {
   beforeEach(() => {
-    resetCutoverGateForTesting();
+    resetAuthzEngineGateForTesting();
   });
   afterEach(() => {
-    resetCutoverGateForTesting();
+    resetAuthzEngineGateForTesting();
     vi.useRealTimers();
   });
 
@@ -272,7 +272,7 @@ describe("CutoverAwareAccessListingRepository", () => {
       // back to the projection to get it. Without this half, the assertion
       // below would hold with no cache at all, or with the TTL widened to a
       // day - it would prove "eventually", not "within one window".
-      vi.advanceTimersByTime(CUTOVER_GATE_CACHE_TTL_MS - 1);
+      vi.advanceTimersByTime(ENGINE_GATE_CACHE_TTL_MS - 1);
       await repository.findOrganizationBindings({ organizationId: "org-1" });
       expect(grants.findOrganizationBindings).toHaveBeenCalledTimes(2);
       expect(legacy.findOrganizationBindings).not.toHaveBeenCalled();

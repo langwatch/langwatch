@@ -4,13 +4,12 @@
  * shape: service CLASSES over repository INTERFACES.
  *
  *   AuthzCollectorService   COLLECT policies over AuthzReadRepository
- *   AuthzService            can / check / authorize / effectivePermissions
- *                           (+ the §9 owner ceiling and the §12 epoch cache
- *                           inside the instance)
+ *   AuthzService            can / check / authorize / effectivePermissions,
+ *                           plus the id-shaped checkByIds / canAnyByIds /
+ *                           canBatchByIds for callers holding ids rather
+ *                           than a resolved scope (+ the §9 owner ceiling
+ *                           and the §12 epoch cache inside the instance)
  *   GrantsService           the one write surface, over AuthzGrantsRepository
- *   AuthzShadowService      the legacy resolvers' engine comparison
- *   AuthzForkService        the engine ANSWERING for a cut-over organization,
- *                           with legacy as the reverse-shadow comparison
  *
  * No storage engine lives here, and no environment read either: every knob
  * arrives as a closure through a service's options. The app implements the
@@ -37,16 +36,6 @@ export type {
   ScopeLineageRepository,
   ShareLinkRow,
 } from "./authz-read.repository";
-export {
-  AuthzForkService,
-  awaitForkComparisonsForTesting,
-} from "./authz-fork.service";
-export type {
-  AuthzForkOptions,
-  ForkedAnyDecision,
-  ForkedBatchDecision,
-  ForkedDecision,
-} from "./authz-fork.service";
 export type {
   AuthzCutoverRepository,
   AuthzGenesisRepository,
@@ -65,8 +54,6 @@ export type {
   ShareLinkFactRow,
   TeamBindingWrite,
 } from "./authz-migration.repository";
-export { AuthzShadowService } from "./authz-shadow.service";
-export type { AuthzShadowOptions } from "./authz-shadow.service";
 export { AuthzService } from "./authz.service";
 export type {
   AuthzEpochReader,

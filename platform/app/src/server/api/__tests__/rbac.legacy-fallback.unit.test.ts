@@ -15,7 +15,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
-import { resetCutoverGateForTesting } from "~/server/app-layer/authz/cutover-gate";
+import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/cutover-gate";
 import { type Permission, resolveTeamPermission } from "../rbac";
 
 const mockPrisma = {
@@ -39,7 +39,7 @@ describe("legacy TeamUser fallback at the resolver seam", () => {
     // A cold, explicit "not on the engine" answer: the gate cache is reset so
     // no other test's cached read leaks in, and the projection stub is what
     // keeps this suite on the legacy resolver path it exists to pin.
-    resetCutoverGateForTesting();
+    resetAuthzEngineGateForTesting();
     mockPrisma.authzCutoverProjection.findUnique.mockResolvedValue({
       onEngine: false,
     });

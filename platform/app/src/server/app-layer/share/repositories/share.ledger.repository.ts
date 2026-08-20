@@ -31,9 +31,9 @@ import type {
   ShareLink,
 } from "~/generated/prisma/client";
 import {
-  cutoverOnEngine,
-  queryCutoverOnEngine,
-} from "../../authz/cutover-gate";
+  organizationOnAuthzEngine,
+  queryOrganizationOnAuthzEngine,
+} from "../../authz/engine-gate";
 import type { GrantsLedgerWriter } from "../../authz/ledger";
 import type {
   CreateShareLinkParams,
@@ -550,7 +550,7 @@ export class LedgerShareRepository implements ShareRepository {
     });
     const organizationId = project?.team?.organizationId;
     if (!organizationId) return null;
-    const onEngine = await cutoverOnEngine({
+    const onEngine = await organizationOnAuthzEngine({
       prisma: this.prisma,
       organizationId,
     });
@@ -561,7 +561,7 @@ export class LedgerShareRepository implements ShareRepository {
    * The organization a REVOCATION is about, or null when the delete belongs
    * to legacy. Deliberately NOT `ledgerOrganizationFor`: revocation is
    * instant-enforcement class (decision 7) and must never come undone, so
-   * its routing cannot ride `cutoverOnEngine` — a 60-second-TTL cache that
+   * its routing cannot ride `organizationOnAuthzEngine` — a 60-second-TTL cache that
    * also answers false (and caches it) when the projection read throws. Any
    * false window routes a cut-over organization's revoke to the legacy-only
    * branch: the compat row is deleted with no fact appended, the Grant head
@@ -587,7 +587,7 @@ export class LedgerShareRepository implements ShareRepository {
     const organizationId = project?.team?.organizationId;
     if (!organizationId) return null;
     try {
-      const onEngine = await queryCutoverOnEngine({
+      const onEngine = await queryOrganizationOnAuthzEngine({
         prisma: this.prisma,
         organizationId,
       });

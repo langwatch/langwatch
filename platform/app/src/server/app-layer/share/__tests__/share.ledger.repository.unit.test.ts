@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient, ShareLink } from "~/generated/prisma/client";
-import { resetCutoverGateForTesting } from "../../authz/cutover-gate";
+import { resetAuthzEngineGateForTesting } from "../../authz/engine-gate";
 import type { GrantsLedgerWriter } from "../../authz/ledger";
 import { LedgerShareRepository } from "../repositories/share.ledger.repository";
 import type { ShareRepository } from "../repositories/share.repository";
@@ -151,10 +151,10 @@ const createParams = {
 
 describe("LedgerShareRepository", () => {
   beforeEach(() => {
-    resetCutoverGateForTesting();
+    resetAuthzEngineGateForTesting();
   });
   afterEach(() => {
-    resetCutoverGateForTesting();
+    resetAuthzEngineGateForTesting();
   });
 
   describe("given the organization has not been cut over", () => {

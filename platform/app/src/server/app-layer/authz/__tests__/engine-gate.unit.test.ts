@@ -7,13 +7,13 @@ import { GRANTS_GENESIS_IMPORT_MIGRATION_NAME } from "@langwatch/authz-server/mi
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
-  isOrgOnLedgerWrites,
-  resetLedgerWriteGateForTests,
-} from "../ledger-write-gate";
-import { authzLedgerWriteGateReadFailuresTotal } from "../metrics";
+  organizationOnAuthzEngine,
+  resetAuthzEngineGateForTesting,
+} from "../engine-gate";
+import { authzEngineGateReadFailuresTotal } from "../metrics";
 
 async function counterValue(): Promise<number> {
-  const metric = await authzLedgerWriteGateReadFailuresTotal.get();
+  const metric = await authzEngineGateReadFailuresTotal.get();
   return metric.values[0]?.value ?? 0;
 }
 
@@ -33,20 +33,20 @@ function stateTable(status: string | null) {
 
 describe("the ledger write gate", () => {
   beforeEach(() => {
-    resetLedgerWriteGateForTests();
+    resetAuthzEngineGateForTesting();
     vi.useRealTimers();
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    resetLedgerWriteGateForTests();
+    resetAuthzEngineGateForTesting();
   });
 
   describe("when the organization has a genesis import state row", () => {
     it("asks about the genesis import, not any other migration", async () => {
       const { findUnique, prisma } = stateTable("migrated");
 
-      await isOrgOnLedgerWrites({ organizationId: ORG_ID, prisma });
+      await organizationOnAuthzEngine({ organizationId: ORG_ID, prisma });
 
       expect(findUnique.mock.calls[0]![0].where).toEqual({
         migrationName_tenantId: {
@@ -66,7 +66,7 @@ describe("the ledger write gate", () => {
       const { prisma } = stateTable(status);
 
       await expect(
-        isOrgOnLedgerWrites({ organizationId: ORG_ID, prisma }),
+        organizationOnAuthzEngine({ organizationId: ORG_ID, prisma }),
       ).resolves.toBe(expected);
     });
   });
@@ -76,7 +76,7 @@ describe("the ledger write gate", () => {
       const { prisma } = stateTable(null);
 
       await expect(
-        isOrgOnLedgerWrites({ organizationId: ORG_ID, prisma }),
+        organizationOnAuthzEngine({ organizationId: ORG_ID, prisma }),
       ).resolves.toBe(false);
     });
   });
@@ -89,7 +89,7 @@ describe("the ledger write gate", () => {
       } as unknown as Pick<PrismaClient, "systemMigrationTenantState">;
 
       await expect(
-        isOrgOnLedgerWrites({ organizationId: ORG_ID, prisma }),
+        organizationOnAuthzEngine({ organizationId: ORG_ID, prisma }),
       ).resolves.toBe(false);
     });
 
@@ -100,7 +100,7 @@ describe("the ledger write gate", () => {
       } as unknown as Pick<PrismaClient, "systemMigrationTenantState">;
       const before = await counterValue();
 
-      await isOrgOnLedgerWrites({ organizationId: ORG_ID, prisma });
+      await organizationOnAuthzEngine({ organizationId: ORG_ID, prisma });
 
       expect(await counterValue()).toBe(before + 1);
     });
@@ -110,9 +110,9 @@ describe("the ledger write gate", () => {
     it("reads the row once inside the cache window", async () => {
       const { findUnique, prisma } = stateTable("migrated");
 
-      await isOrgOnLedgerWrites({ organizationId: ORG_ID, prisma });
-      await isOrgOnLedgerWrites({ organizationId: ORG_ID, prisma });
-      await isOrgOnLedgerWrites({ organizationId: ORG_ID, prisma });
+      await organizationOnAuthzEngine({ organizationId: ORG_ID, prisma });
+      await organizationOnAuthzEngine({ organizationId: ORG_ID, prisma });
+      await organizationOnAuthzEngine({ organizationId: ORG_ID, prisma });
 
       expect(findUnique).toHaveBeenCalledTimes(1);
     });
@@ -122,10 +122,10 @@ describe("the ledger write gate", () => {
       const { prisma: pending } = stateTable("pending");
 
       await expect(
-        isOrgOnLedgerWrites({ organizationId: "org_a", prisma: migrated }),
+        organizationOnAuthzEngine({ organizationId: "org_a", prisma: migrated }),
       ).resolves.toBe(true);
       await expect(
-        isOrgOnLedgerWrites({ organizationId: "org_b", prisma: pending }),
+        organizationOnAuthzEngine({ organizationId: "org_b", prisma: pending }),
       ).resolves.toBe(false);
     });
   });
@@ -144,18 +144,18 @@ describe("the ledger write gate", () => {
       } as unknown as Pick<PrismaClient, "systemMigrationTenantState">;
 
       await expect(
-        isOrgOnLedgerWrites({ organizationId: ORG_ID, prisma }),
+        organizationOnAuthzEngine({ organizationId: ORG_ID, prisma }),
       ).resolves.toBe(true);
       // Still cached: the operator's flip has landed but this pod has not
       // re-read it yet.
       await expect(
-        isOrgOnLedgerWrites({ organizationId: ORG_ID, prisma }),
+        organizationOnAuthzEngine({ organizationId: ORG_ID, prisma }),
       ).resolves.toBe(true);
 
       vi.setSystemTime(new Date("2026-08-18T09:05:00.000Z"));
 
       await expect(
-        isOrgOnLedgerWrites({ organizationId: ORG_ID, prisma }),
+        organizationOnAuthzEngine({ organizationId: ORG_ID, prisma }),
       ).resolves.toBe(false);
       expect(findUnique).toHaveBeenCalledTimes(2);
     });
@@ -173,13 +173,13 @@ describe("the ledger write gate", () => {
       } as unknown as Pick<PrismaClient, "systemMigrationTenantState">;
 
       await expect(
-        isOrgOnLedgerWrites({ organizationId: ORG_ID, prisma }),
+        organizationOnAuthzEngine({ organizationId: ORG_ID, prisma }),
       ).resolves.toBe(false);
 
       vi.setSystemTime(new Date("2026-08-18T09:05:00.000Z"));
 
       await expect(
-        isOrgOnLedgerWrites({ organizationId: ORG_ID, prisma }),
+        organizationOnAuthzEngine({ organizationId: ORG_ID, prisma }),
       ).resolves.toBe(true);
     });
   });

@@ -35,7 +35,7 @@ import {
 } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { resetCutoverGateForTesting } from "../../authz/cutover-gate";
+import { resetAuthzEngineGateForTesting } from "../../authz/engine-gate";
 import type { GrantsLedgerWriter } from "../../authz/ledger";
 import { GrantsAuthzReadRepository } from "../../authz/repositories/authz-read.grants.repository";
 import { LedgerShareRepository } from "../repositories/share.ledger.repository";
@@ -152,7 +152,7 @@ describe("given a cut-over organization's capped share link", () => {
   });
 
   beforeEach(async () => {
-    resetCutoverGateForTesting();
+    resetAuthzEngineGateForTesting();
     // Every case starts from the handed-over budget, whatever the last one
     // spent.
     await cleanupTestRows(prisma, [["grantUsage", { grantId: shareLinkId }]]);
@@ -171,7 +171,7 @@ describe("given a cut-over organization's capped share link", () => {
   });
 
   afterAll(async () => {
-    resetCutoverGateForTesting();
+    resetAuthzEngineGateForTesting();
     if (!organization?.id) return;
     await cleanupTestRows(prisma, [
       ["grantUsage", { organizationId: organization.id }],

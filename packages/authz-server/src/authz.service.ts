@@ -43,6 +43,7 @@ import {
 import { mintWitness } from "@langwatch/authz/witness";
 import { createLogger } from "@langwatch/observability";
 import type { AuthzCollectorService } from "./authz-collector.service";
+import type { AuthzReadRepository } from "./authz-read.repository";
 
 const decisions = createLogger("langwatch:authz:decisions");
 
@@ -56,6 +57,15 @@ const MAX_CACHE_ENTRIES = 10_000;
 const DEFAULT_CACHE_MAX_AGE_MS = 30_000;
 
 type CacheEntry = { epoch: number; grants: CollectedGrants; storedAt: number };
+
+/** The loose ids a caller holds before a scope ref has been resolved. */
+type ScopeIds = {
+  projectId?: string | undefined;
+  teamId?: string | undefined;
+  organizationId?: string | undefined;
+};
+
+type OrganizationRoleOrNull = CollectedGrants["organizationRole"];
 
 type CheckArgs = {
   principal: AuthzPrincipalRef;
@@ -183,6 +193,163 @@ export class AuthzService {
   }
 
   /**
+   * The same question as `check`, asked with the ids a caller already holds
+   * instead of a resolved scope ref. Most call sites have a projectId or a
+   * teamId and nothing else, and resolving the ref themselves is the step
+   * they used to get wrong; the collector resolves it here, most specific
+   * first.
+   *
+   * `ceiling: false` reports the named principal's own grants and nothing
+   * else — the contract of the seams that answer "what does THIS binding
+   * give you", which must not be capped by an api key's owner.
+   */
+  async checkByIds({
+    principal,
+    permission,
+    projectId,
+    teamId,
+    organizationId,
+    ceiling = true,
+  }: ScopeIds & {
+    principal: AuthzPrincipalRef;
+    permission: string;
+    ceiling?: boolean;
+  }): Promise<{ allowed: boolean; organizationRole: OrganizationRoleOrNull }> {
+    const scope = await this.resolveScope({ projectId, teamId, organizationId });
+    if (!scope) return { allowed: false, organizationRole: null };
+
+    const scopeOrg = scopeOrganizationId(scope);
+    const pass = this.collector.beginPass();
+    const [grants, ownerGrants] = await Promise.all([
+      this.collector.collectGrants({
+        principal,
+        organizationId: scopeOrg,
+        reader: pass,
+      }),
+      ceiling
+        ? this.ownerGrantsFor({ principal, organizationId: scopeOrg, reader: pass })
+        : Promise.resolve(null),
+    ]);
+    const decision = this.engine.decideWithCeiling({
+      keyGrants: grants,
+      ownerGrants,
+      permission,
+      scope,
+      demoProjectId: this.demoProjectId(),
+    });
+    recordDenial(decision);
+    return { allowed: decision.allowed, organizationRole: grants.organizationRole };
+  }
+
+  /**
+   * "Any one of these is enough", in the order given, first allow wins. One
+   * scope resolution and one collection serve every candidate — asking per
+   * permission would re-query for an answer the first snapshot already holds.
+   */
+  async canAnyByIds({
+    principal,
+    permissions,
+    projectId,
+  }: {
+    principal: AuthzPrincipalRef;
+    permissions: readonly string[];
+    projectId: string;
+  }): Promise<{
+    allowed: boolean;
+    matchedPermission?: string;
+    organizationRole: OrganizationRoleOrNull;
+  }> {
+    const scope = await this.collector.resolveScopeRef({ projectId });
+    if (!scope) return { allowed: false, organizationRole: null };
+
+    const grants = await this.collector.collectGrants({
+      principal,
+      organizationId: scopeOrganizationId(scope),
+    });
+    const demoProjectId = this.demoProjectId();
+    const matched = permissions.find(
+      (permission) =>
+        this.engine.decide({ grants, permission, scope, demoProjectId }).allowed,
+    );
+    return {
+      allowed: matched !== undefined,
+      ...(matched ? { matchedPermission: matched } : {}),
+      organizationRole: grants.organizationRole,
+    };
+  }
+
+  /**
+   * One permission across many scopes in one organization: one collection,
+   * N pure decisions. Deciding per scope would turn a flat batch into a
+   * collect per scope, which is the pool-starving fan-out this replaces.
+   * Only a project whose team the caller does not already know costs a
+   * resolution, and those resolve in parallel.
+   */
+  async canBatchByIds({
+    principal,
+    permission,
+    organizationId,
+    teams,
+    projects,
+  }: {
+    principal: AuthzPrincipalRef;
+    permission: string;
+    organizationId: string;
+    teams: ReadonlyArray<{ teamId: string }>;
+    projects: ReadonlyArray<{ projectId: string; teamId?: string | undefined }>;
+  }): Promise<{
+    teams: Map<string, boolean>;
+    projects: Map<string, boolean>;
+    organizationRole: OrganizationRoleOrNull;
+  }> {
+    const grants = await this.collector.collectGrants({
+      principal,
+      organizationId,
+    });
+    const demoProjectId = this.demoProjectId();
+    const allowedAt = (scope: AuthzScopeRef | null): boolean =>
+      scope
+        ? this.engine.decide({ grants, permission, scope, demoProjectId }).allowed
+        : false;
+
+    const resolvedProjects = await Promise.all(
+      projects.map(async ({ projectId, teamId }): Promise<[string, boolean]> => [
+        projectId,
+        allowedAt(
+          teamId
+            ? { type: "project", id: projectId, teamId, organizationId }
+            : await this.collector.resolveScopeRef({ projectId }),
+        ),
+      ]),
+    );
+
+    return {
+      teams: new Map(
+        teams.map(({ teamId }) => [
+          teamId,
+          allowedAt({ type: "team", id: teamId, organizationId }),
+        ]),
+      ),
+      projects: new Map(resolvedProjects),
+      organizationRole: grants.organizationRole,
+    };
+  }
+
+  /** Most-specific-first, the order every seam resolves in: an explicit
+   *  project or team wins over the organization it sits in. */
+  private async resolveScope({
+    projectId,
+    teamId,
+    organizationId,
+  }: ScopeIds): Promise<AuthzScopeRef | null> {
+    return this.collector.resolveScopeRef({
+      projectId,
+      teamId,
+      organizationId: projectId || teamId ? undefined : organizationId,
+    });
+  }
+
+  /**
    * ADR-092 §6 — render the walk for a decision against the CURRENT grant
    * snapshot, not the one the decision was made against: a grant write
    * between the decision and this call changes the rendered walk. Carrying
@@ -208,19 +375,32 @@ export class AuthzService {
   private async ownerGrantsFor({
     principal,
     organizationId,
+    reader,
   }: {
     principal: AuthzPrincipalRef;
     organizationId: string;
+    /** Present when the ceiling must come off the same snapshot as the key's
+     *  own grants. Intersecting two heads would let a gate expiry between the
+     *  two collections cap a ledger binding list with a legacy one. Passing a
+     *  reader also means not using the cache, which is the point. */
+    reader?: AuthzReadRepository;
   }): Promise<CollectedGrants | null> {
     if (principal.type !== "apiKey") return null;
     const owner = await this.collector.findApiKeyOwner({
       apiKeyId: principal.id,
     });
     if (!owner?.userId) return null;
-    return this.collectCached({
-      principal: { type: "user", id: owner.userId },
-      organizationId,
-    });
+    const ownerPrincipal: AuthzPrincipalRef = {
+      type: "user",
+      id: owner.userId,
+    };
+    return reader
+      ? this.collector.collectGrants({
+          principal: ownerPrincipal,
+          organizationId,
+          reader,
+        })
+      : this.collectCached({ principal: ownerPrincipal, organizationId });
   }
 
   private async resourceGrantsFor(

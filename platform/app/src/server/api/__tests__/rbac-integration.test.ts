@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
-import { resetCutoverGateForTesting } from "~/server/app-layer/authz/cutover-gate";
+import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/cutover-gate";
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
 import {
   checkOrganizationPermission,
@@ -65,7 +65,7 @@ describe("RBAC Integration Tests", () => {
     // A cold, explicit "not on the engine" answer, so the resolvers stay on
     // the legacy path these tests pin instead of the gate caching a failed
     // read of a missing delegate.
-    resetCutoverGateForTesting();
+    resetAuthzEngineGateForTesting();
     mockPrisma.authzCutoverProjection.findUnique.mockResolvedValue({
       onEngine: false,
     });

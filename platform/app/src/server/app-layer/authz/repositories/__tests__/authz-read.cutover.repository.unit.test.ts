@@ -1,7 +1,7 @@
 import type { AuthzReadRepository } from "@langwatch/authz-server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Prisma } from "~/generated/prisma/client";
-import { resetCutoverGateForTesting } from "../../cutover-gate";
+import { resetAuthzEngineGateForTesting } from "../../engine-gate";
 import { CutoverAwareAuthzReadRepository } from "../authz-read.cutover.repository";
 
 /**
@@ -49,10 +49,10 @@ const repositoryFor = (onEngine: boolean) => {
 
 describe("CutoverAwareAuthzReadRepository", () => {
   beforeEach(() => {
-    resetCutoverGateForTesting();
+    resetAuthzEngineGateForTesting();
   });
   afterEach(() => {
-    resetCutoverGateForTesting();
+    resetAuthzEngineGateForTesting();
   });
 
   describe("given the organization is cut over", () => {
@@ -258,7 +258,7 @@ describe("CutoverAwareAuthzReadRepository", () => {
       await repository.findUserBindings(args);
       // The TTL, expired: without a pin the next read consults the projection
       // again and lands on the other head.
-      resetCutoverGateForTesting();
+      resetAuthzEngineGateForTesting();
       await repository.findGroupBindings(args);
       await repository.findCustomRolePermissions({
         organizationId: "org-1",
@@ -282,7 +282,7 @@ describe("CutoverAwareAuthzReadRepository", () => {
       const args = { userId: "alice", organizationId: "org-1" };
 
       await repository.findUserBindings(args);
-      resetCutoverGateForTesting();
+      resetAuthzEngineGateForTesting();
       await repository.beginPass!().findUserBindings(args);
 
       expect(grants.findUserBindings).toHaveBeenCalledTimes(1);

@@ -17,7 +17,7 @@ import {
 
 /**
  * The statuses a tenant may be rolled back from. The same pair as
- * `LEDGER_WRITE_STATUSES` in ../authz/ledger-write-gate.ts, but the premise
+ * `ON_ENGINE_STATUSES` in ../authz/engine-gate.ts, but the premise
  * is weaker than "already on the ledger": what `migrated` MEANS is each
  * migration's own business (the cutover parks tenants in `migrated` while
  * they merely WAIT on prerequisites or a cohort, and those never touched
@@ -640,7 +640,7 @@ export class SystemMigrationsService {
    *
    *   `migrated`     held on the ledger with parity still disagreeing —
    *   `finalized`    parity clean. Both are already live on ledger writes
-   *                  (ledger-write-gate.ts), so both are the operator's to
+   *                  (engine-gate.ts), so both are the operator's to
    *                  pull back. The pin is written FIRST — the stored
    *                  `rolled_back` status is what stops the next pass
    *                  re-finalizing the tenant, so it must land even if the

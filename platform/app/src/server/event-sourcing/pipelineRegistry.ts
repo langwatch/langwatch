@@ -637,7 +637,7 @@ export class PipelineRegistry {
     // The grants ledger (ADR-092 §13). The write paths emit through the
     // app-layer ledger module, gated PER ORGANIZATION (decision 4): only an
     // organization whose genesis import has landed (its
-    // SystemMigrationTenantState row, read by the ledger-write-gate) sends
+    // SystemMigrationTenantState row, read by the engine gate) sends
     // these commands; every other organization still takes the imperative
     // Prisma path, and an operator's `rolled_back` flip returns one there
     // with no deploy.

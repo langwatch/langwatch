@@ -13,9 +13,8 @@ import {
   type Permission,
   teamRoleHasPermission,
 } from "../api/rbac";
-import { cutoverOnEngine } from "../app-layer/authz/cutover-gate";
-import { authzForkFor } from "../app-layer/authz/fork";
-import { authzShadowFor } from "../app-layer/authz/shadow";
+import { authzChecksFor } from "../app-layer/authz/checks";
+import { organizationOnAuthzEngine } from "../app-layer/authz/engine-gate";
 // The shadow comparison runs on the APP's own Prisma handle, never the
 // caller's. The caller's handle is whatever it happened to pass — a
 // transaction client on any path that opens one — and a detached
@@ -329,58 +328,20 @@ export async function checkRoleBindingPermission({
       permission,
     });
 
-  // ADR-092 delivery-plan PR 3: the fork. A cut-over organization is decided
-  // by the engine for the NAMED principal only — no owner ceiling, because
-  // this function reports one principal's own grants and nothing else, which
-  // is its contract and its suite's subject. `skipShadow` silences the
-  // comparison, never the fork.
-  if (await cutoverOnEngine({ prisma, organizationId })) {
-    const forkScopeIds = scopeRefToIds(scope, organizationId);
-    return authzForkFor(prisma).decidePrincipalPermission({
+  // The NAMED principal only, with no owner ceiling: this function reports
+  // one principal's own grants and nothing else, which is its contract and
+  // its suite's subject.
+  if (await organizationOnAuthzEngine({ prisma, organizationId })) {
+    const decision = await authzChecksFor(prisma).checkByIds({
       principal: resolvedPrincipal,
-      organizationId,
-      projectId: forkScopeIds.projectId,
-      teamId: forkScopeIds.teamId,
       permission,
-      caller:
-        resolvedPrincipal.type === "user"
-          ? "apiKeyPath.userBindings"
-          : "apiKeyPath.keyBindings",
-      legacy: legacyPermitted,
-      compare: !skipShadow,
+      ceiling: false,
+      ...scopeRefToIds(scope, organizationId),
     });
+    return decision.allowed;
   }
 
-  const permitted = await legacyPermitted();
-
-  // ADR-092 stage A4: engine shadow comparison. Mismatches on this path for
-  // EXTERNAL owners are the documented resolver divergence (no lite-member
-  // cap here), auto-tagged knownDivergence by shadow.ts.
-  if (skipShadow) return permitted;
-  const scopeIds = scopeRefToIds(scope, organizationId);
-  if (resolvedPrincipal.type === "user") {
-    authzShadowFor(appPrisma).userPermissionCheck({
-      userId: resolvedPrincipal.id,
-      permission,
-      legacyAllowed: permitted,
-      caller: "apiKeyPath.userBindings",
-      fromApiKeyPath: true,
-      ...scopeIds,
-    });
-  } else {
-    authzShadowFor(appPrisma).apiKeyPermissionCheck({
-      apiKeyId: resolvedPrincipal.id,
-      ownerUserId: null,
-      organizationId,
-      permission,
-      legacyAllowed: permitted,
-      caller: "apiKeyPath.keyBindings",
-      projectId: scopeIds.projectId,
-      teamId: scopeIds.teamId,
-    });
-  }
-
-  return permitted;
+  return legacyPermitted();
 }
 
 function scopeRefToIds(
@@ -702,39 +663,17 @@ export async function resolveApiKeyPermission({
     return legacy.grants(permission);
   };
 
-  // ADR-092 delivery-plan PR 3: the fork. The engine states the same ceiling
-  // as algebra — effective(key) = grants(key) ∩ grants(owner) — rather than as
-  // the four steps above, and a cut-over organization is answered by it.
-  if (await cutoverOnEngine({ prisma, organizationId })) {
-    const forkScopeIds = scopeRefToIds(scope, organizationId);
-    return authzForkFor(prisma).decideApiKeyPermission({
-      apiKeyId,
-      ownerUserId: userId,
-      organizationId,
-      projectId: forkScopeIds.projectId,
-      teamId: forkScopeIds.teamId,
+  // The engine states the same ceiling as algebra — effective(key) =
+  // grants(key) ∩ grants(owner) — rather than as the four steps above. The
+  // key's owner is resolved by the collector, so it is not passed here.
+  if (await organizationOnAuthzEngine({ prisma, organizationId })) {
+    const decision = await authzChecksFor(prisma).checkByIds({
+      principal: { type: "apiKey", id: apiKeyId },
       permission,
-      caller: "apiKeyPath.ceiling",
-      legacy: legacyPermitted,
-      compare: !skipShadow,
+      ...scopeRefToIds(scope, organizationId),
     });
+    return decision.allowed;
   }
 
-  const permitted = await legacyPermitted();
-
-  // ADR-092 stage A4: engine ceiling-algebra shadow comparison.
-  if (skipShadow) return permitted;
-  const scopeIds = scopeRefToIds(scope, organizationId);
-  authzShadowFor(appPrisma).apiKeyPermissionCheck({
-    apiKeyId,
-    ownerUserId: userId,
-    organizationId,
-    permission,
-    legacyAllowed: permitted,
-    caller: "apiKeyPath.ceiling",
-    projectId: scopeIds.projectId,
-    teamId: scopeIds.teamId,
-  });
-
-  return permitted;
+  return legacyPermitted();
 }

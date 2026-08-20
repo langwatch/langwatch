@@ -17,7 +17,7 @@
  * stage-A4 shadow comparison, untouched.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { resetCutoverGateForTesting } from "~/server/app-layer/authz/cutover-gate";
+import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/cutover-gate";
 import type { Session } from "~/server/auth";
 
 const { userPermissionCheck, userBatchPermissionCheck, apiKeyPermissionCheck } =
@@ -112,7 +112,7 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resetCutoverGateForTesting();
+  resetAuthzEngineGateForTesting();
 });
 
 describe("the fork at the permission seams", () => {
