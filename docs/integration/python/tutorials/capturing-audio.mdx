@@ -58,22 +58,63 @@ transcribe("What does the caller ask for?", "call.wav")
 A recording rides an inline data part with an audio media type. The rest of the agent setup does not change.
 
 ```python
+import asyncio
+
 import langwatch
+from google.adk import Agent, Runner
+from google.adk.sessions import InMemorySessionService
 from google.genai import types
 from openinference.instrumentation.google_adk import GoogleADKInstrumentor
 
 langwatch.setup(instrumentors=[GoogleADKInstrumentor()])
 
-message = types.Content(
-    role="user",
-    parts=[
-        types.Part(text="What does the caller ask for?"),
-        types.Part.from_bytes(
-            data=open("call.wav", "rb").read(), mime_type="audio/wav"
-        ),
-    ],
-)
+APP_NAME = "call-reader"
+USER_ID = "caller-1"
+SESSION_ID = "session-1"
+
+
+def transcribe(prompt: str, path: str) -> str:
+    agent = Agent(
+        name="call_agent",
+        model="gemini-2.5-flash",
+        instruction="Answer the user's question about the attached recording directly.",
+    )
+    session_service = InMemorySessionService()
+    asyncio.run(
+        session_service.create_session(
+            app_name=APP_NAME, user_id=USER_ID, session_id=SESSION_ID
+        )
+    )
+    runner = Runner(agent=agent, app_name=APP_NAME, session_service=session_service)
+
+    message = types.Content(
+        role="user",
+        parts=[
+            types.Part(text=prompt),
+            types.Part.from_bytes(
+                data=open(path, "rb").read(), mime_type="audio/wav"
+            ),
+        ],
+    )
+
+    for event in runner.run(
+        user_id=USER_ID, session_id=SESSION_ID, new_message=message
+    ):
+        if event.is_final_response():
+            return event.content.parts[0].text
+    return ""
+
+
+transcribe("What does the caller ask for?", "call.wav")
 ```
+
+<Note>
+  The instrumentor makes the trace for this call. Do not add a
+  `@langwatch.trace()` wrapper around `Runner.run`: it crosses a
+  sync-to-async boundary that does not carry the trace context, so the
+  wrapper lands in a separate trace.
+</Note>
+
 
 ## Audio shapes LangWatch understands
 
