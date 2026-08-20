@@ -82,17 +82,30 @@ fi
 # app port. A stale server answering the health and collector gates would make
 # a refresh look verified while serving the previous commit — the gates check
 # git HEAD, which the reset already moved.
-DEV_PGID_FILE="$WORKDIR/dev-stack.pgid"
-if [ -s "$DEV_PGID_FILE" ]; then
-  OLD_PGID="$(cat "$DEV_PGID_FILE")"
-  # Process ids are recycled, so a pgid recorded before a reboot can name an
-  # unrelated group by the time we read it. Kill it only if its leader still
-  # looks like a dev stack.
-  LEADER_CMD="$(ps -o cmd= -p "$OLD_PGID" 2>/dev/null || true)"
-  case "$LEADER_CMD" in
+DEV_ROOT_FILE="$WORKDIR/dev-stack.pid"
+
+# Kill children before parents: `pnpm start` puts the workers (vite, the Go
+# gateway, the API) in their own session, so a process-group kill rooted at the
+# stack's leader misses exactly the processes that hold the ports. Parentage
+# still connects them, so walk the tree instead of trusting the group.
+kill_tree() {
+  local pid="$1" kid
+  for kid in $(pgrep -P "$pid" 2>/dev/null || true); do
+    kill_tree "$kid"
+  done
+  kill -9 "$pid" 2>/dev/null || true
+}
+
+if [ -s "$DEV_ROOT_FILE" ]; then
+  OLD_ROOT="$(cat "$DEV_ROOT_FILE")"
+  # Process ids are recycled, so a pid recorded before a reboot can name an
+  # unrelated process by the time we read it. Kill it only if it still looks
+  # like a dev stack.
+  ROOT_CMD="$(ps -o cmd= -p "$OLD_ROOT" 2>/dev/null || true)"
+  case "$ROOT_CMD" in
     "") : ;; # already gone
-    *pnpm*dev*) kill -9 -"$OLD_PGID" 2>/dev/null || true ;;
-    *) echo "pgid $OLD_PGID is not a dev stack ($LEADER_CMD) — refusing to kill it" ;;
+    *pnpm*dev*) echo "stopping previous dev stack (pid $OLD_ROOT)"; kill_tree "$OLD_ROOT" ;;
+    *) echo "pid $OLD_ROOT is not a dev stack ($ROOT_CMD) — refusing to kill it" ;;
   esac
 fi
 
@@ -106,19 +119,30 @@ pkill -9 -f "concurrentl[y]" 2>/dev/null || true
 pkill -9 -f "start:ap[p]" 2>/dev/null || true
 pkill -9 -f "tsx/dist/cli.mjs src/server.mt[s]" 2>/dev/null || true
 pkill -9 -f "loader.mjs src/server.mt[s]" 2>/dev/null || true
+# The Go services outlive their parents and hold ports of their own — an
+# nlpgo binary from an earlier stack was found still holding 5561 a day later.
+pkill -9 -f "go run ./cmd/servic[e]" 2>/dev/null || true
+pkill -9 -f "exe/service nlpg[o]" 2>/dev/null || true
+pkill -9 -f "exe/service aigatewa[y]" 2>/dev/null || true
+pkill -9 -f "make -C ../.. servic[e]" 2>/dev/null || true
 sleep 3
 
-# Nothing may still hold the app port, or the new stack's check-ports step
+# Nothing may still hold the app ports, or the new stack's check-ports step
 # blocks and the refresh reports done while the app never boots.
-for _ in $(seq 1 10); do
+for _ in $(seq 1 15); do
   # `|| true` inside the substitution: pgrep exits 1 when nothing matches, and
   # under `set -o pipefail` that failure would abort the whole refresh at the
   # exact moment the loop has succeeded.
-  HOLDERS="$( { pgrep -f "src/server.mt[s]" || true; } | tr '\n' ' ')"
+  HOLDERS="$( { pgrep -f "src/server.mt[s]|exe/servic[e]|vite/bin/vite.j[s]" || true; } | tr '\n' ' ')"
   [ -z "${HOLDERS// /}" ] && break
-  echo "waiting for old API server(s) to exit: $HOLDERS"
+  echo "waiting for old stack processes to exit: $HOLDERS"
   sleep 2
 done
+LEFTOVER="$( { pgrep -f "src/server.mt[s]|exe/servic[e]" || true; } | tr '\n' ' ')"
+if [ -n "${LEFTOVER// /}" ]; then
+  echo "refusing to start: previous stack still holds ports (pids $LEFTOVER)"
+  exit 1
+fi
 # Two deliberate details here:
 #   9>&-  the dev stack outlives this script, and an inherited lock fd would
 #         keep the flock held for the life of the machine.
@@ -128,11 +152,9 @@ done
 setsid nohup pnpm dev > "$DEV_LOG" 2>&1 9>&- &
 DEV_PID=$!
 
-# Record the new stack's process group so the next refresh can stop all of it,
-# including the API server that no name pattern matches. Read from the kernel:
-# $! is only the group id when setsid does not fork.
-sleep 1
-ps -o pgid= -p "$DEV_PID" 2>/dev/null | tr -d '[:space:]' > "$DEV_PGID_FILE" || true
-echo "dev stack pgid: $(cat "$DEV_PGID_FILE" 2>/dev/null || echo unknown)"
+# Record the new stack's root pid so the next refresh can walk and kill the
+# whole tree, including the workers that move into their own session.
+echo "$DEV_PID" > "$DEV_ROOT_FILE"
+echo "dev stack root pid: $DEV_PID"
 
 echo done > "$STATUS"
