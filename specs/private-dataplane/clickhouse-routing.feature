@@ -104,6 +104,22 @@ Feature: Private ClickHouse Routing
     And the shared client is not returned
 
   # ---------------------------------------------------------------------------
+  # Access discipline
+  # ---------------------------------------------------------------------------
+  # Routing is only safe while there is one road to a client. The composition
+  # root builds the resolvers once; everything else receives them through the
+  # app or an injected repository, so no module can quietly reach the wrong
+  # instance by importing its own way in.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: The application reaches ClickHouse through the composition root alone
+    Given the composition root builds the tenant and organization resolvers once
+    When any other module needs a ClickHouse client
+    Then it receives one through the app or an injected repository
+    And no module outside the sanctioned boot paths imports the client module's functions directly
+
+  # ---------------------------------------------------------------------------
   # Admin / migration operations
   # ---------------------------------------------------------------------------
 

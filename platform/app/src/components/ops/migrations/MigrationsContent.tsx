@@ -221,6 +221,49 @@ function CountBadge({
   );
 }
 
+/** Space proportional to trouble: a zero reads as one quiet gray chip,
+ *  a non-zero Held or Parked is the loud one. */
+function MigrationStatusBadges({ migration }: { migration: MigrationListing }) {
+  return (
+    <HStack marginBottom={4} flexWrap="wrap" gap={2}>
+      <CountBadge
+        label="Finalized"
+        count={migration.counts.finalized}
+        palette="green"
+      />
+      <CountBadge
+        label="Held"
+        count={migration.counts.migrated}
+        palette="orange"
+      />
+      <CountBadge
+        label="Parked"
+        count={migration.counts.parked}
+        palette="red"
+      />
+      {migration.counts.rolled_back > 0 && (
+        <CountBadge
+          label="Rolled back"
+          count={migration.counts.rolled_back}
+          palette="gray"
+        />
+      )}
+      {migration.enrollment && (
+        <>
+          <CountBadge
+            label="Enrolled"
+            count={migration.enrollment.enrolledCount}
+            palette="blue"
+          />
+          <Badge colorPalette="gray" variant="subtle">
+            Not enrolled {migration.enrollment.notEnrolledCount}
+          </Badge>
+        </>
+      )}
+    </HStack>
+  );
+}
+
 function MigrationSection({
   step,
   migration,
@@ -284,44 +327,7 @@ function MigrationSection({
       <Text fontSize="sm" color="fg.muted" maxWidth="720px" marginBottom={3}>
         {migration.description}
       </Text>
-      {/* Space proportional to trouble: a zero reads as one quiet gray chip,
-          a non-zero Held or Parked is the loud one. */}
-      <HStack marginBottom={4} flexWrap="wrap" gap={2}>
-        <CountBadge
-          label="Finalized"
-          count={migration.counts.finalized}
-          palette="green"
-        />
-        <CountBadge
-          label="Held"
-          count={migration.counts.migrated}
-          palette="orange"
-        />
-        <CountBadge
-          label="Parked"
-          count={migration.counts.parked}
-          palette="red"
-        />
-        {migration.counts.rolled_back > 0 && (
-          <CountBadge
-            label="Rolled back"
-            count={migration.counts.rolled_back}
-            palette="gray"
-          />
-        )}
-        {migration.enrollment && (
-          <>
-            <CountBadge
-              label="Enrolled"
-              count={migration.enrollment.enrolledCount}
-              palette="blue"
-            />
-            <Badge colorPalette="gray" variant="subtle">
-              Not enrolled {migration.enrollment.notEnrolledCount}
-            </Badge>
-          </>
-        )}
-      </HStack>
+      <MigrationStatusBadges migration={migration} />
       {!migration.availableOnThisInstallation ? (
         <Text fontSize="sm" color="fg.muted">
           Not yet available for self-hosted installations. It will run

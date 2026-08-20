@@ -205,9 +205,6 @@ export function isClickHouseEnabled(): boolean {
   );
 }
 
-/** Re-export for infrastructure-only use (metrics collection, not tenant data). */
-export { _getSharedClickHouseClient as getSharedClickHouseClient } from "./client";
-
 /**
  * Returns a cached ClickHouse client for the given org and URL,
  * creating one if it doesn't exist yet.

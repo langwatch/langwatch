@@ -2,9 +2,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const query = vi.fn();
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForOrganization: vi.fn(async () => ({ query })),
-}));
+vi.mock("~/server/app-layer/app", () => {
+  const app = () => ({
+    clickhouse: {
+      enabled: true,
+      resolveClient: async () => {
+        throw new Error("no tenant client in this suite");
+      },
+      resolveOrganizationClient: vi.fn(async () => ({ query })),
+      allInstances: async () => [],
+    },
+  });
+  return { getApp: app, tryGetApp: app };
+});
 
 import { ActivityMonitorService } from "../activityMonitor.service";
 
