@@ -12,6 +12,8 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import {
   getTestClickHouseClient,
@@ -93,6 +95,16 @@ async function seedDebit(input: {
 /** Stand the world up. Bracketed by `startTestContainers`. */
 export async function seedBudgetOverviewFixture(): Promise<void> {
   ({ redisConnection } = await startTestContainers());
+
+  // The tRPC user.budgetOverview procedure, the CLI REST endpoint and
+  // gatewayBudgets.get all read getApp().gateway.budgets, so stand up a test
+  // App whose budget repo points at the same test ClickHouse the debits below
+  // are seeded into. Without it those surfaces read an empty ledger and
+  // disagree with the direct-service reads.
+  await resetApp();
+  const app = createTestApp({ redis: redisConnection });
+  app.gateway.budgets = chRepo();
+  globalForApp.__langwatch_app = app;
 
   await prisma.organization.create({
     data: { id: ORG_ID, name: `ACME ${suffix}`, slug: `bov-${suffix}` },
@@ -391,6 +403,7 @@ export async function seedBudgetOverviewFixture(): Promise<void> {
 /** Tear it back down, ClickHouse rows and Redis session included. */
 export async function teardownBudgetOverviewFixture(): Promise<void> {
   delete process.env.RELEASE_UI_AI_GOVERNANCE_ENABLED;
+  await resetApp();
   const ch = getTestClickHouseClient();
   if (ch) {
     for (const tenantId of TENANTS) {
