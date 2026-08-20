@@ -88,6 +88,8 @@ type RunOptions = {
   argv?: string[];
   /** Give the run its own process group, so a test can signal the group. */
   isDetached?: boolean;
+  /** The queue to run, for the tests that need one stalled at a known point. */
+  script?: string;
 };
 
 type Run = {
@@ -101,6 +103,7 @@ function startRun({
   env: envOverrides,
   argv: argvOverride,
   isDetached = false,
+  script = QUEUE_SCRIPT,
 }: RunOptions): Run {
   const argv = argvOverride ?? [
     "node",
@@ -133,7 +136,7 @@ function startRun({
     if (value !== undefined) env[key] = value;
   }
 
-  const child = spawn(process.execPath, [QUEUE_SCRIPT, ...argv], {
+  const child = spawn(process.execPath, [script, ...argv], {
     env,
     stdio: ["ignore", "pipe", "pipe"],
     detached: isDetached,
@@ -705,16 +708,16 @@ describe("check queue", () => {
       expect(result.stderr).not.toContain("killed from outside");
     });
 
-    /** @scenario "An interrupted run killed from outside is still reported" */
-    it("still names the kill when an interrupt came first", async () => {
-      const pidFile = path.join(scratch, "escalated.pid");
-      // The command ignores the forwarded SIGTERM (the disposition survives the
-      // exec), so the signal that finally ends it is one nobody forwarded.
-      const run = startRun({
-        tag: "escalated",
-        argv: ["sh", "-c", `trap '' TERM; echo $$ > ${pidFile}; exec sleep 5`],
-      });
+    /**
+     * The command that ignores a forwarded SIGTERM, so the signal that finally
+     * ends it is one nobody forwarded. It publishes its own pid, because the
+     * test has to reach past the wrapper to kill it.
+     */
+    function ignoresTermArgv(pidFile: string): string[] {
+      return ["sh", "-c", `trap '' TERM; echo $$ > ${pidFile}; exec sleep 5`];
+    }
 
+    async function waitForPid(pidFile: string): Promise<string> {
       let pid = "";
       for (let attempt = 0; attempt < 200 && pid === ""; attempt++) {
         try {
@@ -727,13 +730,75 @@ describe("check queue", () => {
         // on both is what keeps the attempts from burning off in microseconds.
         if (pid === "") await sleep(25);
       }
-      expect(pid).not.toBe("");
+      if (pid === "") throw new Error("the command never published its pid");
+      return pid;
+    }
+
+    /** @scenario "An interrupted run killed from outside is still reported" */
+    it("still names the kill when an interrupt came first", async () => {
+      const pidFile = path.join(scratch, "escalated.pid");
+      const run = startRun({
+        tag: "escalated",
+        argv: ignoresTermArgv(pidFile),
+      });
+      const pid = await waitForPid(pidFile);
 
       run.child.kill("SIGTERM");
       await sleep(100);
       process.kill(Number(pid), "SIGKILL");
       const result = await run.done;
 
+      expect(result.code).toBe(137);
+      expect(result.stderr).toContain("killed from outside by SIGKILL");
+    });
+
+    /**
+     * A copy of the queue that stops for `stallMs` at one exact point: the
+     * moment the child exists.
+     *
+     * The interrupt this pins is a scheduling race, so no arrangement of real
+     * timing reproduces it on demand. A delay is the one edit that cannot
+     * change what a program does, only when it does it, so injecting one is
+     * what turns the race into a decision the test can make.
+     */
+    function queueStalledAsCommandAppears(stallMs: number): string {
+      const source = readFileSync(QUEUE_SCRIPT, "utf8");
+      const call = source.indexOf("spawn(commandArgv[0]");
+      const end = source.indexOf("});", call);
+      if (call === -1 || end === -1) {
+        throw new Error(
+          "the queue no longer spawns the command the way this test stalls it",
+        );
+      }
+      const at = end + "});".length;
+      const copy = path.join(scratch, "check-queue-stalled.mjs");
+      writeFileSync(
+        copy,
+        `${source.slice(0, at)}\n{ const until = Date.now() + ${stallMs}; while (Date.now() < until) {} }\n${source.slice(at)}`,
+        "utf8",
+      );
+      return copy;
+    }
+
+    /** @scenario "An interrupt that arrives as the command starts is forwarded" */
+    it("forwards an interrupt that lands in the instant the command appears", async () => {
+      const pidFile = path.join(scratch, "stalled.pid");
+      const run = startRun({
+        tag: "stalled",
+        script: queueStalledAsCommandAppears(400),
+        argv: ignoresTermArgv(pidFile),
+      });
+      // Published from inside the stall, so the interrupt below is delivered
+      // while the wrapper is still held there.
+      const pid = await waitForPid(pidFile);
+
+      run.child.kill("SIGTERM");
+      await sleep(100);
+      process.kill(Number(pid), "SIGKILL");
+      const result = await run.done;
+
+      // A wrapper that took the interrupt on its default disposition would be
+      // dead by now, reporting no code and leaving the command behind.
       expect(result.code).toBe(137);
       expect(result.stderr).toContain("killed from outside by SIGKILL");
     });
