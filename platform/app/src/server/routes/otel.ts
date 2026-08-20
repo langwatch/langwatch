@@ -161,7 +161,6 @@ async function authenticate(
   // access on OTLP ingestion — same semantics as the collector path.
   try {
     await enforceApiKeyCeiling({
-      prisma,
       resolved,
       permission: "traces:create",
     });

@@ -12,11 +12,11 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import crypto from "crypto";
-import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getUserProtectionsForProject } from "~/server/api/utils";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
+import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import {
@@ -66,7 +66,7 @@ secured
 
     // Authorize
     const hasPermission = await hasProjectPermission(
-      { prisma, session },
+      { session },
       request.projectId,
       "traces:view",
     );

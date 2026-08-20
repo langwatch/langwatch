@@ -2,14 +2,14 @@ import type {
   ModelDefaultScopeType,
   PrismaClient,
 } from "~/generated/prisma/client";
-
-import type { Session } from "~/server/auth";
 import {
-  batchScopePermissions,
   hasOrganizationPermission,
   hasProjectPermission,
   hasTeamPermission,
-} from "../api/rbac";
+} from "~/server/app-layer/permissions/imperative";
+
+import type { Session } from "~/server/auth";
+import { batchScopePermissions } from "../api/rbac";
 import {
   allFeatures,
   featureByKey,

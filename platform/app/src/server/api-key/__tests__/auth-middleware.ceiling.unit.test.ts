@@ -23,9 +23,15 @@ vi.mock("~/server/rbac/role-binding-resolver", () => ({
   resolveApiKeyPermission: vi.fn(),
 }));
 
-const resolveMock = vi.mocked(resolveApiKeyPermission);
+// The ceiling resolves its service from the App.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appCredentialPermissionsMock } = await import(
+    "~/test-utils/appCredentialPermissionsMock"
+  );
+  return appCredentialPermissionsMock();
+});
 
-const prisma = {} as never;
+const resolveMock = vi.mocked(resolveApiKeyPermission);
 
 const project = {
   id: "proj1",
@@ -60,10 +66,7 @@ function appWith(resolved: ResolvedToken | undefined) {
     if (resolved) c.set("resolvedToken" as never, resolved as never);
     await next();
   });
-  app.use(
-    "*",
-    requireApiKeyPermission({ prisma, permission: "project:update" }),
-  );
+  app.use("*", requireApiKeyPermission({ permission: "project:update" }));
   app.get("/", handler as never);
   return { app, handler };
 }
@@ -80,7 +83,6 @@ describe("enforceApiKeyCeiling()", () => {
 
         await expect(
           enforceApiKeyCeiling({
-            prisma,
             resolved: apiKeyToken,
             permission: "project:update",
           }),
@@ -94,7 +96,6 @@ describe("enforceApiKeyCeiling()", () => {
 
         await expect(
           enforceApiKeyCeiling({
-            prisma,
             resolved: apiKeyToken,
             permission: "project:update",
           }),
@@ -107,7 +108,6 @@ describe("enforceApiKeyCeiling()", () => {
         resolveMock.mockResolvedValue(true);
 
         await enforceApiKeyCeiling({
-          prisma,
           resolved: apiKeyToken,
           permission: "project:update",
         });
@@ -135,7 +135,6 @@ describe("enforceApiKeyCeiling()", () => {
     it("skips the ceiling entirely", async () => {
       await expect(
         enforceApiKeyCeiling({
-          prisma,
           resolved: legacyProjectKeyToken,
           permission: "project:update",
         }),

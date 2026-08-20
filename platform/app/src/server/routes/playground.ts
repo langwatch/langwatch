@@ -9,12 +9,12 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { env } from "~/env.mjs";
-import { hasProjectPermission } from "~/server/api/rbac";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "~/server/api/routers/modelProviders.utils";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { nlpgoProxyBaseURL } from "~/server/nlpgo/nlpgoFetch";
@@ -46,7 +46,7 @@ secured
     }
 
     const hasPermission = await hasProjectPermission(
-      { prisma, session },
+      { session },
       projectId,
       "playground:manage",
     );

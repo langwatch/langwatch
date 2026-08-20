@@ -190,6 +190,9 @@ importers:
       '@hono/standard-validator':
         specifier: ^0.2.0
         version: 0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1)
+      '@langwatch/authz':
+        specifier: workspace:*
+        version: link:../authz
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error

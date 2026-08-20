@@ -4,7 +4,8 @@
  * down to the middleware built here.
  *
  * ONE seam, decision-neutral, properly layered: this middleware is the tRPC
- * boundary, it composes the `PermissionsService`, which takes the
+ * boundary, it resolves `getApp().permissions` — the App-composed
+ * `PermissionsService`, which takes the
  * `ForkAwarePermissionDecisionRepository`, which owns the client and
  * delegates to the same fork-aware resolvers the legacy
  * `checkXxxPermission` middlewares ran (`rbac.ts`) — so a not-yet-cut-over
@@ -35,13 +36,10 @@ import {
 } from "@langwatch/authz";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
-import type {
-  OrganizationUserRole,
-  PrismaClient,
-} from "~/generated/prisma/client";
+import type { OrganizationUserRole } from "~/generated/prisma/client";
 import type { Session } from "../../auth";
+import { type App, getApp } from "../app";
 import { LiteMemberRestrictedError } from "../permissions/errors";
-import { permissionsServiceFor } from "../permissions/runtime";
 import {
   type DeclaredAuthzMiddleware,
   declareAuthzMiddleware,
@@ -53,14 +51,23 @@ type ScopeInput = Partial<Record<ScopeTierField, unknown>>;
 
 type MiddlewareParams = {
   ctx: {
-    prisma: PrismaClient;
     session: Session | null;
+    /** The composed App the context factory injected (see `trpc.ts`). */
+    app?: App;
     permissionChecked: boolean;
     organizationRole?: OrganizationUserRole | null;
   };
   input: ScopeInput;
   next: () => any;
 };
+
+/**
+ * The App this request decides through: the one its context factory injected,
+ * or the process singleton for contexts built without one (SSG helpers,
+ * embedded callers). Both are the same instance in production — the ctx slot
+ * exists so a test can hand in a fake without mocking the App module.
+ */
+const appOf = (ctx: MiddlewareParams["ctx"]): App => ctx.app ?? getApp();
 
 type DeclaredMiddleware = DeclaredAuthzMiddleware<
   (params: MiddlewareParams) => Promise<any>
@@ -90,9 +97,13 @@ export const checkDeclaredPermission = ({
       }
 
       const scope = requireDeclaredScope({ permission, input, via });
-      const { permitted, organizationRole } = await permissionsServiceFor(
-        ctx.prisma,
-      ).getDecision({ userId: ctx.session.user.id, permission, scope });
+      const { permitted, organizationRole } = await appOf(
+        ctx,
+      ).permissions.getDecision({
+        userId: ctx.session.user.id,
+        permission,
+        scope,
+      });
       if (!permitted) {
         throw deniedError({ permission, scope, organizationRole });
       }
@@ -127,9 +138,9 @@ export const checkDeclaredPermissionAny = (
       if (typeof projectId !== "string" || projectId.length === 0) {
         throw wiringBug({ permission: permissions[0] });
       }
-      const { permitted, organizationRole } = await permissionsServiceFor(
-        ctx.prisma,
-      ).getProjectAnyDecision({
+      const { permitted, organizationRole } = await appOf(
+        ctx,
+      ).permissions.getProjectAnyDecision({
         userId: ctx.session.user.id,
         projectId,
         permissions,

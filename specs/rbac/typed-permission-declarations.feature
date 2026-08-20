@@ -158,3 +158,27 @@ Feature: Typed permission declarations
     When it asks the facade for "traces:view" with a projectId
     Then the check compiles and decides through the same seam
     And asking for an organization-only permission with a projectId is a compile error
+
+  # ============================================================================
+  # Every check resolves the one App-composed service
+  # ============================================================================
+
+  @unit
+  Scenario: Every grant check decides through the App the request context carries
+    Given the permissions service composed once on the App
+    When a declared tRPC check, a REST credential middleware, or the imperative facade decides
+    Then each resolves the service from its request context or the App
+    And none composes its own service from a database client
+
+  @unit
+  Scenario: An endpoint's middleware array cannot displace its declared check
+    Given a management endpoint that declares a permission and carries its own middleware
+    When a request reaches the endpoint
+    Then the framework mounts the declared permission check itself
+    And the check runs even though the endpoint replaced the guard's middleware array
+
+  @unit
+  Scenario: A registered policy that promises an unenforced permission fails the build
+    Given a management endpoint whose declared policy names a permission the config does not enforce
+    When the service builds
+    Then the build fails naming both halves of the declaration

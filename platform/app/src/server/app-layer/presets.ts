@@ -269,6 +269,7 @@ import { getOpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import { OrganizationService } from "./organizations/organization.service";
 import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
 import { NullOrganizationRepository } from "./organizations/repositories/organization.repository";
+import { permissionsServiceFor } from "./permissions/runtime";
 import { PresenceService } from "./presence/presence.service";
 import { InMemoryPresenceRepository } from "./presence/repositories/presence.memory.repository";
 import { RedisPresenceRepository } from "./presence/repositories/presence.redis.repository";
@@ -1800,6 +1801,7 @@ export function initializeDefaultApp(options?: {
     },
     organizations,
     projects,
+    permissions: permissionsServiceFor(prisma),
     tokenizer,
     usage,
     planProvider,
@@ -2157,6 +2159,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     organizations: nullOrganizations,
     projects: nullProjects,
+    permissions: permissionsServiceFor(testPrisma),
     tokenizer: new TokenizerService(new NullTokenizerClient()),
     usage: new UsageService(
       nullOrganizations,

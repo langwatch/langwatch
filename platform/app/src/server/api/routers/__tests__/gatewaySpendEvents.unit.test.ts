@@ -42,13 +42,19 @@ const spendEventsRepository = vi.hoisted(() => ({
     | { readSpendEventsPage: typeof readSpendEventsPage }
     | undefined,
 }));
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({
-    gateway: { spendEvents: spendEventsRepository.current },
-  }),
-}));
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsService } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: () => ({
+      permissions: appPermissionsService(),
+      gateway: { spendEvents: spendEventsRepository.current },
+    }),
+  };
+});
 
 const SPEND_ROW: SpendEventRow = {
   tenantId: PROJECT_ID,

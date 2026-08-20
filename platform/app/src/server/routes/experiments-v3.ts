@@ -23,7 +23,6 @@ import { persistedEvaluationsV3StateSchema } from "~/experiments-v3/types/persis
 import { ExperimentType } from "~/generated/prisma/client";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { Permission } from "~/server/api/rbac";
-import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import {
@@ -32,6 +31,7 @@ import {
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
+import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import {
@@ -164,7 +164,7 @@ const authenticateRequest = async (
   }
 
   try {
-    await enforceApiKeyCeiling({ prisma, resolved, permission });
+    await enforceApiKeyCeiling({ resolved, permission });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
     // `body` carries the full handled payload (code, permission, tips) for
@@ -239,7 +239,7 @@ secured.access(sessionAuth).post(
     }
 
     const hasPermission = await hasProjectPermission(
-      { prisma, session },
+      { session },
       projectId,
       "evaluations:manage",
     );
@@ -388,7 +388,7 @@ secured.access(sessionAuth).post("/abort", async (c) => {
   }
 
   const hasPermission = await hasProjectPermission(
-    { prisma, session },
+    { session },
     projectId,
     "evaluations:manage",
   );

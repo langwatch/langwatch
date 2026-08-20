@@ -19,6 +19,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetCutoverGateForTesting } from "~/server/app-layer/authz/cutover-gate";
 import { checkDeclaredPermissionAny } from "~/server/app-layer/authz/trpc-middleware";
+import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
 import type { Session } from "~/server/auth";
 
 const { userPermissionCheck, userBatchPermissionCheck, apiKeyPermissionCheck } =
@@ -152,6 +153,11 @@ describe("the fork at the permission seams", () => {
           ctx: {
             ...(ctx as Record<string, unknown>),
             permissionChecked: false,
+            app: {
+              permissions: permissionsServiceFor(
+                (ctx as { prisma: never }).prisma,
+              ),
+            },
           },
           input: { projectId: PROJECT_ID },
           next,

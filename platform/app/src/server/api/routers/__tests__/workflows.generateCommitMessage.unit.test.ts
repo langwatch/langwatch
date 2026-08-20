@@ -11,6 +11,14 @@ import { workflowRouter } from "../workflows";
 // plain-text completion with no function-tool round-trip.
 
 const mockGetVercelAIModel = vi.fn();
+// The declared permission seam resolves its service from the App.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return appPermissionsMock();
+});
+
 vi.mock("../../../modelProviders/utils", () => ({
   getVercelAIModel: (...args: unknown[]) => mockGetVercelAIModel(...args),
 }));

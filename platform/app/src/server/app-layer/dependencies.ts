@@ -64,6 +64,7 @@ import type { ReplayService } from "./ops/replay.service";
 import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import type { OpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import type { OrganizationService } from "./organizations/organization.service";
+import type { PermissionsService } from "./permissions/permissions.service";
 import type { PresenceService } from "./presence/presence.service";
 import type { ProjectService } from "./projects/project.service";
 import type { ShareService } from "./share/share.service";
@@ -322,6 +323,13 @@ export interface AppDependencies {
   emailSuppressions: EmailSuppressionService;
   organizations: OrganizationService;
   projects: ProjectService;
+  /**
+   * ADR-092 decision 25 — the one permission-checking service. Every grant
+   * check on every surface (tRPC declarations, Hono session and API-key
+   * middlewares, the management API) resolves THIS instance via
+   * `getApp().permissions`; nothing composes its own from a client.
+   */
+  permissions: PermissionsService;
   tokenizer: TokenizerService;
   usage: UsageService;
   planProvider: PlanProvider;

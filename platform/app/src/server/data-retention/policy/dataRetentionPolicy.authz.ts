@@ -4,12 +4,12 @@ import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { isEnterpriseTier } from "~/server/api/enterprise";
+import { getApp } from "~/server/app-layer/app";
 import {
   hasOrganizationPermission,
   hasProjectPermission,
   hasTeamPermission,
-} from "~/server/api/rbac";
-import { getApp } from "~/server/app-layer/app";
+} from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
 import {
   ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
@@ -54,7 +54,7 @@ async function canWriteScope(
   if (!ctx.session) return false;
   if (scope.scopeType === "ORGANIZATION") {
     return hasOrganizationPermission(
-      { prisma: ctx.prisma, session: ctx.session },
+      { session: ctx.session },
       scope.scopeId,
       "organization:manage",
     );

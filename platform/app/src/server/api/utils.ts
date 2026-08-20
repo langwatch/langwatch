@@ -6,6 +6,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
+import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { VisibilityWindowService } from "~/server/app-layer/traces/visibility-window.service";
 import type { Session } from "~/server/auth";
 import {
@@ -28,7 +29,7 @@ import { resolveOrganizationId } from "~/server/organizations/resolveOrganizatio
 import { TtlCache } from "~/server/utils/ttlCache";
 import { FREE_VISIBILITY_DAYS } from "../../../ee/licensing/constants";
 import type { CategoryVisibility, Protections } from "../traces/protections";
-import { hasProjectPermission, isDemoProject } from "./rbac";
+import { isDemoProject } from "./rbac";
 
 const logger = createLogger("langwatch:api:protections");
 

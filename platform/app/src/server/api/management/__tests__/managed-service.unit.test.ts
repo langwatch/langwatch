@@ -139,6 +139,76 @@ describe("createManagementService", () => {
     });
   });
 
+  describe("given an endpoint that also carries its own middleware", () => {
+    /** @scenario "An endpoint's middleware array cannot displace its declared check" */
+    it("still runs the declared permission check the framework mounted", async () => {
+      const { service, guard } = createManagementService({
+        name: "toy-overwrite",
+        basePath: "/api/toy-overwrite",
+        feature: "MANAGEMENT_API",
+      });
+      const app = service
+        .version(MANAGEMENT_API_VERSION, (v) => {
+          v.get(
+            "/things",
+            {
+              ...guard("organization:manage"),
+              // The overwrite that used to bypass enforcement: a middleware
+              // key after the spread replaces the guard's array wholesale.
+              middleware: [
+                (async (_c, next) => {
+                  executionOrder.push("endpoint-middleware");
+                  await next();
+                }) satisfies MiddlewareHandler,
+              ],
+              output: z.object({ ok: z.boolean() }),
+              description: "toy",
+              docs: { operationId: "listOverwriteThings" },
+            },
+            async () => ({ ok: true }),
+          );
+        })
+        .build();
+
+      executionOrder.length = 0;
+      const response = await app.request("/api/toy-overwrite/things");
+
+      expect(response.status).toBe(200);
+      expect(executionOrder).toEqual([
+        "auth",
+        "permission:organization:manage",
+        "endpoint-middleware",
+      ]);
+    });
+  });
+
+  describe("given a policy that promises a permission the config does not enforce", () => {
+    /** @scenario "A registered policy that promises an unenforced permission fails the build" */
+    it("fails the build naming both halves", () => {
+      const { service, guard } = createManagementService({
+        name: "toy-mismatch",
+        basePath: "/api/toy-mismatch",
+        feature: "MANAGEMENT_API",
+      });
+
+      expect(() =>
+        service
+          .version(MANAGEMENT_API_VERSION, (v) => {
+            v.get(
+              "/things",
+              {
+                ...guard("organization:manage"),
+                permission: undefined,
+                output: z.object({ ok: z.boolean() }),
+              },
+              async () => ({ ok: true }),
+            );
+          })
+          .build(),
+      ).toThrow(/declares policy "organization:manage" but enforces "nothing"/);
+    });
+  });
+
   describe("given an endpoint declares no guard", () => {
     it("refuses to build rather than mounting an unclassified route", () => {
       const { service } = createManagementService({

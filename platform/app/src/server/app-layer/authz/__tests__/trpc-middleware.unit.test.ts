@@ -34,6 +34,15 @@ vi.mock("~/server/api/rbac", () => ({
     resolveProjectPermissionAny(...args),
 }));
 
+// The seam resolves its service from the App; this fake App runs the REAL
+// service + repository over the rbac stubs above.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return appPermissionsMock();
+});
+
 const {
   checkDeclaredPermission,
   checkDeclaredPermissionAny,
@@ -49,7 +58,6 @@ const paramsFor = (
   { authed = true }: { authed?: boolean } = {},
 ) => ({
   ctx: {
-    prisma: {} as any,
     session: (authed ? session : null) as any,
     permissionChecked: false,
     organizationRole: undefined as any,
@@ -98,10 +106,9 @@ describe("checkDeclaredPermission", () => {
         params as any,
       );
       expect(resolveProjectPermission).toHaveBeenCalledWith(
-        {
-          prisma: params.ctx.prisma,
+        expect.objectContaining({
           session: { user: { id: "alice" }, expires: "" },
-        },
+        }),
         "proj-1",
         "traces:view",
       );
@@ -120,10 +127,9 @@ describe("checkDeclaredPermission", () => {
         params as any,
       );
       expect(hasOrganizationPermission).toHaveBeenCalledWith(
-        {
-          prisma: params.ctx.prisma,
+        expect.objectContaining({
           session: { user: { id: "alice" }, expires: "" },
-        },
+        }),
         "org-1",
         "organization:manage",
       );
@@ -140,14 +146,39 @@ describe("checkDeclaredPermission", () => {
         via: "teamId",
       })(params as any);
       expect(resolveTeamPermission).toHaveBeenCalledWith(
-        {
-          prisma: params.ctx.prisma,
+        expect.objectContaining({
           session: { user: { id: "alice" }, expires: "" },
-        },
+        }),
         "team-1",
         "organization:manage",
       );
       expect(hasOrganizationPermission).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the request context carries an App", () => {
+    /** @scenario "Every grant check decides through the App the request context carries" */
+    it("decides through the injected App, never composing its own", async () => {
+      const getDecision = vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" });
+      const params = paramsFor({ projectId: "proj-1" });
+      (params.ctx as { app?: unknown }).app = {
+        permissions: { getDecision },
+      };
+
+      await checkDeclaredPermission({ permission: "traces:view" })(
+        params as any,
+      );
+
+      expect(getDecision).toHaveBeenCalledWith({
+        userId: "alice",
+        permission: "traces:view",
+        scope: { tier: "project", id: "proj-1" },
+      });
+      // The module-level App was never consulted — the context's instance is
+      // the one that decides.
+      expect(resolveProjectPermission).not.toHaveBeenCalled();
     });
   });
 
@@ -248,10 +279,9 @@ describe("checkDeclaredPermissionAny", () => {
       params as any,
     );
     expect(resolveProjectPermissionAny).toHaveBeenCalledWith(
-      {
-        prisma: params.ctx.prisma,
+      expect.objectContaining({
         session: { user: { id: "alice" }, expires: "" },
-      },
+      }),
       "proj-1",
       ["traces:view", "scenarios:view"],
     );

@@ -24,7 +24,7 @@ vi.mock("../../rateLimit", () => ({
   rateLimit: (...args: unknown[]) => rateLimitMock(...args),
 }));
 
-vi.mock("../../api/rbac", () => ({
+vi.mock("~/server/app-layer/permissions/imperative", () => ({
   hasOrganizationPermission: (...args: unknown[]) =>
     hasOrganizationPermissionMock(...args),
   hasTeamPermission: (...args: unknown[]) => hasTeamPermissionMock(...args),

@@ -21,13 +21,13 @@
 
 import type { Context } from "hono";
 import type { Project } from "~/generated/prisma/client";
-import { hasProjectPermission } from "~/server/api/rbac";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
+import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 
@@ -103,7 +103,7 @@ export async function authorizeDirectUpload(
       };
     }
     const permitted = await hasProjectPermission(
-      { prisma, session },
+      { session },
       projectId,
       PERMISSION,
     );
@@ -144,7 +144,7 @@ export async function authorizeDirectUpload(
   }
 
   try {
-    await enforceApiKeyCeiling({ prisma, resolved, permission: PERMISSION });
+    await enforceApiKeyCeiling({ resolved, permission: PERMISSION });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
     // The ceiling only ever denies with 403; narrowed here so the result keeps

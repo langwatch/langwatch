@@ -1276,7 +1276,11 @@ export async function resolveProjectPermissionAny(
 }
 
 /**
- * Check if user has a specific permission for a project
+ * Check if user has a specific permission for a project.
+ *
+ * @deprecated Production callers use the App-routed helpers in
+ * `~/server/app-layer/permissions/imperative` — this stays only as the legacy
+ * walk's own test surface until the contract PR deletes the walk.
  */
 export async function hasProjectPermission(
   ctx: { prisma: PrismaClient; session: Session | null },
@@ -1377,7 +1381,11 @@ export async function resolveTeamPermission(
 }
 
 /**
- * Check if user has a specific permission for a team
+ * Check if user has a specific permission for a team.
+ *
+ * @deprecated Production callers use the App-routed helpers in
+ * `~/server/app-layer/permissions/imperative` — this stays only as the legacy
+ * walk's own test surface until the contract PR deletes the walk.
  */
 export async function hasTeamPermission(
   ctx: { prisma: PrismaClient; session: Session | null },

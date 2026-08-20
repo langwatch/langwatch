@@ -11,7 +11,6 @@ import {
 } from "~/server/rbac/custom-role-permissions";
 import {
   checkRoleBindingPermission,
-  resolveApiKeyPermission,
   resolveLegacyCeiling,
 } from "~/server/rbac/role-binding-resolver";
 import { RoleRepository } from "~/server/role/repositories/role.repository";
@@ -1052,33 +1051,6 @@ export class ApiKeyService {
       organizationId,
     });
     return !!binding;
-  }
-
-  /**
-   * Whether the presented credential resolves the given permission at
-   * organization scope: the same primitive the route-level
-   * `requireOrgPermission` middleware applies, exposed for handlers that need
-   * a second, stricter permission on one branch of a route.
-   */
-  async hasOrgScopedPermission({
-    apiKeyId,
-    userId,
-    organizationId,
-    permission,
-  }: {
-    apiKeyId: string;
-    userId: string | null;
-    organizationId: string;
-    permission: Permission;
-  }): Promise<boolean> {
-    return resolveApiKeyPermission({
-      prisma: this.prisma,
-      apiKeyId,
-      userId,
-      organizationId,
-      scope: { type: "org", id: organizationId },
-      permission,
-    });
   }
 
   /**
