@@ -112,7 +112,11 @@ export function PromptPlaygroundBrowser() {
             <HStack
               flexShrink={0}
               gap={1}
-              paddingRight={2}
+              paddingRight={3}
+              // The strip stretches its children so a tab can reach the card
+              // below; this row is not a tab, so it centres itself in the row
+              // rather than growing into the card's top edge.
+              alignSelf="center"
               onPointerDownCapture={() =>
                 setActiveWindow({ windowId: tabbedWindow.id })
               }
@@ -145,22 +149,24 @@ export function PromptPlaygroundBrowser() {
               />
             </HStack>
           </DraggableTabsBrowser.TabBar>
-          {tabbedWindow.tabs.map((tab) => (
-            <TabIdProvider key={tab.id} tabId={tab.id}>
-              {/* The frame — border, radius, surface — belongs to the window
-                  that holds both the strip and this content, so the content
-                  only claims the room inside it. */}
-              <DraggableTabsBrowser.Content
-                value={tab.id}
-                height="full"
-                padding={0}
-                minHeight="0"
-                overflow="hidden"
-              >
-                <PromptBrowserWindowContent />
-              </DraggableTabsBrowser.Content>
-            </TabIdProvider>
-          ))}
+          {/* The card. The strip above stands on the page ground and only the
+              active tab joins this frame, so the content claims the room inside
+              it and nothing else. */}
+          <DraggableTabsBrowser.Panel>
+            {tabbedWindow.tabs.map((tab) => (
+              <TabIdProvider key={tab.id} tabId={tab.id}>
+                <DraggableTabsBrowser.Content
+                  value={tab.id}
+                  height="full"
+                  padding={0}
+                  minHeight="0"
+                  overflow="hidden"
+                >
+                  <PromptBrowserWindowContent />
+                </DraggableTabsBrowser.Content>
+              </TabIdProvider>
+            ))}
+          </DraggableTabsBrowser.Panel>
         </DraggableTabsBrowser.Window>
       ))}
     </DraggableTabsBrowser.Root>
