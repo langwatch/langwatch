@@ -46,3 +46,22 @@ Feature: TypeScript 7 is the compiler
     Then the second parse reflects the second text
     # The session caches source files by path, so a scan pinning a rule across
     # several snippets would otherwise judge every one of them by the first.
+
+  @unit
+  Scenario: The whole repository is typechecked as one program
+    Given every test file imports the application code it tests
+    When a contributor typechecks everything
+    Then the application files are checked once, not once for each project
+    # Two projects run back to back checked the app's files twice, which cost
+    # 35.1M type instantiations against 18.9M for the single program.
+
+  @unit
+  Scenario: The combined project checks every file the split projects checked
+    Given an application project and a tests project that each cover part of the repository
+    When one project replaces both
+    Then no file that was checked before is left unchecked
+
+  @unit
+  Scenario: The combined project keeps its own incremental cache
+    Given three projects can be warm at the same time
+    Then none of them writes the build information of another

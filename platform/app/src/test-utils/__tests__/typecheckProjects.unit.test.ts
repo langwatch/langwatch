@@ -1,0 +1,97 @@
+/**
+ * How the repository's TypeScript is split into projects, and what that costs.
+ *
+ * The app project and the tests project overlap almost entirely, because every
+ * test file imports the app it tests. Run back to back they parsed, bound and
+ * checked the app's ~17k files twice: 38,046 file loads and 35.1M type
+ * instantiations, against 20,980 and 18.9M for a single program over the union.
+ *
+ * The risk in merging them is silent coverage loss, so the parity check below
+ * loads all three programs and asserts the combined one is a superset. It is
+ * the only assertion that actually proves it; the structural ones alongside it
+ * only say the config still looks the way it was written.
+ *
+ * Spec: specs/setup/typescript-7.feature
+ */
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+/** platform/app/, from src/test-utils/__tests__/. */
+const APP_ROOT = resolve(__dirname, "../../..");
+const REPO_ROOT = resolve(APP_ROOT, "../..");
+
+const APP_PROJECT = "tsconfig.tsgo.json";
+const TESTS_PROJECT = "tsconfig.tsgo.tests.json";
+const ALL_PROJECT = "tsconfig.tsgo.all.json";
+
+/** tsconfig files carry comments, which `JSON.parse` will not take. */
+function readProject(name: string): Record<string, any> {
+  const text = readFileSync(resolve(APP_ROOT, name), "utf8");
+  return JSON.parse(text.replace(/^\s*\/\/.*$/gm, ""));
+}
+
+/** The set of files a project puts in its program. */
+function programFiles(project: string): Set<string> {
+  const stdout = execFileSync(
+    resolve(APP_ROOT, "node_modules/.bin/tsc.real"),
+    ["--noEmit", "--project", `./${project}`, "--listFilesOnly"],
+    { cwd: APP_ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+  );
+  return new Set(stdout.split("\n").filter((line) => line.trim() !== ""));
+}
+
+describe("given the repository's typecheck projects", () => {
+  describe("when the whole repository is typechecked", () => {
+    // @scenario "The whole repository is typechecked as one program"
+    it("runs one project that covers the app and its tests", () => {
+      const pkg = JSON.parse(
+        readFileSync(resolve(APP_ROOT, "package.json"), "utf8"),
+      );
+      expect(pkg.scripts["typecheck:all"]).toContain(ALL_PROJECT);
+      // Two invocations chained would be the two-program shape again.
+      expect(pkg.scripts["typecheck:all"]).not.toContain("&&");
+    });
+
+    // @scenario "The whole repository is typechecked as one program"
+    it("is what CI runs, so local and CI check the same program", () => {
+      const workflow = readFileSync(
+        resolve(REPO_ROOT, ".github/workflows/langwatch-app-ci.yml"),
+        "utf8",
+      );
+      expect(workflow).toContain("pnpm run typecheck:all");
+      expect(workflow).not.toContain("pnpm run typecheck:tests");
+    });
+
+    // @scenario "The combined project keeps its own incremental cache"
+    it("gives each project a build info file of its own", () => {
+      const paths = [APP_PROJECT, TESTS_PROJECT, ALL_PROJECT].map(
+        (p) => readProject(p).compilerOptions?.tsBuildInfoFile,
+      );
+      expect(paths.every((p) => typeof p === "string" && p.length > 0)).toBe(
+        true,
+      );
+      expect(new Set(paths).size).toBe(paths.length);
+    });
+  });
+
+  describe("when the combined project replaces the two it merges", () => {
+    // @scenario "The combined project checks every file the split projects checked"
+    it("leaves no file that was checked before unchecked", () => {
+      expect(existsSync(resolve(APP_ROOT, ALL_PROJECT))).toBe(true);
+
+      const combined = programFiles(ALL_PROJECT);
+      const covered = [
+        ...programFiles(APP_PROJECT),
+        ...programFiles(TESTS_PROJECT),
+      ];
+
+      const dropped = covered.filter((file) => !combined.has(file));
+      expect(
+        dropped,
+        "the combined project must be a superset: these files lose their typecheck",
+      ).toEqual([]);
+    });
+  });
+});

@@ -1,0 +1,46 @@
+{
+	"extends": "./tsconfig.tsgo.json",
+	"compilerOptions": {
+		// Its own incremental cache, so it never clobbers the app-only or
+		// tests-only caches. All three can be warm at the same time.
+		"tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/tsgo-all.tsbuildinfo"
+	},
+	// The app project and the tests project overlap almost entirely: every test
+	// file imports the app, so running them as two programs parses, binds and
+	// checks the app's 17k files twice. This project is the union, so the whole
+	// repo is checked once. `**/*.ts` and `**/*.tsx` already reach the test
+	// files once the test exclusions below are gone, so `./e2e/**/*` is the
+	// only entry the tests project adds.
+	// An include glob drops a `.d.ts` when a `.ts` of the same name sits beside
+	// it, and `vegaLiteSchema.ts` does. The tests project keeps the declaration
+	// only because it never roots the `.ts`. A `files` entry is not subject to
+	// that rule, so this is what holds the coverage identical.
+	"files": ["./src/features/analytics-query/visualization/vegaLiteSchema.d.ts"],
+	"include": [
+		"./src/**/*",
+		"./e2e/**/*",
+		".eslintrc.cjs",
+		"next-env.d.ts",
+		"**/*.ts",
+		"**/*.tsx",
+		"**/*.cjs",
+		"**/*.mjs",
+		".next/types/**/*.ts",
+		".next-saas/types/**/*.ts"
+	],
+	"exclude": [
+		"node_modules",
+		"dist",
+		"../../mcp/typescript",
+		".next",
+		".next-saas",
+		"**/*.snippet.*",
+		"src/**/codegen/snippets/**/*",
+		"packages/insanity-check/**/*",
+		"src/features/analytics-query/visualization/vegaLiteSchemaValidator.generated.js",
+		// Fixtures for the biome plugin tests. They are sources for a lint rule
+		// to match against, not code that has to compile, and neither the app
+		// project nor the tests project reaches them.
+		"biome-plugins/**"
+	]
+}
