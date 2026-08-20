@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 import type { Project } from "~/generated/prisma/client";
 import { lwqlTenantCapability } from "~/server/analytics/lwql/capability";
 import { lwqlConnectionFromEnv } from "~/server/analytics/lwql/executor";
-import { insertLwqlKeyMapRow } from "~/server/analytics/lwql/lwqlKeyMap.repository";
+import type { LwqlKeyMapRepository } from "~/server/analytics/lwql/lwqlKeyMap.repository";
 import {
   type LwqlKeyMapRow,
   lwqlKeyMapTableQualifiedName,
@@ -175,7 +175,15 @@ export interface CreateProjectParams {
 }
 
 export class ProjectService {
-  constructor(readonly repo: ProjectRepository) {}
+  constructor(
+    readonly repo: ProjectRepository,
+    /**
+     * Absent only where the caller cannot reach ClickHouse at all. A new
+     * project's key-map row is then left to the deploy-time backfill, the
+     * same way a failed write is.
+     */
+    private readonly lwqlKeyMap?: LwqlKeyMapRepository,
+  ) {}
 
   async getById(id: string): Promise<Project | null> {
     return this.repo.getById(id);
@@ -308,7 +316,12 @@ export class ProjectService {
         KeyHash: lwqlTenantCapability({ secret: project.lwqlKey }),
         TenantId: project.id,
       };
-      await insertLwqlKeyMapRow({
+      if (!this.lwqlKeyMap) {
+        throw new Error(
+          "No LangWatchQL key-map repository is wired — the row was not written",
+        );
+      }
+      await this.lwqlKeyMap.insertRow({
         table: lwqlKeyMapTableQualifiedName({
           names,
           sourceDatabase,
