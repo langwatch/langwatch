@@ -22,7 +22,7 @@ classifiers = [
 
 dependencies = [
     "nanoid>=2.0.0,<3.0.0",
-    "coolname>=2.2.0",
+    "coolname>=5.0.0",
     "httpx>=0.27.0",
     "openinference-instrumentation-haystack>=0.1.20",
     "openinference-instrumentation-langchain>=0.1.24",
@@ -47,7 +47,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-langchain = ["langchain-core>=0.3.0,<2.0.0"]
+langchain = ["langchain-core>=1.5.4,<2.0.0"]
 dspy = ["dspy-ai>=3.3.0,<4"]
 litellm = ["litellm>=1.96.0"]
 dev = ["ruff>=0.16.2"]
@@ -83,15 +83,15 @@ examples = [
     "dspy-ai>=3.3.0,<4",
     "faiss-cpu>=1.15.0,<2.0.0",
     "fastapi>=0.141.1",
-    "haystack-ai>=2.13.2,<4.0.0",
+    "haystack-ai>=3.0.0,<4.0.0",
     "jupyter>=1.1.1,<2.0.0",
     "langchain>=1.0.0,<2.0.0",
     "langchain-community>=0.4.2,<1.0.0",
-    "langchain-openai>=1.1.14,<2.0.0",
+    "langchain-openai>=1.4.3,<2.0.0",
     "langchain-text-splitters>=1.1.2,<2.0.0",
     "langchain-google-vertexai>=2.0.0,<4.0.0",
     "litellm>=1.96.0",
-    "openinference-instrumentation-dspy>=0.1.23,<0.2.0",
+    "openinference-instrumentation-dspy>=0.1.39,<0.2.0",
     "opentelemetry-instrumentation-fastapi>=0.65b0",
     "langgraph>=1.0.0,<2.0.0",
     "openai>=1.68.2,<2.55.0", # cap re-verified against openai 2.43.0 (2.8+ historically called model_dump(by_alias=None) which pydantic-core rejected)
@@ -100,9 +100,9 @@ examples = [
     "python-dotenv==1.2.2",
     "streamlit>=1.61.1,<2.0.0",
     "uvicorn>=0.38.0,<0.53.0",
-    "json-repair>=0.42.0",
+    "json-repair>=0.63.0",
     "openinference-instrumentation-openai>=0.1.30",
-    "opentelemetry-instrumentation-langchain>=0.40.4",
+    "opentelemetry-instrumentation-langchain>=0.62.3",
     "openinference-instrumentation-litellm>=0.1.36",
     "pandas>=2.2.3",
     "fonttools>=4.63.0",  # security: CVE-2025-66034 (#328)

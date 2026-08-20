@@ -382,11 +382,11 @@ wheels = [
 
 [[package]]
 name = "coolname"
-version = "2.2.0"
+version = "5.0.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/c5/c6/1eaa4495ff4640e80d9af64f540e427ba1596a20f735d4c4750fe0386d07/coolname-2.2.0.tar.gz", hash = "sha256:6c5d5731759104479e7ca195a9b64f7900ac5bead40183c09323c7d0be9e75c7", size = 59006, upload-time = "2023-01-09T14:50:41.724Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fe/45/deae12f31934301a488df985880240a200119aca2e4b5ceba71d73bc5e86/coolname-5.0.0.tar.gz", hash = "sha256:594bc6c98ebc75ddd51c0ce10efbb5d2556c14eac60b5b36900dfdd5db20eecf", size = 45800, upload-time = "2026-04-23T06:04:50.824Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1b/b1/5745d7523d8ce53b87779f46ef6cf5c5c342997939c2fe967e607b944e43/coolname-2.2.0-py2.py3-none-any.whl", hash = "sha256:4d1563186cfaf71b394d5df4c744f8c41303b6846413645e31d31915cdeb13e8", size = 37849, upload-time = "2023-01-09T14:50:39.897Z" },
+    { url = "https://files.pythonhosted.org/packages/97/35/cf824e535233c432048bd7455b28808776471ab5861375772b2c98ea4cbd/coolname-5.0.0-py3-none-any.whl", hash = "sha256:b86eea9670aa0620965167d1bfadfe654fabec839a5b51e8da611c4a64f86192", size = 47368, upload-time = "2026-04-23T06:04:49.374Z" },
 ]
 
 [[package]]
@@ -1026,12 +1026,12 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "attrs", specifier = ">=26.1.0" },
-    { name = "coolname", specifier = ">=2.2.0" },
+    { name = "coolname", specifier = ">=5.0.0" },
     { name = "deprecated", specifier = ">=1.2.18" },
     { name = "dspy-ai", marker = "extra == 'dspy'", specifier = ">=3.3.0,<4" },
     { name = "factory-boy", marker = "extra == 'tests'", specifier = ">=3.3.0,<4.0.0" },
     { name = "httpx", specifier = ">=0.27.0" },
-    { name = "langchain-core", marker = "extra == 'langchain'", specifier = ">=0.3.0,<2.0.0" },
+    { name = "langchain-core", marker = "extra == 'langchain'", specifier = ">=1.5.4,<2.0.0" },
     { name = "litellm", marker = "extra == 'litellm'", specifier = ">=1.96.0" },
     { name = "nanoid", specifier = ">=2.0.0,<3.0.0" },
     { name = "openinference-instrumentation-haystack", specifier = ">=0.1.20" },
@@ -1066,25 +1066,25 @@ examples = [
     { name = "faiss-cpu", specifier = ">=1.15.0,<2.0.0" },
     { name = "fastapi", specifier = ">=0.141.1" },
     { name = "fonttools", specifier = ">=4.63.0" },
-    { name = "haystack-ai", specifier = ">=2.13.2,<4.0.0" },
-    { name = "json-repair", specifier = ">=0.42.0" },
+    { name = "haystack-ai", specifier = ">=3.0.0,<4.0.0" },
+    { name = "json-repair", specifier = ">=0.63.0" },
     { name = "jupyter", specifier = ">=1.1.1,<2.0.0" },
     { name = "jupyterlab", specifier = ">=4.6.3" },
     { name = "langchain", specifier = ">=1.0.0,<2.0.0" },
     { name = "langchain-community", specifier = ">=0.4.2,<1.0.0" },
     { name = "langchain-google-vertexai", specifier = ">=2.0.0,<4.0.0" },
-    { name = "langchain-openai", specifier = ">=1.1.14,<2.0.0" },
+    { name = "langchain-openai", specifier = ">=1.4.3,<2.0.0" },
     { name = "langchain-text-splitters", specifier = ">=1.1.2,<2.0.0" },
     { name = "langgraph", specifier = ">=1.0.0,<2.0.0" },
     { name = "langsmith", specifier = ">=0.10.18" },
     { name = "litellm", specifier = ">=1.96.0" },
     { name = "nltk", specifier = ">=3.10.2" },
     { name = "openai", specifier = ">=1.68.2,<2.55.0" },
-    { name = "openinference-instrumentation-dspy", specifier = ">=0.1.23,<0.2.0" },
+    { name = "openinference-instrumentation-dspy", specifier = ">=0.1.39,<0.2.0" },
     { name = "openinference-instrumentation-litellm", specifier = ">=0.1.36" },
     { name = "openinference-instrumentation-openai", specifier = ">=0.1.30" },
     { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.65b0" },
-    { name = "opentelemetry-instrumentation-langchain", specifier = ">=0.40.4" },
+    { name = "opentelemetry-instrumentation-langchain", specifier = ">=0.62.3" },
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "pydantic", specifier = ">=2.11.0" },
     { name = "pypdf", specifier = ">=6.15.0" },

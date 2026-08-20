@@ -144,8 +144,20 @@ Run tests through the package scripts (`pnpm test:unit`, `pnpm test:component`,
 
 ## Related
 
-- `@langwatch/scenario` (separate repo) is ESM-only from 2.x, because `ai@7`
-  publishes no CommonJS entry point. Any package here that depends on it and
-  still emits CJS will not be able to load it.
+- **`ai@7` publishes no CommonJS entry point, and that is fine.** Its `exports`
+  map carries only `import`/`default`, so `require("ai")` resolves an ES module
+  — which Node loads unflagged from 22.12 on, and `ai@7` already declares
+  `engines.node >=22`. This is load-bearing here, not theoretical:
+  `scripts/build-server.mjs` emits `dist/server/server.cjs` with
+  `format: "cjs"` and keeps third-party packages external, so the app's
+  production entrypoint requires `ai` at runtime today.
+  `@langwatch/scenario` (separate repo) is ESM-only from 2.x for the same
+  upstream reason.
+
+  The one thing that would break this is **top-level await**. If a future `ai`
+  release introduces TLA anywhere in its graph, `require()` throws
+  `ERR_REQUIRE_ASYNC_MODULE`, and only CommonJS consumers see it — on a patch
+  bump. If you own a CJS bundle that requires `ai`, give it a load smoke check
+  so that arrives as a failed build rather than a failed process.
 - [logging-and-tracing.md](logging-and-tracing.md) — how spans reach the collector.
 - [local-observability.md](local-observability.md) — querying them back with `gcx`.
