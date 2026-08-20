@@ -160,7 +160,9 @@ describe("SyncedChatInput", () => {
       renderSyncedChatInput({ tabId: tabId! });
 
       expect(
-        screen.getByPlaceholderText(/type your message/i),
+        screen.getByPlaceholderText(
+          /write the message to run this prompt with/i,
+        ),
       ).toBeInTheDocument();
     });
 
@@ -170,7 +172,9 @@ describe("SyncedChatInput", () => {
 
       renderSyncedChatInput({ tabId: tabId!, inProgress: true });
 
-      const textarea = screen.getByPlaceholderText(/type your message/i);
+      const textarea = screen.getByPlaceholderText(
+        /write the message to run this prompt with/i,
+      );
       // Textarea should remain enabled during AI response so user can type their next message
       expect(textarea).not.toBeDisabled();
     });
@@ -181,7 +185,9 @@ describe("SyncedChatInput", () => {
 
       renderSyncedChatInput({ tabId: tabId! });
 
-      const textarea = screen.getByPlaceholderText(/type your message/i);
+      const textarea = screen.getByPlaceholderText(
+        /write the message to run this prompt with/i,
+      );
       expect(textarea).toHaveAttribute("data-tab-id", tabId);
     });
   });

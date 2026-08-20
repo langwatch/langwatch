@@ -31,9 +31,9 @@ Feature: Prompt playground surface hierarchy
     Then the prompts list marks "summariser" as selected
 
   @integration
-  Scenario: The sub-tab bar closes with a hairline in both layouts
+  Scenario: The conversation's bar closes with a hairline in both layouts
     When I view a prompt in the playground
-    Then the Conversation / Variables / Parameters bar draws a rule along its bottom
+    Then the bar above the conversation draws a rule along its bottom
     And it draws that rule whether the panes sit side by side or stacked
 
   @integration
@@ -43,6 +43,6 @@ Feature: Prompt playground surface hierarchy
     And no rule runs between that tab and the prompt below it
 
   @integration
-  Scenario: The drag divider sits above the sub-tab bar when the panes are stacked
+  Scenario: The drag divider sits above the conversation's bar when the panes are stacked
     When I view a prompt with the editor stacked above the conversation
-    Then the handle that resizes the prompt sits between the prompt and the tab bar
+    Then the handle that resizes the prompt sits between the prompt and that bar
