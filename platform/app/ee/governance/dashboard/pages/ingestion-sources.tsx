@@ -192,7 +192,7 @@ function resolvePullConfig(
     databricks_genie: [
       () => buildDatabricksGeniePullConfig(composer),
       "Missing required Databricks fields",
-      "Workspace URL and workspace token are both required.",
+      "Workspace URL is required, plus a way to sign in: either a workspace token, or a service principal's client ID and secret together.",
     ],
     anthropic_admin: [
       () => buildAnthropicAdminPullConfig(composer),
@@ -1241,8 +1241,23 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       key: "credentialsToken",
       label: "Workspace token",
       placeholder: "dapi...",
-      hint: "A personal access token or OAuth token for a service principal holding Can Manage on every Genie space you want covered. Read access is not enough — Databricks only returns other people's conversations to a token that can manage the space, so a weaker token records nothing and reports no error. We encrypt this server-side.",
-      required: true,
+      hint: "A personal access token or OAuth token for a service principal holding Can Manage on every Genie space you want covered. Read access is not enough — Databricks only returns other people's conversations to a token that can manage the space, so a weaker token records nothing and reports no error. Databricks expires these about an hour after issuing them, so give a client id and secret below instead if this source runs on a schedule. We encrypt this server-side.",
+      secret: true,
+    },
+    {
+      // Both named `credentials*` for the same reason as the token above:
+      // that prefix is what routes a field into the encrypted subtree.
+      key: "credentialsClientId",
+      label: "Service principal client ID",
+      placeholder: "0a1b2c3d-4e5f-6789-abcd-ef0123456789",
+      hint: "Give this and the secret below instead of a workspace token, and the source signs in for itself at the start of every run. A pasted token expires about an hour after Databricks issues it, which is fine for a one-off but leaves a scheduled source dead by the next morning.",
+      secret: true,
+    },
+    {
+      key: "credentialsClientSecret",
+      label: "Service principal secret",
+      placeholder: "dose...",
+      hint: "The OAuth secret for that service principal. It needs the same Can Manage on every Genie space you want covered. We encrypt this server-side. If you also fill in a workspace token above, the token is used and this is ignored.",
       secret: true,
     },
     {
@@ -1250,6 +1265,12 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       label: "Genie space IDs (optional)",
       placeholder: "Leave empty to cover every space the token can see",
       hint: "Comma-separated. Empty is the usual setting — new spaces are then covered the day someone creates them.",
+    },
+    {
+      key: "warehouseId",
+      label: "SQL warehouse ID (optional)",
+      placeholder: "095eb666b2ed2762",
+      hint: "Any warehouse this credential can run a query on. It is where the billing lookup itself runs — NOT the warehouse being priced, which is every warehouse the questions used. Set it to attribute the compute behind each question to the person who asked; leave it empty and questions are recorded at zero cost, which is what Genie itself charges. Naming one makes every run submit a query, so a stopped warehouse is started and billed on the source's schedule. The token additionally needs SELECT on the `system` catalogue, which only a metastore admin can grant — without it questions are still recorded, without cost. The figure is a share of the hourly bill at list prices, so it is an estimate, not the invoice.",
     },
   ],
   s3_custom: [
@@ -1559,8 +1580,9 @@ function buildDatabricksGeniePullConfig(
 ): Record<string, unknown> | null {
   const p = c.parserConfig;
   const workspaceUrl = (p.workspaceUrl ?? "").trim().replace(/\/+$/, "");
-  const token = (p.credentialsToken ?? "").trim();
-  if (!workspaceUrl || !token) return null;
+  const credentials = genieCredentialsFrom(p);
+  const warehouseId = (p.warehouseId ?? "").trim();
+  if (!workspaceUrl || !credentials) return null;
 
   return {
     adapter: "databricks_genie",
@@ -1575,8 +1597,35 @@ function buildDatabricksGeniePullConfig(
       c.pullSchedule.trim() ||
       PULL_SCHEDULE_DEFAULTS.databricks_genie ||
       "*/15 * * * *",
-    credentials: { token },
+    // Omitted rather than sent empty: the adapter reads "no warehouse named" as
+    // "do not price these questions", and an empty string is a warehouse id it
+    // would then ask the workspace about.
+    ...(warehouseId ? { warehouseId } : {}),
+    credentials,
   };
+}
+
+/**
+ * The credential subtree for a Genie source, holding only what was actually
+ * given: an empty string is not a credential, and sending one would make the
+ * adapter prefer a token that does not exist. Null when neither way of
+ * signing in is complete — half of the service principal pair is not one,
+ * and accepting it would save a source that cannot run.
+ */
+function genieCredentialsFrom(
+  p: Record<string, string>,
+): Record<string, string> | null {
+  const token = (p.credentialsToken ?? "").trim();
+  const clientId = (p.credentialsClientId ?? "").trim();
+  const clientSecret = (p.credentialsClientSecret ?? "").trim();
+
+  const credentials: Record<string, string> = {};
+  if (token) credentials.token = token;
+  if (clientId && clientSecret) {
+    credentials.clientId = clientId;
+    credentials.clientSecret = clientSecret;
+  }
+  return Object.keys(credentials).length > 0 ? credentials : null;
 }
 
 function ParserConfigFields({
@@ -1685,7 +1734,10 @@ const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
     // winning the merge would fail the adapter's `.datetime()` check at
     // pull time.
     anthropic_admin: ["report", "bucketWidth", "startingAt"],
-    databricks_genie: ["workspaceUrl", "spaceIds"],
+    // `warehouseId` is here because the builder DROPS it when empty. Left to
+    // the merge, the raw form value would persist `warehouseId: ""`, which the
+    // adapter reads as a warehouse to go ask the workspace about.
+    databricks_genie: ["workspaceUrl", "spaceIds", "warehouseId"],
   };
 
 // Skip sentinel for a parserConfig entry that must not be persisted, kept
