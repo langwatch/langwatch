@@ -59,7 +59,18 @@ Sanitize before you commit: production traces can carry names, emails, account d
 
 Make the fix on a branch: prompt edits (versioned through the `prompts` skill when prompts are managed in LangWatch), retrieval or tool-code changes, guardrails. The PR description must tell the whole story: observation, hypothesis, evidence links, what changed, and which scenario test proves it. The user reviews and merges; you never push to main.
 
-Before any prompt edit, read the trace of the failing run (it shows the assembled input and every tool call) and check the fix is not cheaper at another layer: tool configuration, code path, or knowledge content. When the prompt IS the right layer, fix the class of failure with one general principle, never by pasting the failing conversation or a rule per failing test; then re-run the tests with varied inputs to prove the fix generalizes. After the suite is green, refactor under green: merge overlapping prompt rules, delete rules the new principle covers, and re-run. Report the prompt's size change in the PR the way you would report a bundle size. No universal playbook can say "for X, fix Y" for all setups: the harness, codebase and model you run on define the levers, so let them refine these rules. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
+Pick the layer before you edit, and report the prompt's size change in the PR:
+
+A failing test tells you WHERE the agent fails, not that the prompt is where to fix it. One more rule is the cheapest edit that turns it green, and a prompt maintained that way overfits: it passes exactly the cases it was patched against and degrades everywhere else.
+
+1. **Diagnose the layer.** Five can own a failure: the harness (tools, permissions, context assembly), the model, the knowledge (skills, docs, retrieval), the prompt, or the test itself. The prompt is the last resort. If the fix is "never use tool X", remove tool X from the configuration. Diagnose from the failing run's trace: it holds the assembled input and every tool call.
+2. **Fix the class, not the transcript.** State the one principle that makes the whole class impossible. Never paste the failing conversation into the prompt. If you cannot name the class, keep diagnosing.
+3. **Prove it generalizes.** Re-run with varied wording. The simulator improvises, so a fix that survives one phrasing was a patch for that phrasing.
+4. **Pair each prohibition with an overshoot test.** A "decline out-of-scope requests" rule needs a greeting scenario that fails if the agent declines a greeting.
+5. **Refactor under green.** Merge overlapping rules, delete what a newer principle covers, re-run. Track prompt size like bundle size: pass rate holds while the prompt trends down.
+6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
+
+Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
 
 ### Capture production signals with evaluators and monitors
 

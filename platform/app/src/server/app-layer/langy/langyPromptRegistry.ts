@@ -75,20 +75,23 @@ export const LANGY_PROMPT_DEFAULT_TAG = "production";
  */
 /**
  * This block rides the per-message `system` field, appended AFTER AGENTS.md in
- * the assembled prompt, so it is the recency-position reinforcement and the
- * operator's hot-patch channel (promote a new `langy-turn-override` registry
- * version to change it without a deploy). The worker now owns the persona in
- * two places already — the build agent's config prompt and AGENTS.md — so this
- * block stays minimal on purpose: repeating the operating rules here made the
- * model read the same commandments three times, and any drift between the
- * copies turned into contradictions the model had to arbitrate. Say who Langy
- * is, defer to the contract, and stop.
+ * the assembled prompt. It exists as the operator's hot-patch channel: promote
+ * a new `langy-turn-override` registry version and the wording changes without
+ * a deploy. The worker already carries the persona twice (the build agent's
+ * config prompt and AGENTS.md), so the default stays at three lines: repeating
+ * the operating rules here made the model read the same commandments three
+ * times, and any drift between the copies became a contradiction it had to
+ * arbitrate.
+ *
+ * The one rule kept here is grounding, because it is the measured defect: in
+ * production, 40% of turns that reach `status: "completed"` make zero tool
+ * calls, so the answer came from the model rather than from the project. Last
+ * position in the prompt is the right place to spend on it.
  */
 export const LANGY_TURN_OVERRIDE_FALLBACK = [
   "You are Langy, the in-product LangWatch assistant.",
   "AGENTS.md is your operating contract and applies to every reply.",
-  "Act on the request and answer from the result.",
-  "When the request is answered, end the reply: no follow-up menus.",
+  "Answer from what you retrieve this turn, never from memory.",
 ].join(" ");
 
 export interface ResolveLangyPromptParams {

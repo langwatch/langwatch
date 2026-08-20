@@ -149,11 +149,18 @@ Create reusable criteria for your domain:
 
 1. Run boundary scenarios first to verify basic compliance
 2. Run red team tests to verify adversarial resilience
-3. When a test fails, find the layer that owns the failure before you edit anything: the agent's tool configuration, its code path, its knowledge content, its prompt, or the test itself. Read the trace of the failing run first, since it shows the assembled input (system prompt, injected tool schemas, retrieved context) and every tool call. The prompt is the last resort, not the first. If the fix is "the agent must never do X", prefer removing the capability in configuration over writing a rule about it
-4. Fix the class of failure, never the failing conversation. Do not paste the failing transcript into the system prompt: state the one general principle that makes the whole class impossible, then re-run with varied wording to prove the fix is not tied to the exact phrasing that failed
-5. Pair every new boundary rule with a scenario for the nearby legitimate request, so the fix cannot silently turn into over-refusal of what the agent should answer
-6. When all tests pass, refactor under green: merge overlapping prompt rules, delete rules a newer principle already covers, and re-run everything. Track the prompt's size across changes; a compliance prompt that only ever grows is accumulating patches, not protection
-7. Treat these steps as a starting point: no universal playbook can say "for X, fix Y" for all setups. Your harness, codebase and model define which levers exist and what a clean fix looks like on each
+3. When a test fails, follow the ladder below. A compliance prompt that only ever grows is accumulating patches, not protection
+
+A failing test tells you WHERE the agent fails, not that the prompt is where to fix it. One more rule is the cheapest edit that turns it green, and a prompt maintained that way overfits: it passes exactly the cases it was patched against and degrades everywhere else.
+
+1. **Diagnose the layer.** Five can own a failure: the harness (tools, permissions, context assembly), the model, the knowledge (skills, docs, retrieval), the prompt, or the test itself. The prompt is the last resort. If the fix is "never use tool X", remove tool X from the configuration. Diagnose from the failing run's trace: it holds the assembled input and every tool call.
+2. **Fix the class, not the transcript.** State the one principle that makes the whole class impossible. Never paste the failing conversation into the prompt. If you cannot name the class, keep diagnosing.
+3. **Prove it generalizes.** Re-run with varied wording. The simulator improvises, so a fix that survives one phrasing was a patch for that phrasing.
+4. **Pair each prohibition with an overshoot test.** A "decline out-of-scope requests" rule needs a greeting scenario that fails if the agent declines a greeting.
+5. **Refactor under green.** Merge overlapping rules, delete what a newer principle covers, re-run. Track prompt size like bundle size: pass rate holds while the prompt trends down.
+6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
+
+Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
 
 ## Common Mistakes
 
@@ -161,4 +168,4 @@ Create reusable criteria for your domain:
 - Do NOT skip multi-turn escalation scenarios. Single-turn tests miss persistence attacks
 - Do NOT use weak criteria like "agent is helpful". Be specific about what it must NOT do
 - Do NOT forget to test the "empathetic but firm" response. The agent should show care while maintaining boundaries
-- Do NOT respond to every failing test with another system-prompt rule. A prompt patched once per failure overfits: it passes exactly those tests and degrades the agent everywhere else. See [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent)
+- Do NOT respond to every failing test with another system-prompt rule. A prompt patched once per failure passes exactly those tests and degrades the agent everywhere else

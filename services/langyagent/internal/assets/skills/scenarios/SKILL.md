@@ -18,7 +18,7 @@ If the user's request is **general** ("add scenarios", "test my agent"):
 - Study git history to understand what changed and why: focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Generate comprehensive coverage (happy path, edge cases, error handling)
 - For conversational agents, include multi-turn scenarios, because that's where the interesting edge cases live (context retention, topic switching, recovery from misunderstandings)
-- ALWAYS run the tests after writing them. If they fail, first decide which side is wrong. Change the test only when you have evidence that its criteria or its fixture are wrong; otherwise the agent is what needs the fix (see Improving the Agent When a Scenario Fails below before touching the agent's prompt). A scenario that goes green because its assertions got weaker has tested nothing.
+- ALWAYS run the tests after writing them. If they fail, first decide which side is wrong. Change the test only when you have evidence that its criteria or its fixture are wrong; otherwise the agent is what needs the fix (see Improving the Agent When a Scenario Fails below). A scenario that goes green because its assertions got weaker has tested nothing.
 - After tests are green, transition to consultant mode (see Consultant Mode below) and suggest 2-3 domain-specific improvements.
 
 If the user's request is **specific** ("test the refund flow"):
@@ -49,18 +49,16 @@ Best practices:
 
 ## Improving the Agent When a Scenario Fails
 
-A failing scenario tells you WHERE the agent fails, not that the fix belongs in the system prompt. The cheapest edit that turns a red scenario green is almost always another prompt rule, and a prompt maintained that way overfits: it passes exactly the scenarios it was patched against and degrades everywhere else. Follow this ladder instead:
+A failing test tells you WHERE the agent fails, not that the prompt is where to fix it. One more rule is the cheapest edit that turns it green, and a prompt maintained that way overfits: it passes exactly the cases it was patched against and degrades everywhere else.
 
-1. **Diagnose the layer first.** A failure has five possible owners: the harness (tool surface, permissions, context assembly), the model choice, the knowledge content (skills, docs, retrieval), the prompt instructions, or the scenario itself (ambiguous criteria, a flaky judge). The prompt is the last resort, not the first. If the fix is "the agent must never use tool X", remove tool X from its configuration instead of writing a rule about it.
-2. **Fix the class, never the transcript.** Never paste the failing conversation, or rules quoting it, into the prompt. State the one general principle that makes the whole class of failure impossible. If you cannot name the class, you have not finished diagnosing.
-3. **Prove the class.** Re-run the scenario several times, or with varied wording, before accepting a fix. The simulator improvises, so a fix that only survives one phrasing was a patch for that phrasing.
-4. **Refactor under green.** After the suite passes, merge overlapping prompt rules, delete rules a newer principle covers, and re-run everything: the same discipline as refactoring code under green tests. Track prompt size across changes; pass rate holds or rises while the prompt trends down.
-5. **Pair rules with overshoot scenarios.** Every prohibition needs a scenario for the nearby legitimate case, so a fix cannot silently over-trigger. A "decline out-of-scope requests" rule needs a greeting scenario that fails if the agent declines a greeting.
-6. **Keep the judge independent of the prompt.** Write criteria from user outcomes and verified side effects ("the dataset exists afterward", "the reply contains the count"), never by restating the agent's prompt rules. If the rubric quotes the prompt, passing is circular: you grade obedience, not outcomes.
+1. **Diagnose the layer.** Five can own a failure: the harness (tools, permissions, context assembly), the model, the knowledge (skills, docs, retrieval), the prompt, or the test itself. The prompt is the last resort. If the fix is "never use tool X", remove tool X from the configuration. Diagnose from the failing run's trace: it holds the assembled input and every tool call.
+2. **Fix the class, not the transcript.** State the one principle that makes the whole class impossible. Never paste the failing conversation into the prompt. If you cannot name the class, keep diagnosing.
+3. **Prove it generalizes.** Re-run with varied wording. The simulator improvises, so a fix that survives one phrasing was a patch for that phrasing.
+4. **Pair each prohibition with an overshoot test.** A "decline out-of-scope requests" rule needs a greeting scenario that fails if the agent declines a greeting.
+5. **Refactor under green.** Merge overlapping rules, delete what a newer principle covers, re-run. Track prompt size like bundle size: pass rate holds while the prompt trends down.
+6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
 
-Diagnose from the traces: with a harness, a large part of what the model receives is assembled for you (injected tool schemas, scaffolding, retrieved context), and the trace of the failing run shows that assembled input plus every tool call. Treat the ladder as a starting point rather than a universal playbook: no guide can say "for X, fix Y" for all setups, and an advanced enough codebase and harness already define the standards and levers you can pull for a proper fix. For example, listing which commands and tools exist in AGENTS.md competes with the harness's autoloading tool map that gets injected; that may be valid when additional bias is proven necessary, but it may also be a smell of a harness not properly tuned.
-
-Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
+Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
 
 ## Plan Limits
 
@@ -851,7 +849,7 @@ After delivering initial results, transition to consultant mode to help the user
 
 **Phase 1: read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits because the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
 
-**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run everything and iterate, but stop after two attempts at the same failure and report what is blocking it rather than repeating the run. When a failure needs a change to the agent itself, fix the root cause at the right layer (tools, code, knowledge, then prompt, in that order) and fix the class of failure, never by patching a rule per failing test into the system prompt. Show the user what works.
+**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run everything and iterate, but stop after two attempts at the same failure and report what is blocking it rather than repeating the run. Show the user what works.
 
 **Phase 3: go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue. Add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
 
@@ -866,7 +864,7 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - Do NOT write a `main.py` / `run_scenarios.py` / custom runner that loops over scenarios. Each scenario IS a test (`it(...)` / `async def test_*`). Run them with `pytest` or `vitest`. The test runner already gives you parallelism, retries of just the failing case, watch mode, CI integration, and per-test timeouts; a runner script re-implements all of that and ships with none of it wired up.
 - Do NOT invent a JSON / YAML / TOML "scenario DSL" with keys like `{ "name": ..., "description": ..., "criteria": [...] }` and then load it into a generic loop. The whole point of Scenario being code is that each test is real code: you can use `for`, `if`, parametrize (`@pytest.mark.parametrize`, `it.each(...)`), pull a fixture, call a helper to mint a session, branch by environment, share setup via a `conftest.py`, mock a tool inline, none of which a DSL gives you. The moment a teammate needs a new edge case ("only on Tuesdays the agent should escalate"), the DSL grows another key, then another, until it's a worse version of Python/TypeScript with none of the tooling. If the same boilerplate repeats across scenarios, extract a helper FUNCTION that returns an `AgentAdapter` / a built `UserSimulatorAgent` / a script tuple, and keep each scenario its own test case so it stays grep-able and debuggable.
 - Do NOT use regex or word matching to evaluate responses. Always use `JudgeAgent` natural-language criteria
-- Do NOT fix a failing scenario by pasting new rules, or the failing conversation itself, into the agent's system prompt. Diagnose the layer first and fix the class of failure (see Improving the Agent When a Scenario Fails)
+- Do NOT fix a failing scenario by pasting new rules, or the failing conversation itself, into the agent's system prompt (see Improving the Agent When a Scenario Fails)
 - Do NOT write judge criteria by restating the agent's system prompt. Criteria describe user outcomes; a rubric that quotes the prompt grades obedience, not quality
 - Do NOT forget `@pytest.mark.asyncio` and `@pytest.mark.agent_test` (Python)
 - Do NOT forget a generous timeout (e.g. `30_000` ms) for TypeScript tests

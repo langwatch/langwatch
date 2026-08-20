@@ -1,15 +1,16 @@
 /**
- * Reusable LLM-judge criteria for Langy — the "evaluator" side of dogfooding.
+ * Reusable LLM-judge criteria for Langy: the "evaluator" side of dogfooding.
  *
  * These grade OUTCOMES a user would notice: whether the question got answered,
  * whether the answer is grounded in the project's real data, and whether the
  * reply reads well in the panel. They deliberately do NOT restate Langy's own
- * prompt rules — grading the prompt's rules back at the agent is circular (the
- * suite would measure obedience, not quality, and every prompt change would
- * need a matching criteria change). Layer 2 REST checks in the tests verify
- * side effects; these criteria carry the conversation-quality half.
+ * prompt rules, because grading the prompt's rules back at the agent is
+ * circular: the suite would measure obedience, not quality, and every prompt
+ * change would need a matching criteria change. Layer 2 REST checks in the
+ * tests verify side effects; these criteria carry the conversation-quality
+ * half.
  *
- * Kept in one module so every scenario file shares the SAME rubric — and so
+ * Kept in one module so every scenario file shares the SAME rubric, and so
  * the same criteria can seed a saved `langevals/llm_boolean` Evaluator against
  * Langy's own traces (see e2e/langy/README.md "Rule-adherence evaluator").
  */
@@ -25,12 +26,12 @@ export const LANGY_DECISIVENESS_CRITERION =
 
 /** The always-on outcome rubric every Langy answer is graded against. */
 export const LANGY_CORE_RULE_CRITERIA = [
-  "Langy answers the user's actual question with concrete results from their project (real counts, names, findings, or a clear empty result) — not with a plan, a capability list, or a description of what it is about to do. When the platform refuses the action over permissions, the refusal stated plainly with a real path forward IS the concrete answer.",
-  "Numbers, names, and ids in the reply come from what was actually retrieved; nothing is invented or estimated when the real value was available. Judge this against the conversation itself (the tool results and cards visible in the transcript): an id contradicting that visible evidence fails, but do not demand proof from telemetry, spans, or any source outside the conversation.",
+  "Langy answers the user's actual question with concrete results from their project (real counts, names, findings, or a clear empty result), not with a plan, a capability list, or a description of what it is about to do. When the platform refuses the action over permissions, that refusal stated plainly with a real path forward IS the concrete answer.",
+  "Every claim about the user's project traces back to something retrieved in this conversation. Judge against the transcript itself (the tool results and cards visible in it): a number, name or id contradicting that visible evidence fails, and so does an answer about the project with no retrieval behind it at all, however plausible it sounds. Do not demand proof from telemetry, spans, or any source outside the conversation.",
   LANGY_DECISIVENESS_CRITERION,
-  "The reply reads as the answer, not as a work log: no filler openers, no raw JSON or stack traces pasted into prose, no play-by-play of the commands it ran. A fenced code block tagged langy-card is the product's own UI (it renders as a real card, not as JSON) and is not a violation by itself. Offering a next step is fine only once the asked question is fully answered: an offer or menu that stands in for the answer, or buries it, is a failure.",
-  "Every reply ends with visible text for the user — a turn whose actions succeeded but whose reply is empty is a failure.",
-  "The reply's length matches the question: compact for a lookup, complete for an analysis or diagnosis — nothing padded, and nothing the user asked for missing.",
+  "The reply reads as the answer, not as a work log: no filler openers, no raw JSON or stack traces in prose, no play-by-play of the commands it ran. A fenced code block tagged langy-card is the product's own UI (it renders as a real card) and is not a violation. Offering a next step is fine once the question is fully answered; an offer that stands in for the answer, or buries it, is a failure.",
+  "Every reply ends with visible text for the user. A turn whose actions succeeded but whose reply is empty is a failure.",
+  "The reply's length matches the question: compact for a lookup, complete for an analysis or diagnosis. Nothing padded, and nothing the user asked for missing.",
 ];
 
 /**
@@ -64,32 +65,32 @@ export const LANGY_ACTIVITY_OVERVIEW_CRITERIA = [
 /** Criteria specific to a failed-trace investigation flow. */
 export const LANGY_FAILING_TRACES_CRITERIA = [
   "Langy reports on failed/errored traces (a count, the failing traces, or a clear 'no failures' result).",
-  "If asked to also do a follow-up step (summarise, group, or explain the failures), Langy completes that step too — it does not stop after the search.",
+  "If asked to also do a follow-up step (summarise, group, or explain the failures), Langy completes that step too. It does not stop after the search.",
   ...LANGY_CORE_RULE_CRITERIA,
 ];
 
 /** Criteria specific to the GitHub "open a PR" flow (the github internal skill). */
 export const LANGY_OPEN_PR_CRITERIA = [
   "Langy attempts to open a real pull request (clone/branch/commit/push/PR), or clearly reports the concrete blocker (e.g. the GitHub App is not installed for this org).",
-  "Langy does NOT ask the user for a GitHub token or tell them to run `gh auth login` — the installation token is already provisioned.",
+  "Langy does NOT ask the user for a GitHub token or tell them to run `gh auth login`. The installation token is already provisioned.",
   "If a PR was opened, the reply carries its URL. If the platform blocked the flow (GitHub App not installed for the project), naming that blocker IS the passing outcome and no URL is expected.",
   ...LANGY_CORE_RULE_CRITERIA,
 ];
 
 /**
- * Criteria for the ambiguous "make me an eval" flow — the ONE flow where a
+ * Criteria for the ambiguous "make me an eval" flow, the ONE flow where a
  * question is required rather than wrong: which kind of evaluation gets built
  * decides what gets tested, so the choice is the user's. The decisiveness
  * criterion is excluded by identity and replaced with its inverse for the
  * first turn. Everything downstream of the answer is still Langy's to carry
- * alone — including fixing a rejected type slug from the error's own expected
+ * alone, including fixing a rejected type slug from the error's own expected
  * list instead of bouncing it back to the user.
  */
 export const LANGY_EVAL_CREATION_CRITERIA = [
-  "On the first turn, Langy asks ONE short question distinguishing a batch experiment (offline, runs against a dataset) from an online evaluator (scores live production traffic) — and creates NOTHING until the user answers.",
+  "On the first turn, Langy asks ONE short question distinguishing a batch experiment (offline, runs against a dataset) from an online evaluator (scores live production traffic), and creates NOTHING until the user answers.",
   "Langy does not run any create command (evaluator, monitor, or experiment) before the user has answered the experiment-vs-evaluator question.",
-  "After the user answers, Langy runs the matching create. A batch answer ends with a successful creation naming the thing created. A live answer ends with the evaluator created, and the monitor either created or refused by the platform over permissions with Langy stating that refusal and the user's next step in one line — a silent stop or an unexplained drop of the request fails this.",
-  "If a create is rejected over an invalid field value and the error names the accepted values, Langy corrects that exact field from the error's expected list and retries once within the same turn — it never asks the user to pick a type slug and never abandons the create over a fixable field.",
+  "After the user answers, Langy runs the matching create. A batch answer ends with a successful creation naming the thing created. A live answer ends with the evaluator created, and the monitor either created or refused by the platform over permissions with Langy stating that refusal and the user's next step in one line. A silent stop or an unexplained drop of the request fails this.",
+  "If a create is rejected over an invalid field value and the error names the accepted values, Langy corrects that exact field from the error's expected list and retries once within the same turn. It never asks the user to pick a type slug and never abandons the create over a fixable field.",
   ...LANGY_CORE_RULE_CRITERIA.filter(
     (criterion) => criterion !== LANGY_DECISIVENESS_CRITERION,
   ),

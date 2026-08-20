@@ -118,12 +118,12 @@ describe("resolveLangyPrompt", () => {
     });
 
     // The worker already reads the persona in the agent's config prompt and
-    // the operating rules in AGENTS.md. This block is the recency-position
-    // reinforcement and the operator hot-patch channel; when it also repeated
-    // the rules, the model read the same commandments three times and drift
-    // between the copies became contradictions. Keep it sentence-scale.
+    // the operating rules in AGENTS.md. This block is the operator hot-patch
+    // channel; when it also repeated the rules, the model read the same
+    // commandments three times and drift between the copies became
+    // contradictions. Keep it sentence-scale.
     it("stays a pointer, not a third copy of the rules", () => {
-      expect(LANGY_TURN_OVERRIDE_FALLBACK.length).toBeLessThan(400);
+      expect(LANGY_TURN_OVERRIDE_FALLBACK.length).toBeLessThan(300);
     });
   });
 });

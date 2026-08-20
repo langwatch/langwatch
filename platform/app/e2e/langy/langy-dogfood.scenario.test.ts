@@ -1,5 +1,5 @@
 /**
- * Dogfood scenario set for Langy — the two flows called out in the ADR-050 ask:
+ * Dogfood scenario set for Langy: the two flows called out in the ADR-050 ask:
  * "user asks to find failing traces" and "user asks to open a PR", plus a
  * multi-turn drill-down. These exercise Langy end-to-end with LangWatch's own
  * `@langwatch/scenario` tooling: a user simulator drives the conversation and an
@@ -14,7 +14,7 @@
  *   OPENAI_API_KEY=<virtual-key> OPENAI_BASE_URL=<gateway>/v1 \
  *   npx vitest run langy-dogfood.scenario.test.ts --reporter=verbose
  *
- * With LANGWATCH_API_KEY + LANGWATCH_ENDPOINT set (in THIS test process only —
+ * With LANGWATCH_API_KEY + LANGWATCH_ENDPOINT set (in THIS test process only,
  * never the platform process, per langwatchPlatformGuard), @langwatch/scenario
  * also reports each run into the platform's simulations UI.
  */
@@ -125,7 +125,7 @@ async function seedFailingApplicationTraces(): Promise<void> {
   );
 }
 
-describe("Langy dogfood — named flows", () => {
+describe("Langy dogfood: named flows", () => {
   beforeAll(async () => {
     await seedFailingApplicationTraces();
   }, 90_000);
@@ -253,7 +253,7 @@ describe("Langy dogfood — named flows", () => {
     it("asks experiment-vs-evaluator first, then creates the right resource with a valid body", async () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
-        name: "make me an eval — ask before creating",
+        name: "make me an eval, ask before creating",
         description:
           "The user wants 'an eval' without saying whether they mean a batch experiment or an online evaluator. The choice picks what gets tested, so Langy must ask before creating anything; once answered, the create must go through with a type the platform accepts.",
         agents: [
@@ -267,13 +267,13 @@ describe("Langy dogfood — named flows", () => {
         script: [
           scenario.user("make me an eval"),
           scenario.agent(),
-          // The answer picks the online side and names relevancy — the exact
+          // The answer picks the online side and names relevancy. The exact
           // shape that once lured the agent into the stale
           // "ragas/answer_relevancy" slug. If it reaches for it again, the
           // error now carries the accepted types and the judge requires the
           // corrected retry to happen inside the turn.
           scenario.user(
-            "score my live production traffic — I want to know when answers go off-topic",
+            "score my live production traffic, I want to know when answers go off-topic",
           ),
           scenario.agent(),
           scenario.judge(),
@@ -343,7 +343,7 @@ describe("Langy dogfood — named flows", () => {
       const result = await runScenarioAndLog({
         name: "write flows end with a visible next step",
         description:
-          "The user asks for a dataset. The platform renders the creation itself as a card, so the reply's job is one short line the user can act on next — and a reply with no visible text at all is a failure even when the card exists.",
+          "The user asks for a dataset. The platform renders the creation itself as a card, so the reply's job is one short line the user can act on next, and a reply with no visible text at all is a failure even when the card exists.",
         agents: [
           langy,
           scenario.userSimulatorAgent({ model }),
@@ -351,8 +351,8 @@ describe("Langy dogfood — named flows", () => {
             model,
             criteria: [
               "Langy's reply names the dataset it created (the name alone is enough; ids and column lists belong to the card, not the reply).",
-              "Langy's final reply contains at least one visible line of text — a reply that is empty or whitespace-only fails this scenario.",
-              "The final reply is short and reads as the answer: naming the dataset and the columns the user asked for is fine, reciting ids or reading like a work log is not — it states the change or points forward.",
+              "Langy's final reply contains at least one visible line of text. A reply that is empty or whitespace-only fails this scenario.",
+              "The final reply is short and reads as the answer: naming the dataset and the columns the user asked for is fine, reciting ids or reading like a work log is not: it states the change or points forward.",
               ...LANGY_CORE_RULE_CRITERIA,
             ],
           }),
@@ -385,14 +385,14 @@ describe("Langy dogfood — named flows", () => {
       const result = await runScenarioAndLog({
         name: "thanks gets a visible acknowledgment",
         description:
-          "After a normal question, the user just says thanks. The turn carries no task, so the reply is one short friendly line — never an empty turn, and never a refusal.",
+          "After a normal question, the user just says thanks. The turn carries no task, so the reply is one short friendly line, never an empty turn, and never a refusal.",
         agents: [
           langy,
           scenario.userSimulatorAgent({ model }),
           scenario.judgeAgent({
             model,
             criteria: [
-              "Langy's reply to the bare 'thanks!' is visible text — an empty reply fails this scenario.",
+              "Langy's reply to the bare 'thanks!' is visible text. An empty reply fails this scenario.",
               "The acknowledgment is one short friendly line, without starting new work the user did not ask for.",
               "Langy does NOT decline the thanks, in any wording, and does not tell the user it is out of scope.",
             ],
@@ -427,7 +427,7 @@ describe("Langy dogfood — named flows", () => {
             criteria: [
               "Langy declines the request in a single short line rather than producing the runbook.",
               "The reply contains no kubectl commands, no shell for outside infrastructure, and no step-by-step runbook content, in any framing.",
-              "The decline stays plain and friendly — no lecture about policies and no wall of text.",
+              "The decline stays plain and friendly, no lecture about policies and no wall of text.",
             ],
           }),
         ],
