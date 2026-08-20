@@ -3,24 +3,23 @@
  *
  * The compiler was enabled under Next.js and lost in the migration to Vite
  * (#3170) with nothing failing. So this reads the real vite config rather than
- * a fixture, and runs the real preset through Babel rather than asserting the
- * config's source text — a string check would have passed for the entire
- * period the compiler was not running.
+ * a fixture, and runs the real transformer rather than asserting the config's
+ * source text — a string check would have passed for the entire period the
+ * compiler was not running.
  *
  * Spec: specs/setup/react-compiler.feature
  */
-import { transformAsync } from "@babel/core";
-import { reactCompilerPreset } from "@vitejs/plugin-react";
+import { transform } from "oxc-transform-react";
 import type { Plugin } from "vite";
 import { describe, expect, it } from "vitest";
 
 import viteConfig from "../vite.config";
 
-const BABEL_PLUGIN_NAME = "@rolldown/plugin-babel";
+const COMPILER_PLUGIN_NAME = "vite:react-compiler";
 
 /**
  * The config's plugin list, flattened and settled. Vite accepts nested arrays
- * and promises in `plugins`, and the compiler pass is one of the promises.
+ * and promises in `plugins`.
  */
 const resolvedPluginNames = async (): Promise<string[]> => {
   const config = await viteConfig({ command: "build", mode: "production" });
@@ -30,18 +29,11 @@ const resolvedPluginNames = async (): Promise<string[]> => {
     .map((plugin) => plugin.name);
 };
 
-/** Runs the preset the vite config ships, over one component's source. */
-const compile = async (source: string): Promise<string> => {
-  const preset = reactCompilerPreset();
-  const result = await transformAsync(source, {
-    filename: "Component.tsx",
-    presets: [preset.preset()],
-    parserOpts: { plugins: ["jsx", "typescript"] },
-    configFile: false,
-    babelrc: false,
+/** Runs the transformer the vite config ships, over one component's source. */
+const compile = (source: string) =>
+  transform("Component.tsx", source, {
+    jsx: { runtime: "automatic", development: false, importSource: "react" },
   });
-  return result?.code ?? "";
-};
 
 const A_COMPILABLE_COMPONENT = `
   export function TotalCost({ spans }) {
@@ -69,16 +61,17 @@ describe("the React Compiler pass", () => {
   describe("given the vite config the application builds with", () => {
     /** @scenario "The build compiles the frontend" */
     it("includes the compiler pass in the plugins the build runs", async () => {
-      expect(await resolvedPluginNames()).toContain(BABEL_PLUGIN_NAME);
+      expect(await resolvedPluginNames()).toContain(COMPILER_PLUGIN_NAME);
     });
   });
 
   describe("given a component that derives a value on every render", () => {
     /** @scenario "A component is memoized without anyone writing a hook" */
     it("caches the derived value across renders", async () => {
-      const compiled = await compile(A_COMPILABLE_COMPONENT);
+      const result = await compile(A_COMPILABLE_COMPONENT);
 
-      expect(compiled).toContain("react/compiler-runtime");
+      expect(result.code).toContain("react/compiler-runtime");
+      expect(result.errors).toEqual([]);
       expect(A_COMPILABLE_COMPONENT).not.toContain("useMemo");
     });
   });
@@ -86,10 +79,14 @@ describe("the React Compiler pass", () => {
   describe("when a component breaks the rules of React", () => {
     /** @scenario "Code the compiler cannot prove is left as it was written" */
     it("leaves it uncompiled instead of failing the build", async () => {
-      const compiled = await compile(A_COMPONENT_THAT_BREAKS_THE_RULES);
+      const result = await compile(A_COMPONENT_THAT_BREAKS_THE_RULES);
 
-      expect(compiled).not.toContain("react/compiler-runtime");
-      expect(compiled).toContain("useState(spans.length)");
+      expect(result.code).not.toContain("react/compiler-runtime");
+      expect(result.code).toContain("useState(spans.length)");
+      // Reported, not thrown: the build keeps going without this component's
+      // optimization. A `fatal` here would be the failure mode we are ruling out.
+      expect(result.fatal).toBeFalsy();
+      expect(result.errors.map((error) => error.severity)).toEqual(["Warning"]);
     });
   });
 });

@@ -53,6 +53,23 @@ minimumReleaseAgeExclude:
   # fails the whole install. Drop this once it ages out (2026-08-24).
   - dayjs@1.11.23
   - es-toolkit@1.51.0
+  # React Compiler, native. Every part of it published inside the age gate, and
+  # no older release satisfies the ranges — the `compiler` option does not
+  # exist before plugin-react 6.1.0 — so without these the install cannot
+  # resolve. Drop the two pinned entries once those versions age out
+  # (oxc-transform-react 2026-08-25; plugin-react a week after it publishes).
+  - oxc-transform-react@0.145.0
+  - "@vitejs/plugin-react@6.1.0"
+  # The 19 native bindings are OPTIONAL dependencies, which is why this one is
+  # a pattern and not pinned like everything above it. Two things force that:
+  # pnpm refuses a version on a name pattern outright ("Name patterns are not
+  # allowed with version unions"), and an optional dependency held back by the
+  # age gate is skipped SILENTLY — the install succeeds, one platform's binding
+  # is simply absent, and the failure surfaces later as `Cannot find native
+  # binding` at build time. Listing only the platforms we build on today would
+  # leave that silent trap set for anyone on another one. Drop this with the
+  # entries above.
+  - "@oxc-transform-react/*"
 
 # The union of what the six roots each pinned separately. Overrides are
 # workspace-root-only in pnpm, which is precisely why the old split let these
