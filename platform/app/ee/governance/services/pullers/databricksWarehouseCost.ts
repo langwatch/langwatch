@@ -378,7 +378,16 @@ function shareOf(
   | { nanoUsd: bigint; hourNanoUsd: bigint; hourTotalMs: bigint }
   | { reason: WarehouseCostSkipReason }
   | "free"
+  | "idle"
   | "owed" {
+  // An hour the statement did no work in reveals nothing and can cost nothing,
+  // whatever its SKU says. Checked before the null-SKU branch on purpose: that
+  // branch holds the watermark, and holding the whole source for an hour this
+  // statement was not awake in is a stall bought for a share of exactly zero.
+  // It does not disturb the distinction below, because every row that turns on
+  // it has execution time by definition.
+  if (wholeMs(row.executionMsInHour) === 0n) return "idle";
+
   // No billing row for this statement's hour yet. Checked first, before every
   // other branch: a null SKU is not a free line and not an unreadable one, it
   // is a bill that has not landed. Reading it as anything else — or letting
@@ -495,7 +504,7 @@ export function allocateWarehouseCost({
 
   for (const row of rows) {
     const share = shareOf(row);
-    if (share === "free") continue;
+    if (share === "free" || share === "idle") continue;
     if (share === "owed") {
       noteHour(owedHours, row.statementId, row.usageHour);
       continue;

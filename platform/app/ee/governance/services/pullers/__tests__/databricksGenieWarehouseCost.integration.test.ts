@@ -376,6 +376,14 @@ describe("a source that names a warehouse", () => {
     // not, and an unbilled hour holds the watermark where an unbilled SKU
     // beside a priced one does not.
     expect(sql).toContain("usage_hour");
+
+    // The last hour is half-open. `sequence` includes its stop value, so a
+    // statement ending at exactly 10:00:00.000 would otherwise emit a 10:00
+    // slice it did no work in — and if the warehouse shut down at 10:00, that
+    // hour never bills, the null SKU reads as "not billed yet", and the source
+    // stalls for the seven-day hold. Every hourly scheduled query ends on a
+    // boundary.
+    expect(sql).toMatch(/unix_millis\(\s*r\.ended_at\s*\)\s*-\s*1\b/);
   });
 
   /** @scenario "A question is still priced when its history row names no space" */

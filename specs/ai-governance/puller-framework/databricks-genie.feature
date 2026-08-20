@@ -392,6 +392,20 @@ Feature: Databricks AI/BI Genie puller
       # hour.
 
     @unit
+    Scenario: An hour a statement did no work in cannot hold it
+      Given a query that ends exactly on the hour
+      And the hour it ends on has no bill
+      When the puller allocates warehouse cost
+      Then the query keeps what the hour it worked in is worth
+      And the query is not held for the hour it did not work in
+      # A null price means the bill has not landed yet, and holding the source
+      # until it does is right for an hour the query was awake in. For an hour
+      # it was not, no bill is coming — the warehouse may have shut down at
+      # that boundary — and holding stalls every later pull for the seven-day
+      # hold. Every hourly scheduled query ends on a boundary, so this is a
+      # weekly outage, not a corner.
+
+    @unit
     Scenario: The billing query only ever runs on the configured workspace
       Given a Genie source that names a warehouse
       When the puller asks for billing

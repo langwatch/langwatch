@@ -435,10 +435,27 @@ sliced AS (
       ) div (unix_millis(r.ended_at) - unix_millis(r.start_time))
     END AS execution_ms_in_hour
   FROM ran r
+  -- The last hour is half-open, because \`sequence\` includes its stop value and
+  -- an hour is not. A statement ending at exactly 10:00:00.000 worked in hour
+  -- 09 and not at all in hour 10, and every hourly scheduled query ends on a
+  -- boundary. Emitting that empty hour is not merely untidy: if the warehouse
+  -- shut down at 10:00 no bill for hour 10 will ever arrive, the null SKU reads
+  -- as "not billed yet", and one such statement holds the whole source at this
+  -- chunk until the seven-day hold expires.
+  --
+  -- Backing the stop off by a millisecond cannot invert the range: it is only
+  -- done when the statement ran for at least that long, and a statement that
+  -- did not still needs its one hour to land somewhere.
   LATERAL VIEW explode(
     sequence(
       date_trunc('HOUR', r.start_time),
-      date_trunc('HOUR', r.ended_at),
+      date_trunc('HOUR',
+        CASE
+          WHEN unix_millis(r.ended_at) > unix_millis(r.start_time)
+            THEN timestamp_millis(unix_millis(r.ended_at) - 1)
+          ELSE r.start_time
+        END
+      ),
       INTERVAL 1 HOUR
     )
   ) h AS usage_hour

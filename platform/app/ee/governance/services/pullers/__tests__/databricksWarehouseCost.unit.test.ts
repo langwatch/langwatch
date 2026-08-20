@@ -330,6 +330,47 @@ describe("allocateWarehouseCost", () => {
     expect(costByStatementId.get("straddler")?.costUsd).toBe("0.2");
   });
 
+  /** @scenario "An hour a statement did no work in cannot hold it" */
+  it("does not hold a statement for an hour it did no work in", () => {
+    // A statement ending exactly on the hour touches the next hour without
+    // working in it. If that hour is the one after the warehouse shut down, no
+    // bill for it will ever arrive — and reading a null SKU as "not billed
+    // yet" would hold the whole source here until the seven-day hold expires.
+    // Every hourly scheduled query lands on a boundary, so this is not a
+    // corner: it is a weekly stall waiting for one to end at :00.
+    const { costByStatementId, owed, skipped } = allocateWarehouseCost({
+      rows: [
+        row({
+          statementId: "on-the-hour",
+          usageHour: HOUR_09,
+          executionMsInHour: "1800000",
+          hourTotalMs: "3600000",
+        }),
+        row({
+          statementId: "on-the-hour",
+          usageHour: HOUR_10,
+          executionMsInHour: "0",
+          hourTotalMs: "0",
+          hourBillableUsd: null,
+          currencyCode: null,
+          skuName: null,
+        }),
+      ],
+    });
+
+    expect(owed.has("on-the-hour")).toBe(false);
+    expect(costByStatementId.get("on-the-hour")?.costUsd).toBe("3");
+    // Nor is it a gap worth reporting. Nothing was lost, so naming it as a
+    // skip would put a permanent hole in a record that has none.
+    expect(skipped).toHaveLength(0);
+    // And the hour it did not work in stays out of the ingredients, which are
+    // what anyone reconciling this figure divides by.
+    expect(costByStatementId.get("on-the-hour")?.hourTotalExecutionMs).toBe(
+      "3600000",
+    );
+    expect(costByStatementId.get("on-the-hour")?.hourBillableUsd).toBe("6");
+  });
+
   /** @scenario "Genie's own free usage is never charged" */
   it("charges nothing for Genie's own free-usage line", () => {
     const { costByStatementId } = allocateWarehouseCost({
@@ -349,12 +390,15 @@ describe("allocateWarehouseCost", () => {
 
   it("refuses an hour that reports no execution time at all", () => {
     // Guard rather than behaviour: dividing by it would be an exception on a
-    // path whose whole job is to not lose the visibility records.
+    // path whose whole job is to not lose the visibility records. The share is
+    // nonzero on purpose — an hour that totals less than one statement ran in
+    // it is the contradiction this branch is for, and a zero share would be
+    // caught earlier as an hour the statement did no work in.
     const { costByStatementId, skipped } = allocateWarehouseCost({
       rows: [
         row({
           statementId: "zero-hour",
-          executionMsInHour: "0",
+          executionMsInHour: "1000",
           hourTotalMs: "0",
         }),
       ],
