@@ -50,7 +50,6 @@ interface JsonSchemaLike {
   oneOf?: JsonSchemaLike[];
 }
 
-/** The nested schemas a composite one is built from. */
 function subSchemasOf(schema: JsonSchemaLike): (JsonSchemaLike | undefined)[] {
   return [
     ...(schema.allOf ?? []),
@@ -77,7 +76,6 @@ function defaultedPropertyNames(schema: JsonSchemaLike): string[] {
   return defaulted;
 }
 
-/** Adds every defaulted property to `required`, depth-first. */
 function requireDefaultedProperties(schema: JsonSchemaLike | undefined): void {
   if (!schema || typeof schema !== "object") return;
 
@@ -127,13 +125,6 @@ interface SpecLike {
   paths?: Record<string, unknown>;
 }
 
-/**
- * Reads every response schema in a generated spec as its output type.
- *
- * Request bodies and parameters are deliberately untouched: their input reading
- * is both correct and unchanged by the upgrade.
- */
-/** Every response body schema one operation can answer with. */
 function requireInOperation(operation: OperationLike | undefined): void {
   for (const response of Object.values(operation?.responses ?? {})) {
     for (const media of Object.values(response?.content ?? {})) {
@@ -142,7 +133,6 @@ function requireInOperation(operation: OperationLike | undefined): void {
   }
 }
 
-/** Every operation hanging off one path. */
 function requireInPathItem(rawItem: unknown): void {
   const item = rawItem as Record<string, OperationLike | undefined> | undefined;
   if (!item) return;
@@ -152,6 +142,12 @@ function requireInPathItem(rawItem: unknown): void {
   }
 }
 
+/**
+ * Reads every response schema in a generated spec as its output type.
+ *
+ * Request bodies and parameters are deliberately untouched: their input reading
+ * is both correct and unchanged by the upgrade.
+ */
 export function requireDefaultedResponseFields<T extends SpecLike>(spec: T): T {
   for (const rawItem of Object.values(spec.paths ?? {})) {
     requireInPathItem(rawItem);
