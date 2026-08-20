@@ -111,12 +111,21 @@ export type AnthropicAdminPullConfig = z.infer<
  * and `page` is Anthropic's own token inside that window, so a run cut off
  * mid-window resumes mid-window instead of re-reading it.
  *
- * `query` is the identity of the request the page token was minted under.
+ * `query` is the identity of the request the cursor was minted under.
  * Anthropic returns 400 when a page token is replayed with changed query
  * params, and this adapter holds the cursor still on failure — so without the
  * binding, one config edit mid-window would wedge the source permanently:
- * every retry replays the same dead token. A mismatch drops only the token;
- * the watermark survives, so the window is re-read rather than skipped.
+ * every retry replays the same dead token.
+ *
+ * A mismatch discards the WHOLE cursor, watermark included, and re-reads from
+ * the configured start. The watermark only certifies data pulled under the
+ * query it was minted with: everything behind it was fetched, mapped, and
+ * priced by the old code, and keeping it would strand those rows as written.
+ * That is exactly how the 100x cost figures survived — mature sources resume
+ * from their watermark, so the wrong rows behind it were never re-read.
+ * Re-reading is idempotent: identities are stable, so restatement supersedes
+ * the old rows, and after the first re-pull the cursor carries the current
+ * identity and the rewind never fires again.
  */
 const cursorSchema = z.object({
   startingAt: z.string(),
@@ -144,17 +153,18 @@ function parseCursor({
   if (cursor) {
     try {
       const parsed = cursorSchema.parse(JSON.parse(cursor));
-      if (parsed.page !== null && parsed.query !== queryIdentity(config)) {
-        // Also covers cursors minted before query-binding existed (`query`
-        // null): this change itself widened the group_by set, so their page
-        // tokens are exactly the ones that would 400 on the first replay.
-        logger.warn(
-          { adapter: ANTHROPIC_ADMIN_ADAPTER_ID, report: config.report },
-          "anthropic admin cursor was minted under a different query; dropping the page token and re-reading the window from the watermark",
-        );
-        return { startingAt: parsed.startingAt, page: null };
+      if (parsed.query === queryIdentity(config)) {
+        return { startingAt: parsed.startingAt, page: parsed.page };
       }
-      return { startingAt: parsed.startingAt, page: parsed.page };
+      // Also covers cursors minted before query-binding existed (`query`
+      // null): this change itself widened the group_by set and fixed the
+      // cents→USD conversion, so everything those cursors certify was
+      // written by the old code. Fall through to the configured start —
+      // see the cursorSchema doc for why the watermark must not survive.
+      logger.warn(
+        { adapter: ANTHROPIC_ADMIN_ADAPTER_ID, report: config.report },
+        "anthropic admin cursor was minted under a different query; discarding it and re-reading from the configured start",
+      );
     } catch {
       logger.warn(
         { cursor },

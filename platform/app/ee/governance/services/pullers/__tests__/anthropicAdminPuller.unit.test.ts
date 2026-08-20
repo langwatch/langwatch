@@ -547,7 +547,7 @@ describe("the Anthropic Admin puller", () => {
       expect(String(fetchMock.mock.calls[0]?.[0])).toContain("page=page_2");
     });
 
-    it("drops the page token but keeps the watermark on a config edit", async () => {
+    it("discards the cursor and re-reads from the configured start on a config edit", async () => {
       const puller = new AnthropicAdminPuller();
       const cursor = await midWindowCursor(puller);
 
@@ -558,7 +558,8 @@ describe("the Anthropic Admin puller", () => {
 
       const url = String(fetchMock.mock.calls[0]?.[0]);
       expect(url).not.toContain("page=");
-      // The watermark survives: the window is re-read, not skipped.
+      // The whole window is re-read from the configured start: the watermark
+      // only certifies data pulled under the query it was minted with.
       expect(url).toContain(
         `starting_at=${encodeURIComponent("2026-08-01T00:00:00.000Z")}`,
       );
@@ -572,7 +573,8 @@ describe("the Anthropic Admin puller", () => {
           ...RUN_OPTIONS,
           // A cursor persisted by the previous version: no query identity.
           // This fix itself changes the group_by set, so replaying its page
-          // token would 400 on the first post-deploy run.
+          // token would 400 on the first post-deploy run — and everything
+          // behind its watermark was mapped by the old code.
           cursor: '{"startingAt":"2026-08-01T00:00:00Z","page":"page_stale"}',
         },
         {
@@ -580,14 +582,54 @@ describe("the Anthropic Admin puller", () => {
           report: "usage",
           bucketWidth: "1d",
           schedule: "0 * * * *",
+          startingAt: "2026-07-01T00:00:00.000Z",
         },
       );
 
       const url = String(fetchMock.mock.calls[0]?.[0]);
       expect(url).not.toContain("page=");
+      // Rewound to the configured start, not the legacy watermark.
       expect(url).toContain(
-        `starting_at=${encodeURIComponent("2026-08-01T00:00:00Z")}`,
+        `starting_at=${encodeURIComponent("2026-07-01T00:00:00.000Z")}`,
       );
+    });
+
+    it("rewinds a drained cost cursor from the 100x era so restatement can repair it", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(COST_PAGE));
+
+      const result = await new AnthropicAdminPuller().runOnce(
+        {
+          ...RUN_OPTIONS,
+          // A mature source: drained (no page token), watermark well past the
+          // buckets whose costs were stored 100x. Keeping the watermark would
+          // strand those rows forever — no scheduled run ever re-reads them.
+          cursor:
+            '{"startingAt":"2026-08-05T00:00:00Z","page":null,"query":null}',
+        },
+        {
+          adapter: "anthropic_admin",
+          report: "cost",
+          bucketWidth: "1d",
+          schedule: "0 * * * *",
+          startingAt: "2026-07-01T00:00:00.000Z",
+        },
+      );
+
+      const url = String(fetchMock.mock.calls[0]?.[0]);
+      expect(url).toContain(
+        `starting_at=${encodeURIComponent("2026-07-01T00:00:00.000Z")}`,
+      );
+      // The re-pulled bucket keeps its stable identity, so the corrected
+      // figure supersedes the 100x row instead of sitting beside it.
+      const record = buildPulledUsageRecord({
+        event: result.events[0]!,
+        source: SOURCE,
+        observedAt: OBSERVED_AT,
+      });
+      expect(record?.costNanoUsd).toBe(412_800_000_000);
+      // And the rewind runs once: the freshly minted cursor carries the
+      // current query identity.
+      expect(JSON.parse(result.cursor ?? "{}").query).toContain("cost:");
     });
   });
 
