@@ -10,6 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  composerCadenceError,
   cronFromPullParts,
   MINUTE_INTERVALS,
   partsFromPullCron,
@@ -133,6 +134,25 @@ describe("given the pull-cadence cron mapping", () => {
       expect(pullCadenceCronError("*/15 * * * *")).toBeNull();
       // Shapes the picker can't say must still be saveable from cron mode.
       expect(pullCadenceCronError("0 9 1 * *")).toBeNull();
+    });
+  });
+
+  describe("when the composer decides whether Create may proceed", () => {
+    /** @scenario "Cron editing is still there for schedules the picker cannot say" */
+    it("refuses an impossible cron for a pull source, and only then", () => {
+      // This is the predicate the Create button's disabled state reads, so
+      // "the create button refuses until it is fixed" is pinned here.
+      expect(
+        composerCadenceError("databricks_genie", "99 * * * *"),
+      ).not.toBeNull();
+      expect(composerCadenceError("databricks_genie", "0 * * * *")).toBeNull();
+    });
+
+    /** @scenario "Leaving the cadence untouched keeps the recommended schedule" */
+    it("never blocks an untouched cadence or a source without one", () => {
+      expect(composerCadenceError("databricks_genie", "")).toBeNull();
+      // Push sources carry no cadence; junk in the field must not block them.
+      expect(composerCadenceError("otel_generic", "junk")).toBeNull();
     });
   });
 
