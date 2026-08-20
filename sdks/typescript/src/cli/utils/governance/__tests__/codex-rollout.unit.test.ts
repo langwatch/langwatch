@@ -58,7 +58,7 @@ describe("parseCodexRollout", () => {
 
   describe("given a conversation many times the request-body cap", () => {
     describe("when it is parsed", () => {
-      /** @scenario "A conversation far above the cap is bounded in one pass" */
+      /** @scenario "A conversation far above the cap still harvests in seconds" */
       it("bounds every turn without reading the conversation again per dropped message", () => {
         // The cost that mattered grows with the NUMBER of messages, not their
         // size: every message dropped read the whole conversation again. A
