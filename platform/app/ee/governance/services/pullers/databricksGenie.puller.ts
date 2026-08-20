@@ -2876,10 +2876,11 @@ export class DatabricksGeniePuller
   }
 
   /**
-   * The pieces in order: each that prices whole is merged, and the first that
-   * cannot be — refused, still owing a bill, or outrunning the run's budget —
-   * is returned as where the watermark holds. `"failed"` ends the whole sweep;
-   * `null` says every piece priced.
+   * The pieces in order: every piece that prices is merged — even one still
+   * owing a bill keeps its billed hours' worth — and the first that stops the
+   * walk (refused, owing, or outrunning the run's budget) is returned as where
+   * the watermark holds. `"failed"` ends the whole sweep; `null` says every
+   * piece priced whole.
    */
   private async walkWarehouseCostPieces({
     config,
