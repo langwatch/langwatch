@@ -1,0 +1,209 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Prisma } from "~/generated/prisma/client";
+import { resetCutoverGateForTesting } from "../../cutover-gate";
+import { CutoverAwareAccessListingRepository } from "../access-listing.cutover.repository";
+import type { AccessListingRepository } from "../access-listing.repository";
+
+/**
+ * The decorator answers one question per call - is THIS organization served
+ * by the engine - and delegates. What the tests pin is which head each
+ * listing reaches, because a listing that forked the wrong way would render
+ * an Access page from rows the organization is not being served from: access
+ * that does not exist shown, access that does hidden.
+ */
+const spyRepository = (name: string): AccessListingRepository =>
+  ({
+    findUserBindings: vi.fn().mockResolvedValue([]),
+    findOrganizationBindings: vi.fn().mockResolvedValue([]),
+    findUserAndGroupBindings: vi.fn().mockResolvedValue([]),
+    findScopeBindings: vi.fn().mockResolvedValue([]),
+    findGroupBindings: vi.fn().mockResolvedValue([]),
+    findTeamMemberBindings: vi.fn().mockResolvedValue(new Map()),
+    findBindingsForSynthesis: vi
+      .fn()
+      .mockImplementation(async ({ orgIds }: { orgIds: readonly string[] }) =>
+        orgIds.map((organizationId) => ({
+          organizationId,
+          scopeType: "TEAM",
+          scopeId: `team-of-${organizationId}`,
+          role: "MEMBER",
+          customRoleId: null,
+          customRole: null,
+          head: name,
+        })),
+      ),
+    findUserCreatedRoles: vi.fn().mockResolvedValue([]),
+  }) as unknown as AccessListingRepository;
+
+const repositoryFor = (onEngineByOrg: Record<string, boolean>) => {
+  const legacy = spyRepository("legacy");
+  const grants = spyRepository("grants");
+  const findUnique = vi.fn(
+    async ({ where }: { where: { organizationId: string } }) => ({
+      onEngine: onEngineByOrg[where.organizationId] === true,
+    }),
+  );
+  const prisma = {
+    authzCutoverProjection: { findUnique },
+  } as unknown as Prisma.TransactionClient;
+  return {
+    legacy,
+    grants,
+    findUnique,
+    repository: new CutoverAwareAccessListingRepository(prisma, {
+      legacy,
+      grants,
+    }),
+  };
+};
+
+describe("CutoverAwareAccessListingRepository", () => {
+  beforeEach(() => {
+    resetCutoverGateForTesting();
+  });
+  afterEach(() => {
+    resetCutoverGateForTesting();
+    vi.useRealTimers();
+  });
+
+  describe("given the organization is cut over", () => {
+    /** @scenario "A cut-over organization's access listings are served from the ledger's head" */
+    it("lists every binding surface from the grants head, leaving the legacy head untouched", async () => {
+      const { legacy, grants, repository } = repositoryFor({ "org-1": true });
+
+      await repository.findUserBindings({
+        organizationId: "org-1",
+        userId: "alice",
+      });
+      await repository.findOrganizationBindings({ organizationId: "org-1" });
+      await repository.findUserAndGroupBindings({
+        organizationId: "org-1",
+        userId: "alice",
+        groupIds: ["group-1"],
+      });
+      await repository.findScopeBindings({
+        organizationId: "org-1",
+        scopeType: "TEAM",
+        scopeIds: ["team-1"],
+      });
+      await repository.findGroupBindings({
+        organizationId: "org-1",
+        groupId: "group-1",
+      });
+      await repository.findTeamMemberBindings({
+        organizationId: "org-1",
+        teamIds: ["team-1"],
+      });
+
+      expect(grants.findUserBindings).toHaveBeenCalledTimes(1);
+      expect(grants.findOrganizationBindings).toHaveBeenCalledTimes(1);
+      expect(grants.findUserAndGroupBindings).toHaveBeenCalledTimes(1);
+      expect(grants.findScopeBindings).toHaveBeenCalledTimes(1);
+      expect(grants.findGroupBindings).toHaveBeenCalledTimes(1);
+      expect(grants.findTeamMemberBindings).toHaveBeenCalledTimes(1);
+      expect(legacy.findUserBindings).not.toHaveBeenCalled();
+      expect(legacy.findOrganizationBindings).not.toHaveBeenCalled();
+      expect(legacy.findUserAndGroupBindings).not.toHaveBeenCalled();
+      expect(legacy.findScopeBindings).not.toHaveBeenCalled();
+      expect(legacy.findGroupBindings).not.toHaveBeenCalled();
+      expect(legacy.findTeamMemberBindings).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A cut-over organization's role editor lists roles from the ledger's head" */
+    it("lists the role editor's roles from the grants head", async () => {
+      const { legacy, grants, repository } = repositoryFor({ "org-1": true });
+
+      await repository.findUserCreatedRoles({ organizationId: "org-1" });
+
+      expect(grants.findUserCreatedRoles).toHaveBeenCalledWith({
+        organizationId: "org-1",
+      });
+      expect(legacy.findUserCreatedRoles).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the organization has not cut over", () => {
+    /** @scenario "An organization that has not cut over keeps listing from the legacy tables" */
+    it("lists from the legacy head, leaving the grants head untouched", async () => {
+      const { legacy, grants, repository } = repositoryFor({ "org-1": false });
+
+      await repository.findOrganizationBindings({ organizationId: "org-1" });
+      await repository.findUserCreatedRoles({ organizationId: "org-1" });
+
+      expect(legacy.findOrganizationBindings).toHaveBeenCalledTimes(1);
+      expect(legacy.findUserCreatedRoles).toHaveBeenCalledTimes(1);
+      expect(grants.findOrganizationBindings).not.toHaveBeenCalled();
+      expect(grants.findUserCreatedRoles).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the synthesis read spans cut-over and legacy organizations", () => {
+    it("partitions the organizations across the heads and concatenates the rows", async () => {
+      const { legacy, grants, repository } = repositoryFor({
+        "org-engine": true,
+        "org-legacy": false,
+      });
+
+      const rows = await repository.findBindingsForSynthesis({
+        orgIds: ["org-engine", "org-legacy"],
+        userId: "alice",
+      });
+
+      expect(legacy.findBindingsForSynthesis).toHaveBeenCalledWith({
+        orgIds: ["org-legacy"],
+        userId: "alice",
+      });
+      expect(grants.findBindingsForSynthesis).toHaveBeenCalledWith({
+        orgIds: ["org-engine"],
+        userId: "alice",
+      });
+      expect(rows.map((row) => row.organizationId).sort()).toEqual([
+        "org-engine",
+        "org-legacy",
+      ]);
+    });
+
+    it("asks only the head that has organizations to answer for", async () => {
+      const { legacy, grants, repository } = repositoryFor({
+        "org-legacy": false,
+      });
+
+      await repository.findBindingsForSynthesis({
+        orgIds: ["org-legacy"],
+        userId: "alice",
+      });
+
+      expect(grants.findBindingsForSynthesis).not.toHaveBeenCalled();
+      expect(legacy.findBindingsForSynthesis).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the organization is rolled back after the gate cached a positive answer", () => {
+    /** @scenario "A rolled-back organization's listings return to the legacy head within the gate's cache window" */
+    it("stops reading the grant head once the cache window elapses, with no deploy", async () => {
+      vi.useFakeTimers();
+      const legacy = spyRepository("legacy");
+      const grants = spyRepository("grants");
+      const findUnique = vi
+        .fn()
+        .mockResolvedValueOnce({ onEngine: true })
+        .mockResolvedValueOnce({ onEngine: false });
+      const prisma = {
+        authzCutoverProjection: { findUnique },
+      } as unknown as Prisma.TransactionClient;
+      const repository = new CutoverAwareAccessListingRepository(prisma, {
+        legacy,
+        grants,
+      });
+
+      await repository.findOrganizationBindings({ organizationId: "org-1" });
+      expect(grants.findOrganizationBindings).toHaveBeenCalledTimes(1);
+
+      vi.advanceTimersByTime(61_000);
+
+      await repository.findOrganizationBindings({ organizationId: "org-1" });
+      expect(legacy.findOrganizationBindings).toHaveBeenCalledTimes(1);
+      expect(grants.findOrganizationBindings).toHaveBeenCalledTimes(1);
+    });
+  });
+});

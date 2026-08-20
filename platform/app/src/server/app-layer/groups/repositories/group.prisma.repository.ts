@@ -10,6 +10,11 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
+import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import type {
+  AccessListingBindingRow,
+  AccessListingRepository,
+} from "~/server/app-layer/authz/repositories/access-listing.repository";
 import { scopesTouchPersonalTeam } from "~/server/role-bindings/personal-team-scope";
 import type {
   CreateBindingInput,
@@ -34,10 +39,16 @@ function attachFor(binding: CreateBindingInput) {
 }
 
 export class PrismaGroupRepository implements GroupRepository {
+  // Listing reads go through the per-organization fork (ADR-092,
+  // delivery-plan PR 3 follow-up).
+  private readonly accessListing: AccessListingRepository;
+
   constructor(
     private readonly prisma: PrismaClient,
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-  ) {}
+  ) {
+    this.accessListing = new CutoverAwareAccessListingRepository(prisma);
+  }
 
   async findAllByOrganization({
     organizationId,
@@ -224,11 +235,18 @@ export class PrismaGroupRepository implements GroupRepository {
     });
   }
 
-  async findBindings({ groupId }: { groupId: string }) {
-    return this.prisma.roleBinding.findMany({
-      where: { groupId },
-      include: { customRole: { select: { id: true, name: true } } },
-    });
+  async findBindings({
+    organizationId,
+    groupId,
+  }: {
+    organizationId: string;
+    groupId: string;
+  }): Promise<AccessListingBindingRow[]> {
+    // Through the per-organization fork (ADR-092, delivery-plan PR 3
+    // follow-up): a cut-over organization's group page is served from the
+    // ledger's own head. The organization now bounds the read, too - the
+    // route has already proven the group belongs to it.
+    return this.accessListing.findGroupBindings({ organizationId, groupId });
   }
 
   async createBinding({
