@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -338,5 +339,33 @@ func TestSignalRelayRecordsAQueuedSignal(t *testing.T) {
 
 	if forwarded := relay.close(); !forwarded[syscall.SIGINT] {
 		t.Fatal("a signal queued when the child died must still count as forwarded, or the wrapper reports the operator's own interrupt as a kill from outside")
+	}
+}
+
+// @scenario "An interrupt that arrives as the command starts is forwarded"
+func TestSignalRelayForwardsASignalThatArrivedBeforeTheChild(t *testing.T) {
+	child := exec.Command("sleep", "10")
+	if err := child.Start(); err != nil {
+		t.Fatalf("starting the stand-in child: %v", err)
+	}
+
+	// The wrapper listens before it starts the command, so an interrupt in
+	// between is already waiting when forwarding begins. Dropping it there
+	// would leave the operator's Ctrl-C unanswered and the command running.
+	signals := make(chan os.Signal, 4)
+	relay := newSignalRelay(signals)
+	signals <- syscall.SIGTERM
+	relay.forwardTo(child.Process)
+
+	err := child.Wait()
+	relay.close()
+
+	exit := &exec.ExitError{}
+	if !errors.As(err, &exit) {
+		t.Fatalf("the child must end by the forwarded signal, got %v", err)
+	}
+	status, ok := exit.Sys().(syscall.WaitStatus)
+	if !ok || !status.Signaled() || status.Signal() != syscall.SIGTERM {
+		t.Fatalf("the child must be ended by SIGTERM, got %v", exit)
 	}
 }
