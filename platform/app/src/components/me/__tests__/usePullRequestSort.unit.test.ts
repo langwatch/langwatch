@@ -31,7 +31,6 @@ function row(
     pullRequest: { number: 100, title: "A title" },
     snapshotStatus: "open",
     lastActivityAtMs: 1_000,
-    sessionsCount: 1,
     modelBreakdown: [{ model: "claude-fable-5" }],
     totalTokens: 1_000,
     costUsd: 1,
@@ -356,15 +355,23 @@ describe("the Pull Requests table order", () => {
   describe("given two rows a column cannot tell apart", () => {
     it("reads the more recently updated of them first", () => {
       const rows = [
-        row({ headBranch: "older", sessionsCount: 4, lastActivityAtMs: 1_000 }),
-        row({ headBranch: "newer", sessionsCount: 4, lastActivityAtMs: 5_000 }),
+        row({
+          headBranch: "older",
+          totalTokens: 4_000,
+          lastActivityAtMs: 1_000,
+        }),
+        row({
+          headBranch: "newer",
+          totalTokens: 4_000,
+          lastActivityAtMs: 5_000,
+        }),
       ];
 
       expect(
         orderOf(
           sortPullRequestRows({
             rows,
-            sort: { column: "sessions", direction: "desc" },
+            sort: { column: "tokens", direction: "desc" },
           }),
         ),
       ).toEqual(["newer", "older"]);
@@ -372,7 +379,7 @@ describe("the Pull Requests table order", () => {
         orderOf(
           sortPullRequestRows({
             rows,
-            sort: { column: "sessions", direction: "asc" },
+            sort: { column: "tokens", direction: "asc" },
           }),
         ),
       ).toEqual(["newer", "older"]);

@@ -24,7 +24,7 @@ export function toReportTraceRow({
 }): ReportTraceRow {
   return {
     traceId: item.traceId,
-    url: `${projectUrl}/messages/${item.traceId}`,
+    url: `${projectUrl}/traces/${item.traceId}`,
     timestamp: new Date(item.timestamp).toISOString(),
     input: reportSnippet(item.input),
     output: reportSnippet(item.output),

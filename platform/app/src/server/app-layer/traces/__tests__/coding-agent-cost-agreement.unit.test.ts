@@ -150,6 +150,8 @@ function recomputedSummaryRowCost(): number | null {
     ResponseModel: "",
     Cost: "",
     InputTokens: attr("gen_ai.usage.input_tokens"),
+    InputAudioTokens: attr("gen_ai.usage.input_audio_tokens"),
+    OutputAudioTokens: attr("gen_ai.usage.output_audio_tokens"),
     OutputTokens: attr("gen_ai.usage.output_tokens"),
     CacheReadTokens: attr("gen_ai.usage.cache_read.input_tokens"),
     CacheCreationTokens: attr("gen_ai.usage.cache_creation.input_tokens"),
@@ -193,7 +195,10 @@ function terminalFooterCost(): number {
   } as unknown as SpanDetail;
 
   const transcript = buildCodingAgentTranscript({ spans: [detail], logs: [] });
-  return buildEntryTimeline(transcript.entries).at(-1)?.cumulativeCostUsd ?? 0;
+  return (
+    buildEntryTimeline({ entries: transcript.entries }).at(-1)
+      ?.cumulativeCostUsd ?? 0
+  );
 }
 
 describe("the cost of one claude code model call", () => {

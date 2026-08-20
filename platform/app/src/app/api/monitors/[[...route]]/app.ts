@@ -1,9 +1,8 @@
 import { createLogger } from "@langwatch/observability";
-import type { Prisma } from "@prisma/client";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import type { Prisma } from "~/generated/prisma/client";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { EvaluatorNotFoundError } from "~/server/app-layer/evaluations/errors";

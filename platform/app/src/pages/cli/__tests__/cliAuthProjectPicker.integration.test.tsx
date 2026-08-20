@@ -202,7 +202,7 @@ const renderPage = () =>
   );
 
 const approveButton = () =>
-  screen.getByRole("button", { name: "Generate API key" }) as HTMLButtonElement;
+  screen.getByRole("button", { name: "Send API key" }) as HTMLButtonElement;
 
 beforeEach(() => {
   fetchMock.mockReset();

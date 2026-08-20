@@ -1,5 +1,5 @@
 import { overBroadSecretPatternProbe } from "@langwatch/redaction";
-import type { DataPrivacyPolicy } from "@prisma/client";
+import type { DataPrivacyPolicy } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { isSafeRegex } from "~/utils/safeRegex";
 import {

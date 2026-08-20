@@ -1,9 +1,57 @@
 name: go-services
 
+# The `changes` gate below stays, because this workflow runs three jobs off
+# three DIFFERENT filters and `on.paths` is workflow-wide. What `on.paths`
+# buys is the case where none of the three match at all: today that still
+# leases a runner for six seconds to conclude "nothing to do", and GitHub can
+# reach the same answer for free before allocating anything.
+#
+# DANGER, and the reason this list is written as a plain concatenation: it MUST
+# be a superset of every filter in the `changes` job. A path present in a
+# sub-filter but missing here means the workflow never starts, so the job that
+# sub-filter guards never runs — and the PR goes green having tested nothing.
+# `charts/gateway/**` is the whole reason the `helm` job exists; drop it here
+# and that job silently stops existing. When you add a path to a filter below,
+# add it here in the same edit.
+#
+# (`pkg/config/server.go` and `services/aigateway/config.go` from the `chart`
+# filter are already covered by `pkg/**` and `services/aigateway/**`.)
+#
+# Only `pull_request` carries the list. Pushes to main keep running the gate
+# unconditionally, exactly as before — that is the branch we deploy from, so
+# full coverage there is worth one six-second job, and it means this list
+# lives in ONE place instead of being duplicated across two triggers. (The
+# Actions parser does not reliably resolve YAML anchors, so a shared list
+# would have had to be a literal copy.)
 on:
   push:
     branches: [main]
   pull_request:
+    paths:
+      # from `service`
+      - "services/aigateway/**"
+      - "pkg/**"
+      - "cmd/**"
+      - "go.mod"
+      - "go.sum"
+      - "infra/docker/Dockerfile.go_service"
+      - ".github/workflows/go-services.yaml"
+      # from `chart`
+      - "charts/gateway/**"
+      # from `langyagent`
+      - "services/langyagent/**"
+      - "sdks/go/**"
+      - "infra/docker/Dockerfile.langyagent"
+      - "sdks/typescript/**"
+      - "packages/langy/**"
+      - "skills/**"
+      - "feature-map.json"
+      - "platform/app/src/server/tracer/types.ts"
+      - "platform/app/src/server/filters/types.ts"
+      - "platform/app/src/server/evaluations/types.ts"
+      - "platform/app/src/server/modelProviders/llmModels.json"
+      - "platform/app/src/app/api/openapiLangWatch.json"
+      - "services/langevals/ts-integration/evaluators.generated.ts"
   workflow_dispatch:
 
 permissions:
@@ -33,7 +81,7 @@ jobs:
           # every file this job needs on disk lives under .github/. Checking
           # out the rest of the tree is pure runner time.
           sparse-checkout: .github
-      - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         if: github.event_name != 'workflow_dispatch'
         id: filter
         with:

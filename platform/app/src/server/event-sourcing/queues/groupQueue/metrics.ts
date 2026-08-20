@@ -272,7 +272,7 @@ export const gqGroupsPoisonParkedTotal = new Counter({
  */
 export const gqRetryEncodeFailuresTotal = new Counter({
   name: "gq_retry_encode_failures_total",
-  help: "Retry re-encode failed — dispatched job completed via fail-safe and the job was DISCARDED (replay does not recover reactor jobs; see gq_jobs_dropped_total)",
+  help: "Retry re-encode failed — dispatched job completed via fail-safe and the job was DISCARDED (replay does not recover subscriber jobs; see gq_jobs_dropped_total)",
   labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
 });
 
@@ -307,14 +307,14 @@ export const gqRetryEncodeFailuresTotal = new Counter({
  * - `unknown` — an unclassified throw. Non-zero here means a decode failure mode
  *   exists that we have not named; that is a bug in the enum, not a shrug.
  *
- * ⚠️ A non-zero rate on a reactor pipeline is PERMANENT DATA LOSS, not a blip.
- * Replay rebuilds fold projections and never invokes reactors
+ * ⚠️ A non-zero rate on a subscriber pipeline is PERMANENT DATA LOSS, not a blip.
+ * Replay rebuilds fold projections and never invokes subscribers
  * (`projections/projectionRouter.ts:61-71`), so nothing re-fires a dropped
- * reactor job. This counter is the ONLY signal that it happened.
+ * subscriber job. This counter is the ONLY signal that it happened.
  */
 export const gqJobsDroppedTotal = new Counter({
   name: "gq_jobs_dropped_total",
-  help: "Staged jobs discarded because they could not be decoded — for reactor pipelines this is permanent data loss (replay does not re-invoke reactors)",
+  help: "Staged jobs discarded because they could not be decoded — for subscriber pipelines this is permanent data loss (replay does not re-invoke subscribers)",
   labelNames: [
     "queue_name",
     "pipeline_name",
@@ -369,7 +369,7 @@ export const gqJobsUnroutableTotal = new Counter({
  */
 export const gqBlobReleaseGraceTotal = new Counter({
   name: "gq_blob_release_grace_total",
-  help: "Blobs whose last lease was retired via terminal retirement, moving them from the 4-day backstop onto the release grace window (excludes the dedup-squash release path — a floor, not a total)",
+  help: 'Blobs whose last lease was retired via terminal retirement, moving them from the 4-day backstop onto the release grace window (excludes the dedup-squash release path — a floor, not a total). The "tier" label is where the blob lived, not which provider stored it: "redis" or "s3", where "s3" means the durable object store whatever its scheme — an Azure Blob deployment reports "s3" here.',
   labelNames: ["queue_name", "tier"] as const,
 });
 

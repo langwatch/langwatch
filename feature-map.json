@@ -18,7 +18,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.trace",
-                "typescript": "langwatch"
+                "typescript": "langwatch",
+                "go": "langwatch.Tracer"
               },
               "cli": [
                 "trace search",
@@ -38,7 +39,7 @@
               "docs": "https://langwatch.ai/docs/integration/overview.md"
             },
             "platform": {
-              "ui": "/messages",
+              "ui": "/traces",
               "mcp": [
                 "search_traces",
                 "get_trace"
@@ -104,7 +105,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.track_event",
-                "typescript": null
+                "typescript": null,
+                "go": "client.Events"
               },
               "cli": null,
               "skill": null,
@@ -129,7 +131,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.annotations",
-                "typescript": "langwatch.annotations"
+                "typescript": "langwatch.annotations",
+                "go": "client.Annotations"
               },
               "cli": [
                 "annotation list",
@@ -231,7 +234,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.monitors",
-                "typescript": "langwatch.monitors"
+                "typescript": "langwatch.monitors",
+                "go": "client.Monitors"
               },
               "cli": [
                 "monitor list",
@@ -292,7 +296,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.scenarios",
-                "typescript": "langwatch.scenarios"
+                "typescript": "langwatch.scenarios",
+                "go": "client.Scenarios"
               },
               "cli": [
                 "scenario list",
@@ -345,7 +350,8 @@
             "code": {
               "sdk": {
                 "python": null,
-                "typescript": "langwatch.simulationRuns"
+                "typescript": "langwatch.simulationRuns",
+                "go": "client.Scenarios.ListRuns"
               },
               "cli": [
                 "simulation-run list",
@@ -450,7 +456,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.prompts",
-                "typescript": "langwatch.prompts"
+                "typescript": "langwatch.prompts",
+                "go": "client.Prompts"
               },
               "cli": [
                 "prompt init",
@@ -549,6 +556,7 @@
                 "agent get",
                 "agent create",
                 "agent run",
+                "agent dev",
                 "agent update",
                 "agent delete"
               ],
@@ -682,7 +690,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.dataset",
-                "typescript": "langwatch.datasets"
+                "typescript": "langwatch.datasets",
+                "go": "client.Datasets"
               },
               "cli": [
                 "dataset list",
@@ -798,7 +807,8 @@
         "code": {
           "sdk": {
             "python": "langwatch.triggers",
-            "typescript": "langwatch.triggers"
+            "typescript": "langwatch.triggers",
+            "go": "client.Triggers"
           },
           "cli": [
             "trigger list",
@@ -865,7 +875,7 @@
               "docs": "https://langwatch.ai/docs/ai-gateway/virtual-keys.md"
             },
             "platform": {
-              "ui": "/settings/gateway/virtual-keys",
+              "ui": "/gateway/virtual-keys",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -900,7 +910,7 @@
               "docs": "https://langwatch.ai/docs/ai-gateway/budgets.md"
             },
             "platform": {
-              "ui": "/settings/gateway/budgets",
+              "ui": "/gateway/budgets",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -919,7 +929,7 @@
         {
           "id": "ai-gateway.webhooks",
           "name": "Webhook endpoints",
-          "description": "Stripe-shaped outbound webhooks: subscribed event families, signed batched deliveries, retry ladder, delivery log, replay (enterprise)",
+          "description": "Stripe-shaped outbound webhooks: subscribed event families, signed batched deliveries to an HTTPS endpoint or an Amazon SQS queue, retry ladder, delivery log, replay (enterprise)",
           "surfaces": {
             "code": {
               "sdk": {
@@ -945,7 +955,7 @@
               "docs": null
             },
             "platform": {
-              "ui": "/settings/gateway/webhooks",
+              "ui": "/gateway/webhooks",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -1018,7 +1028,7 @@
               "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
             },
             "platform": {
-              "ui": "/settings/governance",
+              "ui": "/governance",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -1052,7 +1062,7 @@
               "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
             },
             "platform": {
-              "ui": "/settings/governance/ingestion-sources",
+              "ui": "/governance/ingestion-sources",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -1081,7 +1091,8 @@
             "code": {
               "sdk": {
                 "python": null,
-                "typescript": null
+                "typescript": null,
+                "go": "client.Projects"
               },
               "cli": [
                 "projects list",
@@ -1612,7 +1623,7 @@
     ],
     "meta_skills": {
       "level-up": "Orchestrates tracing + prompts + evaluations + scenarios",
-      "analytics": "Cross-cutting skill for querying performance (works for both code and platform users)",
+      "agent-performance": "Cross-cutting skill for querying performance (works for both code and platform users)",
       "datasets": "Generate realistic synthetic evaluation datasets from codebase, prompts, and traces"
     },
     "recipes": {
@@ -1621,7 +1632,7 @@
       "debug-with-langwatch": "Root-cause production errors: errored traces, span inspection, monitor/evaluator scores",
       "eval-triage": "Investigate failing experiments and evaluation regressions",
       "setup-lw": "Set up and troubleshoot the LangWatch CLI (login, endpoint, project)",
-      "improve-setup": "Expert AI engineering consultant for your LangWatch setup",
+      "agent-best-practices": "Expert AI engineering consultant for your LangWatch setup",
       "evaluate-multimodal": "Evaluate multimodal agents (images, audio, PDFs)",
       "generate-rag-dataset": "Generate synthetic evaluation dataset from your RAG knowledge base",
       "test-compliance": "Test that your agent stays observational in regulated domains"

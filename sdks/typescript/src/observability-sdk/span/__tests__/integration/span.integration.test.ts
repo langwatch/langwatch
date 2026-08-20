@@ -3,10 +3,10 @@ import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
-import { setupObservability } from "../../../setup/node";
+import type { setupObservability } from "../../../setup/node";
 import { getLangWatchTracer } from "../../../tracer";
 import { createLangWatchSpan } from "../..";
-import { NoOpLogger } from "../../../../logger";
+import { createIntegrationObservability } from "../../../setup/node/__tests__/createIntegrationObservability";
 import * as semconv from "../../../semconv";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
 
@@ -71,16 +71,13 @@ describe("Span Integration Tests", () => {
     spanExporter = new InMemorySpanExporter();
     spanProcessor = new SimpleSpanProcessor(spanExporter);
 
-    observabilityHandle = setupObservability({
+    observabilityHandle = createIntegrationObservability({
       serviceName: "span-integration-test",
-      langwatch: "disabled",
       attributes: {
         "test.suite": "span-integration",
         "test.component": "span-data-formats",
       },
       spanProcessors: [spanProcessor],
-      debug: { logger: new NoOpLogger() },
-      advanced: { throwOnSetupError: true }
     });
   });
 

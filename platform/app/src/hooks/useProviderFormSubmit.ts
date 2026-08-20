@@ -101,7 +101,7 @@ export function useProviderFormSubmit({
   onSuccess?: () => void;
   onError?: (error: unknown) => void;
 }): UseProviderFormSubmitReturn {
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const updateMutation = api.modelProvider.update.useMutation();
   // B3 redesign: the user's onboarding picks for the three role models
   // need to win over the additive seed (which fills in the registry
@@ -235,7 +235,6 @@ export function useProviderFormSubmit({
             } before saving.`,
             type: "error",
             duration: 5000,
-            meta: { closable: true },
           });
           setIsSaving(false);
           return;
@@ -429,7 +428,6 @@ export function useProviderFormSubmit({
             description: reasons,
             type: "warning",
             duration: 8000,
-            meta: { closable: true },
           });
         }
       }
@@ -461,7 +459,6 @@ export function useProviderFormSubmit({
         title: "Model Provider Updated",
         type: "success",
         duration: 3000,
-        meta: { closable: true },
       });
       onSuccess?.();
     } catch (err) {

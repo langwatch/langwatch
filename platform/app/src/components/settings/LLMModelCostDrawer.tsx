@@ -215,9 +215,6 @@ function LLMModelCostForm({
             } successfully`,
             type: "success",
             duration: 5000,
-            meta: {
-              closable: true,
-            },
           });
           closeDrawer();
           void llmModelCostsQuery.refetch();
@@ -404,7 +401,7 @@ function LLMModelCostForm({
           colorPalette="orange"
           type="submit"
           minWidth="fit-content"
-          loading={createOrUpdate.isLoading}
+          loading={createOrUpdate.isPending}
         >
           Save
         </Button>

@@ -1,5 +1,68 @@
 # Changelog
 
+## [1.6.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.5.0...typescript-sdk@v1.6.0) (2026-08-18)
+
+
+### Features
+
+* **ai-gateway:** virtual keys can auto-expire, and every usage view links to its traces ([#7067](https://github.com/langwatch/langwatch/issues/7067)) ([2e21dc3](https://github.com/langwatch/langwatch/commit/2e21dc3b0529cd627cd7b245c0bec754a2b023c1))
+* **coding-agent:** capture codex conversations and repository identity by default ([#7069](https://github.com/langwatch/langwatch/issues/7069)) ([625ddb6](https://github.com/langwatch/langwatch/commit/625ddb69d626383659f5c6357351ceb1515f3b28))
+* project-scoped coding-agent instrumentation, lazy virtual keys, CLI help cleanup ([#7057](https://github.com/langwatch/langwatch/issues/7057)) ([0f2c353](https://github.com/langwatch/langwatch/commit/0f2c353fa1ac59ac963f8b95fce7a1e43ba6edbe))
+* **scenarios:** judge on remote traces with per-turn propagation and a local dev tunnel ([#7070](https://github.com/langwatch/langwatch/issues/7070)) ([56689a3](https://github.com/langwatch/langwatch/commit/56689a327857169ce0d458a08f9e105ef28e182b))
+* **traces:** remove the legacy trace UI ([#6902](https://github.com/langwatch/langwatch/issues/6902)) ([c2ee570](https://github.com/langwatch/langwatch/commit/c2ee5708c78ea9733bb67b321201d98685dec24d))
+
+
+### Bug Fixes
+
+* **cli:** make scenario run --wait count only its own batch ([#7144](https://github.com/langwatch/langwatch/issues/7144)) ([1a0fd66](https://github.com/langwatch/langwatch/commit/1a0fd66208c63656c2762659e3b02b98382a8449))
+
+
+### Code Refactoring
+
+* **typescript:** move the workspace to TypeScript 7, and stop a typecheck filling a 9 GiB ceiling ([#7081](https://github.com/langwatch/langwatch/issues/7081)) ([f79b748](https://github.com/langwatch/langwatch/commit/f79b74898b6a921823ebd32c57ac2295d79e6113))
+
+## [1.5.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.4.0...typescript-sdk@v1.5.0) (2026-08-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* **spend:** POST /api/gateway/v1/virtual-keys refuses an organization- or team-scoped key, and a key scoped to more than one project, when it does not carry trace_project_id and the organization has projects to choose from. Send trace_project_id, or scope the key to exactly one project. Existing keys are unaffected until they are next edited.
+
+### Features
+
+* **gateway:** model tiers, routing policy editor, and the allowlist that aliases skipped ([#6923](https://github.com/langwatch/langwatch/issues/6923)) ([c4a988d](https://github.com/langwatch/langwatch/commit/c4a988d3ebf7c1f16d09c4257e547f668232c61e))
+* **gateway:** store the trace destination at creation instead of deriving it per read ([#6769](https://github.com/langwatch/langwatch/issues/6769)) ([b65e6f3](https://github.com/langwatch/langwatch/commit/b65e6f3957676df55ba366f0698c9f710b6e5db1))
+* **gateway:** view traces from a virtual key, and teams/projects management in both SDKs ([#6807](https://github.com/langwatch/langwatch/issues/6807)) ([2c55fe3](https://github.com/langwatch/langwatch/commit/2c55fe30ee1dbd89fd2877cede5af645fe49889e))
+* **governed-sql:** governed SQL workbench — full stack (supersedes [#6486](https://github.com/langwatch/langwatch/issues/6486)/[#6861](https://github.com/langwatch/langwatch/issues/6861)/[#6579](https://github.com/langwatch/langwatch/issues/6579)/[#6678](https://github.com/langwatch/langwatch/issues/6678)/[#6690](https://github.com/langwatch/langwatch/issues/6690)/[#6705](https://github.com/langwatch/langwatch/issues/6705)/[#6709](https://github.com/langwatch/langwatch/issues/6709)) ([#7014](https://github.com/langwatch/langwatch/issues/7014)) ([7007d9b](https://github.com/langwatch/langwatch/commit/7007d9bd55b426be89c96ea798447918b5b6484a))
+* **management-api:** full management API surface with CLI, SCIM reference and self-hosted provisioning ([#6720](https://github.com/langwatch/langwatch/issues/6720)) ([5ebf89d](https://github.com/langwatch/langwatch/commit/5ebf89d6f474590f81fbb5c72d2c64dfcf653a53))
+* **scenarios:** scenario run parameters and http secret references ([#6906](https://github.com/langwatch/langwatch/issues/6906)) ([a21b7a1](https://github.com/langwatch/langwatch/commit/a21b7a15f0a98e6a5a4754eea0b8a33729561d24))
+* **sdk:** judge n-way target comparisons from the experiment SDKs ([#6863](https://github.com/langwatch/langwatch/issues/6863)) ([9c34d3c](https://github.com/langwatch/langwatch/commit/9c34d3c37418ecf6d29b0e521d66fca0661a45d8))
+* **spend:** one filter vocabulary on both reads, and a grouping that refuses to lie ([#6656](https://github.com/langwatch/langwatch/issues/6656)) ([dd3be46](https://github.com/langwatch/langwatch/commit/dd3be46de9aa70d40f256b26a4ee49a1ec753e53))
+* **traces:** trace edit overlay and annotation queue to dataset workflow ([#6565](https://github.com/langwatch/langwatch/issues/6565)) ([33d55ee](https://github.com/langwatch/langwatch/commit/33d55ee3b6f3a031f753c252fc89f243d7f9310c))
+* **webhooks:** deliver to SQS as a per-endpoint destination ([#6925](https://github.com/langwatch/langwatch/issues/6925)) ([4c30bf3](https://github.com/langwatch/langwatch/commit/4c30bf3595b40d0d9cd5b04a936639f3ed8d9597))
+
+
+### Bug Fixes
+
+* **clickhouse:** three audit defects — dropped EventVersion, decimal money sums, unbounded events read ([#6627](https://github.com/langwatch/langwatch/issues/6627)) ([984dd6d](https://github.com/langwatch/langwatch/commit/984dd6d3dddef5d053a99698544d6422feebbf23))
+* **cli:** drop billing and cadence wording from wrapper prompts ([#6760](https://github.com/langwatch/langwatch/issues/6760)) ([39cb437](https://github.com/langwatch/langwatch/commit/39cb4377636cd2f8523afda7bc2fd0d1d81df9be))
+* **security:** raise the transitive security floors in the typescript SDK examples ([#6866](https://github.com/langwatch/langwatch/issues/6866)) ([05c9913](https://github.com/langwatch/langwatch/commit/05c9913ad644518e42ea79abe9f44c189310912c))
+* **traces:** reject pageOffset, and pin the updated-axis scroll to a snapshot ([#6812](https://github.com/langwatch/langwatch/issues/6812)) ([e490008](https://github.com/langwatch/langwatch/commit/e49000891dbd58fe0e033230dfc83c380e1b1615))
+* **typescript-sdk:** disable the live LangWatch exporter in logger integration tests ([#3296](https://github.com/langwatch/langwatch/issues/3296)) ([#5811](https://github.com/langwatch/langwatch/issues/5811)) ([2054886](https://github.com/langwatch/langwatch/commit/20548860f53774f2e7b23a0e44e35a2ed6c6ef64))
+* **typescript-sdk:** stop the observability SDK exiting its host on a signal ([#6826](https://github.com/langwatch/langwatch/issues/6826)) ([7a4a8b8](https://github.com/langwatch/langwatch/commit/7a4a8b80398b234d4f040a78eb5b9760f6ce308b))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump vitest-mock-extended from 4.0.0 to 5.1.1 ([#6795](https://github.com/langwatch/langwatch/issues/6795)) ([181f965](https://github.com/langwatch/langwatch/commit/181f9652753f066fa2ac9e6fee775cd8cb806056))
+* **release:** pin typescript-sdk at 1.5.0 ([#6766](https://github.com/langwatch/langwatch/issues/6766)) ([51b3f98](https://github.com/langwatch/langwatch/commit/51b3f98e86e4ca76e85e0adbe14ae9f027d58403))
+
+
+### Code Refactoring
+
+* **typescript-sdk:** extract createIntegrationObservability helper ([f5d9838](https://github.com/langwatch/langwatch/commit/f5d9838c640f300c61d1c3dfbcc51b5bfdbd2614))
+* **typescript-sdk:** extract createIntegrationObservability() helper for test setup ([#3288](https://github.com/langwatch/langwatch/issues/3288)) ([#5750](https://github.com/langwatch/langwatch/issues/5750)) ([f5d9838](https://github.com/langwatch/langwatch/commit/f5d9838c640f300c61d1c3dfbcc51b5bfdbd2614))
+
 ## [1.4.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.3.0...typescript-sdk@v1.4.0) (2026-08-09)
 
 

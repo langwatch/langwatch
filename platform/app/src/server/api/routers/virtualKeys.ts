@@ -14,9 +14,10 @@
  * derivation; the legacy `providerCredentialIds`/`providerChain`
  * fields are no longer surfaced.
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
 import { resolveApplicableBudgetsForDraftKey } from "~/server/gateway/applicableBudgets.service";
@@ -46,6 +47,7 @@ import {
   VirtualKeyService,
   virtualKeyBudgetInputSchema,
 } from "~/server/gateway/virtualKey.service";
+import { loadDirectBudgetsForKeys } from "~/server/gateway/virtualKeyDirectBudget.service";
 import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
 import { authorizeInResolver } from "../rbac";
@@ -136,6 +138,11 @@ export const virtualKeysRouter = createTRPCRouter({
    * can see. Reads the cost path (`trace_summaries`), the same source the
    * Usage tab reads, so the number in the table matches the page a click
    * on it lands on.
+   *
+   * Keys that carry a budget of their own also get that budget's limit and
+   * its CURRENT-PERIOD spend, which is a different measurement from the
+   * month total: a daily cap is measured against today. Both travel in
+   * this one batched call so the table never asks per row.
    */
   spendThisMonth: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
@@ -166,11 +173,20 @@ export const virtualKeysRouter = createTRPCRouter({
         chRepo: undefined,
         spendRepo,
       });
-      const spend = await usage.spendByVirtualKey({
-        organizationId: input.organizationId,
-        virtualKeyIds: keys.map((k) => k.id),
-        window: { fromDate: startOfCurrentMonthUTC(now), toDate: now },
-      });
+      const [spend, directBudgets] = await Promise.all([
+        usage.spendByVirtualKey({
+          organizationId: input.organizationId,
+          virtualKeyIds: keys.map((k) => k.id),
+          window: { fromDate: startOfCurrentMonthUTC(now), toDate: now },
+        }),
+        loadDirectBudgetsForKeys({
+          prisma: ctx.prisma,
+          organizationId: input.organizationId,
+          virtualKeyIds: keys.map((k) => k.id),
+          chRepo: getApp().gateway.budgets,
+          now,
+        }),
+      ]);
       // Every visible key gets a row. With the spend source present, a
       // missing entry means the key genuinely spent nothing, so zero is
       // the honest render rather than an ambiguous blank.
@@ -178,6 +194,7 @@ export const virtualKeysRouter = createTRPCRouter({
         virtualKeyId: k.id,
         spentUsd: spend.get(k.id)?.spentUsd ?? "0",
         requests: spend.get(k.id)?.requests ?? 0,
+        budget: directBudgets.get(k.id) ?? null,
       }));
     }),
 
@@ -297,6 +314,8 @@ export const virtualKeysRouter = createTRPCRouter({
         traceProjectId: z.string().nullable().optional(),
         routingPolicyId: z.string().nullable().optional(),
         routingMode: routingModeSchema.optional(),
+        /** When the key stops serving. Omit it and the key never expires. */
+        expiresAt: z.coerce.date().optional(),
         budget: virtualKeyBudgetInputSchema.nullable().optional(),
         config: virtualKeyConfigSchema.partial().optional(),
       }),
@@ -355,6 +374,7 @@ export const virtualKeysRouter = createTRPCRouter({
         traceProjectId: input.traceProjectId ?? null,
         routingPolicyId: input.routingPolicyId ?? null,
         routingMode: input.routingMode,
+        expiresAt: input.expiresAt ?? null,
         budget: input.budget ?? null,
         config: input.config,
         actorUserId: ctx.session.user.id,
@@ -382,6 +402,8 @@ export const virtualKeysRouter = createTRPCRouter({
         traceProjectId: z.string().nullable().optional(),
         routingPolicyId: z.string().nullable().optional(),
         routingMode: routingModeSchema.optional(),
+        /** Omitted leaves it alone; null clears it; a date moves it. */
+        expiresAt: z.coerce.date().nullable().optional(),
         budget: virtualKeyBudgetInputSchema.nullable().optional(),
         config: virtualKeyConfigSchema.partial().optional(),
       }),
@@ -467,6 +489,7 @@ export const virtualKeysRouter = createTRPCRouter({
         traceProjectId: input.traceProjectId,
         routingPolicyId: input.routingPolicyId,
         routingMode: input.routingMode,
+        expiresAt: input.expiresAt,
         budget: input.budget,
         config: input.config,
         actorUserId: ctx.session.user.id,

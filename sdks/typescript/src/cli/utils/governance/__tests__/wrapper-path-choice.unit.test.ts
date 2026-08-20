@@ -11,6 +11,7 @@ import { describe, it, expect, vi } from "vitest";
 
 import type { GovernanceConfig } from "../config";
 import {
+  parseProjectScopeFlags,
   parseToolModeFlag,
   resolveWrapperPath,
   pathChoiceMessage,
@@ -219,7 +220,7 @@ describe("resolveWrapperPath", () => {
           "keep your own plan, send only telemetry to LangWatch",
         );
         expect(promptArg.choices[1]!.description).toBe(
-          "route calls through LangWatch with a virtual key, billed per token",
+          "route calls through LangWatch with a virtual key",
         );
         // Remembered for next time.
         expect(save).toHaveBeenCalledTimes(1);
@@ -398,11 +399,14 @@ describe("resolveWrapperPath", () => {
       });
       const promptArg = (prompt as unknown as ReturnType<typeof vi.fn>).mock
         .calls[0]![0] as {
-        choices: Array<{ value: string }>;
+        choices: Array<{ value: string; description: string }>;
         initial: number;
       };
       const values = promptArg.choices.map((c) => c.value);
       expect(values[promptArg.initial]).toBe("ingestion");
+      expect(promptArg.choices[values.indexOf("gateway")]!.description).toBe(
+        "route calls through LangWatch with a virtual key",
+      );
     });
 
     /** @scenario An explicit --tool-mode=gateway flag routes copilot through the gateway */
@@ -586,7 +590,9 @@ describe("resolveWrapperPath", () => {
         "keep your own plan, send only telemetry to LangWatch",
       );
       expect(gatewayChoiceTitle()).toBe("Using an API key");
-      expect(gatewayChoiceDescription()).toContain("billed per token");
+      expect(gatewayChoiceDescription()).toBe(
+        "route calls through LangWatch with a virtual key",
+      );
     });
 
     it("names the right subscription per tool, with a neutral fallback", () => {
@@ -597,6 +603,71 @@ describe("resolveWrapperPath", () => {
       expect(otlpChoiceTitle("toString")).toBe("Using your own toString plan");
       // opencode is a bring-your-own client with no single subscription.
       expect(otlpChoiceTitle("opencode")).toBe("Using your own opencode plan");
+    });
+  });
+});
+
+describe("parseProjectScopeFlags", () => {
+  describe("given no scope flag is present", () => {
+    it("forwards every arg verbatim with no scope", () => {
+      const out = parseProjectScopeFlags(["-p", "say hi"]);
+      expect(out).toEqual({
+        args: ["-p", "say hi"],
+        project: undefined,
+        personal: false,
+      });
+    });
+  });
+
+  describe("given --project <value> in the args", () => {
+    it("strips the flag and its value, order preserved", () => {
+      const out = parseProjectScopeFlags(["--project", "acme-app", "-p", "hi"]);
+      expect(out.args).toEqual(["-p", "hi"]);
+      expect(out.project).toBe("acme-app");
+    });
+
+    it("supports the --project=<value> form", () => {
+      const out = parseProjectScopeFlags(["--project=acme-app", "-p", "hi"]);
+      expect(out.args).toEqual(["-p", "hi"]);
+      expect(out.project).toBe("acme-app");
+    });
+
+    it("treats an empty value as no project", () => {
+      expect(parseProjectScopeFlags(["--project="]).project).toBeUndefined();
+      expect(parseProjectScopeFlags(["--project", "  "]).project).toBeUndefined();
+    });
+
+    it("drops a trailing --project with no value instead of eating a flag", () => {
+      const out = parseProjectScopeFlags(["-p", "hi", "--project"]);
+      expect(out.args).toEqual(["-p", "hi"]);
+      expect(out.project).toBeUndefined();
+    });
+  });
+
+  describe("given --project is followed by another option", () => {
+    it("leaves --personal to be parsed, so the scope conflict still surfaces", () => {
+      const out = parseProjectScopeFlags(["--project", "--personal"]);
+      expect(out.project).toBeUndefined();
+      expect(out.personal).toBe(true);
+      expect(out.args).toEqual([]);
+    });
+
+    it("leaves a later wrapper flag on the args instead of consuming it", () => {
+      const out = parseProjectScopeFlags([
+        "--project",
+        "--tool-mode",
+        "gateway",
+      ]);
+      expect(out.project).toBeUndefined();
+      expect(out.args).toEqual(["--tool-mode", "gateway"]);
+    });
+  });
+
+  describe("given --personal in the args", () => {
+    it("strips it and reports the personal reset", () => {
+      const out = parseProjectScopeFlags(["--personal", "-p", "hi"]);
+      expect(out.args).toEqual(["-p", "hi"]);
+      expect(out.personal).toBe(true);
     });
   });
 });

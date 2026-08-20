@@ -138,7 +138,7 @@ describe("scanTelemetryTargets", () => {
 			// codex → [otel] block in config.toml
 			writeCodexOtelBlock(
 				{
-					endpoint: "http://app/api/otel/v1/traces",
+					baseEndpoint: "http://app/api/otel",
 					ingestionToken: "sk-lw-SECRET",
 				},
 				{ persistAuthHeader: true },

@@ -37,7 +37,7 @@ export function useSuiteRunFreshness({
   sseConnected,
 }: UseSuiteRunFreshnessOptions) {
   const { project } = useOrganizationTeamProject();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const { data } = api.scenarios.getSuiteRunFreshness.useQuery(
     {

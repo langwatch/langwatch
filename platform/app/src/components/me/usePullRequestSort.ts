@@ -1,17 +1,22 @@
-import { useCallback, useMemo, useState } from "react";
-
+import {
+  type ColumnSortRules,
+  type ColumnSortState,
+  nextColumnSort,
+  type SortDirection,
+  sortRowsByColumn,
+  useColumnSort,
+} from "./columnSort";
 import {
   PULL_REQUEST_STATUS_SORT_RANK,
   type PullRequestStatus,
 } from "./pullRequestStatus";
 
 /**
- * The order the Pull Requests table reads in, and the way back to it.
+ * The Pull Requests table's columns, named against the shared column-sort
+ * shape in `columnSort.ts`.
  *
  * The table opens on the work that moved most recently, because that is the
- * question the page is asked most: what is warm right now. Every column can
- * take over from there, and a third click on the same column hands the table
- * back to the order it opened in, so trying a sort costs nothing.
+ * question the page is asked most: what is warm right now.
  *
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
@@ -21,38 +26,18 @@ export type PullRequestSortColumn =
   | "title"
   | "status"
   | "lastActivity"
-  | "sessions"
   | "models"
   | "tokens"
   | "cost";
 
-export type PullRequestSortDirection = "asc" | "desc";
+export type PullRequestSortDirection = SortDirection;
 
-export interface PullRequestSortState {
-  column: PullRequestSortColumn;
-  direction: PullRequestSortDirection;
-}
+export type PullRequestSortState = ColumnSortState<PullRequestSortColumn>;
 
 export const DEFAULT_PULL_REQUEST_SORT = {
   column: "lastActivity",
   direction: "desc",
 } as const satisfies PullRequestSortState;
-
-/**
- * Which way a column is read on the first click: a measure leads with its
- * largest value, a name leads with A, and a status leads with the work still
- * in flight.
- */
-const INITIAL_DIRECTION = {
-  number: "desc",
-  title: "asc",
-  status: "asc",
-  lastActivity: "desc",
-  sessions: "desc",
-  models: "asc",
-  tokens: "desc",
-  cost: "desc",
-} as const satisfies Record<PullRequestSortColumn, PullRequestSortDirection>;
 
 /** Everything a row has to carry for the table's order to be decidable. */
 export interface SortablePullRequestRow {
@@ -60,65 +45,41 @@ export interface SortablePullRequestRow {
   headBranch: string;
   snapshotStatus: PullRequestStatus | null;
   lastActivityAtMs: number;
-  sessionsCount: number;
   modelBreakdown: ReadonlyArray<{ model: string }>;
   totalTokens: number;
   costUsd: number | null;
 }
 
-/**
- * What a column sorts a row by. `null` means the column does not apply to this
- * row at all, which is a different thing from a small value: a branch has no
- * pull request number and no status, and a project the reader may not price
- * has no cost.
- */
-type SortKey = number | string | null;
-
-const keyOf: Record<
+const PULL_REQUEST_SORT_RULES: ColumnSortRules<
   PullRequestSortColumn,
-  (row: SortablePullRequestRow) => SortKey
+  SortablePullRequestRow
 > = {
-  number: (row) => row.pullRequest?.number ?? null,
-  title: (row) => (row.pullRequest?.title || row.headBranch).toLowerCase(),
-  status: (row) =>
-    row.snapshotStatus === null
-      ? null
-      : PULL_REQUEST_STATUS_SORT_RANK[row.snapshotStatus],
-  lastActivity: (row) => row.lastActivityAtMs,
-  sessions: (row) => row.sessionsCount,
-  models: (row) => row.modelBreakdown[0]?.model.toLowerCase() ?? null,
-  tokens: (row) => row.totalTokens,
-  cost: (row) => row.costUsd,
+  defaultSort: DEFAULT_PULL_REQUEST_SORT,
+  // A measure leads with its largest value, a name leads with A, and a status
+  // leads with the work still in flight.
+  initialDirection: {
+    number: "desc",
+    title: "asc",
+    status: "asc",
+    lastActivity: "desc",
+    models: "asc",
+    tokens: "desc",
+    cost: "desc",
+  },
+  keyOf: {
+    number: (row) => row.pullRequest?.number ?? null,
+    title: (row) => (row.pullRequest?.title || row.headBranch).toLowerCase(),
+    status: (row) =>
+      row.snapshotStatus === null
+        ? null
+        : PULL_REQUEST_STATUS_SORT_RANK[row.snapshotStatus],
+    lastActivity: (row) => row.lastActivityAtMs,
+    models: (row) => row.modelBreakdown[0]?.model.toLowerCase() ?? null,
+    tokens: (row) => row.totalTokens,
+    cost: (row) => row.costUsd,
+  },
+  tieBreak: (left, right) => right.lastActivityAtMs - left.lastActivityAtMs,
 };
-
-/**
- * One column's comparison. A row the column does not apply to sinks to the
- * bottom whichever way the column is read: flipping the direction is a request
- * to reverse the values, not to promote the rows that have none.
- */
-function compareByColumn({
-  left,
-  right,
-  column,
-  direction,
-}: {
-  left: SortablePullRequestRow;
-  right: SortablePullRequestRow;
-  column: PullRequestSortColumn;
-  direction: PullRequestSortDirection;
-}): number {
-  const a = keyOf[column](left);
-  const b = keyOf[column](right);
-  if (a === null && b === null) return 0;
-  if (a === null) return 1;
-  if (b === null) return -1;
-
-  const sign = direction === "asc" ? 1 : -1;
-  if (typeof a === "string" || typeof b === "string") {
-    return String(a).localeCompare(String(b)) * sign;
-  }
-  return (a - b) * sign;
-}
 
 /**
  * The next sort a click on `column` asks for. A column the table is not
@@ -132,12 +93,7 @@ export function nextPullRequestSort({
   current: PullRequestSortState;
   column: PullRequestSortColumn;
 }): PullRequestSortState {
-  const initial = INITIAL_DIRECTION[column];
-  if (current.column !== column) return { column, direction: initial };
-  if (current.direction === initial) {
-    return { column, direction: initial === "asc" ? "desc" : "asc" };
-  }
-  return DEFAULT_PULL_REQUEST_SORT;
+  return nextColumnSort({ current, column, rules: PULL_REQUEST_SORT_RULES });
 }
 
 /**
@@ -152,16 +108,7 @@ export function sortPullRequestRows<T extends SortablePullRequestRow>({
   rows: readonly T[];
   sort: PullRequestSortState;
 }): T[] {
-  return [...rows].sort((left, right) => {
-    const byColumn = compareByColumn({
-      left,
-      right,
-      column: sort.column,
-      direction: sort.direction,
-    });
-    if (byColumn !== 0) return byColumn;
-    return right.lastActivityAtMs - left.lastActivityAtMs;
-  });
+  return sortRowsByColumn({ rows, sort, rules: PULL_REQUEST_SORT_RULES });
 }
 
 export function usePullRequestSort<T extends SortablePullRequestRow>({
@@ -173,18 +120,5 @@ export function usePullRequestSort<T extends SortablePullRequestRow>({
   sort: PullRequestSortState;
   onSort: (column: PullRequestSortColumn) => void;
 } {
-  const [sort, setSort] = useState<PullRequestSortState>(
-    DEFAULT_PULL_REQUEST_SORT,
-  );
-
-  const sorted = useMemo(
-    () => sortPullRequestRows({ rows, sort }),
-    [rows, sort],
-  );
-
-  const onSort = useCallback((column: PullRequestSortColumn) => {
-    setSort((current) => nextPullRequestSort({ current, column }));
-  }, []);
-
-  return { sorted, sort, onSort };
+  return useColumnSort({ rows, rules: PULL_REQUEST_SORT_RULES });
 }

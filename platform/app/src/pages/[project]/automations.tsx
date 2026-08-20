@@ -9,7 +9,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Monitor, TriggerAction } from "@prisma/client";
 import { useMemo } from "react";
 import {
   Calendar,
@@ -52,6 +51,7 @@ import type { TriggerActionParams } from "~/features/automations/logic/triggerAc
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { automationContextChip } from "~/features/langy/logic/langyContextChips";
+import type { Monitor, TriggerAction } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -231,9 +231,6 @@ function AutomationsPage() {
             title: "Update automation",
             type: "error",
             description: "Failed to update automation",
-            meta: {
-              closable: true,
-            },
           });
         },
       },
@@ -264,9 +261,6 @@ function AutomationsPage() {
             title: "Delete automation",
             type: "success",
             description: "Automation deleted",
-            meta: {
-              closable: true,
-            },
           });
           void triggers.refetch();
         },
@@ -275,9 +269,6 @@ function AutomationsPage() {
             title: "Delete automation",
             type: "error",
             description: "Failed to delete automation",
-            meta: {
-              closable: true,
-            },
           });
         },
       },

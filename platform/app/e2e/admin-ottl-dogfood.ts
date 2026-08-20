@@ -1,6 +1,6 @@
 /**
  * admin-ottl-dogfood.ts — Ask A real-user QA for IngestionTemplates
- * authoring flow at /settings/governance/tool-catalog → Ingestion
+ * authoring flow at /governance/tool-catalog → Ingestion
  * Templates tab. Drives the 4 paths shipped at d61842a3f:
  *
  *   1. List view shows platform rows + org-authored rows
@@ -66,7 +66,7 @@ void (async () => {
   const results: StepResult[] = [];
 
   await step(results, "navigate-to-tool-catalog", async () => {
-    await page.goto(`${BASE_URL}/settings/governance/tool-catalog`);
+    await page.goto(`${BASE_URL}/governance/tool-catalog`);
     await page.waitForLoadState("networkidle");
     await page
       .locator('text="AI Tool Catalog"')

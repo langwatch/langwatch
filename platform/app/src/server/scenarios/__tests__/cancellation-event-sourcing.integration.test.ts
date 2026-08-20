@@ -2,7 +2,7 @@
  * Integration tests for event-sourcing based scenario cancellation.
  *
  * Uses real Redis (via testContainers) to verify the full pub/sub flow:
- * - Publishing cancel signals from the reactor
+ * - Publishing cancel signals from the subscriber
  * - Workers subscribing and receiving targeted cancellations
  * - Multiple workers only killing their own children
  * - Batch cancellation reaching all workers
@@ -20,22 +20,29 @@ import {
   vi,
 } from "vitest";
 
-// Mock the Redis module so startScenarioProcessor uses the test Redis connection.
-// The getter is wired in beforeAll after testContainers starts.
+// `startScenarioProcessor` reads its connection through `tryGetApp` — skipping
+// the processor is its documented outcome when there is none, so overriding
+// `getApp` here would leave it silently skipped and the suite watching a
+// processor that never started. Partial-mock: only the accessor it reads is
+// replaced, and `beforeAll` fills the connection in once testContainers is up.
 let _testRedis: any = null;
-vi.mock("~/server/redis", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("~/server/redis")>()),
-  get connection() {
-    return _testRedis;
-  },
-}));
+vi.mock("~/server/app-layer/app", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("~/server/app-layer/app")>();
+  return {
+    ...actual,
+    tryGetApp: () => (_testRedis ? { redis: _testRedis } : null),
+  };
+});
 
 import type { Redis } from "ioredis";
+import { tryGetApp } from "../../app-layer/app";
 import {
   getTestRedisConnection,
   startTestContainers,
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
+import { createCancelExecutionHandler } from "../../event-sourcing/pipelines/simulation-processing/process-manager";
 import type {
   CancellationMessage,
   CancellationSubscriber,
@@ -127,7 +134,6 @@ describe("Event-sourcing cancellation (real Redis)", () => {
   });
 
   describe("when a single worker is running a scenario", () => {
-    /** @scenario "Cancel reactor broadcasts to Redis on cancel_requested event" */
     /** @scenario "Worker kills its own child process on cancel broadcast" */
     it("kills the child process on cancel broadcast", async () => {
       const worker = createMockWorker(redis);
@@ -149,6 +155,53 @@ describe("Event-sourcing cancellation (real Redis)", () => {
 
       await waitFor(() => worker.killed.get("run-1") === true);
       expect(worker.killed.get("run-1")).toBe(true);
+    });
+
+    /** @scenario "Process manager broadcasts cancel to Redis on cancel_requested event" */
+    it("reaches the worker when the cancel intent is dispatched by the process manager", async () => {
+      // Drives the process manager's own cancel executor rather than calling
+      // publishCancellation directly, so the intent payload -> channel
+      // message mapping is covered end to end on real Redis.
+      const worker = createMockWorker(redis);
+      worker.startChild("run-pm-1");
+      const unsubscribe = await worker.subscribe();
+      cleanupFns.push(unsubscribe);
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      const dispatchCancel = createCancelExecutionHandler({
+        getPool: () => null,
+        commands: () => {
+          throw new Error("unused: the cancel intent never reports an outcome");
+        },
+        // Mirrors the registry wiring: the PM publishes through the shared
+        // Redis connection.
+        // Exactly the two fields the real handler passes. batchRunId is
+        // optional and the cancel intent does not carry it, so sending it
+        // here — as null, a value the type does not even allow — would make
+        // this mock prove something production never does.
+        publishCancellation: async ({ projectId, scenarioRunId }) => {
+          await publishCancellation({
+            publisher: redis,
+            message: { projectId, scenarioRunId },
+          });
+        },
+      });
+
+      await dispatchCancel(
+        { projectId: "proj-1", scenarioRunId: "run-pm-1" },
+        {
+          processName: "simulation_run_execution",
+          projectId: "proj-1",
+          processKey: "run-pm-1",
+          tenantId: "proj-1",
+          messageKey: "process:run-pm-1:cancel:run-pm-1",
+          attempt: 1,
+        },
+      );
+
+      await waitFor(() => worker.killed.get("run-pm-1") === true);
+      expect(worker.killed.get("run-pm-1")).toBe(true);
     });
   });
 
@@ -190,6 +243,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
   });
 
   describe("when a batch cancel fires for multiple scenarios", () => {
+    /** @scenario "Batch cancel across multiple workers terminates all active runs" */
     it("all matching child processes across workers are killed", async () => {
       const workerA = createMockWorker(redis);
       workerA.startChild("run-1");
@@ -366,9 +420,9 @@ describe("Event-sourcing cancellation (real Redis)", () => {
         },
       };
 
-      // Use the REAL startScenarioProcessor with the test Redis
-      // We need to mock the connection module to use test Redis
-      const { connection: testConnection } = await import("../../redis");
+      // Use the REAL startScenarioProcessor with the test Redis, which the
+      // `tryGetApp` mock at the top of this file serves.
+      const testConnection = tryGetApp()?.redis;
 
       // If no Redis in test env, skip (testContainers provides it)
       if (!testConnection) {
@@ -397,7 +451,10 @@ describe("Event-sourcing cancellation (real Redis)", () => {
         });
       } else {
         // Real path: startScenarioProcessor wires everything
-        const handle = await startScenarioProcessor(pool, mockDeps);
+        const handle = await startScenarioProcessor({
+          pool,
+          injectedDeps: mockDeps,
+        });
         if (handle) cleanupFns.push(handle.close);
       }
 
@@ -415,7 +472,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
 
       await waitFor(() => pool.wasCancelled("run-pre-cancel"));
 
-      // Step 2: Execution reactor submits the job
+      // Step 2: Execution subscriber submits the job
       pool.submit({
         projectId: "proj-1",
         scenarioId: "scen-1",

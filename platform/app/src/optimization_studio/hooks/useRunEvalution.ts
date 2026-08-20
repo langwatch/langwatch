@@ -64,7 +64,7 @@ export const useRunEvalution = () => {
       { enabled: !!project?.id },
     );
 
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
 
   const [triggerTimeout, setTriggerTimeout] = useState<{
     run_id: string;
@@ -98,9 +98,6 @@ export const useRunEvalution = () => {
         } evaluation execution`,
         type: "error",
         duration: 5000,
-        meta: {
-          closable: true,
-        },
       });
     }
   }, [triggerTimeout, setEvaluationState, getWorkflow]);
@@ -125,7 +122,6 @@ export const useRunEvalution = () => {
           title: "Error running evaluation: workflow not found",
           type: "error",
           duration: 5000,
-          meta: { closable: true },
         });
         return;
       }
@@ -194,7 +190,6 @@ export const useRunEvalution = () => {
             title: "Error saving version",
             type: "error",
             duration: 5000,
-            meta: { closable: true },
           });
           return;
         }
@@ -280,6 +275,6 @@ export const useRunEvalution = () => {
     runEvaluation,
     stopEvaluation,
     isLoading:
-      isLoading || generateCommitMessage.isLoading || commitVersion.isLoading,
+      isLoading || generateCommitMessage.isPending || commitVersion.isPending,
   };
 };

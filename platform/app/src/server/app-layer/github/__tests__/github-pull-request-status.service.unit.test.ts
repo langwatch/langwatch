@@ -41,6 +41,7 @@ function storedRow(over: Partial<GithubPullRequestRow> = {}) {
     prCreatedAt: MAPPED_AT,
     prClosedAt: null,
     prMergedAt: null,
+    prUpdatedAt: MAPPED_AT,
     mappedAt: MAPPED_AT,
     lastCheckedAt: MAPPED_AT,
     ...over,
@@ -146,6 +147,7 @@ describe("GithubPullRequestStatusService", () => {
           mergedAt: "2026-05-03T00:00:00Z",
           closedAt: "2026-05-03T00:00:00Z",
           createdAt: "2026-05-01T00:00:00Z",
+          updatedAt: "2026-05-03T00:00:00Z",
           authorLogin: "someone",
         }),
       });
@@ -158,7 +160,13 @@ describe("GithubPullRequestStatusService", () => {
       expect(status?.status).toBe("merged");
       expect(status?.source).toBe("live");
       expect(refreshSnapshot).toHaveBeenCalledWith(
-        expect.objectContaining({ prNumber: 7, state: "closed" }),
+        expect.objectContaining({
+          prNumber: 7,
+          state: "closed",
+          // Carried so the store can refuse this write if a webhook has
+          // already stored something newer.
+          prUpdatedAt: new Date("2026-05-03T00:00:00Z"),
+        }),
       );
     });
 
@@ -174,6 +182,7 @@ describe("GithubPullRequestStatusService", () => {
           mergedAt: null,
           closedAt: null,
           createdAt: "2026-05-01T00:00:00Z",
+          updatedAt: "2026-05-01T00:00:00Z",
           authorLogin: "someone",
         }),
       });

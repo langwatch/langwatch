@@ -10,6 +10,10 @@ on:
     branches:
       - main
   pull_request:
+    # ready_for_review is NOT a default pull_request activity type. Without
+    # it, taking a PR out of draft fires no event at all, so the jobs gated
+    # on `heavy` below would never get their first non-draft run.
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   workflow_dispatch:
   # Optional: run nightly for regression detection
@@ -28,6 +32,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
+      # Draft PRs keep the cheap signal and release the runner slots;
+      # everything heavy returns on ready_for_review and in the merge queue.
+      heavy: ${{ steps.detect.outputs.heavy }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
@@ -55,7 +62,7 @@ jobs:
 
   e2e:
     needs: changes
-    if: needs.changes.outputs.relevant == 'true'
+    if: needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
     env:
       # App configuration
@@ -178,6 +185,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # docs/media, docs/images and assets/ are 165 MB of marketing
+          # .gif/.mp4 that the e2e stack never reads. Naming a sparse-checkout
+          # makes checkout fetch with --filter=blob:none, so they never
+          # transfer: 180 MB -> 42 MB of .git on a depth-1 clone. The .mdx tree
+          # under docs/ stays, because a unit test reads it. Non-cone mode so a
+          # new top-level directory arrives by default instead of going missing.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10

@@ -16,7 +16,7 @@
  * Uses:
  *  - testcontainers ClickHouse (via startTestContainers) for real SQL
  *  - LocalFilesystemDriver pointed at a per-test temp dir for real byte storage
- *  - vi.mock to wire getClickHouseClientForProject to the test container client
+ *  - vi.mock to wire getClickHouseClientForTenant to the test container client
  */
 
 import crypto from "node:crypto";
@@ -35,7 +35,6 @@ import {
   it,
   vi,
 } from "vitest";
-import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import {
   startTestContainers,
   stopTestContainers,
@@ -51,12 +50,22 @@ import { mintFileUri } from "../uri";
 // Hoisted mocks — must be declared before any imports that trigger module load
 // ---------------------------------------------------------------------------
 
-// Wire getClickHouseClientForProject to return the test container client.
-// The actual client reference is replaced in beforeAll once the container starts.
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
-  getSharedClickHouseClient: vi.fn(),
-}));
+const resolveClientMock = vi.fn();
+// The repository reads `getApp().clickhouse.resolveClient` (two-door access);
+// the actual client reference lands in beforeAll once the container starts.
+vi.mock("~/server/app-layer/app", () => {
+  const app = () => ({
+    clickhouse: {
+      enabled: true,
+      resolveClient: (...args: unknown[]) => resolveClientMock(...args),
+      resolveOrganizationClient: async () => {
+        throw new Error("no organization client in this suite");
+      },
+      allInstances: async () => [],
+    },
+  });
+  return { getApp: app, tryGetApp: app };
+});
 
 // Suppress logger noise in test output
 vi.mock("@langwatch/observability", () => ({
@@ -170,12 +179,7 @@ beforeAll(async () => {
   // Wire the mock now that ch is available. The vi.mock factory above
   // replaced these exports with mock fns at module-load; we only need
   // to set their return values here, not re-import.
-  vi.mocked(
-    clickhouseClientModule.getClickHouseClientForProject,
-  ).mockResolvedValue(ch);
-  vi.mocked(clickhouseClientModule.getSharedClickHouseClient).mockReturnValue(
-    ch,
-  );
+  resolveClientMock.mockResolvedValue(ch);
 }, 90_000);
 
 afterAll(async () => {

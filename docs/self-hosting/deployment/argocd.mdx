@@ -3,7 +3,7 @@ title: ArgoCD
 description: "Deploy the LangWatch Helm chart via ArgoCD with operator-managed secrets and no GitOps-specific workarounds"
 ---
 
-This page is the getting-started guide for installing the LangWatch Helm chart through ArgoCD. With the current chart release there is no ArgoCD-specific configuration to remember: gateway-auth follows the same operator-pre-create pattern that the app, database, and Redis Secrets already use, so an ordinary Argo Application manifest is enough.
+The LangWatch Helm chart installs through ArgoCD from an ordinary Argo Application manifest. With the current chart release there is no ArgoCD-specific configuration to remember: gateway-auth follows the same operator-pre-create pattern that the app, database, and Redis Secrets already use.
 
 If you are not on ArgoCD, the [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) guide is what you want.
 
@@ -20,7 +20,7 @@ The langwatch chart needs two operator-managed Secrets in your target namespace 
 - `langwatch-app-secrets` holds the app keys + the AI gateway shared-auth keys. Both `langwatch-app` and the gateway pod mount from this Secret.
 - A ClickHouse credentials Secret (any name, referenced from values via `clickhouse.auth.existingSecret`) holds the ClickHouse password and the Keeper inter-node cluster secret. The deployment composes `CLICKHOUSE_URL` at runtime from the password key, so the Secret name must be a non-default name (the chart's render-time validator fails fast if you leave it at the default `<release>-clickhouse` while `autogen.enabled=false`).
 
-This is the same pre-create-then-install pattern that the Kubernetes (Helm) [production deployment](/self-hosting/deployment/kubernetes-helm#production-deployment) uses, and it is what makes the ArgoCD path trivial: the chart never renders these Secrets, so Argo has nothing to reconcile and nothing rotates on subsequent syncs.
+This is the same pre-create-then-install pattern that the Kubernetes (Helm) [production deployment](/self-hosting/deployment/kubernetes-helm#production-deployment) uses: the chart never renders these Secrets, so Argo has nothing to reconcile and nothing rotates on subsequent syncs.
 
 Create the namespace and the Secrets:
 

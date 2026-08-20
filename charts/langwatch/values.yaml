@@ -41,6 +41,30 @@ global:
     readOnlyRootFilesystem: true
   ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
   automountServiceAccountToken: false
+
+  # ServiceAccount for the first-party workloads that touch object storage
+  # (app and workers; the cron pods only curl the app over HTTP, so they are
+  # deliberately left off it). Opt-in: disabled by default, so installs that
+  # do not need it render exactly as they did before and keep using the
+  # namespace `default` account.
+  #
+  # This is what cloud identity attaches to. Both providers grant storage
+  # access to a ServiceAccount rather than to a pod:
+  #   AWS  — annotate with eks.amazonaws.com/role-arn        (IRSA)
+  #   Azure— annotate with azure.workload.identity/client-id (workload identity)
+  #          AND label the pods azure.workload.identity/use: "true"
+  #
+  # Note this is NOT Azure-specific: without it, S3's existing keyless
+  # sign-in (the AWS SDK default provider chain) is unreachable through
+  # chart values too. See issues #6182 and #6087.
+  ## @extra global.serviceAccount ServiceAccount used by app, workers and cronjobs.
+  ## @param global.serviceAccount.create [default: false] Create a ServiceAccount for the first-party workloads.
+  ## @param global.serviceAccount.name [string] Name to use. Defaults to the release name when create is true; set to use an existing account.
+  ## @param global.serviceAccount.annotations [object] Annotations on the ServiceAccount — where the cloud identity binding goes.
+  serviceAccount:
+    create: false
+    name: ""
+    annotations: {}
   ## @extra global.scheduling Global scheduling defaults for all pods.
   ## @param global.scheduling.nodeSelector [object] Node selector labels for all pods.
   ## @param global.scheduling.affinity [object] Affinity rules for all pods.
@@ -119,21 +143,21 @@ images:
   ## @param images.app.pullPolicy [string] App image pull policy.
   app:
     repository: langwatch/langwatch
-    tag: 3.12.0 # x-release-please-version
+    tag: 3.15.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langwatch_nlp.repository [string] NLP image repository (Go nlpgo binary, published as langwatch_nlp).
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
     repository: langwatch/langwatch_nlp
-    tag: 3.12.0 # x-release-please-version
+    tag: 3.15.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langevals.repository [string] Langevals image repository.
   ## @param images.langevals.tag [string] Langevals image tag.
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
   langevals:
     repository: langwatch/langevals
-    tag: 3.12.0 # x-release-please-version
+    tag: 3.15.0 # x-release-please-version
     pullPolicy: IfNotPresent
 
 # =============================================================================
@@ -154,6 +178,15 @@ app:
   # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
   ## @param app.replicaCount [default: 1] Number of application replicas.
   replicaCount: 1
+
+  # Shutdown budget — same shape and the same rule as workers.* below. The app
+  # shares the workers' entrypoint watchdog and can host the worker stack
+  # itself (the `all` process role), so it is sized the same way. A web-only
+  # pod drains in well under this; the grace period is a ceiling, not a wait.
+  ## @param app.shutdownDrainSeconds [default: 25] Seconds the queue may spend draining in-flight jobs on shutdown.
+  shutdownDrainSeconds: 25
+  ## @param app.terminationGracePeriodSeconds [default: 55] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.
+  terminationGracePeriodSeconds: 55
 
   # Kubernetes service configuration
   # See: https://kubespec.dev/v1/Service
@@ -300,7 +333,8 @@ app:
     # Storage provider to use. Options: awsS3 (default), azureBlob.
     # When set to 'awsS3', enables AWS S3 native integration.
     # When set to 'azureBlob', enables Azure Blob Storage (STORED_OBJECTS_BACKEND=azure,
-    # AC37 / issue #4133) — SharedKey auth only, mirrors the awsS3 shape.
+    # AC37 / issue #4133) — shared key or a Microsoft Entra identity, selected
+    # by providers.azureBlob.authMode; mirrors the awsS3 shape.
     provider: awsS3
     bucket: "langwatch-dataset" # Bucket name for dataset storage
 
@@ -331,13 +365,30 @@ app:
           secretKeyRef: { name: "", key: "" }
 
       # Azure Blob Storage configuration for dataset + stored-objects storage
-      # (AC37, issue #4133). SharedKey auth only — workload identity is a later
-      # issue (#6087), per-project Azure BYOC is #6088.
+      # (AC37, issue #4133). Shared key or a Microsoft Entra identity, selected
+      # by authMode below (#6087). Per-project Azure BYOC is still #6088.
       ## @extra app.dataplane.providers.azureBlob Azure Blob provider configuration.
       ## @param app.dataplane.providers.azureBlob.accountName.value [string] Azure Storage account name (not recommended in production — use accountName.secretKeyRef).
       ## @param app.dataplane.providers.azureBlob.accountKey.value [string] Azure Storage account key (not recommended in production — use accountKey.secretKeyRef).
       ## @param app.dataplane.providers.azureBlob.container.value [string] Azure Blob container name (not recommended in production — use container.secretKeyRef).
       azureBlob:
+        # How the app authenticates to Azure Blob. Explicit — never inferred
+        # from which values happen to be filled in (issue #6087).
+        #   sharedKey        the storage account key. Requires accountKey below.
+        #                    Unusable when the account sets
+        #                    allowSharedKeyAccess=false, which many enterprises
+        #                    enforce by policy.
+        #   workloadIdentity AKS workload identity. No key anywhere. Requires
+        #                    global.serviceAccount with the client-id
+        #                    annotation, and the pod label
+        #                    azure.workload.identity/use: "true".
+        #   managedIdentity  IMDS — Azure VM / VMSS / App Service.
+        #   azureCli         a developer's signed-in CLI. Local use only.
+        # Grant the identity "Storage Blob Data Contributor" on the account or
+        # container; the control-plane "Contributor" role does NOT grant data
+        # access.
+        ## @param app.dataplane.providers.azureBlob.authMode [string, default: sharedKey] Azure authentication mode: sharedKey, workloadIdentity, managedIdentity, or azureCli.
+        authMode: sharedKey
         accountName:
           value: ""
           ## @param app.dataplane.providers.azureBlob.accountName.secretKeyRef [object] Secret ref for the Azure Storage account name.
@@ -350,6 +401,8 @@ app:
           value: ""
           ## @param app.dataplane.providers.azureBlob.container.secretKeyRef [object] Secret ref for the Azure Blob container name.
           secretKeyRef: { name: "", key: "" }
+        ## @param app.dataplane.providers.azureBlob.spoolRetentionConfirmed [boolean] Confirms the container has a lifecycle rule deleting `trace-blobs/spool/` blobs after 3 days. The ADR-022 trace spool refuses to write to Azure until this is true, because a crash between the spool write and its delete is bounded only by that rule and the app cannot verify a management-plane policy with a data-plane key. Leave false unless you have created the policy.
+        spoolRetentionConfirmed: false
         # Optional. Override the blob endpoint for sovereign clouds
         # (*.usgovcloudapi.net, *.chinacloudapi.cn), private endpoints, or an
         # emulator. Defaults to https://{accountName}.blob.core.windows.net.
@@ -357,6 +410,21 @@ app:
         endpoint:
           value: ""
           ## @param app.dataplane.providers.azureBlob.endpoint.secretKeyRef [object] Secret ref for a custom Azure Blob endpoint.
+          secretKeyRef: { name: "", key: "" }
+        # Sovereign clouds (Azure Government, Azure China) issue tokens from a
+        # different identity authority and may use a different storage
+        # audience. Required alongside a non-public endpoint in any
+        # identity-based authMode — the app refuses to guess, because asking
+        # the public-cloud issuer for a sovereign token fails confusingly.
+        ## @param app.dataplane.providers.azureBlob.authorityHost.value [string] Entra authority host for sovereign clouds.
+        authorityHost:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.authorityHost.secretKeyRef [object] Secret ref for the identity authority host.
+          secretKeyRef: { name: "", key: "" }
+        ## @param app.dataplane.providers.azureBlob.tokenAudience.value [string] Storage token audience override for sovereign clouds.
+        tokenAudience:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.tokenAudience.secretKeyRef [object] Secret ref for the storage token audience.
           secretKeyRef: { name: "", key: "" }
 
       # Migration aid: when provider is azureBlob, the chart still emits the
@@ -366,6 +434,29 @@ app:
       # greenfield Azure install.
       ## @param app.dataplane.legacyS3ReadBucket [string] Existing S3 bucket to keep reading during an S3->Azure migration.
     legacyS3ReadBucket: ""
+
+    # Mirror of legacyS3ReadBucket for the Azure->S3 direction. Set true when
+    # moving writes back to S3 while objects written to Azure must stay
+    # readable: the Azure connection settings under providers.azureBlob keep
+    # being emitted, but STORED_OBJECTS_BACKEND does not, so new writes go to
+    # S3 and historical azure-blob:// URIs still resolve. Leave false unless
+    # Azure objects exist.
+    #
+    # SCOPE — this covers URI-addressed STORED OBJECTS only (externalized byte
+    # content, trace payloads, staged uploads): each one carries an
+    # `azure-blob://` URI whose scheme picks the driver, so a read re-derives
+    # its own provider regardless of the write toggle.
+    #
+    # It does NOT cover DATASET chunks. Those are addressed by
+    # {projectId, datasetId, index} with no provider recorded on the row, so
+    # dataset reads follow the CURRENT toggle and cannot reach chunks written
+    # to Azure. Switching a deployment that already has datasets makes them
+    # unreachable (not deleted — reachable again if the toggle is reverted).
+    # A migration that carries datasets needs per-dataset storage provenance,
+    # tracked in #6323. Do not use this flag on an install with datasets until
+    # that lands.
+    ## @param app.dataplane.legacyAzureRead [default: false] Keep Azure settings for reads after moving writes back to S3.
+    legacyAzureRead: false
 
   # Stored Objects - externalized byte content (audio, image, PDF, document).
   # By default, uses a local-filesystem PVC so the chart works plug-and-play
@@ -378,12 +469,59 @@ app:
   ## @param app.storedObjects.localFilesystem.path [string, default: /var/lib/langwatch/objects] Mount point that the LocalFilesystemDriver writes under.
   ## @param app.storedObjects.localFilesystem.size [string, default: 10Gi] PVC size for the stored-objects volume.
   ## @param app.storedObjects.localFilesystem.storageClassName [string] PVC storageClassName (cluster default if empty).
+  ## @param app.storedObjects.localFilesystem.serializeUpgrades [default: true] Hold the workers at 0 replicas while the app rolls, so only one pod holds the shared RWO volume.
+  ## @param app.storedObjects.localFilesystem.serializeUpgradesImage [string, default: alpine/k8s:1.34.9] Image the upgrade hooks run. Needs sh and kubectl. A digest reference works too.
+  ## @param app.storedObjects.localFilesystem.serializeUpgradesPullSecrets [array] Pull secrets for that image. The hook Jobs use their own ServiceAccount, so secrets on the namespace default ServiceAccount do not reach them.
   storedObjects:
     localFilesystem:
       enabled: true
       path: /var/lib/langwatch/objects
       size: 10Gi
       storageClassName: ""
+
+      # The app and the workers mount the same ReadWriteOnce PVC in this mode,
+      # and a helm upgrade rolls both Deployments at once. On a cluster with
+      # more than one node the new pod of one Deployment can be scheduled on a
+      # fresh node while the old pod of the other still holds the volume
+      # attachment on the old node, and both wedge in ContainerCreating with a
+      # multi-attach error (issue #7191).
+      #
+      # With this on, a hook Job scales the workers to 0 and waits for their
+      # pods to go away before helm applies the new manifests, and a second
+      # hook Job holds them at 0 until the app rollout finishes and then scales
+      # them back to workers.replicaCount. The app rolls as the only holder of
+      # the volume, and the workers follow the NEW app pod. Both Jobs run on
+      # rollback as well as upgrade.
+      #
+      # One case the chart cannot cover: on a rollback helm runs the hooks
+      # stored in the TARGET revision, so rolling back to a chart version from
+      # before these Jobs existed runs no Jobs at all. Scale the workers
+      # Deployment to 0 by hand before such a downgrade, and back up after it.
+      #
+      # The hooks need a ServiceAccount token and a small Role (get on the app
+      # and the workers Deployments, patch on the workers' scale, read on the
+      # namespace's pods). Turn them off if you order the rollout yourself, if
+      # your cluster forbids that RBAC, or if you moved to app.dataplane (where
+      # they never render anyway, because no volume is shared).
+      serializeUpgrades: true
+      # Needs sh + kubectl. registry.k8s.io/kubectl is distroless and has no
+      # /bin/sh.
+      #
+      # The tag names the kubectl version. kubectl supports one minor version
+      # of skew either way, so change this to match your cluster if it is far
+      # from 1.34. The hook only calls `get deployment`, `patch
+      # deployment --subresource=scale` and `wait --for=delete pod`, which are
+      # long-stable, so a wider skew works in practice.
+      #
+      # Mirror the image into your own registry for an air-gapped install and
+      # point this at your copy. A digest works here too
+      # (`myregistry.example.com/alpine/k8s@sha256:...`) if you pin by digest.
+      serializeUpgradesImage: alpine/k8s:1.34.9
+      # Pull secrets for that image. The hook Jobs run under their own
+      # ServiceAccount, so secrets attached to the namespace's `default`
+      # ServiceAccount, which the rest of the release uses, do not reach them.
+      # Example: [{ name: my-registry }]
+      serializeUpgradesPullSecrets: []
 
   # Email notification configuration
   # Naming a provider is what turns email on, so there is one switch rather
@@ -823,6 +961,24 @@ workers:
   ## @param workers.replicaCount [default: 1] Number of worker replicas.
   replicaCount: 1
 
+  # Shutdown budget. shutdownDrainSeconds is how long the GroupQueue may wait
+  # for in-flight jobs to finish their ClickHouse writes; it must match the
+  # app's own SHUTDOWN_DRAIN_TIMEOUT_MS, which the chart sets from this value.
+  #
+  # terminationGracePeriodSeconds is the kubelet's SIGKILL clock and must cover
+  # the drain plus 5s for App.close, 15s for process teardown and 10s of
+  # kubelet slack — so at least shutdownDrainSeconds + 30. Because it is set
+  # here, raising shutdownDrainSeconds alone always fails the render: raise
+  # both together. The chart refuses rather than installing a release the
+  # kubelet kills mid-drain. Both must be whole numbers of seconds greater
+  # than zero — a quoted or fractional value is rejected, because Helm's `int`
+  # would silently turn it into a zero budget.
+  # See: https://kubespec.dev/v1/Pod#spec.terminationGracePeriodSeconds
+  ## @param workers.shutdownDrainSeconds [default: 25] Seconds the queue may spend draining in-flight jobs on shutdown.
+  shutdownDrainSeconds: 25
+  ## @param workers.terminationGracePeriodSeconds [default: 55] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.
+  terminationGracePeriodSeconds: 55
+
   # Resource requirements for worker pods
   # Workers are CPU/memory intensive for processing evaluations and trace collection
   # See: https://kubespec.dev/v1/Pod#spec.containers.resources
@@ -948,6 +1104,24 @@ langwatch_nlp:
   ## @param langwatch_nlp.service.type [string, default: ClusterIP] Service type.
   ## @param langwatch_nlp.service.port [default: 5561] Service port.
   service: { type: ClusterIP, port: 5561 }
+
+  # Where workflows are allowed to send HTTP requests. This is the service that
+  # runs HTTP agents and workflow HTTP nodes, so this is the setting that
+  # decides whether an agent can reach a service on your own network.
+  #
+  # Keep blockLocalHTTPCalls false for a self-hosted install whose agents are
+  # internal — the common case, and the default. Set it true for a
+  # multi-tenant deployment, where a workflow author is not necessarily
+  # someone you want reaching into the cluster, and list the internal hosts
+  # you do intend to reach in allowedProxyHosts.
+  #
+  # Cloud metadata endpoints are refused either way and cannot be allow-listed.
+  ## @extra langwatch_nlp.security Outbound request policy for workflow HTTP nodes.
+  ## @param langwatch_nlp.security.blockLocalHTTPCalls [default: false] Refuse workflow HTTP requests to private, loopback and link-local addresses. Keep false for self-hosted installs that call internal services; set true for multi-tenant deployments.
+  ## @param langwatch_nlp.security.allowedProxyHosts [array, default: []] Hostnames reachable even when blockLocalHTTPCalls is on. Matched literally, case-insensitive, port ignored. Cloud metadata is never allow-listed.
+  security:
+    blockLocalHTTPCalls: false
+    allowedProxyHosts: []
 
   # Resource requirements for the NLP service. The service is a lean static Go
   # binary (nlpgo) that only spawns a transient Python interpreter to sandbox

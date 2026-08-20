@@ -10,6 +10,7 @@ import {
 } from "@chakra-ui/react";
 import { useEffect } from "react";
 import { isSameOrigin, useSession } from "~/utils/auth-client";
+import { hardNavigate } from "~/utils/browserNavigation";
 import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
 import { LogoIcon } from "../../components/icons/LogoIcon";
@@ -110,14 +111,14 @@ export default function Error() {
           const referrer = document.referrer;
           const isValidDomain = !!referrer && isSameOrigin(referrer);
           if (isValidDomain) {
-            window.location.href = referrer;
+            hardNavigate(referrer);
           } else {
-            window.location.href = "/";
+            hardNavigate("/");
           }
         } else if (isAzureAD) {
-          window.location.href = "/auth/signin";
+          hardNavigate("/auth/signin");
         } else {
-          window.location.href = "/auth/signin";
+          hardNavigate("/auth/signin");
         }
       }
     }, 5000);

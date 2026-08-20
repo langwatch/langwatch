@@ -1,7 +1,7 @@
-import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
+import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 
 vi.mock(
@@ -123,6 +123,7 @@ describe("Events API", () => {
     });
 
     describe("when a predefined event violates its schema", () => {
+      /** @scenario A predefined event that violates its schema is rejected, not errored */
       it("returns 400 with a validation error", async () => {
         const res = await post({
           trace_id: "trace_123",

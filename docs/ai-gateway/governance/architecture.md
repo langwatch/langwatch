@@ -1,9 +1,9 @@
 ---
-title: LangWatch governance — architecture
+title: LangWatch governance architecture
 description: How the personal-keys flow, AI Gateway, Activity Monitor, RoutingPolicy admin, and IngestionSource pipeline fit into one control plane.
 ---
 
-# LangWatch governance — architecture
+# LangWatch governance architecture
 
 ## What problem this is solving
 
@@ -12,13 +12,13 @@ CLIs (Claude Code, Codex, Cursor, Gemini CLI), packaged SaaS that
 embed AI (Cowork, Copilot Studio, Workato Genies, ChatGPT Enterprise),
 and bespoke agents written in-house. Each comes with its own auth
 plane, its own admin console, its own audit trail. There's no single
-view of "what is every AI in our org doing right now," no consistent
-budget enforcement across them, no one-throat-to-choke for the
-security team when an agent misbehaves at 3 AM.
+view of what every AI in the org is doing right now, no consistent
+budget enforcement across them, and no single point of control for
+the security team when an agent misbehaves.
 
 LangWatch is the **control plane** that sits above all of this. It
 provides governance, monitoring, evals, and (for the surfaces we
-proxy) policy enforcement — across every AI tool and platform the
+proxy) policy enforcement across every AI tool and platform the
 enterprise uses, regardless of who built each one.
 
 ## The five integration tiers
@@ -27,34 +27,34 @@ Different platforms allow different levels of governance. We model
 this as a ladder, deepest control on top:
 
 ```
-┌─ Tier A — Gateway proxy ─────────────────────────────────────────────┐
+┌─ Tier A: Gateway proxy ──────────────────────────────────────────────┐
 │ Customer's API key flows through LangWatch's AI Gateway.            │
 │ Mid-flight inspection, rewrite, block. Examples: Claude Code,       │
 │ Codex, Cursor (with custom endpoint), any custom agent, Workato     │
 │ BYOK, Vertex AI, Bedrock-via-proxy.                                 │
 └──────────────────────────────────────────────────────────────────────┘
-┌─ Tier B — BYOK endpoint routing ─────────────────────────────────────┐
+┌─ Tier B: BYOK endpoint routing ──────────────────────────────────────┐
 │ Closed SaaS that supports a custom-LLM endpoint setting. Customer   │
 │ points the platform at LangWatch's gateway. Same depth as Tier A    │
 │ for traffic that flows through. Examples: parts of Workato Genies,  │
 │ open agent frameworks that accept ANTHROPIC_BASE_URL.               │
 └──────────────────────────────────────────────────────────────────────┘
-┌─ Tier C — Audit log ingestion ───────────────────────────────────────┐
+┌─ Tier C: Audit log ingestion ────────────────────────────────────────┐
 │ Closed SaaS we cannot proxy. Pull audit / OTel / S3-delivered logs  │
 │ from the platform's admin API. Observational governance: detect,    │
-│ alert, recommend, trigger admin-API revokes — but no mid-flight     │
+│ alert, recommend, trigger admin-API revokes, but no mid-flight      │
 │ block. Examples: Cowork (OTel push), Copilot Studio (Office 365     │
 │ Management Activity API pull), ChatGPT Enterprise (Compliance       │
 │ Platform pull), Claude Enterprise (Compliance API pull), Workato    │
 │ (audit log streaming push), Gemini for Workspace (Cloud Logging).   │
 └──────────────────────────────────────────────────────────────────────┘
-┌─ Tier D — OTel / SDK instrumentation ────────────────────────────────┐
+┌─ Tier D: OTel / SDK instrumentation ─────────────────────────────────┐
 │ Customer's own agents emitting traces via OpenInference / Traceloop │
 │ / our SDK. Per-turn detail. Better than audit logs but not          │
 │ proxyable. Examples: Cowork's native OTel feed, customer agents     │
 │ with our SDK installed.                                             │
 └──────────────────────────────────────────────────────────────────────┘
-┌─ Tier E — Sandboxed runtime ─────────────────────────────────────────┐
+┌─ Tier E: Sandboxed runtime ──────────────────────────────────────────┐
 │ LangWatch hosts the agent runtime. Maximum control: egress policy,  │
 │ MCP allowlist, per-tool approval gates. Premium / post-land         │
 │ expansion. Examples: Open Managed Agents within LangWatch, Hermes   │
@@ -115,7 +115,7 @@ agents they want sandboxed inside their LangWatch deployment.
 
 ## Data flow per tier
 
-### Tier A — Gateway proxy
+### Tier A: Gateway proxy
 
 ```
 dev's CLI / agent  ──┐
@@ -135,11 +135,11 @@ dev's CLI / agent  ──┐
                 │  - canonicalise attributes          │
                 │  - cost calc per token usage        │
                 │  - emit to ClickHouse               │
-                │  - emit to GatewayBudget reactor    │
+                │  - emit to GatewayBudget subscriber    │
                 └────────────────────────────────────┘
 ```
 
-### Tier C — Audit log ingestion
+### Tier C: Audit log ingestion
 
 ```
 Closed SaaS (Cowork / Copilot / Workato / OpenAI / Claude / S3)
@@ -173,7 +173,7 @@ Closed SaaS (Cowork / Copilot / Workato / OpenAI / Claude / S3)
 | `RoutingPolicy` | Provider chain template | Org-scoped; hierarchical via `scope`+`scopeId` |
 | `VirtualKey` | The actual credential issued to a caller | `organizationId` + `VirtualKeyScope[]` (multi-scope at ORG/TEAM/PROJECT); references RoutingPolicy; optional `principalUserId` for personal VKs |
 | `VirtualKeyScope` | One scope row per VK (1:N) | Cascade upward to derive eligible ModelProviders |
-| `ModelProvider` | Upstream LLM API key (basic creds) + Gateway-only fields (RPM/TPM/RPD, fallback priority, providerConfig) on the **Advanced (Gateway)** tab | Scoped to ORGANIZATION/TEAM/PROJECT; one record per credential — no separate gateway binding |
+| `ModelProvider` | Upstream LLM API key (basic creds) + Gateway-only fields (RPM/TPM/RPD, fallback priority, providerConfig) on the **Advanced (Gateway)** tab | Scoped to ORGANIZATION/TEAM/PROJECT; one record per credential, no separate gateway binding |
 | `GatewayBudget` | Spend limit | Scope = ORG / TEAM / PROJECT / VK / PRINCIPAL |
 | `IngestionSource` | Per-platform fleet config | Org-scoped; carries ingestSecret + parserConfig |
 
@@ -186,9 +186,9 @@ Closed SaaS (Cowork / Copilot / Workato / OpenAI / Claude / S3)
 | `event_log` | Event-sourced audit trail | inherited |
 | `gateway_budget_ledger_events` | Per-trace spend per applicable budget | `principal_user_id` already first-class |
 
-`TenantId = projectId` invariant is preserved across all tables —
-`OrganizationId` is added as a **query dimension** for cross-project
-rollup, not a tenancy boundary swap.
+Every table keeps the `TenantId = projectId` invariant.
+`OrganizationId` is a **query dimension** for cross-project rollup,
+not a tenancy boundary swap.
 
 ## OCSF + AOS event schema
 
@@ -199,8 +199,8 @@ internal event shape, extended with
 fields for AI-specific context. Why:
 
 - Datadog Cloud SIEM, Splunk, Microsoft Sentinel, Elastic Security,
-  Google Chronicle, Sumo Logic all natively understand OCSF — alert
-  routing inherits these integrations for free.
+  Google Chronicle, Sumo Logic all natively understand OCSF, so alert
+  routing inherits these integrations.
 - AOS extends OCSF's API Activity class (6003) with prompt / tool /
   cost / agent-session fields specifically for AI activity.
 - Adopting an open standard keeps us interoperable with whatever
@@ -218,36 +218,35 @@ OCSF.
 |---|---|---|---|---|
 | Claude Code / Codex CLI / Cursor / custom agent | A | ✅ via Gateway | n/a | n/a |
 | Workato (BYOK route) | A/B | ✅ | n/a | n/a |
-| Workato (audit log push) | C | ❌ | ✅ pause recipe via Platform API | — |
-| Cowork desktop | C/D | ❌ | ✅ revoke workspace key via Anthropic Admin | — |
-| Copilot Studio | C | ❌ | ✅ disable agent via Power Platform admin | — |
-| ChatGPT Enterprise / Codex (cloud) | C | ❌ | ✅ revoke key via OpenAI Compliance | — |
-| Claude Enterprise / Cowork (cloud) | C/D | ❌ | ✅ revoke workspace key | — |
-| Gemini for Workspace | C | ❌ | ✅ via Google Workspace admin | — |
-| Salesforce Einstein / Slack AI / Notion AI | — | ❌ | ❌ | ✅ alert only |
+| Workato (audit log push) | C | ❌ | ✅ pause recipe via Platform API | n/a |
+| Cowork desktop | C/D | ❌ | ✅ revoke workspace key via Anthropic Admin | n/a |
+| Copilot Studio | C | ❌ | ✅ disable agent via Power Platform admin | n/a |
+| ChatGPT Enterprise / Codex (cloud) | C | ❌ | ✅ revoke key via OpenAI Compliance | n/a |
+| Claude Enterprise / Cowork (cloud) | C/D | ❌ | ✅ revoke workspace key | n/a |
+| Gemini for Workspace | C | ❌ | ✅ via Google Workspace admin | n/a |
+| Salesforce Einstein / Slack AI / Notion AI | n/a | ❌ | ❌ | ✅ alert only |
 
-This is what gets reflected in the Activity Monitor's "actions
-available" UI per anomaly, and what determines which adapter shipping
-order we prioritise.
+The Activity Monitor lists these actions per anomaly in its "actions
+available" UI, and this matrix sets the order in which we ship the
+adapters.
 
 ## Feature-flag gating
 
-Every governance UI surface is gated behind one app feature flag —
-`release_ui_ai_governance_enabled` — so this long-lived branch can
-merge into main without exposing in-progress features to current
-customers. The CLI surface is always available once installed; per-
-account governance entitlement is enforced server-side.
+One app feature flag, `release_ui_ai_governance_enabled`, gates every
+governance UI surface, so in-progress features stay hidden from
+current customers. The CLI surface is always available once
+installed; per-account governance entitlement is enforced
+server-side.
 
 The AI Gateway product itself ships as-is to customers on the
 existing `release_ui_ai_gateway_menu_enabled` flag. The governance
-flag is intentionally separate — they're different product lines
-with different rollout cadences.
+flag stays separate because the two are different product lines with
+different rollout cadences.
 
-Backend endpoints stay reachable regardless of flag state. Per
-@rchaves's directive, hiding the user-visible surface is enough; the
-data model + tRPC routes + REST endpoints + ingestion receivers all
-exist on every deployment, just not linked to from any visible UI
-when the flag is off.
+Backend endpoints stay reachable regardless of flag state. Hiding the
+user-visible surface is enough: the data model, tRPC routes, REST
+endpoints, and ingestion receivers all exist on every deployment, and
+no visible UI links to them when the flag is off.
 
 See `specs/ai-gateway/governance/feature-flag-gating.feature` for the
 gating contract.
@@ -259,7 +258,7 @@ What's on this branch today:
 - ✅ RoutingPolicy admin UI + provider-cred org validation
 - ✅ Personal VirtualKeys + admin catalog
 - ✅ Unified `langwatch` CLI (10 governance subcommands, device-flow auth)
-- ✅ `/me` + `/me/settings` + `/settings/routing-policies`
+- ✅ `/me` + `/me/settings` + `/gateway/routing-policies`
 - ✅ AI Gateway with personal-key support
 - ✅ `user.personalBudget` tRPC + `BudgetExceededBanner`
 - ✅ Helm NOTES + post-install docs
@@ -319,16 +318,16 @@ docs/ai-gateway/self-hosting/                        # Operator docs
 
 ## Where to read more
 
-- [`gateway.md`](https://github.com/langwatch/langwatch) — full
-  product strategy doc that drives this architecture.
-- [`feature-flag-gating.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/feature-flag-gating.feature)
-  — the single-flag / single-env-var contract.
-- [`activity-monitor.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/activity-monitor.feature)
-  — admin-side oversight UI contract.
-- [`ingestion-sources.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/ingestion-sources.feature)
-  — admin-side IngestionSource setup forms + lifecycle.
-- [`personal-keys-deployment.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/self-hosting/personal-keys-deployment.feature)
-  — self-host deployment contract for the personal-keys flow.
-- [`admin-setup.mdx`](./admin-setup.mdx) — admin's day-1 walkthrough.
-- [`personal-keys.mdx`](./personal-keys.mdx) — end-user dev story.
-- [`routing-policies.mdx`](./routing-policies.mdx) — RoutingPolicy concepts.
+- [langwatch/langwatch](https://github.com/langwatch/langwatch): the repository
+  that holds the gateway product strategy doc driving this architecture.
+- [`feature-flag-gating.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/feature-flag-gating.feature):
+  the single-flag / single-env-var contract.
+- [`activity-monitor.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/activity-monitor.feature):
+  admin-side oversight UI contract.
+- [`ingestion-sources.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/ingestion-sources.feature):
+  admin-side IngestionSource setup forms and lifecycle.
+- [`personal-keys-deployment.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/self-hosting/personal-keys-deployment.feature):
+  self-host deployment contract for the personal-keys flow.
+- [`admin-setup.mdx`](./admin-setup.mdx): admin's day-1 walkthrough.
+- [`personal-keys.mdx`](./personal-keys.mdx): end-user dev story.
+- [`routing-policies.mdx`](./routing-policies.mdx): RoutingPolicy concepts.

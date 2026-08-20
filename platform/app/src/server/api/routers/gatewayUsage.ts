@@ -9,8 +9,9 @@
  * same membership rule as the keys table, so the page and the table agree
  * on which keys exist and what they spent.
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import { getApp } from "~/server/app-layer/app";
 import { VirtualKeyNotFoundError } from "~/server/gateway/errors";
@@ -71,6 +72,8 @@ export const gatewayUsageRouter = createTRPCRouter({
         virtualKeyId: z.string(),
         fromDate: z.string().datetime(),
         toDate: z.string().datetime(),
+        /** Narrows the recent-activity list, and nothing else, to one model. */
+        model: z.string().min(1).max(256).optional(),
       }),
     )
     .use(authorizeInResolver)
@@ -99,6 +102,7 @@ export const gatewayUsageRouter = createTRPCRouter({
           fromDate: new Date(input.fromDate),
           toDate: new Date(input.toDate),
         },
+        model: input.model,
       });
     }),
 });

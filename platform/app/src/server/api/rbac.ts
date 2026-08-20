@@ -1,11 +1,14 @@
+import { TRPCError } from "@trpc/server";
+import { env } from "~/env.mjs";
 import {
   OrganizationUserRole,
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { TRPCError } from "@trpc/server";
-import { env } from "~/env.mjs";
+} from "~/generated/prisma/client";
+import { cutoverOnEngine } from "~/server/app-layer/authz/cutover-gate";
+import { authzForkFor } from "~/server/app-layer/authz/fork";
+import { authzShadowFor } from "~/server/app-layer/authz/shadow";
 import {
   LiteMemberRestrictedError,
   ProjectPermissionDeniedError,
@@ -104,7 +107,7 @@ export const Resources = {
   //   - aiTools:view → ALL org roles. Portal must work for every member
   //     so they can discover what's available + click through to setup.
   //   - aiTools:manage → org ADMIN only. Catalog editor surface at
-  //     /settings/governance/tool-catalog (CRUD + reorder + enable).
+  //     /governance/tool-catalog (CRUD + reorder + enable).
   AI_TOOLS: "aiTools",
   // Outbound webhook endpoints (the webhook platform). Org-tier only:
   // endpoints are org-anchored, carry signing secrets, and stream every
@@ -886,7 +889,13 @@ async function checkPermissionFromBindings({
   });
 
   if (bindings.length === 0) {
-    // Fall back to legacy TeamUser for users not yet migrated to RoleBindings
+    // Fall back to legacy TeamUser for users not yet migrated to RoleBindings.
+    // The fallback stays live for EVERY organization — backfilled, cut over,
+    // or untouched — until contract deletes the rows: stage B's finalization
+    // proves the promoted bindings answer identically at the scopes they
+    // replace, and the engine keeps inferring from the same rows on both
+    // heads (the dormant-fact principle), so switching this off early made
+    // the readers disagree instead of making the rows dead.
     const teamScope = scopes.find(
       (s) => s.scopeType === RoleBindingScopeType.TEAM,
     );
@@ -1113,25 +1122,78 @@ export async function resolveProjectPermission(
     return { permitted: false, organizationRole: null };
   }
 
-  // Check demo project access
+  // Check demo project access. The comparison fires BEFORE the return: the
+  // engine carries its own demo-project rule, and an early return here used
+  // to hide the entire demo surface from shadow mode. The legacy answer is
+  // unchanged by it.
   if (isDemoProject(projectId, permission)) {
+    authzShadowFor(ctx.prisma).userPermissionCheck({
+      userId: ctx.session.user.id,
+      permission,
+      legacyAllowed: true,
+      projectId,
+      caller: "trpc.project",
+    });
     return { permitted: true, organizationRole: null };
   }
 
   const context = await resolveProjectPermissionContext(ctx, projectId);
   if (!context) return { permitted: false, organizationRole: null };
 
-  const permitted = await checkPermissionFromBindings({
-    prisma: ctx.prisma,
-    userId: context.userId,
-    organizationId: context.organizationId,
-    scopes: projectPermissionScopes({
-      projectId,
-      teamId: context.teamId,
+  /**
+   * The legacy binding walk, as ONE implementation both paths run: the
+   * answering path below when the organization is still on legacy, and the
+   * fork's reverse-shadow thunk when it is not.
+   */
+  const legacyPermitted = () =>
+    checkPermissionFromBindings({
+      prisma: ctx.prisma,
+      userId: context.userId,
       organizationId: context.organizationId,
-    }),
-    organizationRole: context.organizationRole,
+      scopes: projectPermissionScopes({
+        projectId,
+        teamId: context.teamId,
+        organizationId: context.organizationId,
+      }),
+      organizationRole: context.organizationRole,
+      permission,
+    });
+
+  // ADR-092 delivery-plan PR 3: the fork. A cut-over organization is DECIDED
+  // by the engine and legacy runs behind it as the reverse-shadow comparison;
+  // everyone else keeps the legacy answer with the stage-A4 shadow behind IT.
+  if (
+    await cutoverOnEngine({
+      prisma: ctx.prisma,
+      organizationId: context.organizationId,
+    })
+  ) {
+    const decision = await authzForkFor(ctx.prisma).decideUserPermission({
+      userId: context.userId,
+      permission,
+      projectId,
+      caller: "trpc.project",
+      legacy: legacyPermitted,
+    });
+    return {
+      permitted: decision.allowed,
+      // The engine's snapshot read the same OrganizationUser row the context
+      // above did, so these agree; the context's is the fallback for the
+      // unresolved-scope answer, which carries no snapshot at all.
+      organizationRole: decision.organizationRole ?? context.organizationRole,
+    };
+  }
+
+  const permitted = await legacyPermitted();
+
+  // ADR-092 stage A4: engine shadow comparison — async, never affects the
+  // legacy answer.
+  authzShadowFor(ctx.prisma).userPermissionCheck({
+    userId: context.userId,
     permission,
+    legacyAllowed: permitted,
+    projectId,
+    caller: "trpc.project",
   });
 
   return { permitted, organizationRole: context.organizationRole };
@@ -1153,8 +1215,22 @@ async function resolveProjectPermissionAny(
   }
 
   // The demo project grants its view permissions to everyone, so one of them
-  // being enough settles the question before anything is read.
-  if (permissions.some((permission) => isDemoProject(projectId, permission))) {
+  // being enough settles the question before anything is read. The comparison
+  // fires BEFORE the return, as in resolveProjectPermission: the engine
+  // carries its own demo-project rule, and an early return here used to hide
+  // the entire demo surface from shadow mode. Only the permission that
+  // matched is shadowed, because that is the only one legacy answered.
+  const demoPermission = permissions.find((permission) =>
+    isDemoProject(projectId, permission),
+  );
+  if (demoPermission !== undefined) {
+    authzShadowFor(ctx.prisma).userPermissionCheck({
+      userId: ctx.session.user.id,
+      permission: demoPermission,
+      legacyAllowed: true,
+      projectId,
+      caller: "trpc.projectAny",
+    });
     return { permitted: true, organizationRole: null };
   }
 
@@ -1166,21 +1242,76 @@ async function resolveProjectPermissionAny(
     teamId: context.teamId,
     organizationId: context.organizationId,
   });
-  for (const permission of permissions) {
-    const permitted = await checkPermissionFromBindings({
-      prisma: ctx.prisma,
-      userId: context.userId,
-      organizationId: context.organizationId,
-      scopes,
-      organizationRole: context.organizationRole,
-      permission,
-    });
-    if (permitted) {
-      return { permitted: true, organizationRole: context.organizationRole };
+
+  /**
+   * The legacy loop, as ONE implementation both paths run.
+   *
+   * `onCandidate` is where stage A4's per-candidate shadow comparison hangs,
+   * rather than inside the loop unconditionally: it fires only on the
+   * legacy-answering path, because a cut-over organization's comparison is the
+   * fork's own (engine-primary) one and running both would log every check
+   * twice, in two directions, for one question.
+   */
+  const legacyAny = async (
+    onCandidate?: (args: {
+      permission: Permission;
+      permitted: boolean;
+    }) => void,
+  ): Promise<PermissionResult> => {
+    for (const permission of permissions) {
+      const permitted = await checkPermissionFromBindings({
+        prisma: ctx.prisma,
+        userId: context.userId,
+        organizationId: context.organizationId,
+        scopes,
+        organizationRole: context.organizationRole,
+        permission,
+      });
+
+      // One comparison per candidate the legacy path actually evaluated - the
+      // loop stops at the first grant, so the shadowed set is exactly the set
+      // legacy answered.
+      onCandidate?.({ permission, permitted });
+
+      if (permitted) {
+        return { permitted: true, organizationRole: context.organizationRole };
+      }
     }
+
+    return { permitted: false, organizationRole: context.organizationRole };
+  };
+
+  // ADR-092 delivery-plan PR 3: the fork, around the WHOLE loop - the engine
+  // answers every candidate off one collected snapshot, in the same order,
+  // stopping at the same first allow.
+  if (
+    await cutoverOnEngine({
+      prisma: ctx.prisma,
+      organizationId: context.organizationId,
+    })
+  ) {
+    const decision = await authzForkFor(ctx.prisma).decideUserPermissionsAny({
+      userId: context.userId,
+      permissions,
+      projectId,
+      caller: "trpc.projectAny",
+      legacy: async () => ({ allowed: (await legacyAny()).permitted }),
+    });
+    return {
+      permitted: decision.allowed,
+      organizationRole: decision.organizationRole ?? context.organizationRole,
+    };
   }
 
-  return { permitted: false, organizationRole: context.organizationRole };
+  return legacyAny(({ permission, permitted }) => {
+    authzShadowFor(ctx.prisma).userPermissionCheck({
+      userId: context.userId,
+      permission,
+      legacyAllowed: permitted,
+      projectId,
+      caller: "trpc.projectAny",
+    });
+  });
 }
 
 /**
@@ -1230,19 +1361,55 @@ export async function resolveTeamPermission(
     return { permitted: false, organizationRole: null };
   }
 
-  const permitted = await checkPermissionFromBindings({
-    prisma: ctx.prisma,
-    userId: ctx.session.user.id,
-    organizationId: team.organizationId,
-    scopes: [
-      { scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
-      {
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: team.organizationId,
-      },
-    ],
-    organizationRole,
+  const userId = ctx.session.user.id;
+
+  /** The legacy binding walk, as ONE implementation both paths run. */
+  const legacyPermitted = () =>
+    checkPermissionFromBindings({
+      prisma: ctx.prisma,
+      userId,
+      organizationId: team.organizationId,
+      scopes: [
+        { scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
+        {
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: team.organizationId,
+        },
+      ],
+      organizationRole,
+      permission,
+    });
+
+  // ADR-092 delivery-plan PR 3: the fork. The organization is the one the team
+  // read above already resolved.
+  if (
+    await cutoverOnEngine({
+      prisma: ctx.prisma,
+      organizationId: team.organizationId,
+    })
+  ) {
+    const decision = await authzForkFor(ctx.prisma).decideUserPermission({
+      userId,
+      permission,
+      teamId,
+      caller: "trpc.team",
+      legacy: legacyPermitted,
+    });
+    return {
+      permitted: decision.allowed,
+      organizationRole: decision.organizationRole ?? organizationRole,
+    };
+  }
+
+  const permitted = await legacyPermitted();
+
+  // ADR-092 stage A4: engine shadow comparison.
+  authzShadowFor(ctx.prisma).userPermissionCheck({
+    userId,
     permission,
+    legacyAllowed: permitted,
+    teamId,
+    caller: "trpc.team",
   });
 
   return { permitted, organizationRole };
@@ -1264,6 +1431,49 @@ export async function hasTeamPermission(
  * Check if user has a specific permission for an organization
  */
 export async function hasOrganizationPermission(
+  ctx: { prisma: PrismaClient; session: Session },
+  organizationId: string,
+  permission: Permission,
+): Promise<boolean> {
+  const userId = ctx.session?.user?.id;
+
+  // ADR-092 delivery-plan PR 3: the fork. `hasOrganizationPermissionLegacy` IS
+  // the reverse-shadow thunk - the wrapper was already the seam, so nothing
+  // below it moved.
+  if (
+    userId &&
+    (await cutoverOnEngine({ prisma: ctx.prisma, organizationId }))
+  ) {
+    const decision = await authzForkFor(ctx.prisma).decideUserPermission({
+      userId,
+      permission,
+      organizationId,
+      caller: "trpc.organization",
+      legacy: () =>
+        hasOrganizationPermissionLegacy(ctx, organizationId, permission),
+    });
+    return decision.allowed;
+  }
+
+  const permitted = await hasOrganizationPermissionLegacy(
+    ctx,
+    organizationId,
+    permission,
+  );
+  // ADR-092 stage A4: engine shadow comparison.
+  if (ctx.session?.user) {
+    authzShadowFor(ctx.prisma).userPermissionCheck({
+      userId: ctx.session.user.id,
+      permission,
+      legacyAllowed: permitted,
+      organizationId,
+      caller: "trpc.organization",
+    });
+  }
+  return permitted;
+}
+
+async function hasOrganizationPermissionLegacy(
   ctx: { prisma: PrismaClient; session: Session },
   organizationId: string,
   permission: Permission,
@@ -1524,7 +1734,8 @@ async function loadScopeResolution(
 
   // Legacy fallback: a user with NO RoleBindings anywhere in the org falls back
   // to their TeamUser role. Mirrored here so the batch paths keep exact parity
-  // with the per-call helpers.
+  // with the per-call helpers. The fallback stays live until contract deletes
+  // the rows — see the same note in checkPermissionFromBindings.
   const needsLegacyFallback = bindings.length === 0;
   const legacyTeamUser = needsLegacyFallback
     ? await ctx.prisma.teamUser.findMany({
@@ -1716,23 +1927,13 @@ export async function batchProjectPermissions(
 }
 
 /**
- * Batched team + project permission check used by surfaces that need to
- * test the SAME permission across many scopes inside one organization
- * (e.g. the model-defaults settings page enumerating every team +
- * project the caller can read/write). One scoped permission check costs
- * ~3-5 queries (team/project lookup, organizationUser, groupMembership,
- * roleBinding, optional customRole). N team + M project checks ran in a
- * Promise.all fan-out, that's hundreds of queries per page load on large
- * orgs.
- *
- * This helper does the four lookups ONCE — via `loadScopeResolution` — then
- * resolves each id in-memory against the same rules a per-call check applies.
- *
- * Project resolution still needs to know the project's team so a
- * team-scoped binding inherits to its projects. Callers pass the
- * project→teamId map alongside the project ids.
+ * The legacy batch resolution, as ONE implementation both paths run: the
+ * answering path in `batchScopePermissions` when the organization is still on
+ * legacy, and the fork's reverse-shadow thunk when it is not. It builds its
+ * own maps per call, so the two paths can never hand out the same mutable
+ * pair.
  */
-export async function batchScopePermissions(
+async function legacyBatchScopePermissions(
   ctx: { prisma: PrismaClient; session: Session | null },
   args: {
     organizationId: string;
@@ -1793,6 +1994,93 @@ export async function batchScopePermissions(
         args.permission,
       ),
     );
+  }
+
+  return { teams: teamsMap, projects: projectsMap };
+}
+
+/**
+ * Batched team + project permission check used by surfaces that need to
+ * test the SAME permission across many scopes inside one organization
+ * (e.g. the model-defaults settings page enumerating every team +
+ * project the caller can read/write). One scoped permission check costs
+ * ~3-5 queries (team/project lookup, organizationUser, groupMembership,
+ * roleBinding, optional customRole). N team + M project checks ran in a
+ * Promise.all fan-out, that's hundreds of queries per page load on large
+ * orgs.
+ *
+ * This helper does the four lookups ONCE — via `loadScopeResolution` — then
+ * resolves each id in-memory against the same rules a per-call check applies.
+ *
+ * Project resolution still needs to know the project's team so a
+ * team-scoped binding inherits to its projects. Callers pass the
+ * project→teamId map alongside the project ids.
+ */
+export async function batchScopePermissions(
+  ctx: { prisma: PrismaClient; session: Session | null },
+  args: {
+    organizationId: string;
+    teamIds: string[];
+    projectIds: string[];
+    projectTeamId: Record<string, string>;
+    permission: Permission;
+  },
+): Promise<{ teams: Map<string, boolean>; projects: Map<string, boolean> }> {
+  const legacyBatch = () => legacyBatchScopePermissions(ctx, args);
+
+  const userId = ctx.session?.user?.id;
+
+  // ADR-092 delivery-plan PR 3: the fork. One collected snapshot answers every
+  // scope in the batch, and the legacy batch runs once behind it — the same
+  // fan-out arithmetic the shadow call below is shaped by, on the answering
+  // side now.
+  if (
+    userId &&
+    (await cutoverOnEngine({
+      prisma: ctx.prisma,
+      organizationId: args.organizationId,
+    }))
+  ) {
+    const decision = await authzForkFor(ctx.prisma).decideUserBatchPermissions({
+      userId,
+      permission: args.permission,
+      organizationId: args.organizationId,
+      teams: args.teamIds.map((teamId) => ({ teamId })),
+      projects: args.projectIds.map((projectId) => ({
+        projectId,
+        teamId: args.projectTeamId[projectId],
+      })),
+      caller: "trpc.batch",
+      legacy: legacyBatch,
+    });
+    return { teams: decision.teams, projects: decision.projects };
+  }
+
+  const { teams: teamsMap, projects: projectsMap } = await legacyBatch();
+
+  // ADR-092 stage A4: every verdict this batch produced is a real
+  // authorization answer, so each one is compared — through the batch entry
+  // point, which draws the sample once and collects grants once for the
+  // whole batch. Per-scope userPermissionCheck calls here would fan legacy's
+  // four flat queries into a detached collect per scope (the pool-starving
+  // fan-out api-key.service.ts documents), with the whole batch as the
+  // worst case at sample rate 1.
+  if (userId) {
+    authzShadowFor(ctx.prisma).userBatchPermissionCheck({
+      userId,
+      permission: args.permission,
+      organizationId: args.organizationId,
+      teams: [...teamsMap].map(([teamId, legacyAllowed]) => ({
+        teamId,
+        legacyAllowed,
+      })),
+      projects: [...projectsMap].map(([projectId, legacyAllowed]) => ({
+        projectId,
+        teamId: args.projectTeamId[projectId],
+        legacyAllowed,
+      })),
+      caller: "trpc.batch",
+    });
   }
 
   return { teams: teamsMap, projects: projectsMap };

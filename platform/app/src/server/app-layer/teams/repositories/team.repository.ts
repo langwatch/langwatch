@@ -1,4 +1,5 @@
-import type { Team } from "@prisma/client";
+import type { LedgerActor } from "@langwatch/authz-server";
+import type { Team, TeamUserRole } from "~/generated/prisma/client";
 
 export interface CreateTeamInput {
   id: string;
@@ -34,4 +35,41 @@ export interface TeamRepository {
     data: UpdateTeamInput;
   }): Promise<Team | null>;
   archive(params: { id: string; organizationId: string }): Promise<Team | null>;
+
+  isUserInOrganization(params: {
+    userId: string;
+    organizationId: string;
+  }): Promise<boolean>;
+
+  /**
+   * Grant one user a TEAM-scoped role. Duplicates are rejected rather than
+   * skipped: adding somebody who is already in the team is a mistake the
+   * caller is told about, not a silent no-op.
+   */
+  grantMembership(params: {
+    teamId: string;
+    organizationId: string;
+    userId: string;
+    role: TeamUserRole;
+    actor: LedgerActor;
+  }): Promise<void>;
+
+  /**
+   * Revoke every TEAM-scoped grant one user holds on a team. Every one of
+   * them, not the first found: permissions at a scope are the union of the
+   * roles held there, so a member granted both Member and Viewer would
+   * otherwise keep the team through the grant the removal did not reach.
+   *
+   * The returned number is how many bindings the compat projection matched,
+   * not a membership verdict. On the ledger path the projection can lag the
+   * ledger by one fold, and the revocation is appended even when the
+   * projection matched nothing, so `0` does not prove the user held no
+   * grants — only that the projection showed none at the time.
+   */
+  revokeMembership(params: {
+    teamId: string;
+    organizationId: string;
+    userId: string;
+    actor: LedgerActor;
+  }): Promise<number>;
 }

@@ -1,24 +1,191 @@
 ---
 title: Claude Code Integration Guide
 sidebarTitle: Claude Code
-description: Monitor Claude Code usage with LangWatch using OpenTelemetry traces
+description: Send Claude Code sessions, cost and traces to LangWatch with the LangWatch command line tool.
 ---
 
-Claude Code supports OpenTelemetry (OTel) traces for monitoring and observability. This guide shows you how to configure Claude Code to send trace data to LangWatch, giving you insights into usage patterns and performance.
+Claude Code reports every session over OpenTelemetry. The LangWatch command line tool connects that report to your workspace, so you can read the cost of each session, the tool call tree of each turn, and the prompt and the response behind both.
+
+There are two ways to set it up:
+
+- `langwatch claude` starts Claude Code and sets up the connection on the first run. Use it on a machine you work on.
+- `langwatch instrument claude` writes the same setup and exits. Use it on a server, or when the telemetry must go to a team project.
+
+## Before you start
+
+- Install Claude Code.
+- Install the LangWatch command line tool: `npm install -g langwatch`
+- Create an account at [app.langwatch.ai](https://app.langwatch.ai), or run your own instance with `npx @langwatch/server`.
+
+## Run Claude Code through the wrapper
+
+```bash
+langwatch login --device
+langwatch claude
+```
+
+The first run asks one question:
+
+| Answer | What it does |
+| --- | --- |
+| **Using a Claude subscription** | Claude Code keeps your own plan and your own login. LangWatch receives telemetry only. |
+| **Using an API key** | Claude Code calls travel through the LangWatch gateway with a virtual key. LangWatch receives telemetry and applies your budget and your policies. |
+
+LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch claude` accepts the same flags, the same subcommands and the same keyboard shortcuts as `claude`, and it returns the same exit code.
 
 <Note>
-  OpenTelemetry support in Claude Code is currently in beta and details are subject to change.
+  A virtual key is created the first time you choose the gateway, not at login. If you always keep your own subscription, LangWatch never creates one for you.
 </Note>
 
-## Prerequisites
+## Set up a machine without starting Claude Code
 
-- Obtain your `LANGWATCH_API_KEY` from the [LangWatch dashboard](https://app.langwatch.ai/)
-- Claude Code installed on your system
-- Access to configure environment variables or managed settings
+`langwatch instrument claude` writes the connection into `~/.claude/settings.json` and exits. A plain `claude` run on that machine then sends its telemetry to LangWatch. This is the setup for a server that holds many agents, for a machine image, or for a configuration management run.
 
-## Quick Start
+```bash
+langwatch instrument claude
+```
 
-Configure Claude Code to send telemetry to LangWatch using environment variables:
+### Choose where the telemetry goes
+
+Pass one scope flag, and one only.
+
+| Command | Destination | Needs a login |
+| --- | --- | --- |
+| `langwatch instrument claude` | Your personal workspace | Yes |
+| `langwatch instrument claude --project <id-or-slug>` | A team project | Yes |
+| `langwatch instrument claude --key <ingest-key>` | The project that owns the key | No |
+| `langwatch instrument claude --personal` | Back to your personal workspace | Yes |
+
+### Send the telemetry to a team project
+
+```bash
+langwatch instrument claude --project acme-app
+```
+
+This creates an ingest key for this device and holds Claude Code to that project. LangWatch creates one key per device and never replaces the key of another device, so many machines can report to one project at the same time. You need a login and the `traces:create` permission on the project. See [Roles and permissions](/ai-governance/roles-and-permissions).
+
+The wrapper accepts the same flags. This pins the project and then starts Claude Code:
+
+```bash
+langwatch claude --project acme-app
+```
+
+`--project` and `--personal` are LangWatch flags. LangWatch removes them from the command line before Claude Code reads it, so they never reach the agent.
+
+### Set up a machine that never logs in
+
+`--key` takes an ingest key (`ik-lw-…`). It needs no login and contacts no server, which makes it the option for a shared machine, a build agent, or a base image.
+
+```bash
+langwatch instrument claude --key ik-lw-...
+```
+
+The command reads the same value from the `LANGWATCH_INGEST_KEY` environment variable:
+
+```bash
+export LANGWATCH_INGEST_KEY=ik-lw-...
+langwatch instrument claude
+```
+
+For a self-hosted instance, add its address:
+
+```bash
+langwatch instrument claude --key ik-lw-... --endpoint https://langwatch.your-company.internal
+```
+
+To get an ingest key without the command line tool, install an ingestion template for the tool in the dashboard: the setup drawer mints one for you. See [Ingestion templates](/ai-governance/ingestion-templates).
+
+### Move a tool back to your personal workspace
+
+```bash
+langwatch instrument claude --personal
+```
+
+This removes the project pin and writes the personal connection again.
+
+### Remove the setup
+
+```bash
+langwatch logout
+```
+
+This deletes every connection the command line tool wrote, for every tool.
+
+## What you get in LangWatch
+
+Open your personal page at `/me`, or open the project you pinned Claude Code to.
+
+- **Sessions**: one row per Claude Code session, with the context it carried, how often it compacted, how long it worked, and the pull requests it drove.
+- **Traces**: one trace per turn, with the tool call tree, the latency of each step, and each subagent on its own branch.
+- **Cost**: the amount per session and per turn, the model of each turn, and the split between tokens written to the prompt cache and tokens read back from it.
+- **Content**: the prompt of each turn, the input and the output of each tool call, and the response of the model.
+
+Your agent can read all of this back. See [Explore your usage with your own agent](/ai-governance/explore-your-usage-with-your-own-agent).
+
+## Content and privacy
+
+The setup that `langwatch claude` and `langwatch instrument claude` write turns on the four Claude Code content flags, because the content is what makes a trace worth reading:
+
+| Flag | What it puts on the wire |
+| --- | --- |
+| `OTEL_LOG_USER_PROMPTS` | The text of every prompt |
+| `OTEL_LOG_TOOL_DETAILS` | What each tool call was asked to do, such as the command text or the change to a file |
+| `OTEL_LOG_TOOL_CONTENT` | What each tool call returned, including the contents of files it read |
+| `OTEL_LOG_RAW_API_BODIES` | The request and the response of every model call |
+
+Remove the flags from `~/.claude/settings.json` to keep only the usage numbers: tokens, cost, model, latency, the tool call tree and the subagent tree stay, and the content stops.
+
+`langwatch claude` and `langwatch instrument claude` set `OTEL_LOG_RAW_API_BODIES`, which already carries the assistant's response text along with the rest of the request and response body. If you want the response text on its own, without the full body, add `OTEL_LOG_ASSISTANT_RESPONSES` yourself: the wrapper does not set it for you.
+
+Claude Code shortens each inline body at 60 kilobytes. `CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH` raises that limit. Claude Code always removes extended thinking from the bodies, so LangWatch never receives it.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Nothing arrives in LangWatch">
+    Restart Claude Code. It reads `~/.claude/settings.json` at start, so a session that was already open when you ran `langwatch instrument claude` keeps its old configuration.
+
+    Then run `langwatch instrument claude` again and read what it prints. It names the file it wrote and the destination the telemetry goes to.
+  </Accordion>
+
+  <Accordion title="The trace has no tool call tree, no latencies and no subagents">
+    `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` is missing. It is the flag that turns spans on, and `OTEL_TRACES_EXPORTER` does nothing without it. Cost and tokens still arrive, so the session appears, but LangWatch has no structure to attach them to and every subagent folds into the main session.
+  </Accordion>
+
+  <Accordion title="The trace has no prompt">
+    `OTEL_LOG_USER_PROMPTS` is missing. Claude Code removes the prompt text from its `user_prompt` event by default.
+  </Accordion>
+
+  <Accordion title="The trace has no response">
+    Both `OTEL_LOG_RAW_API_BODIES` and `OTEL_LOG_ASSISTANT_RESPONSES` are missing. Claude Code reports the response text of the assistant on its `api_response_body` event (needs `OTEL_LOG_RAW_API_BODIES=1`, and carries the full request and response JSON) or on its lighter `assistant_response` event (needs `OTEL_LOG_ASSISTANT_RESPONSES=1`, and carries only the response text). Both are off by default. Set `OTEL_LOG_ASSISTANT_RESPONSES=1` if you want the response without the rest of the body.
+
+    Claude Code docs describe `OTEL_LOG_ASSISTANT_RESPONSES` as falling back to the value of `OTEL_LOG_USER_PROMPTS`. Don't rely on that fallback: set it explicitly.
+
+    Claude Code also reports `api_response_body` and `assistant_response` for work that is not a conversation, such as an autosuggestion or a session title. LangWatch filters those out, so a title never becomes the output of a trace.
+  </Accordion>
+
+  <Accordion title="The telemetry goes to the wrong workspace">
+    Run `langwatch instrument claude --project <id-or-slug>` to move it to a team project, or `langwatch instrument claude --personal` to move it back to your own.
+  </Accordion>
+
+  <Accordion title="Authentication errors">
+    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and nothing else, so a key that works for ingestion still fails on other endpoints.
+
+    On a machine with a login, run `langwatch login --device` again to refresh the session.
+  </Accordion>
+
+  <Accordion title="The cost is zero although the traces arrive">
+    The model name on the span does not match an entry in the LangWatch cost catalog. Read `gen_ai.request.model` on the span. Current names such as `claude-sonnet-4-6`, `claude-opus-4-7` and `claude-haiku-4-5` match; older aliases return no cost.
+  </Accordion>
+</AccordionGroup>
+
+For more failure modes see [CLI debug](/ai-governance/cli-debug).
+
+## Manual OpenTelemetry setup
+
+Use this when you cannot install the LangWatch command line tool. The block below mirrors the variables `langwatch instrument claude` writes for you, plus the optional `OTEL_LOG_ASSISTANT_RESPONSES` flag, which the wrapper does not set. Drop that line if you only want what the wrapper gives you.
+
+### Environment variables
 
 ```bash
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
@@ -30,31 +197,25 @@ export OTEL_LOG_USER_PROMPTS=1
 export OTEL_LOG_TOOL_DETAILS=1
 export OTEL_LOG_TOOL_CONTENT=1
 export OTEL_LOG_RAW_API_BODIES=1
+export OTEL_LOG_ASSISTANT_RESPONSES=1
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
+export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code"
 claude
 ```
 
-<Note>
-  `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` is an experimental Claude Code flag, and it is the one that turns spans on. Without it `OTEL_TRACES_EXPORTER` does nothing and `OTEL_LOG_TOOL_CONTENT` has no span events to write to, so you get flat log records instead of a trace: no tool call tree, no latencies, and every subagent folded into the main session rather than branching off it.
-</Note>
+The header takes an ingest key (`ik-lw-…`), which can create traces and nothing else. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+
+For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. Claude Code appends `/v1/traces`, `/v1/logs` and `/v1/metrics` on its own. Never write the per-signal path yourself.
 
 <Warning>
-  The four `OTEL_LOG_*` flags are what put your session content in LangWatch: prompt text, tool input and output, and the model request and response bodies of every turn. Claude Code sends none of it without them. Read [Security and Privacy](#security-and-privacy) before you run this somewhere the content matters.
+  The five `OTEL_LOG_*` flags put your session content in LangWatch. Read [Content and privacy](#content-and-privacy) before you use them where the content matters.
 </Warning>
 
-## Administrator Configuration
+### Settings file
 
-Administrators can configure OpenTelemetry settings for all users through the managed settings file. This allows for centralized control of telemetry settings across an organization.
-
-The managed settings file is located at:
-
-* macOS: `/Library/Application Support/ClaudeCode/managed-settings.json`
-* Linux and WSL: `/etc/claude-code/managed-settings.json`
-* Windows: `C:\ProgramData\ClaudeCode\managed-settings.json`
-
-Example managed settings configuration for LangWatch:
+Claude Code reads the same variables from the `env` block of `~/.claude/settings.json`, which survives a new terminal:
 
 ```json
 {
@@ -68,187 +229,51 @@ Example managed settings configuration for LangWatch:
     "OTEL_LOG_TOOL_DETAILS": "1",
     "OTEL_LOG_TOOL_CONTENT": "1",
     "OTEL_LOG_RAW_API_BODIES": "1",
+    "OTEL_LOG_ASSISTANT_RESPONSES": "1",
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "https://app.langwatch.ai/api/otel",
-    "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer company-langwatch-api-key"
+    "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer ik-lw-your-ingest-key",
+    "OTEL_RESOURCE_ATTRIBUTES": "service.name=claude-code"
   }
 }
 ```
 
-<Note>
-  Managed settings can be distributed via MDM (Mobile Device Management) or other device management solutions. Environment variables defined in the managed settings file have high precedence and cannot be overridden by users.
-</Note>
+To wire a single repository instead of the whole machine, put the block in `.claude/settings.json` in the repository and keep the key and the content flags in a gitignored `.claude/settings.local.json`. See [Per-repository telemetry](/ai-governance/track-your-claude-code-usage#per-repo-telemetry-with-plain-claude-no-wrapper).
 
-## LangWatch-Specific Configuration
+### Managed settings for a fleet
 
-### Endpoint Configuration
+An administrator can apply the same block to every machine through the managed settings file:
 
-LangWatch provides OpenTelemetry endpoints for traces:
+- macOS: `/Library/Application Support/ClaudeCode/managed-settings.json`
+- Linux and Windows Subsystem for Linux: `/etc/claude-code/managed-settings.json`
+- Windows: `C:\ProgramData\ClaudeCode\managed-settings.json`
 
-```bash
-# General OTLP endpoint (recommended)
-export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
+Variables in the managed settings file take precedence and a user cannot override them. Distribute the file with your device management system.
 
-# Specific traces endpoint (if needed)
-export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://app.langwatch.ai/api/otel/v1/traces
-```
+### Team attribution
 
-### Protocol Selection
-
-LangWatch supports multiple OTLP protocols. For Claude Code integration, we recommend:
+Add your own labels to every trace with `OTEL_RESOURCE_ATTRIBUTES`:
 
 ```bash
-# HTTP/JSON (recommended for Claude Code)
-export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
-
-# Alternative: gRPC (if you prefer binary protocol)
-export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-```
-
-### Authentication
-
-Set your LangWatch API key for authentication:
-
-```bash
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key"
+export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code,department=engineering,team.id=platform"
 ```
 
 <Warning>
-  Never commit API keys to version control. Use environment variables or managed settings for secure configuration.
-</Warning>
-
-## Available Trace Data
-
-Claude Code exports comprehensive trace data that integrates seamlessly with LangWatch's observability platform.
-
-### Standard Attributes
-
-All traces share these standard attributes:
-
-| Attribute           | Description                                                   | Controlled By                                       |
-| ------------------- | ------------------------------------------------------------- | --------------------------------------------------- |
-| `session.id`        | Unique session identifier                                     | `OTEL_METRICS_INCLUDE_SESSION_ID` (default: true)   |
-| `app.version`       | Current Claude Code version                                   | `OTEL_METRICS_INCLUDE_VERSION` (default: false)     |
-| `organization.id`   | Organization UUID (when authenticated)                        | Always included when available                      |
-| `user.account_uuid` | Account UUID (when authenticated)                             | `OTEL_METRICS_INCLUDE_ACCOUNT_UUID` (default: true) |
-| `terminal.type`     | Terminal type (e.g., `iTerm.app`, `vscode`, `cursor`, `tmux`) | Always included when detected                       |
-
-### Key Trace Information
-
-Claude Code traces include:
-
-- **Session tracking**: CLI session lifecycle and duration
-- **Code generation**: Lines of code added/removed, file operations
-- **Tool usage**: Edit, MultiEdit, Write, and NotebookEdit tool decisions
-- **API interactions**: Claude API requests, responses, and performance
-- **User interactions**: Prompt submissions and tool acceptances/rejections
-
-## Configuration Examples
-
-### Basic LangWatch Integration
-
-```bash
-# Enable telemetry and send to LangWatch
-export CLAUDE_CODE_ENABLE_TELEMETRY=1
-export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1
-export OTEL_TRACES_EXPORTER=otlp
-export OTEL_LOGS_EXPORTER=otlp
-export OTEL_METRICS_EXPORTER=otlp
-export OTEL_LOG_USER_PROMPTS=1
-export OTEL_LOG_TOOL_DETAILS=1
-export OTEL_LOG_TOOL_CONTENT=1
-export OTEL_LOG_RAW_API_BODIES=1
-export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
-export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-api-key"
-```
-
-### Advanced Configuration with Custom Attributes
-
-```bash
-# Basic telemetry setup
-export CLAUDE_CODE_ENABLE_TELEMETRY=1
-export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1
-export OTEL_TRACES_EXPORTER=otlp
-export OTEL_LOGS_EXPORTER=otlp
-export OTEL_METRICS_EXPORTER=otlp
-export OTEL_LOG_USER_PROMPTS=1
-export OTEL_LOG_TOOL_DETAILS=1
-export OTEL_LOG_TOOL_CONTENT=1
-export OTEL_LOG_RAW_API_BODIES=1
-
-# LangWatch endpoint configuration
-export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
-export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-api-key"
-
-# Custom resource attributes for team identification
-export OTEL_RESOURCE_ATTRIBUTES="department=engineering,team.id=platform"
-```
-
-### Debug Configuration
-
-```bash
-# Debug configuration with console output and LangWatch
-export CLAUDE_CODE_ENABLE_TELEMETRY=1
-export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1
-export OTEL_TRACES_EXPORTER=console,otlp
-export OTEL_LOGS_EXPORTER=console,otlp
-export OTEL_METRICS_EXPORTER=console,otlp
-export OTEL_LOG_USER_PROMPTS=1
-export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
-export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-api-key"
-```
-
-## Multi-Team Organization Support
-
-Organizations with multiple teams can add custom attributes to distinguish between different groups:
-
-```bash
-# Add custom attributes for team identification
-export OTEL_RESOURCE_ATTRIBUTES="department=engineering,team.id=platform,project=langwatch-integration"
-```
-
-These custom attributes will be included in all traces sent to LangWatch, allowing you to:
-
-* Filter traces by team or department
-* Track usage per department
-* Create team-specific dashboards
-* Set up alerts for specific teams
-
-<Warning>
-  **Important formatting requirements for OTEL_RESOURCE_ATTRIBUTES:**
-
-  The `OTEL_RESOURCE_ATTRIBUTES` environment variable follows the [W3C Baggage specification](https://www.w3.org/TR/baggage/), which has strict formatting requirements:
-
-  * **No spaces allowed**: Values cannot contain spaces. For example, `user.organizationName=My Company` is invalid
-  * **Format**: Must be comma-separated key=value pairs: `key1=value1,key2=value2`
-  * **Allowed characters**: Only US-ASCII characters excluding control characters, whitespace, double quotes, commas, semicolons, and backslashes
-  * **Special characters**: Characters outside the allowed range must be percent-encoded
-
-  **Examples:**
+  `OTEL_RESOURCE_ATTRIBUTES` follows the [W3C Baggage specification](https://www.w3.org/TR/baggage/). Write comma-separated `key=value` pairs. Values cannot contain a space, a double quote, a comma, a semicolon or a backslash. Percent-encode any other character outside that range.
 
   ```bash
-  # ❌ Invalid - contains spaces
-  export OTEL_RESOURCE_ATTRIBUTES="org.name=John's Organization"
+  # Rejected, the value contains a space
+  export OTEL_RESOURCE_ATTRIBUTES="org.name=Acme Corporation"
 
-  # ✅ Valid - use underscores or camelCase instead
-  export OTEL_RESOURCE_ATTRIBUTES="org.name=Johns_Organization"
-  export OTEL_RESOURCE_ATTRIBUTES="org.name=JohnsOrganization"
-
-  # ✅ Valid - percent-encode special characters if needed
-  export OTEL_RESOURCE_ATTRIBUTES="org.name=John%27s%20Organization"
+  # Accepted
+  export OTEL_RESOURCE_ATTRIBUTES="org.name=Acme_Corporation"
+  export OTEL_RESOURCE_ATTRIBUTES="org.name=Acme%20Corporation"
   ```
 </Warning>
 
-## Dynamic Headers for Enterprise
+### Headers from a script
 
-For enterprise environments that require dynamic authentication, you can configure a script to generate headers dynamically:
-
-### Settings Configuration
-
-Add to your `.claude/settings.json`:
+An enterprise that issues short-lived tokens can produce the headers at start time. Add this to `.claude/settings.json`:
 
 ```json
 {
@@ -256,153 +281,13 @@ Add to your `.claude/settings.json`:
 }
 ```
 
-### Script Requirements
-
-The script must output valid JSON with string key-value pairs representing HTTP headers:
+The script writes a JSON object of string headers to standard output:
 
 ```bash
 #!/bin/bash
-# Example: Generate LangWatch headers dynamically
-echo "{\"Authorization\": \"Bearer $(get-langwatch-token.sh)\", \"X-API-Key\": \"$(get-api-key.sh)\"}"
+echo "{\"Authorization\": \"Bearer $(get-langwatch-token.sh)\"}"
 ```
 
 <Warning>
-  **Headers are fetched only at startup, not during runtime.** This is due to OpenTelemetry exporter architecture limitations.
-
-  For scenarios requiring frequent token refresh, use an OpenTelemetry Collector as a proxy that can refresh its own headers.
+  Claude Code reads the headers at start only, so a token that expires mid-session is not refreshed. For frequent refresh, send the telemetry to an OpenTelemetry Collector and let the collector refresh its own headers.
 </Warning>
-
-## Verification and Testing
-
-### 1. Check the shell overrides
-
-After setting up your configuration, verify that Claude Code is sending data to LangWatch:
-
-```bash
-# Shell override for telemetry
-echo $CLAUDE_CODE_ENABLE_TELEMETRY
-
-# Shell override for span tracing
-echo $CLAUDE_CODE_ENHANCED_TELEMETRY_BETA
-
-# Shell override for the endpoint
-echo $OTEL_EXPORTER_OTLP_ENDPOINT
-
-# Shell override for the authentication headers
-echo $OTEL_EXPORTER_OTLP_HEADERS
-```
-
-<Note>
-  These read your shell and nothing else. Claude Code also takes the same variables from the `env` block of a settings file, so an empty line here does not mean the setting is missing: check `.claude/settings.json`, `.claude/settings.local.json`, and your managed settings file too. The one check that covers every source is whether traces arrive in LangWatch, which is the next step.
-</Note>
-
-### 2. Test Data Flow
-
-1. **Start Claude Code** with your configuration
-2. **Make some interactions** (ask questions, edit code, use tools)
-3. **Check LangWatch dashboard** for incoming traces
-4. **Verify data appears** in the dashboard
-
-## Troubleshooting
-
-<AccordionGroup>
-  <Accordion title="No data appearing in LangWatch">
-    - Verify `CLAUDE_CODE_ENABLE_TELEMETRY=1` is set
-    - Verify `OTEL_LOGS_EXPORTER=otlp` is set — Claude Code 2.1.x ships its cost-bearing events as OTLP logs, not spans. With only `OTEL_TRACES_EXPORTER` set you'll see nothing in LangWatch
-    - Check that the endpoint URL is correct: `https://app.langwatch.ai/api/otel`
-    - Ensure your API key is valid and has proper permissions
-    - Check network connectivity to the LangWatch endpoint
-    - Verify the OTLP protocol is supported (http/json or grpc)
-  </Accordion>
-
-  <Accordion title="Trace lands but has no tool call tree, latencies, or subagents">
-    Set `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`. It is the experimental flag that turns span tracing on, and `OTEL_TRACES_EXPORTER` is a no-op without it. Cost and token events still arrive over the logs exporter, so the session shows up, but with no spans LangWatch has no structure to hang them on: every subagent folds into the main session instead of branching off it. `OTEL_LOG_TOOL_CONTENT` also depends on this flag, because the tool input and output it unlocks are written as span events.
-  </Accordion>
-
-  <Accordion title="Trace shows but input/prompt is empty">
-    Set `OTEL_LOG_USER_PROMPTS=1`. Claude Code redacts the prompt body on its `user_prompt` event by default — without this env, the receiver has no input text to attach to the synthesized trace.
-  </Accordion>
-
-  <Accordion title="Trace shows but output/response is empty">
-    Set `OTEL_LOG_RAW_API_BODIES=1`. Claude Code only emits the assistant's response text on its `api_response_body` event, and that event is off by default. With the flag set, LangWatch lifts the full response text into the trace output alongside the cost and token breakdown.
-
-    Claude Code also emits `api_response_body` for non-conversational utility calls (autosuggestions, session-title generation). LangWatch filters those by `query_source` so only genuine conversation turns populate the trace output, never a stray title or suggestion.
-  </Accordion>
-
-  <Accordion title="Authentication errors">
-    - Verify the Authorization header format: `Bearer YOUR_API_KEY`
-    - Ensure the API key is valid and not expired
-    - Check that the API key has the necessary permissions for trace ingestion
-    - Verify the header is properly formatted in the environment variable
-  </Accordion>
-
-  <Accordion title="Large payloads or truncated content">
-    `OTEL_LOG_RAW_API_BODIES` is the flag that carries the large payload: it ships the Messages API request and response JSON on every turn, so `api_request_body` / `api_response_body` events can reach tens of KB each. Claude Code truncates each inline body at 60 KB (raise the limit with `CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH`) and redacts extended thinking. LangWatch caps oversized log records on ingestion to protect the pipeline, keeping the lifted input and output text while trimming the rest. If you only need cost and token data, drop all four content flags. The other three send smaller records than the raw bodies do, but they are content too: `OTEL_LOG_USER_PROMPTS` sends the whole prompt, `OTEL_LOG_TOOL_DETAILS` sends what each tool call was asked to do (the Bash command text, the Edit diff, the path a Read opened), and `OTEL_LOG_TOOL_CONTENT` sends what the tool gave back, including the contents of files a tool read or wrote.
-  </Accordion>
-
-  <Accordion title="Configuration not taking effect">
-    - Restart Claude Code after changing environment variables
-    - Check for conflicting settings in managed settings files
-    - Verify environment variable precedence (managed settings override user settings)
-    - Use `claude --help` to verify configuration is loaded
-  </Accordion>
-</AccordionGroup>
-
-## Best Practices
-
-### 1. **Start with Console Exporter for Debugging**
-
-```bash
-# Begin with console output to verify telemetry is working
-export OTEL_TRACES_EXPORTER=console,otlp
-```
-
-### 2. **Implement Proper Error Handling**
-
-Monitor for export failures and implement retry logic if needed. LangWatch provides reliable endpoints, but network issues can occur.
-
-### 3. **Use Resource Attributes for Organization**
-
-```bash
-# Add meaningful attributes for better data organization
-export OTEL_RESOURCE_ATTRIBUTES="environment=production,region=us-west-2,team=platform"
-```
-
-## Usage Insights
-
-With LangWatch integration, you can gain insights into Claude Code usage:
-
-<Note>
-  Which of these you get depends on which flags are set, and nothing is exported at all without `CLAUDE_CODE_ENABLE_TELEMETRY=1`. With that alone you get the usage fields: token counts, cost, model and latency. The tool call tree, per-tool timings, session structure and subagent attribution need `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`, which is what turns spans on. Prompt text, tool input and output, and the model request and response bodies each need their own content flag (`OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_DETAILS`, `OTEL_LOG_TOOL_CONTENT`, `OTEL_LOG_RAW_API_BODIES`).
-</Note>
-
-### **Productivity Tracking**
-- Monitor code generation patterns
-- Track tool usage and acceptance rates
-- Analyze session duration and frequency
-
-### **User Behavior Analysis**
-- Understand how teams use Claude Code
-- Identify popular features and workflows
-- Monitor adoption across different teams
-
-## Next Steps
-
-1. **Set up your configuration** using the examples above
-2. **Verify data flow** to LangWatch
-3. **Explore the LangWatch dashboard** to view your Claude Code traces
-4. **Create custom dashboards** for your team's specific needs
-5. **Set up alerts** for unusual usage patterns
-
-For comprehensive monitoring resources, see the [Claude Code Monitoring Guide](https://github.com/anthropics/claude-code-monitoring-guide).
-
-## Security and Privacy
-
-- **Telemetry is opt-in** and requires explicit configuration
-- **Prompts, tool input and output, and model request and response bodies are off by default** - without the content flags (`OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_DETAILS`, `OTEL_LOG_TOOL_CONTENT`, `OTEL_LOG_RAW_API_BODIES`) the export still carries usage: token counts, cost, latency, the tool call tree and subagent attribution. What it leaves out is the content itself
-- **Once enabled, prompt text, tool outputs, and file contents passed to tools will appear in traces** - enable the flags only where capturing that content is acceptable
-- **Every example on this page enables the content flags**, because that is what makes a trace worth reading. Trim them to the ones you want before rolling the configuration out to a team, and keep the same decision in mind for managed settings, which apply to everyone at once
-
-<Note>
-  All data sent to LangWatch is encrypted in transit and stored securely. Review LangWatch's [privacy policy](https://langwatch.ai/privacy) and [security practices](https://langwatch.ai/security) for more details.
-</Note>

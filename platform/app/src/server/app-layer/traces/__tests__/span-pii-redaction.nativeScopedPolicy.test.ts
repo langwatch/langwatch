@@ -227,6 +227,20 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       expect(batchSpy).not.toHaveBeenCalled();
     });
 
+    it("keeps a datestamped identifier attribute whole and still redacts a phone number in text", async () => {
+      const { service, batchSpy } = makeService(mkPolicy({}));
+      const span = spanWith({
+        "deployment.name": "hosted-eu-20260812-09",
+        input: "ref 2026081209 checkpoint",
+      });
+
+      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+
+      expect(attr(span, "deployment.name")).toBe("hosted-eu-20260812-09");
+      expect(attr(span, "input")).toBe("ref [PHONE_NUMBER] checkpoint");
+      expect(batchSpy).not.toHaveBeenCalled();
+    });
+
     /** @scenario A credit card number is validated before being redacted */
     it("redacts a Luhn-valid card but keeps a random 16-digit order id", async () => {
       const { service, batchSpy } = makeService(mkPolicy({}));

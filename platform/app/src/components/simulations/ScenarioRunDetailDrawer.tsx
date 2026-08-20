@@ -28,10 +28,10 @@ import { useScenarioTarget } from "~/hooks/useScenarioTarget";
 import { useSimulationStreamingState } from "~/hooks/useSimulationStreamingState";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
+import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
-import { TraceDetails } from "../traces/TraceDetails";
 import { Drawer } from "../ui/drawer";
 import { CopyIdChip } from "./CopyIdChip";
 import { RunCriteriaChip } from "./RunCriteriaChip";
@@ -57,13 +57,10 @@ function formatResultsForCopy(results: unknown): string {
 export function ScenarioRunDetailDrawer({
   open,
 }: ScenarioRunDetailDrawerProps) {
-  const { closeDrawer } = useDrawer();
+  const { closeDrawer, openDrawer } = useDrawer();
   const params = useDrawerParams();
   const { project } = useOrganizationTeamProject();
   const [runModalOpen, setRunModalOpen] = useState(false);
-  const [traceDrawerTraceId, setTraceDrawerTraceId] = useState<string | null>(
-    null,
-  );
   const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
 
   const scenarioRunId = params.scenarioRunId;
@@ -95,8 +92,11 @@ export function ScenarioRunDetailDrawer({
         enabled: !!project?.id && !!scenarioRunId && !!open,
         // Finished runs never change — stop polling entirely. Live runs poll
         // fast only while the event stream is down.
-        refetchInterval: (data) =>
-          getRunStatePollInterval({ status: data?.status, sseConnected }),
+        refetchInterval: (query) =>
+          getRunStatePollInterval({
+            status: query.state.data?.status,
+            sseConnected,
+          }),
       },
     );
 
@@ -224,6 +224,17 @@ export function ScenarioRunDetailDrawer({
     return { met, total: met + unmet };
   }, [scenarioState?.results]);
 
+  // The values this run actually resolved, as recorded when it was queued. A
+  // run from before parameters existed, or one whose scenarios declare none,
+  // has nothing here and shows no section at all.
+  const parameters = useMemo(() => {
+    const parsed = runParameterValuesSchema.safeParse(
+      scenarioState?.metadata?.parameters,
+    );
+    if (!parsed.success) return [];
+    return Object.entries(parsed.data);
+  }, [scenarioState?.metadata]);
+
   const hasConversation =
     (scenarioState?.messages ?? []).length > 0 ||
     (streamingMessages ?? []).length > 0;
@@ -243,6 +254,7 @@ export function ScenarioRunDetailDrawer({
     "conversation",
     "no-response",
     "results",
+    "parameters",
   ]);
 
   // Long messages truncate by default; this seeds every bubble's expand
@@ -353,7 +365,14 @@ export function ScenarioRunDetailDrawer({
                       onEditScenario={() => setScenarioEditorOpen(true)}
                       onOpenThread={
                         firstTraceId && !hasNoResults(scenarioState.status)
-                          ? () => setTraceDrawerTraceId(firstTraceId)
+                          ? () =>
+                              openDrawer("traceV2Details", {
+                                traceId: firstTraceId,
+                                // The thread IS the conversation view; landing
+                                // on the drawer's default mode would show the
+                                // reader spans when they asked for the thread.
+                                mode: "conversation",
+                              })
                           : null
                       }
                       onOpenInTraces={
@@ -518,6 +537,41 @@ export function ScenarioRunDetailDrawer({
                     />
                   </Box>
                 </RunDetailSection>
+
+                {parameters.length > 0 && (
+                  <RunDetailSection
+                    value="parameters"
+                    title="Parameters"
+                    count={parameters.length}
+                  >
+                    <VStack
+                      align="stretch"
+                      gap={1.5}
+                      data-testid="run-parameters"
+                    >
+                      {parameters.map(([name, value]) => (
+                        <HStack key={name} gap={3} align="start">
+                          <Text
+                            fontSize="xs"
+                            fontFamily="mono"
+                            color="fg.muted"
+                            width="180px"
+                            flexShrink={0}
+                          >
+                            {name}
+                          </Text>
+                          <Text
+                            fontSize="xs"
+                            fontFamily="mono"
+                            wordBreak="break-word"
+                          >
+                            {String(value)}
+                          </Text>
+                        </HStack>
+                      ))}
+                    </VStack>
+                  </RunDetailSection>
+                )}
               </Accordion.Root>
             </Drawer.Body>
           )}
@@ -538,28 +592,6 @@ export function ScenarioRunDetailDrawer({
         onClose={() => setScenarioEditorOpen(false)}
         scenarioId={scenarioId}
       />
-
-      {/* Child drawer: Trace Details — managed via local state */}
-      <Drawer.Root
-        open={!!traceDrawerTraceId}
-        onOpenChange={() => setTraceDrawerTraceId(null)}
-        placement="end"
-        size="xl"
-        modal={true}
-      >
-        <Drawer.Content bg="bg" paddingX={0} maxWidth="70%">
-          <Drawer.CloseTrigger zIndex={10} />
-          <Drawer.Body paddingY={0} paddingX={0} overflowY="auto">
-            {traceDrawerTraceId && (
-              <TraceDetails
-                traceId={traceDrawerTraceId}
-                selectedTab="messages"
-                showMessages
-              />
-            )}
-          </Drawer.Body>
-        </Drawer.Content>
-      </Drawer.Root>
     </>
   );
 }

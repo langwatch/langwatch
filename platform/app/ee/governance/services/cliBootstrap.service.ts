@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { env } from "~/env.mjs";
 /**
  * CliBootstrapService - shared logic for the login-completion ceremony.
  * Returns the member's available AI tools (coding assistants they can run),
@@ -20,9 +21,7 @@
  * catalog, and budget collapses to {null, 0, MONTHLY} when the user has no
  * personal workspace yet (fresh login flow, no VK provisioning yet).
  */
-import type { PrismaClient } from "@prisma/client";
-
-import { env } from "~/env.mjs";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
@@ -30,11 +29,7 @@ import { AiToolEntryService } from "./aiToolEntry.service";
 import { resolveGatewayBaseUrl } from "./gatewayUrl";
 import { PersonalVirtualKeyService } from "./personalVirtualKey.service";
 import { PersonalWorkspaceService } from "./personalWorkspace.service";
-import {
-  PLATFORM_TOOL_POLICY_DEFAULTS,
-  PLATFORM_TOOL_SLUGS,
-  type PlatformToolPolicyMap,
-} from "./platformToolPolicy.service";
+import type { PlatformToolPolicyMap } from "./platformToolPolicy.service";
 
 export interface CliBootstrapResult {
   /**
@@ -206,12 +201,14 @@ export class CliBootstrapService {
   }
 
   /**
-   * The login `toolPolicies` map. Derived from the coding_assistant tiles
-   * the user can see (per-tool slug) merged over the hardcoded
-   * {@link PLATFORM_TOOL_POLICY_DEFAULTS}: claude/codex/gemini/opencode =
-   * both paths, cursor = gateway only. A tool with no visible tile keeps
-   * its default, so the map is always complete for every known slug - the
-   * exact wire shape the CLI caches and gates on. Replaces the retired
+   * The login `toolPolicies` map: the effective per-tool policy from
+   * {@link AiToolEntryService.resolveToolPolicyMap}, which is the coding
+   * assistant tiles the user can see merged over the hardcoded defaults
+   * (claude/codex/gemini/opencode = both paths, cursor = gateway only). A
+   * tool with no visible tile keeps its default, so the map is always
+   * complete for every known slug - the exact wire shape the CLI caches and
+   * gates on. The ingestion-key mint reads the same map, so a CLI that skips
+   * its own gate still meets the policy. Replaces the retired
    * PlatformToolPolicy table.
    */
   private async resolveToolPolicies({
@@ -221,15 +218,10 @@ export class CliBootstrapService {
     organizationId: string;
     userId: string;
   }): Promise<PlatformToolPolicyMap> {
-    const overrides = await AiToolEntryService.create(
-      this.prisma,
-    ).resolveToolPolicyOverrides({ organizationId, userId });
-
-    const map = {} as PlatformToolPolicyMap;
-    for (const slug of PLATFORM_TOOL_SLUGS) {
-      map[slug] = overrides[slug] ?? { ...PLATFORM_TOOL_POLICY_DEFAULTS[slug] };
-    }
-    return map;
+    return await AiToolEntryService.create(this.prisma).resolveToolPolicyMap({
+      organizationId,
+      userId,
+    });
   }
 
   private async resolveBudget(input: {

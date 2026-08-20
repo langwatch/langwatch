@@ -136,7 +136,8 @@ Feature: CLI wrapper login → token → env injection → routing
     When the user runs `langwatch claude`
     Then the wrapper exits with code 2 BEFORE spawning the child
     And stderr contains the Screen-8 budget-exceeded box
-    And `last_request_increase_url` in the persisted config equals the URL the control plane returned
+    And the box prints the URL the control plane returned, so the user reaches
+      the request form in one step
     And the child claude binary is NEVER invoked
 
   Scenario: Budget pre-check allows the wrap when under-limit

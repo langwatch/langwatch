@@ -1,8 +1,9 @@
+import type { LedgerActor } from "@langwatch/authz-server";
 import {
-  Prisma,
+  type Prisma,
   type PrismaClient,
   RoleBindingScopeType,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { isOrgExclusivePermission, type Permission } from "~/server/api/rbac";
 import { OrgExclusivePermissionScopeError } from "~/server/role-bindings/errors";
 import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
@@ -92,10 +93,12 @@ export class RoleService {
     roleId,
     organizationId,
     params,
+    actor,
   }: {
     roleId: string;
     organizationId: string;
     params: UpdateRoleParams;
+    actor: LedgerActor;
   }) {
     if (params.name?.startsWith("apikey:")) {
       throw new RoleReservedNameError();
@@ -119,36 +122,12 @@ export class RoleService {
       }
     }
 
-    const updated = await this.updateRoleRow(roleId, params);
+    const updated = await this.repository.update({ roleId, params, actor });
 
     return {
       ...updated,
       permissions: updated.permissions as string[],
     };
-  }
-
-  /**
-   * The update itself, with the `(organizationId, name)` unique index as the
-   * backstop the pre-check cannot be: two concurrent renames to one name both
-   * pass the read, and the loser must still get the deterministic refusal
-   * rather than a raw constraint failure.
-   */
-  private async updateRoleRow(roleId: string, params: UpdateRoleParams) {
-    try {
-      return await this.repository.update(roleId, params);
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002" &&
-        // Narrowed to the name index the docstring names, so a future
-        // constraint on CustomRole does not report an unrelated conflict as
-        // "a role with this name already exists".
-        String(error.meta?.target ?? "").includes("name")
-      ) {
-        throw new RoleDuplicateNameError();
-      }
-      throw error;
-    }
   }
 
   /**
@@ -175,11 +154,15 @@ export class RoleService {
   }
 
   /**
-   * The delete itself, with the in-use condition carried on the statement as
-   * the backstop the pre-check cannot be: a grant written between the check
-   * and the delete would otherwise be unhooked from the role behind it, and a
-   * dangling reference falls back to the built-in permission bag rather than
-   * failing, so nobody would see it happen.
+   * The delete itself. `deleteIfUnused` re-reads every reference immediately
+   * before appending `role_deleted` — a read followed by an append, not a
+   * condition carried on a statement, because the role is a ledger fact
+   * (ADR-092 §13) and its deletion is a command. A grant written inside that
+   * window is silently unhooked from the role behind it, and the dangling
+   * reference falls back to the built-in permission bag rather than failing;
+   * what survives is the guarantee callers rely on — a role somebody holds at
+   * the moment of the re-read is left standing. The window and its cost are
+   * spelled out on `RoleRepository.deleteIfUnused`.
    *
    * Nothing deleted has two causes, and they get different answers, settled by
    * re-reading the role rather than by the counts. Something took a reference
@@ -189,23 +172,26 @@ export class RoleService {
    * answer is that the role is gone, which is also the stable outcome a
    * repeated delete needs.
    *
-   * The counts cannot decide this on their own: the delete's condition spans
-   * every organization, while `countRoleBindings` is organization-scoped as
-   * the tenancy middleware requires, so a holder elsewhere reads as zero here.
-   * Under-reporting how many bindings hold a role is a worse refusal message;
-   * reporting "not found" for a role that is still there would be a wrong
-   * answer.
+   * The counts cannot decide this on their own: `deleteIfUnused`'s reference
+   * check spans every organization, while `countRoleBindings` is
+   * organization-scoped as the tenancy middleware requires, so a holder
+   * elsewhere reads as zero here. Under-reporting how many bindings hold a
+   * role is a worse refusal message; reporting "not found" for a role that is
+   * still there would be a wrong answer.
    */
   private async deleteRoleRow({
     roleId,
     organizationId,
+    actor,
   }: {
     roleId: string;
     organizationId: string;
+    actor: LedgerActor;
   }) {
     const deleted = await this.repository.deleteIfUnused({
       roleId,
       organizationId,
+      actor,
     });
     if (deleted) return;
 
@@ -227,9 +213,11 @@ export class RoleService {
   async deleteRoleForOrg({
     roleId,
     organizationId,
+    actor,
   }: {
     roleId: string;
     organizationId: string;
+    actor: LedgerActor;
   }) {
     const role = await this.repository.findByIdWithUsersInOrg({
       roleId,
@@ -240,7 +228,7 @@ export class RoleService {
     }
 
     await this.assertRoleNotInUse(role);
-    await this.deleteRoleRow({ roleId, organizationId });
+    await this.deleteRoleRow({ roleId, organizationId, actor });
 
     return { success: true };
   }
@@ -251,7 +239,13 @@ export class RoleService {
     return { ...role, permissions: role.permissions as string[] };
   }
 
-  async createRole(params: CreateRoleParams) {
+  async createRole({
+    params,
+    actor,
+  }: {
+    params: CreateRoleParams;
+    actor: LedgerActor;
+  }) {
     if (params.name.startsWith("apikey:")) {
       throw new RoleReservedNameError();
     }
@@ -265,7 +259,7 @@ export class RoleService {
       throw new RoleDuplicateNameError();
     }
 
-    const role = await this.repository.create(params);
+    const role = await this.repository.create({ params, actor });
 
     return {
       ...role,
@@ -273,7 +267,15 @@ export class RoleService {
     };
   }
 
-  async updateRole(roleId: string, params: UpdateRoleParams) {
+  async updateRole({
+    roleId,
+    params,
+    actor,
+  }: {
+    roleId: string;
+    params: UpdateRoleParams;
+    actor: LedgerActor;
+  }) {
     if (params.name?.startsWith("apikey:")) {
       throw new RoleReservedNameError();
     }
@@ -283,7 +285,7 @@ export class RoleService {
       throw new RoleNotFoundError(roleId);
     }
 
-    const updated = await this.updateRoleRow(roleId, params);
+    const updated = await this.repository.update({ roleId, params, actor });
 
     return {
       ...updated,
@@ -291,7 +293,7 @@ export class RoleService {
     };
   }
 
-  async deleteRole(roleId: string) {
+  async deleteRole({ roleId, actor }: { roleId: string; actor: LedgerActor }) {
     const role = await this.repository.findByIdWithUsers(roleId);
 
     if (!role || role.kind !== CUSTOM_ROLE_KIND.CUSTOM) {
@@ -302,12 +304,23 @@ export class RoleService {
     await this.deleteRoleRow({
       roleId,
       organizationId: role.organizationId,
+      actor,
     });
 
     return { success: true };
   }
 
-  async assignRoleToUser(userId: string, teamId: string, customRoleId: string) {
+  async assignRoleToUser({
+    userId,
+    teamId,
+    customRoleId,
+    actor,
+  }: {
+    userId: string;
+    teamId: string;
+    customRoleId: string;
+    actor: LedgerActor;
+  }) {
     const [customRole, team] = await Promise.all([
       this.repository.findById(customRoleId),
       this.repository.findTeamById(teamId),
@@ -339,17 +352,25 @@ export class RoleService {
       client: this.prisma,
       scopes: [{ scopeType: RoleBindingScopeType.TEAM, scopeId: teamId }],
     });
-    await this.repository.assignToUser(userId, teamId, customRoleId);
+    await this.repository.assignToUser({ userId, teamId, customRoleId, actor });
 
     return { success: true };
   }
 
-  async removeRoleFromUser(userId: string, teamId: string) {
+  async removeRoleFromUser({
+    userId,
+    teamId,
+    actor,
+  }: {
+    userId: string;
+    teamId: string;
+    actor: LedgerActor;
+  }) {
     await assertNoPersonalTeamScope({
       client: this.prisma,
       scopes: [{ scopeType: RoleBindingScopeType.TEAM, scopeId: teamId }],
     });
-    await this.repository.removeFromUser(userId, teamId);
+    await this.repository.removeFromUser({ userId, teamId, actor });
     return { success: true };
   }
 

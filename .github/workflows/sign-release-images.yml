@@ -17,6 +17,17 @@ on:
         type: boolean
         default: true
 
+# Backfilling signatures onto images that are already public, so two runs over
+# the same release would sign and attach SBOMs to the same digests at once, and
+# `gh release upload --clobber` makes the last writer win. Serialize; never
+# cancel, for the same reason publish-docker-app does not.
+concurrency:
+  # Keyed on the version being signed, not the ref: this is dispatch-only, so
+  # every run has the same ref and a ref-keyed group would serialize two
+  # unrelated backfills for no reason.
+  group: sign-release-images-${{ inputs.version }}
+  cancel-in-progress: false
+
 permissions:
   contents: write # attach SBOMs to the GitHub release
   id-token: write # keyless OIDC signing via Sigstore

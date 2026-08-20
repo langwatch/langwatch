@@ -11,6 +11,7 @@ import { resolveOutputFormat } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { fetchBatchRuns, tallyBatchRuns } from "../../utils/batchRunProgress";
+import { parseRunParameterFlags } from "../../utils/keyValueFlags";
 
 function parseTarget(targetStr: string): SuiteTarget {
   const colonIndex = targetStr.indexOf(":");
@@ -29,9 +30,11 @@ function parseTarget(targetStr: string): SuiteTarget {
 
 export const runScenarioCommand = async (
   id: string,
-  options: { target: string; wait?: boolean; format?: string },
+  options: { target: string; wait?: boolean; format?: string; param?: string[] },
 ): Promise<void> => {
   await resolveCredentials();
+
+  const parameters = parseRunParameterFlags({ pairs: options.param });
 
   if (!options.target) {
     console.error(chalk.red("Error: --target is required. Specify what to run the scenario against."));
@@ -59,7 +62,7 @@ export const runScenarioCommand = async (
 
     spinner.text = `Running scenario against ${target.type}:${target.referenceId}...`;
 
-    const result = await suitesService.run(suite.id);
+    const result = await suitesService.run(suite.id, { parameters });
 
     spinner.succeed(
       `Scenario run scheduled: ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""} (batch: ${result.batchRunId})`,

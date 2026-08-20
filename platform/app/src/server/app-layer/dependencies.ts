@@ -1,5 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
+import type { RedisConnection } from "@langwatch/redis-client";
 import type Stripe from "stripe";
 import type { AnalyticsService } from "~/server/app-layer/analytics/analytics.service";
 import type { InstanceUsageStatsRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
@@ -8,7 +9,6 @@ import type { FilterService } from "~/server/filters/filter.service";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import type { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
-import type { OrphanedRunFinder } from "~/server/scenarios/orphaned-run-reconciliation";
 import type { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import type { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
@@ -39,6 +39,7 @@ import type {
 } from "./automations/trigger-template.service";
 import type { BroadcastService } from "./broadcast/broadcast.service";
 import type { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
+import type { CodingAgentSessionsListService } from "./coding-agent/coding-agent-sessions-list.service";
 import type { PullRequestUsageService } from "./coding-agent/pull-request-usage.service";
 import type { AppConfig } from "./config";
 import type { DspyStepService } from "./dspy-steps/dspy-step.service";
@@ -62,6 +63,7 @@ import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { QueueService } from "./ops/queue.service";
 import type { ReplayService } from "./ops/replay.service";
 import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
+import type { OpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import type { OrganizationService } from "./organizations/organization.service";
 import type { PresenceService } from "./presence/presence.service";
 import type { ProjectService } from "./projects/project.service";
@@ -102,7 +104,13 @@ export interface OpsDependencies {
   managerExplorer: ManagerExplorerService;
   replay: ReplayService;
   blobStore: BlobStoreService;
+  /**
+   * The lease-elected snapshot writer. Present on every pod that can reach
+   * Redis, but only scans on the pod currently holding the lease (ADR-090).
+   */
   metricsCollector: OpsMetricsCollector | null;
+  /** Serves the shared snapshot to this pod's dashboard subscribers. */
+  snapshotReader: OpsSnapshotReader | null;
 }
 
 export interface AppDependencies {
@@ -210,7 +218,34 @@ export interface AppDependencies {
   clickhouse: {
     enabled: boolean;
     resolveClient: ClickHouseClientResolver;
+    /** Per-organization resolution, for aggregates keyed by organization
+     *  rather than project (usage rollups, the grants ledger). */
+    resolveOrganizationClient: (
+      organizationId: string,
+    ) => Promise<ClickHouseClient>;
+    /** Every configured instance - shared plus private - for fleet sweeps
+     *  and admin surfaces that legitimately touch all of them. */
+    allInstances: () => Promise<
+      Array<{ target: string; client: ClickHouseClient }>
+    >;
   };
+  /**
+   * The process's one Redis connection, owned by the composition root and
+   * closed with the App (ADR-093).
+   *
+   * `null` when this deployment or test run configures no Redis — a supported
+   * outcome, not an error: consumers branch on it to take their documented
+   * fallback (an in-memory counter, a skipped dedupe, an uncached read).
+   *
+   * Prefer taking a connection as a constructor dependency. Read it from here
+   * only where there is no seam to inject through — a route module or a tRPC
+   * router — and read it *inside the handler*, never at module scope.
+   *
+   * Most such readers go through `tryGetApp()` rather than `getApp()`, because
+   * they already branch on absence and treat "no App" the same as "no Redis".
+   * See ADR-093 for which ones deliberately do not.
+   */
+  redis: RedisConnection | null;
   /** Deduplicated usage counters written to ClickHouse for billing. */
   billing: {
     events: BillableEventsRepository;
@@ -221,20 +256,9 @@ export interface AppDependencies {
     instance: InstanceUsageStatsRepository;
   };
   /**
-   * Cross-tenant boot-sweep dependencies for the two orphaned-run
-   * reconciliation sweeps (QUEUED and IN_PROGRESS). Null when ClickHouse is
-   * not configured, in which case both sweeps no-op.
-   */
-  scenarios: {
-    orphanReconciliation: {
-      client: ClickHouseClient | null;
-      finder: OrphanedRunFinder | null;
-    };
-  };
-  /**
    * Governance's OCSF SIEM-export sink (`governance_ocsf_events`). One
    * repository for both directions — the puller worker, the workspace-view
-   * audit trail and the reactor sync write through it; the SIEM export
+   * audit trail and the subscriber sync write through it; the SIEM export
    * procedure reads through it. Undefined on a deployment without
    * ClickHouse.
    */
@@ -256,6 +280,8 @@ export interface AppDependencies {
   /** ADR-056: read side of the coding-agent session aggregate. */
   codingAgents: {
     sessions: CodingAgentSessionService;
+    /** The Sessions screen's list, joined to the pull requests each drove. */
+    sessionsList: CodingAgentSessionsListService;
     /** What a pull request cost in assistant usage, RBAC-scoped. */
     pullRequestUsage: PullRequestUsageService;
   };

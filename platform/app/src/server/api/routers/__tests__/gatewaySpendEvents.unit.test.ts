@@ -3,8 +3,9 @@
  * passthrough to the repository, virtual-key display-name resolution, the
  * ClickHouse-disabled degrade, and RBAC denial.
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { createInnerTRPCContext } from "../../trpc";
 import { gatewaySpendEventsRouter } from "../gatewaySpendEvents";
@@ -43,6 +44,8 @@ const spendEventsRepository = vi.hoisted(() => ({
     | undefined,
 }));
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     gateway: { spendEvents: spendEventsRepository.current },
   }),

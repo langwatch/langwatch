@@ -1,4 +1,5 @@
 import { Box, MenuSeparator, Portal, VStack } from "@chakra-ui/react";
+import type { FocusEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   LuActivity,
@@ -19,9 +20,19 @@ import { SideMenuItem } from "./SideMenuLink";
 
 export type SupportMenuProps = {
   showLabel?: boolean;
+  /**
+   * Where the human-chat entry lives. The current chrome keeps it as a
+   * standalone sidebar item above the Support menu; the navigation-v2
+   * sidebars fold it into the Support menu as "Chat (with a human)".
+   * Spec: specs/navigation/product-sidebars.feature
+   */
+  chatPlacement?: "standalone" | "in-menu";
 };
 
-export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
+export const SupportMenu = ({
+  showLabel = true,
+  chatPlacement = "standalone",
+}: SupportMenuProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const publicEnv = usePublicEnv();
 
@@ -31,6 +42,12 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
   // cursor past the trigger to a sidebar item below leaves the menu
   // stuck open with no cursor over it.
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The menu machine gives focus back to the trigger on every close.
+  // After a keyboard close that is correct; after a pointer-out close it
+  // paints the keyboard focus ring on an entry the reader only hovered,
+  // and the ring stays until the next click. The timestamp marks the
+  // pointer closes so the trigger can drop that one focus when it lands.
+  const pointerCloseAtRef = useRef(Number.NEGATIVE_INFINITY);
   const cancelClose = useCallback(() => {
     if (closeTimerRef.current) {
       clearTimeout(closeTimerRef.current);
@@ -39,14 +56,17 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
   }, []);
   const scheduleClose = useCallback(() => {
     cancelClose();
-    closeTimerRef.current = setTimeout(() => setIsOpen(false), 120);
+    closeTimerRef.current = setTimeout(() => {
+      pointerCloseAtRef.current = performance.now();
+      setIsOpen(false);
+    }, 120);
   }, [cancelClose]);
   useEffect(() => cancelClose, [cancelClose]);
 
   return (
     <VStack width="full" align="start" gap={0.5}>
       {/* Chat button */}
-      {publicEnv.data?.IS_SAAS && (
+      {publicEnv.data?.IS_SAAS && chatPlacement === "standalone" && (
         <Box
           as="button"
           width={showLabel ? "full" : "auto"}
@@ -73,6 +93,11 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
         positioning={{ placement: "right-start" }}
         open={isOpen}
         onOpenChange={({ open }) => setIsOpen(open)}
+        onSelect={({ value }) => {
+          // Item onClick races the menu's own select-then-close unmount;
+          // the root-level select callback is the reliable path.
+          if (value === "chat") toggleSupportChat();
+        }}
       >
         <Menu.Trigger asChild>
           <Box
@@ -86,6 +111,12 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
               setIsOpen(true);
             }}
             onMouseLeave={scheduleClose}
+            onFocus={(e: FocusEvent<HTMLElement>) => {
+              if (performance.now() - pointerCloseAtRef.current < 300) {
+                pointerCloseAtRef.current = Number.NEGATIVE_INFINITY;
+                e.currentTarget.blur();
+              }
+            }}
           >
             <SideMenuItem
               icon={LuLifeBuoy}
@@ -110,6 +141,14 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
             onMouseEnter={cancelClose}
             onMouseLeave={scheduleClose}
           >
+            {publicEnv.data?.IS_SAAS && chatPlacement === "in-menu" && (
+              <>
+                <Menu.Item value="chat">
+                  <LuMessageCircle /> Chat (with a human)
+                </Menu.Item>
+                <MenuSeparator />
+              </>
+            )}
             <Menu.Item value="github">
               <Link
                 isExternal

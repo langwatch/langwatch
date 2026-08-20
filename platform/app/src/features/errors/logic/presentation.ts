@@ -60,6 +60,36 @@ const str = (
   return typeof value === "string" && value.length > 0 ? value : fallback;
 };
 
+/**
+ * Reads a list of short identifiers out of `meta` without trusting it.
+ *
+ * Bounded on both axes because the sentence these end up in is read by a
+ * person: a long list stops being copy and becomes a dump, and a single
+ * oversized entry would push the rest off the screen.
+ */
+const strList = (error: HandledErrorShape, key: string): string[] => {
+  const value = error.meta[key];
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((entry): entry is string => typeof entry === "string")
+    .filter((entry) => entry.length > 0 && entry.length <= 64)
+    .slice(0, 10);
+};
+
+/**
+ * Names the piece of a scenario a parameter failure came from, so the copy can
+ * point at it instead of asking the reader to search their own text.
+ * `meta.field` is written by the renderer as `situation` or `criteria[N]`,
+ * zero-based; criteria are numbered from one for the reader.
+ */
+const scenarioFieldLabel = (error: HandledErrorShape): string => {
+  const field = str(error, "field", "");
+  if (field === "situation") return "The situation";
+  const criterion = /^criteria\[(\d+)\]$/.exec(field);
+  if (criterion) return `Criterion ${Number(criterion[1]) + 1}`;
+  return "The scenario's text";
+};
+
 type MissingModelRequestType =
   | "chat"
   | "messages"
@@ -111,6 +141,44 @@ const num = (
 const SEAT_LIMIT_LABELS: Record<string, string> = {
   members: "full member seats",
   membersLite: "Lite Member seats",
+};
+
+/**
+ * The migration runner's per-tenant statuses as a sentence reads them.
+ *
+ * Authored rather than derived: `meta.status` is a machine sub-classifier, and
+ * this registry's rule for those is to branch on the value and return copy,
+ * never to render the value. Reshaping `rolled_back` into prose with string
+ * surgery also only works by accident — `String.prototype.replace` with a
+ * string pattern converts the FIRST match, so the first status with two
+ * underscores would reach a customer half-converted.
+ */
+const MIGRATION_STATUS_LABELS: Record<string, string> = {
+  parked: "parked for retry",
+  rolled_back: "already rolled back",
+};
+
+/**
+ * Registered migration names, in the operator's words rather than the
+ * column's. Stable identifiers (renaming one orphans its state rows), so
+ * keying copy on them is safe; an unmapped name falls back to the generic
+ * sentence rather than leaking the identifier.
+ */
+const MIGRATION_NAME_LABELS: Record<string, string> = {
+  "authz-team-user-backfill": "the team membership backfill",
+  "authz-grants-genesis-import": "the grants ledger import",
+  "authz-grants-cutover": "the authorization engine cutover",
+};
+
+/**
+ * The migrations another migration's rollback can be blocked by, as the
+ * operator should read them. Registered migration names are stable
+ * identifiers (renaming one orphans its state rows), so keying copy on them
+ * is safe; an unmapped name falls back to the generic sentence rather than
+ * leaking the identifier.
+ */
+const BLOCKING_MIGRATION_LABELS: Record<string, string> = {
+  "authz-grants-cutover": "authorization cutover",
 };
 
 /**
@@ -229,6 +297,11 @@ const presentations = {
     describe: () =>
       "Narrow the time range, add a filter, or select fewer fields.",
   },
+  query_scan_limit_exceeded: {
+    title: "This query read too much data",
+    describe: () =>
+      "Narrow the time range or add filters so the query reads less.",
+  },
   time_range_too_wide: {
     title: "Time range is too wide",
     describe: () => "Pick a shorter range and try again.",
@@ -248,6 +321,63 @@ const presentations = {
       const field = str(error, "field", "");
       return field ? `There's no field called "${field}".` : "";
     },
+  },
+  lwql_unparseable: {
+    title: "This query couldn't be read",
+    describe: () => "Check the SQL syntax and try again.",
+  },
+  lwql_not_permitted: {
+    title: "This query isn't allowed here",
+    describe: () =>
+      "This endpoint runs one read-only SELECT over the analytics datasets. Remove anything else and try again.",
+  },
+  lwql_parameter_missing: {
+    title: "This query is missing a value",
+    describe: () =>
+      "The query declares parameters that weren't given values. Supply one for each and try again.",
+  },
+  lwql_reserved_parameter_supplied: {
+    title: "The time window isn't yours to set",
+    describe: () =>
+      "period_start and period_end come from the period this page is showing. Remove them from your parameters and change the period instead.",
+  },
+  lwql_reserved_parameter_type: {
+    title: "The time window has to be a date and time",
+    describe: () =>
+      "Declare period_start and period_end as DateTime, for example {period_start:DateTime}, and run the query again.",
+  },
+  lwql_not_enabled: {
+    title: "Custom SQL isn't switched on here",
+    describe: () =>
+      "This project doesn't have the SQL workbench enabled yet. Ask your administrator to switch it on.",
+  },
+  saved_workbench_chart_already_exists: {
+    title: "That chart id is already taken",
+    describe: () =>
+      "A saved chart with this id already exists in this project. Save again with a different id, or leave the id out to have one chosen for you.",
+  },
+  saved_workbench_chart_not_found: {
+    title: "That saved chart isn't here",
+    describe: () =>
+      "It may have been deleted, or it belongs to another project. Check the list of saved charts.",
+  },
+  saved_workbench_chart_specification_refused: {
+    title: "This chart specification isn't allowed",
+    describe: () =>
+      "The specification reads something the chart policy doesn't permit. Repair the parts it names and save again.",
+  },
+  saved_workbench_chart_definition_invalid: {
+    title: "This saved chart can't be opened",
+    describe: () =>
+      "We can't read what was stored for it. Rebuild the chart in the workbench and save it again.",
+  },
+  lwql_unavailable: {
+    // Names the workspace administrator first: on a self-hosted deployment
+    // the reader's own operator controls whether this is provisioned, and
+    // LangWatch support cannot switch it on there.
+    title: "Analytics SQL isn't available here",
+    describe: () =>
+      "This feature isn't switched on for this workspace yet. Ask your workspace administrator to enable it, or contact support.",
   },
   clickhouse_unavailable: {
     title: "Search is temporarily unavailable",
@@ -278,6 +408,13 @@ const presentations = {
     // configured wrong. The engine's statusText stays in the server log.
     title: "The workflow couldn't run",
     describe: () => "We've been notified. Try running it again in a moment.",
+  },
+
+  // ---- agent dev tunnel ----
+  agent_dev_tunnel_unreachable: {
+    title: "The agent's local tunnel is not responding",
+    describe: () =>
+      "This agent points at a local development tunnel that seems to have ended. Run `langwatch agent dev` again on the machine that started it, or restore the agent's URL in its settings.",
   },
 
   // ---- agent-submitted reports ----
@@ -404,6 +541,11 @@ const presentations = {
     title: "You don't have permission to manage API keys",
     describe: () => "Ask an admin on your team for access.",
   },
+  api_key_permission_not_delegable: {
+    title: "This is not something the assistant can do for you",
+    describe: () =>
+      "A wider key or a higher role will not change it. Make this change in LangWatch yourself.",
+  },
   api_key_reserved_name: {
     title: "That name is reserved",
     describe: () => "Pick a different name for this key.",
@@ -524,6 +666,13 @@ const presentations = {
     title: "This model's provider can't be used here",
     describe: () =>
       "Pick a different default model in your project's model settings, then try again.",
+  },
+  model_default_scope_forbidden: {
+    // Same refusal shape as `model_provider_scope_forbidden`, aimed at the
+    // Default Models policies instead of the provider credentials.
+    title: "You can't change default models here",
+    describe: () =>
+      "They're managed above where you can act. Ask an admin on your team to change them.",
   },
   model_not_configured: {
     // Distinct from `no_provider_configured` (nothing connected at all) and
@@ -878,6 +1027,93 @@ const presentations = {
     describe: () =>
       "Free a seat by disabling a membership, or upgrade the plan to add more.",
   },
+  migration_enrollment_already_exists: {
+    title: "This organization is already enrolled",
+    describe: (error) => {
+      const migration = label(
+        MIGRATION_NAME_LABELS,
+        str(error, "migrationName", ""),
+      );
+      return migration
+        ? `It is already enrolled for ${migration}, so the next pass will process it. Nothing to do.`
+        : "It is already enrolled for that migration, so the next pass will process it. Nothing to do.";
+    },
+  },
+  migration_enrollment_cloud_only: {
+    title: "Enrollment does not apply to this installation",
+    describe: () =>
+      "Self-hosted installations run released migrations automatically for every organization, so there is nothing to enroll or withdraw.",
+  },
+  migration_enrollment_not_found: {
+    title: "This organization is not enrolled",
+    describe: (error) => {
+      const migration = label(
+        MIGRATION_NAME_LABELS,
+        str(error, "migrationName", ""),
+      );
+      return migration
+        ? `There is no enrollment for ${migration} for this organization to withdraw. Check the organization and the migration.`
+        : "There is no enrollment for this organization to withdraw. Check the organization and the migration.";
+    },
+  },
+  migration_unknown: {
+    title: "No migration exists with that name",
+    describe: () =>
+      "Pick one of the migrations listed on the page — the name may have come from an older link or a typo.",
+  },
+  migration_run_requires_enrollment: {
+    title: "Enroll this organization first",
+    describe: (error) => {
+      const migration = label(
+        MIGRATION_NAME_LABELS,
+        str(error, "migrationName", ""),
+      );
+      return migration
+        ? `Targeted runs follow enrollment: enroll the organization for ${migration}, then run it.`
+        : "Targeted runs follow enrollment: enroll the organization for the migration, then run it.";
+    },
+  },
+  migration_pass_already_running: {
+    title: "This organization appears to be mid-migration",
+    describe: () =>
+      "The migration cannot start for this organization right now — another pass appears to be working it. Wait a moment, then retry.",
+  },
+  migration_not_available_on_installation: {
+    title: "This migration is not available here yet",
+    describe: () =>
+      "It arrives in a later release and will run automatically then — nothing to do until that release.",
+  },
+  migration_state_not_found: {
+    title: "No migration state for that organization",
+    describe: () =>
+      "Check the organization id — only organizations a migration has already processed have state to act on.",
+  },
+  migration_rollback_blocked_by_dependent: {
+    title: "Another migration still stands on this one",
+    describe: (error) => {
+      const blocking = label(
+        BLOCKING_MIGRATION_LABELS,
+        str(error, "blockingMigration", ""),
+      );
+      return blocking
+        ? `This organization's ${blocking} is still in force and depends on this migration's data. Roll the ${blocking} back first, then retry.`
+        : "A migration that depends on this one is still in force. Roll that one back first, then retry.";
+    },
+  },
+  migration_rollback_cutover_not_started: {
+    title: "This organization has not been cut over",
+    describe: () =>
+      "It is still waiting to cut over, so there is nothing to roll back. It stays on the legacy path until the cutover runs.",
+  },
+  migration_rollback_requires_migrated_or_finalized: {
+    title: "Only a migrated or finalized organization can be rolled back",
+    describe: (error) => {
+      const state = label(MIGRATION_STATUS_LABELS, str(error, "status", ""));
+      return state
+        ? `This organization is ${state}, so it is already on — or on its way back to — the legacy path.`
+        : "This organization has not reached the ledger, so it is already on the legacy path.";
+    },
+  },
   duplicate_invite: {
     title: "They already have an invite",
     describe: (error) => {
@@ -914,6 +1150,36 @@ const presentations = {
     title: "They're already in this group",
     describe: () => "Nothing to do: the group already grants them its access.",
   },
+  schedule_not_found: {
+    title: "That schedule no longer exists",
+    describe: () =>
+      "It was removed while this page was open. Reload to see what is scheduled now.",
+  },
+  schedule_inactive: {
+    title: "That schedule is paused",
+    describe: () =>
+      "Resume it before running it. Running a paused schedule would fire work you have switched off.",
+  },
+  schedule_already_in_flight: {
+    // The conditional update found a different fencing value, which means the
+    // loop moved the row between the operator reading it and acting on it.
+    title: "The scheduler got there first",
+    describe: () =>
+      "This slot was claimed while you were looking at it, so nothing was changed. Reload to see its current state.",
+  },
+  schedule_run_in_progress: {
+    // Distinct from `schedule_already_in_flight`: nothing raced the operator,
+    // the schedule is simply mid-run. Re-arming it would hand the same slot to
+    // a second worker and deliver the target twice.
+    title: "That schedule is already running",
+    describe: () =>
+      "Wait for the current run to finish before starting another. Running it now would deliver the same work twice.",
+  },
+  schedule_slot_not_stale: {
+    title: "That run is still current",
+    describe: () =>
+      "Clearing is only for a slot whose worker has stopped responding. Give this one time to finish, or wait until it goes stale.",
+  },
   scim_managed_group: {
     // The group, its name and its membership come from the directory on every
     // sync, so a change made here is not merely refused, it would be undone.
@@ -941,6 +1207,11 @@ const presentations = {
     title: "Role binding not found",
     describe: () =>
       "It may have been removed already. Reload to see the current bindings.",
+  },
+  authz_ledger_unavailable: {
+    title: "Access changes are paused",
+    describe: () =>
+      "We could not record the change just now. Nothing was applied — try again in a moment.",
   },
   role_binding_already_exists: {
     title: "That role is already bound",
@@ -1000,6 +1271,37 @@ const presentations = {
         ? `Ask an organization admin to grant you "${permission}" on this project.`
         : "Ask an organization admin to grant you access to this project.";
     },
+  },
+  permission_denied: {
+    // The ADR-092 engine's one denial code (authorize() / .permission()). Names
+    // the permission when the server sent one, same reasoning as
+    // `project_permission_denied`: the exact grant can be forwarded as-is.
+    // Lite-member denials carry their own client modal via the middleware's
+    // cause; this copy is what everyone else reads.
+    title: "You don't have permission to do this",
+    describe: (error) => {
+      const permission = str(error, "permission", "");
+      return permission
+        ? `Ask an organization admin to grant you "${permission}".`
+        : "Ask an organization admin for access.";
+    },
+  },
+  grant_validation_failed: {
+    // The engine's grant write surface (attach/update/revoke/replace) rejects
+    // duplicates, cross-organization role references, and bindings at scopes
+    // that can't hold them. The wire meta varies per rejection, so the copy
+    // stays general; the admin UI narrates specifics inline (stage D).
+    title: "That role change isn't valid",
+    describe: () =>
+      "Check the role, the scope, and whether an equivalent binding already exists, then try again.",
+  },
+  offboard_incomplete: {
+    // The offboarding transaction proves the member's access resolves to
+    // nothing before committing; when the proof fails everything rolls back,
+    // so nothing was half-removed.
+    title: "Offboarding didn't finish",
+    describe: () =>
+      "Nothing was changed — the removal was rolled back. Try again, and contact support if it keeps failing.",
   },
   cannot_impersonate_admin: {
     // A deliberate denial, not a mistake to correct: admin-to-admin
@@ -1086,6 +1388,44 @@ const presentations = {
         : "Send the credential class this endpoint accepts. Organization API keys are created in Settings > API Keys.";
     },
   },
+  // ---- scenario run parameters ----
+  scenario_parameter_unknown: {
+    // Both lists are our own names, not free text: the run dialog needs to
+    // show the rejected one so the typo is visible, and the declared ones so
+    // the customer can see what they meant to write.
+    title: "No scenario in this run has a parameter by that name",
+    describe: (error) => {
+      const unknown = strList(error, "unknownKeys");
+      const declared = strList(error, "declaredNames");
+      const rejected =
+        unknown.length > 0
+          ? `${listLabels(unknown)} ${unknown.length === 1 ? "isn't" : "aren't"} declared by any scenario in this run.`
+          : "One of the values supplied isn't declared by any scenario in this run.";
+      return declared.length > 0
+        ? `${rejected} You can set ${listLabels(declared)}.`
+        : `${rejected} None of its scenarios declare parameters.`;
+    },
+  },
+  scenario_parameter_missing: {
+    title: "This run is missing a parameter value",
+    describe: (error) => {
+      const missing = strList(error, "names");
+      const plural = missing.length > 1;
+      const subject =
+        missing.length > 0
+          ? `${listLabels(missing)} ${plural ? "have no values" : "has no value"}.`
+          : "A parameter the scenario reads has no value.";
+      const remedy = plural
+        ? "Set values for this run, or give each parameter a default on the scenario."
+        : "Set a value for this run, or give the parameter a default on the scenario.";
+      return `${subject} ${scenarioFieldLabel(error)} reads ${plural ? "them" : "it"}. ${remedy}`;
+    },
+  },
+  scenario_parameter_template_invalid: {
+    title: "This scenario's text couldn't be filled in",
+    describe: (error) =>
+      `${scenarioFieldLabel(error)} references a parameter in a way we can't read. Check it is written as params.name, then try again.`,
+  },
   scenario_run_export_unauthenticated: {
     title: "Log in to export simulation runs",
     describe: () =>
@@ -1129,11 +1469,37 @@ const presentations = {
     title: "Billing is busy right now",
     describe: () => "Nothing was charged. Try again in a moment.",
   },
+  billing_quote_expired: {
+    // fault: customer. Nothing broke — the dialog sat open long enough that
+    // the amount we quoted is no longer the amount that would be charged, so
+    // we refuse rather than charge a different number than the one on screen.
+    // The action is to reopen, which is a real action the customer can take.
+    title: "This quote is out of date",
+    describe: () =>
+      "Nothing was charged. Close this and open it again to see the current amount.",
+  },
   seat_billing_unavailable: {
     // fault: provider. The payment provider didn't answer. Nothing was
     // charged, and saying so is the first thing anyone wants to know.
     title: "Seat billing is unavailable right now",
     describe: () => "Nothing was charged. Try again in a moment.",
+  },
+  subscription_ambiguous: {
+    // fault: platform. Two live plans on one account, which only an operator
+    // can have created and only an operator can resolve. Nothing was charged,
+    // and that is the first thing the customer wants to know on a money path.
+    title: "Seat changes need a hand from us",
+    describe: () =>
+      "This account has more than one active plan, so we didn't change anything or charge you. Contact support and we'll sort it out.",
+  },
+  subscription_not_linked: {
+    // fault: platform. The plan is active but our record of it was never
+    // connected to the billing provider's, so seat changes can't be made from
+    // the app. Waiting doesn't fix it — reconnecting is an operator action —
+    // so the copy must not suggest retrying.
+    title: "Seat changes need a hand from us",
+    describe: () =>
+      "Your plan is active, but seat updates aren't available from here yet. Contact support and we'll finish the setup.",
   },
   subscription_sync_failed: {
     // fault: platform. Our copy of the plan is behind the payment provider's;
@@ -1422,6 +1788,39 @@ const presentations = {
     describe: () =>
       "Langy can't be reached right now. Your message is safe, so send it again in a moment.",
   },
+  // The `/api/langy` key-authed surface. These reach an API caller reading a
+  // JSON envelope, not a person reading a toast, so the copy names the
+  // credential and the fix rather than reassuring anyone about their message.
+  langy_api_credential_missing: {
+    title: "No auth token",
+    describe: () =>
+      "This request carried no project API key. Send one as X-Auth-Token or an Authorization header.",
+  },
+  langy_api_credential_invalid: {
+    title: "Auth token not accepted",
+    describe: () =>
+      "The token did not resolve to a project. Check it was copied whole and has not been revoked.",
+  },
+  langy_api_key_unowned: {
+    title: "Key has no owner",
+    describe: () =>
+      "A Langy turn acts as a user, and this key has no owning user to act as. Use a personal API key instead.",
+  },
+  langy_api_key_no_langy_access: {
+    title: "No Langy access",
+    describe: () =>
+      "The user who owns this key cannot use Langy in this project. A workspace admin can grant that access.",
+  },
+  langy_api_actor_missing: {
+    title: "Key owner is gone",
+    describe: () =>
+      "The user who owns this key no longer exists, so the turn has no one to act as. Mint a new key under a current user.",
+  },
+  langy_api_request_invalid: {
+    title: "Invalid request body",
+    describe: () =>
+      "Some fields in this request were not valid. The error details list each one that was rejected — correct those and send it again.",
+  },
   langy_agent_errored: {
     title: "Langy's reply failed",
     // When the provider's own sentence was captured, Langy's card replaces
@@ -1610,6 +2009,13 @@ const presentations = {
     describe: () =>
       "An administrator can re-enable it; the key itself is unchanged.",
   },
+  virtual_key_expired: {
+    // Distinct from revoked on purpose: the key material is intact, so the
+    // cheap fix is a new date rather than a new secret in every client.
+    title: "This key has expired",
+    describe: () =>
+      "Extend its expiration date in settings, or create a new key.",
+  },
   rate_limited: {
     title: "Too many requests",
     describe: () => "Slow down for a moment, then try again.",
@@ -1621,6 +2027,11 @@ const presentations = {
   no_provider_configured: {
     title: "No model provider configured",
     describe: () => "Add a provider in settings to continue.",
+  },
+  model_provider_not_bound: {
+    title: "That provider isn't bound to this key",
+    describe: () =>
+      "The model name asks for a provider this virtual key has no slot for. Bind that provider to the key, or drop the prefix from the model name.",
   },
   guardrail_blocked: {
     title: "Blocked by a guardrail",
@@ -1741,6 +2152,13 @@ const presentations = {
     describe: () =>
       "It may have been deleted, or it isn't shared with you. Reload to see the keys you can open.",
   },
+  virtual_key_expiry_in_past: {
+    // Says what to do rather than what was wrong: the date is still in the
+    // field, so the only useful sentence is the one that gets it saved.
+    title: "That expiration date has already passed",
+    describe: () =>
+      "Pick a date in the future, or choose Never so the key does not expire.",
+  },
   gateway_budget_not_found: {
     title: "Budget not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
@@ -1846,12 +2264,12 @@ const presentations = {
       "It may have been archived, or the id may belong to another organization. List your endpoints to see the ones that are live.",
   },
   webhook_endpoint_invalid: {
-    // Names the three things the endpoint form can get wrong, rather than
-    // echoing the server's sentence: `meta.message` on this code can carry
-    // an internal reason, and the customer channel is not where that goes.
+    // Names what the endpoint form can get wrong, rather than echoing the
+    // server's sentence: `meta.message` on this code can carry an internal
+    // reason, and the customer channel is not where that goes.
     title: "That webhook endpoint can't be saved",
     describe: () =>
-      "Check the URL is reachable over HTTPS, that every subscribed event type is one the catalog lists, and that the delivery controls are inside their limits.",
+      "Check the address matches the destination: an HTTPS endpoint needs a URL reachable over HTTPS, and an Amazon SQS destination needs a standard queue URL plus credentials that may write to it. Then check that every subscribed event type is one the catalog lists, that the delivery controls are inside their limits, and that you are not moving an existing endpoint to another destination, which needs a new endpoint instead.",
   },
   webhook_event_not_found: {
     // Says the two things a caller can act on: the log's horizon, and that

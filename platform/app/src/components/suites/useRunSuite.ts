@@ -7,13 +7,22 @@
  */
 
 import { generate } from "@langwatch/ksuid";
-import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useMemo, useRef, useState } from "react";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import {
+  parseScenarioParameterDefinitions,
+  type RunParameterValues,
+  type ScenarioParameterDefinition,
+} from "~/server/scenarios/parameters";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { api } from "~/utils/api";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import {
+  displayOptionalValue,
+  serializeOptionalScalarValue,
+} from "~/utils/jsonValueText";
 import { toaster } from "../ui/toaster";
 import { showSuiteRunError } from "./showSuiteRunError";
 
@@ -28,10 +37,67 @@ export interface UseRunSuiteOptions {
   onViewRun?: (suiteId: string) => void;
 }
 
+/**
+ * Every parameter the run can carry: the union of what the scenarios in it
+ * declare.
+ *
+ * Two scenarios can declare the same name and only one of them describe it or
+ * default it, so a name keeps the first description and the first default any
+ * of them gives it rather than the last one read.
+ */
+function unionParameterDefinitions({
+  scenarioIds,
+  scenarios,
+}: {
+  scenarioIds: string[];
+  scenarios: readonly { id: string; parameters: unknown }[];
+}): ScenarioParameterDefinition[] {
+  const inRun = new Set(scenarioIds);
+  const declared = scenarios
+    .filter((scenario) => inRun.has(scenario.id))
+    .flatMap((scenario) =>
+      parseScenarioParameterDefinitions(scenario.parameters),
+    );
+
+  const union = new Map<string, ScenarioParameterDefinition>();
+  for (const definition of declared) {
+    const seen = union.get(definition.name);
+    union.set(definition.name, {
+      name: definition.name,
+      description: seen?.description ?? definition.description,
+      defaultValue: seen?.defaultValue ?? definition.defaultValue,
+    });
+  }
+  return [...union.values()];
+}
+
+/**
+ * The values the run sends, read back from what the confirmation shows.
+ *
+ * A name left empty is omitted rather than sent as an empty string: the run
+ * then falls back to whatever default each scenario declares for it, which is
+ * the same path a run that was never offered the name at all takes.
+ */
+function toRunParameters({
+  definitions,
+  values,
+}: {
+  definitions: ScenarioParameterDefinition[];
+  values: Record<string, string>;
+}): RunParameterValues | undefined {
+  const parameters: RunParameterValues = {};
+  for (const definition of definitions) {
+    const value = serializeOptionalScalarValue(values[definition.name] ?? "");
+    if (value === undefined) continue;
+    parameters[definition.name] = value;
+  }
+  return Object.keys(parameters).length > 0 ? parameters : undefined;
+}
+
 export function useRunSuite(options: UseRunSuiteOptions = {}) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
@@ -41,6 +107,10 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
   const [pendingBatchRunId, setPendingBatchRunId] = useState<string | null>(
     null,
   );
+  /** Only the names typed over in the confirmation, keyed by name. */
+  const [parameterOverrides, setParameterOverrides] = useState<
+    Record<string, string>
+  >({});
 
   const runMutation = api.suites.run.useMutation({
     onSuccess: (result, variables) => {
@@ -68,7 +138,6 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
           title: `Run plan scheduled (${result.jobCount} jobs)`,
           description: `${parts.join(" and ")} skipped.`,
           type: "warning",
-          meta: { closable: true },
           action: {
             label: "Edit Run Plan",
             onClick: () => {
@@ -82,7 +151,6 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
         toaster.create({
           title: `Run plan scheduled (${result.jobCount} jobs)`,
           type: "success",
-          meta: { closable: true },
           action: optionsRef.current.onViewRun
             ? {
                 label: "View run",
@@ -111,9 +179,44 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
     },
   });
 
+  // Fetch active scenarios to exclude archived ones from the confirmation count
+  const { data: allScenarios } = api.scenarios.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project && !!pendingSuite },
+  );
+
+  const parameterDefinitions = useMemo(() => {
+    if (!pendingSuite || !allScenarios) return [];
+    return unionParameterDefinitions({
+      scenarioIds: pendingSuite.scenarioIds,
+      scenarios: allScenarios,
+    });
+  }, [pendingSuite, allScenarios]);
+
+  /**
+   * What the confirmation shows for each name: the declared default, replaced
+   * by whatever was typed over it. Only the overrides are held in state, so a
+   * default that arrives with the scenarios cannot overwrite an edit made
+   * before they loaded.
+   */
+  const parameterValues = useMemo(() => {
+    const values: Record<string, string> = {};
+    for (const definition of parameterDefinitions) {
+      values[definition.name] =
+        parameterOverrides[definition.name] ??
+        displayOptionalValue(definition.defaultValue);
+    }
+    return values;
+  }, [parameterDefinitions, parameterOverrides]);
+
+  const setParameterValue = useCallback((name: string, value: string) => {
+    setParameterOverrides((previous) => ({ ...previous, [name]: value }));
+  }, []);
+
   const requestRun = useCallback(
     (suite: SimulationSuite) => {
       if (!project || runMutation.isPending) return;
+      setParameterOverrides({});
       setPendingSuite(suite);
     },
     [project, runMutation.isPending],
@@ -128,19 +231,24 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
       id: pendingSuite.id,
       idempotencyKey: crypto.randomUUID(),
       batchRunId,
+      parameters: toRunParameters({
+        definitions: parameterDefinitions,
+        values: parameterValues,
+      }),
     });
-  }, [project, pendingSuite, runMutation]);
+  }, [
+    project,
+    pendingSuite,
+    runMutation,
+    parameterDefinitions,
+    parameterValues,
+  ]);
 
   const cancelRun = useCallback(() => {
     if (runMutation.isPending) return;
+    setParameterOverrides({});
     setPendingSuite(null);
   }, [runMutation.isPending]);
-
-  // Fetch active scenarios to exclude archived ones from the confirmation count
-  const { data: allScenarios } = api.scenarios.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project && !!pendingSuite },
-  );
 
   const activeScenarioCount = useMemo(() => {
     if (!pendingSuite || !allScenarios)
@@ -170,6 +278,9 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
       targetCount,
       repeatCount: pendingSuite?.repeatCount ?? 1,
       isLoading: runMutation.isPending,
+      parameters: parameterDefinitions,
+      parameterValues,
+      onParameterChange: setParameterValue,
     },
   };
 }

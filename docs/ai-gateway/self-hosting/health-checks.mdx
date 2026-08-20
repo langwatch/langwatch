@@ -128,7 +128,7 @@ GET /health
 
 The body is deliberately smaller than the probes': no `version`, no `uptime_s`. This endpoint is polled by the public internet, and restart cadence and build identity are not something to publish.
 
-### What it covers, and what it never will
+### What it covers, and what it does not
 
 The verdict covers the gateway process and the dependencies you own: the control plane. It is structurally independent of model providers.
 
@@ -159,7 +159,7 @@ Point the monitor at `https://gateway.your-corp.com/health`. Set `ingress.health
 
 ## Graceful shutdown
 
-`SIGTERM` triggers (the chart's `shutdown.preDrainWaitSeconds` and `shutdown.timeoutSeconds` knobs are wired into the gateway via `SERVER_DRAIN_DELAY_SECONDS`/`SERVER_GRACEFUL_SECONDS` — see [helm.mdx](/ai-gateway/self-hosting/helm#graceful-drain) for the full four-phase drain sequence):
+`SIGTERM` triggers (the chart's `shutdown.preDrainWaitSeconds` and `shutdown.timeoutSeconds` knobs are wired into the gateway via `SERVER_DRAIN_DELAY_SECONDS`/`SERVER_GRACEFUL_SECONDS`; see [helm.mdx](/ai-gateway/self-hosting/helm#graceful-drain) for the full four-phase drain sequence):
 
 1. **Immediately**: `MarkDraining()` flips `/readyz` to 503 with `status:"draining"`. The Service's endpoint controller and the LB observe and stop routing new traffic.
 2. **Pre-drain wait**: the pod keeps accepting connections for `shutdown.preDrainWaitSeconds` (default 5) while the LB catches up on the `/readyz` flip.

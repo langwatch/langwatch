@@ -71,8 +71,12 @@ export function detectCodingAgent({
  *     appears under both keys for the same trace, so a span and a log of one
  *     session do join.
  *   - opencode:    `session.id` everywhere.
- *   - Codex:       `conversation.id` == `thread.id` == `session.id` (its MCP span
- *     sets two of them to the same thread id).
+ *   - Codex:       `conversation.id` on every log EVENT. Its turn SPAN is the
+ *     exception the shared order cannot serve — there
+ *     `gen_ai.conversation.id` is the id of the TURN and the session rides
+ *     `thread.id` — so the codex definition carries a `sessionKeyFromSpan`
+ *     hook and span callers resolve through
+ *     {@link resolveSpanConversationKey}.
  *
  * Order matters only in that all of these are the same value when more than one
  * is present, so the first hit wins and no agent is disadvantaged.
@@ -97,6 +101,32 @@ export function resolveConversationKey(
     }
   }
   return null;
+}
+
+/**
+ * The conversation key off one SPAN's attributes: the detected agent's own
+ * `sessionKeyFromSpan` hook first, the shared candidate order otherwise.
+ * Span callers use this; log and metric callers keep
+ * {@link resolveConversationKey} — no agent's events need the override, and
+ * consulting the hook there would hand it attributes it never claimed to
+ * understand.
+ */
+export function resolveSpanConversationKey({
+  agent,
+  name,
+  attrs,
+}: {
+  agent: CodingAgent;
+  name: string;
+  attrs: Record<string, unknown>;
+}): string | null {
+  const definition = CODING_AGENT_REGISTRY.find(
+    (candidate) => candidate.id === agent,
+  );
+  return (
+    definition?.sessionKeyFromSpan?.({ name, attrs }) ??
+    resolveConversationKey(attrs)
+  );
 }
 
 /**
@@ -268,6 +298,14 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "vcs.repository.name",
   "vcs.ref.head.name",
   "vcs.worktree.name",
+  // The codex harvest names the session on its companion event: codex
+  // withholds prompt text from its own telemetry, so the name is derived
+  // from the transcript on the device and arrives as this one bounded value.
+  "langwatch.session.title",
+  // The session's own name, as the harness itself holds it (claude's --name
+  // and /rename, codex's thread name), mirrored by the capture seams. The
+  // newest name replaces the row's title and outranks the derived titles.
+  "langwatch.session.name",
   "user.id",
   "user.email",
   "user.account_uuid",
@@ -294,6 +332,18 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "spawn_mode",
   "mcp_server_scope",
   "gen_ai.request.model",
+  // The codex turn span's vocabulary (session_task.turn): the gen_ai token
+  // buckets — where `input_tokens` INCLUDES the cache buckets, unlike the
+  // disjoint claude spellings above — and codex's own non-cached count, which
+  // is the disjoint input the fold actually wants.
+  "gen_ai.response.model",
+  "gen_ai.usage.input_tokens",
+  "gen_ai.usage.output_tokens",
+  "gen_ai.usage.cache_read.input_tokens",
+  "gen_ai.usage.cache_creation.input_tokens",
+  "codex.turn.token_usage.non_cached_input_tokens",
+  // Codex's tool_result events spell the MCP server as a bare `mcp_server`.
+  "mcp_server",
   "mcp_server.name",
   "mcp_tool.name",
   "plugin.name",
@@ -355,10 +405,61 @@ export const SESSION_CONTEXT_EVENT_NAME = "langwatch.session_context";
 
 /**
  * The fact key the generated conversation title rides on. Derived rather than
- * lifted: it is parsed out of a response body by the dispatcher and stamped
- * onto the contribution's facts, so the fold reads it like any other fact.
+ * lifted for claude (parsed out of a response body by the dispatcher), and
+ * carried as a wire attribute by the codex harvest's session-context record,
+ * which is why the key is also in the lifted vocabulary above.
  */
 export const SESSION_TITLE_FACT_KEY = "langwatch.session.title";
+
+/**
+ * The fact key a prompt-derived name rides on. Separate from
+ * {@link SESSION_TITLE_FACT_KEY} because the two obey different precedence: a
+ * generated title always replaces what the row has, while a prompt-derived
+ * name only fills an empty one. Most sessions never get a generated title
+ * (the agent generates one for a minority of interactive sessions and no
+ * headless session), and a row named by what the user first asked beats an
+ * untitled one.
+ */
+export const SESSION_TITLE_FALLBACK_FACT_KEY =
+  "langwatch.session.title_fallback";
+
+/**
+ * The fact key the session's own name rides on, lifted from the companion
+ * event's `langwatch.session.name` attribute. The capture seams MIRROR the
+ * name the harness itself holds — claude's `--name` flag and `/rename`
+ * command, codex's thread name — rather than inventing one, so renaming the
+ * session in the harness renames it here. Highest-precedence of the three:
+ * the newest name replaces the row's title in place and neither derived
+ * title may clobber it.
+ */
+export const SESSION_NAME_FACT_KEY = "langwatch.session.name";
+
+/**
+ * The literal codex substitutes for prompt text it withholds
+ * (`log_user_prompt` off, the default). Wherever prompt text is read, this
+ * value means "withheld", not "the user typed this".
+ */
+export const WITHHELD_PROMPT_TEXT = "[REDACTED]";
+
+/** The most of a prompt that becomes a session's name. */
+const MAX_PROMPT_TITLE_CHARS = 120;
+
+/**
+ * A session name out of a prompt's text, or null when the prompt cannot name
+ * one: withheld text, an empty string, or a machine-injected turn (agents
+ * deliver notifications and context as user turns wrapped in tags, and a
+ * session named `<task-notification>` names nothing). The name is the
+ * prompt's first line, whitespace collapsed, capped.
+ */
+export function sessionTitleFromPrompt(text: string): string | null {
+  const trimmed = text.trim();
+  if (trimmed === "" || trimmed === WITHHELD_PROMPT_TEXT) return null;
+  if (trimmed.startsWith("<")) return null;
+  const firstLine = trimmed.split(/\r?\n/, 1)[0] ?? "";
+  const collapsed = firstLine.replace(/\s+/g, " ").trim();
+  if (collapsed === "") return null;
+  return collapsed.slice(0, MAX_PROMPT_TITLE_CHARS);
+}
 
 /**
  * The agent a record DECLARES itself to be, when that name is one LangWatch

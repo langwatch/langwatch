@@ -1,14 +1,14 @@
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { fireTeamMemberInvitedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { fireInviteAcceptedNurturingCalls } from "~/../ee/billing/nurturing/hooks/inviteAcceptance";
 import { env } from "~/env.mjs";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
@@ -23,6 +23,7 @@ import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { decrypt } from "~/utils/encryption";
 import {
   isTeamRoleAllowedForOrganizationRole,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
 } from "~/utils/memberRoleConstraints";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -33,10 +34,7 @@ import {
   InviteNotFoundError,
   OrganizationNotFoundError,
 } from "../../invites/errors";
-import {
-  InviteService,
-  ORGANIZATION_TO_TEAM_ROLE_MAP,
-} from "../../invites/invite.service";
+import { InviteService } from "../../invites/invite.service";
 import { LimitExceededError } from "../../license-enforcement/errors";
 import { LicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
 import {
@@ -255,6 +253,9 @@ export const organizationRouter = createTRPCRouter({
           if (isDemo || !canUpdateProject) {
             project.apiKey = "";
           }
+          // The LangWatchQL key is a control-plane secret: no client surface
+          // reads it, so unlike the base key it is sent to no one at all.
+          project.lwqlKey = "";
         }
       }
       for (const organization of organizations) {
@@ -303,7 +304,7 @@ export const organizationRouter = createTRPCRouter({
         // `useOrganizationTeamProject().organizationRole` and downstream guards
         // (`withPermissionGuard("organization:manage")`) honor it. Without this,
         // a stale `OrganizationUser.role=MEMBER` row shadows a fresh ADMIN
-        // RoleBinding, gating the admin out of /governance + /settings/governance/*.
+        // RoleBinding, gating the admin out of /governance + /governance/*.
         // Backend RBAC paths already honor RoleBindings (`resolveOrganizationPermission`,
         // `requireApiKeyPermission`); this closes the page-guard / SSR-only drift.
         if (isOrgAdminViaBinding) {
@@ -1002,12 +1003,13 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
-      await prisma.$transaction(async (tx) => {
-        const txInviteService = InviteService.create(tx);
-        await txInviteService.applyInvite({
-          userId: session.user.id,
-          invite,
-        });
+      // No transaction: the invite's grants are ledger commands, so the
+      // membership row has to be committed before they are emitted, and the
+      // invite is only marked ACCEPTED once everything before it has landed
+      // (a still-PENDING invite is one still to apply).
+      await InviteService.create(prisma).applyInvite({
+        userId: session.user.id,
+        invite,
       });
 
       // Provision the user's Personal Workspace (Team.isPersonal +

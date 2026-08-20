@@ -5,6 +5,7 @@ import { fireScenarioCreatedNurturing } from "~/../ee/billing/nurturing/hooks/fe
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { trackServerEvent } from "~/server/posthog";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
+import { scenarioParameterDefinitionsSchema } from "~/server/scenarios/parameters";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { checkProjectPermission } from "../../rbac";
@@ -21,6 +22,12 @@ const createScenarioSchema = projectSchema.extend({
   // default (scenarios.user_simulator / scenarios.judge).
   simulatorModel: z.string().nullish(),
   judgeModel: z.string().nullish(),
+  // The parameters the scenario declares, each with an optional description
+  // and default. A run supplies values for these names.
+  parameters: scenarioParameterDefinitionsSchema.optional(),
+  // Turn config (ADR-015); null clears back to SDK default.
+  maxTurns: z.number().int().min(1).max(100).nullish(),
+  minTurns: z.number().int().min(0).max(100).nullish(),
 });
 
 const updateScenarioSchema = projectSchema.extend({
@@ -31,6 +38,9 @@ const updateScenarioSchema = projectSchema.extend({
   labels: z.array(z.string()).optional(),
   simulatorModel: z.string().nullish(),
   judgeModel: z.string().nullish(),
+  parameters: scenarioParameterDefinitionsSchema.optional(),
+  maxTurns: z.number().int().min(1).max(100).nullish(),
+  minTurns: z.number().int().min(0).max(100).nullish(),
 });
 
 /**

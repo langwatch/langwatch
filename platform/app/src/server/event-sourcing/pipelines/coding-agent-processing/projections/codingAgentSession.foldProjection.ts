@@ -21,9 +21,11 @@ import {
   applySpanToCodingAgentSession,
   createInitCodingAgentSession,
 } from "../services/coding-agent-session.derivation";
-import type {
-  CodingAgentSessionData,
-  MetricSeriesFact,
+import {
+  type CodingAgentSessionData,
+  type MetricSeriesFact,
+  type SessionTitleSource,
+  sessionTitleSourceSchema,
 } from "../services/coding-agent-session.types";
 
 /**
@@ -56,6 +58,17 @@ const codingAgentSessionEvents = [
 ] as const;
 
 /** Schema-snapshot version (calendar date). Bump when the derivation changes.
+ *
+ *  2026-08-10: `GitBranches` (migration 00077) joined the projected row shape,
+ *  the bounded first-seen set of every branch a session reported. A row stamped
+ *  2026-08-02 decodes it as an empty array, which is exactly what a session
+ *  that reported no branch at all decodes to, so the fold would carry on from
+ *  empty and remember only the branches reported after the deploy. Unlike the
+ *  git-context columns below, that stamp IS in the wild, so the bump is what
+ *  refolds each session once and rebuilds the whole set from its stored
+ *  contributions. The refold wave is the price of the backfill: the alternative
+ *  is a population that answers "one branch" forever for every session that had
+ *  already moved.
  *
  *  2026-08-02: the context-economics columns of migration 00074 joined the
  *  projected row shape: `RateLimitEvents` (reported rate-limit events, apart
@@ -93,7 +106,7 @@ const codingAgentSessionEvents = [
  *  `PreviousCallContextTokens`, `StepStartedAt`, `MetricSeries`,
  *  `LastEventOccurredAt`) and 00054 (`AppliedEventIds`) joined the projected row
  *  shape. That shape change is exactly what this stamp records (ADR-021/022). */
-export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-08-02";
+export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-08-10";
 
 /**
  * The stamp rows carried while migrations 00053 and 00054 shipped.
@@ -105,14 +118,15 @@ export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-08-02";
  * decodable — see `CodingAgentSessionStore.getWithApplied` for the second half
  * of the discriminator.
  *
- * Still accepted after the 2026-07-28 and 2026-08-02 bumps, deliberately:
- * these rows predate
+ * Still accepted after the 2026-07-28, 2026-08-02 and 2026-08-10 bumps,
+ * deliberately: these rows predate
  * the logs-only fold entirely, so no agent folded a turn from both a log and a
  * span into them. They are stale in shape, never double-counted, and the
  * discriminator already covers the shape. (The same trade holds for the 00074
  * context-economics columns: a pre-stamp row decodes them as zeros, which is
  * honest for sessions that old, and a replay can backfill them if they ever
- * matter.)
+ * matter. And for the 00077 branch set: a pre-stamp row decodes it empty, and
+ * the read side falls back to the single branch such a row does carry.)
  *
  * Rejecting them would buy nothing anyway. They also predate Cowork detection,
  * so their contributions were stored labelled `claude_code` and a refold
@@ -397,8 +411,16 @@ export interface CodingAgentSessionRow {
   repositoryOwner: string;
   repositoryName: string;
   gitBranch: string;
+  /** Every branch the session reported, bounded and first-seen (00077). */
+  gitBranches: string[];
   gitWorktree: string;
   title: string;
+  /**
+   * Which source set `Title` (00083): "prompt", "generated", "name", or ""
+   * on a row from before the column. Read back so a later fold knows whether
+   * a regenerated title may replace it — a name may not be clobbered.
+   */
+  titleSource: string;
 
   modelCalls: number;
   toolCalls: number;
@@ -622,27 +644,40 @@ export function projectCodingAgentSessionToRow({
 }
 
 /**
- * The git identity and title columns (migration 00075). The empty string is
- * the honest unset for all six: an agent with no companion emitter reports
- * none of them, and `nullIfEmpty` maps them straight back on read.
+ * The git identity and title columns (migrations 00075 and 00077). The empty
+ * string is the honest unset for the six scalars: an agent with no companion
+ * emitter reports none of them, and `nullIfEmpty` maps them straight back on
+ * read. `gitBranches` is an empty array for the same reason.
  */
 function gitContextColumns(state: CodingAgentSessionState): {
   repositoryHost: string;
   repositoryOwner: string;
   repositoryName: string;
   gitBranch: string;
+  gitBranches: string[];
   gitWorktree: string;
   title: string;
+  titleSource: string;
 } {
   return {
     repositoryHost: state.repositoryHost ?? "",
     repositoryOwner: state.repositoryOwner ?? "",
     repositoryName: state.repositoryName ?? "",
     gitBranch: state.gitBranch ?? "",
+    gitBranches: state.gitBranches,
     gitWorktree: state.gitWorktree ?? "",
     title: state.title ?? "",
+    titleSource: state.titleSource ?? "",
   };
 }
+
+/**
+ * The title-source column decodes into its union; anything else — the empty
+ * default on a pre-00083 row included — reads as unset, which the fold ranks
+ * as a generated title (see `withTitle`).
+ */
+const titleSourceFromRow = (value: string): SessionTitleSource | null =>
+  sessionTitleSourceSchema.safeParse(value).data ?? null;
 
 /** An empty string in a row column reads back as "unset" (null) in state. */
 const nullIfEmpty = (value: string): string | null =>
@@ -702,8 +737,10 @@ export function codingAgentSessionStateFromRow(
     repositoryOwner: nullIfEmpty(row.repositoryOwner),
     repositoryName: nullIfEmpty(row.repositoryName),
     gitBranch: nullIfEmpty(row.gitBranch),
+    gitBranches: row.gitBranches,
     gitWorktree: nullIfEmpty(row.gitWorktree),
     title: nullIfEmpty(row.title),
+    titleSource: titleSourceFromRow(row.titleSource),
 
     modelCalls: row.modelCalls,
     toolCalls: row.toolCalls,

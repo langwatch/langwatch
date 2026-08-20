@@ -19,14 +19,15 @@
  *   specs/ai-governance/personal-portal/tool-catalog-scoping.feature
  *   specs/ai-governance/personal-portal/tool-catalog-vk-bridge.feature
  */
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   type Prisma,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
@@ -1333,7 +1334,6 @@ describe("aiToolsRouter integration", () => {
           },
           name: `Drawer Default ${nanoid(4)}`,
           modelProviderIds: [],
-          strategy: "priority",
           isDefault: true,
           createdById: adminUserId,
           updatedById: adminUserId,

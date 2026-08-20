@@ -64,6 +64,7 @@ export const exportTracesCommand = async (options: {
   output?: string;
   limit?: string;
   origin?: string;
+  errorsOnly?: boolean;
   includeSpans?: boolean;
 }): Promise<void> => {
   await resolveCredentials();
@@ -95,6 +96,10 @@ export const exportTracesCommand = async (options: {
     process.exit(1);
   }
   const originFilter = parseOriginOption(options.origin);
+  const filters = {
+    ...(originFilter ? { "traces.origin": originFilter } : {}),
+    ...(options.errorsOnly ? { "traces.error": ["true"] } : {}),
+  };
   const spinner = createSpinner(`Exporting traces (${format})...`).start();
   const events = createCommandEvents({ resource: "trace", verb: "export" });
 
@@ -131,7 +136,7 @@ export const exportTracesCommand = async (options: {
           format: "json",
           ...(options.includeSpans ? { includeSpans: true } : {}),
           ...(scrollId ? { scrollId } : {}),
-          ...(originFilter ? { filters: { "traces.origin": originFilter } } : {}),
+          ...(Object.keys(filters).length > 0 ? { filters } : {}),
         }),
       });
 

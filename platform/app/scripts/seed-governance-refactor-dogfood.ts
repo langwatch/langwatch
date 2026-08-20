@@ -47,16 +47,18 @@
  * full-matrix dogfood lane.
  */
 import { randomBytes } from "node:crypto";
-import { Prisma, PrismaClient } from "@prisma/client";
-
+import { Prisma, PrismaClient } from "../src/generated/prisma/client";
 import { nextResetAt } from "../src/server/gateway/budgetWindow";
 import {
   hashVirtualKeySecret,
   mintVirtualKeySecret,
 } from "../src/server/gateway/virtualKey.crypto";
+import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 import { encrypt } from "../src/utils/encryption";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+});
 
 const DOGFOOD_USER_EMAIL = "dogfood@acme.test";
 const DOGFOOD_USER_NAME = "Dogfood Admin";
@@ -386,19 +388,7 @@ async function ensureRoutingPolicy(
       },
       name: "developer-default",
       description: "Try OpenAI first, fall back to other configured providers",
-      strategy: "priority",
       modelProviderIds: chain,
-      modelAllowlist: [
-        "gpt-5-mini",
-        "gpt-5",
-        "claude-haiku-4-5",
-        "claude-3-5-haiku",
-        "claude-3-5-haiku-latest",
-        "claude-sonnet-4",
-        "gemini-2.5-flash",
-        "gemini-2.0-flash",
-        "anthropic.claude-3-5-haiku-20241022-v1:0",
-      ],
       isDefault: true,
     },
   });

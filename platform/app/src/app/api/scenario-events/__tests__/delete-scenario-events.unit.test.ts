@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: vi.fn(),
 }));
 

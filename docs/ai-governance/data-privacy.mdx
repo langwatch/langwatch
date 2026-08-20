@@ -59,7 +59,7 @@ existed.
 
 **Drop** is the hard guarantee. The content is stripped in the
 ingestion pipeline and never written, so no later permission change,
-export, or breach can surface it. The cost is that nobody can debug
+export, or breach can surface it. The cost is that no one can debug
 with it, and it cannot be undone for data that already arrived
 dropped.
 
@@ -118,7 +118,7 @@ workspaces of that department's people.
 When a project resolves its policy, the cascade walks **Project, then
 Department, then Team, then Organization**, and for each setting the
 most specific tier that sets it wins. A department rule beats a team
-rule: the people lens wins over the structural one. Settings a rule
+rule. Settings a rule
 leaves unset inherit from the next tier up, so a project can drop its
 input while inheriting the organization's PII level. Two fields
 accumulate across tiers instead of overriding: **custom drop keys**
@@ -239,8 +239,8 @@ With no rule anywhere in the cascade, a project resolves to:
 | Custom drop keys | None |
 | Custom secret patterns | None |
 
-Privacy is default-on where it matters most: secrets and essential
-PII are scrubbed before you write a single rule.
+Privacy is default-on: secrets and essential PII are scrubbed before
+you write a single rule.
 
 ## Permissions
 

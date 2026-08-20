@@ -73,7 +73,7 @@ export function SignInMethodsSection() {
   const { organization } = useOrganizationTeamProject();
   const publicEnv = usePublicEnv();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
-  const apiContext = api.useContext();
+  const apiContext = api.useUtils();
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   const hasSSOProvider = !!organization?.ssoProvider;
@@ -101,7 +101,6 @@ export function SignInMethodsSection() {
           title: "Failed to link sign-in method",
           description: result.error,
           type: "error",
-          meta: { closable: true },
         });
       }
     })();
@@ -114,7 +113,6 @@ export function SignInMethodsSection() {
       toaster.create({
         title: "Sign-in method removed",
         type: "success",
-        meta: { closable: true },
       });
     } catch (error) {
       showErrorToast({
@@ -194,7 +192,7 @@ export function SignInMethodsSection() {
                   variant="ghost"
                   size="xs"
                   onClick={() => void handleUnlink(account.id)}
-                  disabled={unlinkAccount.isLoading}
+                  disabled={unlinkAccount.isPending}
                 >
                   <LuX />
                 </IconButton>

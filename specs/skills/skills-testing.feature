@@ -151,6 +151,21 @@ Feature: Scenario tests for skills quality assurance
     And the agent does NOT use any MCP tools
 
   # ──────────────────────────────────────────────────
+  # Connect-agent skill tests
+  # ──────────────────────────────────────────────────
+
+  @connect-agent @integration @unimplemented
+  Scenario: Connect-agent skill wires a FastAPI agent for platform simulations
+    Given the fixture "python-fastapi-chat" is copied to a temp directory
+    And the skill "connect-agent" is loaded
+    When Claude Code receives "connect my agent to LangWatch scenarios"
+    Then the agent makes the chat endpoint adopt the incoming W3C traceparent header
+    And the agent adds a dedicated scenario key check against the Authorization Bearer header
+    And the agent keeps the existing session authentication in place for normal traffic
+    And the agent attempts to register the endpoint with `langwatch agent create --type http`
+    And the agent does not claim a suite run succeeded when the platform is unreachable
+
+  # ──────────────────────────────────────────────────
   # Prompts skill tests
   # ──────────────────────────────────────────────────
 

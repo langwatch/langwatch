@@ -22,9 +22,8 @@
  *
  * Guardrails, because provider keys and the default policy are org-wide
  * records: refuses to run against a non-local DATABASE_URL unless
- * --allow-remote-db is passed, refuses to wipe a curated default-policy
- * modelAllowlist unless --clear-allowlist is passed, and refuses to pick
- * among multiple org memberships implicitly (pass --org <id or name>).
+ * --allow-remote-db is passed, and refuses to pick among multiple org
+ * memberships implicitly (pass --org <id or name>).
  */
 
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
@@ -36,23 +35,20 @@ interface Args {
   email: string;
   org: string;
   allowRemoteDb: boolean;
-  clearAllowlist: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
   let email = "";
   let org = "";
   let allowRemoteDb = false;
-  let clearAllowlist = false;
   // biome-ignore lint/style/useForOf: flag parser advances the index (argv[++i]) to consume a value; for...of has no index to advance.
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--email") email = argv[++i] ?? "";
     if (argv[i] === "--org") org = argv[++i] ?? "";
     if (argv[i] === "--allow-remote-db") allowRemoteDb = true;
-    if (argv[i] === "--clear-allowlist") clearAllowlist = true;
   }
   if (!email) throw new Error("--email is required");
-  return { email, org, allowRemoteDb, clearAllowlist };
+  return { email, org, allowRemoteDb };
 }
 
 const LOCAL_DB_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
@@ -207,27 +203,13 @@ async function main() {
     throw new Error("no provider keys in env, nothing to route");
   }
 
-  // Org-default policy with all providers and NO model allowlist: the
-  // audio endpoints route by explicit provider/model, and an allowlist
-  // seeded for chat models would reject every audio model id.
+  // Org-default policy carrying every provider: the audio endpoints route
+  // by explicit provider/model.
   const existingPolicy = await prisma.routingPolicy.findFirst({
     where: { organizationId: org.id, isDefault: true },
-    select: { id: true, modelProviderIds: true, modelAllowlist: true },
+    select: { id: true, modelProviderIds: true },
   });
   if (existingPolicy) {
-    // A curated allowlist on the existing default policy is someone's
-    // deliberate restriction; wiping it silently would lift model limits
-    // for every caller in the org. Require the explicit flag.
-    const hasCuratedAllowlist =
-      Array.isArray(existingPolicy.modelAllowlist) &&
-      existingPolicy.modelAllowlist.length > 0;
-    if (hasCuratedAllowlist && !args.clearAllowlist) {
-      throw new Error(
-        `default policy ${existingPolicy.id} has a curated modelAllowlist, ` +
-          "which would reject audio model ids. Re-run with --clear-allowlist " +
-          "to clear it, or add the audio models to the allowlist yourself.",
-      );
-    }
     // modelProviderIds is a Json column, so Prisma types it as JsonValue.
     const priorIds = Array.isArray(existingPolicy.modelProviderIds)
       ? existingPolicy.modelProviderIds.filter(
@@ -237,10 +219,10 @@ async function main() {
     const merged = Array.from(new Set([...priorIds, ...providerIds]));
     await prisma.routingPolicy.update({
       where: { id: existingPolicy.id },
-      data: { modelProviderIds: merged, modelAllowlist: [] },
+      data: { modelProviderIds: merged },
     });
     process.stderr.write(
-      `[seed-audio] updated default policy ${existingPolicy.id}: providers=${merged.length} allowlist cleared\n`,
+      `[seed-audio] updated default policy ${existingPolicy.id}: providers=${merged.length}\n`,
     );
   } else {
     const policy = await prisma.routingPolicy.create({
@@ -249,9 +231,7 @@ async function main() {
         scopes: { create: [{ scopeType: "ORGANIZATION", scopeId: org.id }] },
         name: "audio-dogfood-default",
         isDefault: true,
-        strategy: "priority",
         modelProviderIds: providerIds,
-        modelAllowlist: [],
       },
     });
     process.stderr.write(`[seed-audio] created default policy ${policy.id}\n`);

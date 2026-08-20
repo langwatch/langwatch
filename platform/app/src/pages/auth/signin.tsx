@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { safeRedirectTarget, signIn, useSession } from "~/utils/auth-client";
+import { replaceLocation } from "~/utils/browserNavigation";
 import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
@@ -45,7 +46,7 @@ export default function SignIn() {
     // callback (or dashboard) instead of staring at a 'Redirecting to Sign
     // in...' splash forever (ariana dogfood finding #2).
     if (session) {
-      window.location.replace(safeRedirectTarget(callbackUrl));
+      replaceLocation(safeRedirectTarget(callbackUrl));
       return;
     }
 
@@ -151,9 +152,6 @@ function SignInForm() {
         title: "Could not sign in",
         description: message,
         type: "error",
-        meta: {
-          closable: true,
-        },
       });
     }
   };

@@ -69,7 +69,7 @@ const lastOpts = () => harness.useQuery.mock.calls.at(-1)?.[1];
 
 /**
  * Answers the query with `data`, plus whichever React Query flags the case is
- * about (`isPreviousData` for a page turn, `isError` for a failed read).
+ * about (`isPlaceholderData` for a page turn, `isError` for a failed read).
  */
 function resolveWith({
   data,
@@ -167,7 +167,7 @@ describe("useTraceListEvents", () => {
               distinctCount: 1,
             },
           },
-          extra: { isPreviousData: true },
+          extra: { isPlaceholderData: true },
         });
 
         const { result } = renderHook(() =>

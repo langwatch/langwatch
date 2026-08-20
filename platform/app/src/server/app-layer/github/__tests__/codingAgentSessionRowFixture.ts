@@ -35,8 +35,10 @@ export function codingAgentSessionRow(
     repositoryOwner: "",
     repositoryName: "",
     gitBranch: "",
+    gitBranches: [],
     gitWorktree: "",
     title: "",
+    titleSource: "",
 
     modelCalls: 0,
     toolCalls: 0,

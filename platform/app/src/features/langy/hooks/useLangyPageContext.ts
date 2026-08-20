@@ -26,7 +26,7 @@ import { useLangyTraceViewContext } from "./useLangyTraceViewContext";
  *   1. The open drawer — the URL-routed drawer (`drawer.open=<name>`) names the
  *      exact resource the user opened (a trace / prompt / evaluation / scenario
  *      drawer). The highest-value signal; see `useLangyDrawerContext`.
- *   2. The route the user is on — `/messages/<trace>`, `/experiments/<slug>`,
+ *   2. The route the user is on — `/traces/<trace>`, `/experiments/<slug>`,
  *      `/datasets/<id>` — parsed from the URL. No page edits needed.
  *   3. The Trace Explorer's live table state, when the user is on it: the bulk
  *      row selection ("N traces selected") and the active filter query
@@ -163,6 +163,10 @@ function routeChips(pathname: string): LangyContextChip[] {
   if (!surface || rest.length === 0) return [];
 
   switch (surface) {
+    // `messages` is the legacy path. It still redirects rather than 404s, so
+    // it can be the pathname for the moment before the redirect lands, and a
+    // routed trace should keep its chip across that moment.
+    case "traces":
     case "messages":
       // Shared with the trace rows / trace drawer that register themselves as
       // context targets, so a clicked trace and a routed one are the same chip.

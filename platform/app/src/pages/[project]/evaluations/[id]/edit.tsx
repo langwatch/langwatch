@@ -33,6 +33,7 @@ export default function EditTraceCheck() {
   );
   const updateCheck = api.monitors.update.useMutation();
   const deleteCheck = api.monitors.delete.useMutation();
+  const utils = api.useUtils();
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
 
   const onSubmit = async (data: CheckConfigFormData) => {
@@ -48,20 +49,17 @@ export default function EditTraceCheck() {
       toaster.create({
         title: "Check updated successfully",
         type: "success",
-        meta: {
-          closable: true,
-        },
       });
       void router.push(`/${project.slug}/online-evaluations`);
-      check.remove();
+      void utils.monitors.getById.invalidate({
+        id: checkId,
+        projectId: project.id,
+      });
     } catch {
       toaster.create({
         title: "Failed to update check",
         description: "Please try again",
         type: "error",
-        meta: {
-          closable: true,
-        },
       });
     }
   };
@@ -91,7 +89,7 @@ export default function EditTraceCheck() {
         message="Are you sure you want to delete this check?"
         confirmLabel="Delete"
         tone="danger"
-        loading={deleteCheck.isLoading}
+        loading={deleteCheck.isPending}
         onConfirm={() => {
           if (!project) return;
           deleteCheck.mutate(
@@ -101,9 +99,6 @@ export default function EditTraceCheck() {
                 toaster.create({
                   title: "Check deleted successfully",
                   type: "success",
-                  meta: {
-                    closable: true,
-                  },
                 });
                 void router.push(`/${project.slug}/online-evaluations`);
               },
@@ -112,9 +107,6 @@ export default function EditTraceCheck() {
                   title: "Failed to delete check",
                   description: "Please try again",
                   type: "error",
-                  meta: {
-                    closable: true,
-                  },
                 });
               },
               onSettled: () => setIsConfirmDeleteOpen(false),
@@ -169,7 +161,7 @@ export default function EditTraceCheck() {
               checkId={checkId}
               defaultValues={defaultValues}
               onSubmit={onSubmit}
-              loading={updateCheck.isLoading}
+              loading={updateCheck.isPending}
             />
           )}
         </VStack>

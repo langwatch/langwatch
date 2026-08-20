@@ -19,15 +19,34 @@ import {
   WebhookEndpointValidationError,
 } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookHealthService } from "@ee/webhooks/webhookHealth.service";
-import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
+import { WEBHOOK_DESTINATION_KINDS } from "~/utils/webhookDestinations";
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const orgInput = z.object({ organizationId: z.string() });
 const endpointInput = orgInput.extend({ endpointId: z.string() });
+
+/**
+ * The queue half of a destination. Which credential fields are ALLOWED is the
+ * service's call; this only says what may be sent.
+ *
+ * The credential fields are nullable, not merely optional, because the
+ * service reads the two differently: absent means "keep what is stored" and
+ * null means "clear it". Without null there is no way through this surface to
+ * rotate an endpoint off static keys, which is the one operation a leaked key
+ * demands.
+ */
+const sqsDestinationInput = z.object({
+  queueUrl: z.string(),
+  roleArn: z.string().nullable().optional(),
+  externalId: z.string().nullable().optional(),
+  accessKeyId: z.string().nullable().optional(),
+  secretAccessKey: z.string().nullable().optional(),
+});
 
 /**
  * Enterprise gate for the whole surface, mirroring the REST app: the org's
@@ -112,7 +131,9 @@ export const webhookEndpointsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       orgInput.extend({
-        url: z.string(),
+        destinationKind: z.enum(WEBHOOK_DESTINATION_KINDS).optional(),
+        url: z.string().optional(),
+        sqs: sqsDestinationInput.optional(),
         enabledEvents: z.array(z.string()).min(1),
         maxBatchSize: z.number().int().optional(),
         maxBatchDelayMs: z.number().int().optional(),
@@ -125,7 +146,9 @@ export const webhookEndpointsRouter = createTRPCRouter({
       translating(() =>
         service(ctx.prisma).create({
           organizationId: input.organizationId,
+          destinationKind: input.destinationKind,
           url: input.url,
+          sqs: input.sqs,
           enabledEvents: input.enabledEvents,
           maxBatchSize: input.maxBatchSize,
           maxBatchDelayMs: input.maxBatchDelayMs,
@@ -153,7 +176,13 @@ export const webhookEndpointsRouter = createTRPCRouter({
   update: protectedProcedure
     .input(
       endpointInput.extend({
+        // Accepted only when it repeats the kind the endpoint already has.
+        // Zod strips unknown keys, so leaving it out would silently drop a
+        // caller's attempted kind change and answer success where REST
+        // refuses: two surfaces, two answers to the same request.
+        destinationKind: z.enum(WEBHOOK_DESTINATION_KINDS).optional(),
         url: z.string().optional(),
+        sqs: sqsDestinationInput.partial().optional(),
         enabledEvents: z.array(z.string()).min(1).optional(),
         maxBatchSize: z.number().int().optional(),
         maxBatchDelayMs: z.number().int().optional(),
@@ -167,7 +196,9 @@ export const webhookEndpointsRouter = createTRPCRouter({
         service(ctx.prisma).update({
           organizationId: input.organizationId,
           endpointId: input.endpointId,
+          destinationKind: input.destinationKind,
           url: input.url,
+          sqs: input.sqs,
           enabledEvents: input.enabledEvents,
           maxBatchSize: input.maxBatchSize,
           maxBatchDelayMs: input.maxBatchDelayMs,

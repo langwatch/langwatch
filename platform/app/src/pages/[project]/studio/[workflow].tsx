@@ -41,7 +41,7 @@ export default function Studio() {
   );
   const { clear } = _useWorkflowStore.temporal.getState();
 
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
   useEffect(() => {
     // Invalidate the workflow once navigating away to make sure when comming back
     // that is doesn't accidentaly renders the previous version of the workflow

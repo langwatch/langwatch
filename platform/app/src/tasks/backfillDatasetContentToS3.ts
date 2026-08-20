@@ -37,7 +37,11 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import { type Dataset, Prisma, type PrismaClient } from "@prisma/client";
+import {
+  type Dataset,
+  Prisma,
+  type PrismaClient,
+} from "~/generated/prisma/client";
 import { StreamingChunkWriter } from "../server/datasets/dataset-chunk-writer";
 import { withDatasetLock } from "../server/datasets/dataset-lock";
 import { DatasetRecordRepository } from "../server/datasets/dataset-record.repository";
@@ -382,7 +386,7 @@ export const migrateAllPostgresDatasets = async (
           else summary.alreadyMigrated += 1;
         } catch (error) {
           summary.failed += 1;
-          logger.error(
+          logger.warn(
             { error, datasetId: dataset.id, projectId: dataset.projectId },
             "Failed to migrate dataset to S3 — will retry on the next run",
           );

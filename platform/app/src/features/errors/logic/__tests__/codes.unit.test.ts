@@ -91,6 +91,30 @@ const RELAYED_META_CODES = new Set(["missing_provider"]);
 const CLIENT_MINTED_CODES = new Set(["langy_codex_plan_limit"]);
 
 /**
+ * Codes passed as a constructor PARAMETER — the shape the docblock above names
+ * as the one this scanner cannot see, because there is no string literal at the
+ * declaration to match.
+ *
+ * `LangyApiIdentityDeniedError` (`src/server/app-layer/langy/errors.ts`) is one
+ * class over three codes on purpose: all three are the same 403 with the same
+ * body, and only the remediation differs (mint a personal key / ask an admin
+ * for Langy access / the owner is gone). Its caller picks the code, so the
+ * declaration is a union in the signature and every CODE_PATTERNS entry misses
+ * it.
+ *
+ * These therefore enter `APP_ERROR_CODES` by hand, and the "raised but not
+ * listed" assertion will NOT notice if a fourth is added to that union and left
+ * off the list. That is the cost of the shape; the entry below is the record of
+ * it. Adding a code here is a decision to hand-maintain it — prefer a subclass
+ * with a literal unless the family genuinely shares one body.
+ */
+const PARAMETERIZED_CODES = new Set([
+  "langy_api_key_unowned",
+  "langy_api_key_no_langy_access",
+  "langy_api_actor_missing",
+]);
+
+/**
  * A path typo turns this whole guard into a no-op, and it reports that as a
  * pass. The exact number is noise, but "we read thousands of files" and "we
  * read none" are worlds apart, and only one of them is a working guard.
@@ -242,7 +266,8 @@ describe("APP_ERROR_CODES", () => {
           !declared.has(code) &&
           !PACKAGE_OWNED_CODES.has(code) &&
           !RELAYED_META_CODES.has(code) &&
-          !CLIENT_MINTED_CODES.has(code),
+          !CLIENT_MINTED_CODES.has(code) &&
+          !PARAMETERIZED_CODES.has(code),
       );
 
       expect(

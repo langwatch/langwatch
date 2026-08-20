@@ -9,6 +9,9 @@
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
+import * as fs from "node:fs";
+import * as path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -78,6 +81,91 @@ describe("the session context hook", () => {
       const attributes = attributesOf(posted[0]!);
       expect(attributes).not.toHaveProperty("vcs.ref.head.name");
       expect(attributes).not.toHaveProperty("vcs.worktree.name");
+    });
+  });
+
+  describe("given a session claude holds a name for", () => {
+    /** @scenario "The session's name rides the context record" */
+    it("carries the name the SessionStart payload reports", async () => {
+      await hook.runHook({
+        input: {
+          session_id: SESSION_ID,
+          cwd: "/repo/worktrees/review",
+          session_title: "pr-reviewer",
+        },
+      });
+
+      expect(attributesOf(posted[0]!)).toMatchObject({
+        "vcs.repository.name": "langwatch",
+        "langwatch.session.name": "pr-reviewer",
+      });
+    });
+
+    /** @scenario "A mid-session rename reaches the next hook through the registry" */
+    it("reads the current name from claude's live registry when the payload has none", async () => {
+      // Two registry entries claim the session — a resumed session leaves
+      // the old process's file behind — so the newest one must win.
+      fs.mkdirSync(hook.claudeRegistryDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(hook.claudeRegistryDir, "83000.json"),
+        JSON.stringify({ sessionId: SESSION_ID, name: "stale", updatedAt: 1 }),
+      );
+      fs.writeFileSync(
+        path.join(hook.claudeRegistryDir, "83315.json"),
+        JSON.stringify({
+          sessionId: SESSION_ID,
+          name: "lw-renamed",
+          updatedAt: 2,
+        }),
+      );
+
+      await hook.runHook();
+
+      expect(attributesOf(posted[0]!)["langwatch.session.name"]).toBe(
+        "lw-renamed",
+      );
+    });
+
+    /** @scenario "A named session posts even outside a git repository" */
+    it("posts the session id and the name with no repository attributes", async () => {
+      await hook.runHook({
+        git: {},
+        input: {
+          session_id: SESSION_ID,
+          cwd: "/repo/worktrees/review",
+          session_title: "pr-reviewer",
+        },
+      });
+
+      expect(posted).toHaveLength(1);
+      const attributes = attributesOf(posted[0]!);
+      expect(attributes).toMatchObject({
+        "session.id": SESSION_ID,
+        "langwatch.session.name": "pr-reviewer",
+      });
+      expect(attributes).not.toHaveProperty("vcs.repository.host");
+      expect(attributes).not.toHaveProperty("vcs.repository.owner");
+      expect(attributes).not.toHaveProperty("vcs.repository.name");
+      expect(hook.exits).toEqual([]);
+    });
+
+    /** @scenario "Only claude's seam reads claude's registry" */
+    it("never names another agent's session from claude's registry", async () => {
+      fs.mkdirSync(hook.claudeRegistryDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(hook.claudeRegistryDir, "83315.json"),
+        JSON.stringify({
+          sessionId: SESSION_ID,
+          name: "claude-name",
+          updatedAt: 1,
+        }),
+      );
+
+      await hook.runHook({ tool: "codex" });
+
+      expect(attributesOf(posted[0]!)).not.toHaveProperty(
+        "langwatch.session.name",
+      );
     });
   });
 

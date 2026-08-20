@@ -3,15 +3,16 @@
  * that the gateway invokes per direction on inbound + outbound traffic.
  *
  * VK opt-in lives on vk.config.guardrailAttachments[]; this router is the
- * admin surface (CRUD) for /settings/gateway/guardrails.
+ * admin surface (CRUD) for /gateway/guardrails.
  *
  * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
  */
+
+import { z } from "zod";
 import {
   GatewayGuardrailDirection,
   GatewayGuardrailFailureMode,
-} from "@prisma/client";
-import { z } from "zod";
+} from "~/generated/prisma/client";
 
 import { GatewayGuardrailService } from "~/server/gateway/guardrail.service";
 

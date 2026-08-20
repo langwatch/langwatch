@@ -66,7 +66,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import type { MiddlewareHandler, ValidationTargets } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { validator as openApiValidator } from "hono-openapi/zod";
+import { validator as openApiValidator } from "hono-openapi";
 import type { ZodIssue, ZodSchema } from "zod";
 
 import { remediation } from "~/server/app-layer/error-remediation";
@@ -261,7 +261,7 @@ function build(
     if (!result.success) {
       throw new RequestValidationError({
         target,
-        violations: (result.error?.issues ?? []).map(violationOf),
+        violations: issuesOf(result.error).map(violationOf),
       });
     }
     return undefined;
@@ -292,7 +292,32 @@ function build(
 
 interface ValidationResult {
   success: boolean;
-  error?: { issues: ZodIssue[] };
+  /**
+   * Two shapes, because hono-openapi changed containers at v1.
+   *
+   * v0.4 wrapped `@hono/zod-validator` and handed the hook zod's `ZodError`
+   * itself, so the issues lived under `.issues`. v1 wraps
+   * `@hono/standard-validator` and hands over the Standard Schema failure —
+   * the issue array, bare.
+   *
+   * Both are accepted rather than only the current one: reading `.issues` off
+   * an array yields `undefined`, and `undefined ?? []` is an empty violation
+   * list, so getting this wrong does not throw. It ships a 422 that names no
+   * field at all — the exact detail this whole file exists to preserve.
+   *
+   * The elements are unchanged either way. Zod's Standard Schema issues ARE
+   * `ZodIssue`s — `code`, `expected`, `options` and `path` all survive the
+   * `~standard` boundary — so `violationOf` reads the same fields as before.
+   */
+  error?: { issues?: ZodIssue[] } | readonly ZodIssue[];
+}
+
+/** The issues a validation failure carries, from either container shape. */
+function issuesOf(error: ValidationResult["error"]): ZodIssue[] {
+  if (!error) return [];
+  return Array.isArray(error)
+    ? [...error]
+    : ((error as { issues?: ZodIssue[] }).issues ?? []);
 }
 
 /**

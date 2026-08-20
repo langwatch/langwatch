@@ -1,6 +1,13 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
 
+import { randomUUID } from "node:crypto";
+import { hostname } from "node:os";
 import { performance } from "node:perf_hooks";
+// Imported rather than read off the global: the constructor destructures a
+// `process` handler out of the queue definition, and a class field initializer
+// runs inside that same scope — so a bare `process.pid` here resolves to the
+// handler's binding and dies in its temporal dead zone.
+import { pid } from "node:process";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -16,7 +23,18 @@ import { Cluster, Redis as IORedis } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
 import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { SHUTDOWN_BUDGET } from "~/server/shutdown/budget";
+import {
+  LATENCY_HOUR_BUCKET_TTL_SECONDS,
+  LATENCY_MINUTE_BUCKET_TTL_SECONDS,
+  LATENCY_SAMPLE_SIZE,
+  latencyAllTimeKey,
+  latencyBucketField,
+  latencyHourBucketKey,
+  latencyMinuteBucketKey,
+} from "~/shared/ops/latency";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { tryGetApp } from "../../../app-layer/app";
 import {
   createContextFromJobData,
   getJobContextMetadata,
@@ -28,7 +46,6 @@ import {
   TenantRateTracker,
   tenantIdFromGroupId,
 } from "../../../observability/tenantRateTracker";
-import { connection } from "../../../redis";
 import {
   type ProjectStorageDestination,
   redactStorageUrisInText,
@@ -94,8 +111,9 @@ import {
   type DrainedJob,
   GroupStagingScripts,
   readBisectionSplitBudget,
-  readClaimStrikeThreshold,
+  readConfirmedDeathThreshold,
   readGroupQuarantineThreshold,
+  WORKER_LIVENESS_REFRESH_MS,
 } from "./scripts";
 import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore";
 
@@ -135,8 +153,14 @@ function nonEmptyString(value: unknown): string | undefined {
 
 /**
  * Configuration for the group queue.
+ *
+ * Exported because `activeTtlSec` and the heartbeat interval derived from it
+ * set the floor on how soon a dead worker's group is redispatched, and the
+ * poison guard's beacon TTL has to stay under that floor to be able to observe
+ * the death at all. The two constants live in different modules, so the
+ * inequality between them is pinned by a test rather than by proximity.
  */
-const GROUP_QUEUE_CONFIG = {
+export const GROUP_QUEUE_CONFIG = {
   /** Default global concurrency (max parallel groups) */
   defaultGlobalConcurrency: Number(process.env.GLOBAL_QUEUE_CONCURRENCY) || 100,
   /** TTL for the active key (safety net for crashes), in seconds */
@@ -145,12 +169,16 @@ const GROUP_QUEUE_CONFIG = {
   signalTimeoutSec: 5,
   /** Interval for collecting queue metrics in milliseconds */
   metricsIntervalMs: 15000,
-  /** Maximum time to wait for graceful shutdown in milliseconds */
-  shutdownTimeoutMs:
-    process.env.NODE_ENV === "development" ||
-    process.env.ENVIRONMENT === "local"
-      ? 2000
-      : 20000,
+  /**
+   * Maximum time to wait for graceful shutdown in milliseconds.
+   *
+   * The innermost of the four nested shutdown clocks — see
+   * server/shutdown/budget.ts, which derives App.close's backstop, the
+   * entrypoint watchdog and the required terminationGracePeriodSeconds from
+   * this one number. Do not hardcode a value here: an increase that the outer
+   * clocks do not hear about is an increase the pod never gets to use.
+   */
+  shutdownTimeoutMs: SHUTDOWN_BUDGET.queueDrainMs,
 } as const;
 
 /** Default TTL for deduplication in milliseconds */
@@ -324,15 +352,48 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    */
   private readonly bisectionSplitBudget = readBisectionSplitBudget();
 
+  /**
+   * Confirmed worker deaths tolerated before a group is parked. Read once at
+   * construction, like the two thresholds above; 0 disables the poison guard.
+   * See {@link readConfirmedDeathThreshold}.
+   */
+  private readonly deathThreshold = readConfirmedDeathThreshold();
+
   private shutdownRequested = false;
   /** Tracks in-flight jobs for active count metrics. */
   private activeJobCount = 0;
+
   /**
-   * Groups whose claim strike is currently outstanding (recorded at claim,
-   * cleared in the processing finally). {@link close} sweeps these so a
-   * planned shutdown never leaves a strike behind as a fake worker death.
+   * Identity this process stamps onto every claim it takes, and the subject of
+   * the liveness beacon the poison guard reads. Unique per process INSTANCE —
+   * a restarted pod must never inherit the identity of the one it replaced, or
+   * its predecessor's death would resolve to "that's me, still running".
    */
-  private readonly inFlightStrikeGroups = new Set<string>();
+  private readonly workerId =
+    `${hostname()}-${pid}-${randomUUID().slice(0, 8)}`;
+
+  /** Beacon refresh timer; stopped before the retirement write in {@link close}. */
+  private livenessTimer: ReturnType<typeof setInterval> | undefined;
+
+  /**
+   * Whether this worker's beacon is known to have reached Redis.
+   *
+   * The guard reads a missing beacon as a death, so a worker that stamps claim
+   * markers it cannot vouch for hands every peer a false death — the exact
+   * failure this design removes, re-entered through the beacon write instead of
+   * the release. While the beacon is unconfirmed the guard sits out entirely:
+   * a real death then goes uncounted, which is the cheap direction to be wrong
+   * in. Parking a healthy group is the expensive one.
+   */
+  private beaconLive = false;
+
+  /**
+   * Resolves once this worker's beacon exists in Redis. Claims await it, so a
+   * worker can never own a claim marker before the beacon that vouches for it —
+   * the window in between is exactly the one where a peer would misread this
+   * live process as a dead one.
+   */
+  private readonly livenessReady: Promise<void>;
 
   constructor(
     definition: EventSourcedQueueDefinition<Payload>,
@@ -360,7 +421,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       auditAdapter,
     } = definition;
 
-    const effectiveConnection = redisConnection ?? connection;
+    // `tryGetApp`, not `getApp`: this is a constructor, and EventSourcing
+    // builds queues while the composition root is still assembling — so an App
+    // may legitimately not exist yet. The caller that matters always passes a
+    // connection; falling through to the ConfigurationError below states the
+    // real problem, where `getApp()` would raise a boot-order error instead.
+    const effectiveConnection = redisConnection ?? tryGetApp()?.redis ?? null;
     if (!effectiveConnection) {
       throw new ConfigurationError(
         "GroupQueueProcessor",
@@ -452,6 +518,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         "Processing queue saturated",
       );
     };
+
+    // Publish the liveness beacon before anything can claim. A consumer that
+    // never claims still needs no beacon, so producers skip it entirely.
+    this.livenessReady = this.consumerEnabled
+      ? this.startLivenessBeacon()
+      : Promise.resolve();
 
     // Start dispatcher and metrics collection in consumer mode
     if (this.consumerEnabled) {
@@ -853,75 +925,72 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   /**
    * fastq worker function: poison guard, then the real job processing.
    *
-   * The guard records a claim strike BEFORE any decode/parse work and clears
-   * it on every code path where the process survives (the finally below -
-   * success, retry, exhausted-park, drop-to-replay, graceful drain all pass
-   * through it). A job that seizes the event loop never reaches the finally:
-   * the liveness probe kills the process, the strike stays behind, and after
-   * enough consecutive deaths the next claim parks the group instead of
-   * re-running the killer (specs/event-sourcing/poison-group-park-guard.feature).
+   * The guard stamps this worker's identity onto the group's claim BEFORE any
+   * decode/parse work, and releases it on every path where the process survives
+   * (the finally below — success, retry, exhausted-park, drop-to-replay and
+   * graceful drain all pass through it). A job that seizes the event loop never
+   * reaches the finally: the liveness probe kills the process, its beacon stops,
+   * and the next worker to claim the group finds a marker whose owner is
+   * provably gone. Enough confirmed deaths and the claim parks the group instead
+   * of re-running the killer (specs/event-sourcing/poison-group-park-guard.feature).
    *
-   * A claim made after a graceful shutdown was requested records NO strike:
-   * the process is about to exit on purpose, and dying with that job in
-   * flight must not read as the job killing the worker. Pre-shutdown strikes
-   * are swept in {@link close} while the event loop is provably alive. A group
-   * already at the threshold is therefore parked at most one claim early: a
-   * claim that begins after the shutdown records no strike and parks on the next
-   * boot's claim instead, while a claim already awaiting its strike record when
-   * the shutdown flips can still cross the threshold and park during the drain —
-   * but only on its real prior-death strikes, never on a shutdown-born one.
+   * Nothing here has to special-case shutdown. A claim held by a process that
+   * exits gracefully resolves through that process's retirement tombstone, and
+   * a release that never reaches Redis resolves through its still-live beacon —
+   * so neither needs the strike to be withheld, swept, or re-checked the way the
+   * count-and-subtract guard did.
    */
   private async processWithRetries(dispatched: DispatchResult): Promise<void> {
     const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
 
-    const strikeThreshold = readClaimStrikeThreshold();
-    const recordStrikes = strikeThreshold > 0 && !this.shutdownRequested;
-    if (recordStrikes) {
-      let strikes = 0;
+    // The beacon must exist before this worker owns a marker, or a peer would
+    // read our live claim as an abandoned one.
+    await this.livenessReady;
+
+    const { deathThreshold } = this;
+    const guardEnabled = deathThreshold > 0 && this.beaconLive;
+    if (guardEnabled) {
+      let deaths = 0;
+      let lastOwnerState = "";
       try {
-        strikes = await this.scripts.recordClaimStrike(groupId);
+        ({ deaths, lastOwnerState } = await this.scripts.recordClaim({
+          groupId,
+          workerId: this.workerId,
+          stagedJobId,
+        }));
       } catch {
-        // Strike accounting is protective, never load-bearing: an unreadable
-        // counter must not stop the queue.
+        // Poison accounting is protective, never load-bearing: an unreadable
+        // marker must not stop the queue.
       }
-      if (strikes > strikeThreshold) {
+      if (deaths >= deathThreshold) {
         await this.parkPoisonGroup({
           groupId,
           stagedJobId,
           jobDataJson,
           originalScore,
           reason: "claim_strikes",
-          errorMessage: `Poison guard: ${strikes - 1} consecutive worker deaths while this group was in flight (threshold ${strikeThreshold}). Inspect the staged jobs, then unblock the group to retry.`,
+          lastOwnerState,
+          errorMessage: `Poison guard: ${deaths} confirmed worker deaths while this group was in flight (threshold ${deathThreshold}). Each was a worker that claimed this group and then stopped heartbeating without shutting down. Inspect the staged jobs, then unblock the group to retry.`,
         });
         return;
-      }
-      this.inFlightStrikeGroups.add(groupId);
-
-      // close() may have flipped shutdownRequested and taken its sweep snapshot
-      // during the recordClaimStrike await above — before this group was in the
-      // set, so the sweep would miss it and an abandoned drain would leave the
-      // strike behind: exactly the false worker-death this guard must not book.
-      // Re-check on the synchronous heels of the add (no await between them, so
-      // close() cannot interleave here) and clear our own strike if the shutdown
-      // began mid-claim. The add and this check are jointly exhaustive: either
-      // close()'s snapshot already saw the group and swept it, or it did not and
-      // we clear it here.
-      if (this.shutdownRequested) {
-        this.inFlightStrikeGroups.delete(groupId);
-        await this.scripts.clearClaimStrikes(groupId).catch(() => {
-          // Protective accounting only; the strike key's TTL bounds a failed clear.
-        });
       }
     }
 
     try {
       await this.processClaimedJob(dispatched);
     } finally {
-      if (recordStrikes) {
-        this.inFlightStrikeGroups.delete(groupId);
-        this.scripts.clearClaimStrikes(groupId).catch(() => {
-          // The TTL on the strike key bounds the damage of a failed clear.
-        });
+      if (guardEnabled) {
+        // Compare-and-delete: this job may have outlived its own active lease
+        // (heartbeat failures are warn-and-continue), in which case the group
+        // was redispatched and the marker now belongs to someone else. Deleting
+        // it blind would erase their ownership AND the group's accrued deaths.
+        this.scripts
+          .releaseClaim({ groupId, workerId: this.workerId })
+          .catch(() => {
+            // Safe to lose: the marker it would have removed still names this
+            // worker, which is alive (and will retire rather than vanish), so
+            // the next claim reads it as ordinary rather than as a death.
+          });
       }
     }
   }
@@ -1660,16 +1729,33 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       this.activeJobCount--;
       const jobDurationMs = performance.now() - jobStartTime;
       gqJobDurationMilliseconds.observe(routingLabels, jobDurationMs);
-      // Feed the ops dashboard P50/P99 tiles. Capped circular buffer; the
-      // collector LRANGE's it every 2s. Fire-and-forget so an instrumentation
-      // hiccup never bubbles into the worker pipeline.
+      // Feed the ops dashboard latency figures. Two shapes, one write: the
+      // capped circular buffer behind the live P50/P99 tiles (LRANGE'd every
+      // 2s, sized by the same shared constant the tiles quote), and the
+      // time-bucketed histograms behind the hour/day/week/all-time windows
+      // (merged by the elected snapshot writer on its detail cycle).
+      // Fire-and-forget so an instrumentation hiccup never bubbles into the
+      // worker pipeline.
+      const completedAtMs = Date.now();
+      const bucketField = latencyBucketField(jobDurationMs);
+      const minuteKey = latencyMinuteBucketKey(this.queueName, completedAtMs);
+      const hourKey = latencyHourBucketKey(this.queueName, completedAtMs);
       this.redisConnection
         .multi()
         .lpush(
           `${this.queueName}:gq:stats:latencies-ms`,
           String(Math.round(jobDurationMs)),
         )
-        .ltrim(`${this.queueName}:gq:stats:latencies-ms`, 0, 199)
+        .ltrim(
+          `${this.queueName}:gq:stats:latencies-ms`,
+          0,
+          LATENCY_SAMPLE_SIZE - 1,
+        )
+        .hincrby(minuteKey, bucketField, 1)
+        .expire(minuteKey, LATENCY_MINUTE_BUCKET_TTL_SECONDS)
+        .hincrby(hourKey, bucketField, 1)
+        .expire(hourKey, LATENCY_HOUR_BUCKET_TTL_SECONDS)
+        .hincrby(latencyAllTimeKey(this.queueName), bucketField, 1)
         .exec()
         .catch(() => {
           // best-effort stats write; failures are non-fatal
@@ -1693,8 +1779,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * parse failure — the job was already removed from staging, so it is DISCARDED
    * here, mirroring the dispatched job's own parse-failure handling.
    *
-   * This used to say "recoverable via event replay". It is not, for a reactor
-   * job: replay never invokes reactors (see {@link dropStagedJob}). The loss is
+   * This used to say "recoverable via event replay". It is not, for a subscriber
+   * job: replay never invokes subscribers (see {@link dropStagedJob}). The loss is
    * counted instead of asserted away.
    */
   private async parseDrainedPayload({
@@ -1890,7 +1976,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
     // Set on BOTH outcomes, and before the split recurses. The flag means "an
     // earlier call in this descent MAY have written", which is what a later
-    // commit needs to know — a handler that stored and then threw (a reactor
+    // commit needs to know — a handler that stored and then threw (a subscriber
     // failing after the fold committed) has written just as surely as one that
     // returned. Treating that as a fresh delivery lets the next sub-batch's
     // commit REPLACE the applied set the failed call recorded (#6578). The
@@ -2087,6 +2173,50 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }
 
   /**
+   * Publishes this worker's liveness beacon and keeps refreshing it.
+   *
+   * The beacon is the poison guard's only evidence of a worker death: a claim
+   * marker whose owner has no beacon is a process that was working and is now
+   * gone. Refresh failures are logged and otherwise tolerated — the TTL is
+   * several refreshes wide precisely so a transient Redis error cannot make a
+   * live worker look dead.
+   */
+  private async startLivenessBeacon(): Promise<void> {
+    const publish = async () => {
+      try {
+        await this.scripts.recordWorkerAlive(this.workerId);
+        this.beaconLive = true;
+      } catch (err) {
+        // Stand the guard down until a refresh lands: claims made without a
+        // beacon behind them would be read as deaths by every peer.
+        this.beaconLive = false;
+        this.logger.warn(
+          {
+            queueName: this.queueName,
+            workerId: this.workerId,
+            error: err instanceof Error ? err.message : String(err),
+          },
+          "Failed to publish worker liveness beacon; the poison guard may read this worker as dead if this persists",
+        );
+      }
+    };
+
+    await publish();
+
+    // close() may have run during that first publish, in which case it found no
+    // timer to stop and has already written the tombstone. Arming one now would
+    // put a refresh AFTER the retirement — restoring a short-lived `alive` that
+    // expires into exactly the false death the tombstone exists to prevent.
+    if (this.shutdownRequested) return;
+
+    this.livenessTimer = setInterval(() => {
+      void publish();
+    }, WORKER_LIVENESS_REFRESH_MS);
+    // Never hold the process open for a beacon refresh.
+    this.livenessTimer.unref?.();
+  }
+
+  /**
    * Starts a periodic heartbeat that refreshes the active key TTL during
    * processing. This prevents the safety-net TTL from expiring when a single
    * job attempt takes longer than activeTtlSec.
@@ -2211,16 +2341,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * does not — and the proof is structural, not another comment: `ReplayExecutor`
    * calls the fold's pure `projection.apply()` and writes straight to the store
    * via `store.store()`, never constructing a `ProjectionRouter` — which is the
-   * only thing that calls `dispatchToReactors`. Reactors are unreachable from
-   * replay BY CONSTRUCTION. (`replay/` contains no reference to a reactor at all,
+   * only thing that calls `dispatchToSubscribers`. Subscribers are unreachable from
+   * replay BY CONSTRUCTION. (`replay/` contains no reference to a subscriber at all,
    * except two that exist to *suppress* re-fires.)
    *
    * `governanceOcsfEventsSync` (OCSF audit) and `governanceKpisSync` are
-   * reactors on the `traceSummary` fold — so for them this method IS the terminal
+   * subscribers on the `traceSummary` fold — so for them this method IS the terminal
    * event, and the counter below is the only evidence it ever happened. Scoped
    * honestly: fold/map drops genuinely ARE replay-covered (`ReplayService.replay`
    * drives `config.projections` + `config.mapProjections`). The false part is
-   * reactor-specific.
+   * subscriber-specific.
    *
    * **Why `complete()`** — there are THREE options here, not two, and an earlier
    * draft of this comment argued a false binary:
@@ -2375,6 +2505,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     originalScore,
     reason,
     errorMessage,
+    lastOwnerState,
   }: {
     groupId: string;
     stagedJobId: string;
@@ -2382,6 +2513,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     originalScore: number;
     reason: "claim_strikes" | "oversized_payload";
     errorMessage: string;
+    /**
+     * What the parking claim found the previous owner to be. A crash-loop and a
+     * Redis outage that expired healthy beacons both park with the same count
+     * and the same message; this is the field that tells them apart. Absent for
+     * the oversized-payload park, which consults no owner.
+     */
+    lastOwnerState?: string;
   }): Promise<void> {
     // Same reasoning as handleExhaustedRetries: keep the original score when it
     // is a real timestamp, otherwise the parked group reads as decades old.
@@ -2396,6 +2534,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       jobDataJson,
       errorMessage,
     });
+    // Release the marker as the group is parked. Leaving it meant the death
+    // count survived the park, so an operator who unblocked inside the marker's
+    // TTL had the group re-park on its very next claim — and whether it did
+    // depended on how long they took to press the button.
+    // Unconditional, unlike the release on the healthy path: the group is
+    // leaving the dispatch path, and a marker left at the threshold would
+    // re-park it on the operator's very next unblock.
+    await this.scripts.discardClaim(groupId).catch(() => {
+      // The marker's TTL bounds a failed clear; unblock clears it outright.
+    });
     gqGroupsPoisonParkedTotal.inc({
       queue_name: this.queueName,
       reason,
@@ -2407,6 +2555,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         groupId,
         stagedJobId,
         reason,
+        // "gone" on every death is the crash-loop signature. A park whose
+        // observations were mostly "alive"/"retired" points at beacon weather
+        // (a Redis outage expiring healthy beacons), not at this group.
+        lastOwnerState,
       },
       "Poison guard parked group into the blocked set",
     );
@@ -2461,7 +2613,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         jobDataJson,
         err,
         reason: "transient_exhausted",
-        message: `Blob store unreachable after ${attempt} attempts; discarding job (replay does not recover reactor jobs)`,
+        message: `Blob store unreachable after ${attempt} attempts; discarding job (replay does not recover subscriber jobs)`,
       });
       return;
     }
@@ -2594,23 +2746,33 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         // best-effort wake; a failed signal only delays dispatcher exit
       });
 
-    // A planned shutdown is not a worker death (poison-group-park-guard
-    // spec: "graceful shutdown mid-job does not count as a poison strike").
-    // Sweep the in-flight claim strikes NOW, before the drain below, while
-    // the event loop is provably alive — a worker whose loop a poison job
-    // seized can never reach this sweep, so real crash-loops keep their
-    // count. Jobs that complete during the drain re-clear harmlessly; jobs
-    // the drain budget (or the platform's SIGKILL) abandons leave no strike
-    // behind and re-dispatch cleanly on the next boot.
-    const inFlight = [...this.inFlightStrikeGroups];
-    if (inFlight.length > 0) {
-      await Promise.allSettled(
-        inFlight.map((groupId) => this.scripts.clearClaimStrikes(groupId)),
-      );
-      this.logger.info(
-        { queueName: this.queueName, groups: inFlight.length },
-        "Cleared in-flight claim strikes for graceful shutdown",
-      );
+    // A planned shutdown is not a worker death (poison-group-park-guard spec:
+    // "graceful shutdown mid-job does not count as a poison strike"). One
+    // tombstone answers for every claim this worker holds, however the drain
+    // ends: jobs it completes, jobs the shutdown budget abandons, and jobs the
+    // platform's SIGKILL cuts short all leave markers that resolve to "retired".
+    //
+    // Stop the beacon FIRST — a refresh landing after the tombstone would
+    // restore a short-lived `alive` that then expires into a false death. And
+    // do this while the event loop is provably alive: a worker whose loop a
+    // poison job seized never reaches here, so real crash-loops still count.
+    if (this.livenessTimer) {
+      clearInterval(this.livenessTimer);
+      this.livenessTimer = undefined;
+    }
+    if (this.consumerEnabled) {
+      try {
+        await this.scripts.retireWorker(this.workerId);
+      } catch (err) {
+        this.logger.warn(
+          {
+            queueName: this.queueName,
+            workerId: this.workerId,
+            error: err instanceof Error ? err.message : String(err),
+          },
+          "Failed to record worker retirement; groups this worker held may book a spurious death",
+        );
+      }
     }
 
     this.logger.debug(
@@ -2642,7 +2804,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         "Group queue processor closed successfully",
       );
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         {
           queueName: this.queueName,
           error,

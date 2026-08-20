@@ -4,7 +4,7 @@ Feature: ON_MESSAGE evaluations only re-run on real, recent messages
   So that derived enrichments and re-touched historical traces cannot spray thousands of evaluations and starve the queue
 
   # Context (2026-05-27 incident): the daily topic-clustering pass appends a
-  # topic_assigned event to thousands of historical traces. The trigger reactor
+  # topic_assigned event to thousands of historical traces. The trigger subscriber
   # treated every trace event as a reason to re-run all ON_MESSAGE monitors, so
   # one clustering pass re-ran 12 monitors over ~863 old traces and saturated
   # ClickHouse. Two guards close it: derived events do not trigger, and old

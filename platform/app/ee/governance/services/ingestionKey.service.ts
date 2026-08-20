@@ -1,10 +1,47 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { ApiKeyRepository } from "~/server/api-key/api-key.repository";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 
 import { PersonalWorkspaceService } from "./personalWorkspace.service";
+
+/** What every project-scoped mint needs to know. */
+interface IngestionKeyMintParams {
+  callerUserId: string;
+  ownerUserId: string | null;
+  organizationId: string;
+  projectId: string;
+  sourceType: string;
+  ingestionTemplateId?: string | null;
+  /**
+   * Human label of the CLI device session that minted the key (display
+   * provenance on the API-keys settings page). Null for non-CLI callers.
+   */
+  createdByDeviceLabel?: string | null;
+}
+
+/**
+ * The caller has no personal workspace yet, so there is no project for a
+ * personal key to reach. Named so a caller can answer "finish your workspace
+ * setup" for this one cause and keep every other failure a real error.
+ */
+export class PersonalWorkspaceMissingError extends Error {
+  constructor() {
+    super(
+      "No personal project for caller. Sign in to a personal workspace before issuing an ingestion key.",
+    );
+    this.name = "PersonalWorkspaceMissingError";
+  }
+}
+
+/** The plaintext token, returned exactly once, plus its identifiers. */
+export interface IssuedIngestionKey {
+  token: string;
+  apiKeyId: string;
+  prefix: string;
+  sourceType: string;
+}
 
 /**
  * Issues and rotates "ingestion keys": project-scoped, ingest-only ApiKeys.
@@ -20,9 +57,13 @@ import { PersonalWorkspaceService } from "./personalWorkspace.service";
  *     to mint is enforced by the caller (router); ownership only governs list
  *     visibility.
  *
- * Rotation is hard-cut: minting revokes any prior live ingest key for the same
- * (project, sourceType) before creating the new one, so a tool never
- * accumulates keys.
+ * Two mint shapes, picked by the caller:
+ *   - `ensureForProject` rotates hard-cut: it revokes any prior live ingest key
+ *     for the same (project, sourceType) before creating the new one, so a
+ *     single owner of a source never accumulates keys.
+ *   - `issueForProject` only creates. Several machines can each hold their own
+ *     live key for one (project, sourceType) pair, and revoking one machine's
+ *     key leaves the others working.
  */
 export class IngestionKeyService {
   private readonly apiKeys: ApiKeyService;
@@ -55,22 +96,7 @@ export class IngestionKeyService {
     sourceType,
     ingestionTemplateId = null,
     createdByDeviceLabel = null,
-  }: {
-    callerUserId: string;
-    ownerUserId: string | null;
-    organizationId: string;
-    projectId: string;
-    sourceType: string;
-    ingestionTemplateId?: string | null;
-    /** Human label of the CLI device session that minted the key (display
-     * provenance on the API-keys settings page). Null for non-CLI callers. */
-    createdByDeviceLabel?: string | null;
-  }): Promise<{
-    token: string;
-    apiKeyId: string;
-    prefix: string;
-    sourceType: string;
-  }> {
+  }: IngestionKeyMintParams): Promise<IssuedIngestionKey> {
     // Hard-cut rotation: revoke any prior live ingest key for this
     // (project, sourceType) so the previous token dies immediately and we
     // never accumulate keys.
@@ -88,8 +114,72 @@ export class IngestionKeyService {
       });
     }
 
-    const { token, apiKey } = await this.apiKeys.create({
+    return await this.mint({
       name: `Ingestion key (${sourceType})`,
+      callerUserId,
+      ownerUserId,
+      organizationId,
+      projectId,
+      sourceType,
+      ingestionTemplateId,
+      createdByDeviceLabel,
+    });
+  }
+
+  /**
+   * Issues an ingestion key for a specific project WITHOUT touching the keys
+   * that already exist for that (project, sourceType). Returns the plaintext
+   * token exactly once.
+   *
+   * This is what a per-machine mint needs: two laptops working on the same
+   * repository each hold their own token, so one developer re-running the
+   * setup does not silently kill the other's telemetry. The key name carries
+   * the source type and the minting device, so the API-keys settings page
+   * shows where each row came from.
+   *
+   * `ownerUserId` decides API-key list visibility, exactly as in
+   * `ensureForProject`.
+   */
+  async issueForProject({
+    callerUserId,
+    ownerUserId,
+    organizationId,
+    projectId,
+    sourceType,
+    ingestionTemplateId = null,
+    createdByDeviceLabel = null,
+  }: IngestionKeyMintParams): Promise<IssuedIngestionKey> {
+    const origin = createdByDeviceLabel
+      ? `${sourceType}, ${createdByDeviceLabel}`
+      : sourceType;
+    return await this.mint({
+      name: `Ingestion key (${origin})`,
+      callerUserId,
+      ownerUserId,
+      organizationId,
+      projectId,
+      sourceType,
+      ingestionTemplateId,
+      createdByDeviceLabel,
+    });
+  }
+
+  /**
+   * The shared create step: one restricted ApiKey carrying `traces:create`
+   * through a single PROJECT-scoped CUSTOM binding.
+   */
+  private async mint({
+    name,
+    callerUserId,
+    ownerUserId,
+    organizationId,
+    projectId,
+    sourceType,
+    ingestionTemplateId,
+    createdByDeviceLabel,
+  }: IngestionKeyMintParams & { name: string }): Promise<IssuedIngestionKey> {
+    const { token, apiKey } = await this.apiKeys.create({
+      name,
       userId: ownerUserId,
       createdByUserId: callerUserId,
       organizationId,
@@ -126,20 +216,13 @@ export class IngestionKeyService {
     sourceType: string;
     ingestionTemplateId?: string | null;
     createdByDeviceLabel?: string | null;
-  }): Promise<{
-    token: string;
-    apiKeyId: string;
-    prefix: string;
-    sourceType: string;
-  }> {
+  }): Promise<IssuedIngestionKey> {
     const workspace = await this.personalWorkspace.findExisting({
       userId,
       organizationId,
     });
     if (!workspace) {
-      throw new Error(
-        "No personal project for caller. Sign in to a personal workspace before issuing an ingestion key.",
-      );
+      throw new PersonalWorkspaceMissingError();
     }
 
     return this.ensureForProject({

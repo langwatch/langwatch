@@ -1,10 +1,10 @@
+import { TRPCError } from "@trpc/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   type PrismaClient,
   TeamUserRole,
-} from "@prisma/client";
-import { TRPCError } from "@trpc/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { OrganizationService } from "../organization.service";
 import type { OrganizationRepository } from "../repositories/organization.repository";
@@ -267,9 +267,12 @@ describe("OrganizationService", () => {
           actingUserId: "admin-789",
         });
 
+        // The acting user travels with the removal: the grant revocation it
+        // emits is attributed to whoever made the decision.
         expect(mockRepo.deleteMember).toHaveBeenCalledWith({
           organizationId: "org-123",
           userId: "user-456",
+          actingUserId: "admin-789",
         });
       });
     });

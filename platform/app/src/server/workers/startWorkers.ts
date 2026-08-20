@@ -3,8 +3,8 @@ import { createLogger } from "@langwatch/observability";
 import type { IncomingMessage, RequestListener, ServerResponse } from "http";
 import http from "http";
 import { register } from "prom-client";
+import { assertRedisReady } from "~/server/app-layer/redis-readiness";
 import { getWorkerMetricsPort, isMetricsAuthorized } from "~/server/metrics";
-import { assertRedisReady } from "~/server/redis";
 
 const logger = createLogger("langwatch:workers");
 
@@ -36,7 +36,8 @@ type ShutdownHandles = Array<() => Promise<void> | void>;
 async function verifyDatabaseReady(): Promise<void> {
   const { prisma } = await import("~/server/db");
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    await prisma.$queryRaw`-- @tenancy: connectivity probe, touches no rows
+SELECT 1`;
     logger.info("database connection verified");
   } catch (error) {
     logger.fatal({ error }, "database unreachable at boot");
@@ -60,12 +61,13 @@ async function bootStorageStatsCollection(
 }
 
 // Scenario simulation executor: an in-process pool late-bound into the
-// scenarioExecution reactor (runIn: ["worker"]). Without this the reactor
-// fires with no pool wired and simulations never execute.
+// pool holder the simulationRunExecution process manager's execute intent
+// reads. Without this the intent throws (outbox retries) and simulations
+// never execute on this pod.
 async function bootScenarioProcessor(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { getScenarioExecutionHandle } = await import(
+  const { getScenarioExecutionPool } = await import(
     "~/server/app-layer/presets"
   );
   const { ScenarioExecutionPool } = await import(
@@ -80,8 +82,10 @@ async function bootScenarioProcessor(
   const scenarioPool = new ScenarioExecutionPool({
     concurrency: SCENARIO_WORKER.CONCURRENCY,
   });
-  getScenarioExecutionHandle()?.setPool(scenarioPool);
-  const scenarioProcessor = await startScenarioProcessor(scenarioPool);
+  getScenarioExecutionPool()?.set(scenarioPool);
+  const scenarioProcessor = await startScenarioProcessor({
+    pool: scenarioPool,
+  });
   if (scenarioProcessor) {
     shutdownHandles.push(() => scenarioProcessor.close());
   }
@@ -499,6 +503,10 @@ export async function startWorkers(
     await bootAnomalyWorker(shutdownHandles);
     await bootSpendSpikeAnomalyWorker(shutdownHandles);
     await bootUsageStatsWorker(shutdownHandles);
+    // One-time in-place data migrations (ADR-092 stage B and successors) are
+    // NOT booted here: they are a worker-only background loop like the
+    // scheduler, so the app layer starts them and the App's graceful
+    // closeables stop them (see presets.ts).
     if (shouldStartMetricsServer) {
       await bootMetricsServer(shutdownHandles);
     }

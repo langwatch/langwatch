@@ -41,7 +41,7 @@ const UNSUPPORTED_FIELDS: ReadonlySet<string> = new Set([
 
 /**
  * Event filter fields that ARE matched in-memory and therefore need the
- * trace-level events list. Reactors gate event derivation on this set, so any
+ * trace-level events list. Subscribers gate event derivation on this set, so any
  * field matched against `traceData.events` must be listed here.
  */
 const MATCHABLE_EVENT_FILTER_FIELDS: ReadonlySet<string> = new Set([
@@ -53,7 +53,7 @@ const MATCHABLE_EVENT_FILTER_FIELDS: ReadonlySet<string> = new Set([
 
 /**
  * Whether any of these filters match on event fields that need the trace-level
- * events list. Reactors use this to derive events from stored_spans only when a
+ * events list. Subscribers use this to derive events from stored_spans only when a
  * trigger actually filters on them, keeping the common path off the read.
  */
 export function triggerFiltersReferenceEvents(
@@ -119,7 +119,7 @@ export function classifyTriggerFilters(filters: TriggerFilters): {
 /**
  * Converts TraceSummaryData (fold state) into PreconditionTraceData for
  * in-memory filter matching. Extracts structured fields from the flat
- * attributes map, mirroring the logic in evaluationTrigger.reactor.ts.
+ * attributes map, mirroring the logic in evaluationTrigger.subscriber.ts.
  *
  * The trace-level events list is no longer carried on the fold state; callers
  * that match event filters pass it in (derived from stored_spans, gated by
@@ -475,6 +475,19 @@ function matchEvaluationField(
   return true;
 }
 
+/**
+ * A verdict (passed/score) is only real when the evaluation ran to
+ * completion. Producers can attach `passed: false` alongside `status:
+ * "error"` (the SDKs expose them as independent params), and the run feed is
+ * unfiltered — without this guard a trigger configured as "evaluations.passed
+ * = false" pages someone for a quality regression that is actually a
+ * provider timeout (#6833). Status-based filters (`evaluations.state`) are
+ * the intended way to alert on errored evaluators.
+ */
+function hasVerdict(e: EvaluationRunData): boolean {
+  return e.status === "processed";
+}
+
 function matchEvaluatorIdFilter(
   evaluations: EvaluationRunData[],
   field: FilterField,
@@ -491,18 +504,25 @@ function matchEvaluatorIdFilter(
 
     case "evaluations.evaluator_id.has_passed":
       return evaluations.some(
-        (e) => evaluatorIds.includes(e.evaluatorId) && e.passed !== null,
+        (e) =>
+          evaluatorIds.includes(e.evaluatorId) &&
+          hasVerdict(e) &&
+          e.passed !== null,
       );
 
     case "evaluations.evaluator_id.has_score":
       return evaluations.some(
-        (e) => evaluatorIds.includes(e.evaluatorId) && e.score !== null,
+        (e) =>
+          evaluatorIds.includes(e.evaluatorId) &&
+          hasVerdict(e) &&
+          e.score !== null,
       );
 
     case "evaluations.evaluator_id.has_label":
       return evaluations.some(
         (e) =>
           evaluatorIds.includes(e.evaluatorId) &&
+          hasVerdict(e) &&
           e.label !== null &&
           e.label !== "",
       );
@@ -520,12 +540,16 @@ function matchEvaluationValues(
   switch (field) {
     case "evaluations.passed":
       return evaluations.some(
-        (e) => e.passed !== null && values.includes(String(e.passed)),
+        (e) =>
+          hasVerdict(e) &&
+          e.passed !== null &&
+          values.includes(String(e.passed)),
       );
 
     case "evaluations.score":
       return evaluations.some(
-        (e) => e.score !== null && values.includes(String(e.score)),
+        (e) =>
+          hasVerdict(e) && e.score !== null && values.includes(String(e.score)),
       );
 
     case "evaluations.state":
@@ -533,7 +557,7 @@ function matchEvaluationValues(
 
     case "evaluations.label":
       return evaluations.some(
-        (e) => e.label !== null && values.includes(e.label),
+        (e) => hasVerdict(e) && e.label !== null && values.includes(e.label),
       );
 
     default:
@@ -542,7 +566,7 @@ function matchEvaluationValues(
 }
 
 // ---------------------------------------------------------------------------
-// Helpers (mirrored from evaluationTrigger.reactor.ts)
+// Helpers (mirrored from evaluationTrigger.subscriber.ts)
 // ---------------------------------------------------------------------------
 
 function parseJsonArray(raw: string | undefined): string[] | null {

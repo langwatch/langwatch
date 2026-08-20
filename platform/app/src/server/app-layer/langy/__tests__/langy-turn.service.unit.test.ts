@@ -15,6 +15,7 @@ import {
   langyTurnIdentity,
   type StartConversationTurnInput,
 } from "../langy-turn.service";
+import { LANGY_REFERENT_POLICY } from "../langyConversationMemory";
 import { LANGY_TURN_OVERRIDE_FALLBACK } from "../langyPromptRegistry";
 import type { LangyMessageRow } from "../repositories/langy-message.repository";
 import type { LangyTurnAdmissionClaim } from "../repositories/langy-turn-admission.repository";
@@ -575,7 +576,7 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     );
 
     const { system, prompt } = dispatchedOf(mocks.dispatch);
-    expect(system).toContain("RESOLVING WHAT THE USER MEANS");
+    expect(system).toContain(LANGY_REFERENT_POLICY);
     // The screen-context DATA precedes the labelled ask inside the message,
     // so the model reads what "this trace" could mean before the words that
     // may say it.

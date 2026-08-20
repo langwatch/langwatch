@@ -33,6 +33,28 @@ import {
 
 declare const __CLI_VERSION__: string;
 
+/**
+ * Help for the repeatable `--param key=value` flag the run commands share.
+ * Written here rather than imported so the command tree keeps its own boot
+ * cost; the reading it describes lives in `cli/utils/keyValueFlags.ts`.
+ */
+const PARAM_FLAG_HELP =
+  "Value for one parameter the run supplies, written key=value. Repeat the flag for more than one. A value is read as text, unless it is exactly true or false, which is read as a boolean, or a plain number, which is read as a number.";
+
+const WORKFLOW_PARAM_FLAG_HELP = `${PARAM_FLAG_HELP} The workflow receives it as an entry input, and a pair given here wins over the same key in --input.`;
+
+/**
+ * Collect a repeated `--param` into the list the run commands read.
+ *
+ * One value per occurrence rather than a variadic `<pair...>`: a variadic
+ * option keeps eating argv until the next flag, so `--param env=prod my-suite`
+ * would swallow the id the command is about to run.
+ */
+const collectParam = (pair: string, previous: string[] = []): string[] => [
+  ...previous,
+  pair,
+];
+
 // Import commands with proper async handling
 const addCommand = async (name: string, options: { version?: string; localFile?: string }): Promise<void> => {
   const { addCommand: addCommandImpl } = await import("./commands/add.js");
@@ -151,11 +173,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .option("--endpoint <url>", "Override the LangWatch control-plane URL for this login (self-hosted instances)")
     .option(
       "--device",
-      "RFC 8628 device-flow login via your company SSO; provisions a personal virtual key for Claude Code / Codex / Cursor / Gemini CLI",
+      "RFC 8628 device-flow login via your company SSO; signs this device in for the coding-assistant wrappers (credentials are issued on first use)",
     )
     .option(
       "--project [slug]",
-      "Project login: mint a project SDK key via the browser and write it to .env (for the SDK, `langwatch eval`, prompts). Prefer this one if user is working on an agent project rather than trying to instrument their coding assistant.",
+      "Project login: write a project's SDK key to .env (for the SDK, `langwatch eval`, prompts). With a slug it uses your existing device login, no browser and no prompts; without one you pick the project in the browser, which needs an interactive terminal and exits 1 in a non-TTY. Prefer this one if user is working on an agent project rather than trying to instrument their coding assistant.",
     )
     .option(
       "--token <token>",
@@ -239,21 +261,6 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       }
     });
 
-  program
-    .command("request-increase")
-    .description("Open the budget-increase request page (uses the gateway-issued signed URL when available).")
-    .option("--browser <name>", "browser to open (chrome|chromium|firefox|safari|none|<path>)")
-    .action(async (options: { browser?: string }) => {
-      try {
-        const { requestIncreaseCommand } = await import("./commands/request-increase.js");
-        await requestIncreaseCommand(options);
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    });
-
   // AI Gateway governance — wrapped tool runners.
   // Each `langwatch <tool>` exec's the underlying binary with the
   // right ANTHROPIC_*/OPENAI_*/GEMINI_* env vars injected pointing
@@ -330,8 +337,48 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       }
     });
 
+  program
+    .command("instrument", { hidden: true })
+    .description(
+      "Write persistent telemetry wiring for a coding agent without launching it, so a plain `<tool>` run captures. Scope with --project (team project), --key (pasted ingest key, no login), or the default personal workspace.",
+    )
+    .argument("<tool>", "claude|codex|gemini|opencode|copilot|code")
+    .option(
+      "--project <idOrSlug>",
+      "scope telemetry to a team project (mints a project ingest key; needs login)",
+    )
+    .option(
+      "--key <ingestKey>",
+      "use a pasted ingest key; no login needed (or set LANGWATCH_INGEST_KEY)",
+    )
+    .option(
+      "--endpoint <url>",
+      "control plane base URL for --key (default: the configured instance)",
+    )
+    .option("--personal", "clear a project pin and rewire the personal scope")
+    .action(
+      async (
+        tool: string,
+        options: {
+          project?: string;
+          key?: string;
+          endpoint?: string;
+          personal?: boolean;
+        },
+      ) => {
+        try {
+          const { instrumentCommand } = await import("./commands/instrument.js");
+          await instrumentCommand(tool, options);
+        } catch (error) {
+          const { reportCommandError } = await import("./utils/errorOutput.js");
+          reportCommandError({ error });
+          process.exit(1);
+        }
+      },
+    );
+
   const copilotAppCmd = program
-    .command("copilot-app")
+    .command("copilot-app", { hidden: true })
     .description(
       "Manage LangWatch capture for the standalone GitHub Copilot app (ADR-039).",
     );
@@ -388,7 +435,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     });
 
   program
-    .command("opencode")
+    .command("opencode", { hidden: true })
     .description("Run `opencode` routed through the LangWatch gateway (multi-provider; injects both Anthropic and OpenAI env vars).")
     .allowUnknownOption(true)
     .allowExcessArguments(true)
@@ -418,8 +465,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       "  cursor          Run `cursor` routed through the gateway",
       "  gemini          Run `gemini` (Gemini CLI) routed through the gateway",
       "  opencode        Run `opencode` (multi-provider) routed through the gateway",
+      "  copilot-app     Set up capture for the standalone GitHub Copilot app",
+      "  instrument      Write persistent telemetry wiring for a tool without launching it",
       "",
-      "`lw` and `langwatch` are the same binary — use whichever you prefer.",
+      "`lw` and `langwatch` are the same binary: use whichever you prefer.",
       "",
       "IMPORTANT, for AI agents reading this: if you struggled with anything",
       "while setting up or using LangWatch (confusing docs, broken commands,",
@@ -438,8 +487,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         "Send an issue report to the LangWatch team: what you were doing, what " +
           "went wrong, optionally the whole session transcript. Works with no " +
           "login and no API key. Ask the user for permission first, then pass " +
-          "--user-approved. Secrets and personal data are redacted locally " +
-          "before anything is sent.",
+          "--user-approved. The title, summary and transcript are scrubbed " +
+          "locally by pattern before anything is sent; whatever no pattern " +
+          "matches is sent as written. Use --dry-run to print the payload.",
       )
       .option("--user-approved", "confirm the user approved sending this report")
       .option(
@@ -480,8 +530,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
           "  had to figure out by trial and error.",
           "",
           "Privacy, so you can send the whole session with confidence:",
-          "  Everything is redacted locally, before upload:",
+          "  The title, summary and transcript are redacted locally by pattern,",
+          "  before upload. What the patterns catch:",
           ...SESSION_REDACTION_SUMMARY.map((line) => `    - ${line}`),
+          "  Anything no pattern matches is sent as written, including a contact",
+          "  address passed with --email.",
           "  Audit the exact rules (short, readable regexes):",
           `    ${REDACTION_AUDIT_URL}`,
           "  Preview precisely what would be sent with --dry-run: it sends nothing,",
@@ -536,23 +589,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       }
     });
 
-  program
-    .command("init-shell")
-    .description("Print an eval-able shell snippet so any shell session auto-exports the gateway env vars (alternative to `langwatch claude`).")
-    .argument("[shell]", "zsh|bash|fish|cmd|powershell", "zsh")
-    .action(async (shell: string) => {
-      try {
-        const { initShellCommand } = await import("./commands/init-shell.js");
-        await initShellCommand(shell);
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    });
-
   // `langwatch ingest *` — read-only debug tools for the IngestionSource
-  // + Activity Monitor surfaces. Mirrors the web admin /settings/governance
+  // + Activity Monitor surfaces. Mirrors the web admin /governance
   // flows for ops folks who live in terminal. Authoring stays browser-only.
   const ingestCmd = program
     .command("ingest")
@@ -1391,8 +1429,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .command("run <slug>")
       .description("Start an experiment run by slug")
       .option("--wait", "Wait for the experiment to complete before returning")
+      .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (slug: string, options: { wait?: boolean }) => {
+    async (slug: string, options: { wait?: boolean; param?: string[] }) => {
       const { runExperimentCommand: impl } = await import("./commands/experiment/run.js");
       return impl(slug, options);
     },
@@ -1499,10 +1538,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .command("run <id>")
       .description("Execute a workflow with JSON input")
       .option("--input <json>", "Input data as JSON string")
+      .option("--param <pair>", WORKFLOW_PARAM_FLAG_HELP, collectParam)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { input?: string }) => {
+    async (id: string, options: { input?: string; param?: string[] }) => {
       const { runWorkflowCommand: impl } = await import("./commands/workflows/run.js");
-      return impl(id, options);
+      return impl({ id, options });
     },
   );
 
@@ -1568,6 +1608,35 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id, options);
     },
   );
+
+  // A live, human-only session: it never returns a CommandResult, so it is
+  // registered with a plain action and the format gate honestly refuses
+  // `-o json` instead of accepting a format the command never renders.
+  agentCmd
+    .command("dev")
+    .alias("tunnel")
+    .description("Expose a local agent server through a public tunnel and point a registered HTTP agent at it (Ctrl-C restores the previous URL)")
+    .option("--port <number>", "Local port to expose (tunnels http://localhost:<number>)")
+    .option("--url <url>", "Local URL to expose (mutually exclusive with --port)")
+    .option("--agent <idOrName>", "Which registered HTTP agent to point at the tunnel (when omitted: picker, and in an interactive terminal it creates one if the project has none)")
+    .option("--tunnel-url <url>", "Bring your own tunnel URL and skip tunnel provisioning")
+    .option("--no-update-url", "Print the tunnel URL without changing the agent")
+    .option("--no-auth", "Skip the local auth proxy (for servers that already authenticate requests)")
+    .option("--api-key <key>", "API key to use for this run")
+    .action(
+      async (options: {
+        port?: string;
+        url?: string;
+        agent?: string;
+        tunnelUrl?: string;
+        updateUrl?: boolean;
+        auth?: boolean;
+        apiKey?: string;
+      }) => {
+        const { agentDevCommand: impl } = await import("./commands/agents/dev.js");
+        return impl(options);
+      },
+    );
 
   emitsResult(
     agentCmd
@@ -2060,10 +2129,19 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     webhooksCmd
       .command("create")
       .description("Create an endpoint; prints the signing secret ONCE")
-      .requiredOption("--url <url>", "HTTPS receiver URL")
+      .option("--url <url>", "HTTPS receiver URL")
+      .option("--queue-url <url>", "Amazon SQS queue URL to deliver to instead of a receiver URL (standard queues only)")
+      .option("--role-arn <arn>", "IAM role to assume to write to the queue; the printed external id goes in its trust policy")
+      .option("--access-key-id <id>", "Static access key id for the queue, as an alternative to a role. Its secret is read from LANGWATCH_SQS_SECRET_ACCESS_KEY, never from an argument")
       .requiredOption("--events <types>", "Comma-separated event types (see: langwatch webhooks event-types)")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
-    async (options: { url: string; events: string }) => {
+    async (options: {
+      url?: string;
+      queueUrl?: string;
+      roleArn?: string;
+      accessKeyId?: string;
+      events: string;
+    }) => {
       const { createWebhookCommand: impl } = await import("./commands/webhooks/create.js");
       return impl(options);
     },
@@ -2072,8 +2150,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     webhooksCmd
       .command("update <id>")
-      .description("Update an endpoint's URL, event subscriptions, or delivery controls")
+      .description("Update an endpoint's address, event subscriptions, or delivery controls")
       .option("--url <url>", "New HTTPS receiver URL")
+      .option("--queue-url <url>", "New Amazon SQS queue URL (an endpoint keeps the destination kind it was created with)")
+      .option("--role-arn <arn>", "New IAM role to assume to write to the queue")
+      .option("--access-key-id <id>", "New static access key id for the queue. Its secret is read from LANGWATCH_SQS_SECRET_ACCESS_KEY, never from an argument")
       .option("--events <types>", "New comma-separated event types (replaces the set)")
       .option("--max-batch-size <n>", "Envelopes per POST, 1-100")
       .option("--max-batch-delay <ms>", "Coalescing window in ms before a partial batch ships, 0-60000")
@@ -2083,6 +2164,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       id: string,
       options: {
         url?: string;
+        queueUrl?: string;
+        roleArn?: string;
+        accessKeyId?: string;
         events?: string;
         maxBatchSize?: string;
         maxBatchDelay?: string;
@@ -2385,13 +2469,20 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     traceCmd
       .command("search")
       .description("Search traces with optional text query and date range")
-      .option("-q, --query <query>", "Text search query")
+      .option(
+        "-q, --query <query>",
+        "Text search query. Plain text only: AND, OR and NOT are matched as words, not as operators",
+      )
       .option("--start-date <date>", "Start date (ISO string or epoch ms, default: 24h ago)")
       .option("--end-date <date>", "End date (ISO string or epoch ms, default: now)")
       .option("--limit <n>", "Max results to return (default: 25)")
       .option(
         "--origin <origins>",
         "Filter by trace origin, comma-separated (e.g. application,evaluation,simulation,playground,langy); 'application' includes traces with no recorded origin",
+      )
+      .option(
+        "--errors-only",
+        "Only traces that contain an error. The error is on the span, not in the searchable text, so this is the way to find failures",
       )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
   ).action(async (_options: unknown, command: Command) => {
@@ -2407,10 +2498,17 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .description("Export traces as CSV, JSONL, or JSON")
     .option("--start-date <date>", "Start date (ISO string, default: 7 days ago)")
     .option("--end-date <date>", "End date (ISO string, default: now)")
-    .option("-q, --query <query>", "Text search query to filter traces")
+    .option(
+      "-q, --query <query>",
+      "Text search query to filter traces. Plain text only: AND, OR and NOT are matched as words, not as operators",
+    )
     .option(
       "--origin <origins>",
       "Filter by trace origin, comma-separated (e.g. application,evaluation,simulation,playground,langy); 'application' includes traces with no recorded origin",
+    )
+    .option(
+      "--errors-only",
+      "Only traces that contain an error. The error is on the span, not in the searchable text, so this is the way to find failures",
     )
     .option("-f, --format <format>", "Output format: jsonl (default), csv, or json", "jsonl")
     .option("-o, --output <file>", "Write output to file instead of stdout")
@@ -2521,8 +2619,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .description("Run a scenario against a target (agent or prompt)")
     .requiredOption("--target <target>", "Target to run against, as <type>:<referenceId> (e.g., http:agent_abc123)")
     .option("--wait", "Wait for the scenario run to complete")
+    .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
     .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { target: string; wait?: boolean; format?: string }) => {
+    .action(async (id: string, options: { target: string; wait?: boolean; format?: string; param?: string[] }) => {
       const { runScenarioCommand: impl } = await import("./commands/scenarios/run.js");
       await impl(id, options);
     });
@@ -2613,10 +2712,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .command("run <id>")
     .description("Execute a suite run — schedules all scenario × target × repeat jobs")
     .option("--wait", "Wait for the suite run to complete before returning")
+    .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
     .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { wait?: boolean; format?: string }) => {
+    .action(async (id: string, options: { wait?: boolean; format?: string; param?: string[] }) => {
       const { runSuiteCommand: impl } = await import("./commands/suites/run.js");
-      await impl(id, options);
+      await impl({ id, options });
     });
 
   emitsResult(

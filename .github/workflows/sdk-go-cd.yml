@@ -6,12 +6,24 @@ on:
       - published
   workflow_dispatch:
 
+# A publish run drains — see publish-docker-app. This one fans a version out
+# across the sibling module tags, so a cancel partway through leaves the Go
+# module tags disagreeing about which version exists.
+concurrency:
+  group: sdk-go-cd-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
-  contents: read
+  # write, because the release fans the version out to the sibling module tags
+  # (see "Tag the sibling modules"). Nothing else here needs it.
+  contents: write
 
 jobs:
   publish:
-    if: startsWith(github.event.release.tag_name, 'sdk-go@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    # Go requires a submodule's tag to be <subdir>/vX.Y.Z, so this component
+    # tags as sdks/go/vX.Y.Z rather than the sdk-go@vX.Y.Z the other components
+    # use. Nothing resolved from the proxy until that changed.
+    if: startsWith(github.event.release.tag_name, 'sdks/go/v') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
 
     steps:
@@ -20,7 +32,8 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25"
+          # The SDK's floor lives in its go.mod; read it rather than restate it.
+          go-version-file: sdks/go/go.mod
           cache-dependency-path: sdks/go/go.sum
 
       - name: Run tests
@@ -31,16 +44,51 @@ jobs:
           GOWORK: off
         run: go test -v ./...
 
+      - name: Tag the sibling modules
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        # sdks/go is the only release-please component, but the SDK is twelve Go
+        # modules. Each one is resolved by the proxy from its OWN <subdir>/vX.Y.Z
+        # tag, so releasing the core alone leaves `go get
+        # .../instrumentation/openai` — which the README tells people to run —
+        # unresolvable. Every sibling requires the core at the released version,
+        # so they are tagged in lockstep off the same commit.
+        #
+        # examples and e2e are excluded: they are in-repo fixtures that always
+        # build through their replace directives, and tagging them would publish
+        # them on pkg.go.dev as if they were something to depend on.
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#sdks/go/}"
+          sha="${GITHUB_SHA}"
+          find sdks/go -name go.mod \
+            -not -path 'sdks/go/go.mod' \
+            -not -path 'sdks/go/examples/*' \
+            -not -path 'sdks/go/e2e/*' -print0 |
+            while IFS= read -r -d '' modfile; do
+              subdir="$(dirname "$modfile")"
+              tag="${subdir}/${version}"
+              if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+                echo "exists, skipping: ${tag}"
+                continue
+              fi
+              echo "tagging ${tag} -> ${sha}"
+              gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
+                -f "ref=refs/tags/${tag}" -f "sha=${sha}"
+            done
+
       - name: Trigger pkg.go.dev to index the new version
         run: |
           # Request pkg.go.dev to fetch the new version
-          curl -s "https://proxy.golang.org/github.com/langwatch/langwatch/sdks/go/@v/$(echo ${{ github.event.release.tag_name }} | sed 's/sdk-go@//').info" || true
+          curl -s "https://proxy.golang.org/github.com/langwatch/langwatch/sdks/go/@v/$(echo ${{ github.event.release.tag_name }} | sed 's|^sdks/go/||').info" || true
 
       - name: Get version from tag or manifest
         id: get_version
         run: |
           if [ "${{ github.event_name }}" = "release" ]; then
-            VERSION=${GITHUB_REF#refs/tags/sdk-go@v}
+            VERSION=${GITHUB_REF#refs/tags/sdks/go/v}
           else
             VERSION=$(cat .github/.release-please-manifest.json | jq -r '."sdks/go"')
           fi

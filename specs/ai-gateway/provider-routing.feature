@@ -224,3 +224,38 @@ Feature: Model → provider routing via VK config
       # The materialised chain already respects the allowlist; this is the
       # dispatch-side check that keeps a stale or hand-crafted bundle from
       # turning a narrowing the UI displays as active into a decoration.
+
+  Rule: A route that forwards a request unchanged decides the vendor
+
+    The Gemini surface at /v1beta sends the caller's body and URL path to
+    Google as they arrived. The model id comes from that path, so it carries
+    no provider prefix, and the credential chain picked the vendor instead.
+    A key with an OpenAI credential and no Google one sent the body to
+    OpenAI, which answered 404 for a model it never had. The 404 is the
+    small part. The prompt had already left for a vendor the caller never
+    named.
+
+    A route that forwards bytes unchanged knows its own vendors from the
+    registration. Gemini and Vertex both serve this wire, so either
+    credential can answer it. No other credential may receive the body.
+
+    @unit
+    Scenario: A provider-native route refuses a key with no provider that speaks it
+      Given a key with an OpenAI credential and no Google credential
+      When a request arrives on the Gemini route at /v1beta
+      Then the request is refused as model provider not bound
+      And the refusal names the providers that serve the route
+      And no call is made to any provider
+
+    @unit
+    Scenario: Either Google credential serves the provider-native route
+      Given a key with a Vertex credential and no Gemini credential
+      When a request arrives on the Gemini route at /v1beta
+      Then the Vertex credential serves it
+
+    @unit
+    Scenario: A translated route leaves the provider choice to the model
+      Given a key with credentials for several providers
+      When a request arrives on /v1/chat/completions
+      Then the route pins no provider
+      And the resolved model decides which credential serves the request

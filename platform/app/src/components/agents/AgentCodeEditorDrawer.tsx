@@ -47,10 +47,8 @@ import {
   DEFAULT_CODE,
   getCodeFromConfig,
 } from "~/optimization_studio/utils/codeAgentConfig";
-import type {
-  AgentComponentConfig,
-  TypedAgent,
-} from "~/server/agents/agent.repository";
+import type { AgentComponentConfig } from "~/server/agents/agent.repository";
+import type { AgentWithFields } from "~/server/agents/agent-fields";
 import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 import { api } from "~/utils/api";
 
@@ -76,7 +74,7 @@ const getOutputsFromConfig = (config: AgentComponentConfig): DSLField[] => {
 export type AgentCodeEditorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
-  onSave?: (agent: TypedAgent) => void;
+  onSave?: (agent: AgentWithFields) => void;
   /** If provided, loads an existing agent for editing */
   agentId?: string;
   /** Available sources for variable mapping (from Evaluations V3) */
@@ -100,7 +98,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
   const flowCallbacks = getFlowCallbacks("agentCodeEditor");
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const onClose = props.onClose ?? closeDrawer;
   const onSave =

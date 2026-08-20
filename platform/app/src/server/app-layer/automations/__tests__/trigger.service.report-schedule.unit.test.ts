@@ -25,6 +25,11 @@ function makeScheduledJobs(
       existingJobs.filter((j) => j.projectId === projectId),
     ),
     listForOps: vi.fn(async () => []),
+    listPausedForOps: vi.fn(async () => ({ rows: [], total: 0 })),
+    findByIdForOps: vi.fn(async () => null),
+    setActiveForOps: vi.fn(async () => true),
+    releaseSlotForOps: vi.fn(async () => true),
+    requestImmediateRunForOps: vi.fn(async () => true),
   };
 }
 

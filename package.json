@@ -1,6 +1,6 @@
 {
   "name": "@langwatch/server",
-  "version": "3.12.0",
+  "version": "3.15.0",
   "description": "Run LangWatch locally with one command — `npx @langwatch/server`. Complete LangWatch stack: observability, evaluations, AI gateway, agent simulations.",
   "license": "Apache-2.0",
   "homepage": "https://langwatch.ai",
@@ -33,6 +33,8 @@
   "files": [
     "packages/server/dist/",
     "packages/api/",
+    "packages/authz/",
+    "packages/authz-server/",
     "packages/automations/",
     "packages/clickhouse-client/",
     "packages/handled-error/",
@@ -40,7 +42,9 @@
     "packages/observability/",
     "packages/react-rum/",
     "packages/redaction/",
+    "packages/redis-client/",
     "packages/ssrf/",
+    "packages/system-migrations/",
     "platform/app/",
     "services/langevals/",
     "sdks/python/",
@@ -69,6 +73,7 @@
     "build:cli": "pnpm --filter @langwatch/server-cli build",
     "test": "pnpm -r --filter \"./packages/*\" test",
     "test:unit": "pnpm --filter @langwatch/web test:unit",
+    "test:component": "pnpm --filter @langwatch/web test:component",
     "test:integration": "pnpm --filter @langwatch/web test:integration",
     "test:e2e": "pnpm --filter @langwatch/web test:e2e",
     "test:cli": "pnpm --filter @langwatch/server-cli test",
@@ -85,6 +90,6 @@
     "release:dry-run": "bash dev/scripts/pack-npm.sh && tar -tzf langwatch-server-*.tgz | head -50"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "typescript": "^7.0.2"
   }
 }

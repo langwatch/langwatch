@@ -151,7 +151,7 @@ export const aiToolsRouter = createTRPCRouter({
 
   /**
    * Admin list - includes disabled (but not deleted) tiles. Powers the
-   * catalog editor at /settings/governance/tool-catalog.
+   * catalog editor at /governance/tool-catalog.
    */
   adminList: protectedProcedure
     .input(z.object({ organizationId: z.string() }))

@@ -2,10 +2,11 @@ import { SCIM_SPEC_OPTIONS } from "@ee/scim/openapi";
 import { app as scimApp } from "@ee/scim/routes";
 import deepmerge from "deepmerge";
 import fs from "fs";
-import { generateSpecs } from "hono-openapi";
+import { generateSpecs as generateSpecsUnpinned } from "hono-openapi";
 import path from "path";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
+import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
 import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
 import { app as codingAgentApp } from "../app/api/coding-agent/[[...route]]/app";
 import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
@@ -30,6 +31,7 @@ import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
 import { app as roleBindingsApp } from "../app/api/role-bindings/[[...route]]/app";
 import { app as rolesApp } from "../app/api/roles/[[...route]]/app";
 import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
+import { requireDefaultedResponseFields } from "../server/api/openapi-response-required";
 import {
   allRegisteredRoutes,
   type CredentialClass,
@@ -46,6 +48,24 @@ import { app as evaluationsLegacyApp } from "../server/routes/evaluations-legacy
 import { app as experimentsV3App } from "../server/routes/experiments-v3";
 import { app as miscApp } from "../server/routes/misc";
 
+/**
+ * `generateSpecs`, with response schemas read as output rather than input.
+ *
+ * The single correction the upgrade needs, applied in one place instead of at
+ * 44 call sites. See `openapi-response-required.ts` for why.
+ *
+ * Operation ids are deliberately NOT corrected. hono-openapi v1 derives them
+ * differently — `getApiCoding-agentPull-request-usage` becomes
+ * `getApiCodingAgentPullRequestUsage` for the 49 paths carrying a hyphen or an
+ * underscore — and the new ones are simply better. They are also not a break:
+ * `openapi-python-client` snake-cases the id, so both spellings produce the
+ * same `get_api_coding_agent_pull_request_usage`, and the TypeScript client is
+ * keyed on `paths`, not `operations`. An id that genuinely must not move is
+ * declared on its own route, the way 53 operations already declare theirs.
+ */
+const generateSpecs: typeof generateSpecsUnpinned = async (hono, options, c) =>
+  requireDefaultedResponseFields(await generateSpecsUnpinned(hono, options, c));
+
 // Surfaces whose routes come straight from their Hono apps. Their paths
 // REPLACE on merge, and any path the apps no longer serve is pruned from
 // the previous spec below: without the prune, a deleted route would ride
@@ -55,6 +75,7 @@ const APP_DERIVED_PREFIXES = [
   "/api/api-keys",
   "/api/analytics",
   "/api/coding-agent",
+  "/api/v1/projects",
   "/api/dashboards",
   "/api/evaluators",
   "/api/events",
@@ -166,6 +187,8 @@ export default async function execute() {
   const apiKeysSpec = await generateSpecs(apiKeysApp);
   console.log("Building analytics spec...");
   const analyticsSpec = await generateSpecs(analyticsApp);
+  console.log("Building governed analytics SQL spec...");
+  const analyticsSqlSpec = await generateSpecs(analyticsSqlApp);
   console.log("Building coding agent spec...");
   const codingAgentSpec = await generateSpecs(codingAgentApp);
   console.log("Building dashboards spec...");
@@ -251,6 +274,7 @@ export default async function execute() {
       agentsSpec,
       apiKeysSpec,
       analyticsSpec,
+      analyticsSqlSpec,
       codingAgentSpec,
       dashboardsSpec,
       datasetSpec,

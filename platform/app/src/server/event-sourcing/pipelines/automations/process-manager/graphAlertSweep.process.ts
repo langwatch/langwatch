@@ -62,7 +62,7 @@ export function runGraphAlertSweep(deps: GraphAlertSweepDeps) {
         await deps.evaluateGraphTrigger(candidate);
       } catch (error) {
         failures++;
-        logger.error(
+        logger.warn(
           {
             projectId: candidate.projectId,
             triggerId: candidate.triggerId,

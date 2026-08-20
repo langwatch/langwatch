@@ -171,14 +171,13 @@ describe("evaluateEligibility", () => {
       ["logout"],
       ["config"],
       ["open"],
-      ["request-increase"],
       ["claude"],
       ["codex"],
       ["cursor"],
       ["gemini"],
       ["opencode"],
       ["daemon"],
-      ["init-shell"],
+      ["instrument"],
       ["report"],
       ["push"],
     ])("refuses %s", (command) => {
@@ -203,7 +202,7 @@ describe("evaluateEligibility", () => {
     // no browser opened, and for the wrappers the caller's output vanished.
     it.each([
       [["-o", "json", "open", "/traces"]],
-      [["--output", "json", "request-increase"]],
+      [["--output", "json", "logout"]],
       [["-o", "json", "claude", "-p", "summarise this"]],
       [["--json", "id,name", "config", "set", "daemon", "off"]],
       [["--jq", ".projects[].id", "login"]],

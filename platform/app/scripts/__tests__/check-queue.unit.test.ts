@@ -79,11 +79,17 @@ afterEach(() => {
 });
 
 type RunOptions = {
+  /** Names the run in the shared event log. */
+  tag: string;
   /** How long the fake command holds the slot once it starts. */
   holdMs?: number;
   env?: Record<string, string | undefined>;
   /** Everything after the script path, replacing the fake command. */
   argv?: string[];
+  /** Give the run its own process group, so a test can signal the group. */
+  isDetached?: boolean;
+  /** The queue to run, for the tests that need one stalled at a known point. */
+  script?: string;
 };
 
 type Run = {
@@ -91,13 +97,20 @@ type Run = {
   done: Promise<{ code: number | null; stdout: string; stderr: string }>;
 };
 
-function startRun(tag: string, options: RunOptions = {}): Run {
-  const argv = options.argv ?? [
+function startRun({
+  tag,
+  holdMs = 0,
+  env: envOverrides,
+  argv: argvOverride,
+  isDetached = false,
+  script = QUEUE_SCRIPT,
+}: RunOptions): Run {
+  const argv = argvOverride ?? [
     "node",
     fakeCommand,
     logFile,
     tag,
-    String(options.holdMs ?? 0),
+    String(holdMs),
   ];
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries({
@@ -108,14 +121,25 @@ function startRun(tag: string, options: RunOptions = {}): Run {
     CHECK_QUEUE_DIR: queueDir,
     CHECK_SLOTS: "1",
     CHECK_QUEUE_POLL_MS: "25",
-    ...options.env,
+    // These tests pin the JS queue. Without this, a developer machine with
+    // haven installed would delegate every run to `haven slot run` and the
+    // suite would be testing haven instead (see the delegation tests below,
+    // which exercise that path deliberately).
+    CHECK_QUEUE_IMPL: "js",
+    // And they pin the pressure level, because the queue measures the real
+    // machine: on a laptop that is genuinely swapping, every derived-limit
+    // assertion would flake red. The pressure tests below force their own
+    // levels the same way.
+    CHECK_PRESSURE: "green",
+    ...envOverrides,
   })) {
     if (value !== undefined) env[key] = value;
   }
 
-  const child = spawn(process.execPath, [QUEUE_SCRIPT, ...argv], {
+  const child = spawn(process.execPath, [script, ...argv], {
     env,
     stdio: ["ignore", "pipe", "pipe"],
+    detached: isDetached,
   });
   running.add(child);
 
@@ -191,7 +215,7 @@ describe("check queue", () => {
   describe("given a free slot", () => {
     /** @scenario "A run that finds a free slot is silent" */
     it("runs immediately and says nothing of its own", async () => {
-      const run = startRun("solo", { env: { CHECK_SLOTS: "2" } });
+      const run = startRun({ tag: "solo", env: { CHECK_SLOTS: "2" } });
       const result = await run.done;
 
       expect(result.code).toBe(0);
@@ -204,7 +228,8 @@ describe("check queue", () => {
       // The bin shims mean a queued `pnpm typecheck` spawns another gated
       // entry point. Without this, it queues behind the slot it is holding and
       // waits out the entire maximum wait before starting.
-      const run = startRun("nested", {
+      const run = startRun({
+        tag: "nested",
         argv: ["node", "-e", "process.stdout.write(process.env.CHECK_SLOTS)"],
         env: { CHECK_SLOTS: "3" },
       });
@@ -215,7 +240,8 @@ describe("check queue", () => {
 
     /** @scenario "The wrapper is transparent to the command it runs" */
     it("passes the command's exit code and output straight through", async () => {
-      const run = startRun("passthrough", {
+      const run = startRun({
+        tag: "passthrough",
         argv: [
           "node",
           "-e",
@@ -234,9 +260,9 @@ describe("check queue", () => {
     /** @scenario "A run past the limit waits and names what it is waiting for" */
     /** @scenario "A run that waited says how long it waited" */
     it("waits, reports what it is queued behind, and reports the wait", async () => {
-      const holder = startRun("holder", { holdMs: 700 });
+      const holder = startRun({ tag: "holder", holdMs: 700 });
       await waitForHolder();
-      const queued = startRun("queued");
+      const queued = startRun({ tag: "queued" });
 
       const [, second] = await Promise.all([holder.done, queued.done]);
 
@@ -255,12 +281,13 @@ describe("check queue", () => {
         npm_package_name: "@langwatch/web",
         npm_lifecycle_event: script,
       });
-      const typecheck = startRun("typecheck", {
+      const typecheck = startRun({
+        tag: "typecheck",
         holdMs: 700,
         env: scriptEnv("typecheck"),
       });
       await waitForHolder();
-      const lint = startRun("lint", { env: scriptEnv("lint") });
+      const lint = startRun({ tag: "lint", env: scriptEnv("lint") });
 
       const [, second] = await Promise.all([typecheck.done, lint.done]);
 
@@ -280,12 +307,18 @@ describe("check queue", () => {
       for (const name of [
         "typecheck",
         "typecheck:tests",
-        "typecheck:legacy",
         "lint",
         "lint:fix",
         "lint:plugins",
         "format",
       ]) {
+        // Named first, because a script that has been renamed or deleted
+        // reaches `toContain` as undefined and fails on the argument type
+        // rather than on the thing this test is about.
+        expect(
+          Object.keys(scripts),
+          `${name} is not a script any more`,
+        ).toContain(name);
         expect(scripts[name], `${name} bypasses the check queue`).toContain(
           "check-queue.mjs",
         );
@@ -294,7 +327,8 @@ describe("check queue", () => {
 
     /** @scenario "A long wait repeats itself so it never looks hung" */
     it("repeats its position and names the holder while it waits", async () => {
-      const holder = startRun("holder", {
+      const holder = startRun({
+        tag: "holder",
         holdMs: 900,
         // A run's label is the package and script pnpm is running, which is
         // what makes one worktree's typecheck distinguishable from another's.
@@ -304,7 +338,8 @@ describe("check queue", () => {
         },
       });
       await waitForHolder();
-      const queued = startRun("queued", {
+      const queued = startRun({
+        tag: "queued",
         env: { CHECK_QUEUE_HEARTBEAT_MS: "150" },
       });
 
@@ -320,11 +355,11 @@ describe("check queue", () => {
 
     /** @scenario "Waiters are served in arrival order" */
     it("serves the run that queued first", async () => {
-      const holder = startRun("holder", { holdMs: 900 });
+      const holder = startRun({ tag: "holder", holdMs: 900 });
       await waitForHolder();
-      const first = startRun("first");
+      const first = startRun({ tag: "first" });
       await sleep(200);
-      const second = startRun("second");
+      const second = startRun({ tag: "second" });
 
       await Promise.all([holder.done, first.done, second.done]);
 
@@ -333,7 +368,7 @@ describe("check queue", () => {
 
     /** @scenario "An explicit limit is honored" */
     it("never runs more than the limit at once", async () => {
-      const runs = ["a", "b", "c"].map((tag) => startRun(tag, { holdMs: 150 }));
+      const runs = ["a", "b", "c"].map((tag) => startRun({ tag, holdMs: 150 }));
       await Promise.all(runs.map((run) => run.done));
 
       expect(startOrder(readEvents())).toHaveLength(3);
@@ -344,13 +379,13 @@ describe("check queue", () => {
   describe("given a slot cannot be released normally", () => {
     /** @scenario "A slot held by a dead process is reclaimed" */
     it("reclaims a slot whose owner was killed", async () => {
-      const holder = startRun("killed", { holdMs: 3000 });
+      const holder = startRun({ tag: "killed", holdMs: 3000 });
       await waitForHolder();
       expect(queueEntries()).toHaveLength(1);
       holder.child.kill("SIGKILL");
       await holder.done;
 
-      const next = startRun("after-kill");
+      const next = startRun({ tag: "after-kill" });
       const result = await next.done;
 
       expect(result.code).toBe(0);
@@ -367,13 +402,14 @@ describe("check queue", () => {
       // overlap has been read, so holding far longer than that costs the suite
       // nothing and keeps a loaded machine from ending the holder first, which
       // reads as the queue having serialized the two runs.
-      const holder = startRun("holder", { holdMs: 60_000 });
+      const holder = startRun({ tag: "holder", holdMs: 60_000 });
       await waitForHolder();
       // The hold must be wide enough that the run's start and end cannot
       // share a Date.now() millisecond: maxOverlap breaks ties end-first
       // (which "never runs more than the limit" needs), and a same-instant
       // start/end pair would collapse this run's occupancy to nothing.
-      const impatient = startRun("impatient", {
+      const impatient = startRun({
+        tag: "impatient",
         holdMs: 150,
         env: { CHECK_QUEUE_MAX_WAIT_MS: "200" },
       });
@@ -410,7 +446,12 @@ describe("check queue", () => {
         process.execPath,
         [QUEUE_SCRIPT, "node", fakeCommand, logFile, "after-malformed", "0"],
         {
-          env: { ...process.env, CHECK_QUEUE_DIR: queueDir, CHECK_SLOTS: "2" },
+          env: {
+            ...process.env,
+            CHECK_QUEUE_DIR: queueDir,
+            CHECK_SLOTS: "2",
+            CHECK_QUEUE_IMPL: "js",
+          },
           encoding: "utf8",
         },
       );
@@ -436,6 +477,7 @@ describe("check queue", () => {
             ...process.env,
             CHECK_QUEUE_DIR: path.join(readOnly, "queue"),
             CHECK_SLOTS: "1",
+            CHECK_QUEUE_IMPL: "js",
           },
           encoding: "utf8",
         },
@@ -452,7 +494,7 @@ describe("check queue", () => {
     /** @scenario "The limit can be turned off" */
     it("runs everything at once and keeps no state", async () => {
       const runs = ["a", "b", "c"].map((tag) =>
-        startRun(tag, { holdMs: 300, env: { CHECK_SLOTS: "0" } }),
+        startRun({ tag, holdMs: 300, env: { CHECK_SLOTS: "0" } }),
       );
       const results = await Promise.all(runs.map((run) => run.done));
 
@@ -465,7 +507,8 @@ describe("check queue", () => {
   describe("given no explicit limit", () => {
     /** @scenario "The default limit is derived from the machine" */
     it("bounds the default by both memory and cores, never below one", async () => {
-      const run = startRun("explain", {
+      const run = startRun({
+        tag: "explain",
         argv: ["--explain"],
         env: { CHECK_SLOTS: undefined, CI: undefined },
       });
@@ -479,9 +522,32 @@ describe("check queue", () => {
       expect(expected).toBeGreaterThanOrEqual(1);
     });
 
+    /** @scenario "Memory pressure narrows the queue to one run" */
+    it("narrows the derived limit to one under pressure", async () => {
+      const result = await startRun({
+        tag: "explain",
+        argv: ["--explain"],
+        env: { CHECK_SLOTS: undefined, CI: undefined, CHECK_PRESSURE: "red" },
+      }).done;
+
+      expect(result.stderr).toContain("slots=1 source=pressure");
+      expect(result.stderr).toContain("pressure=red");
+    });
+
+    it("lets an explicit CHECK_SLOTS win over pressure", async () => {
+      const result = await startRun({
+        tag: "explain",
+        argv: ["--explain"],
+        env: { CHECK_SLOTS: "3", CI: undefined, CHECK_PRESSURE: "red" },
+      }).done;
+
+      expect(result.stderr).toContain("slots=3 source=CHECK_SLOTS");
+    });
+
     /** @scenario "CI does not queue by default" */
     it("does not queue under CI", async () => {
-      const explained = await startRun("explain", {
+      const explained = await startRun({
+        tag: "explain",
         argv: ["--explain"],
         env: { CHECK_SLOTS: undefined, CI: "true" },
       }).done;
@@ -489,13 +555,320 @@ describe("check queue", () => {
       expect(explained.stderr).toContain("queue=off");
 
       const runs = ["a", "b"].map((tag) =>
-        startRun(tag, {
+        startRun({
+          tag,
           holdMs: 300,
           env: { CHECK_SLOTS: undefined, CI: "true" },
         }),
       );
       await Promise.all(runs.map((run) => run.done));
       expect(maxOverlap(readEvents())).toBe(2);
+    });
+
+    /** @scenario "CI keeps the runtime limits it had before the pressure policy" */
+    it("reads green under CI whatever the machine measures", async () => {
+      const explained = await startRun({
+        tag: "ci-pressure",
+        argv: ["--explain"],
+        // No forced level: this is the measured path, which CI short-circuits.
+        env: { CHECK_SLOTS: undefined, CI: "true", CHECK_PRESSURE: undefined },
+      }).done;
+
+      expect(explained.stderr).toContain("pressure=green");
+      // Green sets no GOMAXPROCS at all, so the line is absent entirely.
+      expect(explained.stderr).not.toContain("gomaxprocs=");
+    });
+
+    it("still lets an explicit level through under CI", async () => {
+      const explained = await startRun({
+        tag: "ci-forced",
+        argv: ["--explain"],
+        env: { CHECK_SLOTS: undefined, CI: "true", CHECK_PRESSURE: "red" },
+      }).done;
+
+      expect(explained.stderr).toContain("pressure=red");
+      expect(explained.stderr).toContain("slots=0 source=CI");
+    });
+  });
+
+  describe("given the machine is under memory pressure", () => {
+    /** Dumps the environment the wrapper hands the command it runs. */
+    function envDumper(): { script: string; out: string } {
+      const out = path.join(scratch, "child-env.json");
+      const script = path.join(scratch, "dump-env.cjs");
+      writeFileSync(
+        script,
+        [
+          'const fs = require("node:fs");',
+          "const [target] = process.argv.slice(2);",
+          "fs.writeFileSync(target, JSON.stringify({",
+          "  GOMEMLIMIT: process.env.GOMEMLIMIT ?? null,",
+          "  GOMAXPROCS: process.env.GOMAXPROCS ?? null,",
+          "}));",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+      return { script, out };
+    }
+
+    /** @scenario "Memory pressure lowers the memory ceiling to the floor" */
+    /** @scenario "Memory pressure halves the compiler's parallelism" */
+    it("hands the command the floor and half the cores", async () => {
+      const { script, out } = envDumper();
+      const result = await startRun({
+        tag: "pressured",
+        argv: ["node", script, out],
+        env: {
+          CHECK_PRESSURE: "red",
+          GOMEMLIMIT: undefined,
+          GOMAXPROCS: undefined,
+        },
+      }).done;
+
+      expect(result.code).toBe(0);
+      const child = JSON.parse(readFileSync(out, "utf8"));
+      expect(child.GOMEMLIMIT).toBe("3GiB");
+      const cpus = os.availableParallelism();
+      expect(child.GOMAXPROCS).toBe(String(Math.max(2, Math.floor(cpus / 2))));
+    });
+
+    it("leaves the parallelism alone on a green machine", async () => {
+      const { script, out } = envDumper();
+      const result = await startRun({
+        tag: "green",
+        argv: ["node", script, out],
+        env: {
+          CHECK_PRESSURE: "green",
+          GOMEMLIMIT: undefined,
+          GOMAXPROCS: undefined,
+        },
+      }).done;
+
+      expect(result.code).toBe(0);
+      const child = JSON.parse(readFileSync(out, "utf8"));
+      expect(child.GOMEMLIMIT).toMatch(/GiB$/);
+      expect(child.GOMEMLIMIT).not.toBe(null);
+      expect(child.GOMAXPROCS).toBe(null);
+    });
+
+    it("lets an operator's explicit settings through unchanged", async () => {
+      const { script, out } = envDumper();
+      const result = await startRun({
+        tag: "operator",
+        argv: ["node", script, out],
+        env: { CHECK_PRESSURE: "red", GOMEMLIMIT: "8GiB", GOMAXPROCS: "9" },
+      }).done;
+
+      expect(result.code).toBe(0);
+      const child = JSON.parse(readFileSync(out, "utf8"));
+      expect(child.GOMEMLIMIT).toBe("8GiB");
+      expect(child.GOMAXPROCS).toBe("9");
+    });
+  });
+
+  describe("given a run is killed from outside the queue", () => {
+    /** @scenario "A run killed from outside is reported as not the queue's doing" */
+    it("says the queue never kills and names the wrong fix", async () => {
+      const result = await startRun({
+        tag: "killed",
+        argv: ["sh", "-c", "kill -KILL $$"],
+      }).done;
+
+      expect(result.code).toBe(137);
+      expect(result.stderr).toContain("killed from outside by SIGKILL");
+      expect(result.stderr).toContain("never kills");
+      expect(result.stderr).toContain("Do not set CHECK_SLOTS=0");
+    });
+
+    /** @scenario "A signal delivered to the whole process group still counts as forwarded" */
+    it("says nothing when the whole process group is signalled", async () => {
+      // What a Ctrl-C at a terminal does: the wrapper and the command receive
+      // the signal together, so the command can be gone before the wrapper has
+      // handled its own copy. Reading the record too early accuses the operator
+      // of an outside kill for their own interrupt.
+      const run = startRun({ tag: "group", holdMs: 5000, isDetached: true });
+      await waitForHolder();
+      // Never negate a missing pid: -0 reaches process.kill as 0, which signals
+      // the caller's own process group, and the caller here is the test runner.
+      const group = run.child.pid;
+      if (!group) throw new Error("the detached run reported no pid to signal");
+      process.kill(-group, "SIGTERM");
+      const result = await run.done;
+
+      expect(result.stderr).not.toContain("killed from outside");
+    });
+
+    it("says nothing about a signal the wrapper itself forwarded", async () => {
+      const run = startRun({ tag: "interrupted", holdMs: 5000 });
+      await waitForHolder();
+      run.child.kill("SIGTERM");
+      const result = await run.done;
+
+      expect(result.stderr).not.toContain("killed from outside");
+    });
+
+    /**
+     * The command that ignores a forwarded SIGTERM, so the signal that finally
+     * ends it is one nobody forwarded. It publishes its own pid, because the
+     * test has to reach past the wrapper to kill it.
+     */
+    function ignoresTermArgv(pidFile: string): string[] {
+      return ["sh", "-c", `trap '' TERM; echo $$ > ${pidFile}; exec sleep 5`];
+    }
+
+    async function waitForPid(pidFile: string): Promise<string> {
+      let pid = "";
+      for (let attempt = 0; attempt < 200 && pid === ""; attempt++) {
+        try {
+          pid = readFileSync(pidFile, "utf8").trim();
+        } catch {
+          // Not created yet.
+        }
+        // The redirection creates the file before the shell writes the pid into
+        // it, so an empty read is as much "not ready" as a missing file. Waiting
+        // on both is what keeps the attempts from burning off in microseconds.
+        if (pid === "") await sleep(25);
+      }
+      if (pid === "") throw new Error("the command never published its pid");
+      return pid;
+    }
+
+    /** @scenario "An interrupted run killed from outside is still reported" */
+    it("still names the kill when an interrupt came first", async () => {
+      const pidFile = path.join(scratch, "escalated.pid");
+      const run = startRun({
+        tag: "escalated",
+        argv: ignoresTermArgv(pidFile),
+      });
+      const pid = await waitForPid(pidFile);
+
+      run.child.kill("SIGTERM");
+      await sleep(100);
+      process.kill(Number(pid), "SIGKILL");
+      const result = await run.done;
+
+      expect(result.code).toBe(137);
+      expect(result.stderr).toContain("killed from outside by SIGKILL");
+    });
+
+    /**
+     * A copy of the queue that stops for `stallMs` at one exact point: the
+     * moment the child exists.
+     *
+     * The interrupt this pins is a scheduling race, so no arrangement of real
+     * timing reproduces it on demand. A delay is the one edit that cannot
+     * change what a program does, only when it does it, so injecting one is
+     * what turns the race into a decision the test can make.
+     */
+    function queueStalledAsCommandAppears(stallMs: number): string {
+      const source = readFileSync(QUEUE_SCRIPT, "utf8");
+      const call = source.indexOf("spawn(commandArgv[0]");
+      const end = source.indexOf("});", call);
+      if (call === -1 || end === -1) {
+        throw new Error(
+          "the queue no longer spawns the command the way this test stalls it",
+        );
+      }
+      const at = end + "});".length;
+      const copy = path.join(scratch, "check-queue-stalled.mjs");
+      writeFileSync(
+        copy,
+        `${source.slice(0, at)}\n{ const until = Date.now() + ${stallMs}; while (Date.now() < until) {} }\n${source.slice(at)}`,
+        "utf8",
+      );
+      return copy;
+    }
+
+    /** @scenario "An interrupt that arrives as the command starts is forwarded" */
+    it("forwards an interrupt that lands in the instant the command appears", async () => {
+      const pidFile = path.join(scratch, "stalled.pid");
+      const run = startRun({
+        tag: "stalled",
+        script: queueStalledAsCommandAppears(400),
+        argv: ignoresTermArgv(pidFile),
+      });
+      // Published from inside the stall, so the interrupt below is delivered
+      // while the wrapper is still held there.
+      const pid = await waitForPid(pidFile);
+
+      run.child.kill("SIGTERM");
+      await sleep(100);
+      process.kill(Number(pid), "SIGKILL");
+      const result = await run.done;
+
+      // A wrapper that took the interrupt on its default disposition would be
+      // dead by now, reporting no code and leaving the command behind.
+      expect(result.code).toBe(137);
+      expect(result.stderr).toContain("killed from outside by SIGKILL");
+    });
+
+    it("says nothing about a clean failure", async () => {
+      const result = await startRun({
+        tag: "failing",
+        argv: ["sh", "-c", "exit 7"],
+      }).done;
+
+      expect(result.code).toBe(7);
+      expect(result.stderr).not.toContain("killed from outside");
+    });
+  });
+
+  describe("when haven is installed", () => {
+    /** A stand-in haven binary that records its argv and exits. */
+    function fakeHaven(exitCode: number): { bin: string; argvFile: string } {
+      const argvFile = path.join(scratch, "haven-argv.json");
+      const bin = path.join(scratch, "haven");
+      writeFileSync(
+        bin,
+        `#!/bin/sh\nprintf '%s\\n' "$@" > ${JSON.stringify(argvFile)}\nexit ${exitCode}\n`,
+        { encoding: "utf8", mode: 0o755 },
+      );
+      return { bin, argvFile };
+    }
+
+    /** @scenario "With haven installed the queue runs inside haven" */
+    it("hands the run to `haven slot run` and passes its exit code through", async () => {
+      const { bin, argvFile } = fakeHaven(7);
+      const result = await startRun({
+        tag: "delegated",
+        env: { CHECK_QUEUE_IMPL: undefined, HAVEN_BIN: bin },
+      }).done;
+
+      expect(result.code).toBe(7);
+      const argv = readFileSync(argvFile, "utf8").trim().split("\n");
+      expect(argv.slice(0, 2)).toEqual(["slot", "run"]);
+      expect(argv).toContain("--");
+      // The command reaches haven verbatim, after the `--`.
+      expect(argv[argv.indexOf("--") + 1]).toBe("node");
+    });
+
+    /** @scenario "Without haven the JavaScript queue still gates" */
+    it("falls back to the JS queue when the haven binary does not exist", async () => {
+      const result = await startRun({
+        tag: "fallback",
+        env: {
+          CHECK_QUEUE_IMPL: undefined,
+          HAVEN_BIN: path.join(scratch, "no-such-haven"),
+        },
+      }).done;
+
+      expect(result.code).toBe(0);
+      // The run went through the JS queue: it executed the command (the log
+      // has its events) rather than dying on the missing binary.
+      expect(readEvents().map((e) => e.event)).toEqual(["start", "end"]);
+    });
+
+    /** @scenario "The operator can force the JavaScript queue" */
+    it("never delegates when CHECK_QUEUE_IMPL is js", async () => {
+      const { bin, argvFile } = fakeHaven(7);
+      const result = await startRun({
+        tag: "forced-js",
+        env: { CHECK_QUEUE_IMPL: "js", HAVEN_BIN: bin },
+      }).done;
+
+      expect(result.code).toBe(0);
+      expect(() => readFileSync(argvFile, "utf8")).toThrow();
     });
   });
 });

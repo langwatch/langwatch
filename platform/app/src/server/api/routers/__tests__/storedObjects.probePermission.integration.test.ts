@@ -13,14 +13,18 @@
  *
  * Spec: specs/traces-v2/media-rendering.feature
  */
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
+} from "~/generated/prisma/client";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
 import { prisma } from "../../../db";
 import {
   startTestContainers,
@@ -80,7 +84,13 @@ describe("storedObjects.headById: who may probe", () => {
   }
 
   beforeAll(async () => {
-    await startTestContainers();
+    const containers = await startTestContainers();
+    // headById reaches the stored-objects repository, which resolves its
+    // client through getApp().clickhouse (two-door access) - the fixture
+    // installs the App the seam expects.
+    installClickHouseTestApp({
+      resolveClient: async () => containers.clickHouseClient,
+    });
     await prisma.organization.create({
       data: { id: ORG, name: ORG, slug: ORG },
     });
@@ -101,6 +111,7 @@ describe("storedObjects.headById: who may probe", () => {
   }, 60_000);
 
   afterAll(async () => {
+    await clearClickHouseTestApp();
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG } });
     await prisma.customRole.deleteMany({ where: { organizationId: ORG } });
     await prisma.project.deleteMany({ where: { teamId: TEAM } });

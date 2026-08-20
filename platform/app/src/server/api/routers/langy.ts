@@ -6,7 +6,7 @@ import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
+import { getApp, tryGetApp } from "~/server/app-layer/app";
 import {
   LangyConversationNotFoundError,
   LangyRateLimitedError,
@@ -22,6 +22,7 @@ import {
   type LangyTurnContext,
   langyTurnContextSchema,
 } from "~/server/app-layer/langy/langyTurnContext.schema";
+import { abortableDelay } from "~/server/app-layer/langy/streaming/awaitTurnSettlement";
 import {
   createLangyTokenBuffer,
   type LangyStreamEntry,
@@ -31,7 +32,6 @@ import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/lang
 import type { Session } from "~/server/auth";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
 import { trackServerEvent } from "~/server/posthog";
-import { connection } from "~/server/redis";
 import { checkProjectPermission, type Permission } from "../rbac";
 import {
   type LangyConversationDetailDto,
@@ -202,6 +202,7 @@ async function canWatchTurn({
   turnId: string;
   userId: string;
 }): Promise<boolean> {
+  const connection = tryGetApp()?.redis ?? null;
   if (connection) {
     const access = createLangyTurnAccessStore({ redis: connection });
     if (
@@ -216,25 +217,6 @@ async function canWatchTurn({
     userId,
   });
   return !!conv;
-}
-
-/**
- * Sleep for `ms`, resolving early to `false` when the signal aborts — so a
- * watcher loop unblocks promptly the moment its follow() ends — otherwise `true`.
- */
-function abortableDelay(ms: number, signal: AbortSignal): Promise<boolean> {
-  if (signal.aborted) return Promise.resolve(false);
-  return new Promise<boolean>((resolve) => {
-    const onAbort = () => {
-      clearTimeout(timer);
-      resolve(false);
-    };
-    const timer = setTimeout(() => {
-      signal.removeEventListener("abort", onAbort);
-      resolve(true);
-    }, ms);
-    signal.addEventListener("abort", onAbort, { once: true });
-  });
 }
 
 /** How often the settlement watcher consults the durable fold + heartbeat. */
@@ -859,7 +841,6 @@ export const langyRouter = createTRPCRouter({
     const emitter = getApp().broadcast.getTenantEmitter(projectId);
     try {
       for await (const eventArgs of on(emitter, "langy_conversation_updated", {
-        // @ts-expect-error - signal is not typed on the events overload
         signal: opts.signal,
       })) {
         const data = eventArgs[0] as { event?: unknown; timestamp?: number };
@@ -924,6 +905,7 @@ export const langyRouter = createTRPCRouter({
       }
       // No Redis ⇒ no live buffer; the client falls back to the Postgres
       // conversation/message query.
+      const connection = tryGetApp()?.redis ?? null;
       if (!connection) return;
 
       const blocking = connection.duplicate();
@@ -936,7 +918,6 @@ export const langyRouter = createTRPCRouter({
       const signals: AbortSignal[] = [
         AbortSignal.timeout(AGENT_CHAT_TIMEOUT_MS),
       ];
-      // @ts-expect-error - signal is not typed
       if (opts.signal) signals.push(opts.signal);
       const signal = AbortSignal.any(signals);
 

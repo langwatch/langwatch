@@ -134,6 +134,70 @@ func TestSync_CodeBlock_SecretsNamespaceFromWorkflow(t *testing.T) {
 	assert.Equal(t, "id-123", res.Result["token"])
 }
 
+// TestSync_CodeBlock_ParamsNamespaceFromWorkflow is the end-to-end guard for
+// run parameters: a parameter declared on the workflow DSL
+// (`workflow.params`) must reach user code as `params.NAME`, the same way a
+// secret reaches it as `secrets.NAME`. It proves the same full thread the
+// secrets test above proves (DSL to engine.runCode to codeblock.Request to
+// the runner.py namespace) plus the one deliberate difference: parameter
+// values keep the type they were configured with, so a boolean is a bool and
+// a number is a number rather than the text of one.
+/** @scenario "A code target reads params.NAME the same way it reads secrets.NAME" */
+func TestSync_CodeBlock_ParamsNamespaceFromWorkflow(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 not installed")
+	}
+	stack := setupStack(t)
+	defer stack.close()
+
+	body := `{
+	  "type": "execute_flow",
+	  "payload": {
+	    "trace_id": "params-ns",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"k","spec_version":"1.3","name":"x","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "params":{"TENANT":"acme","RETRIES":3,"VERBOSE":true},
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"q","type":"str"}],
+	          "dataset":{"inline":{"records":{"q":["x"]}}},
+	          "entry_selection":0,
+	          "train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"useParam","type":"code","data":{
+	          "parameters":[
+	            {"identifier":"code","type":"code","value":"def execute(q):\n    return {'tenant': params.TENANT, 'kinds': type(params.TENANT).__name__ + ',' + type(params.VERBOSE).__name__, 'doubled': str(params.RETRIES * 2)}\n"}
+	          ],
+	          "inputs":[{"identifier":"q","type":"str"}],
+	          "outputs":[{"identifier":"tenant","type":"str"},{"identifier":"kinds","type":"str"},{"identifier":"doubled","type":"str"}]
+	        }},
+	        {"id":"end","type":"end","data":{
+	          "inputs":[{"identifier":"tenant","type":"str"},{"identifier":"kinds","type":"str"},{"identifier":"doubled","type":"str"}]
+	        }}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.q","target":"useParam","targetHandle":"inputs.q","type":"default"},
+	        {"id":"e2","source":"useParam","sourceHandle":"outputs.tenant","target":"end","targetHandle":"inputs.tenant","type":"default"},
+	        {"id":"e3","source":"useParam","sourceHandle":"outputs.kinds","target":"end","targetHandle":"inputs.kinds","type":"default"},
+	        {"id":"e4","source":"useParam","sourceHandle":"outputs.doubled","target":"end","targetHandle":"inputs.doubled","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}],
+	    "origin":"workflow"
+	  }
+	}`
+
+	res := postSync(t, stack, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+	assert.Equal(t, "acme", res.Result["tenant"])
+	// Types survive the trip: the boolean is a bool in Python, not the
+	// string "true", and the number is usable in arithmetic.
+	assert.Equal(t, "str,bool", res.Result["kinds"])
+	assert.Equal(t, "6", res.Result["doubled"])
+}
+
 // TestSync_CodeBlock_ThirdPartyImportSkipsCleanly proves the failure
 // mode for missing third-party packages: the user code raises
 // ImportError, the engine surfaces a structured error with the

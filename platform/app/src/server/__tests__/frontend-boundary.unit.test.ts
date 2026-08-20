@@ -165,7 +165,7 @@ const boundImports = (source: string): string[] => {
  *
  * Two forms are TYPES, erased at compile time, and following them would report
  * leaks that do not exist: `typeof import("x")`, and the type-query member
- * access `import("x").Foo` (as in `import("@prisma/client").PrismaClient`).
+ * access `import("x").Foo` (as in `import("~/generated/prisma/client").PrismaClient`).
  * `(await import("x")).foo` puts a paren between the specifier and the dot, so
  * it survives the member-access filter. `import("x").then(...)` is skipped along
  * with them — that under-reports rather than over-reports, which is the safe
@@ -508,11 +508,26 @@ describe("browser-only UI never reaches the backend", () => {
     });
   });
 
+  // Both halves are pinned, the same way the workspace-package cases below
+  // are: the import has to still be there, AND still be excluded. Asserting
+  // only the exclusion passes just as happily when the import is deleted —
+  // which is exactly what happened when this case pointed at a component that
+  // the legacy Traces removal took away with it.
   describe("given a type-only import of a component", () => {
-    it("does not count it, because types are erased", () => {
-      const specs = valueImportsOf(path.join(SRC, "server/traces/types.ts"));
+    const server = path.join(
+      SRC,
+      "server/app-layer/reports/report-chart.service.ts",
+    );
+    const component = "~/components/analytics/CustomGraph";
 
-      expect(specs).not.toContain("~/components/messages/MessageCard");
+    it("still makes that import, so the case has a subject", () => {
+      expect(fs.readFileSync(server, "utf-8")).toContain(
+        `import type { CustomGraphInput } from "${component}";`,
+      );
+    });
+
+    it("does not count it, because types are erased", () => {
+      expect(valueImportsOf(server)).not.toContain(component);
     });
   });
 
@@ -590,7 +605,216 @@ describe("browser-only UI never reaches the backend", () => {
         path.join(SRC, "server/api/routers/gatewayBudgets.ts"),
       );
 
-      expect(specs).not.toContain("@prisma/client");
+      expect(specs).not.toContain("~/generated/prisma/client");
+    });
+  });
+});
+
+/**
+ * The same boundary, walked the other way. A handful of `src/server/` modules
+ * are imported by CLIENT code for their values — the rbac vocabulary
+ * (`~/server/api/rbac`) supplies role helpers to `useOrganizationTeamProject`
+ * and friends — so everything they pull at module scope lands in the browser
+ * bundle and in every jsdom test graph. One import from rbac.ts into the authz
+ * composition root put Prisma, redis and the EE audit writer into the client
+ * graph: the t3-env client guard then throws at module load, which is a white
+ * screen in the browser and eleven failed-to-load jsdom suites in CI. The env
+ * guard only fires where env access is live, so no import probe can catch this
+ * under test config — the graph itself is the invariant.
+ */
+
+/** Trees the browser bundle is built from. `pages/api` and `app/api` sit
+ *  inside two of them and are backends, so they are cut out. */
+const CLIENT_TREES: Array<{ dir: string; excludes?: string }> = [
+  { dir: "components" },
+  { dir: "hooks" },
+  { dir: "features" },
+  { dir: "utils" },
+  { dir: "pages", excludes: path.join("pages", "api") },
+  { dir: "app", excludes: path.join("app", "api") },
+];
+
+/**
+ * Backend files that happen to live in a client tree, and are therefore not
+ * in the bundle whatever their directory says. Both are `src/utils/`:
+ * `testUtils` is imported only from test files, and `lambdaFetch` invokes AWS
+ * Lambda for `server/nlpgo/nlpgoFetch.ts`, its single importer. Excusing the
+ * two IMPORTERS rather than the server modules they reach keeps the guard
+ * sharp: a genuine client file importing either of those modules still fails.
+ */
+const NOT_CLIENT_FILES = new Set(
+  ["utils/testUtils.ts", "utils/lambdaFetch.ts"].map((p) => path.join(SRC, p)),
+);
+
+const clientFiles = CLIENT_TREES.flatMap(({ dir, excludes }) => {
+  const full = path.join(SRC, dir);
+  if (!fs.existsSync(full)) return [];
+  const cut = excludes ? path.join(SRC, excludes) + path.sep : null;
+  return walk(full).filter(
+    (file) => (!cut || !file.startsWith(cut)) && !NOT_CLIENT_FILES.has(file),
+  );
+});
+
+const SERVER_DIR = path.join(SRC, "server") + path.sep;
+
+/**
+ * Derived, not listed. A hand-written list only ever guards the module
+ * someone remembered to add to it, and the leak this catches arrives as a NEW
+ * client→server value import — exactly the case a list cannot see. Every
+ * `src/server/` module the client trees value-import is a root here.
+ */
+const CLIENT_IMPORTED_SERVER_MODULES = [
+  ...new Set(
+    clientFiles.flatMap((file) =>
+      valueImportsOf(file)
+        .map((spec) => resolveAppImport(spec, file))
+        .filter(
+          (target): target is string => target?.startsWith(SERVER_DIR) === true,
+        ),
+    ),
+  ),
+].sort();
+
+/** Module-scope state no client graph may reach: prisma, redis, EE audit. */
+const SERVER_ONLY_STATE = new Set(
+  [
+    path.join(SRC, "server/db.ts"),
+    path.join(SRC, "server/redis.ts"),
+    path.join(SRC, "server/app-layer/authz/runtime.ts"),
+    path.join(SRC, "server/app-layer/authz/epoch.ts"),
+    path.join(APP_ROOT, "ee/audit-log/auditLog.ts"),
+  ].map((p) => path.resolve(p)),
+);
+
+/** Walk `via` from a root to the target it was flooded from. */
+const chainFromVia = (
+  root: string,
+  via: Map<string, string | null>,
+): string[] => {
+  const chain: string[] = [];
+  const guard = new Set<string>();
+  let cursor: string | undefined = root;
+  while (cursor !== undefined && !guard.has(cursor)) {
+    guard.add(cursor);
+    chain.push(rel(cursor));
+    const next = via.get(cursor);
+    if (next == null) break;
+    cursor = next;
+  }
+  return chain;
+};
+
+/**
+ * Chains from each of `roots` to any of `targets`, as one walk and one
+ * backwards flood — the same fixed point `chainsToBrowserUi` uses, and for
+ * the same reason: a per-root BFS re-walks the whole graph once per root,
+ * and there are hundreds of roots.
+ */
+const chainsToTargets = (
+  roots: string[],
+  targets: ReadonlySet<string>,
+): Map<string, string[]> => {
+  const { children } = walkImportGraph(roots);
+  const parents = invertEdges(children);
+
+  const via = new Map<string, string | null>();
+  const work: string[] = [];
+  for (const file of children.keys()) {
+    if (!targets.has(path.resolve(file))) continue;
+    via.set(file, null);
+    work.push(file);
+  }
+  while (work.length > 0) {
+    const node = work.pop()!;
+    for (const parent of parents.get(node) ?? []) {
+      if (via.has(parent)) continue;
+      via.set(parent, node);
+      work.push(parent);
+    }
+  }
+
+  const chains = new Map<string, string[]>();
+  for (const root of roots) {
+    if (via.has(root)) chains.set(root, chainFromVia(root, via));
+  }
+  return chains;
+};
+
+/** Single-root form: the chain into any server-only state, or null. */
+const chainToServerOnlyState = (root: string): string[] | null =>
+  chainsToTargets([root], SERVER_ONLY_STATE).get(root) ?? null;
+
+/**
+ * Single-root, single-target form. The self-validation cases below name the
+ * module they expect to travel through, and asking for "any server-only
+ * state" would answer with whichever one the flood happened to settle first
+ * — a real chain, but not the one under test, so the assertion would turn on
+ * edge order rather than on the graph.
+ */
+const chainToServerModule = (root: string, target: string): string[] | null =>
+  chainsToTargets([root], new Set([path.resolve(target)])).get(root) ?? null;
+
+describe("client-imported vocabulary never reaches server-only state", () => {
+  describe("given the import graph rooted at each client-imported server module", () => {
+    it("finds no chain into prisma, redis, the audit writer, or the authz composition root", () => {
+      const violations = [
+        ...chainsToTargets(
+          CLIENT_IMPORTED_SERVER_MODULES,
+          SERVER_ONLY_STATE,
+        ).values(),
+      ].map((chain) => chain.join("\n     -> "));
+
+      expect(violations).toEqual([]);
+    });
+
+    // The derivation replaced a hand-written list; if it ever stops finding
+    // the rbac vocabulary, the guard above has quietly become a walk over
+    // nothing.
+    it("derives rbac.ts among the roots, so the guard is not walking an empty set", () => {
+      expect(CLIENT_IMPORTED_SERVER_MODULES).toContain(
+        path.join(SRC, "server/api/rbac.ts"),
+      );
+    });
+  });
+
+  // Self-validation, so the guard above cannot pass vacuously: a direct
+  // prisma import and a transitive composition-root import must both report.
+  describe("given a server file that imports prisma directly", () => {
+    it("reports a chain, proving the walker sees the edge", () => {
+      const chain = chainToServerModule(
+        path.join(SRC, "server/api/trpc.ts"),
+        path.join(SRC, "server/db.ts"),
+      );
+
+      expect(chain).not.toBeNull();
+    });
+  });
+
+  describe("given a server file that reaches the composition root transitively", () => {
+    it("reports the chain through runtime.ts", () => {
+      const runtime = path.join(SRC, "server/app-layer/authz/runtime.ts");
+      const chain = chainToServerModule(
+        path.join(SRC, "server/api/routers/authz.ts"),
+        runtime,
+      );
+
+      expect(chain).not.toBeNull();
+      expect(chain).toContain(rel(runtime));
+    });
+  });
+
+  // The negative half of the self-validation, and it has to name a module the
+  // assertion above does NOT already cover — a client-imported root is
+  // asserted clean up there, so re-asserting one here would only restate it.
+  // The shadow composes a repository per call over the caller's own Prisma
+  // handle, which is exactly the shape the boundary permits and the one a
+  // future `import { prisma } from "~/server/db"` would break.
+  describe("given a server module that composes over a caller-supplied handle", () => {
+    it("reports no chain, so a clean root really is clean", () => {
+      const shadow = path.join(SRC, "server/app-layer/authz/shadow.ts");
+
+      expect(CLIENT_IMPORTED_SERVER_MODULES).not.toContain(shadow);
+      expect(chainToServerOnlyState(shadow)).toBeNull();
     });
   });
 });

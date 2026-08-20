@@ -198,9 +198,6 @@ function SignUpForm() {
         title: "Couldn't sign you in",
         description: message,
         type: "error",
-        meta: {
-          closable: true,
-        },
       });
     }
   };
@@ -300,7 +297,7 @@ function SignUpForm() {
                 <Button
                   colorPalette="orange"
                   type="submit"
-                  loading={register.isLoading || signInLoading}
+                  loading={register.isPending || signInLoading}
                 >
                   Sign up
                 </Button>

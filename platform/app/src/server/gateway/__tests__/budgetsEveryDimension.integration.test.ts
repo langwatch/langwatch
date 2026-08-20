@@ -16,7 +16,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-
+import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import { prisma } from "~/server/db";
 import {
   getTestClickHouseClient,
@@ -74,6 +74,11 @@ async function seedProviders() {
     });
   }
 }
+
+// Held for the whole file. The rollup this suite writes to and reads back is
+// database-wide, so a neighbouring suite rebuilding it drops the materialised
+// view out from under these fixtures.
+holdClickHouseSchemaLockForFile();
 
 describe("budgets on every dimension (real PG + real CH)", () => {
   beforeAll(async () => {
@@ -821,6 +826,167 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       expect(budget!.archivedAt).not.toBeNull();
     });
 
+    /** @scenario "Revoking a key retires a cap that targets only that key" */
+    it("archives a budget scoped to the key that the key never managed", async () => {
+      // The orphan case: a cap created on the Budgets page, targeting one
+      // key. It is not drawer-managed, so the key never owned it, but its
+      // scope is that key and nothing else. Once the key is REVOKED, which is
+      // terminal, it can never count spend again.
+      const service = VirtualKeyService.create(prisma);
+      const { virtualKey } = await service.create({
+        organizationId: ORG_ID,
+        name: `standalone-budget-${suffix}`,
+        actorUserId: USER_ID,
+        scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+      });
+      createdVirtualKeyIds.push(virtualKey.id);
+
+      const standalone = await prisma.gatewayBudget.create({
+        data: {
+          organizationId: ORG_ID,
+          scopeType: "VIRTUAL_KEY",
+          scopeId: virtualKey.id,
+          name: `standalone-hard-cap-${suffix}`,
+          window: "MONTH",
+          limitUsd: "5.00",
+          resetsAt: new Date(Date.now() + 86_400_000),
+          createdById: USER_ID,
+          managedByVirtualKeyId: null,
+        },
+      });
+
+      await service.revoke({
+        id: virtualKey.id,
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+      });
+
+      const after = await prisma.gatewayBudget.findUnique({
+        where: { id: standalone.id },
+      });
+      expect(after!.archivedAt).not.toBeNull();
+    });
+
+    /** @scenario "Revoking a key retires a per-end-user allowance anchored on it" */
+    it("archives a per-end-user template anchored on the revoked key", async () => {
+      // ATTRIBUTED_USER hangs one allowance off each end user the anchor's
+      // traffic is attributed to. When the anchor is the key, a dead key
+      // means a template that can never open another bucket.
+      const service = VirtualKeyService.create(prisma);
+      const { virtualKey } = await service.create({
+        organizationId: ORG_ID,
+        name: `per-user-anchor-${suffix}`,
+        actorUserId: USER_ID,
+        scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+      });
+      createdVirtualKeyIds.push(virtualKey.id);
+
+      const template = await prisma.gatewayBudget.create({
+        data: {
+          organizationId: ORG_ID,
+          scopeType: "ATTRIBUTED_USER",
+          scopeId: virtualKey.id,
+          name: `per-user-cap-${suffix}`,
+          window: "MONTH",
+          limitUsd: "2.00",
+          resetsAt: new Date(Date.now() + 86_400_000),
+          createdById: USER_ID,
+        },
+      });
+
+      await service.revoke({
+        id: virtualKey.id,
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+      });
+
+      const after = await prisma.gatewayBudget.findUnique({
+        where: { id: template.id },
+      });
+      expect(after!.archivedAt).not.toBeNull();
+    });
+
+    /** @scenario "Revoking a key leaves a project budget standing" */
+    it("leaves a project budget alone when a key scoped to it is revoked", async () => {
+      // The boundary the case above must not cross. A project outlives any
+      // one key, so its cap is still a live control the moment another key
+      // is scoped there.
+      const service = VirtualKeyService.create(prisma);
+      const { virtualKey } = await service.create({
+        organizationId: ORG_ID,
+        name: `project-budget-survivor-${suffix}`,
+        actorUserId: USER_ID,
+        scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+      });
+      createdVirtualKeyIds.push(virtualKey.id);
+
+      const projectBudget = await prisma.gatewayBudget.create({
+        data: {
+          organizationId: ORG_ID,
+          scopeType: "PROJECT",
+          scopeId: PROJECT_ID,
+          name: `project-hard-cap-${suffix}`,
+          window: "MONTH",
+          limitUsd: "50.00",
+          resetsAt: new Date(Date.now() + 86_400_000),
+          createdById: USER_ID,
+        },
+      });
+
+      await service.revoke({
+        id: virtualKey.id,
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+      });
+
+      const after = await prisma.gatewayBudget.findUnique({
+        where: { id: projectBudget.id },
+      });
+      expect(after!.archivedAt).toBeNull();
+    });
+
+    /** @scenario "Clearing the drawer budget leaves an independently created cap alone" */
+    it("leaves a key-scoped budget alone when only the drawer field is cleared", async () => {
+      // The permission boundary the revoke change must not widen: the key is
+      // still alive here, so an independently created cap on it is still an
+      // enforcement control and virtualKeys:update must not retire it.
+      const service = VirtualKeyService.create(prisma);
+      const { virtualKey } = await service.create({
+        organizationId: ORG_ID,
+        name: `drawer-clear-keeps-${suffix}`,
+        actorUserId: USER_ID,
+        scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+        budget: { limitUsd: "9.00", window: "MONTH" },
+      });
+      createdVirtualKeyIds.push(virtualKey.id);
+
+      const standalone = await prisma.gatewayBudget.create({
+        data: {
+          organizationId: ORG_ID,
+          scopeType: "VIRTUAL_KEY",
+          scopeId: virtualKey.id,
+          name: `survives-drawer-clear-${suffix}`,
+          window: "MONTH",
+          limitUsd: "3.00",
+          resetsAt: new Date(Date.now() + 86_400_000),
+          createdById: USER_ID,
+          managedByVirtualKeyId: null,
+        },
+      });
+
+      await service.update({
+        id: virtualKey.id,
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+        budget: null,
+      });
+
+      const after = await prisma.gatewayBudget.findUnique({
+        where: { id: standalone.id },
+      });
+      expect(after!.archivedAt).toBeNull();
+    });
+
     /** @scenario "Removing a key's budget from the drawer archives it" */
     it("archives rather than deletes when the budget field is cleared", async () => {
       const service = VirtualKeyService.create(prisma);
@@ -986,6 +1152,49 @@ describe("budgets on every dimension (real PG + real CH)", () => {
           config: { providersAllowed: [] },
         }),
       ).rejects.toThrow(/providers_allowed_empty/);
+    });
+
+    /** @scenario A scope-reachable provider can be allowed on a key even when the routing policy omits it */
+    it("allows a scope-reachable provider the routing policy omits", async () => {
+      const policyId = `rp-nxn-omit-${suffix}`;
+      await prisma.routingPolicy.create({
+        data: {
+          id: policyId,
+          organizationId: ORG_ID,
+          name: `omit-policy-${suffix}`,
+          // Lists only OpenAI: Anthropic is reachable from the project scope
+          // but this policy omits it.
+          modelProviderIds: [MP_OPENAI_ID],
+          scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
+        },
+      });
+      const service = VirtualKeyService.create(prisma);
+      try {
+        // Anthropic is scope-reachable but omitted by the policy. The save must
+        // succeed: the policy blocks it at dispatch, not at save.
+        const { virtualKey } = await service.create({
+          organizationId: ORG_ID,
+          name: `policy-omit-key-${suffix}`,
+          actorUserId: USER_ID,
+          scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+          routingMode: "POLICY",
+          routingPolicyId: policyId,
+          config: { providersAllowed: [MP_ANTHROPIC_ID] },
+        });
+        createdVirtualKeyIds.push(virtualKey.id);
+        const stored = await prisma.virtualKey.findUnique({
+          where: { id: virtualKey.id },
+        });
+        expect(
+          (stored?.config as { providersAllowed?: string[] } | null)
+            ?.providersAllowed,
+        ).toContain(MP_ANTHROPIC_ID);
+      } finally {
+        await prisma.routingPolicyScope.deleteMany({
+          where: { routingPolicyId: policyId },
+        });
+        await prisma.routingPolicy.deleteMany({ where: { id: policyId } });
+      }
     });
 
     /** @scenario "A new key defaults to no fallback" */

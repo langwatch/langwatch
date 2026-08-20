@@ -1,13 +1,13 @@
+import { nanoid } from "nanoid";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { projectFactory } from "~/factories/project.factory";
 import type {
   Organization,
   Project,
   Team,
   User,
   Workflow,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { projectFactory } from "~/factories/project.factory";
+} from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
@@ -448,7 +448,15 @@ describe("Workflows REST API", () => {
 
       /** @scenario "The latest committed version is evaluated by default" */
       it("evaluates the latest committed version by default", async () => {
-        await createVersion("1", entryDsl());
+        // "Latest" is createdAt-ordered at millisecond precision; two
+        // back-to-back creates can land in the same millisecond, making the
+        // winner arbitrary. Real commits are never simultaneous, so the
+        // fixture says so explicitly.
+        const v1 = await createVersion("1", entryDsl());
+        await prisma.workflowVersion.update({
+          where: { id: v1.id, projectId: testProjectId },
+          data: { createdAt: new Date(Date.now() - 60_000) },
+        });
         const v2 = await createVersion("2", entryDsl());
 
         const res = await postEvaluate(

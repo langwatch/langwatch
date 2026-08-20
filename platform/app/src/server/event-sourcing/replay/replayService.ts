@@ -2,12 +2,10 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import type IORedis from "ioredis";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 import { discoverProjectionAggregates } from "./replayDiscovery";
-import { replayFoldProjection } from "./replayFoldPath";
+import { runFoldMapReplay } from "./replayEngine";
 import type { ReplayLogWriter } from "./replayLog";
 import { nullLog } from "./replayLog";
-import { replayMapProjection } from "./replayMapPath";
 import { cleanupAll, hasPreviousRun } from "./replayMarkers";
-import { replayOptimized } from "./replayOptimizedPath";
 import { replayStateProjection } from "./replayStatePath";
 import type {
   DiscoveryResult,
@@ -18,6 +16,37 @@ import type {
   ReplayResult,
 } from "./types";
 
+interface ReplayTotals {
+  aggregatesReplayed: number;
+  totalEvents: number;
+  batchErrors: number;
+  firstError: string | undefined;
+}
+
+/** Fold one lane's result into the run's totals, keeping the first error. */
+function accumulate(totals: ReplayTotals, result: ReplayResult): void {
+  totals.aggregatesReplayed += result.aggregatesReplayed;
+  totals.totalEvents += result.totalEvents;
+  totals.batchErrors += result.batchErrors;
+  if (!totals.firstError && result.firstError) {
+    totals.firstError = result.firstError;
+  }
+}
+
+/**
+ * Orchestrates projection replays. Every run flows through ONE engine:
+ *
+ * - Fold and map projections replay together via {@link runFoldMapReplay} —
+ *   one discovery over the union of their event types, each batch's events
+ *   loaded exactly once and streamed into every relevant accumulator.
+ * - Operational state projections (`.withProjection()`) rebuild afterwards in
+ *   their own paused lane ({@link replayStateProjection}) — a from-init
+ *   canonical rebuild keyed across aggregates, which the per-batch marker
+ *   protocol does not fit.
+ *
+ * There is no per-projection serial path: selecting a state projection no
+ * longer demotes the run's folds and maps to one-load-per-projection.
+ */
 export class ReplayService {
   /** Shared dependencies handed to the path implementations. */
   private readonly ctx: ReplayContext;
@@ -62,159 +91,90 @@ export class ReplayService {
     config: ReplayConfig,
     callbacks?: ReplayCallbacks & { log?: ReplayLogWriter },
   ): Promise<ReplayResult> {
-    const log = callbacks?.log ?? nullLog;
-    const batchSize = config.batchSize ?? 5000;
-    const aggregateBatchSize = config.aggregateBatchSize ?? 1000;
+    const mapProjections = config.mapProjections ?? [];
+    const totals: ReplayTotals = {
+      aggregatesReplayed: 0,
+      totalEvents: 0,
+      batchErrors: 0,
+      firstError: undefined,
+    };
 
-    let totalAggregatesReplayed = 0;
-    let totalEventsReplayed = 0;
-    let totalBatchErrors = 0;
-    let firstError: string | undefined;
-    const touchedTenants = new Set<string>();
+    // Fold + map projections: the shared batch engine, one event load per
+    // batch across every selected projection.
+    if (config.projections.length > 0 || mapProjections.length > 0) {
+      const result = await runFoldMapReplay({
+        ctx: this.ctx,
+        config: { ...config, stateProjections: [] },
+        callbacks,
+      });
+      accumulate(totals, result);
+    }
 
+    if (totals.batchErrors === 0) {
+      await this.replayStateLane({ config, callbacks, totals });
+    }
+
+    return {
+      aggregatesReplayed: totals.aggregatesReplayed,
+      totalEvents: totals.totalEvents,
+      batchErrors: totals.batchErrors,
+      firstError: totals.firstError,
+    };
+  }
+
+  /**
+   * State-projection lane: pause and drain each `.withProjection()` queue,
+   * then rebuild its Postgres rows deterministically from canonical events.
+   */
+  private async replayStateLane({
+    config,
+    callbacks,
+    totals,
+  }: {
+    config: ReplayConfig;
+    callbacks?: ReplayCallbacks & { log?: ReplayLogWriter };
+    totals: ReplayTotals;
+  }): Promise<void> {
     const mapProjections = config.mapProjections ?? [];
     const stateProjections = config.stateProjections ?? [];
     const totalProjections =
       config.projections.length +
       mapProjections.length +
       stateProjections.length;
+    const log = callbacks?.log ?? nullLog;
 
-    for (let pi = 0; pi < config.projections.length; pi++) {
-      const projection = config.projections[pi]!;
-      const result = await replayFoldProjection({
+    for (let si = 0; si < stateProjections.length; si++) {
+      const projection = stateProjections[si]!;
+      const result = await replayStateProjection({
         ctx: this.ctx,
         projection,
-        projectionIndex: pi,
+        projectionIndex: config.projections.length + mapProjections.length + si,
         totalProjections,
         tenantIds: config.tenantIds,
         aggregateIds: config.aggregateIds,
         since: config.since,
-        batchSize,
-        aggregateBatchSize,
+        batchSize: config.batchSize ?? 5000,
+        aggregateBatchSize: config.aggregateBatchSize ?? 1000,
         dryRun: config.dryRun ?? false,
         log,
         onProgress: callbacks?.onProgress,
         onBatchComplete: callbacks?.onBatchComplete,
       });
 
-      totalAggregatesReplayed += result.aggregatesReplayed;
-      totalEventsReplayed += result.totalEvents;
-      totalBatchErrors += result.batchErrors;
-      if (!firstError && result.firstError) firstError = result.firstError;
-      for (const tid of result.touchedTenants) touchedTenants.add(tid);
-
-      if (result.batchErrors > 0) break;
+      accumulate(totals, result);
+      if (result.batchErrors > 0) return;
     }
-
-    if (totalBatchErrors === 0) {
-      for (let mi = 0; mi < mapProjections.length; mi++) {
-        const projection = mapProjections[mi]!;
-        const result = await replayMapProjection({
-          ctx: this.ctx,
-          projection,
-          projectionIndex: config.projections.length + mi,
-          totalProjections,
-          tenantIds: config.tenantIds,
-          aggregateIds: config.aggregateIds,
-          since: config.since,
-          batchSize,
-          aggregateBatchSize,
-          dryRun: config.dryRun ?? false,
-          log,
-          onProgress: callbacks?.onProgress,
-          onBatchComplete: callbacks?.onBatchComplete,
-        });
-
-        totalAggregatesReplayed += result.aggregatesReplayed;
-        totalEventsReplayed += result.totalEvents;
-        totalBatchErrors += result.batchErrors;
-        if (!firstError && result.firstError) firstError = result.firstError;
-        for (const tid of result.touchedTenants) touchedTenants.add(tid);
-
-        if (result.batchErrors > 0) break;
-      }
-    }
-
-    // State-projection lane: pause and drain each `.withProjection()` queue,
-    // then rebuild its Postgres rows deterministically from canonical events.
-    if (totalBatchErrors === 0) {
-      for (let si = 0; si < stateProjections.length; si++) {
-        const projection = stateProjections[si]!;
-        const result = await replayStateProjection({
-          ctx: this.ctx,
-          projection,
-          projectionIndex:
-            config.projections.length + mapProjections.length + si,
-          totalProjections,
-          tenantIds: config.tenantIds,
-          aggregateIds: config.aggregateIds,
-          since: config.since,
-          batchSize,
-          aggregateBatchSize,
-          dryRun: config.dryRun ?? false,
-          log,
-          onProgress: callbacks?.onProgress,
-          onBatchComplete: callbacks?.onBatchComplete,
-        });
-
-        totalAggregatesReplayed += result.aggregatesReplayed;
-        totalEventsReplayed += result.totalEvents;
-        totalBatchErrors += result.batchErrors;
-        if (!firstError && result.firstError) firstError = result.firstError;
-        for (const tid of result.touchedTenants) touchedTenants.add(tid);
-
-        if (result.batchErrors > 0) break;
-      }
-    }
-
-    // Trigger OPTIMIZE TABLE on all CH tables that were written to.
-    // Runs per tenant DB so each touched database gets the merge hint.
-    // No FINAL — just nudge ReplacingMergeTree to deduplicate sooner.
-    if (totalEventsReplayed > 0 && totalBatchErrors === 0) {
-      const tables = new Set<string>();
-      for (const p of config.projections) {
-        if (p.targetTable) tables.add(p.targetTable);
-      }
-      for (const p of mapProjections) {
-        if (p.targetTable) tables.add(p.targetTable);
-      }
-
-      const tenantTargets =
-        touchedTenants.size > 0 ? [...touchedTenants] : ["default"];
-
-      for (const tenantId of tenantTargets) {
-        try {
-          const client = await this.ctx.resolveClient(tenantId);
-          for (const table of tables) {
-            await client.command({
-              query: "OPTIMIZE TABLE {table:Identifier}",
-              query_params: { table },
-            });
-            callbacks?.log?.write({
-              step: "optimize",
-              table,
-              tenant: tenantId,
-            });
-          }
-        } catch {
-          // Non-fatal — merge will happen eventually
-        }
-      }
-    }
-
-    return {
-      aggregatesReplayed: totalAggregatesReplayed,
-      totalEvents: totalEventsReplayed,
-      batchErrors: totalBatchErrors,
-      firstError,
-    };
   }
 
+  /**
+   * Run only the fold/map engine. Kept for callers that select fold and map
+   * projections explicitly; throws if the config carries state projections.
+   */
   async replayOptimized(
     config: ReplayConfig,
     callbacks?: ReplayCallbacks & { log?: ReplayLogWriter },
   ): Promise<ReplayResult> {
-    return replayOptimized({ ctx: this.ctx, config, callbacks });
+    return runFoldMapReplay({ ctx: this.ctx, config, callbacks });
   }
 
   /**

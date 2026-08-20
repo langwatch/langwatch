@@ -7,15 +7,15 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { generate } from "@langwatch/ksuid";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   type Organization,
   OrganizationUserRole,
   type Project,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
 import {
@@ -43,6 +43,8 @@ const resolveTestClickHouseClient = async () => chClient;
 // too, so standing in for the store means standing in for all of it.
 let planHasWebhookEndpoints = true;
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     planProvider: {
       getActivePlan: async () => ({
@@ -71,10 +73,11 @@ vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
     >();
   return {
     ...original,
-    getClickHouseClientForProject: resolveTestClickHouseClient,
+    getClickHouseClientForTenant: resolveTestClickHouseClient,
   };
 });
 
+import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import { app } from "../[[...route]]/app";
 
 const ns = `billing-api-${nanoid(8)}`;
@@ -110,6 +113,11 @@ async function deleteOrganizationDependents(
     });
   }
 }
+
+// Held for the whole file. The rollup this suite writes to and reads back is
+// database-wide, so a neighbouring suite rebuilding it drops the materialised
+// view out from under these fixtures.
+holdClickHouseSchemaLockForFile();
 
 describe("Feature: Gateway spend reconciliation REST surface", () => {
   let organization: Organization;
@@ -191,6 +199,11 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
             cache_read_input_tokens: row.tokensCacheRead,
             cache_creation_input_tokens: row.tokensCacheWrite,
             reasoning_tokens: row.tokensReasoning,
+            cache_creation_1h_tokens: 0,
+            input_audio_tokens: 0,
+            output_audio_tokens: 0,
+            input_chars: 0,
+            audio_ms: 0,
           },
           rateVersion: row.rateVersion,
           // Overrides set the display string; derive the integer so both

@@ -380,7 +380,7 @@ secured
   .get("/Users", describeRoute(LIST_USERS), async (c) => {
     const organizationId = c.get("scimOrganizationId");
 
-    const scimService = ScimService.create(prisma);
+    const scimService = ScimService.create({ prisma });
 
     const filter = c.req.query("filter") ?? undefined;
     const startIndex = positiveIntegerQuery(c.req.query("startIndex"), 1);
@@ -401,7 +401,7 @@ secured
   .post("/Users", describeRoute(CREATE_USER), async (c) => {
     const organizationId = c.get("scimOrganizationId");
 
-    const scimService = ScimService.create(prisma);
+    const scimService = ScimService.create({ prisma });
 
     const body = await parseJsonBody(c);
     if (body === null) {
@@ -431,7 +431,7 @@ secured
     const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
-    const scimService = ScimService.create(prisma);
+    const scimService = ScimService.create({ prisma });
 
     const result = await scimService.getUser({ id, organizationId });
 
@@ -448,7 +448,7 @@ secured
     const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
-    const scimService = ScimService.create(prisma);
+    const scimService = ScimService.create({ prisma });
 
     const body = await parseJsonBody(c);
     if (body === null) {
@@ -479,7 +479,7 @@ secured
     const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
-    const scimService = ScimService.create(prisma);
+    const scimService = ScimService.create({ prisma });
 
     const body = await parseJsonBody(c);
     if (body === null) {
@@ -510,7 +510,7 @@ secured
     const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
-    const scimService = ScimService.create(prisma);
+    const scimService = ScimService.create({ prisma });
 
     const result = await scimService.deleteUser({ id, organizationId });
 
@@ -528,7 +528,7 @@ secured
   .get("/Groups", describeRoute(LIST_GROUPS), async (c) => {
     const organizationId = c.get("scimOrganizationId");
 
-    const service = ScimGroupService.create(prisma);
+    const service = ScimGroupService.create({ prisma });
 
     const excludedAttributes = (c.req.query("excludedAttributes") ?? "")
       .split(",")
@@ -551,7 +551,7 @@ secured
   .post("/Groups", describeRoute(CREATE_GROUP), async (c) => {
     const organizationId = c.get("scimOrganizationId");
 
-    const service = ScimGroupService.create(prisma);
+    const service = ScimGroupService.create({ prisma });
 
     const body = await parseJsonBody(c);
     if (body === null) {
@@ -587,7 +587,7 @@ secured
       .map((s) => s.trim())
       .filter(Boolean);
 
-    const result = await ScimGroupService.create(prisma).getGroup({
+    const result = await ScimGroupService.create({ prisma }).getGroup({
       externalScimId: id,
       organizationId,
       excludeMembers: excludedAttributes.includes("members"),
@@ -617,7 +617,7 @@ secured
       return scimError(c, 400, parsed.error.message);
     }
 
-    const result = await ScimGroupService.create(prisma).replaceGroup({
+    const result = await ScimGroupService.create({ prisma }).replaceGroup({
       externalScimId: id,
       organizationId,
       request: parsed.data,
@@ -647,7 +647,7 @@ secured
       return scimError(c, 400, parsed.error.message);
     }
 
-    const result = await ScimGroupService.create(prisma).updateGroup({
+    const result = await ScimGroupService.create({ prisma }).updateGroup({
       externalScimId: id,
       organizationId,
       patchRequest: parsed.data,
@@ -666,7 +666,7 @@ secured
     const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
-    const result = await ScimGroupService.create(prisma).deleteGroup({
+    const result = await ScimGroupService.create({ prisma }).deleteGroup({
       externalScimId: id,
       organizationId,
     });

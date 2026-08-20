@@ -34,12 +34,14 @@ function note(atMs: number): TranscriptEntry {
 describe("buildEntryTimeline", () => {
   describe("given model_call entries carrying tokens and cost", () => {
     it("accumulates tokens and cost as they occur in the sequence", () => {
-      const timeline = buildEntryTimeline([
-        modelCall(1000, 100, 0.01),
-        note(1500),
-        modelCall(2000, 50, 0.02),
-        modelCall(3000, 25, 0.03),
-      ]);
+      const timeline = buildEntryTimeline({
+        entries: [
+          modelCall(1000, 100, 0.01),
+          note(1500),
+          modelCall(2000, 50, 0.02),
+          modelCall(3000, 25, 0.03),
+        ],
+      });
       expect(timeline.map((p) => p.cumulativeTokens)).toEqual([
         100, 100, 150, 175,
       ]);
@@ -51,14 +53,44 @@ describe("buildEntryTimeline", () => {
 
   describe("given entries with timestamps", () => {
     it("measures elapsed time from the first entry", () => {
-      const timeline = buildEntryTimeline([note(1000), note(3000), note(8000)]);
+      const timeline = buildEntryTimeline({
+        entries: [note(1000), note(3000), note(8000)],
+      });
       expect(timeline.map((p) => p.elapsedMs)).toEqual([0, 2000, 7000]);
+    });
+  });
+
+  describe("given the session's own start time", () => {
+    it("measures elapsed time from the session start, not the loaded window", () => {
+      const timeline = buildEntryTimeline({
+        entries: [note(5000), note(8000)],
+        startAtMs: 1000,
+      });
+      expect(timeline.map((p) => p.elapsedMs)).toEqual([4000, 7000]);
+    });
+
+    it("never reads negative when an entry predates the anchor by a hair", () => {
+      const timeline = buildEntryTimeline({
+        entries: [note(990)],
+        startAtMs: 1000,
+      });
+      expect(timeline[0]!.elapsedMs).toBe(0);
+    });
+
+    it("falls back to the first entry when the anchor is null", () => {
+      const timeline = buildEntryTimeline({
+        entries: [note(1000), note(4000)],
+        startAtMs: null,
+      });
+      expect(timeline.map((p) => p.elapsedMs)).toEqual([0, 3000]);
     });
   });
 
   describe("given non-model-call entries", () => {
     it("carries the running totals forward without adding to them", () => {
-      const timeline = buildEntryTimeline([modelCall(1000, 10, 0), note(2000)]);
+      const timeline = buildEntryTimeline({
+        entries: [modelCall(1000, 10, 0), note(2000)],
+      });
       expect(timeline[1]!.cumulativeTokens).toBe(10);
     });
   });

@@ -1,11 +1,12 @@
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
-import type { PrismaClient, Scenario } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
+import type { PrismaClient, Scenario } from "~/generated/prisma/client";
 import { ScenarioNotFoundError } from "./errors";
 import {
   type CreateScenarioInput,
   ScenarioRepository,
+  type ScenarioRunConfig,
   type UpdateScenarioInput,
 } from "./scenario.repository";
 
@@ -88,6 +89,27 @@ export class ScenarioService {
         span.setAttribute("result.found", result !== null);
         return result;
       },
+    );
+  }
+
+  /**
+   * Fetch what a run needs off each scenario before it schedules anything:
+   * the name, the declared parameters, and the text they render into.
+   */
+  async getRunConfigByIds(params: {
+    ids: string[];
+    projectId: string;
+  }): Promise<ScenarioRunConfig[]> {
+    return tracer.withActiveSpan(
+      "ScenarioService.getRunConfigByIds",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+          "scenario.count": params.ids.length,
+        },
+      },
+      async () => this.repository.findRunConfigByIds(params),
     );
   }
 

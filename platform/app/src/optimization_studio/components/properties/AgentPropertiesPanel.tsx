@@ -152,7 +152,7 @@ function DbAgentPanel({
   );
 
   const updateMutation = api.agents.update.useMutation();
-  const trpcContext = api.useContext();
+  const trpcContext = api.useUtils();
 
   const agentData = agentQuery.data;
   // The node's DSL snapshot is the canonical in-workflow state: it is
@@ -619,6 +619,7 @@ function DbAgentPanel({
     headers,
     auth,
     outputPath,
+    bodyTemplate,
   });
 
   // Register footer

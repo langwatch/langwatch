@@ -21,11 +21,7 @@
  * migrates the dedicated test database, and setupEnv pins a deterministic
  * CREDENTIALS_SECRET.
  */
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -37,6 +33,11 @@ import {
   it,
   vi,
 } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 
 /**
  * Every outbound request the probe could make, recorded.

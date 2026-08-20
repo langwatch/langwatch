@@ -188,7 +188,7 @@ describe("S3PollingPullerAdapter", () => {
       });
       expect(result.events[2]).toMatchObject({
         source_event_id: "e3",
-        cost_usd: 0.003,
+        cost_usd: "0.003",
       });
     });
 

@@ -17,6 +17,11 @@ import type {
   SpanFactsContributedEvent,
 } from "../../schemas/events";
 import {
+  isCodingAgentSessionSpan,
+  MAX_SET,
+  meanTtftMs,
+} from "../../services/coding-agent-session.derivation";
+import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   CodingAgentSessionFoldProjection,
   type CodingAgentSessionState,
@@ -489,6 +494,74 @@ describe("CodingAgentSessionFoldProjection", () => {
       expect(state.gitBranch).toBe("feat/git-context");
     });
 
+    /** @scenario Every branch a session reports joins its branch set, first seen first */
+    it("keeps every branch it drove, oldest first, alongside the current one", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ facts: contextFacts() }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: contextFacts({ "vcs.ref.head.name": "feat/sessions-screen" }),
+          timeMs: 2_500,
+        }),
+        state,
+      );
+
+      expect(state.gitBranches).toEqual(["main", "feat/sessions-screen"]);
+      // The scalar stays the present tense: the branch the session is in.
+      expect(state.gitBranch).toBe("feat/sessions-screen");
+    });
+
+    /** @scenario A branch reported twice joins the set once */
+    it("names a branch once however often the session returns to it", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      for (const [index, branch] of [
+        "main",
+        "feat/a",
+        "main",
+        "feat/a",
+      ].entries()) {
+        state = projection.handleCodingAgentSessionLogFactsContributed(
+          logFactsEvent({
+            facts: contextFacts({ "vcs.ref.head.name": branch }),
+            timeMs: 1_000 + index * 500,
+          }),
+          state,
+        );
+      }
+
+      expect(state.gitBranches).toEqual(["main", "feat/a"]);
+      expect(state.gitBranch).toBe("feat/a");
+    });
+
+    /** @scenario The branch set stops growing at its bound */
+    it("holds the first branches it saw once the set is full", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      for (let index = 0; index < MAX_SET + 10; index++) {
+        state = projection.handleCodingAgentSessionLogFactsContributed(
+          logFactsEvent({
+            facts: contextFacts({ "vcs.ref.head.name": `feat/${index}` }),
+            timeMs: 1_000 + index,
+          }),
+          state,
+        );
+      }
+
+      expect(state.gitBranches).toHaveLength(MAX_SET);
+      expect(state.gitBranches[0]).toBe("feat/0");
+      expect(state.gitBranches).not.toContain(`feat/${MAX_SET}`);
+      // The bound caps the SET, never the current branch.
+      expect(state.gitBranch).toBe(`feat/${MAX_SET + 9}`);
+    });
+
     /** @scenario A session context event from Codex folds its git identity */
     /** @scenario A session context event from opencode folds its git identity */
     it.each([
@@ -555,6 +628,239 @@ describe("CodingAgentSessionFoldProjection", () => {
       // The title rides a log event, never a model call: the response body is
       // Claude's second half of a call its api_request already counted.
       expect(state.modelCalls).toBe(0);
+    });
+  });
+
+  describe("when the session earns its name from a prompt", () => {
+    const promptFacts = (
+      title: string,
+    ): Record<string, string | number | boolean> => ({
+      "event.name": "claude_code.user_prompt",
+      prompt_length: title.length,
+      "langwatch.session.title_fallback": title,
+    });
+
+    /** @scenario A session with no generated title is named by the first thing the user asked */
+    it("names an unnamed session by its first prompt and keeps that name", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: promptFacts("Fix the retry loop in the outbox worker"),
+        }),
+        state,
+      );
+      expect(state.title).toBe("Fix the retry loop in the outbox worker");
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ facts: promptFacts("Now the docs"), timeMs: 2_500 }),
+        state,
+      );
+      expect(state.title).toBe("Fix the retry loop in the outbox worker");
+      expect(state.prompts).toBe(2);
+    });
+
+    /** @scenario A generated title replaces the prompt-derived name */
+    it("lets a generated title replace the prompt-derived name", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: promptFacts("fix flaky test please, the fold one"),
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "claude_code.api_response_body",
+            "langwatch.session.title": "Fix the flaky fold test",
+          },
+          timeMs: 2_500,
+        }),
+        state,
+      );
+
+      expect(state.title).toBe("Fix the flaky fold test");
+    });
+
+    /** @scenario The harvest names the session by the first thing the user asked */
+    it("fills the name from the companion event and never overwrites one", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      const harvestContext = (
+        title: string,
+      ): Record<string, string | number | boolean> => ({
+        "event.name": "langwatch.session_context",
+        "coding_agent.name": "codex",
+        "vcs.repository.host": "github.com",
+        "vcs.repository.owner": "acme",
+        "vcs.repository.name": "widgets",
+        "langwatch.session.title": title,
+      });
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: harvestContext("Read notes.txt and summarize it"),
+          agent: "codex",
+        }),
+        state,
+      );
+      expect(state.title).toBe("Read notes.txt and summarize it");
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: harvestContext("A later re-post with another name"),
+          agent: "codex",
+          timeMs: 2_500,
+        }),
+        state,
+      );
+      expect(state.title).toBe("Read notes.txt and summarize it");
+    });
+
+    /** @scenario "The session's own name outranks the generated title" */
+    /** @scenario "The session's own name outranks the prompt-derived name" */
+    it("holds the session's name over both derived titles", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "claude_code",
+            "langwatch.session.name": "pr-reviewer",
+          },
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: promptFacts("Good morning. Use the review skill."),
+          timeMs: 2_000,
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "claude_code.api_response_body",
+            "langwatch.session.title": "Review the open pull requests",
+          },
+          timeMs: 3_000,
+        }),
+        state,
+      );
+
+      // Neither the prompt nor the regenerated conversation title moved it.
+      expect(state.title).toBe("pr-reviewer");
+      expect(state.titleSource).toBe("name");
+    });
+
+    /** @scenario "A renamed session renames its row" */
+    it("folds the newest name in place", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      const declared = (title: string) =>
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "claude_code",
+            "langwatch.session.name": title,
+          },
+        });
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        declared("pr-reviewer"),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        declared("pr-hound"),
+        state,
+      );
+
+      expect(state.title).toBe("pr-hound");
+    });
+
+    /** @scenario "A blank name does not rename the session" */
+    it("keeps the previous title when a later name is whitespace", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      const declared = (title: string) =>
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "claude_code",
+            "langwatch.session.name": title,
+          },
+        });
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        declared("pr-reviewer"),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        declared("   "),
+        state,
+      );
+
+      expect(state.title).toBe("pr-reviewer");
+    });
+
+    /** @scenario "A context record with no repository still folds its titles" */
+    it("folds a context that names no repository", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "codex",
+            "langwatch.session.title": "Read notes.txt",
+            "langwatch.session.name": "pr-reviewer",
+          },
+          agent: "codex",
+        }),
+        state,
+      );
+
+      expect(state.repositoryHost).toBeNull();
+      expect(state.repositoryName).toBeNull();
+      // The name wins over the prompt-derived title on the same record.
+      expect(state.title).toBe("pr-reviewer");
+      expect(state.titleSource).toBe("name");
+    });
+
+    /** @scenario "A row from before the source column still takes a generated title" */
+    it("lets a generated title replace a title with no recorded source", () => {
+      const projection = makeProjection();
+      // A pre-00083 row decodes with a title and no source; it must keep the
+      // old newest-wins behaviour rather than freezing on its first title.
+      const decoded = {
+        ...initStateOf(projection),
+        title: "Good morning.",
+        titleSource: null,
+      };
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "claude_code.api_response_body",
+            "langwatch.session.title": "Review the open pull requests",
+          },
+        }),
+        decoded,
+      );
+
+      expect(state.title).toBe("Review the open pull requests");
+      expect(state.titleSource).toBe("generated");
     });
   });
 
@@ -778,9 +1084,44 @@ describe("CodingAgentSessionFoldProjection", () => {
       expect(bare.repositoryHost).toBe("");
       expect(bare.gitBranch).toBe("");
       expect(bare.title).toBe("");
+      expect(bare.gitBranches).toEqual([]);
       expect(codingAgentSessionStateFromRow(bare).repositoryHost).toBeNull();
       expect(codingAgentSessionStateFromRow(bare).gitBranch).toBeNull();
       expect(codingAgentSessionStateFromRow(bare).title).toBeNull();
+      expect(codingAgentSessionStateFromRow(bare).gitBranches).toEqual([]);
+    });
+
+    it("writes every branch the session drove, and decodes them back", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+      for (const [index, branch] of ["main", "feat/two"].entries()) {
+        state = projection.handleCodingAgentSessionLogFactsContributed(
+          logFactsEvent({
+            facts: {
+              "event.name": "langwatch.session_context",
+              "vcs.repository.owner": "acme",
+              "vcs.repository.name": "widgets",
+              "vcs.ref.head.name": branch,
+            },
+            timeMs: 1_000 + index * 500,
+          }),
+          state,
+        );
+      }
+
+      const row = projectCodingAgentSessionToRow({
+        state,
+        tenantId: "tenant-1",
+        sessionId: SESSION_ID,
+        version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+      });
+
+      expect(row.gitBranches).toEqual(["main", "feat/two"]);
+      expect(row.gitBranch).toBe("feat/two");
+      expect(codingAgentSessionStateFromRow(row).gitBranches).toEqual([
+        "main",
+        "feat/two",
+      ]);
     });
   });
 });
@@ -1204,6 +1545,317 @@ describe("coding-agent session fold, per-agent gating", () => {
       expect(state.toolCalls).toBe(0);
       expect(state.toolCounts).toEqual({});
       expect(state.steps).toEqual([]);
+    });
+  });
+});
+
+describe("coding-agent session fold, codex", () => {
+  /** A live turn span's facts, verbatim spellings from codex-rs 0.147. */
+  const codexTurnFacts = {
+    "gen_ai.request.model": "gpt-5.6-sol",
+    "gen_ai.response.model": "gpt-5.6-sol",
+    "gen_ai.usage.input_tokens": "13944",
+    "gen_ai.usage.output_tokens": "7",
+    "gen_ai.usage.cache_read.input_tokens": "11008",
+    "gen_ai.usage.cache_creation.input_tokens": "0",
+    "codex.turn.token_usage.non_cached_input_tokens": "2936",
+  };
+
+  describe("when a codex turn span contributes", () => {
+    /** @scenario "a codex turn span folds the turn's model call and tokens" */
+    it("folds the turn as a model call with disjoint token buckets", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "session_task.turn",
+          spanId: "turn-1",
+          agent: "codex",
+          facts: codexTurnFacts,
+          startMs: 1_000,
+          endMs: 8_355,
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.modelCalls).toBe(1);
+      expect(state.models).toEqual(["gpt-5.6-sol"]);
+      // codex's gen_ai input INCLUDES the cache buckets; the fold keeps the
+      // disjoint convention, so input here is the non-cached count.
+      expect(state.inputTokens).toBe(2_936);
+      expect(state.outputTokens).toBe(7);
+      expect(state.cacheReadTokens).toBe(11_008);
+      expect(state.cacheCreationTokens).toBe(0);
+      expect(state.peakContextTokens).toBe(11_008);
+      // The turn's wall time includes the tools that ran inside it, so it
+      // does not pretend to be model latency.
+      expect(state.modelCallMs).toBe(0);
+      expect(state.attempts).toBe(1);
+    });
+
+    it("derives the non-cached input when codex's own count is absent", () => {
+      const projection = makeProjection();
+      const {
+        "codex.turn.token_usage.non_cached_input_tokens": _omit,
+        ...rest
+      } = codexTurnFacts;
+
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "session_task.turn",
+          spanId: "turn-2",
+          agent: "codex",
+          facts: rest,
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.inputTokens).toBe(13_944 - 11_008);
+      expect(state.cacheReadTokens).toBe(11_008);
+    });
+
+    it("contributes identity only when the contribution is labeled as another agent", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "session_task.turn",
+          spanId: "turn-3",
+          agent: "unknown",
+          facts: codexTurnFacts,
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.modelCalls).toBe(0);
+      expect(state.inputTokens).toBe(0);
+    });
+  });
+
+  describe("when a codex tool_result event contributes", () => {
+    /** @scenario "a codex shell command counts once despite its sandbox outcome event" */
+    it("folds the tool run from the event and drops the sandbox outcome", () => {
+      const projection = makeProjection();
+
+      const afterToolResult =
+        projection.handleCodingAgentSessionLogFactsContributed(
+          logFactsEvent({
+            agent: "codex",
+            timeMs: 2_000,
+            facts: {
+              "event.name": "codex.tool_result",
+              tool_name: "shell",
+              success: "true",
+              duration_ms: 340,
+            },
+          }),
+          initStateOf(projection),
+        );
+      // The SAME shell command also fires sandbox_outcome; mapping it onto
+      // tool_result again would count the command twice.
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "codex",
+          timeMs: 2_001,
+          facts: {
+            "event.name": "codex.sandbox_outcome",
+            tool_name: "shell",
+            outcome: "success",
+          },
+        }),
+        afterToolResult,
+      );
+
+      expect(state.toolCalls).toBe(1);
+      expect(state.toolCounts).toEqual({ shell: 1 });
+      expect(state.steps).toEqual([
+        { name: "shell", count: 1, startedAtMs: 2_000, failed: false },
+      ]);
+      expect(state.toolMs).toBe(340);
+    });
+
+    /** @scenario "the codex script wrapper is plumbing, its commands are the tool runs" */
+    it("counts the command inside a code-mode script, never the exec wrapper", () => {
+      const projection = makeProjection();
+
+      // Code mode: the model calls `exec` with a script, and the
+      // `tools.exec_command(...)` inside re-enters codex's registry as its
+      // own dispatch — BOTH layers report a tool_result for one command.
+      const afterCommand =
+        projection.handleCodingAgentSessionLogFactsContributed(
+          logFactsEvent({
+            agent: "codex",
+            timeMs: 3_000,
+            facts: {
+              "event.name": "codex.tool_result",
+              tool_name: "exec_command",
+              success: "true",
+              duration_ms: 47,
+            },
+          }),
+          initStateOf(projection),
+        );
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "codex",
+          timeMs: 3_001,
+          facts: {
+            "event.name": "codex.tool_result",
+            tool_name: "exec",
+            success: "true",
+            duration_ms: 283,
+          },
+        }),
+        afterCommand,
+      );
+
+      expect(state.toolCalls).toBe(1);
+      expect(state.toolCounts).toEqual({ exec_command: 1 });
+      expect(state.toolMs).toBe(47);
+      expect(state.steps).toEqual([
+        { name: "exec_command", count: 1, startedAtMs: 3_000, failed: false },
+      ]);
+    });
+
+    it("reads codex's bare mcp_server spelling into the server set", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "codex",
+          timeMs: 2_000,
+          facts: {
+            "event.name": "codex.tool_result",
+            tool_name: "search",
+            success: "true",
+            duration_ms: 50,
+            mcp_server: "grafana",
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.mcpServers).toEqual(["grafana"]);
+    });
+  });
+
+  describe("when the human answers codex's tool prompts", () => {
+    /** @scenario "a codex denial and a codex abort are the human's decisions, not failures" */
+    it("counts denied as a denial, and abort or timed_out as walking away", () => {
+      const projection = makeProjection();
+      const decide = (
+        state: CodingAgentSessionState,
+        decision: string,
+        timeMs: number,
+      ) =>
+        projection.handleCodingAgentSessionLogFactsContributed(
+          logFactsEvent({
+            agent: "codex",
+            timeMs,
+            facts: {
+              "event.name": "codex.tool_decision",
+              tool_name: "shell",
+              decision,
+            },
+          }),
+          state,
+        );
+
+      let state = initStateOf(projection);
+      state = decide(state, "approved", 1_000);
+      state = decide(state, "denied", 1_001);
+      state = decide(state, "denied_with_network_policy_deny", 1_002);
+      state = decide(state, "abort", 1_003);
+      state = decide(state, "timed_out", 1_004);
+
+      expect(state.toolsDenied).toBe(2);
+      expect(state.toolsAborted).toBe(2);
+      expect(state.failedTools).toBe(0);
+    });
+  });
+
+  describe("when codex reports time to first token", () => {
+    /** @scenario "codex time to first token folds from its own event" */
+    it("folds the turn_ttft event into the TTFT mean", () => {
+      const projection = makeProjection();
+
+      const first = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "codex",
+          timeMs: 1_000,
+          facts: { "event.name": "codex.turn_ttft", duration_ms: 1_200 },
+        }),
+        initStateOf(projection),
+      );
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "codex",
+          timeMs: 2_000,
+          facts: { "event.name": "codex.turn_ttft", duration_ms: 800 },
+        }),
+        first,
+      );
+
+      expect(state.ttftMsTotal).toBe(2_000);
+      expect(state.ttftSamples).toBe(2);
+      expect(meanTtftMs(state)).toBe(1_000);
+    });
+  });
+
+  describe("when the rollout harvest reports the session's checkout", () => {
+    /** @scenario "The harvest reports the repository the session worked on" */
+    it("gives the codex session its repository and branch", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "codex",
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "codex",
+            "vcs.repository.host": "github.com",
+            "vcs.repository.owner": "acme",
+            "vcs.repository.name": "acme-app",
+            "vcs.ref.head.name": "feat/pricing",
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.repositoryHost).toBe("github.com");
+      expect(state.repositoryOwner).toBe("acme");
+      expect(state.repositoryName).toBe("acme-app");
+      expect(state.gitBranch).toBe("feat/pricing");
+      expect(state.gitBranches).toEqual(["feat/pricing"]);
+    });
+  });
+
+  describe("the span gate for codex's bare-named spans", () => {
+    it("admits the turn span on the codex scope and declines it elsewhere", () => {
+      expect(
+        isCodingAgentSessionSpan({
+          name: "session_task.turn",
+          scopeName: "codex_exec",
+        }),
+      ).toBe(true);
+      expect(
+        isCodingAgentSessionSpan({
+          name: "session_task.turn",
+          scopeName: "com.acme.pipeline",
+        }),
+      ).toBe(false);
+      // handle_responses repeats the turn's tokens and carries a tokio
+      // thread.id the session-key resolution would read as the session.
+      expect(
+        isCodingAgentSessionSpan({
+          name: "handle_responses",
+          scopeName: "codex_exec",
+        }),
+      ).toBe(false);
+      // Claude's names carry their own namespace and need no scope.
+      expect(
+        isCodingAgentSessionSpan({ name: "claude_code.tool", scopeName: null }),
+      ).toBe(true);
     });
   });
 });

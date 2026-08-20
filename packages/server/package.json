@@ -14,8 +14,8 @@
 		"test:invariants": "vitest run test/workspace-invariants.test.ts"
 	},
 	"dependencies": {
-		"chalk": "^5.4.1",
-		"commander": "^14.0.0",
+		"chalk": "^6.0.0",
+		"commander": "^15.0.0",
 		"concurrently": "^9.1.2",
 		"execa": "^9.6.0",
 		"listr2": "^9.0.4",
@@ -24,12 +24,12 @@
 		"tar": "^7.4.3"
 	},
 	"devDependencies": {
-		"@types/node": "^22.10.7",
+		"@types/node": "^26.2.0",
 		"@types/prompts": "^2.4.9",
 		"@types/tar": "^6.1.13",
 		"esbuild": "^0.28.1",
 		"tsx": "^4.21.0",
-		"typescript": "^5.9.3",
+		"typescript": "^7.0.2",
 		"vitest": "^4.1.0"
 	}
 }

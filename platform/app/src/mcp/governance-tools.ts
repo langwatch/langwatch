@@ -26,8 +26,8 @@
  * Docs: docs/ai-governance/mcp.mdx
  */
 
-import type { PrismaClient } from "@prisma/client";
 import { type ZodRawShape, z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 type ToolCallback = (
   // The MCP SDK passes parsed input as the first arg; we don't currently
@@ -329,7 +329,7 @@ export function registerGovernanceMcpTools(
 
   server.tool(
     "governance_ingestion_keys_mint",
-    "Mint (rotating in place) an ingestion key for the caller's personal project + source_type, returning the sk-lw-* token (shown ONCE). Requires OAuth-authenticated session + organization:view.",
+    "Mint (rotating in place) an ingestion key for the caller's personal project + source_type, returning the ik-lw-* token (shown ONCE). Requires OAuth-authenticated session + organization:view.",
     {
       source_type: z.string(),
       template_id: z.string().optional(),
