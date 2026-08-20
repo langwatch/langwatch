@@ -1,277 +1,156 @@
-# ADR-110: A grant aggregate is a grant, not an organization
+# ADR-110: A grant is an aggregate; the rollout is one migration
 
 **Date:** 2026-08-20
 
 **Status:** Proposed
 
-**Supersedes:** the aggregate choice in ADR-092 §13 (`aggregateId =
-organizationId`). The rest of ADR-092 — the engine, the fork, the cutover
-sequencing — stands unchanged.
+**Supersedes:** ADR-092 §13's aggregate choice (`aggregateId = organizationId`)
+and its three-stage rollout. The rest of ADR-092 — the engine, the fork, the
+vocabulary — stands.
 
-**Builds on:** ADR-100 (the aggregate-scoped lane; once the grant is the
-aggregate, per-grant mutual exclusion and cross-grant concurrency are what
-that lane already gives, so this decision adds no group-key override of its
-own), ADR-105 (an aggregate is one declaration, from which events, commands
-and types are derived — the two new aggregates are declared that way rather
-than hand-written across `constants.ts` and `events.ts`).
+**Builds on:** ADR-100 (the aggregate-scoped lane, which is where per-grant
+concurrency comes from), ADR-105 (an aggregate is one declaration).
 
-**Related:** ADR-103 (a run's totals are a query, not maintained counters —
-the same instinct applied to run-shaped work: stop maintaining what can be
-derived), ADR-057 (one-share-per-resource dropped; the token is the
-credential's own identity, which is why resource grants carry no cross-grant
-invariant).
+**Related:** ADR-103 (a run's totals are a query — the same instinct: stop
+maintaining what can be derived), ADR-057 (the share token is its own
+identity).
 
 ## Context
 
-ADR-092 §13 built the grants ledger as one aggregate per organization —
-`aggregateType = "authz_grants"`, `aggregateId = organizationId` — citing the
-`billing_report` precedent. That precedent does not carry: the
-`reportUsageForMonth` handler returns `[]` on every path, so it never appends
-an event. Its aggregate is a pure routing key and its fold state is
-permanently empty, which is why the shape's one weakness never showed there.
+ADR-092 made `organizationId` both the tenant and the aggregate, citing the
+`billing_report` precedent — a pipeline whose handler returns `[]` on every
+path and therefore never appends, so its fold state is permanently empty and
+the shape's flaw could not show. Here it did. One aggregate's fold state
+became every grant the organization had ever held, and the state store
+reloaded all of it on every event batch.
 
-Copied into a pipeline that *does* append, the shape means the fold state of a
-single aggregate is every grant the organization has ever held. The state
-store reconstructs that whole state from the compat tables on every
-invocation:
+Measured on organization `HXECRq2mRfSQpxTiSCcsS`, 2026-08-20:
 
-```
-PrismaAuthzGrantsProjectionRepository
-  load()            -> prisma.grant.findMany({ where: { organizationId } })   unbounded
-  readStoredHeads() -> prisma.grant.findMany({ where: { organizationId } })   unbounded, again
-                       ... once per applied event batch
-```
-
-Measured on `HXECRq2mRfSQpxTiSCcsS` (2026-08-20, LangWatch's own organization):
-
-| observation | value |
+| | |
 |---|---|
 | grant rows on the aggregate | 69,826 |
-| genesis facts landed 10:26 -> 16:22 | 326 |
-| effective fold rate | ~0.015 facts/sec |
-| rate the convergence budget assumes | ~1.8 facts/sec |
-| cutover facts awaiting | ~69,500 |
-| time those need at the assumed rate | ~10.7 hours |
-| budget the ceiling actually grants | 20 minutes (`maxTimeoutMs`) |
+| facts landed 10:26 → 16:22 | 326 (~0.015/sec) |
+| rate the convergence budget assumed | ~1.8/sec |
+| cutover facts awaiting | ~69,500, needing ~10.7 hours |
+| budget the ceiling granted | 20 minutes |
 
-The import therefore decelerates as it progresses — every batch re-reads a
-head that the previous batch made larger — and the convergence wait can never
-be satisfied, on any retry, by arithmetic rather than by any failure. Every
-subsystem reports healthy throughout: commands `status="completed"` with zero
-failures, the projection completing, no blocked queue groups, ~1.3s backlog.
+The import decelerated as it progressed — every batch re-read a head the
+previous batch had grown — so no retry could ever succeed. Every subsystem
+reported healthy throughout: commands completed, projection completed, no
+blocked groups, 1.3s backlog. Nothing was broken; the arithmetic was.
 
-Two distinct things share the aggregate today, and only one of them wants it:
-
-| fact | cross-grant invariant? | volume on this org |
-|---|---|---|
-| roles, membership, cutover state | yes, genuinely organization-wide | tens |
-| RESOURCE grants (share links) | none — ADR-057 dropped one-share-per-resource; the token is the credential's own identity | 69,500 |
-
-An aggregate is a consistency boundary, and a consistency boundary is supposed
-to be small and bounded. This one grows without limit for as long as the
-organization exists.
-
-A second, quieter problem: grant identity has two rules. The genesis import
-*adopts* a legacy `RoleBinding` row id as the grant id, while organization
-facts (the member floor row, the legacy-admin fallback) *derive* theirs with
-`deriveGrantId`, because they have no legacy row to adopt from. One entity
-type, two identity schemes, decided by provenance.
-
-We are still in rollout. No organization is on the engine, the ledger is dark,
-and every grant and event written so far is disposable.
+The rollout is also three migrations where one will do. The team-user backfill
+promotes `TeamUser` rows into `RoleBinding` rows so genesis has a uniform
+source to adopt; its own docblock says the promoted bindings "replace one for
+one", so it changes no access. It exists only to normalise the legacy schema
+for the benefit of the next step.
 
 ## Decision
 
-**We will separate the tenant from the aggregate.** The organization stays the
-tenant — it is the isolation and routing boundary, it is what the ClickHouse
-client resolver places, and it is what per-tenant ordering keys on. It stops
-being the aggregate.
-
-`authz_grants` is replaced by two aggregate types. The split follows the table
-above: what has a genuine organization-wide invariant keeps the organization
-boundary, and what does not gets its own.
+**A grant is its own aggregate.** The organization stays the TENANT — the
+isolation and routing boundary — and remains the AGGREGATE only for facts that
+are genuinely organization-wide.
 
 ```
-                  tenantId = organizationId   (both: routing, isolation)
-  ┌─────────────────────────────┬──────────────────────────────────────┐
-  │ authz_grant                 │ authz_org_policy                     │
-  ├─────────────────────────────┼──────────────────────────────────────┤
-  │ id = grantId                │ id = organizationId                  │
-  │ one grant's lifecycle:      │ role definitions, cutover flag,      │
-  │ attached, role changed,     │ migration tenant state, epoch        │
-  │ revoked                     │                                      │
-  │ ~1-5 events, bounded        │ tens of events, bounded              │
-  │ the unbounded part, now     │ the part that really is org-wide     │
-  │ bounded per aggregate       │ (deleteRole, offboard sequencing)    │
-  └─────────────────────────────┴──────────────────────────────────────┘
+                tenantId = organizationId  (both)
+  authz_grant                      authz_org_policy
+  id = grantId                     id = organizationId
+  one grant's lifecycle            roles, cutover flag, migration state
+  ~1-5 events                      tens of events
 ```
 
-Roles stay on the organization aggregate rather than becoming a third type.
-They are few (139 on the incident organization, one per API key), they change
-rarely, and keeping them beside the cutover flag preserves the
-role-before-grant ordering the import relies on without a cross-pipeline
-dependency.
+A command may no longer straddle aggregates, so batched `attachGrants` becomes
+a singular `attachGrant`: one command per grant, independent, folding
+concurrently on ADR-100's lane. We add no group-key override — the lane
+already gives per-aggregate mutual exclusion, and the per-organization
+serialization being removed was never a lane decision, only a consequence of
+every grant sharing one aggregate.
 
-Because one command may no longer straddle several aggregates, the batched
-`attachGrants` becomes a singular `attachGrant`. The import sends one command
-per grant instead of one command per 500-grant chunk. That is more commands,
-but each is tiny, and with the group key on the aggregate they run
-concurrently rather than through one per-organization queue — which is the
-point.
+**The rollout is one migration.** Every legacy table is a source of events:
 
-**The rule an aggregate id must satisfy is STABILITY ACROSS RETRIES of the
-same fact, not determinism for its own sake.** The event log dedupes on
-
-```sql
-ENGINE = ReplacingMergeTree(EventTimestamp)
-ORDER BY (TenantId, AggregateType, AggregateId, IdempotencyKey)
+```
+OrganizationUser, TeamUser, RoleBinding, CustomRole, ShareLink
+        │  emit
+        ▼
+  events ──► fold ──► Grant / Role projections
+        │
+        ▼  when the projection agrees with legacy
+  cutover_completed on authz_org_policy  ──►  reads fork here
 ```
 
-so `AggregateId` is part of the dedup key and an idempotency key only dedupes
-*within* one aggregate. An id minted freshly per attempt therefore defeats
-idempotency entirely: the retry lands on a different aggregate, nothing
-collapses, and each pass adds another copy of the same fact. This is the
-row-explosion failure mode relocated, not avoided.
+Read every source table, emit each fact as an event, let it fold, check the
+ledger answers what legacy answers, then emit one `cutover_completed` on the
+organization. The read path forks on that single flag. No normalisation step,
+no staged prerequisites, no cross-migration state.
 
-Derivation is how a writer with no memory satisfies that rule. A migration
-retries across processes and days with nowhere to record what it minted last
-time, so the id must be recomputable from the fact — derivation is the
-mapping, computed rather than stored, and the alternative is a
-`legacyRowId -> grantId` table that is a worse cache of the same function. A
-live write does have somewhere to remember: the caller mints `commandId` once
-and reuses it on retry, so a KSUID minted alongside it is equally stable.
+**Aggregate ids must be STABLE ACROSS RETRIES, which is not the same as
+deterministic.** The event log dedupes on
+`(TenantId, AggregateType, AggregateId, IdempotencyKey)`, so `AggregateId` is
+part of the dedup key and an idempotency key only dedupes *within* an
+aggregate. An id minted freshly per attempt therefore defeats idempotency
+outright — the retry lands elsewhere, nothing collapses, and every pass adds
+another copy. Derivation is how a writer with no memory satisfies the rule: a
+migration retries across processes and days with nowhere to record what it
+minted, so the id must be recomputable from the fact. A live write already
+mints `commandId` once and reuses it on retry, so a KSUID minted alongside it
+is equally stable. Both produce a `grant_`-prefixed KSUID; nothing downstream
+can tell them apart.
 
-Both paths produce a `grant_`-prefixed KSUID and nothing downstream can tell
-them apart. What follows is therefore about where the bits come from:
-
-- **Every imported or backfilled grant derives its id from the fact.** A grant
-  IS the relation (principal × scope × resource) at a business time, so its id
-  is a function of that and nothing else. Adoption of legacy row ids is removed
-  entirely: it was the second rule that made one entity type have two, decided
-  by provenance rather than by anything about the grant.
-
-  ```
-  grantId = KSUID(
-    prefix    "grant",
-    timestamp floor(occurredAtMs / 1000),          // business time, k-sortable
-    instance  sha256(preimage)[0..8),
-    sequence  sha256(preimage).readUInt32BE(8),
-  )
-  preimage = [organizationId, principal.type, principal.id ?? "",
-              scope.type, scope.id, resourceToken ?? ""].join("")
-  ```
-
-  This is the existing `deriveGrantId`, unchanged in construction. Restating a
-  fact derives the same id, so the retry lands on the same aggregate with the
-  same idempotency key and the engine collapses it. Uniqueness becomes a
-  property of identity rather than of a lock held over a large aggregate.
-
-- **A grant created by a live write may mint a KSUID instead**, because its
-  caller already mints `commandId` once and reuses it on retry, which supplies
-  the stability. Its business time is `now()`, so derivation would produce a
-  unique id regardless and buys nothing. The requirement on this path is only
-  that the id is minted ONCE per logical action and not re-minted per attempt.
-
-- **An entity with mutable attributes gets a minted, stable id.** A role has a
-  name and a permission list that both change, so deriving its identity from
-  its content would make a rename a different role and strand every grant
-  referencing `custom:<id>`. Roles adopt their `CustomRole` row id on import
-  and mint a KSUID when created ledger-first. This is uniform for roles: every
-  role gets a stable natural id, never a content hash.
-
-**We will drop cross-aggregate work out of the fold.** `removeDepartedGrants`
-and `removeDepartedRoles` delete rows the current fold's own events never
-mention, which a per-aggregate fold cannot do and should never have done. A
-fold writes only what its own events say. The deny direction — revoking a head
-fact whose legacy row is gone — moves into the migration's reconciliation
-pass, which reads the projection and sends explicit per-grant revoke commands.
-
-**We will not override the group key.** ADR-100's aggregate-scoped lane
-already gives mutual exclusion per aggregate, so once the grant IS the
-aggregate, one organization's grants fold concurrently and a single grant's
-events stay mutually excluded — for free, and without this pipeline holding a
-special case. The per-organization serialization we are removing was never a
-lane decision; it was a consequence of every grant sharing one aggregate.
-
-**We will not preserve backwards compatibility.** Every grant, role and event
-written under the old scheme is deleted, and the rollout restarts from a clean
-ledger with a new set of ids.
+**The migration does not wait.** It cannot write the head — it can only emit —
+so it states its facts and checks once. A check that finds the projection
+behind reports the tenant as held, which the next pass revisits. That is a
+normal outcome, not an error, and it replaces the convergence wait entirely.
 
 ## Rationale / Trade-offs
 
-Making the grant the aggregate is what bounds the fold. `load()` and the
-head read become a lookup of one row by primary key, so cost per event stops
-depending on how much the organization already holds, and the import stops
-decelerating. It also removes the serialization: 69,500 share links import in
-parallel rather than through a single per-organization queue.
+Bounding the aggregate is what fixes the measurements above: `load()` becomes
+a lookup of one row by primary key, so cost per event stops depending on how
+much the organization already holds, and 69,500 share links import in parallel
+rather than through one queue.
 
-The obvious objection is that some invariants really are organization-wide —
-deleting a role must not strand grants that reference it, offboarding revokes
-across the whole organization, and the deny sweep asserts that nothing exists
-beyond the expected set. We accept eventual consistency for all three, because
-none of them needs atomicity to be correct:
+The objection is that some invariants are organization-wide. We accept
+eventual consistency for them, because none needs atomicity: a grant naming a
+deleted role resolves to the empty permission list, which grants nothing; and
+the deny sweep is a query plus compensating commands, which is what it already
+was.
 
-- A grant naming a role that no longer exists resolves to the empty permission
-  list, which grants nothing. The unsafe direction is denied by construction.
-- The deny sweep is a reconciliation over a read model. It is a query and a
-  set of compensating commands, which is what it already was in substance.
-- Offboarding fans out into one revoke command per grant.
+Offboarding is the exception and needs care, because the organization
+aggregate was carrying a safety property that is easy to drop by accident:
+*"the fold sweeps by principal, so an incomplete list cannot leave the member
+holding access."* Per-grant aggregates cannot sweep. We keep the guarantee by
+moving it to the synchronous projection write ADR-092 decision 7 already
+sanctions, so access ends before the call returns and the events become the
+record rather than the mechanism. Anything less trades a security property for
+a performance one.
 
-Offboarding needs care, because the organization aggregate was carrying a
-safety property that is easy to drop by accident. `offboardMember` documents
-it: *"The fold sweeps by principal, so an incomplete list cannot leave the
-member holding access."* A caller that missed a grant was still safe, because
-the fold held the whole organization's state and swept it. Per-grant
-aggregates have no organization-wide state to sweep, so that guarantee does
-not survive the split on its own.
-
-We keep it by moving the guarantee to where it was always strongest: the
-synchronous projection write. ADR-092 decision 7 already sanctions exactly one
-direct projection write for revocation, so that the deny holds before the call
-returns even with the queue stopped. Offboarding uses it, sweeping by
-principal against the projection, and the ledger events become the durable
-record rather than the enforcement mechanism. Access ends synchronously; the
-history catches up. Anything less would trade a security property for a
-performance one.
-
-What we give up is the ability to enforce a cross-grant invariant
-transactionally, should one ever appear. That is a real loss and we take it
-knowingly: the invariant we would be protecting is hypothetical, while the
-unbounded aggregate is measured and is currently blocking the rollout.
-
-Splitting identity by "content-derived vs minted" rather than by "imported vs
-ledger-born" is the rule that removes today's split-brain. Provenance is an
-accident of when a fact arrived; what the entity *is* does not change.
+What we give up is enforcing a cross-grant invariant transactionally, should
+one appear. We take that knowingly: the invariant is hypothetical, the
+unbounded aggregate is measured and is blocking the rollout.
 
 ## Consequences
 
-- The convergence wait stops being impossible to satisfy. It remains worth
-  making progress-based rather than deadline-based, so a large tenant is never
-  parked merely for being large, but that is now a refinement rather than the
-  fix.
-- `AuthzProjectionCursor` is keyed per organization today and becomes keyed per
-  aggregate. Its table is replaced rather than migrated.
-- The park message must name which facts are outstanding, not only how many.
-  Diagnosing the incident that produced this ADR required a database because
-  the error reported a count and a deadline and nothing else.
-- Replay granularity improves: one grant can be replayed without refolding an
-  organization's entire history.
-- Ops surfaces that assume one authz aggregate per organization need updating.
-- ADR-092 §13's aggregate choice is superseded. The rest of ADR-092 — the
-  engine, the fork, the cutover sequencing — stands unchanged.
+- Collapsing three migrations into one means a single pass does more, but the
+  only behaviour change is still one event, so the risky moment is unchanged.
+- Rollback becomes flipping one flag. The events stay and are inert until it
+  is set again.
+- Nothing materialises legacy rows before the flip, so the dark period is dark
+  by construction rather than by an UPDATE-ONLY rule inside the projection.
+- **Open:** the projection's compat writes exist so legacy stays usable for
+  rollback *after* the flip. They are not needed before it. Whether they
+  survive at all depends on whether rollback must be instant or may replay.
+- `AuthzProjectionCursor` becomes keyed per aggregate; its table is replaced.
+- A park must name which facts are outstanding. Diagnosing the incident above
+  needed a database because the error gave a count and a deadline, nothing
+  else.
+- Replay granularity improves: one grant replays without refolding an
+  organization.
 
 ## References
 
-- Supersedes the aggregate decision in [ADR-092](092-unified-authorization-engine.md) §13
-- [ADR-100](100-dispatch-plane-group-keys.md) — the aggregate-scoped lane this relies on
-- [ADR-103](103-runs-aggregates-are-queries.md) — the sibling decision for run-shaped work
-- [ADR-105](105-defining-an-aggregate.md) — how the two new aggregates are declared
-- [ADR-057](057-token-gated-trace-sharing.md) — one-share-per-resource dropped; the token is the credential's identity
-- Spec: `specs/rbac/grant-aggregate-boundary.feature`
-- Also: `specs/rbac/unified-authorization-engine.feature`, `specs/rbac/in-place-authz-migration.feature`
-- Incident: organization `HXECRq2mRfSQpxTiSCcsS`, 2026-08-20 — genesis and cutover both parked all day
+- [ADR-092](092-unified-authorization-engine.md) — partially superseded
+- [ADR-100](100-dispatch-plane-group-keys.md), [ADR-105](105-defining-an-aggregate.md) — the lane and the declaration form
+- Spec: `specs/rbac/authz-ledger-rollout.feature`
+- Incident: `HXECRq2mRfSQpxTiSCcsS`, 2026-08-20
 
-Note on numbering: 100–109 were all claimed by in-flight branches at the time
-of writing (the event-sourcing corpus and the identity platform redesign), so
-this record takes 110. ADR-100, -103 and -105 above are part of that corpus and
-were not yet on `main` when this was written.
+Numbering: 100–109 were all claimed by in-flight branches (the event-sourcing
+corpus, the identity redesign), so this record takes 110.
