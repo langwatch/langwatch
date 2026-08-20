@@ -196,16 +196,14 @@ overrides:
   "deepmerge-ts@<8.0.0": "8.0.0"
   # body-parser DoS on malformed urlencoded input.
   "body-parser@<1.20.6": ">=1.20.6"
-  # @langchain/community SSRF / path traversal in loaders is deliberately NOT
-  # pinned. The advisory range is `<=1.1.17`, which covers the 0.3.59 this tree
-  # actually resolves, and the first patched release is 1.1.18 — i.e. the only
-  # fix is a 0.x -> 1.x major. 1.x pruned its exports map and dropped the
-  # `./llms/ollama` subpath, which @copilotkit/runtime@1.8.14 requires
-  # internally, so forcing the floor crashes the server at boot with
-  # ERR_PACKAGE_PATH_NOT_EXPORTED and takes two unit shards with it (verified:
-  # the pin resolved 1.1.29 and CI went red on exactly that).
-  # Clearing these two medium alerts means moving @copilotkit/runtime to a
-  # release built against @langchain/community 1.x, which is its own change.
+  # @langchain/community needs no pin: it is no longer in the tree. Its SSRF /
+  # path traversal advisories (`<=1.1.17`, covering the 0.3.59 that used to
+  # resolve here) were unfixable by pinning, because the first patched release
+  # was a 0.x -> 1.x major whose pruned exports map dropped the `./llms/ollama`
+  # subpath that @copilotkit/runtime required internally — forcing the floor
+  # crashed the server at boot with ERR_PACKAGE_PATH_NOT_EXPORTED. Removing
+  # CopilotKit removed the only thing that depended on it, so both advisories
+  # cleared by deletion rather than by a version bump.
   # OpenTelemetry core + Jaeger propagator parsing advisories.
   "@opentelemetry/core@<2.8.0": ">=2.8.0"
   "@opentelemetry/propagator-jaeger@<2.9.0": ">=2.9.0"

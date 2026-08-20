@@ -1,9 +1,9 @@
 /**
  * Lightweight chat message preview for grid cards.
  *
- * Renders scenario messages with user/assistant alignment and colors
- * without requiring the CopilotKit runtime. Designed for compact
- * card previews — the full SimulationChat is used in detail views.
+ * Renders scenario messages with user/assistant alignment and colors.
+ * Deliberately minimal: a grid card shows a few lines at a glance, so it
+ * skips the shared conversation renderer that detail views use.
  */
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";

@@ -10,7 +10,7 @@ version: 2
 #   - Runs weekly (Monday) instead of daily, so version churn arrives as one
 #     predictable batch rather than a daily trickle.
 #   - Coordinated dependency families that release in lockstep (@aws-sdk/*,
-#     @opentelemetry/*, @ai-sdk/*, @copilotkit/*, vitest, react, ...) are each
+#     @opentelemetry/*, @ai-sdk/*, vitest, react, ...) are each
 #     grouped into ONE PR via `patterns`. Since ADR-076 the repo is a single
 #     pnpm workspace, so one npm entry at `/` covers every JS project and a
 #     family (or any shared dependency) is bumped across all of them together
@@ -66,10 +66,6 @@ updates:
         patterns:
           - "@opentelemetry/*"
           - "import-in-the-middle"
-      copilotkit:
-        applies-to: version-updates
-        patterns:
-          - "@copilotkit/*"
       vitest:
         applies-to: version-updates
         patterns:

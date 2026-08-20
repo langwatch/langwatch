@@ -21,7 +21,10 @@ export type ContentSource =
   | { type: "url"; value: string; mimeType?: string }
   | { type: "data"; value: string; mimeType: string };
 
-/** Binary part — exactly the ag-ui BinaryInputContent shape. */
+/**
+ * Binary part — the agent dialect's binary content shape.
+ * @see server/scenarios/schemas/agent-message-schemas.ts
+ */
 export interface BinaryPart {
   type: "binary";
   mimeType: string;

@@ -223,44 +223,10 @@ html[data-crisp-suppressed] .crisp-client {
 	}
 }
 
-// .copilotKitChat,
-// .copilotKitMessages {
-//     overflow: unset !important;
-// }
-
-.copilotKitChat .poweredBy {
-	display: none !important;
-}
-
 // To fix bug in Chakra UI CodeBlock
 span[data-highlight]::after {
 	pointer-events: none;
 	overflow: unset !important;
-}
-
-.prompt-studio-chat {
-	display: flex;
-	flex-direction: column;
-	height: 100%;
-	.copilotKitChat {
-		height: 100%;
-	}
-	.copilotKitMessages {
-		width: 100%;
-		max-width: 768px;
-		margin: 0 auto;
-	}
-	.copilotKitMessagesContainer {
-		padding-right: 4px;
-	}
-	.copilotKitChat,
-	.copilotKitMessages {
-		background: none;
-	}
-	.copilotKitMessage.copilotKitUserMessage,
-	.copilotKitMarkdownElement {
-		font-size: 14px;
-	}
 }
 
 .rich-textarea-position-relative {

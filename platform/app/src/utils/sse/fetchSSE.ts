@@ -30,6 +30,33 @@ export interface FetchSSEOptions<T> {
 
   /** Error handler */
   onError?: (error: Error) => void;
+
+  /**
+   * Cancels the stream from the outside — a Stop button, or a component
+   * unmounting mid-run. The server treats the disconnect as the cancel signal.
+   */
+  signal?: AbortSignal;
+}
+
+/**
+ * Reads the sentence a refused request came back with.
+ *
+ * Our routes answer with `{ error }` — a dataset still normalising (425), a
+ * node with no model (422) — and that sentence is the one telling the user
+ * what to fix. Falling back to `statusText` reduced every one of them to
+ * "Unprocessable Entity".
+ */
+async function describeRefusal(response: Response): Promise<string> {
+  const body = (await response
+    .clone()
+    .json()
+    .catch(() => null)) as { error?: unknown } | null;
+
+  if (typeof body?.error === "string") return body.error;
+
+  return response.status >= 500
+    ? `Server error: ${response.status} ${response.statusText}`
+    : response.statusText;
 }
 
 /**
@@ -45,6 +72,7 @@ export async function fetchSSE<T>({
   chunkTimeout = 480_000,
   headers = {},
   onError,
+  signal,
 }: FetchSSEOptions<T>): Promise<void> {
   // Wrap in a Promise so timeout errors can properly reject
   // instead of becoming unhandled exceptions
@@ -52,6 +80,12 @@ export async function fetchSSE<T>({
     const controller = new AbortController();
     let timeoutId: NodeJS.Timeout | undefined;
     let isSettled = false;
+
+    if (signal?.aborted) {
+      resolve();
+      return;
+    }
+    signal?.addEventListener("abort", () => controller.abort(), { once: true });
 
     const cleanup = () => {
       controller.abort();
@@ -104,12 +138,7 @@ export async function fetchSSE<T>({
           return;
         }
 
-        const error = new Error(
-          response.status >= 500
-            ? `Server error: ${response.status} ${response.statusText}`
-            : response.statusText,
-        );
-        handleError(error);
+        handleError(new Error(await describeRefusal(response)));
       },
 
       onmessage(ev) {
