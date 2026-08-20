@@ -939,11 +939,6 @@ function replacementFor(rule: ValueRule, args: string[]): string | null {
 }
 
 /**
- * Redact secrets from one string. Runs every built-in value rule, then any
- * caller-supplied custom patterns. Returns the scrubbed text and how many
- * secrets were replaced.
- */
-/**
  * Cut oversized text into scannable pieces, preferring a newline boundary so a
  * credential is not split down the middle.
  *
@@ -1002,9 +997,12 @@ function sliceEndAfter(text: string, start: number): number {
   }
 
   const begin = text.lastIndexOf(PEM_BEGIN, end);
-  if (begin >= start && text.indexOf(PEM_END, begin) >= end) {
-    const close = text.indexOf(PEM_END, begin);
-    end = close === -1 ? text.length : close + PEM_END.length;
+  const close = text.indexOf(PEM_END, begin);
+  // `close >= end` implies the block opened inside this slice and closes past
+  // its end, so the cut moves out to take the whole block. A missing END gives
+  // -1, which fails that same test, so an unterminated block is left alone.
+  if (begin >= start && close >= end) {
+    end = close + PEM_END.length;
   }
   return end;
 }
@@ -1019,6 +1017,11 @@ const SAFE_CUT_LOOKAHEAD = 4_096;
 const PEM_BEGIN = "-----BEGIN";
 const PEM_END = "-----END";
 
+/**
+ * Redact secrets from one string. Runs every built-in value rule, then any
+ * caller-supplied custom patterns. Returns the scrubbed text and how many
+ * secrets were replaced.
+ */
 export function redactSecretsInText({
   text,
   customPatterns = [],
