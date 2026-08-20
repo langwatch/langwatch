@@ -106,7 +106,7 @@ export function MigrationsContent() {
       toaster.create({
         title: "Migration pass started",
         description:
-          "The pass runs in the background under the fleet-wide lease. This page refreshes as organizations move.",
+          "The pass runs in the background, several organizations at a time. This page refreshes as organizations move.",
         type: "success",
       });
       await utils.ops.listSystemMigrations.invalidate();

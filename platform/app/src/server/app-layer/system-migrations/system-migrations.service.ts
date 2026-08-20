@@ -523,8 +523,9 @@ export class SystemMigrationsService {
    * fire-and-forget - the operator asked about one organization and wants
    * its outcome. Enrollment stays the pacing source of truth on cloud: an
    * unenrolled organization is refused, never quietly migrated. The
-   * fleet-wide lease still applies, so a run during a full pass is refused
-   * with a retry-shaped error instead of double-driving the organization.
+   * organization's own claim still applies, so a run while another pass is
+   * working that organization is refused with a retry-shaped error instead
+   * of double-driving it.
    */
   async runForOrganization({
     organizationId,
@@ -615,9 +616,9 @@ export class SystemMigrationsService {
   /**
    * Kick a pass now instead of waiting for the next worker boot - the lever
    * for processing a fresh enrollment right away or re-verifying held
-   * tenants after remediation. Fire-and-forget: the fleet-wide lease already guarantees a
-   * single driver, so the worst case for a double click is a pass that
-   * stands down immediately.
+   * tenants after remediation. Fire-and-forget: per-organization claims keep
+   * two passes off the same organization, so the worst case for a double
+   * click is a pass that finds everything claimed and does nothing.
    */
   startPass(): void {
     void this.deps.runPass().catch((error) => {

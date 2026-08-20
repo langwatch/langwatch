@@ -24,9 +24,10 @@ return 0
 `;
 
 /**
- * The fleet-wide single-driver lease on Redis. Fail-safe direction: no
- * Redis, or any Redis error, reads as "not acquired" - the pass simply does
- * not run on this boot, and the legacy paths keep answering.
+ * The runner's named leases on Redis - one claim per organization.
+ * Fail-safe direction: no Redis, or any Redis error, reads as "not
+ * acquired" - no organization is worked on this boot, and the legacy paths
+ * keep answering.
  */
 export class RedisMigrationLeaseRepository implements MigrationLeaseRepository {
   private readonly token = randomUUID();

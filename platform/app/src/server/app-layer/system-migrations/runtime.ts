@@ -591,10 +591,11 @@ function warnWhenRetiredCohortVariablesAreSet(): void {
  */
 /**
  * One migration for one organization, now - the ops page's targeted run.
- * The same lease as a full pass (one driver fleet-wide, so a targeted run
- * can never double-drive an organization a pass is working through; null
- * means the lease is held and the service turns that into a retry-shaped
- * refusal), the same cohort read (enrollment stays the pacing source of
+ * The same per-organization claim as a full pass (so a targeted run can
+ * never double-drive an organization a pass is working through; a summary
+ * counting the organization as claimed is what the service turns into a
+ * retry-shaped refusal), the same cohort read (enrollment stays the pacing
+ * source of
  * truth even here - the service refuses unenrolled organizations before
  * composing this, and the cohort would skip them anyway), a tenant source
  * of exactly one id, and the migration list cut to the one asked for.

@@ -1589,8 +1589,8 @@ export const opsRouter = createTRPCRouter({
    * Run one migration for one organization now. Awaited: the operator asked
    * about one organization and gets the status it ended the run in. The
    * service refuses unknown migrations, unknown organizations, unenrolled
-   * organizations (cloud) and a pass already holding the fleet-wide lease,
-   * each with a handled error the page renders.
+   * organizations (cloud) and an organization whose claim another pass
+   * already holds, each with a handled error the page renders.
    */
   runSystemMigrationForOrganization: protectedProcedure
     .use(opsManagePermission)
