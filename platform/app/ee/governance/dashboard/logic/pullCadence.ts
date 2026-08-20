@@ -110,6 +110,58 @@ export function cronFromPullParts(parts: PullCadenceParts): string {
   }
 }
 
+/** Neutral values for the parts a given frequency does not use, so the
+ *  picker lands somewhere sensible when the admin switches frequency. */
+const BASE_PARTS = { everyMinutes: 15, minute: 0, hour: 9, dayOfWeek: 1 };
+
+interface CronShapeFields {
+  minField: string;
+  hourField: string;
+  dowField: string;
+}
+
+/** The `*\/N * * * *` shape, N from MINUTE_INTERVALS. */
+function minutesShape({
+  minField,
+  hourField,
+  dowField,
+}: CronShapeFields): PullCadenceParts | null {
+  const stepMatch = /^\*\/(\d+)$/.exec(minField);
+  if (!stepMatch) return null;
+  const everyMinutes = Number(stepMatch[1]);
+  if (!(MINUTE_INTERVALS as readonly number[]).includes(everyMinutes)) {
+    return null;
+  }
+  if (hourField !== "*" || dowField !== "*") return null;
+  return { ...BASE_PARTS, frequency: "minutes", everyMinutes };
+}
+
+/** The hourly / daily / weekly shapes, all anchored on a plain minute. */
+function fixedMinuteShape({
+  minField,
+  hourField,
+  dowField,
+}: CronShapeFields): PullCadenceParts | null {
+  const minute = parsePlainInt(minField, 0, 59);
+  if (minute === null) return null;
+
+  if (hourField === "*") {
+    if (dowField !== "*") return null;
+    return { ...BASE_PARTS, frequency: "hourly", minute };
+  }
+
+  const hour = parsePlainInt(hourField, 0, 23);
+  if (hour === null) return null;
+
+  if (dowField === "*") {
+    return { ...BASE_PARTS, frequency: "daily", minute, hour };
+  }
+
+  const dayOfWeek = parsePlainInt(dowField, 0, 6);
+  if (dayOfWeek === null) return null;
+  return { ...BASE_PARTS, frequency: "weekly", minute, hour, dayOfWeek };
+}
+
 /**
  * Map a cron string back to the friendly picker parts. Returns null for any
  * expression outside the four shapes we generate ("custom") so the caller
@@ -122,37 +174,8 @@ export function partsFromPullCron(cron: string): PullCadenceParts | null {
     fields;
   // Month and day-of-month are wildcards in every shape we speak.
   if (monField !== "*" || domField !== "*") return null;
-
-  const base = { everyMinutes: 15, minute: 0, hour: 9, dayOfWeek: 1 };
-
-  const stepMatch = /^\*\/(\d+)$/.exec(minField);
-  if (stepMatch) {
-    const everyMinutes = Number(stepMatch[1]);
-    if (!(MINUTE_INTERVALS as readonly number[]).includes(everyMinutes)) {
-      return null;
-    }
-    if (hourField !== "*" || dowField !== "*") return null;
-    return { ...base, frequency: "minutes", everyMinutes };
-  }
-
-  const minute = parsePlainInt(minField, 0, 59);
-  if (minute === null) return null;
-
-  if (hourField === "*") {
-    if (dowField !== "*") return null;
-    return { ...base, frequency: "hourly", minute };
-  }
-
-  const hour = parsePlainInt(hourField, 0, 23);
-  if (hour === null) return null;
-
-  if (dowField === "*") {
-    return { ...base, frequency: "daily", minute, hour };
-  }
-
-  const dayOfWeek = parsePlainInt(dowField, 0, 6);
-  if (dayOfWeek === null) return null;
-  return { ...base, frequency: "weekly", minute, hour, dayOfWeek };
+  const shape = { minField, hourField, dowField };
+  return minutesShape(shape) ?? fixedMinuteShape(shape);
 }
 
 /**

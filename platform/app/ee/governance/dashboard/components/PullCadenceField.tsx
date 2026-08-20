@@ -57,6 +57,167 @@ function partsFromChoice(
   return { ...current, frequency: choice as PullFrequency };
 }
 
+function CadenceCronEditor({
+  value,
+  recommended,
+  error,
+  onChange,
+}: {
+  value: string;
+  recommended: string;
+  error: string | null;
+  onChange: (next: string) => void;
+}) {
+  return (
+    <Field.Root invalid={error !== null}>
+      <Field.Label fontSize="xs">Cron expression</Field.Label>
+      <Input
+        size="sm"
+        fontFamily="mono"
+        value={value}
+        placeholder={recommended}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {error !== null ? (
+        <Field.ErrorText fontSize="xs">{error}</Field.ErrorText>
+      ) : null}
+    </Field.Root>
+  );
+}
+
+function CadenceMinutePastField({
+  minute,
+  onMinute,
+}: {
+  minute: number;
+  onMinute: (minute: number) => void;
+}) {
+  return (
+    <Field.Root flex="1">
+      <Field.Label fontSize="xs">Minutes past the hour</Field.Label>
+      <Input
+        size="sm"
+        type="number"
+        min={0}
+        max={59}
+        value={minute}
+        onChange={(e) => {
+          const next = Number(e.target.value);
+          if (Number.isInteger(next) && next >= 0 && next <= 59) onMinute(next);
+        }}
+      />
+    </Field.Root>
+  );
+}
+
+function CadenceTimeField({
+  parts,
+  emitParts,
+}: {
+  parts: PullCadenceParts;
+  emitParts: (next: Partial<PullCadenceParts>) => void;
+}) {
+  const onTimeChange = (timeValue: string) => {
+    const match = /^(\d{1,2}):(\d{2})$/.exec(timeValue);
+    if (!match) return;
+    const hour = Number(match[1]);
+    const minute = Number(match[2]);
+    if (hour > 23 || minute > 59) return;
+    emitParts({ hour, minute });
+  };
+  return (
+    <Field.Root flex="1">
+      <Field.Label fontSize="xs">Time (UTC)</Field.Label>
+      <Input
+        size="sm"
+        type="time"
+        value={timeOfDay(parts)}
+        onChange={(e) => onTimeChange(e.target.value)}
+      />
+    </Field.Root>
+  );
+}
+
+function CadenceFrequencyPicker({
+  parts,
+  emitParts,
+  onPickChoice,
+}: {
+  parts: PullCadenceParts;
+  emitParts: (next: Partial<PullCadenceParts>) => void;
+  onPickChoice: (choice: string) => void;
+}) {
+  const wantsTimeOfDay =
+    parts.frequency === "daily" || parts.frequency === "weekly";
+  return (
+    <VStack align="stretch" gap={3}>
+      <HStack gap={3} align="flex-start">
+        <Field.Root flex="1">
+          <Field.Label fontSize="xs">Frequency</Field.Label>
+          <NativeSelect.Root size="sm">
+            <NativeSelect.Field
+              value={choiceFromParts(parts)}
+              onChange={(e) => onPickChoice(e.target.value)}
+            >
+              {FREQUENCY_CHOICES.map((choice) => (
+                <option key={choice.value} value={choice.value}>
+                  {choice.label}
+                </option>
+              ))}
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
+        </Field.Root>
+
+        {parts.frequency === "hourly" ? (
+          <CadenceMinutePastField
+            minute={parts.minute}
+            onMinute={(minute) => emitParts({ minute })}
+          />
+        ) : null}
+
+        {wantsTimeOfDay ? (
+          <CadenceTimeField parts={parts} emitParts={emitParts} />
+        ) : null}
+      </HStack>
+
+      {parts.frequency === "weekly" ? (
+        <Field.Root>
+          <Field.Label fontSize="xs">Day of week</Field.Label>
+          <SegmentedControl
+            size="sm"
+            value={String(parts.dayOfWeek)}
+            onValueChange={({ value: day }) =>
+              emitParts({ dayOfWeek: Number(day) })
+            }
+            items={WEEKDAY_OPTIONS.map((d) => ({
+              value: String(d.value),
+              label: d.short,
+            }))}
+          />
+        </Field.Root>
+      ) : null}
+    </VStack>
+  );
+}
+
+function CadenceSummary({ effectiveCron }: { effectiveCron: string }) {
+  const summaryParts = partsFromPullCron(effectiveCron);
+  return (
+    <>
+      <Text fontSize="xs" color="fg.muted">
+        {summaryParts
+          ? summarizePullCadence(summaryParts)
+          : `Runs on the schedule ${effectiveCron}`}
+      </Text>
+      <Text fontSize="xs" color="fg.muted">
+        How often we check this source for new activity. Leave as-is to use the
+        recommended schedule.
+      </Text>
+    </>
+  );
+}
+
 /**
  * The Cadence section of the source composer: how often a pull-mode source
  * checks for new activity, said in plain words. Controlled like the raw
@@ -118,15 +279,6 @@ export function PullCadenceField({
     setCronMode(toCronMode);
   };
 
-  const onTimeChange = (timeValue: string) => {
-    const match = /^(\d{1,2}):(\d{2})$/.exec(timeValue);
-    if (!match) return;
-    const hour = Number(match[1]);
-    const minute = Number(match[2]);
-    if (hour > 23 || minute > 59) return;
-    emitParts({ hour, minute });
-  };
-
   // Blank means "the recommended schedule" and is always saveable; only a
   // typed cron can be one the scheduler would refuse.
   const cronError =
@@ -152,105 +304,23 @@ export function PullCadenceField({
       </HStack>
 
       {cronMode ? (
-        <Field.Root invalid={cronError !== null}>
-          <Field.Label fontSize="xs">Cron expression</Field.Label>
-          <Input
-            size="sm"
-            fontFamily="mono"
-            value={value}
-            placeholder={recommended}
-            onChange={(e) => onChange(e.target.value)}
-          />
-          {cronError !== null ? (
-            <Field.ErrorText fontSize="xs">{cronError}</Field.ErrorText>
-          ) : null}
-        </Field.Root>
+        <CadenceCronEditor
+          value={value}
+          recommended={recommended}
+          error={cronError}
+          onChange={onChange}
+        />
       ) : (
-        <VStack align="stretch" gap={3}>
-          <HStack gap={3} align="flex-start">
-            <Field.Root flex="1">
-              <Field.Label fontSize="xs">Frequency</Field.Label>
-              <NativeSelect.Root size="sm">
-                <NativeSelect.Field
-                  value={choiceFromParts(parts)}
-                  onChange={(e) =>
-                    onChange(
-                      cronFromPullParts(partsFromChoice(e.target.value, parts)),
-                    )
-                  }
-                >
-                  {FREQUENCY_CHOICES.map((choice) => (
-                    <option key={choice.value} value={choice.value}>
-                      {choice.label}
-                    </option>
-                  ))}
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
-            </Field.Root>
-
-            {parts.frequency === "hourly" ? (
-              <Field.Root flex="1">
-                <Field.Label fontSize="xs">Minutes past the hour</Field.Label>
-                <Input
-                  size="sm"
-                  type="number"
-                  min={0}
-                  max={59}
-                  value={parts.minute}
-                  onChange={(e) => {
-                    const minute = Number(e.target.value);
-                    if (Number.isInteger(minute) && minute >= 0 && minute <= 59)
-                      emitParts({ minute });
-                  }}
-                />
-              </Field.Root>
-            ) : null}
-
-            {parts.frequency === "daily" || parts.frequency === "weekly" ? (
-              <Field.Root flex="1">
-                <Field.Label fontSize="xs">Time (UTC)</Field.Label>
-                <Input
-                  size="sm"
-                  type="time"
-                  value={timeOfDay(parts)}
-                  onChange={(e) => onTimeChange(e.target.value)}
-                />
-              </Field.Root>
-            ) : null}
-          </HStack>
-
-          {parts.frequency === "weekly" ? (
-            <Field.Root>
-              <Field.Label fontSize="xs">Day of week</Field.Label>
-              <SegmentedControl
-                size="sm"
-                value={String(parts.dayOfWeek)}
-                onValueChange={({ value: day }) =>
-                  emitParts({ dayOfWeek: Number(day) })
-                }
-                items={WEEKDAY_OPTIONS.map((d) => ({
-                  value: String(d.value),
-                  label: d.short,
-                }))}
-              />
-            </Field.Root>
-          ) : null}
-        </VStack>
+        <CadenceFrequencyPicker
+          parts={parts}
+          emitParts={emitParts}
+          onPickChoice={(choice) =>
+            onChange(cronFromPullParts(partsFromChoice(choice, parts)))
+          }
+        />
       )}
 
-      <Text fontSize="xs" color="fg.muted">
-        {(() => {
-          const summaryParts = partsFromPullCron(effectiveCron);
-          return summaryParts
-            ? summarizePullCadence(summaryParts)
-            : `Runs on the schedule ${effectiveCron}`;
-        })()}
-      </Text>
-      <Text fontSize="xs" color="fg.muted">
-        How often we check this source for new activity. Leave as-is to use the
-        recommended schedule.
-      </Text>
+      <CadenceSummary effectiveCron={effectiveCron} />
     </VStack>
   );
 }
