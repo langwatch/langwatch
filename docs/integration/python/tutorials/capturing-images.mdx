@@ -1,0 +1,174 @@
+---
+title: Capturing Images
+sidebarTitle: Python
+description: LangWatch captures the images your Python application sends to a model and shows them on the trace.
+icon: python
+keywords: langwatch, python, images, multimodal, vision, attachments, tracing
+---
+
+LangWatch captures an image as soon as it appears in the messages of a traced model call. There is no extra API to call and no separate upload step. Send the image the way your model provider expects, keep the call inside a trace, and the picture is on the trace.
+
+This page lists the image shapes LangWatch understands, what happens to the bytes, and where the picture appears in the product.
+
+## Send the image with the model call
+
+The examples below all use `langwatch.setup()` and a `@langwatch.trace()` entry point. Read [Integration Guide](/integration/python/guide) first if you have not set that up yet.
+
+### OpenAI
+
+An image rides an `image_url` part carrying a data URL.
+
+```python
+import base64
+import langwatch
+from openai import OpenAI
+
+langwatch.setup()
+
+
+def data_url(path: str, media_type: str) -> str:
+    encoded = base64.b64encode(open(path, "rb").read()).decode("utf-8")
+    return f"data:{media_type};base64,{encoded}"
+
+
+@langwatch.trace(name="describe image")
+def describe(prompt: str, path: str) -> str:
+    client = OpenAI()
+    langwatch.get_current_trace().autotrack_openai_calls(client)
+
+    completion = client.chat.completions.create(
+        model="gpt-5-mini",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": data_url(path, "image/png")},
+                    },
+                ],
+            }
+        ],
+    )
+    return completion.choices[0].message.content or ""
+
+
+describe("What does this image show?", "shapes.png")
+```
+
+### Anthropic
+
+An image rides an `image` content block with a base64 source.
+
+```python
+import base64
+import langwatch
+from anthropic import Anthropic
+from openinference.instrumentation.anthropic import AnthropicInstrumentor
+
+langwatch.setup(instrumentors=[AnthropicInstrumentor()])
+
+
+@langwatch.trace(name="describe image")
+def describe(prompt: str, path: str) -> str:
+    client = Anthropic()
+    encoded = base64.b64encode(open(path, "rb").read()).decode("utf-8")
+
+    message = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/png",
+                            "data": encoded,
+                        },
+                    },
+                ],
+            }
+        ],
+    )
+    return message.content[0].text
+
+
+describe("What does this image show?", "shapes.png")
+```
+
+Anthropic's hosted form, `{"type": "url", "url": "https://..."}`, is understood too.
+
+### Google Gemini and Vertex
+
+An image rides an inline data part. `Part.from_bytes` builds it for you. The rest of the agent setup does not change.
+
+```python
+import langwatch
+from google.genai import types
+from openinference.instrumentation.google_adk import GoogleADKInstrumentor
+
+langwatch.setup(instrumentors=[GoogleADKInstrumentor()])
+
+message = types.Content(
+    role="user",
+    parts=[
+        types.Part(text="What does this image show?"),
+        types.Part.from_bytes(
+            data=open("shapes.png", "rb").read(), mime_type="image/png"
+        ),
+    ],
+)
+```
+
+## Image shapes LangWatch understands
+
+Send any of these and the picture is captured. The list covers the shapes the major providers and agent frameworks produce.
+
+| Source | Shape |
+|---|---|
+| OpenAI | `{"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}` |
+| OpenAI | `{"type": "image_url", "image_url": {"url": "https://..."}}` |
+| Anthropic | `{"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "..."}}` |
+| Anthropic | `{"type": "image", "source": {"type": "url", "url": "https://..."}}` |
+| Google Gemini and Vertex | `{"inline_data": {"mime_type": "image/png", "data": "..."}}` |
+| AG-UI | `{"type": "image", "source": {"type": "data", "value": "...", "mimeType": "image/png"}}` |
+
+Always set the media type. A part that carries bytes with no media type stays inline in the trace instead of moving into storage, because those bytes would come back as a plain download and not as a picture.
+
+## What happens to the bytes
+
+LangWatch moves the image out of the span at the ingestion edge. The bytes go into content-addressed object storage and the message part is rewritten to a short `/api/files/<projectId>/<id>` reference, so the trace itself stays small and fast to query.
+
+Storage is addressed by SHA-256, so identical bytes are stored once. The same picture sent on ten traces costs one stored object.
+
+On read, LangWatch serves the original media type for images, audio, video and PDF files. Anything else is served as a download.
+
+## Where the image appears
+
+A thumbnail sits next to the input preview on the trace list, so a run that carried a picture is recognisable without opening it.
+
+<Frame caption="Trace list rows showing image thumbnails next to the input text, and a paperclip on the row whose attachment is a document">
+  <img src="/images/integration/multimodal/trace-list-thumbnails.png" alt="LangWatch trace list with image thumbnails on the input previews" />
+</Frame>
+
+Open the trace and the Summary tab shows the picture inline under the question. The Conversation tab shows it in the message it belongs to, and the Trace tab shows the full message payload.
+
+<Frame caption="The trace drawer Summary tab, with the captured picture rendered inline below the input text and the model answer below it">
+  <img src="/images/integration/multimodal/trace-drawer-image.png" alt="LangWatch trace drawer showing a captured image below the input question" />
+</Frame>
+
+<Note>
+Attachment capture is enabled per project. If your traces show the message text but no picture, ask LangWatch to turn it on for your project.
+</Note>
+
+## Related
+
+- [Capturing Documents](/integration/python/tutorials/capturing-documents), for PDF files and other attachments
+- [Capturing Audio and Voice](/integration/python/tutorials/capturing-audio), for recordings and voice agents
+- [Multimodal Evaluation](/evaluations/experiments/multimodal-evaluation), to score image inputs and outputs with a vision model
+- [View images in datasets](/datasets/dataset-images), to hold images in a dataset column
