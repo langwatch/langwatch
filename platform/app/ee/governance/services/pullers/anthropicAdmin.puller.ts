@@ -132,19 +132,33 @@ export type AnthropicAdminPullConfig = z.infer<
  * the deeper window. That is the operator's repair lever for sources whose
  * first post-deploy run only covered the default window.
  *
- * USAGE sources drop only the unsafe page token and KEEP the watermark.
- * Usage identity is NOT stable across a query change — it embeds the config
- * bucket width, and this fix itself added `serviceTier` and `contextWindow`
- * to it — so a historical re-read would emit rows under new keys BESIDE the
- * old ones rather than superseding them: every re-read bucket would be
- * double-counted spend. History stays as written (the flat-cache zeros and
- * collapsed tiers are a documented, bounded wrong); correctness applies from
- * the watermark forward.
+ * USAGE sources drop only the unsafe page token and resume as close to where
+ * the token pointed as the cursor can certify. Usage identity is NOT stable
+ * across a query change — it embeds the config bucket width, and this fix
+ * itself added `serviceTier` and `contextWindow` to it — so anything re-read
+ * under the new query is emitted under new keys BESIDE the old rows rather
+ * than superseding them: every re-read bucket is double-counted spend.
+ * That is why `watermark` exists: a run cut off mid-window (deadline or
+ * MAX_PAGES_PER_RUN) records the newest bucket it actually emitted, and a
+ * usage mismatch resumes from there — re-reading at most the one bucket the
+ * token was sitting inside. Cursors minted before `watermark` existed carry
+ * only the window start, so their in-flight window (bounded by
+ * MAX_PAGES_PER_RUN) is re-read ONCE under the new keys — a bounded,
+ * one-shot duplication, accepted over skipping the rest of the window.
+ * History behind the window stays as written (the flat-cache zeros and
+ * collapsed tiers are a documented, bounded wrong).
  */
 const cursorSchema = z.object({
   startingAt: z.string(),
   page: z.string().nullable().default(null),
   query: z.string().nullable().default(null),
+  /**
+   * Newest bucket `starting_at` already emitted from the in-flight window,
+   * recorded only while a page token is in hand. Null once the window drains
+   * (`startingAt` itself becomes the resume point) and on cursors minted
+   * before this field existed.
+   */
+  watermark: z.string().nullable().default(null),
 });
 
 /**
@@ -173,12 +187,16 @@ function parseCursor({
 }: {
   cursor: string | null;
   config: AnthropicAdminPullConfig;
-}): Pick<z.infer<typeof cursorSchema>, "startingAt" | "page"> {
+}): Pick<z.infer<typeof cursorSchema>, "startingAt" | "page" | "watermark"> {
   if (cursor) {
     try {
       const parsed = cursorSchema.parse(JSON.parse(cursor));
       if (parsed.query === queryIdentity(config)) {
-        return { startingAt: parsed.startingAt, page: parsed.page };
+        return {
+          startingAt: parsed.startingAt,
+          page: parsed.page,
+          watermark: parsed.watermark,
+        };
       }
       // Also covers cursors minted before query-binding existed (`query`
       // null): this change itself widened the group_by set and fixed the
@@ -195,6 +213,7 @@ function parseCursor({
   return {
     startingAt: config.startingAt ?? defaultStartingAt(config.report),
     page: null,
+    watermark: null,
   };
 }
 
@@ -209,22 +228,31 @@ function staleCursorRestart({
 }: {
   parsed: z.infer<typeof cursorSchema>;
   config: AnthropicAdminPullConfig;
-}): Pick<z.infer<typeof cursorSchema>, "startingAt" | "page"> {
+}): Pick<z.infer<typeof cursorSchema>, "startingAt" | "page" | "watermark"> {
   if (config.report === "usage") {
     // No rewind: usage identity is not stable across a query change, so
     // re-reading history would duplicate spend rather than restate it.
     // The page token still has to go — it would 400 against the new
-    // query params. A watermark that doesn't parse as a date certifies no
-    // history at all, so falling back to the configured start duplicates
-    // nothing — and passing it through would 400 on every retry forever.
+    // query params. Resume from the in-window watermark when the cursor
+    // recorded one: that re-reads at most the bucket the token sat inside,
+    // instead of every page of the window already emitted under the old
+    // keys. Cursors without one (minted pre-`watermark`, or drained)
+    // resume from the window start. A date that doesn't parse certifies no
+    // history at all, so the configured start duplicates nothing — and
+    // passing it through would 400 on every retry forever.
     logger.warn(
       { adapter: ANTHROPIC_ADMIN_ADAPTER_ID, report: config.report },
-      "anthropic admin usage cursor was minted under a different query; dropping the page token and keeping the watermark",
+      "anthropic admin usage cursor was minted under a different query; dropping the page token and resuming from the newest bucket it certifies",
     );
-    const keptWatermark = Number.isNaN(Date.parse(parsed.startingAt))
-      ? (config.startingAt ?? defaultStartingAt(config.report))
-      : parsed.startingAt;
-    return { startingAt: keptWatermark, page: null };
+    const resumeFrom = [parsed.watermark, parsed.startingAt].find(
+      (candidate) => candidate !== null && !Number.isNaN(Date.parse(candidate)),
+    );
+    return {
+      startingAt:
+        resumeFrom ?? config.startingAt ?? defaultStartingAt(config.report),
+      page: null,
+      watermark: null,
+    };
   }
   logger.warn(
     { adapter: ANTHROPIC_ADMIN_ADAPTER_ID, report: config.report },
@@ -241,19 +269,20 @@ function staleCursorRestart({
     Number.isNaN(watermarkMs) || Date.parse(configuredStart) <= watermarkMs
       ? configuredStart
       : parsed.startingAt;
-  return { startingAt: rewoundStart, page: null };
+  return { startingAt: rewoundStart, page: null, watermark: null };
 }
 
 function encodeCursor({
   startingAt,
   page,
   query,
+  watermark,
 }: Omit<z.infer<typeof cursorSchema>, "query"> & {
   // Refined non-null: every cursor minted after query-binding carries the
   // query identity; only cursors READ from storage can lack it.
   query: string;
 }): string {
-  return JSON.stringify({ startingAt, page, query });
+  return JSON.stringify({ startingAt, page, query, watermark });
 }
 
 /**
@@ -490,13 +519,18 @@ export class AnthropicAdminPuller
     config: AnthropicAdminPullConfig,
   ): Promise<PullResult> {
     const events: NormalizedPullEvent[] = [];
-    // The window's watermark does not move within a run; only the page token
-    // does. Two variables rather than one reassigned object, so a page advance
-    // mid-run can never quietly carry a different `startingAt` with it.
+    // The window start does not move within a run; only the page token and
+    // the in-window watermark do. Separate variables rather than one
+    // reassigned object, so a page advance mid-run can never quietly carry a
+    // different `startingAt` with it. The watermark tracks the newest bucket
+    // actually emitted, so a cut-off run records how far it really got —
+    // that record is what lets a later identity mismatch resume near the
+    // token instead of re-reading the window (see `cursorSchema`).
     const cursor = parseCursor({ cursor: options.cursor, config });
     const startingAt = cursor.startingAt;
     const query = queryIdentity(config);
     let page = cursor.page;
+    let watermark = cursor.watermark;
 
     for (let pageCount = 0; pageCount < MAX_PAGES_PER_RUN; pageCount += 1) {
       if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
@@ -504,7 +538,7 @@ export class AnthropicAdminPuller
         // so a deadline costs latency rather than a window.
         return {
           events,
-          cursor: encodeCursor({ startingAt, page, query }),
+          cursor: encodeCursor({ startingAt, page, query, watermark }),
           errorCount: 0,
         };
       }
@@ -516,16 +550,19 @@ export class AnthropicAdminPuller
         return { events, cursor: options.cursor, errorCount: 1 };
       }
       events.push(...read.events);
+      watermark = read.watermark ?? watermark;
 
       if (read.nextPage === null) {
         // Drained. The next run starts from the newest bucket read, so the
-        // watermark only ever moves forward.
+        // watermark only ever moves forward — and the in-window watermark is
+        // retired: `startingAt` itself is now the resume point.
         return {
           events,
           cursor: encodeCursor({
-            startingAt: read.watermark ?? startingAt,
+            startingAt: watermark ?? startingAt,
             page: null,
             query,
+            watermark: null,
           }),
           errorCount: 0,
         };
@@ -539,7 +576,7 @@ export class AnthropicAdminPuller
     );
     return {
       events,
-      cursor: encodeCursor({ startingAt, page, query }),
+      cursor: encodeCursor({ startingAt, page, query, watermark }),
       errorCount: 0,
     };
   }

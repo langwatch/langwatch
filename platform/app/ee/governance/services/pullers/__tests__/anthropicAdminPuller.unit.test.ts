@@ -547,7 +547,7 @@ describe("the Anthropic Admin puller", () => {
       expect(String(fetchMock.mock.calls[0]?.[0])).toContain("page=page_2");
     });
 
-    it("keeps the usage watermark on a config edit, dropping only the page token", async () => {
+    it("resumes a config-edited usage source from the newest bucket it emitted, not the window start", async () => {
       const puller = new AnthropicAdminPuller();
       const cursor = await midWindowCursor(puller);
 
@@ -558,13 +558,48 @@ describe("the Anthropic Admin puller", () => {
 
       const url = String(fetchMock.mock.calls[0]?.[0]);
       expect(url).not.toContain("page=");
-      // Usage identity embeds the config bucket width, so a historical
-      // re-read under the new query would emit rows under NEW keys beside
-      // the old ones — duplicated spend, not restatement. The watermark
-      // survives; only the dead page token goes.
+      // Usage identity embeds the config bucket width, so everything re-read
+      // under the new query is emitted under NEW keys beside the old rows —
+      // duplicated spend, not restatement. Restarting the window at its
+      // start would re-read every page already emitted, so the resume point
+      // is the in-window watermark the cut-off run recorded (the bucket's
+      // `starting_at`, not the window's `2026-08-01T00:00:00.000Z` start):
+      // at most one bucket is re-read.
       expect(url).toContain(
-        `starting_at=${encodeURIComponent("2026-08-01T00:00:00.000Z")}`,
+        `starting_at=${encodeURIComponent("2026-08-01T00:00:00Z")}`,
       );
+    });
+
+    it("records the newest bucket emitted beside the page token when a run is cut off", async () => {
+      const puller = new AnthropicAdminPuller();
+
+      const cursor = await midWindowCursor(puller);
+
+      // The window start alone says where the window BEGAN, not how far the
+      // run got — resuming a stale cursor from it re-reads the whole window.
+      expect(JSON.parse(cursor)).toMatchObject({
+        startingAt: "2026-08-01T00:00:00.000Z",
+        page: "page_2",
+        watermark: "2026-08-01T00:00:00Z",
+      });
+    });
+
+    it("carries the recorded watermark through a resumed run cut off before its first page", async () => {
+      const puller = new AnthropicAdminPuller();
+      const cursor = await midWindowCursor(puller);
+
+      const run = await puller.runOnce(
+        { ...RUN_OPTIONS, cursor, deadlineMs: Date.now() - 1 },
+        { ...config, bucketWidth: "1d" },
+      );
+
+      // A deadline that fires before any page is read must not blank the
+      // watermark the previous run recorded — that would silently widen the
+      // stale-cursor re-read back to the whole window.
+      expect(JSON.parse(run.cursor!)).toMatchObject({
+        page: "page_2",
+        watermark: "2026-08-01T00:00:00Z",
+      });
     });
 
     it("keeps a pre-query-binding usage watermark rather than rewinding into duplicates", async () => {
@@ -573,11 +608,15 @@ describe("the Anthropic Admin puller", () => {
       await new AnthropicAdminPuller().runOnce(
         {
           ...RUN_OPTIONS,
-          // A cursor persisted by the previous version: no query identity.
-          // Its page token would 400 against the widened group_by, so it
-          // goes — but the watermark stays: this PR changed the usage
-          // identity (serviceTier, contextWindow), so re-reading history
-          // would double-count every bucket instead of restating it.
+          // A cursor persisted by the previous version: no query identity
+          // and no in-window watermark. Its page token would 400 against the
+          // widened group_by, so it goes — and with no record of how far the
+          // cut-off run got, the resume point falls back to the window
+          // start. That re-reads the in-flight window (bounded by
+          // MAX_PAGES_PER_RUN) under the new usage identity, duplicating
+          // those buckets ONCE — accepted over skipping the rest of the
+          // window. It must not reach further back than that: rewinding to
+          // the configured start would double-count all history.
           cursor: '{"startingAt":"2026-08-01T00:00:00Z","page":"page_stale"}',
         },
         {
