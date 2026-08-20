@@ -102,14 +102,36 @@ but each is tiny, and with the group key on the aggregate they run
 concurrently rather than through one per-organization queue — which is the
 point.
 
-**We will generate aggregate ids by two rules, chosen by what the entity is,
-and we will not mix them within one entity type.**
+**The rule an aggregate id must satisfy is STABILITY ACROSS RETRIES of the
+same fact, not determinism for its own sake.** The event log dedupes on
 
-- **A fact defined by its own content gets a content-derived id.** A grant IS
-  the relation (principal × scope × resource), so its id is a function of that
-  relation and nothing else. Every grant id — imported, backfilled, or
-  ledger-born — comes from `deriveGrantId`. Adoption of legacy row ids is
-  removed entirely.
+```sql
+ENGINE = ReplacingMergeTree(EventTimestamp)
+ORDER BY (TenantId, AggregateType, AggregateId, IdempotencyKey)
+```
+
+so `AggregateId` is part of the dedup key and an idempotency key only dedupes
+*within* one aggregate. An id minted freshly per attempt therefore defeats
+idempotency entirely: the retry lands on a different aggregate, nothing
+collapses, and each pass adds another copy of the same fact. This is the
+row-explosion failure mode relocated, not avoided.
+
+Derivation is how a writer with no memory satisfies that rule. A migration
+retries across processes and days with nowhere to record what it minted last
+time, so the id must be recomputable from the fact — derivation is the
+mapping, computed rather than stored, and the alternative is a
+`legacyRowId -> grantId` table that is a worse cache of the same function. A
+live write does have somewhere to remember: the caller mints `commandId` once
+and reuses it on retry, so a KSUID minted alongside it is equally stable.
+
+Both paths produce a `grant_`-prefixed KSUID and nothing downstream can tell
+them apart. What follows is therefore about where the bits come from:
+
+- **Every imported or backfilled grant derives its id from the fact.** A grant
+  IS the relation (principal × scope × resource) at a business time, so its id
+  is a function of that and nothing else. Adoption of legacy row ids is removed
+  entirely: it was the second rule that made one entity type have two, decided
+  by provenance rather than by anything about the grant.
 
   ```
   grantId = KSUID(
@@ -122,10 +144,16 @@ and we will not mix them within one entity type.**
               scope.type, scope.id, resourceToken ?? ""].join("")
   ```
 
-  This is the existing `deriveGrantId`, unchanged in construction and now
-  applied universally. Restating a fact derives the same id, so a retry is
-  idempotent and uniqueness is a property of identity rather than of a lock
-  held over a large aggregate.
+  This is the existing `deriveGrantId`, unchanged in construction. Restating a
+  fact derives the same id, so the retry lands on the same aggregate with the
+  same idempotency key and the engine collapses it. Uniqueness becomes a
+  property of identity rather than of a lock held over a large aggregate.
+
+- **A grant created by a live write may mint a KSUID instead**, because its
+  caller already mints `commandId` once and reuses it on retry, which supplies
+  the stability. Its business time is `now()`, so derivation would produce a
+  unique id regardless and buys nothing. The requirement on this path is only
+  that the id is minted ONCE per logical action and not re-minted per attempt.
 
 - **An entity with mutable attributes gets a minted, stable id.** A role has a
   name and a permission list that both change, so deriving its identity from
