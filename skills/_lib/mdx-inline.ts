@@ -75,7 +75,6 @@ function parseFile(filePath: string): Root {
   return parser.parse(raw) as Root;
 }
 
-/** Partial name as `excludeShared` spells it: basename without extension. */
 const basename = (p: string) => path.basename(p, path.extname(p));
 
 function inlineTree(filePath: string, opts: InlineOptions, stack: string[]): Root {

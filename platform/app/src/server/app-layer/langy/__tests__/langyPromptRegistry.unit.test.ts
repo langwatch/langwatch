@@ -117,6 +117,14 @@ describe("resolveLangyPrompt", () => {
       expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain("AGENTS.md");
     });
 
+    // The one rule this block spends its last-position budget on, because it
+    // is the measured defect: 40% of turns reaching `status: "completed"` in
+    // production make zero tool calls. Without this assertion the size check
+    // below passes just as happily on a block that dropped it.
+    it("keeps the grounding rule", () => {
+      expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain("retrieve this turn");
+    });
+
     // The worker already reads the persona in the agent's config prompt and
     // the operating rules in AGENTS.md. This block is the operator hot-patch
     // channel; when it also repeated the rules, the model read the same

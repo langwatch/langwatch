@@ -54,8 +54,6 @@ const DEFAULT_OUT = path.join(skillsRoot, "_compiled", "native");
  */
 const LANGY_EXCLUDED_PARTIALS = ["cli-setup", "projects-and-api-keys"];
 
-// Render one canonical skill into opencode SKILL.md text — frontmatter + body,
-// using the same renderer as the public publisher, minus the setup partials.
 export function renderSkill(skill: PublishedSkill): string {
   if (!fs.existsSync(skill.src)) {
     throw new Error(`Skill source not found: ${skill.src}`);

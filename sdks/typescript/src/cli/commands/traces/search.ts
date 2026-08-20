@@ -30,6 +30,7 @@ export const searchTracesCommand = async (options: {
   endDate?: string;
   limit?: string;
   origin?: string;
+  errorsOnly?: boolean;
 } & RawOutputFlags): Promise<void> => {
   await resolveCredentials();
 
@@ -53,6 +54,14 @@ export const searchTracesCommand = async (options: {
       : now;
     const pageSize = options.limit ? parseInt(options.limit, 10) : 25;
     const originFilter = parseOriginOption(options.origin);
+    // "Show me my failed traces" has no text to search for: the error lives on
+    // the span, not in the trace's indexed text, so `-q error` returns nothing
+    // and reads like a clean project. `traces.error` is the same filter the
+    // Trace Explorer's error toggle uses.
+    const filters = {
+      ...(originFilter ? { "traces.origin": originFilter } : {}),
+      ...(options.errorsOnly ? { "traces.error": ["true"] } : {}),
+    };
 
     // The `format` option controls CLI output (table vs json); the API's
     // `format` parameter controls server response shape ("digest" | "json").
@@ -63,7 +72,7 @@ export const searchTracesCommand = async (options: {
       endDate,
       pageSize,
       format: "json",
-      ...(originFilter ? { filters: { "traces.origin": originFilter } } : {}),
+      ...(Object.keys(filters).length > 0 ? { filters } : {}),
     });
 
     const matched = result.pagination.totalHits;

@@ -25,11 +25,16 @@ const skillsDir = path.join(langyagent, "assets/skills");
 const NON_SKILL_TARGETS = ["direct CLI"];
 
 function skillsNamedInPromptTable(prompt: string): string[] {
-  const table = prompt.slice(
-    prompt.indexOf("## Skills"),
-    prompt.indexOf("## Replies"),
-  );
-  if (!table) throw new Error("the prompt no longer has a Skills section");
+  const start = prompt.indexOf("## Skills");
+  const end = prompt.indexOf("## Replies");
+  // Both headings, in this order, or the slice silently widens to a suffix of
+  // the prompt and this check starts parsing prose that is not the table.
+  if (start < 0 || end < 0 || end <= start) {
+    throw new Error(
+      "the prompt no longer has a Skills section followed by a Replies section",
+    );
+  }
+  const table = prompt.slice(start, end);
   const named = new Set<string>();
   for (const line of table.split("\n")) {
     const cells = line.split("|");

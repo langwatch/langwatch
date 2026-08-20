@@ -64,8 +64,9 @@ Edit the generated `.prompt.yaml` file to match the original prompt content.
 **Model:** keep the generated `model` on a current model. Store the alias
 `openai/latest` rather than a version number: LangWatch resolves it to the
 current flagship at run time, so the prompt does not go a generation stale
-every release. Never downgrade a new prompt to a legacy model like
-`gpt-4o-mini`.
+every release. Do not default a new prompt to a legacy model like
+`gpt-4o-mini`; pick one only when the user is trading quality for cost or
+latency on purpose.
 
 **Temperature:** the gpt-5 family rejects a custom `temperature`, so do not add
 `modelParameters.temperature` for those models. `create` omits it on purpose.

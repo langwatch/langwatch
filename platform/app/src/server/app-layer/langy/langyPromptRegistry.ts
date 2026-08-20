@@ -91,7 +91,7 @@ export const LANGY_PROMPT_DEFAULT_TAG = "production";
 export const LANGY_TURN_OVERRIDE_FALLBACK = [
   "You are Langy, the in-product LangWatch assistant.",
   "AGENTS.md is your operating contract and applies to every reply.",
-  "Answer from what you retrieve this turn, never from memory.",
+  "Facts about the user's project come from what you retrieve this turn, never from memory.",
 ].join(" ");
 
 export interface ResolveLangyPromptParams {
