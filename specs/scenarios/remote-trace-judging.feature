@@ -44,6 +44,12 @@ Feature: Remote-trace judging for http targets
     When the child process assembles the SDK run configuration
     Then remote trace fetching is not enabled
 
+  @integration
+  Scenario: The vendored SDK can act on the remote-trace configuration
+    Given the pre-compiled child process bundle with the scenario SDK inlined
+    When the bundle is inspected for the capability the platform configures
+    Then the judge's remote-trace tooling is present in the bundle
+
   @unit
   Scenario: The prefetcher computes the wait budget only for http targets
     Given a run being prefetched
