@@ -20,10 +20,13 @@ import { QueueManager } from "../../services/queues/queueManager";
 import { ProjectionRouter } from "../projectionRouter";
 import type { StateProjectionDefinition } from "../stateProjection.types";
 
-function stateProjectionOf(
-  name: string,
-  coalesceMaxBatch?: number,
-): StateProjectionDefinition<{ count: number }, Event> {
+function stateProjectionOf({
+  name,
+  coalesceMaxBatch,
+}: {
+  name: string;
+  coalesceMaxBatch?: number;
+}): StateProjectionDefinition<{ count: number }, Event> {
   return {
     name,
     version: "test-1",
@@ -51,7 +54,9 @@ describe("state projection coalescing wiring", () => {
         TEST_CONSTANTS.PIPELINE_NAME,
         queueManager as never,
       );
-      router.registerStateProjection(stateProjectionOf("batched", 500));
+      router.registerStateProjection(
+        stateProjectionOf({ name: "batched", coalesceMaxBatch: 500 }),
+      );
 
       router.initializeStateProjectionQueues();
 
@@ -70,7 +75,9 @@ describe("state projection coalescing wiring", () => {
         TEST_CONSTANTS.PIPELINE_NAME,
         queueManager as never,
       );
-      router.registerStateProjection(stateProjectionOf("batched", 500));
+      router.registerStateProjection(
+        stateProjectionOf({ name: "batched", coalesceMaxBatch: 500 }),
+      );
 
       router.initializeStateProjectionQueues();
 
