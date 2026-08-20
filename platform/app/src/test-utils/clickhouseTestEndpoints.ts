@@ -24,6 +24,7 @@ import {
   ClickHouseContainer,
   type StartedClickHouseContainer,
 } from "@testcontainers/clickhouse";
+import { customAlphabet } from "nanoid";
 
 /**
  * The ClickHouse image every container-backed test starts, here and in
@@ -96,6 +97,27 @@ export interface TestClickHouseEndpoint {
   url: string;
   /** The database this endpoint owns, for statements that qualify a table. */
   database: string;
+}
+
+/**
+ * A random organization id for a suite that routes it with a
+ * `CLICKHOUSE_URL__<label>__<orgId>` variable.
+ *
+ * The id lands inside the variable NAME, where `__` separates the label from
+ * the organization and the organization is read as the last such segment. Plain
+ * `nanoid` draws from an alphabet that contains `_`, so about one id in 800
+ * carries a `__` of its own; the name then splits in the wrong place, the route
+ * registers under a fragment of the id, and the organization silently falls
+ * back to the shared client. The alphabet here has no `_`, so the name a suite
+ * writes is the name the parser reads back.
+ */
+const routableIdSuffix = customAlphabet(
+  "0123456789abcdefghijklmnopqrstuvwxyz",
+  6,
+);
+
+export function privateRouteOrgId(name: string): string {
+  return `${name}-${routableIdSuffix()}`;
 }
 
 /**

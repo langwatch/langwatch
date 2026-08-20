@@ -25,10 +25,6 @@ Feature: Icon rail navigation
     When a page wider than the room it has renders
     Then the page ends at the right edge of the window
     And the room it has is the window less the rail and the sidebar
-    # The rail and the sidebar both take room from the page. Counting the
-    # rail as room the page gains instead of room it loses left every page
-    # in this mode two rails too wide, and the right of a full page (the ops
-    # dashboard first) was cut off the window.
 
   @integration
   Scenario: Only the active tile carries a surface

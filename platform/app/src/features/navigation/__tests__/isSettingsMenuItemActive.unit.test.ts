@@ -41,7 +41,7 @@ const PROJECTIONS: SettingsMenuItem = {
 };
 
 describe("isSettingsMenuItemActive", () => {
-  describe("given the address of the page on screen", () => {
+  describe("when the address of the page on screen is passed", () => {
     it("marks the entry the address belongs to", () => {
       expect(
         isSettingsMenuItemActive({
@@ -79,7 +79,7 @@ describe("isSettingsMenuItemActive", () => {
     });
   });
 
-  describe("given an entry that answers for more than one address", () => {
+  describe("when an entry answers for more than one address", () => {
     it("marks it on the address it also answers for", () => {
       expect(
         isSettingsMenuItemActive({
@@ -90,7 +90,7 @@ describe("isSettingsMenuItemActive", () => {
     });
   });
 
-  describe("given an entry that only its own page marks", () => {
+  describe("when an entry is one that only its own page marks", () => {
     it("marks General on the settings home", () => {
       expect(
         isSettingsMenuItemActive({ item: GENERAL, pathname: "/settings" }),
