@@ -26,12 +26,14 @@ import {
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 
 /**
- * The gateway spend pipeline is stubbed so a confirmation can be asserted on
- * its own. What the pipeline then does with it (rate, fold, debit every
- * budget the key is under) is the spend spine's own tested behavior, and
- * this file's subject is the session record that produces the event.
+ * The gateway spend pipeline and the trace collector are stubbed so the two
+ * writes a settlement makes can be asserted on their own. What each one then
+ * does (rate and debit every budget the key is under; fold the span into the
+ * trace summary) is tested where it lives, and this file's subject is the
+ * session record that produces both.
  */
 const sentConfirmations = vi.hoisted(() => [] as Record<string, unknown>[]);
+const ingestedSpans = vi.hoisted(() => [] as Record<string, any>[]);
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
     eventSourcing: {
@@ -46,8 +48,24 @@ vi.mock("~/server/app-layer/app", () => ({
         },
       }),
     },
+    traces: {
+      collection: {
+        ingestNormalizedSpan: (data: Record<string, any>) => {
+          ingestedSpans.push(data);
+          return Promise.resolve({ status: "collected" });
+        },
+      },
+    },
   }),
 }));
+
+/** The value of one span attribute, whichever shape it was written in. */
+function spanAttr(span: Record<string, any>, key: string): unknown {
+  const found = (span.span.attributes as Record<string, any>[]).find(
+    (a) => a.key === key,
+  );
+  return found?.value?.doubleValue ?? found?.value?.stringValue;
+}
 
 import {
   closeAndConfirmRealtimeSession,
@@ -85,7 +103,11 @@ async function keyWithCap(id: string, max: number | null): Promise<string> {
   return id;
 }
 
-function reservation(virtualKeyId: string, sessionId: string) {
+function reservation(
+  virtualKeyId: string,
+  sessionId: string,
+  traceId?: string,
+) {
   return {
     sessionId,
     projectId: PROJECT_ID,
@@ -94,6 +116,7 @@ function reservation(virtualKeyId: string, sessionId: string) {
     modelProviderId: PROVIDER_ID,
     vendor: "elevenlabs",
     model: "convai",
+    ...(traceId === undefined ? {} : { traceId }),
   };
 }
 
@@ -144,6 +167,7 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
       where: { organizationId: ORG_ID },
     });
     sentConfirmations.length = 0;
+    ingestedSpans.length = 0;
   });
 
   /** @scenario A post-call report closes the session and confirms its spend */
@@ -218,6 +242,98 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
         })
       ).status,
     ).toBe("CLOSED");
+  });
+
+  /** @scenario A settled session is written into the trace it was minted in */
+  it("writes the call's cost and quantities into the mint's trace", async () => {
+    const vk = await keyWithCap(`vk-span-${nanoid(6)}`, null);
+    const sessionId = `sp-${nanoid(6)}`;
+    const traceId = `trace-${nanoid(10)}`;
+    await reserveRealtimeSession(reservation(vk, sessionId, traceId));
+    const session = await prisma.gatewayRealtimeSession.findUniqueOrThrow({
+      where: { id: sessionId },
+    });
+
+    await closeAndConfirmRealtimeSession({
+      session,
+      usage: { audio_ms: 6000 },
+      durationMs: 6000,
+      reason: "post-call report",
+    });
+
+    expect(ingestedSpans).toHaveLength(1);
+    const written = ingestedSpans[0]!;
+    expect(written.tenantId).toBe(PROJECT_ID);
+    // Same trace as the mint, so the call is one trace rather than two.
+    expect(written.span.traceId).toBe(traceId);
+
+    // The cost on the trace is the same figure the spend record carries,
+    // rated once from the same quantities. Two surfaces pricing one call
+    // separately is how they come to disagree about it.
+    const confirmedNanoUsd = sentConfirmations[0]!.cost_nano_usd as number;
+    expect(confirmedNanoUsd).toBeGreaterThan(0);
+    expect(spanAttr(written, "langwatch.cost.usd")).toBeCloseTo(
+      confirmedNanoUsd / 1_000_000_000,
+      12,
+    );
+    expect(spanAttr(written, "langwatch.virtual_key_id")).toBe(vk);
+    expect(spanAttr(written, "langwatch.realtime.audio_ms")).toBe(6000);
+    expect(spanAttr(written, "gen_ai.system")).toBe("elevenlabs");
+    expect(spanAttr(written, "langwatch.model")).toBe("convai");
+  });
+
+  /** @scenario A settlement delivered twice is written into the trace once */
+  it("writes nothing more when the same settlement is delivered again", async () => {
+    const vk = await keyWithCap(`vk-replay-${nanoid(6)}`, null);
+    const sessionId = `rp-${nanoid(6)}`;
+    await reserveRealtimeSession(
+      reservation(vk, sessionId, `trace-${nanoid(10)}`),
+    );
+    const session = await prisma.gatewayRealtimeSession.findUniqueOrThrow({
+      where: { id: sessionId },
+    });
+
+    await closeAndConfirmRealtimeSession({
+      session,
+      usage: { audio_ms: 6000 },
+      durationMs: 6000,
+      reason: "post-call report",
+    });
+    // The same row the first delivery read: a resent webhook carries no
+    // knowledge that the session has since closed.
+    await closeAndConfirmRealtimeSession({
+      session,
+      usage: { audio_ms: 6000 },
+      durationMs: 6000,
+      reason: "post-call report, resent",
+    });
+
+    // The trace shows one call at one cost. The spend pipeline collapses the
+    // second confirmation by its own per-step key; the trace has no such
+    // gate, so the close is what makes this exactly once.
+    expect(ingestedSpans).toHaveLength(1);
+  });
+
+  /** @scenario A session minted without a trace writes no span */
+  it("confirms the spend and writes no span when the mint had no trace", async () => {
+    const vk = await keyWithCap(`vk-notrace-${nanoid(6)}`, null);
+    const sessionId = `nt-${nanoid(6)}`;
+    await reserveRealtimeSession(reservation(vk, sessionId));
+    const session = await prisma.gatewayRealtimeSession.findUniqueOrThrow({
+      where: { id: sessionId },
+    });
+
+    await closeAndConfirmRealtimeSession({
+      session,
+      usage: { audio_ms: 3000 },
+      durationMs: 3000,
+      reason: "post-call report",
+    });
+
+    // The money still lands. Only the trace surface is missing, because
+    // there is no trace to write it into.
+    expect(sentConfirmations).toHaveLength(1);
+    expect(ingestedSpans).toHaveLength(0);
   });
 
   /** @scenario A mint past the cap is refused and books nothing */

@@ -68,6 +68,23 @@ const UNATTRIBUTED_OUTCOME = {
   team_id: "",
 };
 
+/**
+ * The attribution an outcome states about itself when its emitter repeats it.
+ *
+ * The control plane confirms a brokered voice session, and the gateway
+ * admitted it, so the confirmation may be the first event the fold sees.
+ */
+const ATTRIBUTED_OUTCOME = {
+  ...UNATTRIBUTED_OUTCOME,
+  organization_id: "org_1",
+  virtual_key_id: "vk_1",
+  end_user_id: "end-user-7",
+  trace_id: "trace-1",
+  request_type: "realtime_session",
+  labels: ["customer:acme-172"] as string[],
+  metadata: '{"call_site":"summary"}',
+};
+
 const admitted = () =>
   makeEvent<GatewaySpendAdmittedEvent>(
     GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
@@ -318,5 +335,50 @@ describe("gatewaySpend fold", () => {
     expect(state.httpStatus).toBe(504);
     expect(state.costNanoUsd).toBe(FAILED_COST_NANO_USD);
     expect(Number.isInteger(state.costNanoUsd)).toBe(true);
+  });
+  /** @scenario An outcome states the attribution its admission has not delivered */
+  it("names the organization and the key from an outcome that has no admission", () => {
+    const state = projection.handleGatewaySpendConfirmed(
+      makeEvent<GatewaySpendConfirmedEvent>(
+        GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+        { ...confirmed().data, ...ATTRIBUTED_OUTCOME },
+        T0 + 3800,
+      ),
+      initial(),
+    );
+
+    // Priced and named. Without the outcome's own attribution this row is a
+    // real charge belonging to no organization and no key, which is what a
+    // brokered voice session produced: the gateway admits it and the control
+    // plane confirms it, so the confirmation can reach the fold first.
+    expect(state.costNanoUsd).toBe(CONFIRMED_COST_NANO_USD);
+    expect(state.organizationId).toBe("org_1");
+    expect(state.virtualKeyId).toBe("vk_1");
+    expect(state.requestType).toBe("realtime_session");
+    expect(state.traceId).toBe("trace-1");
+    expect(state.endUserId).toBe("end-user-7");
+    expect(state.labels).toEqual(["customer:acme-172"]);
+  });
+
+  /** @scenario An outcome states the attribution its admission has not delivered */
+  it("lets the admission win over what the outcome stated", () => {
+    const early = projection.handleGatewaySpendConfirmed(
+      makeEvent<GatewaySpendConfirmedEvent>(
+        GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+        {
+          ...confirmed().data,
+          ...ATTRIBUTED_OUTCOME,
+          organization_id: "org_stale",
+        },
+        T0 + 3800,
+      ),
+      initial(),
+    );
+    expect(early.organizationId).toBe("org_stale");
+
+    // Admission is the authority. The outcome only fills a gap.
+    expect(
+      projection.handleGatewaySpendAdmitted(admitted(), early).organizationId,
+    ).toBe("org_1");
   });
 });

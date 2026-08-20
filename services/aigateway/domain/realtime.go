@@ -63,6 +63,10 @@ type RealtimeReservation struct {
 	AgentID         string
 	// Model is the catalog id this session bills under.
 	Model string
+	// TraceID is the customer-facing trace this mint was recorded under, so
+	// the settlement can write the call's cost back into the same trace.
+	// Empty when the request carried no trace context.
+	TraceID string
 }
 
 // The cap itself is deliberately absent from this struct and from the

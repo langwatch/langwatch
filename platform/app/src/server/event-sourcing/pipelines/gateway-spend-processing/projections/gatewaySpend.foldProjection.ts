@@ -91,6 +91,54 @@ export interface GatewaySpendState {
  * request. Re-pricing is a correction against the log, never a side
  * effect of whichever consumer happened to run after a catalog deploy.
  */
+/**
+ * Attribution the outcome carries, for a row whose admission has not landed.
+ *
+ * Admission is the authority and wins wherever the state already holds a
+ * value, so a normal request folds exactly as before. It matters when the
+ * outcome is folded first, or alone: a brokered voice session is admitted by
+ * the gateway and confirmed by the control plane, which are different
+ * emitters on different paths, so the confirmation can reach the fold before
+ * the admission does. Without this the row is priced correctly and named
+ * nothing, which reads as spend belonging to no organization and no key.
+ */
+function attributionFromOutcome(
+  state: GatewaySpendState,
+  d: {
+    organization_id: string;
+    virtual_key_id: string;
+    principal_user_id: string;
+    end_user_id: string;
+    trace_id: string;
+    request_type: string;
+    labels: string[];
+    metadata: string;
+  },
+): Pick<
+  GatewaySpendState,
+  | "organizationId"
+  | "virtualKeyId"
+  | "principalUserId"
+  | "endUserId"
+  | "traceId"
+  | "requestType"
+  | "labels"
+  | "metadataJson"
+> {
+  return {
+    organizationId: state.organizationId || d.organization_id,
+    virtualKeyId: state.virtualKeyId || d.virtual_key_id,
+    principalUserId: state.principalUserId || d.principal_user_id,
+    endUserId: state.endUserId || d.end_user_id,
+    traceId: state.traceId || d.trace_id,
+    requestType: state.requestType || d.request_type,
+    // Read defensively: this runs on every priced outcome, and a fold that
+    // throws stops the projection rather than losing one field.
+    labels: state.labels?.length ? state.labels : (d.labels ?? []),
+    metadataJson: state.metadataJson || d.metadata,
+  };
+}
+
 export class GatewaySpendFoldProjection
   extends AbstractFoldProjection<
     GatewaySpendState,
@@ -208,6 +256,7 @@ export class GatewaySpendFoldProjection
     const providerKey = d.model_provider_id || state.providerKey;
     return {
       ...state,
+      ...attributionFromOutcome(state, d),
       status: "confirmed",
       model,
       providerKey,
@@ -232,6 +281,7 @@ export class GatewaySpendFoldProjection
     const providerKey = d.model_provider_id || state.providerKey;
     return {
       ...state,
+      ...attributionFromOutcome(state, d),
       status: "failed",
       model,
       providerKey,
@@ -260,6 +310,7 @@ export class GatewaySpendFoldProjection
     }
     return {
       ...state,
+      ...attributionFromOutcome(state, event.data),
       status: "settled",
       needsReconciliation: true,
       settleReason: event.data.reason,

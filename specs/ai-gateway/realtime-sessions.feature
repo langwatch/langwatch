@@ -132,6 +132,31 @@ Feature: Brokered realtime voice sessions on the AI Gateway
       # The fold makes a confirmation supersede a settled record, so a late
       # report replaces the unknown cost with the real one.
 
+    @integration
+    Scenario: A settled session is written into the trace it was minted in
+      Given a session was minted and a conversation was held
+      When the vendor's post-call report arrives
+      Then one span carrying the call's cost and quantities is written into the mint's trace
+      # The media runs client to vendor, so the only span the gateway itself
+      # can emit is the mint, and a mint costs nothing yet. Without this the
+      # trace surface shows a call we billed at zero.
+
+    @integration
+    Scenario: A settlement delivered twice is written into the trace once
+      Given a session that has already been closed and confirmed
+      When the same settlement is delivered again
+      Then no second span is written into the trace
+      # A vendor may resend a webhook and a client may retry its report, so a
+      # replay must supersede rather than add to what the trace already shows.
+
+    @integration
+    Scenario: A session minted without a trace writes no span
+      Given a session was minted with no trace context
+      When the vendor's post-call report arrives
+      Then the spend is confirmed and no span is written
+      # A trace id invented here would put a cost in the explorer under an id
+      # nothing else references.
+
     @unit
     Scenario: Audio tokens are taken out of the text totals before rating
       When a client posts an OpenAI realtime usage report carrying an audio split

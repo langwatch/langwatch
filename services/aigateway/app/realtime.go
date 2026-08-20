@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/herr"
@@ -35,20 +36,10 @@ func (a *App) dispatchRealtimeSession(ctx context.Context, call *pipeline.Call) 
 	if err := call.MaterializeBody(); err != nil {
 		return nil, err
 	}
-	creds, err := a.candidateChain(ctx, call)
+	cred, err := a.realtimeCredential(ctx, call)
 	if err != nil {
 		return nil, err
 	}
-	// coreDispatch hands the chain to retry.Walk, which tolerates an empty
-	// slice. This lane takes the head of it, so it has to say what an empty
-	// chain means itself rather than panicking on the request thread.
-	if len(creds) == 0 {
-		return nil, herr.New(ctx, domain.ErrProviderNotBound, herr.M{
-			"message": "no provider credential on this key can mint a realtime voice session for the vendor this endpoint names",
-			"fault":   "customer",
-		})
-	}
-	cred := creds[0]
 
 	session := call.Request.RealtimeSession
 	if session == nil {
@@ -68,6 +59,7 @@ func (a *App) dispatchRealtimeSession(ctx context.Context, call *pipeline.Call) 
 		Vendor:          session.Vendor,
 		AgentID:         session.AgentID,
 		Model:           resolvedModelID(call.Request),
+		TraceID:         customerTraceID(ctx),
 	}
 	if err := a.reserveRealtimeSession(ctx, reservation); err != nil {
 		return nil, err
@@ -95,6 +87,25 @@ func (a *App) dispatchRealtimeSession(ctx context.Context, call *pipeline.Call) 
 	}
 	a.metrics.RecordRealtimeMint(string(session.Vendor), "minted")
 	return resp, nil
+}
+
+// realtimeCredential takes the one credential that serves this mint.
+//
+// coreDispatch hands the chain to retry.Walk, which tolerates an empty slice.
+// This lane takes the head of it, so it has to say what an empty chain means
+// itself rather than panicking on the request thread.
+func (a *App) realtimeCredential(ctx context.Context, call *pipeline.Call) (domain.Credential, error) {
+	creds, err := a.candidateChain(ctx, call)
+	if err != nil {
+		return domain.Credential{}, err
+	}
+	if len(creds) == 0 {
+		return domain.Credential{}, herr.New(ctx, domain.ErrProviderNotBound, herr.M{
+			"message": "no provider credential on this key can mint a realtime voice session for the vendor this endpoint names",
+			"fault":   "customer",
+		})
+	}
+	return creds[0], nil
 }
 
 // refuseUncorrelatedMint discards a credential the vendor issued but nothing
@@ -203,6 +214,17 @@ func (a *App) releaseRealtimeSession(ctx context.Context, reservation domain.Rea
 			zap.Error(err),
 		)
 	}
+}
+
+// customerTraceID is the trace the mint's own span belongs to. A brokered
+// call emits no further spans of its own, so this is the only way the
+// settlement can find the trace to write its cost into.
+func customerTraceID(ctx context.Context) string {
+	sc := trace.SpanContextFromContext(ctx)
+	if !sc.IsValid() {
+		return ""
+	}
+	return sc.TraceID().String()
 }
 
 // resolvedModelID names the model a session bills under: the resolved id

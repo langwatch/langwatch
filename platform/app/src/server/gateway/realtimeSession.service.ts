@@ -27,6 +27,7 @@ import {
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
 import { GATEWAY_SPEND_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import { rateSpendNanoUsd } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
+import { recordRealtimeSessionSpan } from "./realtimeSessionSpan";
 import { parseVirtualKeyConfig } from "./virtualKey.config";
 
 const logger = createLogger("langwatch:gateway:realtime-session");
@@ -56,6 +57,12 @@ export interface ReserveInput {
   vendor: string;
   agentId?: string;
   model: string;
+  /**
+   * The customer-facing trace the mint's own span belongs to, so the
+   * settlement can write this call's cost back into that trace. Absent for a
+   * request with no trace context.
+   */
+  traceId?: string;
 }
 
 /**
@@ -122,6 +129,7 @@ export async function reserveRealtimeSession(
         vendor: input.vendor,
         agentId: input.agentId ?? null,
         model: input.model,
+        traceId: input.traceId ?? null,
         status: "OPEN",
       },
     });
@@ -279,12 +287,14 @@ export async function closeAndConfirmRealtimeSession(params: {
     virtual_key_id: params.session.virtualKeyId,
     request_type: "realtime_session",
     admitted_at: params.session.mintedAt.getTime(),
-    // Not known on this path. A brokered call runs client to vendor, so no
-    // span reaches us to carry a trace id, and the mint takes no end-user
-    // header. The principal and the team are joined by the ingest seam from
-    // the virtual key.
+    // The mint recorded its own trace id on the session row, so the spend
+    // record and the settlement span name the same trace and the two money
+    // surfaces can be joined. The rest is not known on this path: a brokered
+    // call runs client to vendor, so no span reaches us, and the mint takes
+    // no end-user header. The principal and the team are joined by the
+    // ingest seam from the virtual key.
     end_user_id: "",
-    trace_id: "",
+    trace_id: params.session.traceId ?? "",
     principal_user_id: "",
     team_id: "",
     labels: [],
@@ -311,7 +321,20 @@ export async function closeAndConfirmRealtimeSession(params: {
       { sessionId: params.session.id },
       "a realtime report arrived for a session that was already closed",
     );
+    return;
   }
+
+  // One session, one span, emitted by whichever confirmation won the close.
+  // Gating on the close is what makes it exactly once: a resent webhook, a
+  // retried client report, or a late confirmation superseding a settled
+  // record all find the row already CLOSED and add nothing to the trace.
+  await recordRealtimeSessionSpan({
+    session: params.session,
+    usage,
+    costNanoUsd: rated.costNanoUsd,
+    durationMs: params.durationMs ?? 0,
+    occurredAt,
+  });
 }
 
 /**

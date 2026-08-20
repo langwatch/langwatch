@@ -4209,6 +4209,15 @@ model GatewayRealtimeSession {
   // Why the session left OPEN, for the rows that did not close normally.
   closeReason String?
 
+  // The customer-facing trace the mint was recorded under.
+  //
+  // A brokered call runs client to vendor, so the only span the gateway emits
+  // for it is the mint itself, and that span is written before the call has
+  // cost anything. Keeping the trace id here lets the settlement write its
+  // cost back into the same trace, so one session stays one trace instead of
+  // becoming a zero-cost mint next to an orphaned cost.
+  traceId String?
+
   // The vendor's own cost payload, kept verbatim for reconciliation only.
   // Money is rated from the quantities like every other request; this is
   // what the two are compared against when they disagree.
