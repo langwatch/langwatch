@@ -667,6 +667,20 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       this.prisma.grantUsage.deleteMany({ where: { organizationId } }),
       this.prisma.grant.deleteMany({ where: { organizationId } }),
       this.prisma.role.deleteMany({ where: { organizationId } }),
+      // The migration machinery's own per-tenant rows follow the same rule:
+      // plain organizationId columns, no relation, nothing cascades them. A
+      // purge that left them behind would keep a deleted tenant enrolled and
+      // its migration state answering the next pass.
+      this.prisma.systemMigrationTenantState.deleteMany({
+        where: { tenantId: organizationId },
+      }),
+      this.prisma.systemMigrationEnrollment.deleteMany({
+        where: { organizationId },
+      }),
+      this.prisma.apiKey.deleteMany({ where: { organizationId } }),
+      this.prisma.promptTag.deleteMany({ where: { organizationId } }),
+      this.prisma.team.deleteMany({ where: { organizationId } }),
+      this.prisma.organization.deleteMany({ where: { id: organizationId } }),
     ]);
   }
 

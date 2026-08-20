@@ -40,18 +40,14 @@ import { type AuthzGrantsCommandSenders, GrantsLedgerWriter } from "../ledger";
 
 const ns = `authz-revoke-${nanoid(8)}`;
 
-/** Every command the writer can send, none of which ever reaches a fold. */
+/** Every command the writer can send, one per entity. */
 const COMMAND_VERBS = [
-  "attachGrants",
+  "attachGrant",
   "changeGrantRole",
-  "revokeGrants",
-  "defineRoles",
+  "revokeGrant",
+  "defineRole",
+  "changeRolePermissions",
   "deleteRole",
-  "offboardMember",
-  "proveMigrationParity",
-  "completeCutover",
-  "rollBackCutover",
-  "recordMigrationTenantState",
 ] as const;
 
 describe("given a revocation with the queue severed and Redis disconnected", () => {
@@ -63,10 +59,12 @@ describe("given a revocation with the queue severed and Redis disconnected", () 
   let survivingGrantId: string;
   let previousApp: App | null = null;
 
-  const grantIds = async () =>
+  /** The grants that still authorize — which, now that a revoke marks its
+   *  row rather than deleting it, is the only count that means anything. */
+  const liveGrantIds = async () =>
     (
       await prisma.grant.findMany({
-        where: { organizationId: organization.id },
+        where: { organizationId: organization.id, revokedAt: null },
         select: { id: true },
       })
     ).map((row) => row.id);

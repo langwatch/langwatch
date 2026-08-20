@@ -51,8 +51,48 @@ const gate = perOrganizationCachedFlag({
 
 type MigrationStatePrisma = Pick<PrismaClient, "systemMigrationTenantState">;
 
-/** The status read itself, uncached — what a cache miss runs, and what the
- *  migration's own repository runs while awaiting the state it just wrote. */
+/**
+ * The status read itself, uncached and UNCAUGHT — an unreadable state table
+ * raises here.
+ *
+ * That matters for exactly one caller. Revocation must never come undone, so
+ * it routes on a fresh read and treats a failed one as "on the engine": the
+ * branch that writes both heads, which is harmless on a legacy organization
+ * and the only correct answer on a migrated one. It cannot use the fail-safe
+ * wrapper below, because a swallowed error there is indistinguishable from a
+ * genuine "not migrated" and would route the revoke to the legacy branch
+ * alone — compat row deleted, grant still live, access not actually taken
+ * away. Everything else wants the wrapper.
+ */
+export async function readOrganizationOnAuthzEngine({
+  prisma,
+  organizationId,
+}: {
+  prisma: MigrationStatePrisma;
+  organizationId: string;
+}): Promise<boolean> {
+  const record = await prisma.systemMigrationTenantState.findUnique({
+    where: {
+      migrationName_tenantId: {
+        migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
+        tenantId: organizationId,
+      },
+    },
+    select: { status: true },
+  });
+  // `status` is a plain string column, wider than the union above on
+  // purpose, so the cast sits on the comparison rather than on the
+  // declaration a rename must still catch.
+  return (
+    record !== null &&
+    (ON_ENGINE_STATUSES as readonly string[]).includes(record.status)
+  );
+}
+
+/** The same read, failing safe: an unreadable state table leaves the
+ *  organization on the legacy path, which always works. What a cache miss
+ *  runs, and what the migration's own repository runs while awaiting the
+ *  state it just wrote. */
 export async function queryOrganizationOnAuthzEngine({
   prisma,
   organizationId,
@@ -61,27 +101,11 @@ export async function queryOrganizationOnAuthzEngine({
   organizationId: string;
 }): Promise<boolean> {
   try {
-    const record = await prisma.systemMigrationTenantState.findUnique({
-      where: {
-        migrationName_tenantId: {
-          migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
-          tenantId: organizationId,
-        },
-      },
-      select: { status: true },
-    });
-    // `status` is a plain string column, wider than the union above on
-    // purpose, so the cast sits on the comparison rather than on the
-    // declaration a rename must still catch.
-    return (
-      record !== null &&
-      (ON_ENGINE_STATUSES as readonly string[]).includes(record.status)
-    );
+    return await readOrganizationOnAuthzEngine({ prisma, organizationId });
   } catch (error) {
-    // Fail safe: an unreadable state table leaves the organization on the
-    // legacy path, which always works. Said out loud because the failure is
-    // otherwise silent — a migrated organization pinned back onto legacy for
-    // the cache TTL looks exactly like one that never migrated.
+    // Said out loud because the failure is otherwise silent — a migrated
+    // organization pinned back onto legacy for the cache TTL looks exactly
+    // like one that never migrated.
     logger.warn(
       { organizationId, error, ttlMs: ENGINE_GATE_CACHE_TTL_MS },
       "could not read the authz migration state; this organization stays on the legacy path until the cache expires",

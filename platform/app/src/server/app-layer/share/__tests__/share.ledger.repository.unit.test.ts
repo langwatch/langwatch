@@ -104,8 +104,11 @@ function buildRepository({
   const transaction = vi.fn(async (run: (tx: unknown) => Promise<unknown>) =>
     run({ grantUsage, shareLink: { update: compatMirror } }),
   );
-  const cutoverFindUnique = vi.fn().mockResolvedValue({ onEngine });
+  const cutoverFindUnique = vi
+    .fn()
+    .mockResolvedValue(onEngine ? { status: "migrated" } : null);
   const prisma = {
+    systemMigrationTenantState: { findUnique: cutoverFindUnique },
     project: {
       findUnique: vi
         .fn()
@@ -377,7 +380,7 @@ describe("LedgerShareRepository", () => {
           maxViews: null,
         });
         expect(legacy.consumeView).toHaveBeenCalledTimes(1);
-        cutoverFindUnique.mockResolvedValue({ onEngine: true });
+        cutoverFindUnique.mockResolvedValue({ status: "migrated" });
 
         await repository.deleteById({ id: "share_1", projectId: PROJECT_ID });
 
@@ -430,6 +433,7 @@ describe("LedgerShareRepository", () => {
             scopeType: "RESOURCE",
             resourceKind: "TRACE",
             scopeId: TRACE_ID,
+            revokedAt: null,
           },
           select: { id: true },
         });
@@ -497,6 +501,7 @@ describe("LedgerShareRepository", () => {
             projectId: PROJECT_ID,
             scopeType: "RESOURCE",
             resourceKind: "TRACE",
+            revokedAt: null,
           },
           select: { id: true },
         });

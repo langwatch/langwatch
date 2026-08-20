@@ -48,11 +48,17 @@ const repositoryFor = (onEngineByOrg: Record<string, boolean>) => {
   const legacy = spyRepository("legacy");
   const grants = spyRepository("grants");
   const findUnique = vi.fn(
-    async ({ where }: { where: { organizationId: string } }) => ({
-      onEngine: onEngineByOrg[where.organizationId] === true,
-    }),
+    async ({
+      where,
+    }: {
+      where: { migrationName_tenantId: { tenantId: string } };
+    }) =>
+      onEngineByOrg[where.migrationName_tenantId.tenantId] === true
+        ? { status: "migrated" }
+        : null,
   );
   const prisma = {
+    systemMigrationTenantState: { findUnique },
   } as unknown as Prisma.TransactionClient;
   return {
     legacy,
@@ -251,10 +257,10 @@ describe("CutoverAwareAccessListingRepository", () => {
       const grants = spyRepository("grants");
       const findUnique = vi
         .fn()
-        .mockResolvedValueOnce({ onEngine: true })
-        .mockResolvedValueOnce({ onEngine: false })
-        .mockResolvedValue({ onEngine: false });
+        .mockResolvedValueOnce({ status: "migrated" })
+        .mockResolvedValue(null);
       const prisma = {
+        systemMigrationTenantState: { findUnique },
       } as unknown as Prisma.TransactionClient;
       const repository = new CutoverAwareAccessListingRepository(prisma, {
         legacy,

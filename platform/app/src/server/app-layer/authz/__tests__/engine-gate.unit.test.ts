@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
   organizationOnAuthzEngine,
+  readOrganizationOnAuthzEngine,
   resetAuthzEngineGateForTesting,
 } from "../engine-gate";
 import { authzEngineGateReadFailuresTotal } from "../metrics";
@@ -103,6 +104,29 @@ describe("the authz engine gate", () => {
       await organizationOnAuthzEngine({ organizationId: ORG_ID, prisma });
 
       expect(await counterValue()).toBe(before + 1);
+    });
+
+    /**
+     * The fail-safe direction is right for a CHECK and wrong for a REVOKE.
+     * A check that cannot read the state stays on the legacy path, which
+     * always answers; a revoke that did the same would write the legacy head
+     * alone, leaving the grant live and the access it was told to remove
+     * still working.
+     *
+     * So revocation routes on `readOrganizationOnAuthzEngine`, which raises,
+     * and treats raising as "on the engine". This pins the raising: when the
+     * two functions were one, its caller's catch became unreachable and the
+     * revoke silently took the legacy-only branch.
+     */
+    it("raises through the uncached read a revoke routes on", async () => {
+      const findUnique = vi.fn().mockRejectedValue(new Error("pg is down"));
+      const prisma = {
+        systemMigrationTenantState: { findUnique },
+      } as unknown as Pick<PrismaClient, "systemMigrationTenantState">;
+
+      await expect(
+        readOrganizationOnAuthzEngine({ organizationId: ORG_ID, prisma }),
+      ).rejects.toThrow("pg is down");
     });
   });
 

@@ -54,7 +54,6 @@ const buildPrisma = (teamRole: TeamUserRole) => {
     systemMigrationTenantState: {
       findUnique: vi.fn().mockResolvedValue(null),
     },
-    systemMigrationTenantState: { findUnique: vi.fn().mockResolvedValue(null) },
   };
   return { prisma, projectFindUnique, organizationUserFindFirst };
 };

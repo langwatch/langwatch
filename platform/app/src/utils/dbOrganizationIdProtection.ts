@@ -324,8 +324,6 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   SystemMigrationEnrollment: {
     platformScopeActions: ["findMany", "groupBy"],
   },
-  AuthzProjectionCursor: {},
-  AuthzCutoverProjection: {},
   AiToolEntry: {},
   GatewayBudget: {},
   // Per-bucket period boundaries for attributed-user templates. Bound by

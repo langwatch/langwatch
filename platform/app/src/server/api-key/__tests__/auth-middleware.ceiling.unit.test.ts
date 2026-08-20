@@ -156,7 +156,6 @@ describe("enforceApiKeyCeiling()", () => {
 
         await expect(
           enforceApiKeyCeiling({
-            prisma,
             resolved: langySessionKeyToken,
             permission: "triggers:create",
           }),
@@ -177,7 +176,6 @@ describe("enforceApiKeyCeiling()", () => {
 
         await expect(
           enforceApiKeyCeiling({
-            prisma,
             resolved: langySessionKeyToken,
             permission: "prompts:create",
           }),
@@ -193,7 +191,6 @@ describe("enforceApiKeyCeiling()", () => {
 
         await expect(
           enforceApiKeyCeiling({
-            prisma,
             resolved: apiKeyToken,
             permission: "triggers:create",
           }),

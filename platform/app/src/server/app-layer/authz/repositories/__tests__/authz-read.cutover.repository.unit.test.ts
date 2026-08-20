@@ -208,8 +208,9 @@ describe("CutoverAwareAuthzReadRepository", () => {
 
   describe("when several calls ask about the same organization", () => {
     it("reads the projection once, because the gate caches the answer", async () => {
-      const findUnique = vi.fn().mockResolvedValue({ onEngine: true });
+      const findUnique = vi.fn().mockResolvedValue({ status: "migrated" });
       const prisma = {
+        systemMigrationTenantState: { findUnique },
       } as unknown as Prisma.TransactionClient;
       const repository = new CutoverAwareAuthzReadRepository(prisma, {
         legacy: spyRepository("legacy"),
@@ -234,9 +235,10 @@ describe("CutoverAwareAuthzReadRepository", () => {
     const gateFlippingAfterFirstRead = () => {
       const findUnique = vi
         .fn()
-        .mockResolvedValueOnce({ onEngine: true })
-        .mockResolvedValue({ onEngine: false });
+        .mockResolvedValueOnce({ status: "migrated" })
+        .mockResolvedValue(null);
       const prisma = {
+        systemMigrationTenantState: { findUnique },
       } as unknown as Prisma.TransactionClient;
       const legacy = spyRepository("legacy");
       const grants = spyRepository("grants");

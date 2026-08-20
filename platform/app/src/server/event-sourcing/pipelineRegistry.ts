@@ -348,7 +348,7 @@ export interface PipelineRepositories {
   topicModel: StateProjectionStore<TopicModelData>;
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
   langyTurnAdmission: LangyTurnAdmissionRepository;
-  /** The grants ledger's two-headed Postgres projection (ADR-092 §13). */
+  /** Where the grants pipeline's write instructions land (ADR-110). */
   authzGrantsWrite: GrantProjectionWriteStore;
   /** Insert-only audit sink for the grants ledger (ADR-092 decision 17). */
   authzAuditTrail: AuthzAuditTrailStore;

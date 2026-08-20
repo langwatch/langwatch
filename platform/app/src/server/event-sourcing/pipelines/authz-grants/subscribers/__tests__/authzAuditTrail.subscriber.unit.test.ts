@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createTenantId } from "../../../..";
 import {
-  AUTHZ_GRANTS_AGGREGATE_TYPE,
+  AUTHZ_GRANT_AGGREGATE_TYPE,
   AUTHZ_GRANTS_EVENT_VERSION_LATEST,
-  CUTOVER_COMPLETED_EVENT_TYPE,
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
@@ -39,7 +38,7 @@ function event(
   return {
     id: overrides?.id ?? "evt_2Zk",
     aggregateId: ORG,
-    aggregateType: AUTHZ_GRANTS_AGGREGATE_TYPE,
+    aggregateType: AUTHZ_GRANT_AGGREGATE_TYPE,
     tenantId: createTenantId(ORG),
     createdAt: 1_800_000_000_000,
     occurredAt: overrides?.occurredAt ?? OCCURRED_AT,
@@ -102,9 +101,6 @@ describe("authz audit trail subscriber", () => {
         ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
         ROLE_DELETED_EVENT_TYPE,
       ]);
-      expect([...AUTHZ_AUDIT_EVENT_TYPES]).not.toContain(
-        CUTOVER_COMPLETED_EVENT_TYPE,
-      );
     });
   });
 
@@ -290,11 +286,11 @@ describe("authz audit trail subscriber", () => {
     it("writes no row and fails loudly", async () => {
       const store = recordingStore();
 
+      // A type outside the verb map on purpose: every type the family
+      // currently publishes IS audited, so the only way to reach this guard
+      // is to hand it the shape a future unmapped event would have.
       await expect(
-        deliver(
-          store,
-          event(CUTOVER_COMPLETED_EVENT_TYPE, { actor: USER_ACTOR }),
-        ),
+        deliver(store, event("authz.grants.unmapped", { actor: USER_ACTOR })),
       ).rejects.toThrow(/no audit verb/);
       expect(store.inserts).toHaveLength(0);
     });
