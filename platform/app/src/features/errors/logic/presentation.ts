@@ -165,9 +165,7 @@ const MIGRATION_STATUS_LABELS: Record<string, string> = {
  * sentence rather than leaking the identifier.
  */
 const MIGRATION_NAME_LABELS: Record<string, string> = {
-  "authz-team-user-backfill": "the team membership backfill",
-  "authz-grants-genesis-import": "the grants ledger import",
-  "authz-grants-cutover": "the authorization engine cutover",
+  "authz-engine": "the authorization upgrade",
 };
 
 /**

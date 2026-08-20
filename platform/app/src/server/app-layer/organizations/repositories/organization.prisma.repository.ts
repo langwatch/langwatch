@@ -658,36 +658,15 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     // Role bindings first: RoleBinding.apiKeyId restricts api-key deletion.
     await this.prisma.$transaction([
       this.prisma.roleBinding.deleteMany({ where: { organizationId } }),
-      // The grants ledger's projections (ADR-092 §13). They carry
-      // organizationId as a plain column and never a relation - facts derived
-      // from the ledger must not presume the row they describe still exists -
-      // so nothing cascades them, and a purge that skipped them would leave a
-      // deleted tenant's access rows behind as the only surviving head. Usage
-      // before its Grant, and the cursor and cutover flag last, so the state
-      // this org is served from disappears in one transaction with the rest.
+      // The authorization read model. It carries organizationId as a plain
+      // column and never a relation - facts derived from the log must not
+      // presume the row they describe still exists - so nothing cascades
+      // them, and a purge that skipped them would leave a deleted tenant's
+      // access rows behind as the only surviving head. Usage before its
+      // Grant.
       this.prisma.grantUsage.deleteMany({ where: { organizationId } }),
       this.prisma.grant.deleteMany({ where: { organizationId } }),
       this.prisma.role.deleteMany({ where: { organizationId } }),
-      this.prisma.authzProjectionCursor.deleteMany({
-        where: { organizationId },
-      }),
-      this.prisma.authzCutoverProjection.deleteMany({
-        where: { organizationId },
-      }),
-      // The migration machinery's own per-tenant rows follow the same rule:
-      // plain organizationId columns, no relation, nothing cascades them. A
-      // purge that left them behind would keep a deleted tenant enrolled and
-      // its migration state answering the next pass.
-      this.prisma.systemMigrationTenantState.deleteMany({
-        where: { tenantId: organizationId },
-      }),
-      this.prisma.systemMigrationEnrollment.deleteMany({
-        where: { organizationId },
-      }),
-      this.prisma.apiKey.deleteMany({ where: { organizationId } }),
-      this.prisma.promptTag.deleteMany({ where: { organizationId } }),
-      this.prisma.team.deleteMany({ where: { organizationId } }),
-      this.prisma.organization.deleteMany({ where: { id: organizationId } }),
     ]);
   }
 

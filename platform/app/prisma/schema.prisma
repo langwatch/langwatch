@@ -2449,11 +2449,9 @@ model Grant {
   // of that resource's identity itself: resourceKind says what the id names
   // (TRACE | THREAD, ShareLink's own spelling) and projectId says where it
   // lives. createdByUserId is whoever minted the link.
-  // Partial unique (`WHERE "revokedAt" IS NULL`), defined in migration
-  // 20260820180000_grants_revoke_marks_the_row and NOT declared as @unique
-  // here: Prisma would rebuild it non-partially on the next migrate dev, and
-  // a revoked link's token would then block re-minting it forever.
-  token           String?
+  // Unique GLOBALLY, revoked or not: a reissued token is an old share link
+  // that works again, which is the one thing revoking it was for.
+  token           String?   @unique
   permission      String?
   resourceKind    String?
   projectId       String?
@@ -2530,12 +2528,12 @@ model Role {
   occurredAt     DateTime
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @default(now()) @updatedAt
-  // Same rule as Grant.revokedAt: a delete marks, so the name stays taken by
-  // a row nothing can see unless the unique is partial. The
-  // (organizationId, name) unique is therefore SQL-side too - see migration
-  // 20260820180000_grants_revoke_marks_the_row.
+  // A delete marks the row. The name stays taken: identity is the id, and
+  // reusing a deleted role's name would make two different roles read as one
+  // in every audit trail that recorded the name.
   deletedAt      DateTime?
 
+  @@unique([organizationId, name])
   @@index([organizationId])
 }
 

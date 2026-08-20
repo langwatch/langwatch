@@ -1,7 +1,6 @@
 import { z } from "zod";
 import {
   grantEventSourceSchema,
-  grantRevocationSelectorSchema,
   grantShapeRefinement,
   grantsLedgerActorSchema,
   ledgerPrincipalSchema,

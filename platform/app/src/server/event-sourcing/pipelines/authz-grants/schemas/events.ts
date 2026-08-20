@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { GRANT_EVENT_SOURCES } from "@langwatch/authz-server";
 import { EventSchema } from "../../../domain/types";
 import {
   GRANT_ATTACHED_EVENT_TYPE,
@@ -76,14 +77,9 @@ export const ledgerScopeSchema = z.object({
   id: z.string(),
 });
 
-export const grantEventSourceSchema = z.enum([
-  "grants-service",
-  "scim",
-  "invite",
-  "backfill-b",
-  "genesis-import",
-  "read-through-mint",
-]);
+/** Derived, never restated: a source added to the vocabulary is accepted on
+ *  the wire with no edit here. */
+export const grantEventSourceSchema = z.enum(GRANT_EVENT_SOURCES);
 
 export const grantsLedgerActorSchema = z.object({
   type: z.enum(["user", "system"]),
@@ -198,43 +194,15 @@ export const grantRoleChangedEventSchema = EventSchema.extend({
 });
 export type GrantRoleChangedEvent = z.infer<typeof grantRoleChangedEventSchema>;
 
-/**
- * Which grants a revocation names by IDENTITY rather than by id.
- *
- * A revoke-by-filter resolves its ids from the compat projection, and that
- * projection lags the ledger by a fold: a grant appended a moment earlier is
- * invisible to the query, so an id list alone leaves it standing. Carrying the
- * identity the caller filtered on lets the FOLD — which sees what the stream
- * itself produced — remove every grant that matches. The reducer applies it
- * against the state at that point in the stream, so a replay reproduces the
- * same removal (`GrantRevocationSelector` in @langwatch/authz-server).
- */
-export const grantRevocationSelectorSchema = z.object({
-  principal: ledgerPrincipalSchema,
-  /** Present when the caller filtered on one scope; absent means the
-   *  principal's grants at every scope. */
-  scope: ledgerScopeSchema.optional(),
-});
-
+/** A revoke names its grant, and only its grant: the aggregate IS the grant,
+ *  so an event cannot address a set of them. */
 export const grantRevokedEventSchema = EventSchema.extend({
   type: z.literal(GRANT_REVOKED_EVENT_TYPE),
-  data: z
-    .object({
-      /** Absent only on a revoke-by-identity whose lagging projection listed
-       *  no id at all — the selector is then the whole instruction. */
-      grantId: z.string().min(1).optional(),
-      selector: grantRevocationSelectorSchema.optional(),
-      reason: z.string().min(1).optional(),
-      actor: grantsLedgerActorSchema,
-    })
-    .refine(
-      (data) => data.grantId !== undefined || data.selector !== undefined,
-      {
-        message:
-          "a revocation names a grant id, an identity selector, or both — never neither",
-        path: ["grantId"],
-      },
-    ),
+  data: z.object({
+    grantId: z.string().min(1),
+    reason: z.string().min(1).optional(),
+    actor: grantsLedgerActorSchema,
+  }),
 });
 export type GrantRevokedEvent = z.infer<typeof grantRevokedEventSchema>;
 

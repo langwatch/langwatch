@@ -59,20 +59,16 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import type {
-  AttachGrantsCommandData,
+  AttachGrantCommandData,
   ChangeGrantRoleCommandData,
-  CompleteCutoverCommandData,
-  DefineRolesCommandData,
+  ChangeRolePermissionsCommandData,
+  DefineRoleCommandData,
   DeleteRoleCommandData,
-  OffboardMemberCommandData,
-  ProveMigrationParityCommandData,
-  RecordMigrationTenantStateCommandData,
-  RevokeGrantsCommandData,
-  RollBackCutoverCommandData,
+  RevokeGrantCommandData,
 } from "~/server/event-sourcing/pipelines/authz-grants/schemas/commands";
 import {
   AUTHZ_AUDIT_ACTION_PREFIX,
-  AUTHZ_GRANTS_PIPELINE_NAME,
+  AUTHZ_GRANT_PIPELINE_NAME,
   type AuthzAuditVerb,
 } from "~/server/event-sourcing/pipelines/authz-grants/schemas/constants";
 import { prisma as appPrisma } from "../../db";
@@ -80,7 +76,7 @@ import { RoleDuplicateNameError } from "../../role/errors/role-duplicate-name.er
 import { tryGetApp } from "../app";
 import { bumpAuthzEpoch } from "./epoch";
 import { organizationOnAuthzEngine } from "./engine-gate";
-import { PrismaAuthzGrantsProjectionRepository } from "./repositories/authz-grants-projection.prisma.repository";
+import { PrismaAuthzRevocationRepository } from "./repositories/authz-revocation.prisma.repository";
 
 const logger = createLogger("langwatch:authz:ledger");
 
@@ -104,17 +100,18 @@ let grantsLedgerHandle: Promise<{
   commands: AuthzGrantsCommandSenders;
 }> | null = null;
 
+/**
+ * One command per entity (ADR-110): a batch would straddle aggregates, so a
+ * caller with many grants sends many commands. They are independent and
+ * apply concurrently, which is the point.
+ */
 export type AuthzGrantsCommandSenders = {
-  attachGrants: Sender<AttachGrantsCommandData>;
+  attachGrant: Sender<AttachGrantCommandData>;
   changeGrantRole: Sender<ChangeGrantRoleCommandData>;
-  revokeGrants: Sender<RevokeGrantsCommandData>;
-  defineRoles: Sender<DefineRolesCommandData>;
+  revokeGrant: Sender<RevokeGrantCommandData>;
+  defineRole: Sender<DefineRoleCommandData>;
+  changeRolePermissions: Sender<ChangeRolePermissionsCommandData>;
   deleteRole: Sender<DeleteRoleCommandData>;
-  offboardMember: Sender<OffboardMemberCommandData>;
-  proveMigrationParity: Sender<ProveMigrationParityCommandData>;
-  completeCutover: Sender<CompleteCutoverCommandData>;
-  rollBackCutover: Sender<RollBackCutoverCommandData>;
-  recordMigrationTenantState: Sender<RecordMigrationTenantStateCommandData>;
 };
 
 /**
@@ -214,7 +211,7 @@ async function resolveAuthzGrantsCommands(options?: {
     throw new AuthzLedgerUnavailableError();
   }
   return app.eventSourcing.getPipeline(
-    AUTHZ_GRANTS_PIPELINE_NAME as never,
+    AUTHZ_GRANT_PIPELINE_NAME as never,
   ) as unknown as { commands: AuthzGrantsCommandSenders };
 }
 
@@ -295,7 +292,7 @@ export class GrantsLedgerWriter {
    * the projection store's fold-side surface.
    */
   private readonly enforcement: Pick<
-    PrismaAuthzGrantsProjectionRepository,
+    PrismaAuthzRevocationRepository,
     "enforceGrantRevocation"
   >;
 
@@ -313,7 +310,7 @@ export class GrantsLedgerWriter {
       onLedgerWrites?: (args: { organizationId: string }) => Promise<boolean>;
     } = {},
   ) {
-    this.enforcement = new PrismaAuthzGrantsProjectionRepository(prisma);
+    this.enforcement = new PrismaAuthzRevocationRepository(prisma);
   }
 
   private now(): number {
@@ -443,20 +440,28 @@ export class GrantsLedgerWriter {
         occurredAtMs,
       });
     }
-    await (await this.commands()).commands.attachGrants.send({
-      tenantId: organizationId,
-      organizationId,
-      commandId: commandId ?? newLedgerCommandId(),
-      grants: fresh.map((binding) => ({
-        grantId: binding.bindingId,
-        principal: principalForWhere(binding.principal),
-        roleKey: roleKeyFor(binding),
-        scope: { type: binding.scopeType, id: binding.scopeId },
-        source,
-        actor,
-        occurredAtMs,
-      })),
-    });
+    // One command per grant, and a command id derived from the batch's own
+    // so a retry of the same attach dedupes per grant at the event store.
+    const batchId = commandId ?? newLedgerCommandId();
+    const senders = (await this.commands()).commands;
+    await Promise.all(
+      fresh.map((binding) =>
+        senders.attachGrant.send({
+          tenantId: organizationId,
+          organizationId,
+          commandId: `${batchId}:${binding.bindingId}`,
+          grant: {
+            grantId: binding.bindingId,
+            principal: principalForWhere(binding.principal),
+            roleKey: roleKeyFor(binding),
+            scope: { type: binding.scopeType, id: binding.scopeId },
+            source,
+            actor,
+            occurredAtMs,
+          },
+        }),
+      ),
+    );
 
     const wanted = fresh.map((binding) => binding.bindingId);
     if (awaitProjection) {
@@ -683,22 +688,20 @@ export class GrantsLedgerWriter {
     actor: LedgerActor;
     commandId?: string;
   }): Promise<void> {
-    await (await this.commands()).commands.attachGrants.send({
+    await (await this.commands()).commands.attachGrant.send({
       tenantId: organizationId,
       organizationId,
       commandId: commandId ?? newLedgerCommandId(),
-      grants: [
-        {
-          grantId,
-          principal,
-          roleKey: null,
-          scope: { type: "RESOURCE", id: scopeId },
-          resource: { ...resource, projectId },
-          source: "grants-service",
-          actor,
-          occurredAtMs: this.now(),
-        },
-      ],
+      grant: {
+        grantId,
+        principal,
+        roleKey: null,
+        scope: { type: "RESOURCE", id: scopeId },
+        resource: { ...resource, projectId },
+        source: "grants-service",
+        actor,
+        occurredAtMs: this.now(),
+      },
     });
     await this.awaitProjection({
       what: `attach of resource grant ${grantId}`,
@@ -760,22 +763,31 @@ export class GrantsLedgerWriter {
     bindingIds,
     actor,
     reason,
-    selector,
   }: {
     organizationId: string;
     bindingIds: string[];
     actor: LedgerActor;
     reason?: string;
-    selector?: GrantRevocationSelector;
   }): Promise<void> {
-    await (await this.commands()).commands.revokeGrants.send({
-      tenantId: organizationId,
-      organizationId,
-      commandId: newLedgerCommandId(),
-      revocations: revocationEntries({ bindingIds, reason, selector }),
-      actor,
-      occurredAtMs: this.now(),
-    });
+    // A revoke names its grant id: a selector cannot address an aggregate,
+    // so resolving "every grant this principal holds" into ids is the
+    // caller's job now, and the deny below is what makes that safe.
+    const revokedAtMs = this.now();
+    const batchId = newLedgerCommandId();
+    const senders = (await this.commands()).commands;
+    await Promise.all(
+      bindingIds.map((grantId) =>
+        senders.revokeGrant.send({
+          tenantId: organizationId,
+          organizationId,
+          commandId: `${batchId}:${grantId}`,
+          grantId,
+          ...(reason ? { reason } : {}),
+          actor,
+          occurredAtMs: revokedAtMs,
+        }),
+      ),
+    );
     await this.enforcement.enforceGrantRevocation({
       organizationId,
       grantIds: bindingIds,
@@ -970,21 +982,19 @@ export class GrantsLedgerWriter {
     actor: LedgerActor;
   }): Promise<void> {
     const occurredAtMs = this.now();
-    await (await this.commands()).commands.attachGrants.send({
+    await (await this.commands()).commands.attachGrant.send({
       tenantId: organizationId,
       organizationId,
       commandId: newLedgerCommandId(),
-      grants: [
-        {
-          grantId: row.id,
-          principal: principalForWhere(principalWhereForRow(row)),
-          roleKey: roleKeyFor({ role, customRoleId }),
-          scope: { type: row.scopeType, id: row.scopeId },
-          source: "grants-service",
-          actor,
-          occurredAtMs,
-        },
-      ],
+      grant: {
+        grantId: row.id,
+        principal: principalForWhere(principalWhereForRow(row)),
+        roleKey: roleKeyFor({ role, customRoleId }),
+        scope: { type: row.scopeType, id: row.scopeId },
+        source: "grants-service",
+        actor,
+        occurredAtMs,
+      },
     });
     await this.awaitProjection({
       what: `adoption of stranded binding ${row.id} at role ${roleKeyFor({ role, customRoleId })}`,
@@ -1064,38 +1074,13 @@ export class GrantsLedgerWriter {
     bindingIds,
     actor,
     reason,
-    selector,
-    skipAppendWhenNoMatches = false,
   }: {
     organizationId: string;
     bindingIds: string[];
     actor: LedgerActor;
     reason?: string;
-    /**
-     * The identity a revoke-by-filter named, carried onto the events so the
-     * FOLD sweeps every grant matching it. `bindingIds` comes from the compat
-     * projection, which lags the ledger by a fold: a grant appended moments
-     * earlier is missing from that list, and an id-only revocation would leave
-     * it standing forever. Synchronous enforcement still runs on the ids alone
-     * — a row the projection cannot see is a row there is nothing to delete —
-     * and the sweep closes the gap when the fold catches up.
-     */
-    selector?: GrantRevocationSelector;
-    /**
-     * Opt-in fold-lag-safety override: when true, an empty `bindingIds`
-     * skips the write entirely, even with a `selector` set. The default
-     * keeps the safety net above — a selector-only `grant_revoked` still
-     * appends when nothing was visible yet, which is what lets the fold's
-     * sweep catch a grant that lands in the gap. Set this only on a call
-     * site whose common case IS "nothing to revoke" (a narrowing revoke
-     * that almost never has a broad grant to find) and that does not depend
-     * on the sweep for that filter shape — otherwise a grant landing in the
-     * gap silently outlives the revoke that was meant to catch it.
-     */
-    skipAppendWhenNoMatches?: boolean;
   }): Promise<void> {
-    if (bindingIds.length === 0 && selector === undefined) return;
-    if (skipAppendWhenNoMatches && bindingIds.length === 0) return;
+    if (bindingIds.length === 0) return;
     if (!(await this.onLedger(organizationId))) {
       // The pre-ledger revoke. An imperative delete IS instant enforcement —
       // decision 7's synchronous deny effect is what this path always was —
@@ -1121,7 +1106,6 @@ export class GrantsLedgerWriter {
       bindingIds,
       actor,
       ...(reason ? { reason } : {}),
-      ...(selector ? { selector } : {}),
     });
   }
 
@@ -1200,13 +1184,11 @@ export class GrantsLedgerWriter {
       where: legacyWhere,
       select: { id: true },
     });
-    const selector = revocationSelector(where);
     await this.revokeBindings({
       organizationId,
       bindingIds: rows.map((row) => row.id),
       actor,
       ...(reason ? { reason } : {}),
-      ...(selector ? { selector } : {}),
       ...(skipAppendWhenNoMatches !== undefined
         ? { skipAppendWhenNoMatches }
         : {}),
@@ -1245,22 +1227,32 @@ export class GrantsLedgerWriter {
       await this.recordLegacyAudit({
         organizationId,
         actor,
-        verb: "offboard",
+        verb: "revoke",
         createdAt: new Date(this.now()),
         facts: [{ userId, revokedGrantIds }],
       });
       await bumpAuthzEpoch({ organizationId });
       return;
     }
-    await (await this.commands()).commands.offboardMember.send({
-      tenantId: organizationId,
-      organizationId,
-      commandId: newLedgerCommandId(),
-      userId,
-      revokedGrantIds,
-      actor,
-      occurredAtMs: this.now(),
-    });
+    // Offboarding is N revocations sharing one reason, not an event of its
+    // own: a person is not an aggregate here, and an event that named one
+    // would have to straddle every grant they hold.
+    const offboardedAtMs = this.now();
+    const batchId = newLedgerCommandId();
+    const senders = (await this.commands()).commands;
+    await Promise.all(
+      revokedGrantIds.map((grantId) =>
+        senders.revokeGrant.send({
+          tenantId: organizationId,
+          organizationId,
+          commandId: `${batchId}:${grantId}`,
+          grantId,
+          reason: `offboarded:${userId}`,
+          actor,
+          occurredAtMs: offboardedAtMs,
+        }),
+      ),
+    );
     await this.enforcement.enforceGrantRevocation({
       organizationId,
       grantIds: revokedGrantIds,
@@ -1303,20 +1295,18 @@ export class GrantsLedgerWriter {
         occurredAtMs,
       });
     }
-    await (await this.commands()).commands.defineRoles.send({
+    await (await this.commands()).commands.defineRole.send({
       tenantId: organizationId,
       organizationId,
       commandId: newLedgerCommandId(),
-      roles: [
-        {
-          roleId,
-          name,
-          ...(description ? { description } : {}),
-          permissions,
-          kind,
-          occurredAtMs,
-        },
-      ],
+      role: {
+        roleId,
+        name,
+        ...(description ? { description } : {}),
+        permissions,
+        kind,
+        occurredAtMs,
+      },
       actor,
     });
     // Always held. A role row is a foreign key target: the grant attach that
@@ -1535,84 +1525,6 @@ export function grantsLedgerWriter(): GrantsLedgerWriter {
  * listed no id at all, the selector IS the whole instruction and is the only
  * entry — which is why a filtered revoke that matched nothing still appends.
  */
-function revocationEntries({
-  bindingIds,
-  reason,
-  selector,
-}: {
-  bindingIds: string[];
-  reason?: string;
-  selector?: GrantRevocationSelector;
-}): {
-  grantId?: string;
-  selector?: GrantRevocationSelector;
-  reason?: string;
-}[] {
-  const withReason = reason ? { reason } : {};
-  if (bindingIds.length === 0) {
-    return selector ? [{ selector, ...withReason }] : [];
-  }
-  return bindingIds.map((grantId, index) => ({
-    grantId,
-    ...(index === 0 && selector ? { selector } : {}),
-    ...withReason,
-  }));
-}
-
-/** The three principal columns, as the selector's principal type. */
-const SELECTOR_PRINCIPAL_TYPE = {
-  userId: "user",
-  groupId: "group",
-  apiKeyId: "apiKey",
-} as const;
-
-/** The filter keys a selector can express. Anything else — a customRoleId
- *  filter, a nested relation, a NOT — leaves the revocation on ids alone. */
-const SELECTABLE_FILTER_KEYS: readonly string[] = [
-  ...Object.keys(SELECTOR_PRINCIPAL_TYPE),
-  "scopeType",
-  "scopeId",
-  "organizationId",
-];
-
-/**
- * The identity a `revokeBindingsWhere` filter names, when it names one the
- * event can carry: exactly one principal column, optionally narrowed to one
- * scope, every value a plain string.
- *
- * Returning undefined is the safe answer, not a failure: the revocation then
- * behaves exactly as it did before — the ids the projection could see — and
- * the only thing lost is the fold's healing for that filter shape.
- */
-function revocationSelector(
-  where: Prisma.RoleBindingWhereInput,
-): GrantRevocationSelector | undefined {
-  const keys = Object.keys(where).filter(
-    (key) => where[key as keyof typeof where] !== undefined,
-  );
-  if (keys.some((key) => !SELECTABLE_FILTER_KEYS.includes(key))) {
-    return undefined;
-  }
-  const principals = keys.filter((key) => key in SELECTOR_PRINCIPAL_TYPE);
-  if (principals.length !== 1) return undefined;
-  const column = principals[0] as keyof typeof SELECTOR_PRINCIPAL_TYPE;
-  const id = where[column];
-  if (typeof id !== "string") return undefined;
-
-  const principal = { type: SELECTOR_PRINCIPAL_TYPE[column], id } as const;
-
-  const { scopeType, scopeId } = where;
-  if (scopeType === undefined && scopeId === undefined) return { principal };
-  // A half-named scope (one column without the other) is not a scope, and
-  // guessing which grants it meant is exactly the wrong kind of healing.
-  if (typeof scopeId !== "string") return undefined;
-  const scope = ledgerScopeType(scopeType);
-  if (scope === undefined) return undefined;
-  return { principal, scope: { type: scope, id: scopeId } };
-}
-
-/** The scope enum as the ledger spells it, or undefined for anything the
- *  selector cannot name (a Prisma filter object rather than a value). */
 function ledgerScopeType(value: unknown): LedgerScopeType | undefined {
   return LEDGER_SCOPE_TYPES.find((candidate) => candidate === value);
 }

@@ -1,6 +1,10 @@
 import { Box, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import { Check } from "react-feather";
-import type { Action, Permission, Resource } from "../../server/api/rbac";
+import {
+  type AuthzPermission,
+  isRegistryPermission,
+} from "@langwatch/authz";
+import type { Action, Resource } from "../../server/api/rbac";
 import {
   getValidActionsForResource,
   orderedResources,
@@ -14,16 +18,20 @@ import {
 export function PermissionViewer({
   permissions,
 }: {
-  permissions: Permission[];
+  permissions: AuthzPermission[];
 }) {
-  // Helper function to safely create permission strings
-  const createPermission = (resource: Resource, action: Action): Permission => {
-    return `${resource}:${action}`;
-  };
+  // The registry is the vocabulary the engine grants from, so it is the
+  // vocabulary the settings UI offers: the legacy per-resource action table
+  // produces the full Resource x Action cross product, most of which no
+  // grant can ever carry.
+  const permissionsFor = (resource: Resource): AuthzPermission[] =>
+    getValidActionsForResource(resource)
+      .map((action) => `${resource}:${action}`)
+      .filter(isRegistryPermission);
 
-  const groupedPermissions: Record<Resource, Permission[]> = {} as Record<
+  const groupedPermissions: Record<Resource, AuthzPermission[]> = {} as Record<
     Resource,
-    Permission[]
+    AuthzPermission[]
   >;
 
   // Use orderedResources from shared config (PLAYGROUND hidden, ORG/TEAM omitted)
@@ -31,25 +39,20 @@ export function PermissionViewer({
 
   // Group permissions by resource using shared valid actions
   resourceOrder.forEach((resource) => {
-    const validActions = getValidActionsForResource(resource);
-    groupedPermissions[resource] = validActions.map((action) =>
-      createPermission(resource, action),
-    );
+    groupedPermissions[resource] = permissionsFor(resource);
   });
 
   return (
     <VStack align="start" width="full" gap={4}>
       {(Object.keys(groupedPermissions) as Resource[]).map((resource) => {
-        const validActions = getValidActionsForResource(resource);
-        const hasAnyPermission = validActions.some((action) =>
-          permissions.includes(`${resource}:${action}`),
-        );
+        // The grouped list is already narrowed to what the registry
+        // admits, so the actions are read back off it rather than off the
+        // legacy table a second time.
+        const grantedActions = (groupedPermissions[resource] ?? [])
+          .filter((permission) => permissions.includes(permission))
+          .map((permission) => permission.split(":")[1] as Action);
 
-        if (!hasAnyPermission) return null;
-
-        const grantedActions = validActions.filter((action) =>
-          permissions.includes(`${resource}:${action}`),
-        );
+        if (grantedActions.length === 0) return null;
 
         // If manage is present, filter out view, create, update, delete since manage includes them
         const hasManage = grantedActions.includes("manage");
@@ -71,7 +74,7 @@ export function PermissionViewer({
               </Text>
               <VStack align="start" gap={1.5} paddingLeft={4} width="full">
                 {displayActions.map((action) => {
-                  const permission = createPermission(resource, action);
+                  const permission = `${resource}:${action}`;
                   const actionText =
                     action === "manage"
                       ? "Manage (Create, Update, Delete)"

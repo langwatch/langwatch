@@ -229,7 +229,7 @@ export function legacyGrantForKey(
   return {
     bindingId: deriveGrantId({
       organizationId: apiKey.organizationId,
-      principal: { type: "api_key", id: apiKey.id },
+      principal: { type: "apiKey", id: apiKey.id },
       scope: {
         type: RoleBindingScopeType.ORGANIZATION,
         id: apiKey.organizationId,

@@ -132,7 +132,9 @@ export class AuthzGrantsWriteProjection
           : null,
         projectId: data.resource?.projectId ?? null,
         createdByUserId: data.resource?.createdByUserId ?? null,
-        expiresAt: data.resource?.expiresAt ?? null,
+        expiresAt: data.resource?.expiresAtMs
+          ? new Date(data.resource.expiresAtMs)
+          : null,
         maxViews: data.resource?.maxViews ?? null,
         occurredAt: new Date(event.occurredAt),
       },

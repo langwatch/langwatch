@@ -25,14 +25,23 @@ export type LedgerScopeType = StoredScopeTier;
  *  `cutover-import` is the composite per-org cutover migration's source —
  *  share links, lite members, project credentials and platform operators
  *  arriving as backdated history, so it is skipped like the others. */
-export type GrantEventSource =
-  | "grants-service"
-  | "scim"
-  | "invite"
-  | "backfill-b"
-  | "genesis-import"
-  | "read-through-mint"
-  | "cutover-import";
+/**
+ * Which writer authored a fact.
+ *
+ * `migration` is backdated history: it replaces the genesis-import,
+ * backfill-b and cutover-import of the three-migration model ADR-110 folded
+ * into one. The audit subscriber skips it, so a customer's audit page does
+ * not fill with thousands of rows for changes nobody made.
+ */
+export const GRANT_EVENT_SOURCES = [
+  "grants-service",
+  "scim",
+  "invite",
+  "read-through-mint",
+  "migration",
+] as const;
+
+export type GrantEventSource = (typeof GRANT_EVENT_SOURCES)[number];
 
 export interface LedgerPrincipal {
   type: LedgerPrincipalType;
@@ -130,3 +139,14 @@ export interface GrantsLedgerActor {
  * on one.
  */
 
+
+/**
+ * The runner's per-(migration, tenant) status vocabulary, mirrored from
+ * @langwatch/system-migrations rather than imported: the authz side must not
+ * couple to the runner package.
+ */
+export type MigrationTenantStatus =
+  | "migrated"
+  | "finalized"
+  | "parked"
+  | "rolled_back";

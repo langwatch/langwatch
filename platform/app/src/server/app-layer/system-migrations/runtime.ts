@@ -7,7 +7,6 @@
  * Server-only - this graph reaches Prisma, Redis and the EE audit writer.
  */
 import { auditLog } from "@ee/audit-log/auditLog";
-import type { GrantsLedgerEmitter } from "@langwatch/authz-server/migration";
 import { createLogger } from "@langwatch/observability";
 import {
   type MigrationPassSummary,
@@ -20,9 +19,6 @@ import type { Prisma } from "~/generated/prisma/client";
 import { getPrivateClickHouseUrls } from "../../clickhouse/clickhouseClient";
 import { prisma } from "../../db";
 import { tryGetApp } from "../app";
-import { bumpAuthzEpoch } from "../authz/epoch";
-import { authzGrantsCommands } from "../authz/ledger";
-import { SYSTEM_ACTORS } from "../authz/ledger-actor";
 import {
   migrationRunsOnThisInstallation,
   organizationMigrates,
@@ -31,48 +27,20 @@ import { RedisMigrationLeaseRepository } from "./repositories/migration-lease.re
 import { PrismaOrganizationTenantSource } from "./repositories/organization-tenant-source.prisma.repository";
 import { PrismaSystemMigrationEnrollmentRepository } from "./repositories/system-migration-enrollment.prisma.repository";
 import { PrismaSystemMigrationStateRepository } from "./repositories/system-migration-state.prisma.repository";
-import { WitnessingSystemMigrationStateRepository } from "./repositories/witnessing-migration-state.repository";
 import { SystemMigrationsService } from "./system-migrations.service";
 
 const logger = createLogger("langwatch:system-migrations:runtime");
-
-/**
- * The composed state repository, wrapped so every lifecycle transition is
- * witnessed as a ledger fact (best-effort; the synchronous write stays the
- * latch). The runner and the ops service both write through this instance,
- * so operator rollbacks are witnessed too. Routes must not touch it - they
- * go through `systemMigrationsService` below.
- */
-const systemMigrationState = new WitnessingSystemMigrationStateRepository({
-  inner: new PrismaSystemMigrationStateRepository(prisma),
-  witness: async ({
-    migrationName,
-    tenantId,
-    status,
-    report,
-    occurredAtMs,
-  }) => {
-    await (
-      await authzGrantsCommands()
-    ).commands.recordMigrationTenantState.send({
-      tenantId,
-      organizationId: tenantId,
-      commandId: `runner:${migrationName}:${tenantId}:${status}:${occurredAtMs}`,
-      migrationName,
-      status,
-      report,
-      actor: { type: "system", id: SYSTEM_ACTORS.migrationRunner },
-      occurredAtMs,
-    });
-  },
-  now: () => Date.now(),
-});
 
 /**
  * The cloud rollout's enrollment rows: what the ops enrollment actions write
  * and what every pass reads fresh (see `runSystemMigrationPass` and the
  * cutover's `cutoverCohort` below).
  */
+/** The runner and the ops service both write through this instance. */
+const systemMigrationState = new PrismaSystemMigrationStateRepository(
+  prisma,
+);
+
 const enrollmentRepository = new PrismaSystemMigrationEnrollmentRepository(
   prisma,
 );
@@ -112,82 +80,6 @@ export const systemMigrationsService = new SystemMigrationsService({
   // waiting stage to report, no rollback lever to register an effect for,
   // and so no dependency graph between migrations to guard.
 });
-
-/**
- * The migration's compensating half, split out because it IS a separate
- * job: every other verb states a grant that exists, these two state one that
- * stopped existing — a head grant whose legacy row is gone, and a stale
- * custom role.
- */
-function denyDirectionEmitter(): Pick<
-  GrantsLedgerEmitter,
-  "revokeGrants" | "deleteRole"
-> {
-  return {
-    revokeGrants: async ({
-      organizationId,
-      commandId,
-      revocations,
-      actor,
-      occurredAtMs,
-    }) => {
-      await (await authzGrantsCommands()).commands.revokeGrants.send({
-        tenantId: organizationId,
-        organizationId,
-        commandId,
-        revocations,
-        actor,
-        occurredAtMs,
-      });
-    },
-    deleteRole: async ({
-      organizationId,
-      commandId,
-      roleId,
-      actor,
-      occurredAtMs,
-    }) => {
-      await (await authzGrantsCommands()).commands.deleteRole.send({
-        tenantId: organizationId,
-        organizationId,
-        commandId,
-        roleId,
-        actor,
-        occurredAtMs,
-      });
-    },
-  };
-}
-
-/**
- * The migrations' door into the ledger, over the shared lazy senders in
- * `server/app-layer/authz/ledger.ts` (a send while the App is still composing waits;
- * an App without the event-sourcing stack refuses loudly — the migration
- * then parks its organization with an honest report, and the state witness
- * logs and moves on).
- */
-function grantsLedgerEmitter(): GrantsLedgerEmitter {
-  return {
-    attachGrants: async ({ organizationId, commandId, grants }) => {
-      await (await authzGrantsCommands()).commands.attachGrants.send({
-        tenantId: organizationId,
-        organizationId,
-        commandId,
-        grants,
-      });
-    },
-    defineRoles: async ({ organizationId, commandId, roles, actor }) => {
-      await (await authzGrantsCommands()).commands.defineRoles.send({
-        tenantId: organizationId,
-        organizationId,
-        commandId,
-        roles,
-        actor,
-      });
-    },
-    ...denyDirectionEmitter(),
-  };
-}
 
 /**
  * Every registered in-place migration, in the order they run per tenant.

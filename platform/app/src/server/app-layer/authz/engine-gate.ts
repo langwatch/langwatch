@@ -16,7 +16,7 @@
  * Browser-safety: no module-scope Prisma or Redis — the caller hands in its
  * client, so `rbac.ts` stays importable for its enums.
  */
-import type { LedgerMigrationStatus } from "@langwatch/authz-server";
+import type { MigrationTenantStatus } from "@langwatch/authz-server";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "./migration-name";
@@ -31,7 +31,7 @@ const logger = createLogger("langwatch:authz:engine-gate");
  * written to. Anything else (absent, pending, parked) means the history is
  * not there, and the organization stays on the legacy path.
  */
-const ON_ENGINE_STATUSES: readonly LedgerMigrationStatus[] = [
+const ON_ENGINE_STATUSES: readonly MigrationTenantStatus[] = [
   "migrated",
   "finalized",
 ];

@@ -104,11 +104,13 @@ export type {
 } from "./ledger/grant-identity";
 export {
 } from "./ledger/facts";
+export { GRANT_EVENT_SOURCES } from "./ledger/facts";
 export type {
   GrantEventSource,
   GrantFact,
   GrantsLedgerActor,
   LedgerPrincipal,
+  MigrationTenantStatus,
   LedgerPrincipalType,
   LedgerScope,
   LedgerScopeType,

@@ -8,7 +8,11 @@ import {
 } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { Info } from "react-feather";
-import type { Action, Permission, Resource } from "../../server/api/rbac";
+import {
+  type AuthzPermission,
+  isRegistryPermission,
+} from "@langwatch/authz";
+import type { Action, Resource } from "../../server/api/rbac";
 import {
   getValidActionsForResource,
   orderedResources,
@@ -25,42 +29,54 @@ export function PermissionSelector({
   selectedPermissions,
   onChange,
 }: {
-  selectedPermissions: Permission[];
-  onChange: (permissions: Permission[]) => void;
+  selectedPermissions: AuthzPermission[];
+  onChange: (permissions: AuthzPermission[]) => void;
 }) {
-  // Helper function to safely create permission strings
-  const createPermission = (resource: Resource, action: Action): Permission => {
-    return `${resource}:${action}`;
-  };
+  // The registry is the vocabulary the engine grants from, so it is the
+  // vocabulary the settings UI offers: the legacy per-resource action table
+  // produces the full Resource x Action cross product, most of which no
+  // grant can ever carry.
+  const permissionsFor = (resource: Resource): AuthzPermission[] =>
+    getValidActionsForResource(resource)
+      .map((action) => `${resource}:${action}`)
+      .filter(isRegistryPermission);
 
   // Group permissions by resource using the correct valid actions
   const groupedPermissions = useMemo(() => {
-    const grouped: Record<Resource, Permission[]> = {} as Record<
+    const grouped: Record<Resource, AuthzPermission[]> = {} as Record<
       Resource,
-      Permission[]
+      AuthzPermission[]
     >;
     // Use orderedResources from shared config (PLAYGROUND hidden, ORG/TEAM omitted)
     orderedResources.forEach((resource) => {
-      const validActions = getValidActionsForResource(resource);
-      grouped[resource] = validActions.map((action) =>
-        createPermission(resource, action),
-      );
+      grouped[resource] = permissionsFor(resource);
     });
     return grouped;
   }, []);
 
+  /** One resource's permission for an action, or null when the registry
+   *  does not admit that pair. Read off the grouped list so the UI can only
+   *  ever name a permission it is already showing. */
+  const permissionIn = (
+    resource: Resource,
+    action: Action,
+  ): AuthzPermission | null =>
+    (groupedPermissions[resource] ?? []).find(
+      (permission) => permission === `${resource}:${action}`,
+    ) ?? null;
+
   /**
    * Get permissions that should be removed when removing a given permission
    *
-   * Permission hierarchy rules:
+   * AuthzPermission hierarchy rules:
    * - Removing "manage" removes all permissions for that resource
    * - Removing "view" removes create/update/delete (they require view)
    * - Removing other permissions only removes that specific permission
    */
   const getPermissionsToRemove = (
-    permission: Permission,
+    permission: AuthzPermission,
     resource: Resource,
-  ): Permission[] => {
+  ): AuthzPermission[] => {
     if (permission.endsWith(":manage")) {
       // Removing manage removes all permissions for this resource
       return groupedPermissions[resource] || [];
@@ -84,15 +100,15 @@ export function PermissionSelector({
   /**
    * Get permissions that should be added when adding a given permission
    *
-   * Permission hierarchy rules:
+   * AuthzPermission hierarchy rules:
    * - Adding "manage" adds all permissions for that resource
    * - Adding create/update/delete automatically adds view (they require it)
    * - Adding other permissions only adds that specific permission
    */
   const getPermissionsToAdd = (
-    permission: Permission,
+    permission: AuthzPermission,
     resource: Resource,
-  ): Permission[] => {
+  ): AuthzPermission[] => {
     if (permission.endsWith(":manage")) {
       // Adding manage adds all permissions for this resource
       return groupedPermissions[resource] || [];
@@ -101,8 +117,8 @@ export function PermissionSelector({
     const [_, action] = permission.split(":") as [Resource, Action];
     if (action === "create" || action === "update" || action === "delete") {
       // Adding create/update/delete automatically adds view
-      const viewPermission = createPermission(resource, "view");
-      return [permission, viewPermission];
+      const viewPermission = permissionIn(resource, "view");
+      return viewPermission ? [permission, viewPermission] : [permission];
     }
 
     // Adding other permissions only adds that specific permission
@@ -112,7 +128,7 @@ export function PermissionSelector({
   /**
    * Remove a permission and all its dependent permissions
    */
-  const removePermission = (permission: Permission): void => {
+  const removePermission = (permission: AuthzPermission): void => {
     const [resource] = permission.split(":") as [Resource, Action];
     const permissionsToRemove = getPermissionsToRemove(permission, resource);
     const newPermissions = selectedPermissions.filter(
@@ -124,7 +140,7 @@ export function PermissionSelector({
   /**
    * Add a permission and all its required dependencies
    */
-  const addPermission = (permission: Permission): void => {
+  const addPermission = (permission: AuthzPermission): void => {
     const [resource] = permission.split(":") as [Resource, Action];
     const permissionsToAdd = getPermissionsToAdd(permission, resource);
     const newPermissions = [
@@ -140,10 +156,12 @@ export function PermissionSelector({
    * Single Responsibility: Toggle a permission while maintaining proper
    * permission dependencies (manage includes all, view required for CRUD)
    */
-  const togglePermission = (permission: Permission): void => {
+  const togglePermission = (permission: AuthzPermission): void => {
     const [resource, action] = permission.split(":") as [Resource, Action];
-    const managePermission = createPermission(resource, "manage");
-    const hasManage = selectedPermissions.includes(managePermission);
+    const managePermission = permissionIn(resource, "manage");
+    const hasManage =
+      managePermission !== null &&
+      selectedPermissions.includes(managePermission);
 
     // If manage is selected, the permission is implicitly included
     // So we need to check if it's explicitly selected OR implicitly via manage
@@ -160,8 +178,6 @@ export function PermissionSelector({
   return (
     <VStack align="start" width="full" gap={4}>
       {(Object.keys(groupedPermissions) as Resource[]).map((resource) => {
-        const validActions = getValidActionsForResource(resource);
-
         return (
           <Box key={resource} width="full">
             <Fieldset.Root>
@@ -175,23 +191,22 @@ export function PermissionSelector({
               </Fieldset.Legend>
               <Fieldset.Content>
                 <HStack gap={4} flexWrap="wrap" paddingLeft={6}>
-                  {validActions.map((action) => {
-                    const permission = createPermission(resource, action);
+                  {(groupedPermissions[resource] ?? []).map((permission) => {
+                    const action = permission.split(":")[1] as Action;
                     const isChecked = selectedPermissions.includes(permission);
 
-                    // Check if this permission is implicitly checked due to manage being selected
-                    const managePermission = createPermission(
-                      resource,
-                      "manage",
-                    );
-                    const hasManage =
-                      selectedPermissions.includes(managePermission);
+                    // Implicitly checked when manage is selected: manage
+                    // includes every other action on its resource.
+                    const managePermission = permissionIn(resource, "manage");
                     const isImplicitlyChecked =
-                      action !== "manage" && hasManage;
+                      action !== "manage" &&
+                      managePermission !== null &&
+                      selectedPermissions.includes(managePermission);
 
                     const handleToggle = () => {
-                      // If clicking on an implicitly checked permission, toggle manage instead
-                      if (isImplicitlyChecked) {
+                      // Clicking an implicitly checked permission toggles the
+                      // manage that implies it, not the permission itself.
+                      if (isImplicitlyChecked && managePermission) {
                         togglePermission(managePermission);
                       } else {
                         togglePermission(permission);

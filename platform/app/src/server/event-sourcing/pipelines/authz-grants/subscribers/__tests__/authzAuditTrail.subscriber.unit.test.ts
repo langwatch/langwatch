@@ -7,7 +7,6 @@ import {
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
-  MEMBER_OFFBOARDED_EVENT_TYPE,
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
@@ -27,7 +26,10 @@ import {
 const ORG = "org_acme";
 const OCCURRED_AT = 1_700_000_000_000;
 const USER_ACTOR = { type: "user" as const, id: "user_admin" };
-const GENESIS_ACTOR = { type: "system" as const, id: "system:genesis-import" };
+const MIGRATION_ACTOR = {
+  type: "system" as const,
+  id: "system:migration-runner",
+};
 
 function event(
   type: string,
@@ -99,7 +101,6 @@ describe("authz audit trail subscriber", () => {
         ROLE_DEFINED_EVENT_TYPE,
         ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
         ROLE_DELETED_EVENT_TYPE,
-        MEMBER_OFFBOARDED_EVENT_TYPE,
       ]);
       expect([...AUTHZ_AUDIT_EVENT_TYPES]).not.toContain(
         CUTOVER_COMPLETED_EVENT_TYPE,
@@ -154,19 +155,17 @@ describe("authz audit trail subscriber", () => {
     });
   });
 
-  describe("when the event carries a cutover source", () => {
+  describe("when the event carries a backdated source", () => {
     /** @scenario "The migration's own facts never reach the audit trail" */
-    it.each([
-      "genesis-import",
-      "backfill-b",
-      "read-through-mint",
-      "cutover-import",
-    ])("writes no row for %s", async (source) => {
-      const store = recordingStore();
-      await deliver(store, attached({ source }));
+    it.each(["migration", "read-through-mint"])(
+      "writes no row for %s",
+      async (source) => {
+        const store = recordingStore();
+        await deliver(store, attached({ source }));
 
-      expect(store.inserts).toHaveLength(0);
-    });
+        expect(store.inserts).toHaveLength(0);
+      },
+    );
 
     /** @scenario "The migration's own facts never reach the audit trail" */
     it("still writes a row for a live source", async () => {
@@ -178,7 +177,7 @@ describe("authz audit trail subscriber", () => {
   });
 
   describe("when a role event carries no source", () => {
-    it("skips the genesis import, recognised by its actor", async () => {
+    it("skips the migration, recognised by its actor", async () => {
       const store = recordingStore();
       await deliver(
         store,
@@ -187,7 +186,7 @@ describe("authz audit trail subscriber", () => {
           name: "Auditor",
           permissions: ["traces.read"],
           kind: "custom",
-          actor: GENESIS_ACTOR,
+          actor: MIGRATION_ACTOR,
         }),
       );
 
@@ -228,7 +227,6 @@ describe("authz audit trail subscriber", () => {
         "authz.grants.role_permissions_changed",
       ],
       [ROLE_DELETED_EVENT_TYPE, "authz.grants.role_deleted"],
-      [MEMBER_OFFBOARDED_EVENT_TYPE, "authz.grants.offboard"],
     ])("maps %s onto the stable verb %s", async (type, action) => {
       const store = recordingStore();
       await deliver(store, event(type, { actor: USER_ACTOR }));
@@ -332,10 +330,10 @@ describe("authz audit trail subscriber", () => {
       const context = { tenantId: ORG, aggregateId: ORG, state: undefined };
 
       expect(
-        subscriber.when?.(attached({ source: "genesis-import" }), context),
+        subscriber.when?.(attached({ source: "migration" }), context),
       ).toBe(false);
       expect(
-        subscriber.when?.(attached({ source: "cutover-import" }), context),
+        subscriber.when?.(attached({ source: "read-through-mint" }), context),
       ).toBe(false);
       expect(subscriber.when?.(attached(), context)).toBe(true);
     });
