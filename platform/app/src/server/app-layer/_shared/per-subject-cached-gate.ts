@@ -1,9 +1,11 @@
 /**
- * The shape ./cutover-gate.ts and ./ledger-write-gate.ts both are: a
- * boolean answer, asked once per permission check, cached per organization
- * with a TTL so a rollback or a finalization takes effect fleet-wide without
- * a deploy. This module owns that shape once; each gate supplies only its own
- * query and its own TTLs.
+ * The shape the authz gates (../authz/cutover-gate.ts,
+ * ../authz/ledger-write-gate.ts) and the identity write gate
+ * (../identity/identifier-write-gate.ts) all are: a boolean answer, asked
+ * once per check, cached per SUBJECT — an organization for authz, a user for
+ * identity — with a TTL so a rollback or a finalization takes effect
+ * fleet-wide without a deploy. This module owns that shape once; each gate
+ * supplies only its own query and its own TTLs.
  *
  * Two behaviours live here that the two gates used to (not) have on their
  * own:
@@ -29,7 +31,7 @@
  */
 import { createLogger } from "@langwatch/observability";
 
-const logger = createLogger("langwatch:authz:per-organization-cached-gate");
+const logger = createLogger("langwatch:app-layer:per-subject-cached-gate");
 
 type CacheEntry = { isOn: boolean; expiresAt: number };
 
@@ -43,14 +45,14 @@ type CacheEntry = { isOn: boolean; expiresAt: number };
  */
 type InFlightEntry = { promise: Promise<boolean>; isStale: boolean };
 
-export type PerOrganizationCachedFlag = {
+export type PerSubjectCachedFlag = {
   /**
    * The cached answer for one organization, reading through `read` on a
    * cache miss. Concurrent calls for the same organization while that read
    * is in flight all resolve to the SAME promise - `read` runs once.
    */
   get(args: {
-    organizationId: string;
+    subject: string;
     read: () => Promise<boolean>;
   }): Promise<boolean>;
   /** Drop ONE organization's cached answer AND its in-flight read's right
@@ -58,7 +60,7 @@ export type PerOrganizationCachedFlag = {
    *  callers with the old value, but it will not cache it, and the next
    *  `get` starts a fresh read. Pod-local, exactly as the TTL is pod-local;
    *  every other pod converges on the TTL. */
-  invalidate(args: { organizationId: string }): void;
+  invalidate(args: { subject: string }): void;
   /** The cache, dropped - for tests that flip an organization mid-suite. */
   resetForTesting(): void;
 };
@@ -82,7 +84,7 @@ export const MAX_CACHE_ENTRIES = 5_000;
  * one-way latch and can be trusted far longer than its negative one) - a
  * single TTL is just both arguments given the same value.
  */
-export function perOrganizationCachedFlag({
+export function perSubjectCachedFlag({
   name,
   positiveTtlMs,
   negativeTtlMs,
@@ -92,50 +94,50 @@ export function perOrganizationCachedFlag({
   name: string;
   positiveTtlMs: number;
   negativeTtlMs: number;
-}): PerOrganizationCachedFlag {
+}): PerSubjectCachedFlag {
   const cached = new Map<string, CacheEntry>();
   const inFlight = new Map<string, InFlightEntry>();
 
   async function get({
-    organizationId,
+    subject,
     read,
   }: {
-    organizationId: string;
+    subject: string;
     read: () => Promise<boolean>;
   }): Promise<boolean> {
-    const entry = cached.get(organizationId);
+    const entry = cached.get(subject);
     if (entry !== undefined) {
       if (Date.now() < entry.expiresAt) return entry.isOn;
-      cached.delete(organizationId);
+      cached.delete(subject);
     }
 
-    const pending = inFlight.get(organizationId);
+    const pending = inFlight.get(subject);
     if (pending !== undefined) return pending.promise;
 
     const flight: InFlightEntry = {
       isStale: false,
       promise: Promise.resolve(false),
     };
-    flight.promise = settle({ organizationId, read, flight });
-    inFlight.set(organizationId, flight);
+    flight.promise = settle({ subject, read, flight });
+    inFlight.set(subject, flight);
     try {
       return await flight.promise;
     } finally {
       // An invalidation may already have removed this flight and a NEWER one
       // may have taken the slot - deleting unconditionally would tear that
       // newer read's coalescing down.
-      if (inFlight.get(organizationId) === flight) {
-        inFlight.delete(organizationId);
+      if (inFlight.get(subject) === flight) {
+        inFlight.delete(subject);
       }
     }
   }
 
   async function settle({
-    organizationId,
+    subject,
     read,
     flight,
   }: {
-    organizationId: string;
+    subject: string;
     read: () => Promise<boolean>;
     flight: InFlightEntry;
   }): Promise<boolean> {
@@ -148,7 +150,7 @@ export function perOrganizationCachedFlag({
       // the fallback here is the same value either gate wants - only the
       // silence is new, and it is gone.
       logger.warn(
-        { organizationId, gate: name, error },
+        { subject, gate: name, error },
         "could not read the per-organization gate; caching the failure briefly and answering false",
       );
       isOn = false;
@@ -159,7 +161,7 @@ export function perOrganizationCachedFlag({
     // `get` re-reads the source.
     if (flight.isStale) return isOn;
     if (cached.size >= MAX_CACHE_ENTRIES) evictUntilUnderCap();
-    cached.set(organizationId, {
+    cached.set(subject, {
       isOn,
       expiresAt: Date.now() + (isOn ? positiveTtlMs : negativeTtlMs),
     });
@@ -183,12 +185,12 @@ export function perOrganizationCachedFlag({
     }
   }
 
-  function invalidate({ organizationId }: { organizationId: string }): void {
-    cached.delete(organizationId);
-    const pending = inFlight.get(organizationId);
+  function invalidate({ subject }: { subject: string }): void {
+    cached.delete(subject);
+    const pending = inFlight.get(subject);
     if (pending !== undefined) {
       pending.isStale = true;
-      inFlight.delete(organizationId);
+      inFlight.delete(subject);
     }
   }
 

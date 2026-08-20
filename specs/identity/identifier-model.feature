@@ -92,25 +92,26 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And folding the erasure wipes value and hash fields from "sam"'s Identifier rows
     And replaying "sam"'s history reproduces the tombstone, never the email
 
-  @unimplemented
+  @unit
   Scenario: The adapter's write gate ships closed for every user
     Given the identity adapter is deployed and no backfill has run
     When better-auth writes any protocol row for "sam"
     Then the row is written exactly as the stock adapter would
     And no identity command is dispatched and no event is emitted
 
-  @unimplemented
+  @unit
   Scenario: A latched user's domain-significant writes produce events structurally
-    Given "sam"'s identifier backfill is finalized
+    Given "sam"'s identifier backfill has latched
     When better-auth creates an account row for "sam" through the adapter
     Then the attach ceremony runs as an identity command before the row exists
-    And the protocol values land only through the credentials repository
+    And a vetoed ceremony refuses the protocol write too
 
-  @unimplemented
-  Scenario: An unrouted better-auth write is a startup error
+  @unit
+  Scenario: An unrouted better-auth write is refused and named
     Given a better-auth model+operation missing from the adapter routing table
-    When the application boots
-    Then startup fails naming the unrouted write
+    When better-auth writes to it
+    Then the write is refused naming the model and operation
+    And the routing coverage test pins the full mounted surface in CI
 
   @unimplemented
   Scenario: Email verification completes only with the ceremony's proof

@@ -20,7 +20,7 @@
  * stays importable for its enums.
  */
 import type { PrismaClient } from "~/generated/prisma/client";
-import { perOrganizationCachedFlag } from "./per-organization-cached-gate";
+import { perSubjectCachedFlag } from "../_shared/per-subject-cached-gate";
 
 /**
  * Both directions expire on the same bound, and sixty seconds is what the
@@ -43,7 +43,7 @@ import { perOrganizationCachedFlag } from "./per-organization-cached-gate";
  */
 export const CUTOVER_GATE_CACHE_TTL_MS = 60_000;
 
-const gate = perOrganizationCachedFlag({
+const gate = perSubjectCachedFlag({
   name: "cutover-gate",
   positiveTtlMs: CUTOVER_GATE_CACHE_TTL_MS,
   negativeTtlMs: CUTOVER_GATE_CACHE_TTL_MS,
@@ -77,7 +77,7 @@ export async function cutoverOnEngine({
   organizationId: string;
 }): Promise<boolean> {
   return gate.get({
-    organizationId,
+    subject: organizationId,
     read: () => queryCutoverOnEngine({ prisma, organizationId }),
   });
 }
@@ -101,7 +101,7 @@ export function invalidateCutoverGate({
 }: {
   organizationId: string;
 }): void {
-  gate.invalidate({ organizationId });
+  gate.invalidate({ subject: organizationId });
 }
 
 /** The cache, dropped - for tests that cut an org over mid-suite. */

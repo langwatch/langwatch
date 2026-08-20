@@ -32,12 +32,12 @@ Aggregate tenancy: `user_identity` uses `tenantId = userId` — the user is the 
 
 ### 2. The identity adapter — better-auth never writes the database
 
-We implement better-auth's `database` contract with its `createAdapter` factory — the same first-class plug point the stock Prisma adapter implements. No wrapping, no interception, uniform across core and every plugin. Inside the adapter:
+We implement better-auth's `database` contract — the same first-class plug point the stock Prisma adapter implements — as a **routing facade whose row engine is the stock prismaAdapter** (decided 2026-08-20; reimplementing the adapter's query/field-mapping translation from scratch would duplicate hundreds of lines of the stock adapter on the most sensitive surface we own, for no structural gain). The facade is uniform across core and every plugin, and the guarantees live in the facade, not the engine: every write is routed, gated, and vetoable before the engine sees it. Inside the adapter:
 
 ```text
                              better-auth (protocol engine)
                                         │
-                            identity adapter (createAdapter)
+                            identity adapter (routing facade)
                                         │
         ┌───────────────────────────────┼─────────────────────────────────┐
         │ READS                         │ DOMAIN-SIGNIFICANT WRITES       │ PROTOCOL WRITES
@@ -56,7 +56,8 @@ We implement better-auth's `database` contract with its `createAdapter` factory 
         │                               │    only, no events (yet)        │
         └───────────────────────────────┴─────────────────────────────────┘
           every (model, operation) is declared in a ROUTING TABLE in the module;
-          an unrouted write is a startup error — nothing is implicitly captured
+          an unrouted write is refused, loudly, naming itself — and the routing
+          coverage test pins the full mounted surface in CI
 ```
 
 Command → event → projection, never a hand-written upsert in a handler. Protocol values (password hash, tokens) ride only on the command — transient, never durably stored in events — and land through the credentials repository as row-truth on `Account`. Read-your-writes holds because the fold apply runs on the calling path; the queue fold re-applies the same events later and converges because applies are idempotent (the ledger's dispatch discipline, ADR-092 §13). A thin endpoint-hook plugin stamps ceremony context (flow, actor, request metadata) onto request-scoped storage so the adapter knows why a row is written.
@@ -129,4 +130,4 @@ The rollout is the grants rollout, re-tenanted:
 - Epic: `dev/docs/identity-platform-redesign.md` (decisions R8, R10–R13) · Plan: `dev/docs/identity-platform/delivery-plan.md` (Wave 1 PR breakdown) · Deliverable: `dev/docs/identity-platform/D01-identity-pipeline-and-identifiers.md` (schemas, payload examples, state machine)
 - Doctrine anchor: `specs/event-sourcing/pipeline-model.feature`
 - Rollout shape mirrored: ADR-092 §13 and its merged PRs (#7143 ledger + witnessed migrations, #7147 write gate + genesis adoption, #7151 read gate + parity-proved cutover); `@langwatch/system-migrations` (#7079)
-- better-auth adapter contract: `createAdapter` — the `database` option's sanctioned "you handle reading and writing" plug point
+- better-auth adapter contract: the `database` option's sanctioned "you handle reading and writing" plug point — implemented as the routing facade over the stock prismaAdapter row engine (§2)

@@ -1,0 +1,245 @@
+import { describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { IdentityCommandRefusedError } from "~/server/event-sourcing/pipelines/identity/commands/identityCommands";
+import {
+  createIdentityDatabase,
+  IdentityAdapterUnroutedWriteError,
+  identifierProviderFor,
+  ROUTED_MODELS,
+  routeWrite,
+  WRITE_OPERATIONS,
+} from "../identityDatabase";
+
+const USER = "user_sam";
+
+/**
+ * A recording PrismaClient stub the stock prismaAdapter row engine runs
+ * against. Empty better-auth options mean canonical model names map to
+ * themselves, so the stub's keys are the canonical names — the facade's
+ * behavior is under test here, not the stock adapter's field mapping.
+ */
+function prismaStub() {
+  const calls: { model: string; method: string; args: unknown }[] = [];
+  const modelDelegate = (model: string) =>
+    new Proxy(
+      {},
+      {
+        get: (_target, method: string) => {
+          return async (args: unknown) => {
+            calls.push({ model, method, args });
+            if (method === "create") {
+              const data = (args as { data: Record<string, unknown> }).data;
+              return { id: data.id ?? "row_1", ...data };
+            }
+            if (method === "findFirst") {
+              if (model === "user") return { id: USER, email: "sam@acme.com" };
+              if (model === "identifier") return { id: "idf_1" };
+              return null;
+            }
+            if (method === "findMany") {
+              if (model === "account") {
+                return [
+                  {
+                    id: "acc_1",
+                    userId: USER,
+                    providerId: "google",
+                    accountId: "gid_1",
+                  },
+                ];
+              }
+              return [];
+            }
+            if (method === "update") return { id: USER };
+            if (method === "count") return 0;
+            if (method === "deleteMany" || method === "updateMany") {
+              return { count: 1 };
+            }
+            return null;
+          };
+        },
+      },
+    );
+  const client = new Proxy(
+    {},
+    {
+      get: (_target, prop: string) => {
+        if (prop === "$transaction") {
+          return async (fn: (trx: unknown) => Promise<unknown>) => fn(client);
+        }
+        if (prop === "then") return undefined;
+        return modelDelegate(prop);
+      },
+    },
+  ) as PrismaClient;
+  return { client, calls };
+}
+
+function ceremoniesStub() {
+  return {
+    attachIdentifier: vi.fn().mockResolvedValue([]),
+    detachIdentifier: vi.fn().mockResolvedValue([]),
+  };
+}
+
+describe("identity adapter routing table", () => {
+  describe("when the current better-auth surface is enumerated", () => {
+    it("classifies every mounted model and write operation explicitly", () => {
+      for (const model of ROUTED_MODELS) {
+        for (const operation of WRITE_OPERATIONS) {
+          expect(() => routeWrite(model, operation)).not.toThrow();
+        }
+      }
+      expect(ROUTED_MODELS).toEqual(
+        expect.arrayContaining(["user", "session", "account", "verification"]),
+      );
+    });
+  });
+
+  describe("when better-auth writes to a model nobody classified", () => {
+    /** @scenario "An unrouted better-auth write is refused and named" */
+    it("refuses the write naming the model and operation", async () => {
+      const { client } = prismaStub();
+      const adapter = createIdentityDatabase({
+        prisma: client,
+        ceremonies: ceremoniesStub(),
+        isLatched: async () => false,
+      })({});
+      await expect(
+        adapter.create({ model: "twoFactor", data: { userId: USER } }),
+      ).rejects.toBeInstanceOf(IdentityAdapterUnroutedWriteError);
+      expect(() => routeWrite("twoFactor", "delete")).toThrow(
+        /twoFactor.*delete/,
+      );
+    });
+  });
+});
+
+describe("identity adapter write gate", () => {
+  describe("when no user is latched", () => {
+    /** @scenario "The adapter's write gate ships closed for every user" */
+    it("writes protocol rows exactly as the stock adapter would and runs no ceremony", async () => {
+      const { client, calls } = prismaStub();
+      const ceremonies = ceremoniesStub();
+      const adapter = createIdentityDatabase({
+        prisma: client,
+        ceremonies,
+        isLatched: async () => false,
+      })({});
+
+      await adapter.create({
+        model: "account",
+        data: { userId: USER, providerId: "google", accountId: "gid_1" },
+      });
+      await adapter.create({
+        model: "session",
+        data: { userId: USER, token: "tok" },
+      });
+
+      expect(ceremonies.attachIdentifier).not.toHaveBeenCalled();
+      expect(ceremonies.detachIdentifier).not.toHaveBeenCalled();
+      expect(
+        calls.filter((c) => c.method === "create").map((c) => c.model),
+      ).toEqual(["account", "session"]);
+    });
+  });
+
+  describe("when the user's backfill has latched", () => {
+    /** @scenario "A latched user's domain-significant writes produce events structurally" */
+    it("runs the attach ceremony before the Account row exists", async () => {
+      const { client, calls } = prismaStub();
+      const ceremonies = ceremoniesStub();
+      const order: string[] = [];
+      ceremonies.attachIdentifier.mockImplementation(async () => {
+        order.push("ceremony");
+        return [];
+      });
+      const adapter = createIdentityDatabase({
+        prisma: client,
+        ceremonies,
+        isLatched: async ({ userId }) => userId === USER,
+        now: () => 1_690_000_000_000,
+      })({});
+
+      await adapter.create({
+        model: "account",
+        data: { userId: USER, providerId: "google", accountId: "gid_1" },
+      });
+      order.push(
+        ...calls
+          .filter((c) => c.model === "account" && c.method === "create")
+          .map(() => "row"),
+      );
+
+      expect(order).toEqual(["ceremony", "row"]);
+      expect(ceremonies.attachIdentifier).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: USER,
+          tenantId: USER,
+          provider: "google",
+          providerAccountId: "gid_1",
+          value: "sam@acme.com",
+          occurredAtMs: 1_690_000_000_000,
+        }),
+      );
+    });
+
+    it("a vetoed ceremony refuses the protocol write too", async () => {
+      const { client, calls } = prismaStub();
+      const ceremonies = ceremoniesStub();
+      ceremonies.detachIdentifier.mockRejectedValue(
+        new IdentityCommandRefusedError(
+          "identity_primary_must_demote_first",
+          "refused",
+        ),
+      );
+      const adapter = createIdentityDatabase({
+        prisma: client,
+        ceremonies,
+        isLatched: async () => true,
+      })({});
+
+      await expect(
+        adapter.delete({
+          model: "account",
+          where: [{ field: "id", value: "acc_1" }],
+        }),
+      ).rejects.toMatchObject({ code: "identity_primary_must_demote_first" });
+      expect(
+        calls.some((c) => c.model === "account" && c.method === "delete"),
+      ).toBe(false);
+    });
+  });
+
+  describe("when a user row is created", () => {
+    it("mints the userHashKey after the row exists", async () => {
+      const { client, calls } = prismaStub();
+      const adapter = createIdentityDatabase({
+        prisma: client,
+        ceremonies: ceremoniesStub(),
+        isLatched: async () => false,
+      })({});
+
+      await adapter.create({
+        model: "user",
+        data: { email: "sam@acme.com" },
+      });
+
+      const mint = calls.find(
+        (c) => c.model === "user" && c.method === "update",
+      );
+      expect(mint).toBeDefined();
+      const data = (mint!.args as { data: { userHashKey: string } }).data;
+      expect(data.userHashKey).toMatch(/^[0-9a-f]{64}$/);
+    });
+  });
+});
+
+describe("identifier provider mapping", () => {
+  it("maps better-auth providerIds into the identifier vocabulary", () => {
+    expect(identifierProviderFor("credential")).toBe("credential");
+    expect(identifierProviderFor("google")).toBe("google");
+    expect(identifierProviderFor("microsoft")).toBe("azure-ad");
+    expect(identifierProviderFor("auth0")).toBe("oidc");
+    expect(identifierProviderFor("okta")).toBe("oidc");
+  });
+});

@@ -16,7 +16,6 @@ import { createLogger } from "@langwatch/observability";
 import { RedisConfigService } from "@langwatch/redis-client";
 import { compare, hash } from "bcrypt";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
-import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { env } from "~/env.mjs";
@@ -34,6 +33,7 @@ import {
   beforeSessionCreate,
   beforeUserCreate,
 } from "./hooks";
+import { createIdentityDatabase } from "./identityDatabase";
 import { revokeAllSessionsForUser } from "./revokeSessions";
 
 const logger = createLogger("langwatch:better-auth");
@@ -215,7 +215,15 @@ export const auth = betterAuth({
           : []),
       ],
   secret: isBuildTime ? "build-time-only" : env.NEXTAUTH_SECRET,
-  database: prismaAdapter(prisma, { provider: "postgresql" }),
+  /**
+   * The identity adapter (ADR-101 §2, R10): the routing facade over the
+   * stock prismaAdapter. Protocol behavior is byte-identical to the stock
+   * adapter; domain-significant writes additionally run identity ceremonies
+   * for users whose backfill has latched (the write gate ships closed, so
+   * deploying this changed nothing on its own). An unrouted better-auth
+   * write throws — see identityDatabase.ts.
+   */
+  database: createIdentityDatabase(),
 
   /**
    * Tell BetterAuth's rate limiter (and session IP tracking) which
