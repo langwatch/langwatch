@@ -49,7 +49,7 @@ describe("given the first page of events", () => {
     const result = absorbFetch({ pageSize: 3, request: req, fetched });
     expect(result.rows.map((r) => r.eventId)).toEqual(["a", "b", "c"]);
     expect(result.hasMore).toBe(true);
-    expect(result.stalled).toBe(false);
+    expect(result.isStalled).toBe(false);
   });
 
   it("shows everything and stops when the fetch came back short", () => {
@@ -121,7 +121,7 @@ describe("given events stamped with the same millisecond at a page boundary", ()
       fetched,
     });
     expect(stalledResult.rows).toEqual([]);
-    expect(stalledResult.stalled).toBe(true);
+    expect(stalledResult.isStalled).toBe(true);
 
     const skip = stallSkipRequest({ pageSize: 2, displayedRows: displayed });
     expect(skip.beforeIso).toBe(iso(T)); // strict <, ties knowingly skipped
@@ -137,17 +137,18 @@ describe("given events stamped with the same millisecond at a page boundary", ()
       fetched: [row("b", T)],
     });
     expect(result.rows).toEqual([]);
-    expect(result.stalled).toBe(false);
+    expect(result.isStalled).toBe(false);
     expect(result.hasMore).toBe(false);
   });
 });
 
 describe("given the pagination bar needs numbers a cursor cannot give", () => {
   /** @scenario "The pager offers no control it cannot honour" */
-  it("counts only what was loaded, plus one sentinel row while more exists", () => {
+  it("counts page slots plus one sentinel row while more exists", () => {
     const midWalk = paginationView({
-      loadedCount: 75,
+      pageSize: 25,
       loadedPages: 3,
+      lastPageCount: 25,
       hasMore: true,
     });
     expect(midWalk.totalCount).toBe(76);
@@ -160,12 +161,40 @@ describe("given the pagination bar needs numbers a cursor cannot give", () => {
 
   it("settles on the exact count once the walk hits the end", () => {
     const done = paginationView({
-      loadedCount: 85,
+      pageSize: 25,
       loadedPages: 4,
+      lastPageCount: 10,
       hasMore: false,
     });
     expect(done.totalCount).toBe(85);
     expect(done.canGoNext).toBe(false);
     expect(done.maxReachablePage).toBe(4);
+  });
+
+  it("keeps the next page reachable even when a loaded page came up short", () => {
+    // Tie-drops (or the server cap) can leave a non-final page holding
+    // fewer than pageSize rows. A row-count total would then put
+    // totalPages below the pages already walked, and the bar's clamp
+    // would strand the walk. Slots, not rows, drive the page count.
+    const shortMidWalk = paginationView({
+      pageSize: 10,
+      loadedPages: 2,
+      lastPageCount: 3,
+      hasMore: true,
+    });
+    expect(shortMidWalk.maxReachablePage).toBe(3);
+    expect(Math.ceil(shortMidWalk.totalCount / 10)).toBe(3);
+    expect(shortMidWalk.canGoNext).toBe(true);
+    expect(shortMidWalk.isPageReachable(3)).toBe(true);
+  });
+
+  it("reports zero for a source that loaded nothing, hiding the bar", () => {
+    const empty = paginationView({
+      pageSize: 25,
+      loadedPages: 1,
+      lastPageCount: 0,
+      hasMore: false,
+    });
+    expect(empty.totalCount).toBe(0);
   });
 });

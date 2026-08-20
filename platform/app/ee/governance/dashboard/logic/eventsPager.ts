@@ -112,31 +112,40 @@ export function absorbFetch<R extends PagerRow>({
   pageSize: number;
   request: PageRequest;
   fetched: readonly R[];
-}): { rows: R[]; hasMore: boolean; stalled: boolean } {
+}): { rows: R[]; hasMore: boolean; isStalled: boolean } {
   const drop = new Set(request.dropIds);
   const fresh = fetched.filter((row) => !drop.has(row.eventId));
-  const fullResponse = fetched.length >= request.limit;
+  const isFullResponse = fetched.length >= request.limit;
   return {
     rows: fresh.slice(0, pageSize),
     // The sentinel row proves more; a full response with the sentinel
     // eaten by drops can only assume it.
-    hasMore: fresh.length > pageSize || fullResponse,
-    stalled: fresh.length === 0 && fullResponse,
+    hasMore: fresh.length > pageSize || isFullResponse,
+    isStalled: fresh.length === 0 && isFullResponse,
   };
 }
 
 /**
- * What the pagination bar may honestly claim without a server total:
- * the rows actually loaded, plus one sentinel row while more exist —
- * enough to keep a "next" page open without ever printing a total.
+ * What the pagination bar may honestly claim without a server total.
+ *
+ * The count is built from page SLOTS, not loaded rows: the bar derives
+ * its page count as `ceil(totalCount / pageSize)` and clamps the
+ * current page to it, so a short non-final page (tie-drops, the server
+ * cap) under a row-count total would put the clamp below pages already
+ * walked and strand the walk. Full slots for every page but the last,
+ * the last page's real row count, and one sentinel row while more
+ * exist — the page count always equals the reachable pages, and no
+ * grand total is ever printed.
  */
 export function paginationView({
-  loadedCount,
+  pageSize,
   loadedPages,
+  lastPageCount,
   hasMore,
 }: {
-  loadedCount: number;
+  pageSize: number;
   loadedPages: number;
+  lastPageCount: number;
   hasMore: boolean;
 }): {
   totalCount: number;
@@ -145,8 +154,11 @@ export function paginationView({
   isPageReachable: (page: number) => boolean;
 } {
   const maxReachablePage = loadedPages + (hasMore ? 1 : 0);
+  const totalCount = hasMore
+    ? loadedPages * pageSize + 1
+    : Math.max(0, (loadedPages - 1) * pageSize + lastPageCount);
   return {
-    totalCount: loadedCount + (hasMore ? 1 : 0),
+    totalCount,
     canGoNext: hasMore,
     maxReachablePage,
     isPageReachable: (page) => page >= 1 && page <= maxReachablePage,

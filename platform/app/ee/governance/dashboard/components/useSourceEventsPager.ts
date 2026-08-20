@@ -139,7 +139,7 @@ async function walkOnePage<R extends PagerRow>({
     request,
     fetched: await fetchPage(request),
   });
-  if (!result.stalled) return result;
+  if (!result.isStalled) return result;
   const skip = stallSkipRequest({ pageSize, displayedRows });
   return absorbFetch({
     pageSize,
@@ -155,8 +155,9 @@ function presentPager<R extends PagerRow>(
 ): SourceEventsPager<R> {
   const loadedCount = state.pages?.reduce((sum, p) => sum + p.length, 0) ?? 0;
   const view = paginationView({
-    loadedCount,
+    pageSize: state.pageSize,
     loadedPages: state.pages?.length ?? 0,
+    lastPageCount: state.pages?.[state.pages.length - 1]?.length ?? 0,
     hasMore: state.hasMore,
   });
   return {
