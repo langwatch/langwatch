@@ -29,8 +29,12 @@ env:
   # Poll budgets, in seconds. They must sum to less than timeout-minutes below,
   # with headroom for the gates and the snapshot save, so that a stuck refresh
   # ends in this workflow's own diagnostics instead of a bare job cancellation.
-  REFRESH_WAIT_SECONDS: "2700" # 45 min (a full cold refresh was observed at ~31)
-  HEALTH_WAIT_SECONDS: "1200" # 20 min
+  # The numbers come from timing the real thing on the golden, not from guesses:
+  # a cold refresh (pnpm install + migrations) took ~31 min, and because that
+  # install replaces node_modules, the dev stack then rebuilds every SDK and
+  # bundle before it serves — a clean boot to /api/health 204 measured 27m28s.
+  REFRESH_WAIT_SECONDS: "2700" # 45 min
+  HEALTH_WAIT_SECONDS: "2700" # 45 min
   SNAPSHOT_WAIT_SECONDS: "900" # 15 min
 
 jobs:
@@ -40,7 +44,9 @@ jobs:
     # workflow_dispatch at a modified branch and run arbitrary code with it.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # 45 + 45 + 15 minutes of polling, plus room for the CLI install, the two
+    # HTTP gates and the SHA check.
+    timeout-minutes: 120
     permissions:
       contents: read
     steps:
