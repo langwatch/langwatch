@@ -16,8 +16,11 @@ const DEFAULT_LEASE_TTL_MS = 60_000;
 const DEFAULT_LEASE_RENEW_INTERVAL_MS = 20_000;
 /** How many organizations one pass works at once. Each is its own claim,
  *  its own migrations, its own convergence waits - so one large
- *  organization's import never holds the rest of the fleet behind it. */
-const DEFAULT_TENANT_CONCURRENCY = 10;
+ *  organization's import never holds the rest of the fleet behind it. The
+ *  per-tenant work is light (the fold queue does the heavy lifting), so
+ *  the bound exists to cap claim heartbeats and convergence polls, not
+ *  throughput. */
+const DEFAULT_TENANT_CONCURRENCY = 25;
 
 /**
  * Which (tenant, migration) pairs a pass may touch. The app composes this:
@@ -44,7 +47,7 @@ export type SystemMigrationRunnerDeps = {
   leaseTtlMs?: number;
   /** How often a held claim renews. Must stay well inside the TTL. */
   leaseRenewIntervalMs?: number;
-  /** How many organizations to migrate concurrently. Defaults to 10. */
+  /** How many organizations to migrate concurrently. Defaults to 25. */
   tenantConcurrency?: number;
 };
 
