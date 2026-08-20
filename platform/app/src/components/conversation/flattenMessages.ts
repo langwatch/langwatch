@@ -232,24 +232,67 @@ export function flattenMessages({
 
 /**
  * Groups consecutive parts that share a trace into numbered turns.
+ *
+ * A turn is an exchange, not a reply. Only the traced half carries the trace —
+ * the playground writes a user message locally and the trace id arrives with
+ * the answer — so grouping on the trace alone put the separator *between* the
+ * question and its answer, splitting the exchange it was supposed to bound.
+ * Untraced parts therefore lead into the traced turn that follows them.
+ *
+ * Untraced parts with no traced turn after them are the live case: a message
+ * just sent, a reply still streaming. Whether that counts as a turn depends on
+ * what the surface is showing. A live conversation numbers it — the exchange
+ * starts when the reader sends, and waiting for the trace made the separator
+ * appear a beat late, under content already on screen; the trace affordance is
+ * what waits, not the number. A recorded transcript does not: an untraced
+ * message there is one that was never traced, and numbering it would promise a
+ * trace that is not coming.
  */
-export function groupIntoTurns(parts: DisplayPart[]): ConversationTurn[] {
+export function groupIntoTurns(
+  parts: DisplayPart[],
+  { live = false }: { live?: boolean } = {},
+): ConversationTurn[] {
   const turns: ConversationTurn[] = [];
   let turnNumber = 0;
+  // Parts seen since the last traced turn closed, waiting to find out whether
+  // a traced turn follows them or the conversation simply ends here.
+  let leading: DisplayPart[] = [];
+
+  const flushLeading = () => {
+    if (leading.length === 0) return;
+    turns.push({
+      key: leading[0]!.id,
+      turnNumber: live ? ++turnNumber : undefined,
+      parts: leading,
+    });
+    leading = [];
+  };
 
   for (const part of parts) {
+    // An untraced part is always the start of something rather than the end of
+    // it: either it leads the traced turn that answers it, or the conversation
+    // ends here and it is live content.
+    if (!part.traceId) {
+      leading.push(part);
+      continue;
+    }
+
     const last = turns[turns.length - 1];
-    if (last && (last.traceId ?? "") === (part.traceId ?? "")) {
+    if (leading.length === 0 && last?.traceId === part.traceId) {
       last.parts.push(part);
       continue;
     }
+
     turns.push({
-      key: part.id,
+      key: leading[0]?.id ?? part.id,
       traceId: part.traceId,
-      turnNumber: part.traceId ? ++turnNumber : undefined,
-      parts: [part],
+      turnNumber: ++turnNumber,
+      parts: [...leading, part],
     });
+    leading = [];
   }
+
+  flushLeading();
 
   return turns;
 }

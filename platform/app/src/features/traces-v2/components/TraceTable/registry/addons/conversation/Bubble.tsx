@@ -163,7 +163,10 @@ export const Bubble: React.FC<BubbleProps> = ({
 
   return (
     <Flex
-      align="center"
+      // Anchored to the top, not centred: a long message would otherwise float
+      // its avatar down beside the middle of the text, away from the label
+      // that says whose message it is.
+      align="flex-start"
       gap={2}
       flexDirection={side === "right" ? "row-reverse" : "row"}
       width="full"
@@ -274,6 +277,11 @@ export const Bubble: React.FC<BubbleProps> = ({
               fontSize: compact ? "13.5px" : "14px",
               lineHeight: "1.55",
             },
+            // Prose gives every block a margin on both sides. Inside a bubble
+            // the outermost ones stack on top of the bubble's own padding, so
+            // the message reads as sitting high in a box too tall for it.
+            "& > div > *:first-child": { marginTop: "0 !important" },
+            "& > div > *:last-child": { marginBottom: "0 !important" },
             "& h1": { fontSize: "1.15em !important" },
             "& h2": { fontSize: "1.1em !important" },
             "& h3": { fontSize: "1.05em !important" },
