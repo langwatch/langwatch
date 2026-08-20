@@ -340,9 +340,7 @@ describe("detachIdentifier command", () => {
           actor: ACTOR,
         }),
       );
-      await expect(attempt).rejects.toBeInstanceOf(
-        IdentityCommandRefusedError,
-      );
+      await expect(attempt).rejects.toBeInstanceOf(IdentityCommandRefusedError);
       await expect(
         handler
           .handle(

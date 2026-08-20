@@ -39,10 +39,7 @@ class InMemoryVerificationStore implements IdentityVerificationStore {
   }
 }
 
-function harness(options?: {
-  identifierState?: string;
-  now?: () => number;
-}) {
+function harness(options?: { identifierState?: string; now?: () => number }) {
   const store = new InMemoryVerificationStore();
   const verifyIdentifier = vi.fn(
     async (_data: VerifyIdentifierCommandData) => [],

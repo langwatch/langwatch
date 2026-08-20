@@ -108,9 +108,7 @@ export function s256Challenge(codeVerifier: string): string {
 function safeEqualHex(a: string, b: string): boolean {
   const bufferA = Buffer.from(a);
   const bufferB = Buffer.from(b);
-  return (
-    bufferA.length === bufferB.length && timingSafeEqual(bufferA, bufferB)
-  );
+  return bufferA.length === bufferB.length && timingSafeEqual(bufferA, bufferB);
 }
 
 export interface MintedEmailVerification {
@@ -149,7 +147,7 @@ export class VerificationCeremonyService {
       userId,
       identifierId,
     });
-    if (!fact || fact.provider !== "email" || fact.state !== "ATTACHED") {
+    if (fact?.provider !== "email" || fact.state !== "ATTACHED") {
       logger.warn(
         { userId, identifierId, state: fact?.state ?? "missing" },
         "verification mint refused: not an ATTACHED email identifier of this user",

@@ -161,9 +161,7 @@ describe("identity replay determinism", () => {
 
       // The emitted streams themselves converge: deterministic ids, same
       // idempotency keys, same payloads.
-      expect(secondRun.map((e) => e.data)).toEqual(
-        firstRun.map((e) => e.data),
-      );
+      expect(secondRun.map((e) => e.data)).toEqual(firstRun.map((e) => e.data));
 
       const live = reducerSurface(fold(firstRun));
       const replayed = reducerSurface(fold(firstRun));
@@ -171,10 +169,7 @@ describe("identity replay determinism", () => {
 
       const facts = Object.values(live.identifiers);
       expect(facts).toHaveLength(2);
-      expect(facts.map((f) => f.state).sort()).toEqual([
-        "DETACHED",
-        "PRIMARY",
-      ]);
+      expect(facts.map((f) => f.state).sort()).toEqual(["DETACHED", "PRIMARY"]);
     });
   });
 });

@@ -15,12 +15,17 @@
  * durable; staging, the aggregate's next event, or replay repairs the
  * projection.
  */
+
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { ZodType } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { tryGetApp } from "~/server/app-layer/app";
 import { createTenantId } from "~/server/event-sourcing";
-import type { Command, CommandHandler } from "~/server/event-sourcing/commands/command";
+import type {
+  Command,
+  CommandHandler,
+} from "~/server/event-sourcing/commands/command";
 import type { AggregateType } from "~/server/event-sourcing/domain/aggregateType";
 import {
   AttachIdentifierCommand,
@@ -30,17 +35,8 @@ import {
   MarkPrimaryCommand,
   VerifyIdentifierCommand,
 } from "~/server/event-sourcing/pipelines/identity/commands/identityCommands";
-import { IdentityStateFoldProjection } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
 import type { IdentityFoldState } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
-import {
-  ATTACH_IDENTIFIER_COMMAND_TYPE,
-  DETACH_IDENTIFIER_COMMAND_TYPE,
-  ERASE_USER_COMMAND_TYPE,
-  IDENTITY_PIPELINE_NAME,
-  MARK_PRIMARY_COMMAND_TYPE,
-  USER_IDENTITY_AGGREGATE_TYPE,
-  VERIFY_IDENTIFIER_COMMAND_TYPE,
-} from "~/server/event-sourcing/pipelines/identity/schemas/constants";
+import { IdentityStateFoldProjection } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
 import {
   type AttachIdentifierCommandData,
   attachIdentifierCommandDataSchema,
@@ -53,21 +49,29 @@ import {
   type VerifyIdentifierCommandData,
   verifyIdentifierCommandDataSchema,
 } from "~/server/event-sourcing/pipelines/identity/schemas/commands";
+import {
+  ATTACH_IDENTIFIER_COMMAND_TYPE,
+  DETACH_IDENTIFIER_COMMAND_TYPE,
+  ERASE_USER_COMMAND_TYPE,
+  IDENTITY_PIPELINE_NAME,
+  MARK_PRIMARY_COMMAND_TYPE,
+  USER_IDENTITY_AGGREGATE_TYPE,
+  VERIFY_IDENTIFIER_COMMAND_TYPE,
+} from "~/server/event-sourcing/pipelines/identity/schemas/constants";
 import type { IdentityEvent } from "~/server/event-sourcing/pipelines/identity/schemas/events";
-import type { EventStore } from "~/server/event-sourcing/stores/eventStore.types";
 import type {
   StateProjectionStore,
   StoredProjection,
 } from "~/server/event-sourcing/projections/stateProjection.types";
-import { generate } from "@langwatch/ksuid";
+import type { EventStore } from "~/server/event-sourcing/stores/eventStore.types";
 import { prisma as appPrisma } from "../../db";
-import { PrismaIdentityGuardReads } from "./repositories/identity-guard-reads.prisma.repository";
-import { PrismaIdentityProjectionRepository } from "./repositories/identity-projection.prisma.repository";
 import {
   identityCallingPathApplyDurationSeconds,
   identityCallingPathApplyFailuresTotal,
   identityStagingDroppedTotal,
 } from "./metrics";
+import { PrismaIdentityGuardReads } from "./repositories/identity-guard-reads.prisma.repository";
+import { PrismaIdentityProjectionRepository } from "./repositories/identity-projection.prisma.repository";
 
 const logger = createLogger("langwatch:identity:ceremonies");
 
@@ -197,16 +201,19 @@ export class IdentityCeremonies {
     });
     this.eventStore = deps.eventStore ?? resolveEventStore;
     this.stagedSender = deps.stagedSender ?? resolveStagedSender;
-    this.stagingTimeoutMs = deps.stagingTimeoutMs ?? IDENTITY_STAGING_TIMEOUT_MS;
+    this.stagingTimeoutMs =
+      deps.stagingTimeoutMs ?? IDENTITY_STAGING_TIMEOUT_MS;
     this.verbs = {
       attachIdentifier: {
-        schema: attachIdentifierCommandDataSchema as ZodType<AttachIdentifierCommandData>,
+        schema:
+          attachIdentifierCommandDataSchema as ZodType<AttachIdentifierCommandData>,
         commandType: ATTACH_IDENTIFIER_COMMAND_TYPE,
         senderName: "attachIdentifier",
         handler: new AttachIdentifierCommand(guardReads),
       },
       verifyIdentifier: {
-        schema: verifyIdentifierCommandDataSchema as ZodType<VerifyIdentifierCommandData>,
+        schema:
+          verifyIdentifierCommandDataSchema as ZodType<VerifyIdentifierCommandData>,
         commandType: VERIFY_IDENTIFIER_COMMAND_TYPE,
         senderName: "verifyIdentifier",
         handler: new VerifyIdentifierCommand(guardReads),
@@ -218,7 +225,8 @@ export class IdentityCeremonies {
         handler: new MarkPrimaryCommand(guardReads),
       },
       detachIdentifier: {
-        schema: detachIdentifierCommandDataSchema as ZodType<DetachIdentifierCommandData>,
+        schema:
+          detachIdentifierCommandDataSchema as ZodType<DetachIdentifierCommandData>,
         commandType: DETACH_IDENTIFIER_COMMAND_TYPE,
         senderName: "detachIdentifier",
         handler: new DetachIdentifierCommand(guardReads),

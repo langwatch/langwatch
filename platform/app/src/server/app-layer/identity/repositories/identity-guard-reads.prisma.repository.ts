@@ -12,11 +12,7 @@ import { identifierProviderSchema } from "~/server/event-sourcing/pipelines/iden
 export class PrismaIdentityGuardReads implements IdentityGuardReads {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async getUserHashKey({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<string | null> {
+  async getUserHashKey({ userId }: { userId: string }): Promise<string | null> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { userHashKey: true },
@@ -59,7 +55,8 @@ export class PrismaIdentityGuardReads implements IdentityGuardReads {
             identifierHash: row.identifierHash,
             accountId: row.accountId,
             connectionId: row.connectionId,
-            state: row.state as IdentityLedgerState["identifiers"][string]["state"],
+            state:
+              row.state as IdentityLedgerState["identifiers"][string]["state"],
             verifiedAtMs: row.verifiedAt?.getTime() ?? null,
             attachedAtMs: row.attachedAt.getTime(),
             detachedAtMs: row.detachedAt?.getTime() ?? null,

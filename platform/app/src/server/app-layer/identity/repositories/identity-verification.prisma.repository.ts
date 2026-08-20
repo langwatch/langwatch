@@ -71,7 +71,9 @@ export class PrismaIdentityVerificationRepository
 {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async replaceForIdentifier(record: IdentityVerificationRecord): Promise<void> {
+  async replaceForIdentifier(
+    record: IdentityVerificationRecord,
+  ): Promise<void> {
     const identifier = keyFor(record.identifierId);
     await this.prisma.verificationToken.deleteMany({ where: { identifier } });
     await this.prisma.verificationToken.create({

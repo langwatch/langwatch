@@ -29,6 +29,7 @@ import type {
   SystemMigration,
   TenantMigrationOutcome,
 } from "@langwatch/system-migrations";
+import { identifierProviderFor } from "~/server/better-auth/identityDatabase";
 import { IdentityCommandRefusedError } from "~/server/event-sourcing/pipelines/identity/commands/identityCommands";
 import {
   arrivalStateForProvider,
@@ -36,7 +37,6 @@ import {
   normalizeIdentifierValue,
 } from "~/server/event-sourcing/pipelines/identity/projections/identifierIdentity";
 import type { IdentifierProvider } from "~/server/event-sourcing/pipelines/identity/schemas/events";
-import { identifierProviderFor } from "~/server/better-auth/identityDatabase";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../identifier-write-gate";
 import type { IdentityCeremonies } from "../identity-ceremonies";
 

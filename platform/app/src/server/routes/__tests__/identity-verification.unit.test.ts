@@ -12,14 +12,14 @@
  * See specs/identity/identifier-model.feature.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { VerifyIdentifierCommandData } from "~/server/event-sourcing/pipelines/identity/schemas/commands";
-import { getServerAuthSession } from "~/server/auth";
 import {
   type IdentityVerificationRecord,
   type IdentityVerificationStore,
   s256Challenge,
   VerificationCeremonyService,
 } from "~/server/app-layer/identity/verification-ceremony";
+import { getServerAuthSession } from "~/server/auth";
+import type { VerifyIdentifierCommandData } from "~/server/event-sourcing/pipelines/identity/schemas/commands";
 import {
   app as identityFamilyApp,
   setVerificationCeremoniesForTests,

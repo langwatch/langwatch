@@ -12,9 +12,7 @@ const USER = "user_sam";
 function prismaWithStatus(status: string | null) {
   return {
     systemMigrationTenantState: {
-      findUnique: vi.fn(async () =>
-        status === null ? null : { status },
-      ),
+      findUnique: vi.fn(async () => (status === null ? null : { status })),
     },
   } as unknown as Pick<PrismaClient, "systemMigrationTenantState">;
 }
@@ -30,9 +28,7 @@ describe("identifier write gate", () => {
       await expect(
         isUserOnIdentityWrites({ userId: USER, prisma }),
       ).resolves.toBe(false);
-      expect(
-        prisma.systemMigrationTenantState.findUnique,
-      ).toHaveBeenCalledWith(
+      expect(prisma.systemMigrationTenantState.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
             migrationName_tenantId: {
@@ -118,7 +114,10 @@ describe("identifier write gate", () => {
   describe("when the backfill latches a cached-closed user", () => {
     it("invalidation reopens the question immediately", async () => {
       await expect(
-        isUserOnIdentityWrites({ userId: USER, prisma: prismaWithStatus(null) }),
+        isUserOnIdentityWrites({
+          userId: USER,
+          prisma: prismaWithStatus(null),
+        }),
       ).resolves.toBe(false);
       invalidateIdentityWriteGate({ userId: USER });
       await expect(

@@ -108,7 +108,11 @@ export function withRedisFailOpen(
   return {
     get: async (key) => {
       try {
-        return await withinBudget("get", Promise.resolve(storage.get(key)), timeoutMs);
+        return await withinBudget(
+          "get",
+          Promise.resolve(storage.get(key)),
+          timeoutMs,
+        );
       } catch (error) {
         // A miss, not a failure: better-auth falls through to the database.
         failOpen("get", error);

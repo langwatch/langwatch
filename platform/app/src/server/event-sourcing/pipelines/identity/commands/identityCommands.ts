@@ -1,6 +1,14 @@
 import { createTenantId, defineCommandSchema, EventUtils } from "../../..";
 import type { Command, CommandHandler } from "../../../commands/command";
 import {
+  arrivalStateForProvider,
+  computeIdentifierHash,
+  deriveIdentifierId,
+  identifierDomain,
+  normalizeIdentifierValue,
+} from "../projections/identifierIdentity";
+import type { IdentityLedgerState } from "../projections/reduceIdentity";
+import {
   type AttachIdentifierCommandData,
   attachIdentifierCommandDataSchema,
   type DetachIdentifierCommandData,
@@ -35,14 +43,6 @@ import type {
   PrimaryChangedEvent,
   UserErasedEvent,
 } from "../schemas/events";
-import {
-  arrivalStateForProvider,
-  computeIdentifierHash,
-  deriveIdentifierId,
-  identifierDomain,
-  normalizeIdentifierValue,
-} from "../projections/identifierIdentity";
-import type { IdentityLedgerState } from "../projections/reduceIdentity";
 
 /**
  * The identity pipeline's commands (ADR-101 §2). Guards run HERE, before any
@@ -102,7 +102,10 @@ function eventIdempotencyKey({
 
 export class AttachIdentifierCommand
   implements
-    CommandHandler<Command<AttachIdentifierCommandData>, IdentifierAttachedEvent>
+    CommandHandler<
+      Command<AttachIdentifierCommandData>,
+      IdentifierAttachedEvent
+    >
 {
   static readonly schema = defineCommandSchema(
     ATTACH_IDENTIFIER_COMMAND_TYPE,
@@ -318,7 +321,10 @@ export class MarkPrimaryCommand
 
 export class DetachIdentifierCommand
   implements
-    CommandHandler<Command<DetachIdentifierCommandData>, IdentifierDetachedEvent>
+    CommandHandler<
+      Command<DetachIdentifierCommandData>,
+      IdentifierDetachedEvent
+    >
 {
   static readonly schema = defineCommandSchema(
     DETACH_IDENTIFIER_COMMAND_TYPE,

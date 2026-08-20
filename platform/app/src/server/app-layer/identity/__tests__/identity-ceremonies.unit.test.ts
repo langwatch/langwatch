@@ -46,9 +46,7 @@ class InMemoryGuardReads implements IdentityGuardReads {
   }
 
   async loadIdentityState({ userId }: { userId: string }) {
-    return (
-      this.store.stored.get(userId)?.state ?? { userId, identifiers: {} }
-    );
+    return this.store.stored.get(userId)?.state ?? { userId, identifiers: {} };
   }
 }
 
@@ -189,9 +187,9 @@ describe("identity ceremony dispatch", () => {
     it("the ceremony fails: no apply, no staging, no phantom state", async () => {
       const { ceremonies, store, order } = harness({ appendFails: true });
 
-      await expect(
-        ceremonies.attachIdentifier(attachData()),
-      ).rejects.toThrow("clickhouse unavailable");
+      await expect(ceremonies.attachIdentifier(attachData())).rejects.toThrow(
+        "clickhouse unavailable",
+      );
       expect(order).toEqual(["append"]);
       expect(store.stored.get(USER)).toBeUndefined();
     });
@@ -227,9 +225,7 @@ describe("identity ceremony dispatch", () => {
       await ceremonies.attachIdentifier(attachData());
       const reapplied = store.stored.get(USER)!;
       expect(Object.keys(reapplied.state.identifiers)).toHaveLength(1);
-      expect(
-        reapplied.cursor.acceptedAt >= after.cursor.acceptedAt,
-      ).toBe(true);
+      expect(reapplied.cursor.acceptedAt >= after.cursor.acceptedAt).toBe(true);
       expect(events).toHaveLength(1);
     });
   });
