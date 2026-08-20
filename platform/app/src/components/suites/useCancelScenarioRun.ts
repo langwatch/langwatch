@@ -1,7 +1,7 @@
 /**
  * Hook for cancelling scenario runs via event-sourcing.
  *
- * Dispatches cancel_requested events. The pipeline reactor broadcasts
+ * Dispatches cancel_requested events. The pipeline subscriber broadcasts
  * to workers, and the worker owning the scenario kills its child process.
  *
  * @see specs/features/suites/cancel-queued-running-jobs.feature

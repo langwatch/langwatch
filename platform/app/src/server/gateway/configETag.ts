@@ -6,79 +6,63 @@
  * everything in the bundle is still current, so the token has to move
  * whenever anything the bundle is built from moves.
  *
- * Two parts:
+ * Two parts.
  *
- *   - `VirtualKey.revision`, which covers the key itself: its config, its
- *     scopes and its routing policy all bump it.
- *   - The provider rows of the key's organization, which the revision does
- *     not cover at all. A credential rotation writes `ModelProvider` and
- *     leaves every virtual key untouched, so a revision-only token answers
- *     304 to a bundle carrying the replaced key and the gateway keeps
- *     dispatching with it.
+ * `VirtualKey.revision` covers the key itself: its config, its scopes, its
+ * routing policy link, its status and its expiry all bump it through
+ * `VirtualKeyService`.
  *
- * The provider half is a digest of the rows themselves rather than an
- * aggregate over them. A newest-`updatedAt` summary is cheaper but not
- * correct: `updatedAt` is `TIMESTAMP(3)`, so two writes inside one
- * millisecond leave the summary where it was and the token stops tracking
- * the content. Digesting the fields the bundle is built from moves the token
- * whenever any of them differ, at any write rate, and it needs no row count
- * to notice a delete.
+ * The provider digest covers the dispatch chain, which the revision does not
+ * reach at all. A credential rotation writes `ModelProvider`, and a grant or
+ * a revoke writes `ModelProviderScope`; neither touches any virtual key, so a
+ * revision-only token answers 304 to a bundle built from providers that have
+ * since changed, moved out of reach, or just come into it.
  *
- * It is deliberately organization-wide rather than a scope-cascade walk to
- * the exact rows one key reaches: one indexed read on the revalidation path,
- * which is the path that has to stay cheap. It over-invalidates, and the cost
- * of that is a re-materialise on the next refresh for keys in an organization
- * where some provider changed.
+ * The digest is taken over `eligibleModelProvidersForVk`, the same resolver
+ * the materialiser calls to build `providers[]`, rather than over a query
+ * written here. That is deliberate. A hand-written approximation of the
+ * provider set has to be kept in step with the resolver by hand, and each
+ * time it fell behind the token stopped tracking something the bundle reads:
+ * first the provider columns, then the scope relation that decides
+ * reachability at all, then the ordering that `fallbackPriorityGlobal` and
+ * `createdAt` settle. Digesting the resolver's own output cannot fall behind
+ * it, because it is the thing the bundle is built from.
  *
- * This is the backstop, not the propagation path. `MODEL_PROVIDER_UPDATED`
- * on the change feed evicts within a poll, and that is what a rotation
- * through the API rides. The token is what covers a write the change feed
- * never saw, such as a seeding script or a migration writing straight to the
- * row.
+ * So the token moves for: a rotated or edited credential, a provider enabled
+ * or disabled or withdrawn, a scope row granted or revoked at any level, a
+ * routing policy that reorders or drops a provider, and a change of dispatch
+ * order. It moves whether the write went through the service or straight to
+ * the row, which is the point: this is the backstop for writes the change
+ * feed never saw, such as a seeding script or a migration.
+ *
+ * What it does not cover, by decision rather than oversight: budgets, cache
+ * rules and guardrails. Each already emits its own change event
+ * (`BUDGET_*`, `CACHE_RULE_*`, `ROUTING_POLICY_*`), and reproducing their
+ * resolvers here would mean three more reads on the revalidation path plus
+ * three more copies to keep in step. A direct write to one of those tables
+ * is bounded by the change feed, not by this token.
+ *
+ * Spend is excluded for a different reason: it changes continuously, so
+ * folding it in would move the token on nearly every revalidation and there
+ * would be no 304s left to save anything.
  */
 import { createHash } from "node:crypto";
-import type { Prisma, PrismaClient } from "~/generated/prisma/client";
-
-export type ConfigETagKey = {
-  organizationId: string;
-  revision: bigint;
-};
-
-/**
- * The provider columns the materialised bundle reads. Anything the gateway
- * can act on belongs here, or a change to it will not move the token.
- */
-const PROVIDER_DIGEST_COLUMNS = {
-  id: true,
-  provider: true,
-  name: true,
-  enabled: true,
-  disabledAt: true,
-  customKeys: true,
-  extraHeaders: true,
-  customModels: true,
-  customEmbeddingsModels: true,
-  deploymentMapping: true,
-  providerConfig: true,
-  rateLimitRpm: true,
-  rateLimitTpm: true,
-  rateLimitRpd: true,
-  fallbackPriorityGlobal: true,
-} as const;
+import type { PrismaClient } from "~/generated/prisma/client";
+import { eligibleModelProvidersForVk } from "./scopeResolver";
+import type { VirtualKeyWithScopes } from "./virtualKey.repository";
 
 export async function computeConfigETag({
   prisma,
   virtualKey,
 }: {
-  prisma: PrismaClient | Prisma.TransactionClient;
-  virtualKey: ConfigETagKey;
+  prisma: PrismaClient;
+  virtualKey: VirtualKeyWithScopes;
 }): Promise<string> {
-  const providers = await prisma.modelProvider.findMany({
-    where: { organizationId: virtualKey.organizationId },
-    orderBy: { id: "asc" },
-    select: PROVIDER_DIGEST_COLUMNS,
-  });
+  const providers = await eligibleModelProvidersForVk(prisma, virtualKey);
 
+  // Order is part of the answer: `providers[]` is the fallback chain, so two
+  // identical sets in a different order are two different bundles. The array
+  // comes back in dispatch order, and it is digested as it comes.
   const digest = createHash("sha256")
     .update(
       JSON.stringify(providers, (_key, value) =>

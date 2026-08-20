@@ -132,6 +132,10 @@ describe("the real command tree", () => {
       ["suite run", "human-interactive --wait poll"],
       ["scenario run", "human-interactive --wait poll"],
 
+      // A live session that runs until Ctrl-C: it produces status prose and
+      // exits via process.exit, never a result document.
+      ["agent dev", "live tunnel session until Ctrl-C, no result document"],
+
       // Launchers and passthroughs: they exec another tool and own its stdio.
       ...(
         ["claude", "codex", "cursor", "gemini", "opencode", "copilot", "code", "open"] as const

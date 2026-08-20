@@ -47,7 +47,7 @@ export class FeatureFlagStorePostgres {
     CACHE_PREFIX,
   );
   // Per-pod in-process cache. Sits in front of Redis so the trace-
-  // processing reactor (called per event) does not generate a Redis GET
+  // processing subscriber (called per event) does not generate a Redis GET
   // per event.
   private readonly local = new Map<
     string,
@@ -57,9 +57,8 @@ export class FeatureFlagStorePostgres {
   /**
    * Resolve `key` against the calling context. Returns `null` when no
    * postgres row exists (caller should fall through to the registry
-   * default or PostHog). When a row exists, targeting rules are
-   * evaluated first; the row-level `enabled` is the fallback if no
-   * rule matches.
+   * default). When a row exists, targeting rules are evaluated first;
+   * the row-level `enabled` is the fallback if no rule matches.
    */
   async get(
     key: string,
@@ -75,14 +74,14 @@ export class FeatureFlagStorePostgres {
    * Same resolution as `get`, but an absent row resolves to the flag's
    * registry default instead of `null`.
    *
-   * For hot-path callers that must decide without the service layer: the
-   * PRODUCT branch of `FeatureFlagService` falls through to PostHog when no
-   * row exists, which per-span ingestion cannot afford. Reading `get`
-   * directly instead makes an absent row read as "off" and silently strands
-   * the registry default, so a flag that ships on by default would never
-   * reach a deployment that has not written an operator row. This method is
-   * the resolution those callers actually want: operator row (with its
-   * targeting rules) first, registry default second, PostHog never.
+   * For hot-path callers that must decide without going through
+   * `FeatureFlagService`: reading `get` directly makes an absent row read as
+   * "off" and silently strands the registry default, so a flag that ships on
+   * by default would never reach a deployment that has not written an
+   * operator row. This method is the resolution those callers actually want
+   * — operator row (with its targeting rules) first, registry default
+   * second — without paying the service layer's per-call overhead (env
+   * override parsing, force-enable list split) on a per-span hot path.
    */
   async getOrRegistryDefault(
     key: FeatureFlagKey,

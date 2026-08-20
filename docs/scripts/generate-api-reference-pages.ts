@@ -58,8 +58,8 @@ const UNDOCUMENTED_CALLER_IDENTITY =
 const UNDOCUMENTED_MODEL_DEFAULTS =
   "Not yet documented in the API reference: the default-model cascade routes have no reference pages yet.";
 
-const UNDOCUMENTED_GOVERNED_ANALYTICS_SQL =
-  "Not yet documented in the API reference: the governed analytics SQL routes require the analytics:view permission and have no reference pages yet.";
+const UNDOCUMENTED_LWQL_ANALYTICS_SQL =
+  "Not yet documented in the API reference: the LangWatchQL analytics SQL routes require the analytics:view permission and have no reference pages yet.";
 
 /**
  * Spec paths that deliberately get no reference page, each with the reason it
@@ -85,13 +85,13 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/model-defaults": UNDOCUMENTED_MODEL_DEFAULTS,
   "/api/model-defaults/{id}": UNDOCUMENTED_MODEL_DEFAULTS,
   "/api/v1/projects/{projectId}/analytics/query/clickhouse":
-    UNDOCUMENTED_GOVERNED_ANALYTICS_SQL,
+    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
   "/api/v1/projects/{projectId}/analytics/schema":
-    UNDOCUMENTED_GOVERNED_ANALYTICS_SQL,
+    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
   "/api/v1/projects/{projectId}/analytics/charts":
-    UNDOCUMENTED_GOVERNED_ANALYTICS_SQL,
+    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}":
-    UNDOCUMENTED_GOVERNED_ANALYTICS_SQL,
+    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
 };
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [

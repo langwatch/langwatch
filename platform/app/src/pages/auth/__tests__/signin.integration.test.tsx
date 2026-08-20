@@ -32,6 +32,20 @@ vi.mock("~/utils/auth-client", async (importOriginal) => {
   };
 });
 
+// The page leaves the SPA for the callback target, and a full-page navigation
+// goes through this seam rather than `window.location`. It has to: jsdom
+// defines `location` and its methods as non-configurable, so replacing them —
+// which this test used to do — throws outright in a VM realm, and assigning for
+// real is a navigation jsdom does not implement and therefore cannot record.
+// Mocking the module is the only way to see the redirect, in any environment.
+const { replace } = vi.hoisted(() => ({ replace: vi.fn() }));
+
+vi.mock("~/utils/browserNavigation", () => ({
+  replaceLocation: replace,
+  hardNavigate: vi.fn(),
+  reloadPage: vi.fn(),
+}));
+
 vi.mock("~/utils/compat/next-navigation", () => ({
   useSearchParams: () => searchParamsRef.current,
 }));
@@ -106,30 +120,16 @@ describe("SignIn forgot-password entry point", () => {
 });
 
 describe("SignIn already-authenticated redirect", () => {
-  let originalLocation: Location;
-  let replace: ReturnType<typeof vi.fn>;
-
   beforeEach(() => {
     vi.clearAllMocks();
     sessionRef.current = { data: { user: { id: "user-1" } } };
     publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
 
-    originalLocation = window.location;
-    replace = vi.fn();
-    Object.defineProperty(window, "location", {
-      value: { ...originalLocation, replace },
-      writable: true,
-      configurable: true,
-    });
+    replace.mockClear();
   });
 
   afterEach(() => {
     cleanup();
-    Object.defineProperty(window, "location", {
-      value: originalLocation,
-      writable: true,
-      configurable: true,
-    });
   });
 
   describe("given a protocol-relative callbackUrl (@regression: open redirect via //host)", () => {

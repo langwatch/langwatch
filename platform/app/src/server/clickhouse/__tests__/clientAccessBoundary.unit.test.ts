@@ -44,7 +44,7 @@ const DRIVER_MODULE = /from\s+["']@clickhouse\/client(?:\/[^"']+)?["']/;
 
 /** The functions that hand out a live client. */
 const RESOLVES_CLIENT =
-  /\b(getClickHouseClientForProject|getClickHouseClientForOrganization|getSharedClickHouseClient|getAllClickHouseInstances)\b/;
+  /\b(getClickHouseClientForTenant|getClickHouseClientForOrganization|getSharedClickHouseClient|getAllClickHouseInstances)\b/;
 
 /**
  * A shared exported resolver is the same escape hatch again, one import away
@@ -65,14 +65,13 @@ const RESOLVES_CLIENT =
 const CLIENT_MODULE = "src/server/clickhouse/clickhouseClient.ts";
 
 const CLIENT_MODULE_VALUE_EXPORTS = new Set([
-  "getClickHouseClientForProject",
+  "getClickHouseClientForTenant",
   "getClickHouseClientForOrganization",
   "getAllClickHouseInstances",
-  "getSharedClickHouseClient",
   "isClickHouseEnabled",
   "clearCustomClientCache",
   "getCustomClientCacheSize",
-  "clearProjectOrgCache",
+  "clearTenantOrgCache",
   "getPrivateClickHouseUrls",
 ]);
 
@@ -162,11 +161,15 @@ const MAY_RESOLVE_VIA_APP = new Set([
  *  - `ops/explain-core.ts` connects as `langwatch_ops` under a readonly
  *    profile that rejects every client-side setting, including the
  *    `date_time_input_format` the managed client always sends.
- *  - `analytics/governed-sql/executor.ts` authenticates as the restricted
- *    governed identity, whose server-side profile carries the limits the
+ *  - `analytics/lwql/executor.ts` authenticates as the restricted
+ *    LangWatchQL identity, whose server-side profile carries the limits the
  *    managed client applies client-side; the managed constructor cannot carry
  *    a second identity's credentials, and must not, or the two pools' policies
  *    would be decided in one another's terms.
+ *  - `tasks/provisionLwql.ts` provisions the LangWatchQL objects at deploy
+ *    time, before the app (and its shared client) exists, on an admin client
+ *    it opens and closes per run — the same shape as `goose.ts`, whose
+ *    migrations run immediately before it in `start:prepare:db`.
  *
  * None of them read tenant rows as the application, so none of them belong
  * behind a repository.
@@ -176,7 +179,8 @@ const MAY_CONSTRUCT = new Set([
   "src/server/clickhouse/goose.ts",
   "src/server/clickhouse/ttlReconciler.ts",
   "src/server/ops/explain-core.ts",
-  "src/server/analytics/governed-sql/executor.ts",
+  "src/server/analytics/lwql/executor.ts",
+  "src/tasks/provisionLwql.ts",
   "src/test-utils/clickhouseTestEndpoints.ts",
 ]);
 
@@ -202,11 +206,7 @@ function mayResolveByLocation(path: string): boolean {
  * the caller takes that repository from `getApp()`. Delete a line when its file
  * is done. Do not add one.
  */
-const RESOLVES_DIRECTLY_BACKLOG = new Set([
-  "ee/governance/services/activity-monitor/activityMonitor.service.ts",
-  "src/server/experiments-v3/services/experiment-run.service.ts",
-  "src/server/traces/clickhouse-trace.service.ts",
-]);
+const RESOLVES_DIRECTLY_BACKLOG = new Set<string>([]);
 
 const SKIPPED_DIRECTORIES = new Set([
   "node_modules",
@@ -279,7 +279,7 @@ const EVERY_EXPORT_FORM = [
   '  export * from "./more-resolvers";',
   '\texport * as clients from "./clients";',
   "  export const inferredResolver = async (tenantId: string) => tenantId;",
-  "export async function getClickHouseClientForProject(id: string) {}",
+  "export async function getClickHouseClientForTenant(id: string) {}",
   'export { _shared as getSharedClickHouseClient } from "./client";',
   "export type ClickHouseClientResolver = (id: string) => Promise<Client>;",
   "export interface Unrelated { a: string }",
@@ -295,7 +295,7 @@ describe("the ClickHouse client access boundary", () => {
         '* from "./more-resolvers"',
         '* from "./clients"',
         "inferredResolver",
-        "getClickHouseClientForProject",
+        "getClickHouseClientForTenant",
         "getSharedClickHouseClient",
       ]);
     });

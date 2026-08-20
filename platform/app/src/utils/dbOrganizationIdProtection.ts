@@ -22,6 +22,22 @@ import type { GuardMiddleware, GuardParams } from "./dbGuardMiddleware";
 
 type OrgScopedModelConfig = {
   /**
+   * Actions admitted with NO single-organization predicate at all — the narrow
+   * case of a table whose rows are platform bookkeeping rather than tenant
+   * data, and whose reads are across-organizations by design.
+   *
+   * This is deliberately separate from `extraBound`, which can only ever
+   * narrow a WHERE clause that exists: the guard rejects a missing or
+   * non-object `where` before any bound is consulted, so a bare `findMany()`
+   * is unreachable from there no matter what the bound says. A model that
+   * genuinely has no predicate to offer has to say so here, by action, where
+   * it reads as the exemption it is.
+   *
+   * Grant this to READ actions only, and only to a model carrying no customer
+   * data. It is the widest thing in this file.
+   */
+  platformScopeActions?: readonly string[];
+  /**
    * Extra single-org-bounding predicates beyond organizationId / row id /
    * composite-org key. Used for parent foreign keys and globally-unique
    * secret columns that each resolve to exactly one organization.
@@ -258,6 +274,58 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
       (action === "updateMany" && isSystemManagedKeySweep(clause)),
   },
   RoutingPolicy: {},
+  // The grants ledger's projection tables (ADR-092 §13). Written only by
+  // the authz_grants fold (plus revocation enforcement); read by the engine
+  // per organization. Row id / organizationId cover every access pattern.
+  Grant: {
+    // The resource tier's possession path presents only the share token —
+    // globally unique, resolving to exactly one organization (ADR-057's
+    // ShareLink lookup, inherited when share links become RESOURCE grants).
+    extraBound: ({ clause }) =>
+      typeof clauseField(clause, "token") === "string",
+  },
+  // ShareService's view accounting for resource grants (delivery-plan
+  // decision 22). Keyed by grantId - a ledger-derived id, globally unique
+  // and resolving to exactly one organization - which is also the only
+  // predicate the per-view increment can name, since the viewer arrives
+  // with a share token and nothing else.
+  GrantUsage: {
+    // A single grant id resolves to exactly one organization; a LIST of them
+    // is only as tenant-scoped as its weakest entry, so the list shape is
+    // admitted only alongside the organization it claims to be about.
+    extraBound: ({ clause }) =>
+      typeof clauseField(clause, "grantId") === "string" ||
+      (isNonEmptyStringList(clauseField(clause, "grantId")) &&
+        typeof clauseField(clause, "organizationId") === "string"),
+  },
+  Role: {},
+  // Which organizations the in-place migration runner processes on cloud
+  // (specs/rbac/in-place-authz-migration.feature, the enrollment scenarios).
+  // The runner's per-pass read and the ops listing are platform-scope by
+  // design - the same posture as the ops rollup over
+  // SystemMigrationTenantState - so READS are admitted unbounded.
+  //
+  // They used to be admitted only alongside a `stage` string, back when
+  // enrollment was one row per (organization, stage) and every read named the
+  // stage it was about. Enrollment is now per MIGRATION, and all three reads
+  // span migrations as well as organizations: the ops listing shows every
+  // enrollment, the pass reads the whole table once to probe per (tenant,
+  // migration) in memory, and the rollout gauge groups by migration name.
+  // There is no narrowing predicate left to require, and going on requiring
+  // the departed column meant the guard refused every one of them.
+  //
+  // Reads only, and the action gate is what keeps that honest. Writes stay
+  // bounded to one organization: enroll carries organizationId in its data,
+  // withdraw names the compound (organizationId, migrationName) key, the
+  // organization purge deletes by organizationId, and a migration-wide bulk
+  // write - which would withdraw every organization at once - has no admitted
+  // shape. The rows themselves are operator bookkeeping: an organization id, a
+  // migration name, and who enrolled it.
+  SystemMigrationEnrollment: {
+    platformScopeActions: ["findMany", "groupBy"],
+  },
+  AuthzProjectionCursor: {},
+  AuthzCutoverProjection: {},
   AiToolEntry: {},
   GatewayBudget: {},
   // Per-bucket period boundaries for attributed-user templates. Bound by
@@ -435,6 +503,12 @@ const _guardOrganizationId = ({ params }: { params: GuardParams }) => {
     }
     return;
   }
+
+  // The platform-scope exemption, granted per action and read before any
+  // predicate is looked at — which is the whole point of it, since the reads it
+  // covers carry no predicate to look at. Placed after the create branch so it
+  // can never admit a write that declares no owner.
+  if (config.platformScopeActions?.includes(action)) return;
 
   const where = params.args?.where;
   if (!where || typeof where !== "object") {

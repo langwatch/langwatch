@@ -71,7 +71,8 @@ func faultForCode(code herr.Code) Fault {
 		domain.ErrGuardrailBlocked, domain.ErrPolicyViolation, domain.ErrModelNotAllowed,
 		domain.ErrProviderNotBound,
 		domain.ErrPayloadTooLarge, domain.ErrBadRequest, domain.ErrMissingModel, domain.ErrNotFound,
-		domain.ErrKeyRevoked, domain.ErrKeyDisabled, domain.ErrNoProviderConfigured,
+		domain.ErrKeyRevoked, domain.ErrKeyDisabled, domain.ErrKeyExpired,
+		domain.ErrNoProviderConfigured,
 		domain.ErrEndUserRequired,
 		// The customer's own OpenAI sign-in died and only they can restore it,
 		// so it is their fault in the only sense this attribution means: whose

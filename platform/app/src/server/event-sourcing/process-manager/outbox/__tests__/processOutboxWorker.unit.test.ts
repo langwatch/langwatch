@@ -40,9 +40,10 @@ describe("ProcessOutboxWorker", () => {
   it("logs a failed drain and recovers on the next poll", async () => {
     vi.useFakeTimers();
     const logger = makeLogger();
+    const failure = new Error("database unavailable");
     const runOnce = vi
       .fn()
-      .mockRejectedValueOnce(new Error("database unavailable"))
+      .mockRejectedValueOnce(failure)
       .mockResolvedValue(report());
     const worker = new ProcessOutboxWorker({
       dispatcher: { runOnce },
@@ -57,7 +58,15 @@ describe("ProcessOutboxWorker", () => {
     await vi.advanceTimersByTimeAsync(100);
 
     expect(runOnce).toHaveBeenCalledTimes(2);
-    expect(logger.error).toHaveBeenCalledOnce();
+    // Warning, not error: the drain is retried on the next poll, and the very
+    // next assertion is that it recovered.
+    expect(logger.warn).toHaveBeenCalledOnce();
+    expect(logger.error).not.toHaveBeenCalled();
+    // The Error itself, not its message: a bare string under `error` loses the
+    // stack and the log collector drops the field outright (saas#1041).
+    expect(vi.mocked(logger.warn).mock.calls[0]?.[0]).toMatchObject({
+      error: failure,
+    });
     await worker.stop();
   });
 

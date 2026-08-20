@@ -55,10 +55,19 @@ const { mockClickHouseQuery } = vi.hoisted(() => ({
   mockClickHouseQuery: vi.fn(),
 }));
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: () =>
-    Promise.resolve({ query: mockClickHouseQuery }),
-}));
+vi.mock("~/server/app-layer/app", () => {
+  const app = () => ({
+    clickhouse: {
+      enabled: true,
+      resolveClient: () => Promise.resolve({ query: mockClickHouseQuery }),
+      resolveOrganizationClient: async () => {
+        throw new Error("no organization client in this suite");
+      },
+      allInstances: async () => [],
+    },
+  });
+  return { getApp: app, tryGetApp: app };
+});
 
 vi.mock("~/server/db", () => ({
   prisma: {},
@@ -565,10 +574,10 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
           ioExtractionService: new TraceIOExtractionService(),
           logger: createLogger("test"),
         });
-    return new ClickHouseTraceService(
-      { project: { findUnique: vi.fn() } } as never,
-      resolveTraceSpansFn,
-    );
+    return new ClickHouseTraceService({
+      prisma: { project: { findUnique: vi.fn() } } as never,
+      resolveTraceSpans: resolveTraceSpansFn,
+    });
   }
 
   describe("given a >64 KB offloaded langwatch.output (preview + flat eventref)", () => {

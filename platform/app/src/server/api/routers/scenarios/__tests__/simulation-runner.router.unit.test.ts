@@ -500,10 +500,10 @@ describe("simulationRunnerRouter.run", () => {
 
         expect(mockPrefetchScenarioData).toHaveBeenCalledWith(
           expect.objectContaining({
-            parameters: { account_tier: "platinum", region: "eu-central" },
+            context: expect.objectContaining({
+              parameters: { account_tier: "platinum", region: "eu-central" },
+            }),
           }),
-          expect.anything(),
-          expect.anything(),
         );
       });
 

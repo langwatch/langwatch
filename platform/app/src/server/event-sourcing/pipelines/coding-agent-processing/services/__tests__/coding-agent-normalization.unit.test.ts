@@ -21,6 +21,7 @@ import {
   resolveSpanConversationKey,
   resolveToolName,
   SESSION_CONTEXT_EVENT_NAME,
+  sessionTitleFromPrompt,
 } from "../coding-agent-normalization";
 
 describe("detectCodingAgent", () => {
@@ -294,6 +295,25 @@ describe("liftCodingAgentLogFacts", () => {
       expect(facts).toEqual(attributes);
     });
 
+    /** @scenario "The session's name lifts from the session context record" */
+    it("lifts the name and the derived title alongside the vcs attributes", () => {
+      const titled = {
+        ...attributes,
+        "langwatch.session.title": "Read notes.txt",
+        "langwatch.session.name": "pr-reviewer",
+      };
+
+      const facts = liftCodingAgentLogFacts({
+        scopeName: "langwatch.coding_agent.hook",
+        attributes: titled,
+      });
+
+      expect(facts).toMatchObject({
+        "langwatch.session.title": "Read notes.txt",
+        "langwatch.session.name": "pr-reviewer",
+      });
+    });
+
     /** @scenario A langwatch session context event passes the log lift without a vendor scope */
     it("required no vendor instrumentation scope to be admitted", () => {
       // The proof that the admission is the event name and nothing else: the
@@ -512,5 +532,33 @@ describe("isCodingAgentMetricName", () => {
     expect(isCodingAgentMetricName("http.server.duration")).toBe(false);
     // A coding agent's metric we have no mapping for is also not worth folding.
     expect(isCodingAgentMetricName("codex.websocket.request")).toBe(false);
+  });
+});
+
+describe("sessionTitleFromPrompt", () => {
+  describe("given the first thing a user typed", () => {
+    /** @scenario A session with no generated title is named by the first thing the user asked */
+    it("names the session by the prompt's first line, whitespace collapsed", () => {
+      expect(
+        sessionTitleFromPrompt(
+          "Fix the retry loop   in the outbox worker\nIt spins on lease loss.",
+        ),
+      ).toBe("Fix the retry loop in the outbox worker");
+    });
+
+    it("caps a run-on prompt", () => {
+      expect(sessionTitleFromPrompt("a".repeat(500))).toHaveLength(120);
+    });
+  });
+
+  describe("given text that is not the user's own words", () => {
+    /** @scenario A machine-injected first prompt does not name the session */
+    it("answers null for machine-injected turns, withheld text, and nothing", () => {
+      expect(
+        sessionTitleFromPrompt("<task-notification>\n<task-id>a</task-id>"),
+      ).toBeNull();
+      expect(sessionTitleFromPrompt("[REDACTED]")).toBeNull();
+      expect(sessionTitleFromPrompt("   \n  ")).toBeNull();
+    });
   });
 });

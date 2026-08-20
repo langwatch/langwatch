@@ -27,7 +27,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
-import { createPullRequestMappingReactor } from "../../../event-sourcing/pipelines/coding-agent-processing/reactors/pullRequestMapping.reactor";
+import { createPullRequestMappingHandler } from "../../../event-sourcing/pipelines/coding-agent-processing/subscribers/pullRequestMapping.subscriber";
 import { CodingAgentSessionService } from "../../coding-agent/coding-agent-session.service";
 import { CodingAgentSessionClickHouseRepository } from "../../coding-agent/repositories/coding-agent-session.clickhouse.repository";
 import { NullCodingAgentSessionEventsRepository } from "../../coding-agent/repositories/coding-agent-session-events.repository";
@@ -320,17 +320,17 @@ describe("branch pull-request mapping", () => {
       ]);
       const { mapping } = servicesWith({ listPullRequestsForHead });
 
-      // Driven through the reactor, so the fold-side trigger is part of what
-      // this proves rather than something the test steps around.
-      const reactor = createPullRequestMappingReactor({
+      // Driven through the subscriber handler, so the fold-side trigger is
+      // part of what this proves rather than something the test steps around.
+      const handler = createPullRequestMappingHandler({
         requestBranchMapping: (params) => mapping.requestBranchMapping(params),
       });
-      await reactor.handle(
+      await handler(
         {} as never,
         {
           tenantId: projectId,
           aggregateId: "session-1",
-          foldState: {
+          state: {
             repositoryHost: "github.com",
             repositoryOwner: `acme-${tag}`,
             repositoryName: "widgets",

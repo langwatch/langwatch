@@ -11,16 +11,29 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type * as NextRouterModule from "~/utils/compat/next-router";
 
 const state = vi.hoisted(() => ({
   project: {} as Record<string, unknown>,
   flagEnabled: true,
   permitted: true,
+  /** The address the reader is standing on, as it appears in the browser. */
+  path: "/demo",
 }));
 
-vi.mock("~/utils/compat/next-router", () => ({
-  useRouter: () => ({ pathname: "/[project]" }),
-}));
+vi.mock("~/utils/compat/next-router", async () => {
+  const actual = await vi.importActual<typeof NextRouterModule>(
+    "~/utils/compat/next-router",
+  );
+  return {
+    ...actual,
+    // The real resolver rather than a hand-written route pattern: the rail
+    // compares what the router reports against the pattern, so a route the
+    // pattern list forgets has to fail here instead of silently reading as
+    // never open.
+    useRouter: () => ({ pathname: actual.resolvePathname(state.path) }),
+  };
+});
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -58,10 +71,6 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("~/components/messages/HeaderButtons", () => ({
-  useTableView: () => ({ isTableView: false }),
-}));
-
 vi.mock("~/components/sidebar/CollapsibleMenuGroup", () => ({
   CollapsibleMenuGroup: ({ label }: { label: string }) => (
     <a href="/demo/simulations" aria-label={label}>
@@ -71,8 +80,20 @@ vi.mock("~/components/sidebar/CollapsibleMenuGroup", () => ({
 }));
 
 vi.mock("~/components/sidebar/SideMenuLink", () => ({
-  SideMenuLink: ({ label, href }: { label: string; href: string }) => (
-    <a href={href} aria-label={label}>
+  SideMenuLink: ({
+    label,
+    href,
+    isActive,
+  }: {
+    label: string;
+    href: string;
+    isActive?: boolean;
+  }) => (
+    <a
+      href={href}
+      aria-label={label}
+      aria-current={isActive ? "page" : undefined}
+    >
       {label}
     </a>
   ),
@@ -115,6 +136,7 @@ describe("<MainMenu /> coding-agent destinations", () => {
     state.project = projectWith();
     state.flagEnabled = true;
     state.permitted = true;
+    state.path = "/demo";
   });
 
   afterEach(() => {
@@ -188,6 +210,42 @@ describe("<MainMenu /> coding-agent destinations", () => {
       render(<MainMenu />, { wrapper: Wrapper });
 
       expect(linkNamed("Sessions")).toBeNull();
+    });
+  });
+
+  describe("given both destinations are offered", () => {
+    beforeEach(() => {
+      state.project = projectWith({
+        lastCodingAgentSessionAt: daysAgo(1),
+        lastCodingAgentPullRequestAt: daysAgo(1),
+      });
+    });
+
+    describe("when the reader is on the Sessions page", () => {
+      /** @scenario "The rail marks the Sessions destination while the Sessions page is open" */
+      it("marks Sessions as the open destination and leaves Pull requests unmarked", () => {
+        state.path = "/demo/sessions";
+
+        render(<MainMenu />, { wrapper: Wrapper });
+
+        expect(linkNamed("Sessions")).toHaveAttribute("aria-current", "page");
+        expect(linkNamed("Pull requests")).not.toHaveAttribute("aria-current");
+      });
+    });
+
+    describe("when the reader is on the Pull requests page", () => {
+      /** @scenario "The rail marks the Pull requests destination while the Pull requests page is open" */
+      it("marks Pull requests as the open destination and leaves Sessions unmarked", () => {
+        state.path = "/demo/pull-requests";
+
+        render(<MainMenu />, { wrapper: Wrapper });
+
+        expect(linkNamed("Pull requests")).toHaveAttribute(
+          "aria-current",
+          "page",
+        );
+        expect(linkNamed("Sessions")).not.toHaveAttribute("aria-current");
+      });
     });
   });
 

@@ -1,7 +1,9 @@
 package controlplane
 
 import (
+	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -50,6 +52,32 @@ type configWire struct {
 	// | "skip"). Present and non-skip only for Langy virtual keys, so ordinary
 	// customer traffic is never mirrored. Empty/absent ⇒ no mirror.
 	LangyMirrorTier string `json:"langy_mirror_tier"`
+	// ExpiresAt is the key's own expiration date in unix seconds, or null when
+	// the key has no date. Held raw so decode can tell an explicit null from a
+	// field a control plane older than it never sent, which are different
+	// answers: see keyExpiry.
+	ExpiresAt json.RawMessage `json:"expires_at"`
+}
+
+// keyExpiry reads the key's own expiration date off the wire as the tri-state
+// domain.ConfigFetchResult carries: the instant, whether the response said
+// anything about expiry at all, and an error for a field that is neither a unix
+// timestamp nor null.
+//
+// json.RawMessage is what separates the three: an absent field leaves it empty,
+// while an explicit null decodes to the four bytes of the literal.
+func (w *configWire) keyExpiry() (time.Time, bool, error) {
+	if len(w.ExpiresAt) == 0 {
+		return time.Time{}, false, nil
+	}
+	var seconds *int64
+	if err := json.Unmarshal(w.ExpiresAt, &seconds); err != nil {
+		return time.Time{}, false, err
+	}
+	if seconds == nil {
+		return time.Time{}, true, nil
+	}
+	return time.Unix(*seconds, 0).UTC(), true, nil
 }
 
 // excludedProviderWire is one provider the gateway will not dispatch to,

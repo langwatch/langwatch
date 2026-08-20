@@ -4,12 +4,18 @@ import { prisma } from "../db";
 import { _getSharedClickHouseClient } from "./client";
 import { createManagedClickHouseClient } from "./managedClient";
 import { unregisterClickHouseLimiter } from "./metrics";
+import {
+  PRIVATE_CH_ENV_PREFIX,
+  type PrivateRoute,
+  parseRouteKey,
+} from "./privateRouteKey";
 
 const logger = createLogger("langwatch:clickhouse:routing");
 
 /**
  * Resolver function that returns the appropriate ClickHouseClient for a given
- * tenant (projectId). Repositories use this instead of holding a fixed client,
+ * tenant — a project for most callers, an organization for the ones whose
+ * aggregate is one. Repositories use this instead of holding a fixed client,
  * enabling per-tenant routing to private ClickHouse instances.
  *
  * The type is exported; a resolver is not. One is built in the composition
@@ -23,18 +29,9 @@ export type ClickHouseClientResolver = (
 ) => Promise<ClickHouseClient>;
 
 /**
- * Env var format: CLICKHOUSE_URL__<label>__<orgId>=<connectionUrl>
+ * Map of orgId → route, parsed from env vars at module load. The format and its
+ * parsing live in `./privateRouteKey`.
  *
- * The <label> is a human-readable customer name (e.g., "acme"), ignored by code.
- * The <orgId> is the organization ID used for routing.
- *
- * Example:
- *   CLICKHOUSE_URL__acme__dv0uZFgPfenFvzg2qKNQa=http://default:pass@acme-ch:8123/langwatch
- */
-const PRIVATE_CH_ENV_PREFIX = "CLICKHOUSE_URL__";
-
-/**
- * Map of orgId → connectionUrl, parsed from env vars at module load.
  * Zero runtime overhead — no DB queries, no decryption.
  */
 const privateClickHouseUrls = parsePrivateEnvVars(
@@ -45,8 +42,8 @@ const privateClickHouseUrls = parsePrivateEnvVars(
 function parsePrivateEnvVars(
   prefix: string,
   label: string,
-): Map<string, string> {
-  const map = new Map<string, string>();
+): Map<string, PrivateRoute & { url: string }> {
+  const map = new Map<string, PrivateRoute & { url: string }>();
   for (const [key, value] of Object.entries(process.env)) {
     if (!key.startsWith(prefix)) continue;
 
@@ -58,13 +55,9 @@ function parsePrivateEnvVars(
       continue;
     }
 
-    // Format: <PREFIX><label>__<orgId>
-    // Strip prefix, then take the last segment after "__" as orgId
-    const suffix = key.slice(prefix.length);
-    const lastSep = suffix.lastIndexOf("__");
-    const orgId = lastSep >= 0 ? suffix.slice(lastSep + 2) : suffix;
-
-    if (!orgId) continue;
+    const parsed = parseRouteKey({ key, prefix });
+    if (!parsed) continue;
+    const { orgId, cluster } = parsed;
 
     if (map.has(orgId)) {
       throw new Error(
@@ -72,9 +65,9 @@ function parsePrivateEnvVars(
       );
     }
 
-    map.set(orgId, value);
+    map.set(orgId, { orgId, cluster, url: value });
     logger.info(
-      { orgId, envVar: key },
+      { orgId, cluster, envVar: key },
       `Loaded private ${label} URL from env var`,
     );
   }
@@ -87,32 +80,51 @@ function parsePrivateEnvVars(
 /** Cache of custom ClickHouse clients keyed by organizationId. */
 const customClientCache = new Map<string, ClickHouseClient>();
 
-/** Cache of projectId → organizationId to avoid repeated DB lookups. */
-const projectOrgCache = new Map<string, string>();
+/** Cache of tenantId → organizationId to avoid repeated DB lookups. */
+const tenantOrgCache = new Map<string, string>();
 
 /**
- * Returns the appropriate ClickHouse client for a given project.
+ * Returns the appropriate ClickHouse client for a given tenant.
  *
- * Resolves the project's organization (cached), then checks for a private
- * ClickHouse env var for that org. Falls back to the shared client.
+ * A tenant is usually a project, and was only ever a project until the grants
+ * ledger (ADR-092 §13) put an aggregate per ORGANIZATION into the same event
+ * store. Both kinds resolve here because routing is per-organization either
+ * way: a project contributes the organization that owns it, and an
+ * organization contributes itself.
+ *
+ * Resolves that organization (cached), then checks for a private ClickHouse
+ * env var for it. Falls back to the shared client.
+ *
+ * An id that names neither is still an error rather than the shared client:
+ * a tenant we cannot place is exactly the one whose data must not land on
+ * somebody else's instance.
  */
-export async function getClickHouseClientForProject(
-  projectId: string,
+export async function getClickHouseClientForTenant(
+  tenantId: string,
 ): Promise<ClickHouseClient | null> {
-  let orgId = projectOrgCache.get(projectId);
+  let orgId = tenantOrgCache.get(tenantId);
 
   if (!orgId) {
     const project = await prisma.project.findUnique({
-      where: { id: projectId },
+      where: { id: tenantId },
       select: { team: { select: { organizationId: true } } },
     });
-    if (!project) {
-      throw new Error(
-        `Cannot resolve ClickHouse client: project "${projectId}" not found. Refusing to fall back to shared client to prevent data leakage.`,
-      );
+    orgId = project?.team.organizationId;
+
+    if (!orgId) {
+      const organization = await prisma.organization.findUnique({
+        where: { id: tenantId },
+        select: { id: true },
+      });
+      if (!organization) {
+        throw new Error(
+          `Cannot resolve ClickHouse client: tenant "${tenantId}" is neither a project nor an organization. Refusing to fall back to shared client to prevent data leakage.`,
+        );
+      }
+      orgId = organization.id;
     }
-    orgId = project.team.organizationId;
-    projectOrgCache.set(projectId, orgId);
+
+    tenantOrgCache.set(tenantId, orgId);
   }
 
   return getClickHouseClientForOrganization(orgId);
@@ -127,8 +139,8 @@ export async function getClickHouseClientForProject(
 export async function getClickHouseClientForOrganization(
   organizationId: string,
 ): Promise<ClickHouseClient> {
-  const privateUrl = privateClickHouseUrls.get(organizationId);
-  if (!privateUrl) {
+  const route = privateClickHouseUrls.get(organizationId);
+  if (!route) {
     const shared = _getSharedClickHouseClient();
     if (!shared) {
       throw new Error(
@@ -139,7 +151,7 @@ export async function getClickHouseClientForOrganization(
     return shared;
   }
 
-  return getOrCreateCustomClient(organizationId, privateUrl);
+  return getOrCreateCustomClient(organizationId, route);
 }
 
 /**
@@ -163,18 +175,20 @@ export async function getAllClickHouseInstances(): Promise<
   }
 
   const seenUrls = new Set<string>();
-  for (const [orgId, url] of privateClickHouseUrls) {
-    if (seenUrls.has(url)) {
+  for (const [orgId, route] of privateClickHouseUrls) {
+    if (seenUrls.has(route.url)) {
+      // The cluster name, never the URL: a private ClickHouse URL embeds
+      // `user:password@host`, and this line put it in the log sink verbatim.
       logger.info(
-        { orgId, url },
+        { orgId, cluster: route.cluster },
         "Skipping duplicate private ClickHouse URL (already included for another org)",
       );
       continue;
     }
-    seenUrls.add(url);
+    seenUrls.add(route.url);
     instances.push({
       target: orgId,
-      client: getOrCreateCustomClient(orgId, url),
+      client: getOrCreateCustomClient(orgId, route),
     });
   }
 
@@ -191,16 +205,13 @@ export function isClickHouseEnabled(): boolean {
   );
 }
 
-/** Re-export for infrastructure-only use (metrics collection, not tenant data). */
-export { _getSharedClickHouseClient as getSharedClickHouseClient } from "./client";
-
 /**
  * Returns a cached ClickHouse client for the given org and URL,
  * creating one if it doesn't exist yet.
  */
 function getOrCreateCustomClient(
   organizationId: string,
-  url: string,
+  route: PrivateRoute & { url: string },
 ): ClickHouseClient {
   const cached = customClientCache.get(organizationId);
   if (cached) {
@@ -213,8 +224,9 @@ function getOrCreateCustomClient(
   // server than the shared one, so it is the last place that should have had
   // the weaker limits.
   const client = createManagedClickHouseClient({
-    url,
+    url: route.url,
     instance: organizationId,
+    cluster: route.cluster,
   });
   customClientCache.set(organizationId, client);
   return client;
@@ -245,15 +257,25 @@ export function getCustomClientCacheSize(): number {
 }
 
 /**
- * Clears the project → org cache. Useful for testing.
+ * Clears the tenant → org cache. Useful for testing.
  */
-export function clearProjectOrgCache(): void {
-  projectOrgCache.clear();
+export function clearTenantOrgCache(): void {
+  tenantOrgCache.clear();
 }
 
 /**
- * Returns the parsed private ClickHouse URLs map. Exposed for testing.
+ * Returns the parsed private ClickHouse URLs map. Two production consumers on
+ * top of the tests: `tasks/clickhouseMigrate.ts` runs each private instance's
+ * migrations off the values, and the system-migrations composition reads the
+ * KEYS as the private-dataplane organizations a cohort enrollment must skip.
  */
 export function getPrivateClickHouseUrls(): ReadonlyMap<string, string> {
-  return privateClickHouseUrls;
+  // Projected, not returned directly. The backing map now holds a route object
+  // so a failure can name its cluster, but this getter's contract is one URL
+  // per org and `tasks/clickhouseMigrate.ts` hands each value straight to goose
+  // as a connection string — returning the route would have run every private
+  // instance's migrations against "[object Object]".
+  return new Map(
+    [...privateClickHouseUrls].map(([orgId, route]) => [orgId, route.url]),
+  );
 }

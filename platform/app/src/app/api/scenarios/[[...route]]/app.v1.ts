@@ -1,6 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import type { Scenario } from "~/generated/prisma/client";

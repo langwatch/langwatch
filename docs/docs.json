@@ -74,9 +74,18 @@
             "group": "Agent Simulations",
             "pages": [
               "agent-simulations/introduction",
+              {
+                "group": "Connect your agent",
+                "pages": [
+                  "agent-simulations/connect-your-agent",
+                  "agent-simulations/remote-traces",
+                  "agent-simulations/local-development",
+                  "agent-simulations/scenario-parameters",
+                  "agent-simulations/authenticated-agents"
+                ]
+              },
+              "agent-simulations/testing-your-agent",
               "agent-simulations/getting-started",
-              "agent-simulations/scenario-parameters",
-              "agent-simulations/authenticated-agents",
               "agent-simulations/voice-agents",
               "agent-simulations/red-teaming"
             ]
@@ -1487,7 +1496,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1786884294",
+      "source": "/ci/cache/busted/1787230152",
       "destination": "/"
     },
     {

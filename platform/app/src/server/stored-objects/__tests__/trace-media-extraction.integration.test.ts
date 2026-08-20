@@ -29,7 +29,6 @@ import {
   it,
   vi,
 } from "vitest";
-import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import { wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
 import {
   collectMediaRefs,
@@ -60,10 +59,22 @@ import { mintFileUri } from "../uri";
 // Environment shims (no behavior mocking)
 // ---------------------------------------------------------------------------
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
-  getSharedClickHouseClient: vi.fn(),
-}));
+const resolveClientMock = vi.fn();
+// The repository reads `getApp().clickhouse.resolveClient` (two-door access);
+// the actual client reference lands in beforeAll once the container starts.
+vi.mock("~/server/app-layer/app", () => {
+  const app = () => ({
+    clickhouse: {
+      enabled: true,
+      resolveClient: (...args: unknown[]) => resolveClientMock(...args),
+      resolveOrganizationClient: async () => {
+        throw new Error("no organization client in this suite");
+      },
+      allInstances: async () => [],
+    },
+  });
+  return { getApp: app, tryGetApp: app };
+});
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -278,12 +289,7 @@ async function chRowFor(id: string): Promise<{
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  vi.mocked(
-    clickhouseClientModule.getClickHouseClientForProject,
-  ).mockResolvedValue(ch);
-  vi.mocked(clickhouseClientModule.getSharedClickHouseClient).mockReturnValue(
-    ch,
-  );
+  resolveClientMock.mockResolvedValue(ch);
 }, 90_000);
 
 afterAll(async () => {

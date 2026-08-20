@@ -11,13 +11,13 @@
  *
  * No database, no containers: this reads the routers as they are built.
  *
- * @see specs/analytics/governed-sql-saved-charts.feature
- * @see specs/analytics/governed-sql-workbench.feature
+ * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/analytics/lwql-workbench.feature
  */
 
 import { describe, expect, it } from "vitest";
 
-import { governedSqlRouter } from "../governedSql";
+import { lwqlRouter } from "../lwql";
 import { savedWorkbenchChartsRouter } from "../savedWorkbenchCharts";
 import { enforceWorkbenchEnabled } from "../workbenchAccessMiddleware";
 
@@ -66,11 +66,11 @@ describe("the workbench feature gate", () => {
     });
   });
 
-  describe("given the governed SQL router", () => {
+  describe("given the LangWatchQL router", () => {
     it("gates everything except the procedure whose answer is the switch", () => {
       // `availability` reads the switch rather than being refused by it: it is
       // what the navigation asks, and it has to be able to answer "off".
-      expect(gatedProcedures(governedSqlRouter)).toEqual(["query", "schema"]);
+      expect(gatedProcedures(lwqlRouter)).toEqual(["query", "schema"]);
     });
   });
 });

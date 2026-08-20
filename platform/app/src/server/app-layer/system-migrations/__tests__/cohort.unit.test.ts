@@ -1,0 +1,67 @@
+import { describe, expect, it } from "vitest";
+import {
+  migrationRunsOnThisInstallation,
+  organizationMigrates,
+} from "../cohort";
+
+describe("organizationMigrates", () => {
+  describe("when the installation is self-hosted", () => {
+    /** @scenario "A self-hosted installation migrates every organization automatically" */
+    it("includes every organization, enrolled or not", () => {
+      expect(organizationMigrates({ isSaaS: false, enrolled: false })).toBe(
+        true,
+      );
+      expect(organizationMigrates({ isSaaS: false, enrolled: true })).toBe(
+        true,
+      );
+    });
+  });
+
+  describe("when the installation is cloud", () => {
+    /** @scenario "Cloud rollout processes only enrolled organizations" */
+    it("includes exactly the enrolled organizations", () => {
+      expect(organizationMigrates({ isSaaS: true, enrolled: true })).toBe(true);
+      expect(organizationMigrates({ isSaaS: true, enrolled: false })).toBe(
+        false,
+      );
+    });
+  });
+});
+
+describe("migrationRunsOnThisInstallation", () => {
+  describe("when the installation is cloud", () => {
+    /** @scenario "Cloud rollout is unaffected by the self-hosted release declaration" */
+    it("runs every registered migration whatever it declares", () => {
+      expect(
+        migrationRunsOnThisInstallation({
+          isSaaS: true,
+          runsAutomaticallyOnSelfHosted: false,
+        }),
+      ).toBe(true);
+      expect(
+        migrationRunsOnThisInstallation({
+          isSaaS: true,
+          runsAutomaticallyOnSelfHosted: true,
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("when the installation is self-hosted", () => {
+    /** @scenario "A migration not yet released for self-hosting never runs there" */
+    it("runs only the migrations released for self-hosting", () => {
+      expect(
+        migrationRunsOnThisInstallation({
+          isSaaS: false,
+          runsAutomaticallyOnSelfHosted: false,
+        }),
+      ).toBe(false);
+      expect(
+        migrationRunsOnThisInstallation({
+          isSaaS: false,
+          runsAutomaticallyOnSelfHosted: true,
+        }),
+      ).toBe(true);
+    });
+  });
+});

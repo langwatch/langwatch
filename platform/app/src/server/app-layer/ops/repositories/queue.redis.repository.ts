@@ -284,6 +284,29 @@ redis.call("LTRIM", signalKey, 0, 999)
 return count
 `;
 
+// Discard a DLQ group: the operator marking its jobs never-to-run
+// (specs/ops/dead-letter-recovery.feature). The Redis substrate already
+// forgets DLQ entries at their TTL, so the durable mark lives in the audit
+// row the service writes — this script's job is to remove the group and
+// hand back what that audit row must record: the job count and last error.
+const DISCARD_FROM_DLQ_LUA = `
+local dlqJobsKey   = KEYS[1]
+local dlqDataKey   = KEYS[2]
+local dlqErrorKey  = KEYS[3]
+local dlqIndexKey  = KEYS[4]
+local groupId      = ARGV[1]
+
+local count = redis.call("ZCARD", dlqJobsKey)
+local lastError = redis.call("HGET", dlqErrorKey, "message")
+
+redis.call("DEL", dlqJobsKey)
+redis.call("DEL", dlqDataKey)
+redis.call("DEL", dlqErrorKey)
+redis.call("SREM", dlqIndexKey, groupId)
+
+return {count, lastError or ""}
+`;
+
 // Re-arm (or drop, when the requested TTL is not positive) the pending-reconcile
 // single-flight marker, but only while the caller still holds it. A marker that
 // lapsed mid-pass may already have been re-acquired by another instance, and
@@ -357,6 +380,7 @@ const unblockScript = new CachedLuaScript(UNBLOCK_LUA);
 const drainGroupScript = new CachedLuaScript(DRAIN_GROUP_LUA);
 const moveToDlqScript = new CachedLuaScript(MOVE_TO_DLQ_LUA);
 const replayFromDlqScript = new CachedLuaScript(REPLAY_FROM_DLQ_LUA);
+const discardFromDlqScript = new CachedLuaScript(DISCARD_FROM_DLQ_LUA);
 const reconcileMarkerTtlScript = new CachedLuaScript(RECONCILE_MARKER_TTL_LUA);
 const reconcileWriteScript = new CachedLuaScript(RECONCILE_WRITE_LUA);
 const pendingIndexPruneScript = new CachedLuaScript(PENDING_INDEX_PRUNE_LUA);
@@ -369,6 +393,14 @@ const SSCAN_BATCH = 500;
 
 /** Page size for the index reads that enumerate a queue's groups. */
 const PENDING_RECONCILE_PAGE_SIZE = 1000;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const batches: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    batches.push(items.slice(i, i + size));
+  }
+  return batches;
+}
 
 /** Number of ZCARDs sent per pipeline round trip during a reconcile pass. */
 const PENDING_RECONCILE_ZCARD_BATCH = 1000;
@@ -1353,7 +1385,7 @@ export class QueueRedisRepository implements QueueRepository {
   // must contain in addition to starting with `<tenantId>/`. Use this to
   // scope a drain to part of a tenant's groups — for example:
   //   - "/fold/traceSummary/" → drop only that fold's groups
-  //   - "/reactor/customEvaluationSync/" → drop only this reactor's groups
+  //   - "/reactor/customEvaluationSync/" → drop only this subscriber's groups
   //   - "/map/spanStorage/" → drop only the span-storage map groups
   // Honest substring semantics (matches the operator's mental model of
   // what they see in the Groups table): no fancy resolution to pipeline
@@ -1633,6 +1665,119 @@ export class QueueRedisRepository implements QueueRepository {
     } while (cursor !== "0");
 
     return { replayedCount, jobsReplayed };
+  }
+
+  /**
+   * Redrive an explicit set of DLQ groups. The list comes from what the
+   * operator's filter SHOWED, so acting on ids rather than re-evaluating a
+   * filter server-side means the confirmation and the act cover the same
+   * groups (specs/ops/dead-letter-recovery.feature).
+   */
+  async redriveManyFromDlq(params: {
+    queueName: string;
+    groupIds: string[];
+  }): Promise<{ redrivenCount: number; jobsRedriven: number }> {
+    const prefix = `${params.queueName}:gq:`;
+    let redrivenCount = 0;
+    let jobsRedriven = 0;
+    await this.runOverDlqGroups({
+      groupIds: params.groupIds,
+      script: replayFromDlqScript,
+      keyCount: 8,
+      argsFor: (groupId) => [
+        `${prefix}dlq:${groupId}:jobs`,
+        `${prefix}dlq:${groupId}:data`,
+        `${prefix}dlq:${groupId}:error`,
+        `${prefix}group:${groupId}:jobs`,
+        `${prefix}group:${groupId}:data`,
+        `${prefix}ready`,
+        `${prefix}signal`,
+        `${prefix}dlq`,
+        groupId,
+        String(Date.now()),
+      ],
+      onResult: (result) => {
+        const replayed = Number(result);
+        if (replayed > 0) {
+          redrivenCount++;
+          jobsRedriven += replayed;
+        }
+      },
+    });
+    return { redrivenCount, jobsRedriven };
+  }
+
+  /**
+   * Run one Lua script over an explicit group-id list, batched into pipelines.
+   * Shared by the two explicit-id recovery paths, which differ only in their
+   * script, their key arity and what they count. Errored replies are skipped
+   * — a group that failed its script simply does not count as acted on.
+   */
+  private async runOverDlqGroups(params: {
+    groupIds: string[];
+    script: CachedLuaScript;
+    keyCount: number;
+    argsFor: (groupId: string) => string[];
+    onResult: (result: unknown) => void;
+  }): Promise<void> {
+    for (const batch of chunk(params.groupIds, SSCAN_BATCH)) {
+      const pipeline = this.redis.pipeline();
+      const argsByIndex = batch.map(params.argsFor);
+      for (const args of argsByIndex) {
+        params.script.queue(pipeline, params.keyCount, ...args);
+      }
+      const results = await execWithNoScriptRecovery(pipeline, (index) =>
+        params.script.run(this.redis, params.keyCount, ...argsByIndex[index]!),
+      );
+      for (const [err, result] of results ?? []) {
+        if (err) continue;
+        params.onResult(result);
+      }
+    }
+  }
+
+  /**
+   * Discard an explicit set of DLQ groups: their jobs never run again. The
+   * substrate forgets DLQ entries at their TTL anyway, so the durable record
+   * is the audit row the service writes from what this returns — per-group
+   * job counts and a sample of the last errors.
+   */
+  async discardManyFromDlq(params: {
+    queueName: string;
+    groupIds: string[];
+  }): Promise<{
+    discardedCount: number;
+    jobsDiscarded: number;
+    lastErrors: string[];
+  }> {
+    const prefix = `${params.queueName}:gq:`;
+    let discardedCount = 0;
+    let jobsDiscarded = 0;
+    const lastErrors = new Set<string>();
+    await this.runOverDlqGroups({
+      groupIds: params.groupIds,
+      script: discardFromDlqScript,
+      keyCount: 4,
+      argsFor: (groupId) => [
+        `${prefix}dlq:${groupId}:jobs`,
+        `${prefix}dlq:${groupId}:data`,
+        `${prefix}dlq:${groupId}:error`,
+        `${prefix}dlq`,
+        groupId,
+      ],
+      onResult: (result) => {
+        const [count, lastError] = result as [number, string];
+        if (Number(count) > 0) {
+          discardedCount++;
+          jobsDiscarded += Number(count);
+        }
+        // A sample. The service reduces these to error shapes before they
+        // reach the audit row, and five distinct failures is enough to tell
+        // "they all died the same way" from "these are unrelated".
+        if (lastError && lastErrors.size < 5) lastErrors.add(lastError);
+      },
+    });
+    return { discardedCount, jobsDiscarded, lastErrors: [...lastErrors] };
   }
 
   // ── Canary Operations ───────────────────────────────────────────

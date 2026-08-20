@@ -29,9 +29,9 @@ import { screenVegaExpression } from "../vegaLiteExpressions";
 import { validateFieldReferences } from "../vegaLiteFields";
 import {
   ALLOWED_VEGA_LITE_TRANSFORMS,
-  applyGovernedVegaPolicy,
-  GOVERNED_VEGA_LIMITS,
-  GOVERNED_VEGA_RULES,
+  applyLangWatchQLVegaPolicy,
+  LWQL_VEGA_LIMITS,
+  LWQL_VEGA_RULES,
 } from "../vegaLitePolicy";
 import {
   getVegaLiteSchemaValidator,
@@ -40,7 +40,7 @@ import {
 } from "../vegaLiteSchema";
 import { collectViewNodes, measureSpecBytes } from "../vegaLiteStructure";
 import {
-  GOVERNED_VEGA_RULE_IDS,
+  LWQL_VEGA_RULE_IDS,
   VEGA_VALIDATION_ERROR_CODES,
 } from "../visualization.types";
 
@@ -144,7 +144,7 @@ describe("the Vega-Lite validator and policy modules", () => {
         ).toBe(true);
         expect(validateAgainstVegaLiteSchema({ mark: "bar" })).not.toEqual([]);
         expect(
-          applyGovernedVegaPolicy({
+          applyLangWatchQLVegaPolicy({
             spec: { data: { name: "d" }, mark: "bar" },
             registeredDatasets: ["d"],
           }).errors,
@@ -165,9 +165,9 @@ describe("the Vega-Lite validator and policy modules", () => {
       });
 
       it("keeps the rule identifiers, codes, limits and allowlists enumerable", () => {
-        expect(GOVERNED_VEGA_RULE_IDS.length).toBe(GOVERNED_VEGA_RULES.length);
+        expect(LWQL_VEGA_RULE_IDS.length).toBe(LWQL_VEGA_RULES.length);
         expect(VEGA_VALIDATION_ERROR_CODES.length).toBeGreaterThan(0);
-        expect(Object.keys(GOVERNED_VEGA_LIMITS).sort()).toEqual([
+        expect(Object.keys(LWQL_VEGA_LIMITS).sort()).toEqual([
           "maxExpressionBytes",
           "maxInteractiveParams",
           "maxLayersPerView",

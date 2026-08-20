@@ -12,14 +12,13 @@
  *
  * Resolution looks up exact keys first, then matches against family
  * prefix+suffix shapes. Anything not registered falls through to the
- * legacy PostHog path so we never silently change behavior for an
+ * legacy in-memory path so we never silently change behavior for an
  * unknown flag.
  *
- * Scope drives the resolver:
- *   - SYSTEM: env, then postgres, then default. PostHog is never consulted.
- *   - PRODUCT: env, then PostHog, then postgres, then default. PostHog
- *     stays the source of truth for user/A-B targeting; postgres is a
- *     self-hosted and emergency-override fallback.
+ * Scope drives the resolver, though both scopes resolve identically today:
+ *   - SYSTEM: env, then postgres, then default.
+ *   - PRODUCT: env, then postgres, then default. Postgres targeting rules
+ *     (per-project / per-org) are the source of truth for rollout targeting.
  *
  * Adding a new flag:
  *   1. Append an entry to FEATURE_FLAGS below with a SYSTEM or PRODUCT
@@ -50,8 +49,8 @@ export interface FeatureFlagDefinition {
   legacyEnvVar?: string;
   /**
    * Set to `false` to opt the flag out of the auto-derived
-   * UPPERCASE(key) env-var override, leaving the operator store (and,
-   * for PRODUCT flags, PostHog) as the only runtime levers.
+   * UPPERCASE(key) env-var override, leaving the operator store as the
+   * only runtime lever.
    */
   envOverridable?: false;
 }
@@ -82,7 +81,7 @@ export const FEATURE_FLAGS = [
     scope: "SYSTEM",
     defaultValue: false,
     description:
-      "Disables the per-event evaluator causality-loop guard in the trace-processing reactor. Emergency only; bypasses the safeguard that stopped the 2026-05 outage.",
+      "Disables the per-event evaluator causality-loop guard in the trace-processing subscriber. Emergency only; bypasses the safeguard that stopped the 2026-05 outage.",
     family: "Event sourcing",
     legacyEnvVar: "LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD",
   },
@@ -104,10 +103,12 @@ export const FEATURE_FLAGS = [
   // online path, instead of being silently dropped and replaced by langevals'
   // own strict default prompt — which scored every trace 0.
   //
-  // SYSTEM scope is load-bearing, not incidental. A PRODUCT-scoped flag resolves
-  // env -> PostHog -> postgres -> default, so a 0%-rollout PostHog definition
-  // would leave the registry default reading `true` while production still ran
-  // the old behavior — shipping the fix inert with every test green.
+  // SYSTEM scope is load-bearing, not incidental. At the time (langwatch#6397),
+  // a PRODUCT-scoped flag resolved env -> PostHog -> postgres -> default, so a
+  // 0%-rollout PostHog definition would have left the registry default reading
+  // `true` while production still ran the old behavior — shipping the fix
+  // inert with every test green. PostHog has since been removed from the
+  // resolver entirely, but the scope stays pinned as the regression guard.
   {
     key: "ops_evaluator_settings_recovery_disabled",
     scope: "SYSTEM",
@@ -133,8 +134,8 @@ export const FEATURE_FLAGS = [
   // Per-span token estimation kill switches. Hardcoded raw keys before;
   // each `record_span` job was a PostHog /flags call for the global key
   // plus another for the project key (~5k calls/day in dogfood at modest
-  // traffic). Registering them moves the hot path to env + postgres so
-  // the only PostHog traffic is the Ops UI toggle.
+  // traffic). Registering them moved the hot path to env + postgres,
+  // eliminating that traffic entirely.
   {
     key: "token-estimation-killswitch",
     scope: "SYSTEM",
@@ -152,13 +153,30 @@ export const FEATURE_FLAGS = [
     family: "Collector",
   },
 
-  // ----- PRODUCT -----
+  // Per-organization gate for pulled provider usage cost (ADR-088). Checked
+  // once per pull run, not per usage item. Off by default: with it off the
+  // puller behaves exactly as it did before — OCSF audit rows only, no
+  // `PulledUsageObserved` event and no ledger row — so enabling is an explicit
+  // opt-in for the first provider integration. It is the ADR's stated gate for
+  // "new pulled_usage event + ledger write", and the reason it is per-ORG
+  // rather than per-project is that pulled usage is attributed at org/team and
+  // has no project of its own (Decision 4, deferred).
   {
-    key: "release_governed_sql_workbench",
+    key: "release_pulled_usage_cost_enabled",
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Gates the whole governed SQL surface — the Custom query workbench UI and the analytics.governedSql tRPC endpoints — while it is experimental. Off by default; enable per project or organization via a targeting rule, or globally via the operator store.",
+      "Records cost pulled from a provider's own usage/cost report as a priced record on the customer's usage screens (ADR-088). Off by default; enable per organization via the operator store or a PostHog rule. With it off the puller writes audit rows only. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_pulled_usage_cost_enabled.",
+    family: "Governance",
+  },
+
+  // ----- PRODUCT -----
+  {
+    key: "release_lwql_workbench",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Gates the whole LangWatchQL surface — the Custom query workbench UI and the analytics.lwql tRPC endpoints — while it is experimental. Off by default; enable per project or organization via a targeting rule, or globally via the operator store.",
   },
   {
     key: "release_ui_ai_gateway_menu_enabled",
@@ -166,6 +184,13 @@ export const FEATURE_FLAGS = [
     defaultValue: true,
     description:
       "Surfaces the AI Gateway menu in the project sidebar. Default flipped to on: operators can hide the surface per project via a PostHog rule or operator-store row.",
+  },
+  {
+    key: "release_ui_navigation_v2_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Unlocks the product-scoped navigation shells (spec: specs/navigation/navigation-modes.feature): a per-device mode picker in the avatar menu with legacy, product-switcher and icon-rail values. The flag only unlocks the picker; the device preference decides which shell renders, and flag off or mode legacy keeps the current chrome unchanged. Default off. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_navigation_v2_enabled.",
   },
   // Per-project gate for the transient S3 spool at the ingestion edge
   // (#4215 / ADR-022). ON by default, so a deployment with object storage
@@ -211,14 +236,17 @@ export const FEATURE_FLAGS = [
     // On by default (ADR-038 Decision 7): self-hosted installations get
     // governance (AI-tools device login, /me, admin surfaces, the
     // onboarding intent fork, the org "Primary use" setting) with zero
-    // configuration. SaaS stays PostHog-governed: a per-org off-condition
-    // (or an operator store row / RELEASE_UI_AI_GOVERNANCE_ENABLED=0)
-    // re-arms every gate for that org. This default and the auth-cli
-    // device-login fallback are a pinned pair, move them together
-    // (governanceGaDefaults.unit.test.ts enforces it).
+    // configuration. Two off-switches with different blast radii: an
+    // operator store row targets per organization, while
+    // RELEASE_UI_AI_GOVERNANCE_ENABLED=0 is deployment-wide — it is
+    // evaluated before store targeting and disables the flag for every
+    // context in the process, so it cannot re-arm the gate for just one
+    // org. This default and the auth-cli device-login fallback are a
+    // pinned pair, move them together (governanceGaDefaults.unit.test.ts
+    // enforces it).
     defaultValue: true,
     description:
-      "Gates the personal keys, admin oversight, RoutingPolicy, IngestionSource UI surfaces, the onboarding intent fork, and the org Primary use setting (ADR-038). On by default; switch off per org via PostHog or the operator store to hide governance and refuse AI-tools device login. Distinct from release_ui_ai_gateway_menu_enabled: the gateway product ships on its own flag.",
+      "Gates the personal keys, admin oversight, RoutingPolicy, IngestionSource UI surfaces, the onboarding intent fork, and the org Primary use setting (ADR-038). On by default; switch off per org via the operator store (or deployment-wide via RELEASE_UI_AI_GOVERNANCE_ENABLED=0) to hide governance and refuse AI-tools device login. Distinct from release_ui_ai_gateway_menu_enabled: the gateway product ships on its own flag.",
   },
   // ADR-034 Phase 3 — routes analytics getTimeseries reads to the slim
   // `trace_analytics` / rollup `trace_analytics_rollup` tables (Phases 1+2)
@@ -248,8 +276,8 @@ export const FEATURE_FLAGS = [
   // the event-sourced graph-alert path is now unconditional and the K8s cron
   // was removed, so there is no longer a cron/ES choice to gate.
   // SYSTEM on purpose despite being a product surface: the Langy rollout is
-  // decided solely by the internal flag store — never PostHog, never an env
-  // var (envOverridable: false) — so the /ops/feature-flags toggle is the one
+  // decided solely by the internal flag store — never an env var
+  // (envOverridable: false) — so the /ops/feature-flags toggle is the one
   // authoritative lever.
   {
     key: "release_langy_enabled",
@@ -348,7 +376,7 @@ const FLAGS_BY_KEY: Map<string, FeatureFlagDefinition> = new Map(
  * Resolve a flag key to its registered definition, preferring exact
  * matches over family-prefix matches. Returns undefined when the key
  * does not appear in either list; callers should fall through to a
- * legacy PostHog evaluation in that case (back-compat for flags that
+ * legacy in-memory evaluation in that case (back-compat for flags that
  * existed before the registry).
  */
 export function resolveFlagDefinition(

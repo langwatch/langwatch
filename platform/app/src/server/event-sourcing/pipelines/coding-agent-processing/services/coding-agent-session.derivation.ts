@@ -9,12 +9,15 @@ import {
   normalizeEventName,
   normalizeMetricName,
   parseMcpToolName,
+  SESSION_NAME_FACT_KEY,
   SESSION_TITLE_FACT_KEY,
+  SESSION_TITLE_FALLBACK_FACT_KEY,
 } from "./coding-agent-normalization";
 import type {
   CodingAgentSessionData,
   MetricSeriesFact,
   SessionStep,
+  SessionTitleSource,
 } from "./coding-agent-session.types";
 
 /**
@@ -152,8 +155,54 @@ const LANGWATCH = {
     BRANCH: "vcs.ref.head.name",
     WORKTREE: "vcs.worktree.name",
     TITLE: SESSION_TITLE_FACT_KEY,
+    TITLE_FALLBACK: SESSION_TITLE_FALLBACK_FACT_KEY,
+    NAME: SESSION_NAME_FACT_KEY,
   },
 } as const;
+
+/**
+ * The title tiers, weakest first. `withTitle` compares against this table so
+ * the precedence lives in exactly one place.
+ */
+const TITLE_RANK: Record<SessionTitleSource, number> = {
+  prompt: 1,
+  generated: 2,
+  name: 3,
+};
+
+/**
+ * Fold one title candidate onto the session by source rank: the harness's
+ * own session name beats the generated conversation title beats the
+ * prompt-derived name. Within a rank the newest non-empty value wins IN
+ * PLACE — that is what makes a rename land — except the prompt tier, which
+ * only ever fills an empty row. Whitespace is no title at any rank: it would
+ * outrank real names and render as a blank row.
+ *
+ * A row from before the source column decodes with a title and no source;
+ * it ranks as `generated`, the strongest source that existed then, so a
+ * newer generated title still replaces it and a name still wins.
+ */
+function withTitle({
+  state,
+  value,
+  source,
+}: {
+  state: CodingAgentSessionData;
+  value: string | null;
+  source: SessionTitleSource;
+}): CodingAgentSessionData {
+  const title = value?.trim() || null;
+  if (title === null) return state;
+  if (source === "prompt" && state.title !== null) return state;
+  const current =
+    state.titleSource !== null
+      ? TITLE_RANK[state.titleSource]
+      : state.title !== null
+        ? TITLE_RANK.generated
+        : 0;
+  if (TITLE_RANK[source] < current) return state;
+  return { ...state, title, titleSource: source };
+}
 
 /**
  * Claude's span names carry their own namespace, so the name alone is the
@@ -245,6 +294,7 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     gitBranches: [],
     gitWorktree: null,
     title: null,
+    titleSource: null,
 
     modelCalls: 0,
     toolCalls: 0,
@@ -841,7 +891,13 @@ export function applyLogToCodingAgentSession({
     case CLAUDE.EVENT.USER_PROMPT: {
       const command = str(attrs.command_name);
       return {
-        ...base,
+        // The first prompt names an unnamed session; the generated title
+        // (API_RESPONSE below) and the session's own name replace it.
+        ...withTitle({
+          state: base,
+          value: str(attrs[LANGWATCH.ATTR.TITLE_FALLBACK]),
+          source: "prompt",
+        }),
         prompts: base.prompts + 1,
         // The length, never the text.
         promptChars: base.promptChars + num(attrs.prompt_length),
@@ -867,13 +923,17 @@ export function applyLogToCodingAgentSession({
       return isLogsOnly ? foldModelCall(withCost, attrs, 0) : withCost;
     }
 
-    case CLAUDE.EVENT.API_RESPONSE: {
+    case CLAUDE.EVENT.API_RESPONSE:
       // The generated conversation title, already parsed out of the response
-      // body by the dispatcher. Last non-empty wins: the agent regenerates
-      // the title as the conversation turns, and the newest one describes it.
-      const title = str(attrs[LANGWATCH.ATTR.TITLE]);
-      return title !== null ? { ...base, title } : base;
-    }
+      // body by the dispatcher. Last non-empty wins within its rank: the
+      // agent regenerates the title as the conversation turns, and the
+      // newest one describes it — but it never replaces the session's own
+      // name.
+      return withTitle({
+        state: base,
+        value: str(attrs[LANGWATCH.ATTR.TITLE]),
+        source: "generated",
+      });
 
     case LANGWATCH.EVENT.SESSION_CONTEXT: {
       // Repository identity and worktree are once-set: a session is one
@@ -883,8 +943,23 @@ export function applyLogToCodingAgentSession({
       // the set as well, because a session that moves on has still driven the
       // branch it left, and the pull request it opened there.
       const branch = str(attrs[LANGWATCH.ATTR.BRANCH]);
+      // Two titles can ride the record. The context title is the codex
+      // harvest's prompt-derived name (codex withholds prompt text from its
+      // own events), so it fills an empty row only. The session NAME is the
+      // one the harness itself holds — claude's --name and /rename, codex's
+      // thread name — mirrored by the capture seams: the newest name
+      // replaces the title in place and neither derived tier may clobber it.
+      const named = withTitle({
+        state: withTitle({
+          state: base,
+          value: str(attrs[LANGWATCH.ATTR.TITLE]),
+          source: "prompt",
+        }),
+        value: str(attrs[LANGWATCH.ATTR.NAME]),
+        source: "name",
+      });
       return {
-        ...base,
+        ...named,
         repositoryHost:
           base.repositoryHost ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_HOST]),
         repositoryOwner:

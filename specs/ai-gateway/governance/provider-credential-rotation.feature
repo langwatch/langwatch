@@ -51,6 +51,15 @@ Feature: A changed provider credential reaches a running gateway
     And the new bundle carries the replaced credential
 
   @integration
+  Scenario: a scope row written straight to the table moves the version token
+    Given a provider the key reaches through an organization scope grant
+    When that grant is revoked by a write straight to the scope table
+    Then the version token the control plane serves is a different one
+    And granting it back moves the token again
+    When only the order the providers are tried in changes
+    Then the version token moves, because the chain is part of the bundle
+
+  @integration
   Scenario: a key nobody touched keeps its version token
     When nothing about the key or its providers changes
     Then the version token stays the same

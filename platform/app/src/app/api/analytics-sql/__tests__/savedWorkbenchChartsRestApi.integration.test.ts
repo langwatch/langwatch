@@ -6,12 +6,12 @@
  * service and both of its governors — against a real Postgres. Nothing between
  * the request and the row is stubbed.
  *
- * No ClickHouse: nothing in this slice executes a statement. The governed SQL
+ * No ClickHouse: nothing in this slice executes a statement. The LangWatchQL
  * validator is consulted for a verdict, which it reaches from the catalog and
  * the caller's permissions alone, so a chart can be saved on a deployment that
  * could not run it — and the suite proves the gate rather than the database.
  *
- * Three habits carried over from the governed SQL REST suite, for the same
+ * Three habits carried over from the LangWatchQL REST suite, for the same
  * reasons:
  *
  *  - Every "nothing was written" claim is paired with the listing that would
@@ -23,12 +23,12 @@
  *
  * The family publishes the canonical error envelope, so a refusal is read at
  * `body.error.code` and its structured detail at `body.error.meta` — the same
- * places the governed SQL REST suite reads them.
+ * places the LangWatchQL REST suite reads them.
  *
  * @see ~/app/api/shared/canonical-error — the mapping every refusal here goes
  *   through, including the 5xx redaction one case below turns on
  *
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  * @see ~/server/analytics/saved-workbench-charts — the service under test
  */
 
@@ -64,7 +64,7 @@ import { getFeatureFlagStore } from "~/server/featureFlag";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
-/** Names a governed dataset every deployment publishes, and reads nothing gated. */
+/** Names a LangWatchQL dataset every deployment publishes, and reads nothing gated. */
 const SQL =
   "SELECT count() AS value FROM analytics.traces WHERE OccurredAt >= {since:DateTime}";
 
@@ -195,7 +195,7 @@ describe("given the saved workbench chart REST endpoints", () => {
     // default. The suite runs with it on via the flag's own env override —
     // the same lever a deployment uses — and the flag-off cases below unset
     // it for exactly one request.
-    process.env.RELEASE_GOVERNED_SQL_WORKBENCH = "1";
+    process.env.RELEASE_LWQL_WORKBENCH = "1";
 
     await resetApp();
     globalForApp.__langwatch_app = createTestApp({
@@ -291,7 +291,7 @@ describe("given the saved workbench chart REST endpoints", () => {
   });
 
   afterAll(async () => {
-    delete process.env.RELEASE_GOVERNED_SQL_WORKBENCH;
+    delete process.env.RELEASE_LWQL_WORKBENCH;
     // Every statement is guarded on the identifier it actually uses, so a
     // failure half way through setup never turns an undefined id into a
     // `deleteMany` that matches every row in the database. The chart deletes
@@ -418,8 +418,8 @@ describe("given the saved workbench chart REST endpoints", () => {
     });
   });
 
-  describe("when the governed validator refuses the statement", () => {
-    /** @scenario "SQL the governed validator refuses earns the same code over the API as the query endpoint" */
+  describe("when the LangWatchQL validator refuses the statement", () => {
+    /** @scenario "SQL the LangWatchQL validator refuses earns the same code over the API as the query endpoint" */
     it("gives the same code the query endpoint gives that key for that statement", async () => {
       const saving = await refused({
         path: chartsPath(gatedProject),
@@ -438,7 +438,7 @@ describe("given the saved workbench chart REST endpoints", () => {
         body: { sql: GATED_SQL },
       });
 
-      expect(saving.error.code).toBe("governed_sql_not_permitted");
+      expect(saving.error.code).toBe("lwql_not_permitted");
       expect(saving.error.code).toBe(running.error.code);
       expect(await listedIds(gatedProject)).toEqual([]);
 
@@ -452,7 +452,7 @@ describe("given the saved workbench chart REST endpoints", () => {
       expect(permitted.definition.sql).toBe(GATED_SQL);
     });
 
-    /** @scenario "SQL the governed validator refuses earns the same code over the API as the query endpoint" */
+    /** @scenario "SQL the LangWatchQL validator refuses earns the same code over the API as the query endpoint" */
     it("refuses a write dressed as a chart, and a definition of the wrong shape", async () => {
       const write = await refused({
         path: chartsPath(openProject),
@@ -463,7 +463,7 @@ describe("given the saved workbench chart REST endpoints", () => {
           definition: { ...DEFINITION, sql: "DROP TABLE analytics.traces" },
         },
       });
-      expect(write.error.code).toBe("governed_sql_not_permitted");
+      expect(write.error.code).toBe("lwql_not_permitted");
 
       const shapeless = await refused({
         path: chartsPath(openProject),
@@ -527,17 +527,17 @@ describe("given the saved workbench chart REST endpoints", () => {
     });
   });
 
-  describe("when the governed SQL feature switch is off for the project", () => {
+  describe("when the LangWatchQL feature switch is off for the project", () => {
     /** Runs one request with the switch off, whatever else the suite set. */
     const withFlagOff = async <T>(request: () => Promise<T>): Promise<T> => {
       // The env override is consulted before the force-enable list, so `0`
       // really does switch it off on a deployment (and in this repository's
       // own `.env`) that force-enables the flag.
-      process.env.RELEASE_GOVERNED_SQL_WORKBENCH = "0";
+      process.env.RELEASE_LWQL_WORKBENCH = "0";
       try {
         return await request();
       } finally {
-        process.env.RELEASE_GOVERNED_SQL_WORKBENCH = "1";
+        process.env.RELEASE_LWQL_WORKBENCH = "1";
       }
     };
 
@@ -574,7 +574,7 @@ describe("given the saved workbench chart REST endpoints", () => {
       ]);
 
       expect(refusals.map((body) => body.error.code)).toEqual(
-        Array(5).fill("governed_sql_not_enabled"),
+        Array(5).fill("lwql_not_enabled"),
       );
       // Neither the write nor the delete happened while the surface was off.
       expect(await listedIds(openProject)).toEqual([created.id]);
@@ -594,7 +594,7 @@ describe("given the saved workbench chart REST endpoints", () => {
     ): Promise<T> => {
       const store = getFeatureFlagStore();
       await store.setRules(
-        "release_governed_sql_workbench",
+        "release_lwql_workbench",
         [{ match: { organizationId }, enabled: true }],
         null,
       );
@@ -602,16 +602,16 @@ describe("given the saved workbench chart REST endpoints", () => {
       // `.env` force-enables this flag, and force-enable wins before the
       // store — leaving it in place turns both of these tests vacuous.
       const forceEnable = process.env.FEATURE_FLAG_FORCE_ENABLE;
-      delete process.env.RELEASE_GOVERNED_SQL_WORKBENCH;
+      delete process.env.RELEASE_LWQL_WORKBENCH;
       delete process.env.FEATURE_FLAG_FORCE_ENABLE;
       try {
         return await request();
       } finally {
-        process.env.RELEASE_GOVERNED_SQL_WORKBENCH = "1";
+        process.env.RELEASE_LWQL_WORKBENCH = "1";
         if (forceEnable !== undefined) {
           process.env.FEATURE_FLAG_FORCE_ENABLE = forceEnable;
         }
-        await store.clear("release_governed_sql_workbench", null);
+        await store.clear("release_lwql_workbench", null);
       }
     };
 
@@ -632,7 +632,7 @@ describe("given the saved workbench chart REST endpoints", () => {
       );
       expect(response.status).toBe(403);
       expect(((await response.json()) as Body).error.code).toBe(
-        "governed_sql_not_enabled",
+        "lwql_not_enabled",
       );
     });
   });
@@ -742,7 +742,7 @@ describe("given the saved workbench chart REST endpoints", () => {
 
   describe("when a stored definition does not match the versioned schema", () => {
     /** @scenario "A stored definition this build cannot read is refused, not returned as data" */
-    it("refuses as an internal error rather than returning the raw stored payload", async () => {
+    it("refuses with the opaque 500 rather than returning the raw stored payload", async () => {
       const stored = await prisma.customGraph.create({
         data: {
           id: `chart-unreadable-${ns}`,
@@ -762,12 +762,12 @@ describe("given the saved workbench chart REST endpoints", () => {
         const response = await call({ path, auth: asProject(openProject) });
         const body = (await response.json()) as Body;
         expect(response.status, path).toBe(500);
-        // `saved_workbench_chart_definition_invalid` is a 5xx `platform` fault,
-        // and the canonical envelope answers every 5xx as `internal_error` with
-        // a generic sentence on purpose — a platform failure's detail is not
-        // API copy. The named code stays server-side, correlated by the trace
-        // ids the envelope carries. Asserted rather than skipped because the
-        // alternative outcome this rules out is a 200 carrying the raw row.
+        // Handled 5xx bodies are collapsed to the opaque `internal_error`
+        // shape by the canonical envelope — a 5xx is the platform's fault,
+        // so the body carries nothing for the caller to act on beyond trace
+        // ids; the coded detail lives in the server logs. Asserted rather
+        // than skipped because the alternative outcome this rules out is a
+        // 200 carrying the raw row.
         expect(body.error.code, path).toBe("internal_error");
         expect(body.error.type, path).toBe("internal_error");
         expect(

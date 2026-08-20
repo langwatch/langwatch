@@ -10,7 +10,6 @@ import {
   redactSecrets,
   resolveAuthSecrets,
   resolveSecretRefs,
-  resolveSecretsInMap,
 } from "../secret-references";
 
 const SECRETS = { AGENT_TOKEN: "tok-live-123", OTHER: "other-value" };
@@ -122,20 +121,6 @@ describe("secret references", () => {
           secrets: { TRICKY: "a{% endraw %}b" },
         }),
       ).toBe("a{% endraw %}b");
-    });
-  });
-
-  describe("given a record of header values", () => {
-    it("resolves the values and leaves the keys alone", () => {
-      expect(
-        resolveSecretsInMap({
-          values: {
-            "X-Api-Key": "{{ secrets.AGENT_TOKEN }}",
-            Accept: "text/plain",
-          },
-          secrets: SECRETS,
-        }),
-      ).toEqual({ "X-Api-Key": "tok-live-123", Accept: "text/plain" });
     });
   });
 

@@ -101,7 +101,7 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
   @bdd @sessions-and-devices @max-duration @policy
   Scenario: Admin sets org-level maxSessionDurationDays
     Given the org's current `maxSessionDurationDays` is NULL (unlimited)
-    When carol navigates to /settings/governance and sets `maxSessionDurationDays` to 30
+    When carol navigates to /governance and sets `maxSessionDurationDays` to 30
     Then `Organization.maxSessionDurationDays` is updated to 30
     And an audit row `gateway.organization.max_session_duration_changed`
         with payload { previousDays: null, newDays: 30, actorUserId: carol.id } is emitted

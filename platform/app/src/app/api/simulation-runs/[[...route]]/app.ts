@@ -1,6 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
@@ -110,8 +109,10 @@ secured.access(requires("scenarios:view")).get(
 
     const simulationRuns = getApp().simulations.runs;
 
-    if (batchRunId && scenarioSetId) {
-      // Get runs for a specific batch
+    if (batchRunId) {
+      // Get runs for a specific batch. The scenario set id narrows the query
+      // when given, but the batch id alone is enough: the CLI's --wait polls
+      // with just the batch id it was handed at scheduling time.
       const result = await simulationRuns.getRunDataForBatchRun({
         projectId: project.id,
         scenarioSetId,

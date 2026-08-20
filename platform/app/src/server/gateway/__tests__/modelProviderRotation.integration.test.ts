@@ -45,12 +45,16 @@ async function changeEvents() {
   });
 }
 
+/** The key as the config route loads it, relations and all. */
 async function loadVk() {
-  const vk = await prisma.virtualKey.findUniqueOrThrow({
+  return await prisma.virtualKey.findUniqueOrThrow({
     where: { id: VK_ID },
-    select: { id: true, organizationId: true, revision: true },
+    include: { scopes: true, routingPolicy: true },
   });
-  return vk;
+}
+
+async function etag() {
+  return await computeConfigETag({ prisma, virtualKey: await loadVk() });
 }
 
 describe("provider credential rotation reaches the gateway", () => {
@@ -224,9 +228,7 @@ describe("provider credential rotation reaches the gateway", () => {
       select: { updatedAt: true },
     });
     expect(stamps[0]?.updatedAt).toEqual(sameInstant);
-    expect(
-      await computeConfigETag({ prisma, virtualKey: await loadVk() }),
-    ).not.toEqual(before);
+    expect(await etag()).not.toEqual(before);
   });
 
   /** @scenario "a key nobody touched keeps its version token" */
@@ -255,9 +257,78 @@ describe("provider credential rotation reaches the gateway", () => {
       data: { revision: { increment: 1n } },
     });
 
-    expect(
-      await computeConfigETag({ prisma, virtualKey: await loadVk() }),
-    ).not.toEqual(before);
+    expect(await etag()).not.toEqual(before);
+  });
+
+  // The provider set a bundle carries is the scope-reachable subset, not the
+  // organization's rows. A grant or a revoke writes ModelProviderScope and
+  // touches no column of ModelProvider and no virtual key, so a token built
+  // from provider columns alone cannot see the one write that decides
+  // whether the key can reach the provider at all.
+  /** @scenario "a scope row written straight to the table moves the version token" */
+  it("moves the config ETag when a scope row is revoked and again when it is granted back", async () => {
+    const reachable = await etag();
+
+    const scope = await prisma.modelProviderScope.findFirstOrThrow({
+      where: { modelProviderId: MP_ID },
+      select: { id: true, scopeType: true, scopeId: true },
+    });
+    await prisma.modelProviderScope.delete({ where: { id: scope.id } });
+
+    const revoked = await etag();
+    expect(revoked).not.toEqual(reachable);
+
+    await prisma.modelProviderScope.create({
+      data: {
+        modelProviderId: MP_ID,
+        scopeType: scope.scopeType,
+        scopeId: scope.scopeId,
+      },
+    });
+
+    const grantedBack = await etag();
+    expect(grantedBack).not.toEqual(revoked);
+    expect(grantedBack).toEqual(reachable);
+  });
+
+  // providers[] is the fallback chain, so the same providers in a different
+  // order are a different bundle. Order is settled by
+  // fallbackPriorityGlobal, which is a column no event names on its own.
+  /** @scenario "a scope row written straight to the table moves the version token" */
+  it("moves the config ETag when only the dispatch order changes", async () => {
+    const SECOND_MP_ID = `mp-rot-second-${suffix}`;
+    await prisma.modelProvider.create({
+      data: {
+        id: SECOND_MP_ID,
+        name: "OpenAI Secondary",
+        provider: "openai",
+        enabled: true,
+        organizationId: ORG_ID,
+        fallbackPriorityGlobal: 20,
+        customKeys: { OPENAI_API_KEY: "fake-secondary" },
+        scopes: { create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }] },
+      },
+    });
+    await prisma.modelProvider.update({
+      where: { id: MP_ID },
+      data: { fallbackPriorityGlobal: 10 },
+    });
+    const firstOrder = await etag();
+
+    // Swap which one is tried first. No credential, no scope and no key
+    // changes; only the order the gateway would dispatch in.
+    await prisma.modelProvider.update({
+      where: { id: MP_ID },
+      data: { fallbackPriorityGlobal: 30 },
+    });
+
+    expect(await etag()).not.toEqual(firstOrder);
+
+    await prisma.modelProvider.delete({ where: { id: SECOND_MP_ID } });
+    await prisma.modelProvider.update({
+      where: { id: MP_ID },
+      data: { fallbackPriorityGlobal: null },
+    });
   });
 
   /** @scenario "deleting a provider tells the gateway to drop its copy" */

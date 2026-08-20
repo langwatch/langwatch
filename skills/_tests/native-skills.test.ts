@@ -105,18 +105,32 @@ describe("native skill generation", () => {
       }
     });
 
-    it("keeps the Go embed copy of github synchronized with its root source", () => {
-      const embedded = fs.readFileSync(
-        path.resolve(
-          skillsRoot,
-          "..",
-          "services/langyagent/internal/assets/skills/github/SKILL.md",
-        ),
-        "utf8",
+    // The Docker build overlays _compiled/native/ over the Go embed tree, so
+    // production always ships the compiled set — but a local (host-tier)
+    // manager builds from the committed copy, and that copy silently drifted
+    // for weeks until Langy ran skills older than the docs. generate.sh now
+    // mirrors the whole tree; this pins every file, not just github.
+    it("keeps the whole Go embed skill tree synchronized with the compiled set — regenerate with `bash skills/_compiled/generate.sh`", () => {
+      const embedRoot = path.resolve(
+        skillsRoot,
+        "..",
+        "services/langyagent/internal/assets/skills",
       );
-      expect(embedded).toBe(
-        fs.readFileSync(path.join(nativeDir, "github/SKILL.md"), "utf8"),
-      );
+      const embeddedDirs = fs
+        .readdirSync(embedRoot, { withFileTypes: true })
+        .filter((e) => e.isDirectory())
+        .map((e) => e.name)
+        .sort();
+      expect(embeddedDirs).toEqual(skills.map((s) => s.slug).sort());
+      for (const slug of embeddedDirs) {
+        const embedded = fs.readFileSync(
+          path.join(embedRoot, slug, "SKILL.md"),
+          "utf8",
+        );
+        expect(embedded, `${slug}: Go embed copy is stale`).toBe(
+          fs.readFileSync(path.join(nativeDir, slug, "SKILL.md"), "utf8"),
+        );
+      }
     });
   });
 

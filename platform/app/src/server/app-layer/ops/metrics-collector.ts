@@ -113,19 +113,33 @@ function emptyPhases(): DashboardData["phases"] {
   };
 }
 
-function mapJobTypeToPhase(
+export function mapJobTypeToPhase(
   jobType: string | null | undefined,
 ): "commands" | "projections" | "reactions" {
   if (!jobType) return "commands";
   const lower = jobType.toLowerCase();
-  if (lower === "projection" || lower === "handler") return "projections";
+  if (
+    lower === "projection" ||
+    lower === "handler" ||
+    lower === "stateprojection"
+  )
+    return "projections";
   if (lower === "reactor" || lower === "reaction") return "reactions";
   return "commands";
 }
 
+/**
+ * Raw `__jobType` values become the projection-kind node names the health
+ * join looks up: folds enqueue as `projection`, maps as `handler`, state
+ * projections as `stateProjection`. Filing `handler` under `fold` (as this
+ * did until #7322) left every map row permanently dark — the join looked
+ * under `map`, which the tree never produced.
+ */
 function normalizeJobType(jobType: string): string {
   const lower = jobType.toLowerCase();
-  if (lower === "handler" || lower === "projection") return "fold";
+  if (lower === "projection") return "fold";
+  if (lower === "handler") return "map";
+  if (lower === "stateprojection") return "state";
   if (lower === "reaction") return "reactor";
   return jobType;
 }

@@ -23,7 +23,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
 
     // Create fresh processor and exporter for each test
     logRecordExporter = new InMemoryLogRecordExporter();
-    logRecordProcessor = new SimpleLogRecordProcessor(logRecordExporter);
+    logRecordProcessor = new SimpleLogRecordProcessor({ exporter: logRecordExporter });
 
     // Setup observability with real OpenTelemetry SDK
     observabilityHandle = setupObservability({

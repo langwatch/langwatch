@@ -13,6 +13,7 @@ type AgentLike = {
   name: string;
   type: string;
   updatedAt: Date | string;
+  config?: unknown;
 };
 
 type ScenarioAgent = AgentLike & { type: "http" | "code" | "workflow" };

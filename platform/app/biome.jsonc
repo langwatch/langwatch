@@ -1,6 +1,21 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
 
+	// Nested under /biome.jsonc, which is a marker rather than a ruleset -- see
+	// the comment there for why it has to exist. Everything below is still the
+	// whole of this project's configuration; `extends: "//"` inherits only the
+	// vcs block.
+	//
+	// KEEP THESE TWO KEYS TOGETHER. `root: false` without a reachable root does
+	// not fail -- Biome falls back to its built-in defaults in silence, which
+	// turns every rule disabled below back on and reformats to the default
+	// style. On the subset used to check this, 179 diagnostics became 1232. A
+	// tree with this file but no /biome.jsonc (an export, a sparse checkout, a
+	// base tree built from a commit that predates the root) lints clean-looking
+	// nonsense rather than erroring, so there is nothing to notice.
+	"root": false,
+	"extends": "//",
+
 	// SEVERITY IS THE TIER.
 	//
 	//   error — baseline is clean; blocks everywhere, for everyone.
@@ -249,6 +264,25 @@
 			}
 		},
 		{
+			// These files hold the legacy avatar menu and the legacy page body.
+			// They keep the shape they had inside DashboardLayout because the
+			// legacy-mode pinning tests compare the rendered chrome item by
+			// item, so a split changes the output the tests hold. Removal of the
+			// navigation flag deletes the legacy shell and this override.
+			"includes": [
+				"src/components/AppHeaderUserMenu.tsx",
+				"src/components/DashboardPageBody.tsx"
+			],
+			"linter": {
+				"rules": {
+					"complexity": {
+						"noExcessiveCognitiveComplexity": "off",
+						"noExcessiveLinesPerFunction": "off"
+					}
+				}
+			}
+		},
+		{
 			// e2e/ and scripts/dogfood/ are throwaway operator scripts — browser
 			// QA walkthroughs and seed/demo tooling — not product code. They are
 			// full of best-effort `catch {}` around actions allowed to fail, and
@@ -381,7 +415,7 @@
 			}
 		},
 		{
-			// The governed-SQL proof suites (#6480). noMisplacedAssertion is
+			// The LangWatchQL proof suites (#6480). noMisplacedAssertion is
 			// the rule this override uniquely disables; the repo-wide
 			// test-file block above already turns noExcessiveCognitiveComplexity
 			// off for every test file, and it is restated here so the reason
@@ -397,12 +431,12 @@
 			// assertion helpers" case the repo-wide block flags as warn.
 			//
 			// noExcessiveCognitiveComplexity: these are table-driven bodies —
-			// a list of governed datasets, a loop, and a branch per column
+			// a list of LangWatchQL datasets, a loop, and a branch per column
 			// gate. The score counts entries in the table, not tangle, and the
 			// production findings this PR raised were refactored rather than
 			// silenced (see diagnostics.ts and validation/validate.ts).
 			"includes": [
-				"src/server/analytics/governed-sql/**/__tests__/**",
+				"src/server/analytics/lwql/**/__tests__/**",
 				"src/app/api/analytics-sql/__tests__/**"
 			],
 			"linter": {

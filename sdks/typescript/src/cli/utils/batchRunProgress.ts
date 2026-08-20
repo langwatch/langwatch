@@ -13,6 +13,7 @@
 
 /** What the run list gives us. Narrower than the endpoint's full response. */
 interface BatchRun {
+	batchRunId?: string;
 	status?: string;
 	results?: { verdict?: string | null } | null;
 }
@@ -99,7 +100,13 @@ export async function fetchBatchRuns({
 			nextCursor?: string;
 		};
 
-		runs.push(...(page.runs ?? []));
+		// Deployed servers apply the batchRunId filter only when scenarioSetId
+		// is also present, and answer with the whole project's runs otherwise.
+		// Keep only the batch's own runs, or a stale in-progress run from an
+		// old batch holds the wait open until its timeout.
+		runs.push(
+			...(page.runs ?? []).filter((run) => run.batchRunId === batchRunId),
+		);
 		cursor = page.hasMore ? page.nextCursor : undefined;
 	} while (cursor);
 

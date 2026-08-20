@@ -57,6 +57,7 @@ export function RoutingPoliciesTable({
   onEdit,
   onSetDefault,
   onDelete,
+  canManage,
 }: {
   policies: RoutingPolicyRow[];
   resolveScopeNames: (scopes: ScopeTriadEntry[]) => ScopeTriadEntry[];
@@ -64,6 +65,12 @@ export function RoutingPoliciesTable({
   onEdit: (policy: RoutingPolicyRow) => void;
   onSetDefault: (policy: RoutingPolicyRow) => void;
   onDelete: (policy: RoutingPolicyRow) => void;
+  /**
+   * Whether the viewer holds `routingPolicies:manage`. False hides the "New
+   * policy" buttons and the per-row overflow menu, since every action behind
+   * them is a write the server refuses without the grant.
+   */
+  canManage: boolean;
 }) {
   const { bucketed, unplaced } = bucketByScopeLevel(policies);
 
@@ -89,9 +96,15 @@ export function RoutingPoliciesTable({
                 </Text>
               </VStack>
               <Spacer />
-              <Button size="sm" variant="outline" onClick={() => onNew(level)}>
-                <Plus size={14} /> New policy
-              </Button>
+              {canManage && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onNew(level)}
+                >
+                  <Plus size={14} /> New policy
+                </Button>
+              )}
             </HStack>
 
             <VStack align="stretch" gap={2}>
@@ -108,6 +121,7 @@ export function RoutingPoliciesTable({
                   onEdit={() => onEdit(policy)}
                   onSetDefault={() => onSetDefault(policy)}
                   onDelete={() => onDelete(policy)}
+                  canManage={canManage}
                 />
               ))}
             </VStack>
@@ -141,6 +155,7 @@ export function RoutingPoliciesTable({
                 onEdit={() => onEdit(policy)}
                 onSetDefault={() => onSetDefault(policy)}
                 onDelete={() => onDelete(policy)}
+                canManage={canManage}
               />
             ))}
           </VStack>
@@ -184,12 +199,14 @@ function PolicyRow({
   onEdit,
   onSetDefault,
   onDelete,
+  canManage,
 }: {
   policy: RoutingPolicyRow;
   resolveScopeNames: (scopes: ScopeTriadEntry[]) => ScopeTriadEntry[];
   onEdit: () => void;
   onSetDefault: () => void;
   onDelete: () => void;
+  canManage: boolean;
 }) {
   const providerCount = Array.isArray(policy.modelProviderIds)
     ? policy.modelProviderIds.length
@@ -239,13 +256,15 @@ function PolicyRow({
             ` · ${mappingCount} ${mappingCount === 1 ? "name mapping" : "name mappings"}`}
         </Text>
       </VStack>
-      <RoutingPolicyRowActions
-        policyName={policy.name}
-        isDefault={policy.isDefault}
-        onEdit={onEdit}
-        onSetDefault={onSetDefault}
-        onDelete={onDelete}
-      />
+      {canManage && (
+        <RoutingPolicyRowActions
+          policyName={policy.name}
+          isDefault={policy.isDefault}
+          onEdit={onEdit}
+          onSetDefault={onSetDefault}
+          onDelete={onDelete}
+        />
+      )}
     </HStack>
   );
 }

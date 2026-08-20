@@ -10,7 +10,7 @@
  *     npx tsx scripts/seed-trace-evals.ts
  */
 import { EvaluationRunClickHouseRepository } from "../src/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
-import { getClickHouseClientForProject } from "../src/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "../src/server/clickhouse/clickhouseClient";
 
 async function main() {
   const projectId = process.env.PROJECT_ID;
@@ -19,14 +19,14 @@ async function main() {
     throw new Error("PROJECT_ID and TRACE_ID required");
   }
 
-  const repo = new EvaluationRunClickHouseRepository(
-    async (tenantId: string) => {
-      const client = await getClickHouseClientForProject(tenantId);
+  const repo = new EvaluationRunClickHouseRepository({
+    resolveClient: async (tenantId: string) => {
+      const client = await getClickHouseClientForTenant(tenantId);
       if (!client)
         throw new Error(`No ClickHouse client for project ${tenantId}`);
       return client;
     },
-  );
+  });
 
   const now = new Date();
   const samples: Array<{

@@ -89,6 +89,7 @@ import {
   isMetricsAuthorized,
   normalizeMetricsPath,
 } from "./server/metrics";
+import { isRootDiscoveryPath } from "./server/openapi/discovery-locations";
 import { canonicalOtlpPath } from "./server/otel/otlpPathCanonicalisation";
 import { shutdownPostHog } from "./server/posthog";
 import { buildSecurityHeaders } from "./server/securityHeaders";
@@ -314,9 +315,16 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
       // and a 200 — the exporter reads that as success and drops the batch.
       // Those paths belong to the API, which canonicalises them
       // (src/server/routes/otel-path-aliases.ts).
+      //
+      // `/.well-known/openapi` and `/llms.txt` are here for the same reason:
+      // they are root-level by convention, which is the whole point of them,
+      // and the SPA fallback would answer both with the HTML shell and a 200.
+      // A discovery URL that returns HTML and calls it success is worse than
+      // one that 404s (src/server/routes/api-discovery.ts).
       if (
         pathname.startsWith("/api/") ||
-        canonicalOtlpPath(pathname) !== null
+        canonicalOtlpPath(pathname) !== null ||
+        isRootDiscoveryPath(pathname)
       ) {
         await apiListener(req, res);
         return;

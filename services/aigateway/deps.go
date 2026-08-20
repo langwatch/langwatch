@@ -23,6 +23,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
+	"github.com/langwatch/langwatch/pkg/profiling"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/authresolver"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/budget"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/cacherules"
@@ -58,6 +59,10 @@ type Deps struct {
 	SpendEmitter *spendemitter.Emitter
 	SpendSpool   *spendemitter.Spool
 	SpendDrainer *spendemitter.Drainer
+	// Profiler is the continuous CPU/heap profiler. Its zero value is a
+	// no-op, so an unconfigured deployment carries an inert struct rather
+	// than a nil check at every use.
+	Profiler profiling.Profiler
 }
 
 // NewDeps builds all infrastructure adapters from the given config.
@@ -291,6 +296,10 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		SpendEmitter:  spendEmitterAdapter,
 		SpendSpool:    spendSpool,
 		SpendDrainer:  spendDrainer,
+		// Started here rather than at the top of NewDeps so the one line saying
+		// profiling is on lands wherever the rest of this service's logs do —
+		// `logger` above is the collector-teed one.
+		Profiler: profiling.StartFromEnv(svcInfo.Service, svcInfo.Environment, logger),
 	}, nil
 }
 

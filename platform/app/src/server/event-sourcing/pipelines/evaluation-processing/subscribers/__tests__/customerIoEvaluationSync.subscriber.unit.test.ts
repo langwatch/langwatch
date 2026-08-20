@@ -1,0 +1,315 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
+import { CIO_SYNC_DEBOUNCE_TTL_MS } from "~/server/event-sourcing/pipelines/trace-processing/subscribers/customerIoTraceSync.subscriber";
+import type { NurturingService } from "../../../../../../../ee/billing/nurturing/nurturing.service";
+import type { ProjectService } from "../../../../../app-layer/projects/project.service";
+import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
+import type { EvaluationProcessingEvent } from "../../schemas/events";
+import {
+  type CustomerIoEvaluationSyncSubscriberDeps,
+  createCustomerIoEvaluationSyncSubscriber,
+} from "../customerIoEvaluationSync.subscriber";
+
+// Suppress logger output
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  }),
+}));
+
+vi.mock("~/utils/posthogErrorCapture", () => ({
+  captureException: vi.fn(),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
+}));
+
+function createFoldState(
+  overrides: Partial<EvaluationRunData> = {},
+): EvaluationRunData {
+  return {
+    evaluationId: "eval-1",
+    evaluatorId: "evaluator-1",
+    evaluatorType: "llm_judge",
+    evaluatorName: "Toxicity Check",
+    traceId: "trace-1",
+    isGuardrail: false,
+    status: "processed",
+    score: 0.85,
+    passed: true,
+    label: null,
+    details: null,
+    error: null,
+    errorDetails: null,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    archivedAt: null,
+    scheduledAt: null,
+    startedAt: null,
+    completedAt: Date.now(),
+    costId: null,
+    ...overrides,
+  } as EvaluationRunData;
+}
+
+function createEvent(
+  overrides: Record<string, unknown> = {},
+): EvaluationProcessingEvent {
+  return {
+    id: "event-1",
+    aggregateId: "eval-1",
+    aggregateType: "evaluation",
+    tenantId: "project-1",
+    createdAt: Date.now(),
+    occurredAt: Date.now(),
+    type: "lw.evaluation.completed",
+    version: 1,
+    data: {
+      evaluationId: "eval-1",
+      status: "processed",
+      score: 0.85,
+      passed: true,
+    },
+    metadata: {},
+    ...overrides,
+  } as unknown as EvaluationProcessingEvent;
+}
+
+function createContext(
+  state: EvaluationRunData,
+): TriggerContext<EvaluationRunData> {
+  return {
+    tenantId: "project-1",
+    aggregateId: "eval-1",
+    state,
+  };
+}
+
+function createMockNurturing(): NurturingService {
+  return {
+    identifyUser: vi.fn().mockResolvedValue(undefined),
+    trackEvent: vi.fn().mockResolvedValue(undefined),
+    groupUser: vi.fn().mockResolvedValue(undefined),
+    batch: vi.fn().mockResolvedValue(undefined),
+  } as unknown as NurturingService;
+}
+
+function createMockProjectService(
+  overrides: Partial<{ resolveOrgAdmin: ReturnType<typeof vi.fn> }> = {},
+): ProjectService {
+  return {
+    resolveOrgAdmin: vi.fn().mockResolvedValue({
+      userId: "user-1",
+      organizationId: "org-1",
+      firstMessage: false,
+    }),
+    ...overrides,
+  } as unknown as ProjectService;
+}
+
+function createDeps(
+  overrides: Partial<CustomerIoEvaluationSyncSubscriberDeps> = {},
+): CustomerIoEvaluationSyncSubscriberDeps {
+  return {
+    projects: createMockProjectService(),
+    nurturing: createMockNurturing(),
+    evaluationCountFn: vi.fn().mockResolvedValue(0),
+    ...overrides,
+  };
+}
+
+describe("customerIoEvaluationSync subscriber", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-15T12:00:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe("dedupId", () => {
+    /** @scenario 'Evaluation sync subscriber uses project-and-evaluation-scoped job ID for debouncing' */
+    it("returns cio-eval-sync-{projectId}-{evaluationId}", () => {
+      const deps = createDeps();
+      const subscriber = createCustomerIoEvaluationSyncSubscriber(deps);
+      const event = createEvent({
+        tenantId: "project-42",
+        aggregateId: "eval-99",
+      });
+
+      expect(subscriber.dedupId!(event)).toBe(
+        "cio-eval-sync-project-42-eval-99",
+      );
+      expect(subscriber.ttl).toBe(CIO_SYNC_DEBOUNCE_TTL_MS);
+    });
+  });
+
+  describe("given an organization with no prior evaluations", () => {
+    describe("when the first evaluation is processed", () => {
+      /** @scenario 'First evaluation identifies user with evaluation milestones' */
+      it("identifies user with has_evaluations true and evaluation_count 1", async () => {
+        const deps = createDeps({
+          evaluationCountFn: vi.fn().mockResolvedValue(1),
+        });
+        const subscriber = createCustomerIoEvaluationSyncSubscriber(deps);
+
+        await subscriber.handler(
+          createEvent(),
+          createContext(createFoldState()),
+        );
+
+        expect(deps.nurturing.identifyUser).toHaveBeenCalledWith({
+          userId: "user-1",
+          traits: expect.objectContaining({
+            has_evaluations: true,
+            evaluation_count: 1,
+            first_evaluation_at: expect.any(String),
+          }),
+        });
+      });
+
+      /** @scenario 'First evaluation fires first_evaluation_created event' */
+      it("tracks first_evaluation_created event", async () => {
+        const deps = createDeps({
+          evaluationCountFn: vi.fn().mockResolvedValue(1),
+        });
+        const subscriber = createCustomerIoEvaluationSyncSubscriber(deps);
+
+        await subscriber.handler(
+          createEvent(),
+          createContext(createFoldState({ evaluatorType: "llm_judge" })),
+        );
+
+        expect(deps.nurturing.trackEvent).toHaveBeenCalledWith({
+          userId: "user-1",
+          event: "first_evaluation_created",
+          properties: expect.objectContaining({
+            evaluation_type: "llm_judge",
+            project_id: "project-1",
+          }),
+        });
+      });
+    });
+  });
+
+  describe("given an organization that already has evaluations", () => {
+    describe("when a new evaluation is processed", () => {
+      /** @scenario 'Subsequent evaluations update identify with evaluation count' */
+      /** @scenario 'Subsequent evaluation updates are debounced per project' */
+      it("identifies user with updated evaluation_count and last_evaluation_at", async () => {
+        const deps = createDeps({
+          evaluationCountFn: vi.fn().mockResolvedValue(6),
+        });
+        const subscriber = createCustomerIoEvaluationSyncSubscriber(deps);
+
+        await subscriber.handler(
+          createEvent(),
+          createContext(createFoldState({ score: 0.85, passed: true })),
+        );
+
+        expect(deps.nurturing.identifyUser).toHaveBeenCalledWith({
+          userId: "user-1",
+          traits: expect.objectContaining({
+            evaluation_count: 6,
+            last_evaluation_at: expect.any(String),
+          }),
+        });
+      });
+
+      /** @scenario 'Subsequent evaluations fire evaluation_ran event' */
+      it("tracks evaluation_ran event", async () => {
+        const deps = createDeps({
+          evaluationCountFn: vi.fn().mockResolvedValue(6),
+        });
+        const subscriber = createCustomerIoEvaluationSyncSubscriber(deps);
+        const state = createFoldState({
+          evaluationId: "eval-42",
+          score: 0.85,
+          passed: true,
+        });
+
+        await subscriber.handler(createEvent(), createContext(state));
+
+        expect(deps.nurturing.trackEvent).toHaveBeenCalledWith({
+          userId: "user-1",
+          event: "evaluation_ran",
+          properties: expect.objectContaining({
+            evaluation_id: "eval-42",
+            score: 0.85,
+            passed: true,
+          }),
+        });
+      });
+    });
+  });
+
+  describe("given the evaluation count query fails", () => {
+    describe("when evaluationCountFn returns null", () => {
+      it("skips nurturing sync to avoid false milestones", async () => {
+        const deps = createDeps({
+          evaluationCountFn: vi.fn().mockResolvedValue(null),
+        });
+        const subscriber = createCustomerIoEvaluationSyncSubscriber(deps);
+
+        await subscriber.handler(
+          createEvent(),
+          createContext(createFoldState()),
+        );
+
+        expect(deps.nurturing.identifyUser).not.toHaveBeenCalled();
+        expect(deps.nurturing.trackEvent).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given the project is not found", () => {
+    it("does not call nurturing methods", async () => {
+      const deps = createDeps({
+        projects: createMockProjectService({
+          resolveOrgAdmin: vi.fn().mockResolvedValue({
+            userId: null,
+            organizationId: null,
+            firstMessage: false,
+          }),
+        }),
+      });
+      const subscriber = createCustomerIoEvaluationSyncSubscriber(deps);
+
+      await subscriber.handler(createEvent(), createContext(createFoldState()));
+
+      expect(deps.nurturing.identifyUser).not.toHaveBeenCalled();
+      expect(deps.nurturing.trackEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the evaluation is not in a completed state", () => {
+    it("does not call nurturing methods", async () => {
+      const deps = createDeps();
+      const subscriber = createCustomerIoEvaluationSyncSubscriber(deps);
+
+      await subscriber.handler(
+        createEvent({ type: "lw.evaluation.scheduled" } as any),
+        createContext(createFoldState({ status: "scheduled" })),
+      );
+
+      expect(deps.nurturing.identifyUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the nurturing service throws", () => {
+    it("does not propagate the error", async () => {
+      const nurturing = createMockNurturing();
+      vi.mocked(nurturing.identifyUser).mockRejectedValue(
+        new Error("CIO down"),
+      );
+      const deps = createDeps({ nurturing });
+      const subscriber = createCustomerIoEvaluationSyncSubscriber(deps);
+
+      await expect(
+        subscriber.handler(createEvent(), createContext(createFoldState())),
+      ).resolves.toBeUndefined();
+    });
+  });
+});

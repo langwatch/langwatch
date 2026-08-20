@@ -198,9 +198,6 @@ function SignUpForm() {
         title: "Couldn't sign you in",
         description: message,
         type: "error",
-        meta: {
-          closable: true,
-        },
       });
     }
   };

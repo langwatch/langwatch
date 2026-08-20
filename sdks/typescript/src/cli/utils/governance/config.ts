@@ -60,7 +60,7 @@ export interface GovernanceConfig {
    * `/api/auth/cli/governance/ingestion-key`), keyed by the tool's
    * source_type slug (`claude_code` / `codex` / `gemini` / `opencode`).
    * One key per source so different wrapped tools surface as their own
-   * ingestion source in /me + /messages.
+   * ingestion source in /me + /traces.
    *
    * When the right key is present for a wrapped tool, the
    * `langwatch <tool>` wrapper injects the standard OTEL_*_EXPORTER
@@ -174,6 +174,13 @@ export interface GovernanceConfig {
    * field name in sync.
    */
   daemon?: "on" | "off";
+
+  /**
+   * The agent last chosen by `langwatch agent dev`, keyed by the project
+   * directory (absolute path) the command ran in, so the next run in the
+   * same folder skips the picker. `--agent` always overrides.
+   */
+  agent_dev_agents?: Record<string, string>;
 }
 
 function defaults(): GovernanceConfig {

@@ -21,10 +21,10 @@ export function SpendByTeamBar({
   teams: Array<{
     teamId: string | null;
     teamName: string;
-    spendUsd: number;
+    spendUsd: string;
   }>;
 }) {
-  const total = teams.reduce((sum, t) => sum + t.spendUsd, 0);
+  const total = teams.reduce((sum, t) => sum + Number(t.spendUsd), 0);
   if (total === 0 || teams.length === 0) {
     return null;
   }
@@ -47,7 +47,7 @@ export function SpendByTeamBar({
         borderColor="border.subtle"
       >
         {teams.map((t) => {
-          const pct = (t.spendUsd / total) * 100;
+          const pct = (Number(t.spendUsd) / total) * 100;
           const color = getHexColorForString(t.teamName);
           return (
             <Box
@@ -55,7 +55,7 @@ export function SpendByTeamBar({
               width={`${pct}%`}
               backgroundColor={color}
               opacity={0.9}
-              title={`${t.teamName} — ${numeral(t.spendUsd).format(
+              title={`${t.teamName} — ${numeral(Number(t.spendUsd)).format(
                 "$0,0.00",
               )} (${pct.toFixed(1)}%)`}
               _hover={{ opacity: 1 }}
@@ -65,7 +65,7 @@ export function SpendByTeamBar({
       </Box>
       <HStack wrap="wrap" gap={3} fontSize="xs">
         {teams.map((t) => {
-          const pct = (t.spendUsd / total) * 100;
+          const pct = (Number(t.spendUsd) / total) * 100;
           const color = getHexColorForString(t.teamName);
           return (
             <HStack key={t.teamId ?? t.teamName} gap={1.5}>

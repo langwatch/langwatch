@@ -49,9 +49,6 @@ export default function EditTraceCheck() {
       toaster.create({
         title: "Check updated successfully",
         type: "success",
-        meta: {
-          closable: true,
-        },
       });
       void router.push(`/${project.slug}/online-evaluations`);
       void utils.monitors.getById.invalidate({
@@ -63,9 +60,6 @@ export default function EditTraceCheck() {
         title: "Failed to update check",
         description: "Please try again",
         type: "error",
-        meta: {
-          closable: true,
-        },
       });
     }
   };
@@ -105,9 +99,6 @@ export default function EditTraceCheck() {
                 toaster.create({
                   title: "Check deleted successfully",
                   type: "success",
-                  meta: {
-                    closable: true,
-                  },
                 });
                 void router.push(`/${project.slug}/online-evaluations`);
               },
@@ -116,9 +107,6 @@ export default function EditTraceCheck() {
                   title: "Failed to delete check",
                   description: "Please try again",
                   type: "error",
-                  meta: {
-                    closable: true,
-                  },
                 });
               },
               onSettled: () => setIsConfirmDeleteOpen(false),

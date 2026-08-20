@@ -1,10 +1,13 @@
 ---
-title: Getting Started
+title: Write Scenarios in Code
+sidebarTitle: Scenarios in code
 ---
 
 <Tip>
   **Quick setup?** [Copy the scenarios prompt](/skills/code-prompts#add-scenario-tests) into your coding agent to add simulation tests automatically.
 </Tip>
+
+Scenarios in code run with the open-source Scenario SDK, inside your own test suite and CI. To run scenarios from the platform against your agent's HTTP endpoint instead, with no test code, see [Connect your agent](/agent-simulations/connect-your-agent).
 
 This guide will walk you through the basic setup required to run your first simulation and see the results in LangWatch.
 
@@ -234,3 +237,30 @@ While optional, we strongly recommend setting stable identifiers for your scenar
     ```
   </Tab>
 </Tabs>
+
+## 5. Let the Judge Read Your Traces
+
+When your adapter calls an agent that runs as a separate service, the judge cannot see what happens inside it. Turn on remote trace fetching and the judge also reads the traces your agent reports to LangWatch, one per conversation turn, before its verdict:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    scenario.configure(
+        default_model="openai/gpt-5",
+        fetch_remote_traces=True,
+        trace_wait_timeout=60.0,  # seconds to wait for traces before the verdict
+    )
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    const result = await scenario.run({
+      // ...
+      fetchRemoteTraces: true,
+      traceWaitTimeoutMs: 60_000,
+    });
+    ```
+  </Tab>
+</Tabs>
+
+Spread `input.propagation_headers` (Python) or `input.propagationHeaders` (TypeScript) onto your adapter's outgoing HTTP request, so the remote service joins each turn's trace. [Remote traces](/agent-simulations/remote-traces) covers the mechanism, the wait behavior, and how to write trace-aware criteria.

@@ -4,7 +4,7 @@
  *
  * All three seams write the same JSON object to the hook's stdin, so reading it
  * is one concern with two halves: draining the pipe without ever waiting
- * forever on it, and reading three optional strings out of whatever turned up.
+ * forever on it, and reading a few optional strings out of whatever turned up.
  * Every malformed shape reads as an empty payload, which is what lets the
  * command stay silent instead of explaining itself to a session.
  *
@@ -47,18 +47,28 @@ const hookInputSchema = z
     session_id: reportedText,
     cwd: reportedText,
     hook_event_name: reportedText,
+    // Claude's SessionStart payload carries the session's current title when
+    // one is set (`--name` at launch, `/rename` before a resume). Absent on
+    // the other events, where the live registry answers instead.
+    session_title: reportedText,
   })
   .transform(
     (
       payload,
-    ): { sessionId?: string; cwd?: string; hookEventName?: string } => ({
+    ): {
+      sessionId?: string;
+      cwd?: string;
+      hookEventName?: string;
+      sessionTitle?: string;
+    } => ({
       sessionId: payload.session_id,
       cwd: payload.cwd,
       hookEventName: payload.hook_event_name,
+      sessionTitle: payload.session_title,
     }),
   );
 
-/** The three facts every seam reports, each absent until proven otherwise. */
+/** The facts a seam reports, each absent until proven otherwise. */
 export type HookInput = z.infer<typeof hookInputSchema>;
 
 /**

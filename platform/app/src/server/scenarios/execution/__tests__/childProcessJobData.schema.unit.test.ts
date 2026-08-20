@@ -171,4 +171,27 @@ describe("ChildProcessJobDataSchema", () => {
       expect(result.data.parameters).toEqual({});
     });
   });
+
+  describe("given a payload carrying a trace wait budget", () => {
+    // Zod strips undeclared keys at parse, so the budget surviving the parse
+    // is what lets the child pass it to the SDK.
+    it("keeps the budget through the parse, and tolerates its absence", () => {
+      const withBudget = ChildProcessJobDataSchema.safeParse({
+        ...basePayload,
+        modelParams: litellmParams,
+        traceWaitTimeoutMs: 45_000,
+      });
+      expect(withBudget.success).toBe(true);
+      if (!withBudget.success) return;
+      expect(withBudget.data.traceWaitTimeoutMs).toBe(45_000);
+
+      const withoutBudget = ChildProcessJobDataSchema.safeParse({
+        ...basePayload,
+        modelParams: litellmParams,
+      });
+      expect(withoutBudget.success).toBe(true);
+      if (!withoutBudget.success) return;
+      expect(withoutBudget.data.traceWaitTimeoutMs).toBeUndefined();
+    });
+  });
 });

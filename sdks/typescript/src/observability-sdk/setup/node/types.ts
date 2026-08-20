@@ -213,7 +213,7 @@ export interface SetupObservabilityOptions {
    * Use this when you need full control over batching, filtering, or
    * custom processing logic.
    *
-   * @example [new BatchLogRecordProcessor(exporter, { maxExportBatchSize: 100 })]
+   * @example [new BatchLogRecordProcessor({ exporter, maxExportBatchSize: 100 })]
    */
   logRecordProcessors?: LogRecordProcessor[];
 

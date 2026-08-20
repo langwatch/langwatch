@@ -590,7 +590,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     });
 
   // `langwatch ingest *` — read-only debug tools for the IngestionSource
-  // + Activity Monitor surfaces. Mirrors the web admin /settings/governance
+  // + Activity Monitor surfaces. Mirrors the web admin /governance
   // flows for ops folks who live in terminal. Authoring stays browser-only.
   const ingestCmd = program
     .command("ingest")
@@ -1609,6 +1609,35 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
+  // A live, human-only session: it never returns a CommandResult, so it is
+  // registered with a plain action and the format gate honestly refuses
+  // `-o json` instead of accepting a format the command never renders.
+  agentCmd
+    .command("dev")
+    .alias("tunnel")
+    .description("Expose a local agent server through a public tunnel and point a registered HTTP agent at it (Ctrl-C restores the previous URL)")
+    .option("--port <number>", "Local port to expose (tunnels http://localhost:<number>)")
+    .option("--url <url>", "Local URL to expose (mutually exclusive with --port)")
+    .option("--agent <idOrName>", "Which registered HTTP agent to point at the tunnel (when omitted: picker, and in an interactive terminal it creates one if the project has none)")
+    .option("--tunnel-url <url>", "Bring your own tunnel URL and skip tunnel provisioning")
+    .option("--no-update-url", "Print the tunnel URL without changing the agent")
+    .option("--no-auth", "Skip the local auth proxy (for servers that already authenticate requests)")
+    .option("--api-key <key>", "API key to use for this run")
+    .action(
+      async (options: {
+        port?: string;
+        url?: string;
+        agent?: string;
+        tunnelUrl?: string;
+        updateUrl?: boolean;
+        auth?: boolean;
+        apiKey?: string;
+      }) => {
+        const { agentDevCommand: impl } = await import("./commands/agents/dev.js");
+        return impl(options);
+      },
+    );
+
   emitsResult(
     agentCmd
       .command("update <id>")
@@ -2440,13 +2469,20 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     traceCmd
       .command("search")
       .description("Search traces with optional text query and date range")
-      .option("-q, --query <query>", "Text search query")
+      .option(
+        "-q, --query <query>",
+        "Text search query. Plain text only: AND, OR and NOT are matched as words, not as operators",
+      )
       .option("--start-date <date>", "Start date (ISO string or epoch ms, default: 24h ago)")
       .option("--end-date <date>", "End date (ISO string or epoch ms, default: now)")
       .option("--limit <n>", "Max results to return (default: 25)")
       .option(
         "--origin <origins>",
         "Filter by trace origin, comma-separated (e.g. application,evaluation,simulation,playground,langy); 'application' includes traces with no recorded origin",
+      )
+      .option(
+        "--errors-only",
+        "Only traces that contain an error. The error is on the span, not in the searchable text, so this is the way to find failures",
       )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
   ).action(async (_options: unknown, command: Command) => {
@@ -2462,10 +2498,17 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .description("Export traces as CSV, JSONL, or JSON")
     .option("--start-date <date>", "Start date (ISO string, default: 7 days ago)")
     .option("--end-date <date>", "End date (ISO string, default: now)")
-    .option("-q, --query <query>", "Text search query to filter traces")
+    .option(
+      "-q, --query <query>",
+      "Text search query to filter traces. Plain text only: AND, OR and NOT are matched as words, not as operators",
+    )
     .option(
       "--origin <origins>",
       "Filter by trace origin, comma-separated (e.g. application,evaluation,simulation,playground,langy); 'application' includes traces with no recorded origin",
+    )
+    .option(
+      "--errors-only",
+      "Only traces that contain an error. The error is on the span, not in the searchable text, so this is the way to find failures",
     )
     .option("-f, --format <format>", "Output format: jsonl (default), csv, or json", "jsonl")
     .option("-o, --output <file>", "Write output to file instead of stdout")

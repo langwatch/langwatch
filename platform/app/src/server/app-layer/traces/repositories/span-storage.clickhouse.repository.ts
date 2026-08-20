@@ -980,7 +980,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         clickhouse_settings: SPAN_INSERT_SETTINGS,
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId: span.tenantId,
           spanId: span.spanId,
@@ -1029,7 +1029,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         clickhouse_settings: SPAN_INSERT_SETTINGS,
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           count: spans.length,
           error: error instanceof Error ? error.message : String(error),
@@ -1092,7 +1092,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         },
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,
@@ -1158,7 +1158,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         },
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,
@@ -1202,7 +1202,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         },
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,
@@ -1274,7 +1274,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           }),
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,
@@ -1636,7 +1636,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         },
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,
@@ -1686,7 +1686,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         (await result.json()) as TraceEventRollupRow[],
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceCount: traceIds.length,
@@ -1757,7 +1757,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         },
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,
@@ -1837,7 +1837,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         },
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,

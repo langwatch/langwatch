@@ -167,7 +167,6 @@ export function DefaultModelsSection({
         title: "Config deleted",
         type: "success",
         duration: 2500,
-        meta: { closable: true },
       });
     } catch (err) {
       showErrorToast({

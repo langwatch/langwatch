@@ -49,6 +49,24 @@ export const ESSENTIAL_PII_ENTITIES = [
 interface Recognizer {
   entity: string;
   regex: RegExp;
+  /**
+   * A literal the regex cannot match without, checked with `String.includes`
+   * before the regex is run at all.
+   *
+   * These patterns are unanchored and scanned with `matchAll`, so on text that
+   * cannot match they still cost a pass per starting position — the email
+   * pattern alone measured 2.6% of the worker's wall time in production,
+   * because `[A-Za-z0-9._%+-]+` consumes a long alphanumeric run, fails to
+   * find `@`, and backs off a character at a time. `includes` is a native
+   * substring scan and settles the same question in one pass.
+   *
+   * Only set this where the literal appears in the pattern itself, so the
+   * claim is readable next to the regex rather than remembered. Getting it
+   * wrong silently stops redacting real personal data, which is why
+   * `essentialPii.prefilter.unit.test.ts` proves each one against its own
+   * pattern rather than trusting the annotation.
+   */
+  requiresSubstring?: string;
   /** Checksum/structure check on the raw match; a falsey result drops the candidate. */
   validate?: (raw: string) => boolean;
   /** Low-confidence patterns only fire when one of these words is within the window. */
@@ -129,6 +147,7 @@ const RECOGNIZERS: Recognizer[] = [
   {
     entity: "EMAIL_ADDRESS",
     regex: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
+    requiresSubstring: "@",
     isSelfProving: true,
   },
   {
@@ -139,6 +158,7 @@ const RECOGNIZERS: Recognizer[] = [
   {
     entity: "IP_ADDRESS",
     regex: /\b(?:[0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{0,4}\b/g,
+    requiresSubstring: ":",
     validate: ipv6Plausible,
   },
   {
@@ -153,7 +173,12 @@ const RECOGNIZERS: Recognizer[] = [
     validate: ibanValid,
     isSelfProving: true,
   },
-  { entity: "CRYPTO", regex: /\b0x[a-fA-F0-9]{40}\b/g, isSelfProving: true },
+  {
+    entity: "CRYPTO",
+    regex: /\b0x[a-fA-F0-9]{40}\b/g,
+    requiresSubstring: "0x",
+    isSelfProving: true,
+  },
   {
     entity: "CRYPTO",
     regex: /\b(?:bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b/g,
@@ -484,12 +509,25 @@ function recognizerRuns({
   recognizer,
   allowed,
   isIdentifierShaped,
+  text,
 }: {
   recognizer: Recognizer;
   allowed: ReadonlySet<string> | null;
   isIdentifierShaped: boolean;
+  text: string;
 }): boolean {
   if (allowed && !allowed.has(recognizer.entity)) return false;
+  // A pattern that cannot match without a literal is skipped on text that
+  // does not contain it. This only ever removes a scan that would have found
+  // nothing, so it cannot change which spans are redacted — provided the
+  // literal really is required, which is what `requiresSubstring` documents
+  // and its tests hold to.
+  if (
+    recognizer.requiresSubstring !== undefined &&
+    !text.includes(recognizer.requiresSubstring)
+  ) {
+    return false;
+  }
   return !isIdentifierShaped || recognizer.isSelfProving === true;
 }
 
@@ -512,7 +550,9 @@ function collectRecognizerSpans({
 }): Span[] {
   const spans: Span[] = [];
   for (const recognizer of RECOGNIZERS) {
-    if (!recognizerRuns({ recognizer, allowed, isIdentifierShaped })) continue;
+    if (!recognizerRuns({ recognizer, allowed, isIdentifierShaped, text })) {
+      continue;
+    }
     for (const match of text.matchAll(recognizer.regex)) {
       const span = recognizedSpanFor({ recognizer, match, text, excepted });
       if (span) spans.push(span);

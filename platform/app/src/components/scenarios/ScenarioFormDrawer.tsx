@@ -164,7 +164,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         title: "Agent created",
         description: `"${agent.name}" is now selected as the target.`,
         type: "success",
-        meta: { closable: true },
       });
     };
     setFlowCallbacks("agentHttpEditor", { onSave: onAgentSaved });
@@ -382,7 +381,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           description:
             "Please select a prompt or agent to run the scenario against.",
           type: "warning",
-          meta: { closable: true },
         });
         return;
       }
@@ -418,7 +416,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                   label: "Open agent editor",
                   onClick: openAgentEditor,
                 },
-                meta: { closable: true },
               });
               // Auto-open the editor now; the toast action above is the manual
               // fallback if this auto-open races, is dismissed, or fails.
@@ -524,7 +521,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           toaster.create({
             title: scenario ? "Scenario updated" : "Scenario created",
             type: "success",
-            meta: { closable: true },
           });
           onClose();
         }
@@ -685,7 +681,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             title: "Prompt created",
             description: `"${prompt.name}" is now selected as the target.`,
             type: "success",
-            meta: { closable: true },
           });
         }}
       />

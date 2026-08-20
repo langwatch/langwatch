@@ -16,7 +16,9 @@ import type { RunParameterValues } from "../../parameters";
 import { createChildProcessLogger } from "../child-logger";
 import {
   buildTemplateContext,
+  mergePropagationHeaders,
   renderBodyTemplate,
+  renderHeaderTemplate,
   renderUrlTemplate,
 } from "../http-template-engine";
 import {
@@ -24,7 +26,6 @@ import {
   preserveSecretRefs,
   redactSecrets,
   resolveAuthSecrets,
-  resolveSecretsInMap,
 } from "../secret-references";
 import type { HttpAgentData } from "../types";
 
@@ -106,7 +107,6 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
   private readonly config: HttpAgentData;
   private readonly logger: Logger;
   private readonly parameters: RunParameterValues;
-  private capturedTraceId: string | undefined;
 
   constructor({
     config,
@@ -131,20 +131,24 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     return this.config.secrets ?? {};
   }
 
-  /** Returns the trace ID captured during the most recent HTTP request. */
-  getTraceId(): string | undefined {
-    return this.capturedTraceId;
-  }
-
   async call(input: AgentInput): Promise<string> {
     try {
+      // One capture per turn: the traceparent header and the `{{ traceId }}`
+      // / `{{ traceparent }}` template variables all name the same trace.
+      const { headers: propagationHeaders, traceId } =
+        injectTraceContextHeaders({ headers: {} });
+      const traceparent = propagationHeaders.traceparent;
       const templateContext = buildTemplateContext({
         input,
         scenarioMappings: this.config.scenarioMappings,
         parameters: this.parameters,
+        traceContext: { traceId, traceparent },
       });
       const url = this.buildUrl(templateContext);
-      const headers = this.buildRequestHeaders();
+      const headers = this.buildRequestHeaders(
+        templateContext,
+        propagationHeaders,
+      );
       const body = this.buildRequestBody(input, templateContext);
       const responseData = await this.executeHttpRequest(url, headers, body);
       return this.extractResponseContent(responseData);
@@ -200,7 +204,20 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     return error;
   }
 
-  private buildRequestHeaders(): Record<string, string> {
+  /**
+   * Each configured header value renders through the header engine with the
+   * same fence/restore discipline as `buildUrl` (see its comment for why the
+   * order matters). The fence is also what resolves the references, so
+   * rendered output is never re-scanned for them: a conversation turn or a
+   * run parameter that spells `{{ secrets.NAME }}` stays literal text instead
+   * of pulling the credential into the request. Auth goes on top as before,
+   * and the propagation headers merge last without clobbering one the target
+   * configured itself.
+   */
+  private buildRequestHeaders(
+    context: Record<string, unknown>,
+    propagationHeaders: Record<string, string>,
+  ): Record<string, string> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
@@ -208,21 +225,24 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     for (const header of this.config.headers) {
       const key = header.key.trim();
       if (key) {
-        headers[key] = header.value;
+        const { template, restore } = fenceSecretRefs({
+          template: header.value,
+          secrets: this.secrets,
+        });
+        headers[key] = restore(
+          renderHeaderTemplate({ template, context, headerKey: key }),
+        );
       }
     }
 
     const resolved = {
-      ...resolveSecretsInMap({ values: headers, secrets: this.secrets }),
+      ...headers,
       ...applyAuthentication(
         resolveAuthSecrets({ auth: this.config.auth, secrets: this.secrets }),
       ),
     };
 
-    const { traceId } = injectTraceContextHeaders({ headers: resolved });
-    this.capturedTraceId = traceId;
-
-    return resolved;
+    return mergePropagationHeaders({ headers: resolved, propagationHeaders });
   }
 
   /**

@@ -1,6 +1,6 @@
 import json
-import os
 from typing import Optional, cast
+from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
     MAX_TOKENS_HARD_LIMIT,
     BaseEvaluator,
@@ -53,10 +53,6 @@ class CustomLLMScoreEvaluator(
     is_guardrail = False
 
     def evaluate(self, entry: CustomLLMScoreEntry) -> SingleEvaluationResult:
-        if self.env:
-            for key, env in self.env.items():
-                os.environ[key] = env
-
         if not entry.input and not entry.output and not entry.contexts:
             return EvaluationResultSkipped(details="No content to evaluate")
 
@@ -100,6 +96,7 @@ class CustomLLMScoreEvaluator(
         else:
             response = litellm.completion(
                 model=self.settings.model,
+                **azure_api_version(self.settings.model, "2023-12-01-preview"),
                 messages=[
                     {
                         "role": "system",

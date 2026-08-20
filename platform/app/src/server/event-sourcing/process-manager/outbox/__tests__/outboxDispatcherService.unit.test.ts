@@ -165,6 +165,115 @@ describe("OutboxDispatcherService", () => {
       });
     });
 
+    describe("when failed deliveries are recorded to the attempt log", () => {
+      /** @scenario Each failed delivery records why it failed */
+      it("appends one entry per failed attempt, oldest first, with the killer marked dead", async () => {
+        // DispatchError's shape: a deliberately-written delivery diagnostic,
+        // which the attempt log preserves verbatim.
+        const transient = Object.assign(new Error("receiver returned 503"), {
+          name: "DispatchError",
+          retryable: true,
+        });
+        const handler = vi.fn().mockRejectedValue(transient);
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 2,
+        });
+
+        await dispatcher.runOnce({ now: T0 + 1 });
+        await dispatcher.runOnce({ now: T0 + 2_000 });
+
+        const attempts = store.findFailedAttempts({
+          processName: pilotRef.processName,
+          projectId: pilotRef.projectId,
+          messageKey: "dispatch:turn_1:1",
+        });
+        expect(attempts.map((a) => a.attempt)).toEqual([1, 2]);
+        expect(attempts[0]?.outcome).toBe("retry_scheduled");
+        expect(attempts[1]?.outcome).toBe("dead");
+        expect(attempts[1]?.errorMessage).toBe("receiver returned 503");
+      });
+
+      it("redacts the diagnostic for an untyped error, which can carry anything", async () => {
+        const handler = vi
+          .fn()
+          .mockRejectedValue(new Error("raw payload: sk-secret"));
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 2,
+        });
+
+        await dispatcher.runOnce({ now: T0 + 1 });
+
+        const attempts = store.findFailedAttempts({
+          processName: pilotRef.processName,
+          projectId: pilotRef.projectId,
+          messageKey: "dispatch:turn_1:1",
+        });
+        expect(attempts[0]?.errorMessage).not.toContain("sk-secret");
+      });
+
+      it("redacts an error that merely claims to be retryable", async () => {
+        // `retryable` alone is not proof of provenance: anything can carry it,
+        // and only our own class stamps the DispatchError name.
+        const impostor = Object.assign(new Error("raw payload: sk-secret"), {
+          retryable: true,
+        });
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": vi.fn().mockRejectedValue(impostor) },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 2,
+        });
+
+        await dispatcher.runOnce({ now: T0 + 1 });
+
+        const attempts = store.findFailedAttempts({
+          processName: pilotRef.processName,
+          projectId: pilotRef.projectId,
+          messageKey: "dispatch:turn_1:1",
+        });
+        expect(attempts[0]?.errorMessage).not.toContain("sk-secret");
+      });
+
+      /** @scenario A recording failure never fails the delivery accounting */
+      it("retries and retires exactly as it would have when the attempt log write throws", async () => {
+        const failingStore = new Proxy(store, {
+          get(target, prop, receiver) {
+            if (prop === "recordFailedAttempt") {
+              return () => Promise.reject(new Error("attempt log down"));
+            }
+            return Reflect.get(target, prop, receiver);
+          },
+        });
+        const handler = vi.fn().mockRejectedValue(new Error("always broken"));
+        const dispatcher = new OutboxDispatcherService({
+          store: failingStore,
+          handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 2,
+        });
+
+        const first = await dispatcher.runOnce({ now: T0 + 1 });
+        expect(first.retried).toEqual(["dispatch:turn_1:1"]);
+        const second = await dispatcher.runOnce({ now: T0 + 2_000 });
+        expect(second.dead).toEqual(["dispatch:turn_1:1"]);
+
+        // The missing attempt entry is the only loss.
+        expect(
+          store.findFailedAttempts({
+            processName: pilotRef.processName,
+            projectId: pilotRef.projectId,
+            messageKey: "dispatch:turn_1:1",
+          }),
+        ).toEqual([]);
+      });
+    });
+
     describe("when the handler throws a terminal error", () => {
       /** @scenario A permanent receiver error retires the batch immediately */
       it("dead-letters on that attempt instead of burning the remaining ladder", async () => {
@@ -419,6 +528,81 @@ describe("OutboxDispatcherService", () => {
         // next drain at the same logical time picks it up.
         const second = await dispatcher.runOnce({ now: T0 + 2 });
         expect(second.dispatched).toEqual(first.released);
+      });
+    });
+  });
+
+  describe("given a domain whose slow deliveries earn it a large lease", () => {
+    describe("when a delivery would start with less than the scaled margin", () => {
+      it("scales the safety margin with the lease instead of capping it", async () => {
+        for (let index = 0; index < 2; index++) {
+          await service.handleEvent({
+            envelope: pilotEvent({
+              eventId: `evt_large_${index}`,
+              processKey: `conv_large_${index}`,
+              payload: { turnId: `turn_large_${index}` },
+            }),
+            now: T0,
+          });
+        }
+        let elapsed = 0;
+        const handler = vi.fn().mockImplementation(async () => {
+          elapsed += 85_000;
+        });
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          leaseDurationMs: 100_000,
+          clock: () => elapsed,
+        });
+
+        // Margin is 20_000ms (20% of the lease). After the first delivery
+        // 15_000ms remain: under a flat 10_000ms cap the second delivery
+        // would start and outlive the lease; the scaled margin releases it.
+        const report = await dispatcher.runOnce({ now: T0 + 1 });
+
+        expect(report.dispatched).toHaveLength(1);
+        expect(report.released).toHaveLength(1);
+        expect(handler).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe("given a lease query slowed by the same degraded store", () => {
+    describe("when the query consumes most of the lease before any delivery", () => {
+      it("counts the query time against the lease budget", async () => {
+        await commitStartedTurn();
+        let elapsed = 0;
+        const slowLeasingStore = new Proxy(store, {
+          get(target, property, receiver) {
+            if (property !== "leaseDueMessages") {
+              return Reflect.get(target, property, receiver);
+            }
+            return async (
+              params: Parameters<typeof store.leaseDueMessages>[0],
+            ) => {
+              // The store anchors leasedUntil before the query runs, so a
+              // slow query burns real lease time before any delivery starts.
+              elapsed += 900;
+              return target.leaseDueMessages(params);
+            };
+          },
+        });
+        const handler = vi.fn().mockResolvedValue(undefined);
+        const dispatcher = new OutboxDispatcherService({
+          store: slowLeasingStore,
+          handlers: { "worker-dispatch": handler },
+          leaseDurationMs: 1_000,
+          clock: () => elapsed,
+        });
+
+        // 900ms of the 1_000ms lease went to the query; 100ms remain, under
+        // the 200ms margin, so the delivery must not start.
+        const report = await dispatcher.runOnce({ now: T0 + 1 });
+
+        expect(report.dispatched).toHaveLength(0);
+        expect(report.released).toHaveLength(1);
+        expect(handler).not.toHaveBeenCalled();
       });
     });
   });

@@ -631,6 +631,239 @@ describe("CodingAgentSessionFoldProjection", () => {
     });
   });
 
+  describe("when the session earns its name from a prompt", () => {
+    const promptFacts = (
+      title: string,
+    ): Record<string, string | number | boolean> => ({
+      "event.name": "claude_code.user_prompt",
+      prompt_length: title.length,
+      "langwatch.session.title_fallback": title,
+    });
+
+    /** @scenario A session with no generated title is named by the first thing the user asked */
+    it("names an unnamed session by its first prompt and keeps that name", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: promptFacts("Fix the retry loop in the outbox worker"),
+        }),
+        state,
+      );
+      expect(state.title).toBe("Fix the retry loop in the outbox worker");
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ facts: promptFacts("Now the docs"), timeMs: 2_500 }),
+        state,
+      );
+      expect(state.title).toBe("Fix the retry loop in the outbox worker");
+      expect(state.prompts).toBe(2);
+    });
+
+    /** @scenario A generated title replaces the prompt-derived name */
+    it("lets a generated title replace the prompt-derived name", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: promptFacts("fix flaky test please, the fold one"),
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "claude_code.api_response_body",
+            "langwatch.session.title": "Fix the flaky fold test",
+          },
+          timeMs: 2_500,
+        }),
+        state,
+      );
+
+      expect(state.title).toBe("Fix the flaky fold test");
+    });
+
+    /** @scenario The harvest names the session by the first thing the user asked */
+    it("fills the name from the companion event and never overwrites one", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      const harvestContext = (
+        title: string,
+      ): Record<string, string | number | boolean> => ({
+        "event.name": "langwatch.session_context",
+        "coding_agent.name": "codex",
+        "vcs.repository.host": "github.com",
+        "vcs.repository.owner": "acme",
+        "vcs.repository.name": "widgets",
+        "langwatch.session.title": title,
+      });
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: harvestContext("Read notes.txt and summarize it"),
+          agent: "codex",
+        }),
+        state,
+      );
+      expect(state.title).toBe("Read notes.txt and summarize it");
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: harvestContext("A later re-post with another name"),
+          agent: "codex",
+          timeMs: 2_500,
+        }),
+        state,
+      );
+      expect(state.title).toBe("Read notes.txt and summarize it");
+    });
+
+    /** @scenario "The session's own name outranks the generated title" */
+    /** @scenario "The session's own name outranks the prompt-derived name" */
+    it("holds the session's name over both derived titles", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "claude_code",
+            "langwatch.session.name": "pr-reviewer",
+          },
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: promptFacts("Good morning. Use the review skill."),
+          timeMs: 2_000,
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "claude_code.api_response_body",
+            "langwatch.session.title": "Review the open pull requests",
+          },
+          timeMs: 3_000,
+        }),
+        state,
+      );
+
+      // Neither the prompt nor the regenerated conversation title moved it.
+      expect(state.title).toBe("pr-reviewer");
+      expect(state.titleSource).toBe("name");
+    });
+
+    /** @scenario "A renamed session renames its row" */
+    it("folds the newest name in place", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      const declared = (title: string) =>
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "claude_code",
+            "langwatch.session.name": title,
+          },
+        });
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        declared("pr-reviewer"),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        declared("pr-hound"),
+        state,
+      );
+
+      expect(state.title).toBe("pr-hound");
+    });
+
+    /** @scenario "A blank name does not rename the session" */
+    it("keeps the previous title when a later name is whitespace", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      const declared = (title: string) =>
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "claude_code",
+            "langwatch.session.name": title,
+          },
+        });
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        declared("pr-reviewer"),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        declared("   "),
+        state,
+      );
+
+      expect(state.title).toBe("pr-reviewer");
+    });
+
+    /** @scenario "A context record with no repository still folds its titles" */
+    it("folds a context that names no repository", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "codex",
+            "langwatch.session.title": "Read notes.txt",
+            "langwatch.session.name": "pr-reviewer",
+          },
+          agent: "codex",
+        }),
+        state,
+      );
+
+      expect(state.repositoryHost).toBeNull();
+      expect(state.repositoryName).toBeNull();
+      // The name wins over the prompt-derived title on the same record.
+      expect(state.title).toBe("pr-reviewer");
+      expect(state.titleSource).toBe("name");
+    });
+
+    /** @scenario "A row from before the source column still takes a generated title" */
+    it("lets a generated title replace a title with no recorded source", () => {
+      const projection = makeProjection();
+      // A pre-00083 row decodes with a title and no source; it must keep the
+      // old newest-wins behaviour rather than freezing on its first title.
+      const decoded = {
+        ...initStateOf(projection),
+        title: "Good morning.",
+        titleSource: null,
+      };
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "claude_code.api_response_body",
+            "langwatch.session.title": "Review the open pull requests",
+          },
+        }),
+        decoded,
+      );
+
+      expect(state.title).toBe("Review the open pull requests");
+      expect(state.titleSource).toBe("generated");
+    });
+  });
+
   describe("when a session sends only metrics", () => {
     /** @scenario a session that sent only metrics still appears */
     it("materializes the session from metric contributions alone", () => {
@@ -1566,6 +1799,34 @@ describe("coding-agent session fold, codex", () => {
       expect(state.ttftMsTotal).toBe(2_000);
       expect(state.ttftSamples).toBe(2);
       expect(meanTtftMs(state)).toBe(1_000);
+    });
+  });
+
+  describe("when the rollout harvest reports the session's checkout", () => {
+    /** @scenario "The harvest reports the repository the session worked on" */
+    it("gives the codex session its repository and branch", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "codex",
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "codex",
+            "vcs.repository.host": "github.com",
+            "vcs.repository.owner": "acme",
+            "vcs.repository.name": "acme-app",
+            "vcs.ref.head.name": "feat/pricing",
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.repositoryHost).toBe("github.com");
+      expect(state.repositoryOwner).toBe("acme");
+      expect(state.repositoryName).toBe("acme-app");
+      expect(state.gitBranch).toBe("feat/pricing");
+      expect(state.gitBranches).toEqual(["feat/pricing"]);
     });
   });
 

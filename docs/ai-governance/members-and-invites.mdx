@@ -102,11 +102,11 @@ What the user controls about their own account lives at `/settings/authenticatio
 
 The page is per-user. There's no admin gate, every member of the org can manage their own credentials here. Admins don't manage other users' sign-in methods from this page; user-account-management is by-design self-service.
 
-Org-level SSO configuration (IdP metadata, SAML cert, SCIM provisioning) is **separate** from this page, it lives at `/settings/governance/scim-provisioning` (admin-only) and the SSO-provider env config in your deployment's helm values, `.env`.
+Org-level SSO configuration (IdP metadata, SAML cert, SCIM provisioning) is **separate** from this page, it lives at `/settings/scim` (admin-only) and the SSO-provider env config in your deployment's helm values, `.env`.
 
 ## Where to next
 
 - **Self-service for me**: [/settings/authentication](#per-user-sign-in-methods-at-settingsauthentication) (this page) and [Devices](/ai-governance/personal-portal/sessions).
-- **Org SSO + SCIM auto-provisioning**: `/settings/governance/scim-provisioning` (admin-only).
+- **Org SSO + SCIM auto-provisioning**: `/settings/scim` (admin-only).
 - **Role catalog**: [Roles & permissions](/ai-governance/roles-and-permissions).
 - **Audit who did what when**: [Audit log](/ai-governance/audit-log).

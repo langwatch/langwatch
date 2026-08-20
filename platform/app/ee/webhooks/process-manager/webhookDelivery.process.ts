@@ -1002,6 +1002,123 @@ function withStashedOutcome(
   };
 }
 
+/**
+ * The attribution an outcome states about itself, or null when it states
+ * none.
+ *
+ * Every outcome carries it from the build that sets
+ * `outcome_carries_attribution` on its admissions; an older build's outcomes
+ * carry nothing and fall back to the admission this instance remembered.
+ * The organization is the discriminator because delivery cannot resolve a
+ * single endpoint without it.
+ */
+function attributionFromOutcome(
+  data: ConfirmSpendCommandData | FailSpendCommandData | SettleSpendCommandData,
+): SpendAttribution | null {
+  if (!data.organization_id) return null;
+  return {
+    organization_id: data.organization_id,
+    virtual_key_id: data.virtual_key_id,
+    principal_user_id: data.principal_user_id,
+    end_user_id: data.end_user_id,
+    // Every outcome states a model identity. A confirmation or failure
+    // states the one it RESOLVED; a settlement resolved none, so the
+    // sweeper copies the identity admission requested off the spend record
+    // — which is what a settled envelope has always named.
+    model: data.model,
+    model_provider_id: data.model_provider_id,
+    trace_id: data.trace_id,
+    request_type: data.request_type,
+    labels: data.labels,
+    metadata: data.metadata,
+    admitted_at: data.admitted_at,
+  };
+}
+
+/** What an outcome handler needs from the process context. */
+interface DeliverOutcomeContext<Intent> {
+  projectId: string;
+  intents: { deliver: (key: string, payload: DeliverPayload) => Intent };
+}
+
+/**
+ * One outcome, routed by what it can see. All three route identically, so
+ * they share this rather than repeating it with a different payload builder.
+ *
+ * An outcome that states its own attribution freezes its deliver intent
+ * immediately and leaves the state untouched, so the evolution is transient
+ * and the request costs no durable row. One that does not falls back to the
+ * admission this instance remembered: stashed until admission arrives,
+ * released by it after.
+ */
+function onSpendOutcome<
+  Intent,
+  Data extends
+    | ConfirmSpendCommandData
+    | FailSpendCommandData
+    | SettleSpendCommandData,
+>({
+  state,
+  ctx,
+  status,
+  data,
+  toPayload,
+}: {
+  state: WebhookDeliveryState;
+  ctx: DeliverOutcomeContext<Intent>;
+  status: DeliverPayload["status"];
+  data: Data;
+  toPayload: (data: Data, instance: DeliverInstance) => DeliverPayload;
+}): { state: WebhookDeliveryState; intents?: Intent[] } {
+  const attribution = attributionFromOutcome(data) ?? state.attribution;
+  const payload = toPayload(data, { projectId: ctx.projectId, attribution });
+  if (attribution === null) {
+    return { state: withStashedOutcome(state, payload) };
+  }
+  return {
+    state,
+    intents: [ctx.intents.deliver(`deliver:${status}`, payload)],
+  };
+}
+
+/**
+ * The admission: the one place a request's attribution is known.
+ *
+ * It releases an outcome that arrived ahead of it on BOTH paths, including
+ * the one where it remembers nothing. A stash is not expected there — an
+ * outcome only stashes when it carried no attribution, and admission and
+ * outcome always come from the same pod and the same build — but the two
+ * conditions are not the same one: an outcome stashes on its OWN empty
+ * organization, not on the build that sent it. Where they disagree, dropping
+ * the stash would cost the envelope and strand the instance row holding it,
+ * since this handler is the only thing that could ever clear it.
+ */
+function onAdmission<Intent>({
+  state,
+  ctx,
+  admit,
+}: {
+  state: WebhookDeliveryState;
+  ctx: DeliverOutcomeContext<Intent>;
+  admit: AdmitSpendCommandData;
+}): { state: WebhookDeliveryState; intents?: Intent[] } {
+  const attribution = attributionFrom(admit);
+  const stashed = state.pendingOutcome;
+  const release = stashed
+    ? [ctx.intents.deliver("deliver:late", { ...stashed, attribution })]
+    : void 0;
+
+  // Every outcome states the attribution itself, so there is nothing worth
+  // remembering and this admission writes no row.
+  if (admit.outcome_carries_attribution) {
+    if (!stashed) return { state };
+    return { state: { ...state, pendingOutcome: null }, intents: release };
+  }
+
+  const admitted = { ...state, attribution, pendingOutcome: null };
+  return stashed ? { state: admitted, intents: release } : { state: admitted };
+}
+
 function attributionFrom(data: AdmitSpendCommandData): SpendAttribution {
   return {
     organization_id: data.organization_id,
@@ -1036,57 +1153,36 @@ export function webhookDeliveryPM(
       // releases whatever outcome arrived ahead of it. One admission per
       // instance (the log's idempotency key, then the inbox) means
       // `deliver:late` is minted at most once.
-      .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data, ctx) => {
-        const attribution = attributionFrom(data as AdmitSpendCommandData);
-        const stashed = state.pendingOutcome;
-        const admitted = { ...state, attribution, pendingOutcome: null };
-        if (!stashed) return { state: admitted };
-        return {
-          state: admitted,
-          intents: [
-            ctx.intents.deliver("deliver:late", { ...stashed, attribution }),
-          ],
-        };
-      })
-      .on(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, (state, data, ctx) => {
-        const payload = confirmedDeliverPayload(
-          data as ConfirmSpendCommandData,
-          { projectId: ctx.projectId, attribution: state.attribution },
-        );
-        if (state.attribution === null) {
-          return { state: withStashedOutcome(state, payload) };
-        }
-        return {
+      .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data, ctx) =>
+        onAdmission({ state, ctx, admit: data as AdmitSpendCommandData }),
+      )
+      .on(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, (state, data, ctx) =>
+        onSpendOutcome({
           state,
-          intents: [ctx.intents.deliver("deliver:confirmed", payload)],
-        };
-      })
-      .on(GATEWAY_SPEND_FAILED_EVENT_TYPE, (state, data, ctx) => {
-        const payload = failedDeliverPayload(data as FailSpendCommandData, {
-          projectId: ctx.projectId,
-          attribution: state.attribution,
-        });
-        if (state.attribution === null) {
-          return { state: withStashedOutcome(state, payload) };
-        }
-        return {
+          ctx,
+          status: "confirmed",
+          data: data as ConfirmSpendCommandData,
+          toPayload: confirmedDeliverPayload,
+        }),
+      )
+      .on(GATEWAY_SPEND_FAILED_EVENT_TYPE, (state, data, ctx) =>
+        onSpendOutcome({
           state,
-          intents: [ctx.intents.deliver("deliver:failed", payload)],
-        };
-      })
-      .on(GATEWAY_SPEND_SETTLED_EVENT_TYPE, (state, data, ctx) => {
-        const payload = settledDeliverPayload(data as SettleSpendCommandData, {
-          projectId: ctx.projectId,
-          attribution: state.attribution,
-        });
-        if (state.attribution === null) {
-          return { state: withStashedOutcome(state, payload) };
-        }
-        return {
+          ctx,
+          status: "failed",
+          data: data as FailSpendCommandData,
+          toPayload: failedDeliverPayload,
+        }),
+      )
+      .on(GATEWAY_SPEND_SETTLED_EVENT_TYPE, (state, data, ctx) =>
+        onSpendOutcome({
           state,
-          intents: [ctx.intents.deliver("deliver:settled", payload)],
-        };
-      })
+          ctx,
+          status: "settled",
+          data: data as SettleSpendCommandData,
+          toPayload: settledDeliverPayload,
+        }),
+      )
       // Endpoint streams arm wakes for their coalescing deadlines; the
       // wake hands the flush to the I/O executor.
       .onWake((state, ctx) => {
@@ -1106,5 +1202,11 @@ export function webhookDeliveryPM(
       // metadata echo; no prompts or responses exist anywhere in this
       // pipeline, so the event data is safe to persist as the payload.
       .toPayload((event) => event.data as unknown as JsonValue)
+      // Per-REQUEST keys hold nothing once an outcome states its own
+      // attribution, so they commit one idempotent outbox insert and no row.
+      // Per-ENDPOINT streams are untouched by this: they hold a buffer and a
+      // wake, so their evolutions are never transient and keep the
+      // compare-and-swap that guards a concurrent flush.
+      .transient()
       .outbox(WEBHOOK_DELIVERY_OUTBOX);
 }

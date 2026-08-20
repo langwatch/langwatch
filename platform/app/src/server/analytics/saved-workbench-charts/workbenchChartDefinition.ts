@@ -1,7 +1,7 @@
 /**
  * What a saved workbench chart actually stores.
  *
- * The record is the pair that travels together — the governed SQL that produces
+ * The record is the pair that travels together — the LangWatchQL that produces
  * the numbers and the Vega-Lite specification that draws them — plus the
  * parameter values the SQL was saved with. They are stored side by side rather
  * than folded into each other: no visualization syntax reaches the SQL, and the
@@ -12,12 +12,12 @@
  * so a definition written by a build that disagreed with this one is refused by
  * name instead of being half-understood.
  *
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { z } from "zod";
 
-import { MAX_GOVERNED_SQL_LENGTH } from "../governed-sql/sqlText";
+import { MAX_LWQL_LENGTH } from "../lwql/sqlText";
 
 /**
  * The version this build writes, and the only one it reads.
@@ -52,7 +52,7 @@ const MAX_PARAMETER_VALUE_LENGTH = 4_000;
 /**
  * A bound parameter's saved value.
  *
- * Deliberately the scalars and nothing else: the governed query endpoint binds
+ * Deliberately the scalars and nothing else: the LangWatchQL query endpoint binds
  * named scalars, so admitting an object here would store a chart that could
  * only ever fail when someone opened it.
  */
@@ -96,7 +96,7 @@ export const workbenchChartDefinitionSchema = z.object({
    * Bounded by the same constant the query endpoints bound their input with, so
    * every statement the workbench will run is one it can also save.
    */
-  sql: z.string().min(1).max(MAX_GOVERNED_SQL_LENGTH),
+  sql: z.string().min(1).max(MAX_LWQL_LENGTH),
   /** Values for the parameters the SQL declares, keyed by the declared name. */
   parameters: parametersSchema,
   /**
