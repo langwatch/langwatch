@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef } from "react";
 
 import {
   absorbFetch,
@@ -38,6 +38,86 @@ export type SourceEventsPager<R extends PagerRow> = {
   setPageSize: (size: number) => void;
 };
 
+type PagerState<R extends PagerRow> = {
+  pages: R[][] | null;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+  error: unknown;
+  isFetching: boolean;
+  /** Bumped on every reset; a fetch started before a reset landed in a
+   * world that no longer exists and its result is discarded. */
+  generation: number;
+};
+
+type PagerAction<R extends PagerRow> =
+  | { type: "reset" }
+  | { type: "resize"; pageSize: number }
+  | { type: "fetchStart" }
+  | { type: "fetchLanded"; generation: number; rows: R[]; hasMore: boolean }
+  | { type: "fetchFailed"; generation: number; error: unknown }
+  | { type: "show"; page: number };
+
+const initPagerState = <R extends PagerRow>(
+  pageSize: number,
+): PagerState<R> => ({
+  pages: null,
+  page: 1,
+  pageSize,
+  hasMore: false,
+  error: null,
+  isFetching: false,
+  generation: 0,
+});
+
+function landFetch<R extends PagerRow>(
+  state: PagerState<R>,
+  action: { rows: R[]; hasMore: boolean },
+): PagerState<R> {
+  const pages = [...(state.pages ?? [])];
+  // An empty page is only kept as the very first one — it is how "this
+  // source has no events" is represented; later empty results just end
+  // the walk on the page already shown.
+  if (action.rows.length > 0 || pages.length === 0) pages.push(action.rows);
+  return {
+    ...state,
+    pages,
+    page: pages.length,
+    hasMore: action.rows.length > 0 && action.hasMore,
+    isFetching: false,
+  };
+}
+
+function pagerReducer<R extends PagerRow>(
+  state: PagerState<R>,
+  action: PagerAction<R>,
+): PagerState<R> {
+  switch (action.type) {
+    case "reset":
+      return {
+        ...initPagerState<R>(state.pageSize),
+        generation: state.generation + 1,
+      };
+    case "resize":
+      return {
+        ...initPagerState<R>(action.pageSize),
+        generation: state.generation + 1,
+      };
+    case "fetchStart":
+      return { ...state, isFetching: true };
+    case "fetchLanded":
+      return action.generation === state.generation
+        ? landFetch(state, action)
+        : state;
+    case "fetchFailed":
+      return action.generation === state.generation
+        ? { ...state, error: action.error, isFetching: false }
+        : state;
+    case "show":
+      return { ...state, page: action.page };
+  }
+}
+
 /**
  * One step of the walk: build the request for the page after
  * `displayedRows`, fetch, and absorb — falling back to a skip past the
@@ -68,6 +148,37 @@ async function walkOnePage<R extends PagerRow>({
   });
 }
 
+/** The state, shaped for the table and the pagination bar. */
+function presentPager<R extends PagerRow>(
+  state: PagerState<R>,
+  controls: Pick<SourceEventsPager<R>, "goToPage" | "setPageSize">,
+): SourceEventsPager<R> {
+  const loadedCount = state.pages?.reduce((sum, p) => sum + p.length, 0) ?? 0;
+  const view = paginationView({
+    loadedCount,
+    loadedPages: state.pages?.length ?? 0,
+    hasMore: state.hasMore,
+  });
+  return {
+    status:
+      state.error !== null
+        ? "error"
+        : state.pages === null
+          ? "loading"
+          : "ready",
+    error: state.error,
+    page: state.page,
+    pageSize: state.pageSize,
+    rows: state.pages?.[state.page - 1] ?? [],
+    loadedCount,
+    totalCount: view.totalCount,
+    canGoNext: view.canGoNext,
+    isPageReachable: view.isPageReachable,
+    isFetching: state.isFetching,
+    ...controls,
+  };
+}
+
 export function useSourceEventsPager<R extends PagerRow>({
   enabled,
   initialPageSize = 25,
@@ -77,24 +188,38 @@ export function useSourceEventsPager<R extends PagerRow>({
   initialPageSize?: number;
   fetchPage: (request: PageRequest) => Promise<R[]>;
 }): SourceEventsPager<R> {
-  const [pages, setPages] = useState<R[][] | null>(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSizeState] = useState(initialPageSize);
-  const [hasMore, setHasMore] = useState(false);
-  const [error, setError] = useState<unknown>(null);
-  const [isFetching, setIsFetching] = useState(false);
-  // Bumped on every reset; in-flight fetches from before a reset land
-  // in a world that no longer exists and must be discarded.
-  const generationRef = useRef(0);
+  const [state, dispatch] = useReducer(
+    (current: PagerState<R>, action: PagerAction<R>) =>
+      pagerReducer(current, action),
+    initialPageSize,
+    initPagerState<R>,
+  );
 
-  const reset = useCallback(() => {
-    generationRef.current += 1;
-    setPages(null);
-    setPage(1);
-    setHasMore(false);
-    setError(null);
-    setIsFetching(false);
-  }, []);
+  const startFetch = useCallback(
+    (snapshot: PagerState<R>) => {
+      dispatch({ type: "fetchStart" });
+      walkOnePage({
+        pageSize: snapshot.pageSize,
+        displayedRows: snapshot.pages?.flat() ?? [],
+        fetchPage,
+      }).then(
+        ({ rows, hasMore }) =>
+          dispatch({
+            type: "fetchLanded",
+            generation: snapshot.generation,
+            rows,
+            hasMore,
+          }),
+        (error: unknown) =>
+          dispatch({
+            type: "fetchFailed",
+            generation: snapshot.generation,
+            error,
+          }),
+      );
+    },
+    [fetchPage],
+  );
 
   // `fetchPage` closes over the org and source ids, so a new identity
   // means the walk now addresses different data — everything loaded so
@@ -105,80 +230,31 @@ export function useSourceEventsPager<R extends PagerRow>({
   useEffect(() => {
     if (previousFetchPageRef.current === fetchPage) return;
     previousFetchPageRef.current = fetchPage;
-    reset();
-  }, [fetchPage, reset]);
-
-  const fetchNextPage = useCallback(
-    async (currentPages: R[][] | null, currentPageSize: number) => {
-      const generation = generationRef.current;
-      setIsFetching(true);
-      try {
-        const result = await walkOnePage({
-          pageSize: currentPageSize,
-          displayedRows: currentPages?.flat() ?? [],
-          fetchPage,
-        });
-        if (generationRef.current !== generation) return;
-        const nextPages = [...(currentPages ?? [])];
-        if (result.rows.length > 0 || nextPages.length === 0) {
-          nextPages.push(result.rows);
-        }
-        setPages(nextPages);
-        setHasMore(result.rows.length > 0 && result.hasMore);
-        setPage(nextPages.length);
-      } catch (fetchError) {
-        if (generationRef.current !== generation) return;
-        setError(fetchError);
-      } finally {
-        if (generationRef.current === generation) setIsFetching(false);
-      }
-    },
-    [fetchPage],
-  );
+    dispatch({ type: "reset" });
+  }, [fetchPage]);
 
   useEffect(() => {
-    if (!enabled || pages !== null || error !== null || isFetching) return;
-    void fetchNextPage(null, pageSize);
-  }, [enabled, pages, error, isFetching, pageSize, fetchNextPage]);
+    const untouched =
+      state.pages === null && state.error === null && !state.isFetching;
+    if (enabled && untouched) startFetch(state);
+  }, [enabled, state, startFetch]);
 
   const goToPage = useCallback(
     (target: number) => {
-      if (target < 1 || pages === null || isFetching) return;
-      if (target <= pages.length) {
-        setPage(target);
-        return;
-      }
-      if (target === pages.length + 1 && hasMore) {
-        void fetchNextPage(pages, pageSize);
+      if (target < 1 || state.pages === null || state.isFetching) return;
+      if (target <= state.pages.length) {
+        dispatch({ type: "show", page: target });
+      } else if (target === state.pages.length + 1 && state.hasMore) {
+        startFetch(state);
       }
     },
-    [pages, isFetching, hasMore, pageSize, fetchNextPage],
+    [state, startFetch],
   );
 
   const setPageSize = useCallback(
-    (size: number) => {
-      reset();
-      setPageSizeState(size);
-    },
-    [reset],
+    (size: number) => dispatch({ type: "resize", pageSize: size }),
+    [],
   );
 
-  const loadedPages = pages?.length ?? 0;
-  const loadedCount = pages?.reduce((sum, p) => sum + p.length, 0) ?? 0;
-  const view = paginationView({ loadedCount, loadedPages, hasMore });
-
-  return {
-    status: error !== null ? "error" : pages === null ? "loading" : "ready",
-    error,
-    page,
-    pageSize,
-    rows: pages?.[page - 1] ?? [],
-    loadedCount,
-    totalCount: view.totalCount,
-    canGoNext: view.canGoNext,
-    isPageReachable: view.isPageReachable,
-    isFetching,
-    goToPage,
-    setPageSize,
-  };
+  return presentPager(state, { goToPage, setPageSize });
 }
