@@ -133,10 +133,17 @@ Feature: The identifier model - identity as an event-sourced pipeline
     When the scanner fetches the magic link
     Then the identifier remains unverified and the token remains unconsumed
 
-  @unimplemented
+  @unit
   Scenario: The backfill adopts existing accounts and proves itself per user
     Given "sam" has legacy Account rows and a User.email
     When the identity backfill migrates "sam"
     Then adoption events carry each source row's own business time
     And "sam" is finalized only when the fold-built rows match what the live rows imply
     And a disagreement holds "sam" at migrated with a diff report
+
+  @unit
+  Scenario: Finalizing a user's backfill opens their write gate
+    Given "sam"'s backfill pass concludes with matching rows
+    When the migration state records "sam" as finalized
+    Then the adapter's write gate answers open for "sam"
+    And an operator rollback closes it again

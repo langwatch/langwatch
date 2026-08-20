@@ -28,6 +28,7 @@ import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/ap
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
 import { app as groupsApp } from "../app/api/groups/[[...route]]/app";
+import { app as identityApp } from "../app/api/identity/[[...route]]/app";
 import { app as meApp } from "../app/api/me/[[...route]]/app";
 import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
@@ -205,7 +206,11 @@ export function createApiRouter() {
 
   api.route("/", adminApp);
   api.route("/", bugReportsApp); // /api/bug-reports — public issue-report intake
-  api.route("/", identityVerificationApp); // /api/identity/verify — GET renders, POST completes (D01)
+  // ORDERING: the magic-link landing page (GET /api/identity/verify) must
+  // register before the identity RPC family so its literal path matches
+  // ahead of the family's version-namespace guards.
+  api.route("/", identityVerificationApp); // GET renders only (D01)
+  api.route("/", identityApp); // /api/identity/verification.complete — RPC family (D01)
   api.route("/", annotationsApp);
   // ORDERING: authCliApp MUST be registered BEFORE authApp.
   // authApp owns the BetterAuth catch-all (`/auth/*`), which would

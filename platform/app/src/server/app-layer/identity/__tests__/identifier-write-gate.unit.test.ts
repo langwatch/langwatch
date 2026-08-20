@@ -94,6 +94,27 @@ describe("identifier write gate", () => {
     });
   });
 
+  describe("when the backfill finalizes and later an operator rolls back", () => {
+    /** @scenario "Finalizing a user's backfill opens their write gate" */
+    it("the latch opens on finalized and the rollback pin closes it again", async () => {
+      await expect(
+        isUserOnIdentityWrites({
+          userId: USER,
+          prisma: prismaWithStatus("finalized"),
+        }),
+      ).resolves.toBe(true);
+      // The runtime's witness invalidates the gate on every transition, so
+      // the operator's rolled_back pin takes effect without waiting the TTL.
+      invalidateIdentityWriteGate({ userId: USER });
+      await expect(
+        isUserOnIdentityWrites({
+          userId: USER,
+          prisma: prismaWithStatus("rolled_back"),
+        }),
+      ).resolves.toBe(false);
+    });
+  });
+
   describe("when the backfill latches a cached-closed user", () => {
     it("invalidation reopens the question immediately", async () => {
       await expect(

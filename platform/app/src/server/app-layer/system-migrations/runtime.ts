@@ -23,6 +23,7 @@ import {
 } from "@langwatch/authz-server/migration";
 import { createLogger } from "@langwatch/observability";
 import {
+  type MigrationCohort,
   type MigrationPassSummary,
   type SystemMigration,
   SystemMigrationRunnerService,
@@ -33,6 +34,13 @@ import { env } from "~/env.mjs";
 import type { Prisma } from "~/generated/prisma/client";
 import { prisma } from "../../db";
 import { tryGetApp } from "../app";
+import { IdentityCeremonies } from "../identity/identity-ceremonies";
+import {
+  IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
+  invalidateIdentityWriteGate,
+} from "../identity/identifier-write-gate";
+import { IdentityIdentifierBackfillMigration } from "../identity/migration/identifier-backfill.migration";
+import { PrismaIdentityBackfillRepository } from "../identity/repositories/identity-backfill.prisma.repository";
 import {
   invalidateCutoverGate,
   queryCutoverOnEngine,
@@ -56,12 +64,25 @@ import {
 } from "./errors";
 import { RedisMigrationLeaseRepository } from "./repositories/migration-lease.redis.repository";
 import { PrismaOrganizationTenantSource } from "./repositories/organization-tenant-source.prisma.repository";
+import {
+  PrismaOrganizationMemberTenantSource,
+  PrismaUserTenantSource,
+} from "./repositories/user-tenant-source.prisma.repository";
 import { PrismaSystemMigrationEnrollmentRepository } from "./repositories/system-migration-enrollment.prisma.repository";
 import { PrismaSystemMigrationStateRepository } from "./repositories/system-migration-state.prisma.repository";
 import { WitnessingSystemMigrationStateRepository } from "./repositories/witnessing-migration-state.repository";
 import { SystemMigrationsService } from "./system-migrations.service";
 
 const logger = createLogger("langwatch:system-migrations:runtime");
+
+/**
+ * The synthetic "enrollment" id for the identifier backfill's final sweep
+ * (D01 §6): enrolling it puts every user in the cohort — the org-less users
+ * and new sign-ups that org enrollment can never reach. Declared to the ops
+ * service via `syntheticCohorts`, so it enrolls and withdraws like an
+ * organization without having to be one.
+ */
+export const IDENTITY_EVERYONE_ELSE_COHORT = "everyone-else";
 
 /**
  * The composed state repository, wrapped so every lifecycle transition is
@@ -79,6 +100,16 @@ const systemMigrationState = new WitnessingSystemMigrationStateRepository({
     report,
     occurredAtMs,
   }) => {
+    // The USER-rooted identity migration is not witnessed on the grants
+    // ledger — `recordMigrationTenantState` is an organization-rooted verb,
+    // and the identifier backfill's own adoption events already ARE its
+    // replayable record. Its transition is instead the write gate's input,
+    // so the pod that wrote it drops its cached answer here: a latch opens
+    // (and an operator rollback closes) without waiting out the gate TTL.
+    if (migrationName === IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME) {
+      invalidateIdentityWriteGate({ userId: tenantId });
+      return;
+    }
     await (
       await authzGrantsCommands()
     ).commands.recordMigrationTenantState.send({
@@ -111,15 +142,26 @@ const enrollmentRepository = new PrismaSystemMigrationEnrollmentRepository(
 export const systemMigrationsService = new SystemMigrationsService({
   state: systemMigrationState,
   migrations: () =>
-    registeredMigrations().map((migration) => ({
-      name: migration.name,
-      title: migration.title,
-      description: migration.description,
-      requiresOperatorConfirmation: migration.requiresOperatorConfirmation,
-      runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
-    })),
+    [...registeredMigrations(), ...registeredUserMigrations()].map(
+      (migration) => ({
+        name: migration.name,
+        title: migration.title,
+        description: migration.description,
+        requiresOperatorConfirmation: migration.requiresOperatorConfirmation,
+        runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
+      }),
+    ),
   isSaaS: () => env.IS_SAAS === true,
   enrollments: enrollmentRepository,
+  // The identifier backfill's final sweep (D01): user-rooted pacing is
+  // org-driven, which leaves org-less users and new sign-ups with nothing to
+  // enroll — this synthetic cohort id is what an operator enrolls to sweep
+  // everyone the org enrollments do not reach.
+  syntheticCohorts: {
+    [IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME]: [
+      IDENTITY_EVERYONE_ELSE_COHORT,
+    ],
+  },
   audit: (entry) =>
     auditLog({
       userId: entry.userId,
@@ -524,6 +566,82 @@ export function registeredMigrations(): SystemMigration[] {
 }
 
 /**
+ * The USER-rooted migrations (ADR-101 §6): their tenant is the user, so they
+ * ride a second runner over the user tenant source rather than joining
+ * `registeredMigrations`. Same state table, same lease, same ops page — only
+ * the tenant axis differs.
+ */
+export function registeredUserMigrations(): SystemMigration[] {
+  return [
+    new IdentityIdentifierBackfillMigration({
+      reads: new PrismaIdentityBackfillRepository(prisma),
+      ceremonies: new IdentityCeremonies({ prisma }),
+    }),
+  ];
+}
+
+/**
+ * The user-rooted pass's cohort: pacing stays ORG-driven (the ops page
+ * enrolls organizations), so a user is in a migration's cohort when any of
+ * their organizations is enrolled for it — or when the everyone-else sweep
+ * is enrolled, which admits every user. Enrollment and membership are read
+ * once, fresh, at the start of each pass.
+ */
+export async function userMigrationPassCohort(): Promise<MigrationCohort> {
+  if (env.IS_SAAS !== true) return () => true;
+  const enrolledByMigration =
+    await enrollmentRepository.findEnrolledOrganizationIdsByMigration();
+  const cohorts = new Map<
+    string,
+    { everyone: boolean; members: Set<string> }
+  >();
+  for (const migration of registeredUserMigrations()) {
+    const enrolled =
+      enrolledByMigration.get(migration.name) ?? new Set<string>();
+    const everyone = enrolled.has(IDENTITY_EVERYONE_ELSE_COHORT);
+    const organizationIds = [...enrolled].filter(
+      (id) => id !== IDENTITY_EVERYONE_ELSE_COHORT,
+    );
+    const members = new Set<string>();
+    if (!everyone && organizationIds.length > 0) {
+      const rows = await prisma.organizationUser.findMany({
+        where: { organizationId: { in: organizationIds } },
+        select: { userId: true },
+      });
+      for (const row of rows) members.add(row.userId);
+    }
+    cohorts.set(migration.name, { everyone, members });
+  }
+  return ({ tenantId, migrationName }) => {
+    const cohort = cohorts.get(migrationName);
+    if (!cohort) return false;
+    return cohort.everyone || cohort.members.has(tenantId);
+  };
+}
+
+function userMigrationsForThisInstallation(): SystemMigration[] {
+  return registeredUserMigrations().filter((migration) =>
+    migrationRunsOnThisInstallation({
+      isSaaS: env.IS_SAAS === true,
+      runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
+    }),
+  );
+}
+
+function mergeSummaries(
+  a: MigrationPassSummary,
+  b: MigrationPassSummary,
+): MigrationPassSummary {
+  return {
+    tenantsSeen: a.tenantsSeen + b.tenantsSeen,
+    finalized: a.finalized + b.finalized,
+    held: a.held + b.held,
+    parked: a.parked + b.parked,
+    skipped: a.skipped + b.skipped,
+  };
+}
+
+/**
  * Whether one organization may cut over on THIS pass of THIS installation:
  * its "cutover" enrollment on cloud (a per-call database read, so enrolling
  * needs no restart), automatic self-hosted - where reaching this question at
@@ -609,6 +727,28 @@ export async function runSystemMigrationTargetedPass({
   signal?: AbortSignal;
 }): Promise<MigrationPassSummary | null> {
   const redis = tryGetApp()?.redis ?? null;
+  // A user-rooted migration's targeted run keeps the operator's org-shaped
+  // lever: the named organization's MEMBERS are the tenants (the service
+  // already refused an unenrolled organization), and the everyone-else
+  // cohort id targets the full user sweep.
+  const userMigration = userMigrationsForThisInstallation().find(
+    (migration) => migration.name === migrationName,
+  );
+  if (userMigration) {
+    const runner = new SystemMigrationRunnerService({
+      state: systemMigrationState,
+      lease: new RedisMigrationLeaseRepository(redis),
+      tenants:
+        organizationId === IDENTITY_EVERYONE_ELSE_COHORT
+          ? new PrismaUserTenantSource(prisma)
+          : new PrismaOrganizationMemberTenantSource(prisma, organizationId),
+      // Enrollment was verified for this organization by the service before
+      // composing this; every member the source yields is the cohort.
+      cohort: () => true,
+      migrations: [userMigration],
+    });
+    return runner.runPass({ signal });
+  }
   const runner = new SystemMigrationRunnerService({
     state: systemMigrationState,
     lease: new RedisMigrationLeaseRepository(redis),
@@ -654,5 +794,25 @@ export async function runSystemMigrationPass(args?: {
       }),
     ),
   });
-  return runner.runPass({ signal: args?.signal });
+  const organizationSummary = await runner.runPass({ signal: args?.signal });
+  // Another process holds the lease: it is running the whole pass — the
+  // user-rooted leg included — so there is nothing left for this one.
+  if (organizationSummary === null) return null;
+
+  // The USER-rooted leg (ADR-101 §6): the same lease, state table and pacing
+  // rows, driven over users. Runs after the organization pass so a pass's
+  // enrollment read reflects the same moment for both.
+  const userMigrations = userMigrationsForThisInstallation();
+  if (userMigrations.length === 0) return organizationSummary;
+  const userRunner = new SystemMigrationRunnerService({
+    state: systemMigrationState,
+    lease: new RedisMigrationLeaseRepository(redis),
+    tenants: new PrismaUserTenantSource(prisma),
+    cohort: await userMigrationPassCohort(),
+    migrations: userMigrations,
+  });
+  const userSummary = await userRunner.runPass({ signal: args?.signal });
+  return userSummary === null
+    ? organizationSummary
+    : mergeSummaries(organizationSummary, userSummary);
 }

@@ -168,6 +168,17 @@ export class SystemMigrationsService {
       isSaaS: () => boolean;
       enrollments: SystemMigrationEnrollmentStore;
       /**
+       * Synthetic cohort ids an operator may enroll for specific migrations,
+       * per migration name. A USER-rooted migration is paced by organization
+       * enrollment, which leaves nothing to enroll for users outside every
+       * organization — the final "everyone else" sweep enrolls one of these
+       * ids instead of an organization. Enrolling one skips the
+       * organization-existence check and nothing else: it still creates a
+       * real enrollment row, is withdrawn the same way, and only the
+       * migrations listed here accept it.
+       */
+      syntheticCohorts?: Record<string, readonly string[]>;
+      /**
        * The ops audit trail. Enrollment decides which organizations the
        * platform migrates, so both actions are recorded the way the
        * backfill's own writes are - and the enrollment LISTING is recorded
@@ -353,11 +364,13 @@ export class SystemMigrationsService {
   }): Promise<void> {
     if (!this.deps.isSaaS()) throw new MigrationEnrollmentCloudOnlyError();
     this.requireRegisteredMigration(migrationName);
-    const organization = await this.deps.enrollments.findOrganizationById({
-      organizationId,
-    });
-    if (!organization) {
-      throw new MigrationEnrollmentOrganizationNotFoundError();
+    if (!this.isSyntheticCohort({ migrationName, organizationId })) {
+      const organization = await this.deps.enrollments.findOrganizationById({
+        organizationId,
+      });
+      if (!organization) {
+        throw new MigrationEnrollmentOrganizationNotFoundError();
+      }
     }
     await this.deps.enrollments.create({
       organizationId,
@@ -428,11 +441,13 @@ export class SystemMigrationsService {
     if (!this.deps.isSaaS() && !migration.runsAutomaticallyOnSelfHosted) {
       throw new MigrationNotAvailableOnInstallationError();
     }
-    const organization = await this.deps.enrollments.findOrganizationById({
-      organizationId,
-    });
-    if (!organization) {
-      throw new MigrationEnrollmentOrganizationNotFoundError();
+    if (!this.isSyntheticCohort({ migrationName, organizationId })) {
+      const organization = await this.deps.enrollments.findOrganizationById({
+        organizationId,
+      });
+      if (!organization) {
+        throw new MigrationEnrollmentOrganizationNotFoundError();
+      }
     }
     if (this.deps.isSaaS()) {
       const enrolled = await this.deps.enrollments.isEnrolled({
@@ -487,6 +502,20 @@ export class SystemMigrationsService {
   }
 
   /** The migration a name refers to, or the refusal the operator can act on. */
+  /** Whether this (migration, id) pair names a declared synthetic cohort. */
+  private isSyntheticCohort({
+    migrationName,
+    organizationId,
+  }: {
+    migrationName: string;
+    organizationId: string;
+  }): boolean {
+    return (
+      this.deps.syntheticCohorts?.[migrationName]?.includes(organizationId) ??
+      false
+    );
+  }
+
   private requireRegisteredMigration(migrationName: string): {
     name: string;
     title: string;

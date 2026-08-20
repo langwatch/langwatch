@@ -1,9 +1,13 @@
 /**
  * @vitest-environment node
  *
- * The GET-renders/POST-completes route shape of the email verification
- * ceremony (D01): a fetched magic link must never verify anything — only the
- * POST carrying the token AND the initiating context's PKCE verifier can.
+ * The GET-renders/POST-completes shape of the email verification ceremony
+ * (D01): a fetched magic link must never verify anything — only the
+ * `verification.complete` RPC carrying the token AND the initiating
+ * context's PKCE verifier can.
+ *
+ * Two apps meet at one surface: the landing page (this directory) renders,
+ * the identity RPC family (src/app/api/identity) completes.
  *
  * See specs/identity/identifier-model.feature.
  */
@@ -16,7 +20,11 @@ import {
   s256Challenge,
   VerificationCeremonyService,
 } from "~/server/app-layer/identity/verification-ceremony";
-import { app, setVerificationCeremoniesForTests } from "../identity-verification";
+import {
+  app as identityFamilyApp,
+  setVerificationCeremoniesForTests,
+} from "../../../app/api/identity/[[...route]]/app";
+import { app as landingApp } from "../identity-verification";
 
 vi.mock("~/server/auth", () => ({
   getServerAuthSession: vi.fn(async () => null),
@@ -24,6 +32,7 @@ vi.mock("~/server/auth", () => ({
 
 const USER = "user_sam";
 const IDENTIFIER = "idf_work";
+const COMPLETE_PATH = "/api/identity/verification.complete";
 
 class InMemoryVerificationStore implements IdentityVerificationStore {
   records = new Map<string, IdentityVerificationRecord>();
@@ -85,14 +94,22 @@ function magicLinkPath(minted: { verificationId: string; token: string }) {
   return `/api/identity/verify?vid=${encodeURIComponent(minted.verificationId)}&token=${encodeURIComponent(minted.token)}`;
 }
 
+function completionRequest(body: Record<string, string>) {
+  return identityFamilyApp.request(COMPLETE_PATH, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
 describe("the verification route shape", () => {
   describe("when the emailed magic link is opened with a GET request", () => {
     /** @scenario "Email verification completes only with the ceremony's proof" */
-    it("renders only; completion needs the POST with token and verifier", async () => {
+    it("renders only; completion needs the RPC with token and verifier", async () => {
       const codeVerifier = "held-by-the-initiating-context";
       const minted = await mint(codeVerifier);
 
-      const rendered = await app.request(magicLinkPath(minted));
+      const rendered = await landingApp.request(magicLinkPath(minted));
       expect(rendered.status).toBe(200);
       expect(verifyIdentifier).not.toHaveBeenCalled();
       expect(store.records.has(IDENTIFIER)).toBe(true);
@@ -100,15 +117,11 @@ describe("the verification route shape", () => {
       vi.mocked(getServerAuthSession).mockResolvedValue({
         user: { id: USER },
       } as never);
-      const completed = await app.request("/api/identity/verify", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          identifierId: IDENTIFIER,
-          verificationId: minted.verificationId,
-          token: minted.token,
-          codeVerifier,
-        }),
+      const completed = await completionRequest({
+        identifierId: IDENTIFIER,
+        verificationId: minted.verificationId,
+        token: minted.token,
+        codeVerifier,
       });
       expect(completed.status).toBe(200);
       expect(await completed.json()).toEqual({ verified: true });
@@ -123,7 +136,7 @@ describe("the verification route shape", () => {
 
       // Scanners follow GET and some retry; none of it may consume anything.
       for (let fetchCount = 0; fetchCount < 3; fetchCount += 1) {
-        const response = await app.request(magicLinkPath(minted));
+        const response = await landingApp.request(magicLinkPath(minted));
         expect(response.status).toBe(200);
       }
 
@@ -137,17 +150,36 @@ describe("the verification route shape", () => {
   describe("when completion is posted without a session", () => {
     it("answers 401 before touching the ceremony", async () => {
       const minted = await mint("verifier");
-      const response = await app.request("/api/identity/verify", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          identifierId: IDENTIFIER,
-          verificationId: minted.verificationId,
-          token: minted.token,
-          codeVerifier: "verifier",
-        }),
+      const response = await completionRequest({
+        identifierId: IDENTIFIER,
+        verificationId: minted.verificationId,
+        token: minted.token,
+        codeVerifier: "verifier",
       });
       expect(response.status).toBe(401);
+      expect(verifyIdentifier).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when completion presents a refusable proof", () => {
+    it("answers the handled code, never a generic failure", async () => {
+      const minted = await mint("the-real-verifier");
+      vi.mocked(getServerAuthSession).mockResolvedValue({
+        user: { id: USER },
+      } as never);
+      const response = await completionRequest({
+        identifierId: IDENTIFIER,
+        verificationId: minted.verificationId,
+        token: minted.token,
+        codeVerifier: "a-wrong-verifier",
+      });
+      expect(response.status).toBe(400);
+      const body = (await response.json()) as { error?: { code?: string } } & {
+        code?: string;
+      };
+      expect(body.error?.code ?? body.code).toBe(
+        "identity_verification_invalid",
+      );
       expect(verifyIdentifier).not.toHaveBeenCalled();
     });
   });
