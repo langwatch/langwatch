@@ -7,7 +7,7 @@ import {
   gqGroupsOverStagingDepth,
   gqOldestBacklogAgeMilliseconds,
   gqOldestPendingAgeMilliseconds,
-  STAGING_DEPTH_REPORT_THRESHOLD,
+  STAGING_DEPTH_REPORT_FLOOR,
 } from "../metrics";
 import { GroupQueueMetricsCollector } from "../metricsCollector";
 import { MIN_PLAUSIBLE_EPOCH_MS } from "../readyScore";
@@ -172,10 +172,13 @@ function makeLogger() {
   };
 }
 
-function makeCollector(
-  redis: IORedis | Cluster,
-  logger: ReturnType<typeof makeLogger> = makeLogger(),
-) {
+function makeCollector({
+  redis,
+  logger = makeLogger(),
+}: {
+  redis: IORedis | Cluster;
+  logger?: ReturnType<typeof makeLogger>;
+}) {
   const collector = new GroupQueueMetricsCollector({
     scripts: { getKeyPrefix: () => PREFIX } as unknown as GroupStagingScripts,
     processingQueue: { length: () => 0 } as never,
@@ -191,7 +194,7 @@ function makeCollector(
 
 /** One cycle on a fresh collector, which is what most cases here want. */
 function runCollect(redis: IORedis | Cluster) {
-  return makeCollector(redis).collect();
+  return makeCollector({ redis }).collect();
 }
 
 async function readGauge(): Promise<number | undefined> {
@@ -506,9 +509,9 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
         const redis = makeRedis({
           readyZset: ready("a", "b", "c"),
           stagingDepths: {
-            a: STAGING_DEPTH_REPORT_THRESHOLD,
-            b: STAGING_DEPTH_REPORT_THRESHOLD - 1,
-            c: STAGING_DEPTH_REPORT_THRESHOLD * 3,
+            a: STAGING_DEPTH_REPORT_FLOOR,
+            b: STAGING_DEPTH_REPORT_FLOOR - 1,
+            c: STAGING_DEPTH_REPORT_FLOOR * 3,
           },
         });
 
@@ -516,6 +519,9 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
 
         // One hot key and a stalled drainer both raise the max; only this
         // separates them.
+        // The floor is inclusive: `a` sits exactly on it and counts, `b` is
+        // one below and does not. That boundary is the one most likely to be
+        // chosen deliberately, so it is the one worth pinning.
         expect(await readOverThreshold()).toBe(2);
       });
     });
@@ -529,7 +535,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
           stagingDepths: { g1: 1, g2: 2, g3: 3, deep: 250_000 },
           zscanPageSize: 2,
         });
-        const collector = makeCollector(redis);
+        const collector = makeCollector({ redis });
 
         await collector.collect();
         expect(await readMax()).toBe(2);
@@ -548,7 +554,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
           readyZset: ready("quiet", "deep"),
           stagingDepths: depths,
         });
-        const collector = makeCollector(redis);
+        const collector = makeCollector({ redis });
 
         // One cycle covers both groups, so this cycle completes a rotation.
         await collector.collect();
@@ -593,7 +599,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
           stagingDepths: { g1: 1, g2: 2 },
           gateFirstCall: gate,
         });
-        const collector = makeCollector(redis);
+        const collector = makeCollector({ redis });
 
         const inFlight = collector.collect();
         await collector.collect();
@@ -614,7 +620,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
   describe("given a group ZSCAN returns on two pages", () => {
     describe("when the rotation counts groups over the threshold", () => {
       it("counts it once, because the scan promises at least once", async () => {
-        const deep = STAGING_DEPTH_REPORT_THRESHOLD * 2;
+        const deep = STAGING_DEPTH_REPORT_FLOOR * 2;
         const redis = makeRedis({
           // "seen-twice" spans a page boundary, which is what a rehash part
           // way through a rotation looks like from here.
@@ -626,7 +632,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
           },
           zscanPageSize: 2,
         });
-        const collector = makeCollector(redis);
+        const collector = makeCollector({ redis });
 
         await collector.collect();
         await collector.collect();
@@ -646,7 +652,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
           stagingDepthErrors: ["a", "b"],
         });
 
-        await makeCollector(redis, logger).collect();
+        await makeCollector({ redis, logger }).collect();
 
         // Both gauges read 0 here, which is indistinguishable from a quiet
         // queue. The log line is the only thing that says the sweep saw

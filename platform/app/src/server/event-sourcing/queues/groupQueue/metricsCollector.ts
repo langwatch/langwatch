@@ -13,7 +13,7 @@ import {
   gqOldestPendingAgeMilliseconds,
   gqParkedGroups,
   gqPendingGroups,
-  STAGING_DEPTH_REPORT_THRESHOLD,
+  STAGING_DEPTH_REPORT_FLOOR,
 } from "./metrics";
 import { isPlausibleReadyScore, MIN_PLAUSIBLE_EPOCH_MS } from "./readyScore";
 import type { DispatchResult, GroupStagingScripts } from "./scripts";
@@ -358,7 +358,7 @@ export class GroupQueueMetricsCollector {
       if (depth > this.stagingDepthMax) {
         this.stagingDepthMax = depth;
       }
-      if (depth >= STAGING_DEPTH_REPORT_THRESHOLD) {
+      if (depth >= STAGING_DEPTH_REPORT_FLOOR) {
         this.stagingOverThreshold.add(groupId);
       }
     }

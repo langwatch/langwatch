@@ -237,7 +237,7 @@ export const gqGroupStagingDepthMax = new Gauge({
 });
 
 /**
- * How many groups are over {@link STAGING_DEPTH_REPORT_THRESHOLD}.
+ * How many groups are at or above {@link STAGING_DEPTH_REPORT_FLOOR}.
  *
  * Separate from the max because they answer different questions under alarm.
  * One deep group is a hot key; a thousand is the drainer having stopped. The
@@ -245,20 +245,25 @@ export const gqGroupStagingDepthMax = new Gauge({
  */
 export const gqGroupsOverStagingDepth = new Gauge({
   name: "gq_groups_over_staging_depth",
-  help: "Groups whose staging hash exceeds the reporting threshold, in the current sweep rotation",
+  help: "Groups whose staging hash is at or above the reporting floor, in the current sweep rotation",
   labelNames: ["queue_name"] as const,
 });
 
 /**
- * Depth at which a group is counted as accumulating.
+ * Depth at which a group starts being counted as accumulating.
+ *
+ * A floor, and inclusive: a group sitting at exactly this depth is counted.
+ * The alternative reads better in a sentence and worse in an incident, since
+ * the one depth that would slip through is the round number a person is most
+ * likely to have chosen deliberately.
  *
  * 10k staged jobs in one group is far outside anything the queue produces in
  * normal operation and far below the ~290k the incident reached, so it leaves
- * room to act. It is a reporting threshold only: nothing in the queue changes
+ * room to act. It is a reporting floor only: nothing in the queue changes
  * behaviour when a group crosses it, and where the alarm sits is a dashboard
  * decision, not this module's.
  */
-export const STAGING_DEPTH_REPORT_THRESHOLD = 10_000;
+export const STAGING_DEPTH_REPORT_FLOOR = 10_000;
 
 /**
  * Jobs whose producer supplied a ready score the queue refused.
