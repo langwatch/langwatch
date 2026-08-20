@@ -93,6 +93,23 @@ describe("decideCredentialWrite", () => {
     });
   });
 
+  // A record whose values are blank is not a credential. Treating it as one
+  // let a forced run replace a working key with whitespace, which empties the
+  // column by another name.
+  it.each([
+    ["an empty string", { OPENAI_API_KEY: "" }],
+    ["whitespace", { OPENAI_API_KEY: "   " }],
+    ["a null value", { OPENAI_API_KEY: null }],
+  ])("keeps a stored credential when the replacement is %s, even forced", (_label, replacement) => {
+    expect(
+      decideCredentialWrite({
+        stored: { state: "present", keys: { OPENAI_API_KEY: "fake-working" } },
+        replacement,
+        shouldForce: true,
+      }),
+    ).toEqual({ action: "keep", reason: "a credential is already stored" });
+  });
+
   // Forcing swaps one key for another. It is never a way to empty the column,
   // and an unset environment variable is the common way to arrive here.
   it.each([

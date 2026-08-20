@@ -101,10 +101,18 @@ export function decideCredentialWrite({
     : decideWithoutReplacement(stored);
 }
 
+/**
+ * Whether this run holds a credential worth writing.
+ *
+ * Deliberately the same test `readStoredCredential` applies to what is already
+ * in the column. A record whose only key is empty or blank is not a
+ * credential, and treating it as one let a forced run replace a working key
+ * with whitespace, which empties the column by another name.
+ */
 function hasSomethingToWrite(
   replacement: Record<string, unknown> | null,
 ): boolean {
-  return replacement !== null && Object.keys(replacement).length > 0;
+  return replacement !== null && hasAnyValue(replacement);
 }
 
 /**
