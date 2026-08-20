@@ -356,7 +356,7 @@ const registry = {
   },
   langy_conversation_id_unadoptable: {
     tips: [
-      "Check `meta.reason`: `invalid_shape` means the id must be 6-120 characters from [A-Za-z0-9_-]; `archived` means the id collides with an archived conversation — pick a different id",
+      "Retry with a different conversation id, or omit `conversationId` to let the server generate one",
     ],
   },
   langy_model_not_configured: {
