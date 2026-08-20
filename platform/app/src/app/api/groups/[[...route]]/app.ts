@@ -344,7 +344,10 @@ secured
       });
       if (!group) throw new GroupNotFoundError(id);
 
-      const bindings = await service.getBindings({ groupId: id });
+      const bindings = await service.getBindings({
+        organizationId: organization.id,
+        groupId: id,
+      });
       return c.json({
         data: bindings.map((b) => ({
           id: b.id,
