@@ -500,13 +500,11 @@ export class LangyTokenBuffer {
   }): Promise<void> {
     await this.flush({ conversationId, turnId });
     await this.flushReasoning({ conversationId, turnId });
-    // A turn that completes without ever emitting a text delta leaves the user
-    // staring at a finished spinner and nothing else — the failure mode is
-    // indistinguishable from the product being broken, even when every command
-    // in the turn succeeded. The agent is told to always end with visible text;
-    // this is the backstop for when it does not, because silence is the one
-    // outcome the panel cannot render. A turn of pure whitespace reads to the
-    // user exactly like a turn of nothing, so it takes the fallback too.
+    // A turn that completes without a text delta leaves a finished spinner and
+    // nothing else, which reads as a broken product even when every command in
+    // the turn succeeded. The agent is told to always end with visible text;
+    // this is the backstop. Pure whitespace reads the same as nothing, so it
+    // takes the fallback too.
     if (!this.sawVisibleText.has(this.pendingKey(conversationId, turnId))) {
       await this.append(conversationId, turnId, {
         type: "delta",

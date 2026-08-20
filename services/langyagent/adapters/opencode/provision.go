@@ -497,6 +497,15 @@ func buildWorkerEnv(conversationID, workerHome string, creds domain.Credentials,
 		// the world-readable /proc/<pid>/cmdline — only in /proc/<pid>/environ,
 		// which is 0400 and UID-gated.
 		"OPENCODE_SERVER_PASSWORD="+openCodePassword,
+		// opencode also scans ~/.claude/skills and ~/.agents/skills and folds
+		// whatever it finds into the system prompt. The worker's HOME is its
+		// own session dir, but those two scans resolve the real account home,
+		// so on a host-tier manager the operator's personal skills reach Langy.
+		// Measured on a dev box: 17 foreign skills, 8,191 characters, 22% of
+		// the assembled system message, one of them a credential broker. Langy
+		// runs exactly the skills we ship it.
+		"OPENCODE_DISABLE_EXTERNAL_SKILLS=1",
+		"OPENCODE_DISABLE_CLAUDE_CODE_SKILLS=1",
 	)
 	// Host-mediated worker telemetry (phase 1): opencode's native OTel export
 	// points at the manager's loopback relay. NO authorization header — the

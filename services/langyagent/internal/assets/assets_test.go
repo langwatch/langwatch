@@ -24,11 +24,9 @@ func TestAgentsTemplate_CarriesPlaceholder(t *testing.T) {
 
 // The prompt has a byte budget so it cannot silently grow back into a rule
 // pile. It once reached 52,795 bytes by accreting one rule per observed
-// failure; the rewrite brought it to ~13KB of role, interface contract and
-// principles. A fix that needs the ceiling raised is a fix at the wrong layer:
-// fix the class of failure in one principle, in the harness config, or in the
-// product, and see the Improving your Agent guide
-// (https://scenario.langwatch.ai/best-practices/improving-your-agent).
+// failure. A fix that needs the ceiling raised is a fix at the wrong layer:
+// state the class in one principle, or move the constraint into the harness
+// config. See https://scenario.langwatch.ai/best-practices/improving-your-agent
 //
 // @scenario "The prompt fits its size budget"
 func TestAgentsTemplate_FitsSizeBudget(t *testing.T) {

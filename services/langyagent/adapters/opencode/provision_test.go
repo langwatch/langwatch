@@ -155,6 +155,35 @@ func TestBuildWorkerEnv_InjectsUniqueOpenCodePassword(t *testing.T) {
 	}
 }
 
+// opencode folds every skill it discovers into the system prompt, and two of
+// its scan roots (~/.claude/skills, ~/.agents/skills) resolve the real account
+// home rather than the worker's HOME. On a host-tier manager that puts the
+// operator's own skills in front of Langy: measured on a dev box, 17 of them,
+// 8,191 characters, 22% of the assembled system message, including a skill
+// that brokers Slack and Gmail credentials. Langy runs the skills we ship it.
+//
+// @scenario "The worker runs only the skills we ship it"
+func TestBuildWorkerEnv_DisablesExternalSkillScans(t *testing.T) {
+	env := buildWorkerEnv(
+		"conv-a",
+		"/workspace/sessions/conv-a",
+		domain.Credentials{LangwatchAPIKey: "lw-key"},
+		"pw",
+		19001,
+		Mediation{},
+		nil,
+	)
+
+	for _, key := range []string{
+		"OPENCODE_DISABLE_EXTERNAL_SKILLS",
+		"OPENCODE_DISABLE_CLAUDE_CODE_SKILLS",
+	} {
+		if got := valueOfEnv(env, key); got != "1" {
+			t.Errorf("worker env %s = %q, want %q", key, got, "1")
+		}
+	}
+}
+
 // buildWorkerEnv must inject the per-worker credentials. It must NOT hand the
 // worker any OTLP telemetry key/endpoint — the OTel plugin was removed (its
 // module-load cost killed turns) and worker telemetry returns host-mediated, so

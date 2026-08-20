@@ -19,6 +19,14 @@ Feature: Langy minimal harness
       since Langy answers questions whose answers are not in LangWatch's docs
 
   @unit
+  Scenario: The worker runs only the skills we ship it
+    Given the host account has its own agent skills installed
+    When a worker is provisioned
+    Then the worker does not load them
+    And the operator's skills stay out of Langy's system prompt and out of the
+      capabilities it offers the user
+
+  @unit
   Scenario: The prompt fits its size budget
     When the prompt asset is checked
     Then its size is under the enforced byte ceiling
