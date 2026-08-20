@@ -28,24 +28,39 @@ import {
 /** One billable hour: $6.00 across 3600s of warehouse time. */
 const BILLABLE_SKU = "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST";
 
+/**
+ * The hour a row belongs to. Most rows here name one hour; the straddling
+ * cases name two, which is the whole point of them.
+ */
+const HOUR_09 = "2026-08-01T09:00:00.000Z";
+const HOUR_10 = "2026-08-01T10:00:00.000Z";
+
 function row({
   statementId,
-  executionDurationMs,
+  executionMsInHour,
   hourTotalMs,
+  usageHour = HOUR_09,
   hourBillableUsd = "6.00",
   currencyCode = "USD",
   skuName = BILLABLE_SKU,
 }: {
   statementId: string;
-  executionDurationMs: string;
+  /**
+   * The part of the statement's execution that fell inside THIS row's hour,
+   * not its whole runtime — a statement that ran through a boundary is
+   * several rows, one per hour it was awake in.
+   */
+  executionMsInHour: string;
   hourTotalMs: string;
+  usageHour?: string;
   hourBillableUsd?: string | null;
   currencyCode?: string | null;
   skuName?: string | null;
 }) {
   return {
     statementId,
-    executionDurationMs,
+    executionMsInHour,
+    usageHour,
     hourTotalMs,
     hourBillableUsd,
     currencyCode,
@@ -60,7 +75,7 @@ describe("allocateWarehouseCost", () => {
       rows: [
         row({
           statementId: "stmt-1",
-          executionDurationMs: "3600000",
+          executionMsInHour: "3600000",
           hourTotalMs: "3600000",
         }),
       ],
@@ -76,12 +91,12 @@ describe("allocateWarehouseCost", () => {
       rows: [
         row({
           statementId: "long",
-          executionDurationMs: "2000",
+          executionMsInHour: "2000",
           hourTotalMs: "3000",
         }),
         row({
           statementId: "short",
-          executionDurationMs: "1000",
+          executionMsInHour: "1000",
           hourTotalMs: "3000",
         }),
       ],
@@ -104,12 +119,12 @@ describe("allocateWarehouseCost", () => {
       rows: [
         row({
           statementId: "genie-1",
-          executionDurationMs: "900000",
+          executionMsInHour: "900000",
           hourTotalMs: "3600000",
         }),
         row({
           statementId: "genie-2",
-          executionDurationMs: "900000",
+          executionMsInHour: "900000",
           hourTotalMs: "3600000",
         }),
       ],
@@ -128,7 +143,7 @@ describe("allocateWarehouseCost", () => {
       rows: [
         row({
           statementId: "tiny",
-          executionDurationMs: "1",
+          executionMsInHour: "1",
           hourTotalMs: "3600000",
         }),
       ],
@@ -147,7 +162,7 @@ describe("allocateWarehouseCost", () => {
       rows: [
         row({
           statementId: "eur",
-          executionDurationMs: "1000",
+          executionMsInHour: "1000",
           hourTotalMs: "1000",
           currencyCode: "EUR",
         }),
@@ -166,7 +181,7 @@ describe("allocateWarehouseCost", () => {
       rows: [
         row({
           statementId: "unpriced",
-          executionDurationMs: "1000",
+          executionMsInHour: "1000",
           hourTotalMs: "1000",
           hourBillableUsd: null,
           currencyCode: null,
@@ -192,7 +207,7 @@ describe("allocateWarehouseCost", () => {
       rows: [
         row({
           statementId: "unbilled",
-          executionDurationMs: "1000",
+          executionMsInHour: "1000",
           hourTotalMs: "1000",
           hourBillableUsd: null,
           currencyCode: null,
@@ -212,7 +227,7 @@ describe("allocateWarehouseCost", () => {
       rows: [
         row({
           statementId: "stmt-1",
-          executionDurationMs: "3600000",
+          executionMsInHour: "3600000",
           hourTotalMs: "3600000",
           hourBillableUsd: "6.00",
           skuName: BILLABLE_SKU,
@@ -221,7 +236,7 @@ describe("allocateWarehouseCost", () => {
         // The priced line wins: the statement has a cost, so it is not owed.
         row({
           statementId: "stmt-1",
-          executionDurationMs: "3600000",
+          executionMsInHour: "3600000",
           hourTotalMs: "3600000",
           hourBillableUsd: null,
           currencyCode: null,
@@ -234,13 +249,100 @@ describe("allocateWarehouseCost", () => {
     expect(owed.has("stmt-1")).toBe(false);
   });
 
+  /** @scenario "Traffic that began before the hour keeps its share of the bill" */
+  it("leaves a straddling statement its share of the hour it ran into", () => {
+    // The case a start-hour denominator got wrong. A forty-minute statement
+    // begins at 09:58; a one-second question is the only thing to START in
+    // hour 10. Sliced by the hours it RAN in, the straddler is 38 of hour 10's
+    // 38-and-a-bit minutes, so the question pays for its second and nothing
+    // more. Bucketed by start hour, hour 10's denominator held only that
+    // second and the question carried the entire hour.
+    const { costByStatementId } = allocateWarehouseCost({
+      rows: [
+        // Two of its forty minutes fell in hour 09, which was otherwise idle.
+        row({
+          statementId: "straddler",
+          usageHour: HOUR_09,
+          executionMsInHour: "120000",
+          hourTotalMs: "120000",
+        }),
+        // The other thirty-eight landed in hour 10, beside the question.
+        row({
+          statementId: "straddler",
+          usageHour: HOUR_10,
+          executionMsInHour: "2280000",
+          hourTotalMs: "2281000",
+        }),
+        row({
+          statementId: "question",
+          usageHour: HOUR_10,
+          executionMsInHour: "1000",
+          hourTotalMs: "2281000",
+        }),
+      ],
+    });
+
+    // 6 USD * 1000 / 2_281_000 — a quarter of a cent, not six dollars.
+    expect(Number(costByStatementId.get("question")?.costUsd)).toBeCloseTo(
+      0.00263,
+      5,
+    );
+    // And the compute it did not do stays with the statement that did it:
+    // 6 * 120000/120000 + 6 * 2280000/2281000.
+    expect(Number(costByStatementId.get("straddler")?.costUsd)).toBeCloseTo(
+      11.99737,
+      5,
+    );
+
+    // The ingredients have to name every hour the share was drawn from. Costing
+    // a statement out of two hours and then reporting the first hour's total
+    // as the denominator makes the record read as a twentyfold error, and the
+    // record is what anyone reconciling the bill actually reads.
+    expect(costByStatementId.get("straddler")?.hourTotalExecutionMs).toBe(
+      "2401000",
+    );
+    expect(costByStatementId.get("straddler")?.hourBillableUsd).toBe("12");
+  });
+
+  /** @scenario "A statement is held when an hour it ran through has no bill yet" */
+  it("holds a statement whose later hour has not been billed yet", () => {
+    // A statement that ran through the boundary is priced by two hours, and the
+    // later one is the one still in flight. Reading "priced at all" as settled
+    // moves the watermark past the unbilled hour, and the part of this
+    // statement that ran in it is recorded at nothing for good.
+    const { costByStatementId, owed } = allocateWarehouseCost({
+      rows: [
+        row({
+          statementId: "straddler",
+          usageHour: HOUR_09,
+          executionMsInHour: "120000",
+          hourTotalMs: "3600000",
+        }),
+        row({
+          statementId: "straddler",
+          usageHour: HOUR_10,
+          executionMsInHour: "2280000",
+          hourTotalMs: "2281000",
+          hourBillableUsd: null,
+          currencyCode: null,
+          skuName: null,
+        }),
+      ],
+    });
+
+    expect(owed.has("straddler")).toBe(true);
+    // Held, not discarded: what did price stays on the record, and the re-read
+    // that lands the missing hour restates it.
+    expect(costByStatementId.get("straddler")?.costUsd).toBe("0.2");
+  });
+
   /** @scenario "Genie's own free usage is never charged" */
   it("charges nothing for Genie's own free-usage line", () => {
     const { costByStatementId } = allocateWarehouseCost({
       rows: [
         row({
           statementId: "free",
-          executionDurationMs: "1000",
+          executionMsInHour: "1000",
           hourTotalMs: "1000",
           skuName: `${GENIE_FREE_USAGE_SKU_MARKER}_SOMETHING`,
           hourBillableUsd: "99.00",
@@ -258,7 +360,7 @@ describe("allocateWarehouseCost", () => {
       rows: [
         row({
           statementId: "zero-hour",
-          executionDurationMs: "0",
+          executionMsInHour: "0",
           hourTotalMs: "0",
         }),
       ],
@@ -275,14 +377,14 @@ describe("allocateWarehouseCost", () => {
       rows: [
         row({
           statementId: "stmt-1",
-          executionDurationMs: "3600000",
+          executionMsInHour: "3600000",
           hourTotalMs: "3600000",
           hourBillableUsd: "4.00",
           skuName: BILLABLE_SKU,
         }),
         row({
           statementId: "stmt-1",
-          executionDurationMs: "3600000",
+          executionMsInHour: "3600000",
           hourTotalMs: "3600000",
           hourBillableUsd: "2.00",
           skuName: "PREMIUM_SERVERLESS_SQL_COMPUTE_SURCHARGE",

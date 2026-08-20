@@ -97,6 +97,26 @@ const ONE_HOUR_MS = 60 * 60 * 1000;
 export const WAREHOUSE_COST_CHUNK_MS = 7 * 24 * ONE_HOUR_MS;
 
 /**
+ * How far BEFORE a window the cost read scans for statements still running in
+ * it.
+ *
+ * A statement that began at 09:58 and ran forty minutes is billed to hour 10
+ * for thirty-eight of them, so hour 10's denominator has to count it — but the
+ * statement's own row lives in hour 09, outside a window that starts at 10:00.
+ * Without a look-back that hour under-counts its execution time and hands every
+ * question inside it a larger share of the bill than it earned.
+ *
+ * A day, and the bound is the point. It is not free: it widens the scan of
+ * `system.query.history`, which on the normal seven-day chunk is +14% and on a
+ * refused chunk's one-day pieces is double. Unbounded it would be a full-table
+ * scan on every read. What a day buys is every plausible warehouse statement —
+ * a query still running after twenty-four hours is a runaway, and its
+ * under-counted first hours err in the same direction as the bug this bound
+ * exists to fix, but bounded to that one statement rather than to all of them.
+ */
+export const WAREHOUSE_COST_STRADDLE_LOOKBACK_MS = 24 * ONE_HOUR_MS;
+
+/**
  * How much of one refused chunk a follow-up request asks about.
  *
  * A day, because that is the size the whole window used to be read at: it is
@@ -231,7 +251,27 @@ export const GENIE_FREE_USAGE_SKU_MARKER = "GENIE_FREE_USAGE";
  */
 export const warehouseCostRowSchema = z.object({
   statementId: z.string().min(1),
-  executionDurationMs: z.string(),
+  /**
+   * The hour this row is about, as the warehouse rendered it. An opaque key,
+   * only ever compared against other rows of the same reply.
+   *
+   * It is load-bearing because one statement can now produce several rows for
+   * two entirely different reasons, and they fold in opposite ways. Several
+   * rows for ONE hour are several SKUs the warehouse billed that hour under:
+   * they share a denominator, and summing it would halve every share. Several
+   * rows for DIFFERENT hours are the hours a statement ran through: their
+   * denominators are different totals and must be summed, or the record claims
+   * a share of two hours' bills against one hour's execution time.
+   */
+  usageHour: z.string(),
+  /**
+   * The part of the statement's execution that fell inside THIS row's hour —
+   * not its whole runtime. The warehouse is billed per hour for the work that
+   * actually ran in that hour, so the share's numerator has to be cut the same
+   * way or it is answering a different question than the denominator.
+   */
+  executionMsInHour: z.string(),
+  /** Executed milliseconds across the whole warehouse in this row's hour. */
   hourTotalMs: z.string(),
   /** Null when the workspace publishes no USD price for the hour's SKU. */
   hourBillableUsd: z.string().nullable(),
@@ -276,19 +316,25 @@ export type WarehouseCostSkip = {
  * carries. So the record says what was measured and claims nothing more.
  */
 export type WarehousePricedStatement = {
-  /** The statement's share of its hour's bill, as an exact decimal USD string. */
+  /**
+   * The statement's share of the bill, as an exact decimal USD string. A
+   * statement that ran through an hour boundary is priced once per hour and
+   * this is the sum of those shares.
+   */
   costUsd: string;
   /**
-   * Executed milliseconds across ALL statements on the warehouse that hour —
-   * the share's denominator. A sum, not a utilization: concurrency can carry
-   * it past one hour of wall clock.
+   * Executed milliseconds across ALL statements on the warehouse, summed over
+   * the hours this statement itself ran through — the share's denominator. A
+   * sum, not a utilization: concurrency can carry a single hour past one hour
+   * of wall clock, and a statement spanning three hours adds three of them.
    */
   hourTotalExecutionMs: string;
   /**
-   * The hour's bill across the lines this statement priced on, as an exact
-   * decimal USD string — the share's other ingredient, so
+   * The bill across the lines this statement priced on, as an exact decimal USD
+   * string — the share's other ingredient, so
    * `costUsd ≈ hourBillableUsd × executionMs / hourTotalExecutionMs` holds on
-   * the record itself.
+   * the record itself. Both this and the denominator span the same hours, so
+   * the identity survives a statement that straddled.
    */
   hourBillableUsd: string;
 };
@@ -329,7 +375,7 @@ function wholeMs(value: string): bigint | null {
 function shareOf(
   row: WarehouseCostRow,
 ):
-  | { nanoUsd: bigint; hourNanoUsd: bigint }
+  | { nanoUsd: bigint; hourNanoUsd: bigint; hourTotalMs: bigint }
   | { reason: WarehouseCostSkipReason }
   | "free"
   | "owed" {
@@ -353,7 +399,7 @@ function shareOf(
     return { reason: "currency_not_usd" };
   }
 
-  const executionMs = wholeMs(row.executionDurationMs);
+  const executionMs = wholeMs(row.executionMsInHour);
   const totalMs = wholeMs(row.hourTotalMs);
   if (executionMs === null || totalMs === null) {
     return { reason: "unreadable_row" };
@@ -374,45 +420,53 @@ function shareOf(
   return {
     nanoUsd: (hourNanoUsd * executionMs) / totalMs,
     hourNanoUsd,
+    hourTotalMs: totalMs,
   };
 }
 
-/** A statement's running totals while its hour's lines are being folded in. */
+/** A statement's running totals while its lines are being folded in. */
 type PricedTotals = {
   costNanoUsd: bigint;
   hourNanoUsd: bigint;
-  hourTotalExecutionMs: string;
+  /**
+   * Each hour this statement drew from, and that hour's whole-warehouse total —
+   * keyed, not accumulated, because an hour billed under three SKUs sends the
+   * same total three times and adding them would treble the denominator the
+   * record reports. Summed once at the end, over the KEYS.
+   */
+  hourTotalMsByHour: Map<string, bigint>;
 };
 
 /** Fold one priced line into its statement's running totals. */
 function foldPricedLine(
   into: Map<string, PricedTotals>,
   row: WarehouseCostRow,
-  share: { nanoUsd: bigint; hourNanoUsd: bigint },
+  share: { nanoUsd: bigint; hourNanoUsd: bigint; hourTotalMs: bigint },
 ): void {
   const entry = into.get(row.statementId);
   if (entry) {
     entry.costNanoUsd += share.nanoUsd;
-    // Several lines are several PARTS of one hour's bill, so the hour's
-    // billable figure sums the same way the cost does.
+    // Several lines are several PARTS of a bill, so the billable figure sums
+    // the same way the cost does — whether they are one hour's SKUs or the
+    // several hours a long statement ran through.
     entry.hourNanoUsd += share.hourNanoUsd;
+    entry.hourTotalMsByHour.set(row.usageHour, share.hourTotalMs);
     return;
   }
   into.set(row.statementId, {
     costNanoUsd: share.nanoUsd,
     hourNanoUsd: share.hourNanoUsd,
-    // A statement lives in exactly one hour (bucketed by start_time), so
-    // every one of its lines names the same total.
-    hourTotalExecutionMs: row.hourTotalMs,
+    hourTotalMsByHour: new Map([[row.usageHour, share.hourTotalMs]]),
   });
 }
 
 /**
  * The per-statement share of each hour's warehouse bill.
  *
- * A statement may appear more than once: serverless SQL bills several lines for
- * the same hour, and each is a PART of the statement's cost. They are summed,
- * not treated as competing answers for the same thing.
+ * A statement may appear more than once, for two unrelated reasons, and both
+ * are PARTS of one cost rather than competing answers: serverless SQL bills
+ * several lines for the same hour, and a statement that ran through an hour
+ * boundary is cut into one line per hour it was awake in. Both are summed.
  */
 export function allocateWarehouseCost({
   rows,
@@ -421,13 +475,29 @@ export function allocateWarehouseCost({
 }): WarehouseCostAllocation {
   const nanoByStatementId = new Map<string, PricedTotals>();
   const skipped: WarehouseCostSkip[] = [];
-  const owed = new Set<string>();
+  // Both sides of the hold are tracked per HOUR, not per statement. A statement
+  // that ran through two hours can be settled for one of them and still be
+  // waiting on the other, and it is the unsettled hour that has to hold the
+  // watermark — pricing the hour that happens to be billed already is not
+  // evidence about the hour that is not.
+  const owedHours = new Map<string, Set<string>>();
+  const pricedHours = new Map<string, Set<string>>();
+
+  const noteHour = (
+    into: Map<string, Set<string>>,
+    statementId: string,
+    usageHour: string,
+  ): void => {
+    const hours = into.get(statementId);
+    if (hours) hours.add(usageHour);
+    else into.set(statementId, new Set([usageHour]));
+  };
 
   for (const row of rows) {
     const share = shareOf(row);
     if (share === "free") continue;
     if (share === "owed") {
-      owed.add(row.statementId);
+      noteHour(owedHours, row.statementId, row.usageHour);
       continue;
     }
 
@@ -444,24 +514,67 @@ export function allocateWarehouseCost({
       continue;
     }
 
+    noteHour(pricedHours, row.statementId, row.usageHour);
     foldPricedLine(nanoByStatementId, row, share);
   }
 
+  return {
+    costByStatementId: settleTotals(nanoByStatementId),
+    skipped,
+    owed: heldStatements({ owedHours, pricedHours }),
+  };
+}
+
+/**
+ * The per-hour running totals turned into the record's money fields.
+ *
+ * The denominator is summed over the KEYS of `hourTotalMsByHour`, so an hour
+ * billed under several SKUs contributes its total once while a statement that
+ * ran through two hours contributes both — which is what keeps
+ * `hourTotalExecutionMs` spanning exactly the hours `hourBillableUsd` came
+ * from.
+ */
+function settleTotals(
+  nanoByStatementId: Map<string, PricedTotals>,
+): Map<string, WarehousePricedStatement> {
   const costByStatementId = new Map<string, WarehousePricedStatement>();
   for (const [statementId, entry] of nanoByStatementId) {
+    let hourTotalMs = 0n;
+    for (const total of entry.hourTotalMsByHour.values()) hourTotalMs += total;
     costByStatementId.set(statementId, {
       costUsd: nanoUsdToDecimalString(entry.costNanoUsd),
-      hourTotalExecutionMs: entry.hourTotalExecutionMs,
+      hourTotalExecutionMs: hourTotalMs.toString(),
       hourBillableUsd: nanoUsdToDecimalString(entry.hourNanoUsd),
     });
   }
+  return costByStatementId;
+}
 
-  // A statement that priced on any line is priced, even if another of its lines
-  // had not been billed yet. Only statements with no priced line at all are
-  // owed.
-  for (const statementId of costByStatementId.keys()) owed.delete(statementId);
-
-  return { costByStatementId, skipped, owed };
+/**
+ * The statements whose cost is not settled yet, and so must hold the watermark.
+ *
+ * An hour that priced is settled; an hour that only ever showed up unbilled is
+ * not, and one such hour is enough to hold the whole statement. Within a single
+ * hour this is exactly the old rule — a line that priced settles the hour its
+ * unbilled sibling SKU left open.
+ */
+function heldStatements({
+  owedHours,
+  pricedHours,
+}: {
+  owedHours: Map<string, Set<string>>;
+  pricedHours: Map<string, Set<string>>;
+}): Set<string> {
+  const owed = new Set<string>();
+  for (const [statementId, hours] of owedHours) {
+    const priced = pricedHours.get(statementId);
+    for (const hour of hours) {
+      if (priced?.has(hour)) continue;
+      owed.add(statementId);
+      break;
+    }
+  }
+  return owed;
 }
 
 /**

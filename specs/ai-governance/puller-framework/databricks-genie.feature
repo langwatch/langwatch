@@ -77,6 +77,18 @@ Feature: Databricks AI/BI Genie puller
       # Dividing the hour across Genie's queries alone hands Genie the whole
       # warehouse bill, including the dashboards and jobs sharing it.
 
+    @unit @integration
+    Scenario: Traffic that began before the hour keeps its share of the bill
+      Given a query that started in the hour before and ran on into this one
+      And a short question asked inside this hour
+      When the puller prices this hour
+      Then the query that ran in from before carries part of this hour's bill
+      And the short question carries only its own share of the time worked
+      # The bill is for the hour the work ran in, not the hour it was started
+      # in. Counting a straddling query only against the hour it began in
+      # leaves this hour's bill divided among whatever happened to start in it,
+      # so a one-second question can end up carrying an entire hour of compute.
+
     @integration
     Scenario: The puller's own billing query is not charged to a question
       Given the puller asks the warehouse for its billing
@@ -364,6 +376,17 @@ Feature: Databricks AI/BI Genie puller
       And it is not held waiting on the unbilled one
       # The priced line wins. Holding an already-priced statement would stall
       # the watermark on every hour where two SKUs bill at different speeds.
+
+    @unit
+    Scenario: A statement is held when an hour it ran through has no bill yet
+      Given a query that ran through two hours
+      And only the first of those hours has been billed
+      When the puller allocates warehouse cost
+      Then the query is held rather than recorded at the first hour's cost
+      # A query spanning two hours is only fully priced once both hours have
+      # billed. Recording it on the first hour alone understates it, and the
+      # record cannot be revised later, so the unbilled hour has to hold it —
+      # the same rule as an entirely unbilled question, applied per hour.
 
     @unit
     Scenario: The billing query only ever runs on the configured workspace

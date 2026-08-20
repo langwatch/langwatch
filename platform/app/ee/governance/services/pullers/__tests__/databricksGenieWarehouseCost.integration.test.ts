@@ -46,6 +46,12 @@ const CONVERSATION_ID = "conv-1";
 const MESSAGE_ID = "msg-1";
 const STATEMENT_ID = "stmt-abc";
 const WAREHOUSE_ID = "095eb666b2ed2762";
+/**
+ * The hour a fixture row is about. Opaque to the adapter — it only ever groups
+ * rows against each other — so one constant serves every fixture that does not
+ * care which hours a statement spanned.
+ */
+const USAGE_HOUR = "2026-08-01T09:00:00.000Z";
 
 type CostPlan = {
   status?: number;
@@ -150,7 +156,8 @@ beforeEach(async () => {
               columns: (
                 plan?.columns ?? [
                   "statement_id",
-                  "execution_duration_ms",
+                  "usage_hour",
+                  "execution_ms_in_hour",
                   "hour_total_ms",
                   "hour_billable_usd",
                   "currency_code",
@@ -272,6 +279,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "1800000",
           "3600000",
           "6.00",
@@ -298,6 +306,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "1800000",
           "3600000",
           "6.00",
@@ -334,6 +343,39 @@ describe("a source that names a warehouse", () => {
     const sql = String(statementBodies[0]!.statement);
     expect(sql).toContain("w.genie_space_id IS NOT NULL");
     expect(sql).toContain("OR w.client_application = :genie_app");
+  });
+
+  /** @scenario "Traffic that began before the hour keeps its share of the bill" */
+  it("asks for execution time by the hours a statement ran in, not the one it began in", async () => {
+    costPlan = { rows: [] };
+
+    await pull({ warehouseId: WAREHOUSE_ID });
+
+    // The fixture cannot execute SQL, so what this pins is the question asked.
+    // The defect it guards is invisible in any result set: bucketing a
+    // statement wholly into its start hour leaves the NEXT hour's denominator
+    // holding only what happened to begin in it, and a one-second Genie
+    // question in that hour carries the whole hour's bill.
+    const sql = String(statementBodies[0]!.statement);
+
+    // The statement's end is read, and reconstructed when the row has none —
+    // an in-flight statement with a null end_time would otherwise drop out of
+    // the denominator entirely.
+    expect(sql).toContain("end_time");
+    expect(sql).toContain("execution_duration_ms");
+
+    // One row per hour the statement was awake in, not one per statement.
+    expect(sql).toMatch(/explode\(\s*sequence\(/);
+
+    // And the share's numerator is the part of the runtime inside THAT hour.
+    expect(sql).toContain("execution_ms_in_hour");
+
+    // The hour each row belongs to travels with it. Without it the allocator
+    // cannot tell one statement's two hours from one hour's two SKUs, and it
+    // has to treat them differently: two hours sum their totals, two SKUs do
+    // not, and an unbilled hour holds the watermark where an unbilled SKU
+    // beside a priced one does not.
+    expect(sql).toContain("usage_hour");
   });
 
   /** @scenario "A question is still priced when its history row names no space" */
@@ -432,8 +474,9 @@ describe("a source that names a warehouse", () => {
     costPlan = {
       columns: [
         "statement_id",
+        "usage_hour",
         "hour_total_ms",
-        "execution_duration_ms",
+        "execution_ms_in_hour",
         "hour_billable_usd",
         "currency_code",
         "sku_name",
@@ -441,6 +484,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "900000",
           "6.00",
@@ -465,6 +509,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -487,6 +532,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -509,6 +555,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           "some-other-statement",
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -531,6 +578,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -557,6 +605,7 @@ describe("a source that names a warehouse", () => {
       { length: WAREHOUSE_COST_ROW_LIMIT - 1 },
       (_, i): (string | null)[] => [
         `other-statement-${i}`,
+        USAGE_HOUR,
         "1",
         "3600000",
         "6.00",
@@ -568,6 +617,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -593,6 +643,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -614,6 +665,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -640,6 +692,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -679,6 +732,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -724,7 +778,9 @@ describe("a source that names a warehouse", () => {
     // A null SKU in the last column is exactly what the LEFT JOIN produces for
     // an unbilled hour.
     costPlan = {
-      rows: [[STATEMENT_ID, "3600000", "3600000", null, null, null]],
+      rows: [
+        [STATEMENT_ID, USAGE_HOUR, "3600000", "3600000", null, null, null],
+      ],
     };
 
     const result = await pull({ warehouseId: WAREHOUSE_ID });
@@ -743,6 +799,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -848,6 +905,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -923,6 +981,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -1013,6 +1072,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -1038,6 +1098,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -1180,6 +1241,7 @@ describe("a billing answer that did not come back", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
