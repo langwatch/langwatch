@@ -49,7 +49,9 @@ trap 'code=$?; if [ "$code" -ne 0 ]; then echo failed > "$STATUS"; fi' EXIT
 export CI=true
 
 # nvm-installed node is only on the interactive PATH
-NODE_BIN="$(ls -d "$HOME"/.nvm/versions/node/*/bin 2>/dev/null | sort -V | tail -1)"
+# `|| true`: under `set -o pipefail` an unmatched glob would abort the refresh
+# here with no message at all, rather than failing later where the log says why.
+NODE_BIN="$( { ls -d "$HOME"/.nvm/versions/node/*/bin 2>/dev/null || true; } | sort -V | tail -1)"
 export PATH="$NODE_BIN:$HOME/bin:$HOME/go/bin:/usr/local/bin:$PATH"
 
 cd "$HOME/langwatch"
@@ -101,8 +103,11 @@ sleep 3
 # Nothing may still hold the app port, or the new stack's check-ports step
 # blocks and the refresh reports done while the app never boots.
 for _ in $(seq 1 10); do
-  HOLDERS="$(pgrep -f "src/server.mt[s]" | tr '\n' ' ')"
-  [ -z "$HOLDERS" ] && break
+  # `|| true` inside the substitution: pgrep exits 1 when nothing matches, and
+  # under `set -o pipefail` that failure would abort the whole refresh at the
+  # exact moment the loop has succeeded.
+  HOLDERS="$( { pgrep -f "src/server.mt[s]" || true; } | tr '\n' ' ')"
+  [ -z "${HOLDERS// /}" ] && break
   echo "waiting for old API server(s) to exit: $HOLDERS"
   sleep 2
 done
