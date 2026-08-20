@@ -1489,9 +1489,19 @@ export const opsRouter = createTRPCRouter({
       z.object({
         organizationId: z.string().min(1).max(200),
         stage: z.enum(MIGRATION_ENROLLMENT_STAGES),
+        // Typed confirmation for the cutover stage, same reasoning as the
+        // rollback's: enrolling an organization for cutover is what lets the
+        // next pass flip which tables answer every permission check for it.
+        confirm: z.literal("ENROLL").optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // The `migrations` stage is behavior-neutral (backfill and genesis
+      // change nothing about who decides); the cutover stage has the
+      // rollback's blast radius, so it takes the rollback's guard.
+      if (input.stage === "cutover") {
+        requireDestructiveOpsAuth(ctx, input.confirm);
+      }
       await systemMigrationsService.enroll({
         organizationId: input.organizationId,
         stage: input.stage,

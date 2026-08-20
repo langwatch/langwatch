@@ -311,6 +311,14 @@ describe("LedgerShareRepository", () => {
           id: "share_1",
           projectId: PROJECT_ID,
         });
+        // The order is load-bearing: the fact must be on the ledger before
+        // the compat row goes, or a crash between the two leaves a deleted
+        // link with no revocation for the fold to converge on.
+        expect(
+          vi.mocked(writer.revokeResourceGrants).mock.invocationCallOrder[0],
+        ).toBeLessThan(
+          vi.mocked(legacy.deleteById).mock.invocationCallOrder[0]!,
+        );
       });
 
       /** @scenario "Revoking a link whose grant row has not landed still records the fact" */

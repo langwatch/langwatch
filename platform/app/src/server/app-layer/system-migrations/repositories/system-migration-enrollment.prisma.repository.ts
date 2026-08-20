@@ -42,14 +42,17 @@ export class PrismaSystemMigrationEnrollmentRepository {
       }),
       this.prisma.user.findMany({
         where: { id: { in: rows.map((row) => row.enrolledByUserId) } },
-        select: { id: true, name: true, email: true },
+        // Name only, never the email: the listing is a plain ops read with no
+        // audit trail of its own, so it must not carry PII - a user with no
+        // name falls back to the user id the record already carries.
+        select: { id: true, name: true },
       }),
     ]);
     const organizationNames = new Map(
       organizations.map((organization) => [organization.id, organization.name]),
     );
     const userLabels = new Map(
-      users.map((user) => [user.id, user.name ?? user.email ?? null]),
+      users.map((user) => [user.id, user.name ?? null]),
     );
     return rows.map((row) => ({
       organizationId: row.organizationId,

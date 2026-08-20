@@ -274,9 +274,13 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // predicate the per-view increment can name, since the viewer arrives
   // with a share token and nothing else.
   GrantUsage: {
+    // A single grant id resolves to exactly one organization; a LIST of them
+    // is only as tenant-scoped as its weakest entry, so the list shape is
+    // admitted only alongside the organization it claims to be about.
     extraBound: ({ clause }) =>
       typeof clauseField(clause, "grantId") === "string" ||
-      isNonEmptyStringList(clauseField(clause, "grantId")),
+      (isNonEmptyStringList(clauseField(clause, "grantId")) &&
+        typeof clauseField(clause, "organizationId") === "string"),
   },
   Role: {},
   // Which organizations the in-place migration runner processes on cloud

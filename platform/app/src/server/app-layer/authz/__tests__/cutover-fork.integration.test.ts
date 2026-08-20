@@ -18,6 +18,7 @@
  *
  * @see specs/rbac/in-place-authz-migration.feature
  */
+import { awaitForkComparisonsForTesting } from "@langwatch/authz-server";
 import { GRANTS_CUTOVER_MIGRATION_NAME } from "@langwatch/authz-server/migration";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -244,8 +245,9 @@ describe("given an organization whose cutover pass runs to a clean proof", () =>
 
     expect(decision).toEqual({ permitted: true, organizationRole: "MEMBER" });
 
-    // The reverse-shadow thunk is detached; let it finish against the rows
-    // this suite is about to delete.
-    await new Promise((resolve) => setImmediate(resolve));
+    // The reverse-shadow thunk is detached and awaits Prisma - one macrotask
+    // tick would not cover a database read, so drain it properly before the
+    // teardown deletes the rows it reads.
+    await awaitForkComparisonsForTesting();
   });
 });

@@ -177,18 +177,30 @@ describe("given an organization whose legacy facts live outside its bindings", (
 
   afterAll(async () => {
     if (!organization?.id) return;
+    // Every sibling fixture guards itself: a `beforeAll` that failed partway
+    // leaves later fixtures undefined, and a TypeError here would bury the
+    // failure that actually broke the suite.
+    const userIds = [adminUserId, operatorUserId].filter(
+      (id): id is string => typeof id === "string",
+    );
     await cleanupTestRows(prisma, [
       // The sentinel aggregate is shared by every organization's cutover, so
       // only this operator's rows are swept from it.
-      [
-        "grant",
-        {
-          organizationId: PLATFORM_AUTHZ_TENANT_ID,
-          principalId: operatorUserId,
-        },
-      ],
+      ...(operatorUserId
+        ? ([
+            [
+              "grant",
+              {
+                organizationId: PLATFORM_AUTHZ_TENANT_ID,
+                principalId: operatorUserId,
+              },
+            ],
+          ] as const)
+        : []),
       ["grantUsage", { organizationId: organization.id }],
-      ["shareLink", { projectId: project.id }],
+      ...(project?.id
+        ? ([["shareLink", { projectId: project.id }]] as const)
+        : []),
       ["grant", { organizationId: organization.id }],
       ["role", { organizationId: organization.id }],
       ["roleBinding", { organizationId: organization.id }],
@@ -197,9 +209,11 @@ describe("given an organization whose legacy facts live outside its bindings", (
       ["authzCutoverProjection", { organizationId: organization.id }],
       ["systemMigrationTenantState", { tenantId: organization.id }],
       ["organizationUser", { organizationId: organization.id }],
-      ["project", { id: project.id }],
-      ["team", { id: team.id }],
-      ["user", { id: { in: [adminUserId, operatorUserId] } }],
+      ...(project?.id ? ([["project", { id: project.id }]] as const) : []),
+      ...(team?.id ? ([["team", { id: team.id }]] as const) : []),
+      ...(userIds.length > 0
+        ? ([["user", { id: { in: userIds } }]] as const)
+        : []),
       ["organization", { id: organization.id }],
     ]);
   });

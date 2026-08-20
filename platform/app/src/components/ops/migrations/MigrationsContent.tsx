@@ -18,7 +18,7 @@ import { useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
-import { api, type RouterOutputs } from "~/utils/api";
+import { api, type RouterInputs, type RouterOutputs } from "~/utils/api";
 import { JsonViewer } from "../JsonViewer";
 import { ConfirmDialog } from "../shared/ConfirmDialog";
 
@@ -115,7 +115,12 @@ export function MigrationsContent() {
   );
 }
 
-const ENROLLMENT_STAGE_LABEL: Record<string, string> = {
+/** The server's vocabulary, derived rather than restated: the router's input
+ *  schema is the single source, so a stage added there fails the typecheck
+ *  here instead of drifting past it. */
+type EnrollmentStage = RouterInputs["ops"]["enrollMigrationTenant"]["stage"];
+
+const ENROLLMENT_STAGE_LABEL: Record<EnrollmentStage, string> = {
   migrations: "Enrolled for migration",
   cutover: "Enrolled for cutover",
 };
@@ -175,7 +180,8 @@ function EnrollmentSection({ canManage }: { canManage: boolean }) {
 
 function EnrollForm() {
   const [organizationId, setOrganizationId] = useState("");
-  const [stage, setStage] = useState<"migrations" | "cutover">("migrations");
+  const [stage, setStage] = useState<EnrollmentStage>("migrations");
+  const [cutoverConfirmOpen, setCutoverConfirmOpen] = useState(false);
   const utils = api.useUtils();
   const enroll = api.ops.enrollMigrationTenant.useMutation({
     onSuccess: async () => {
@@ -186,6 +192,7 @@ function EnrollForm() {
         type: "success",
       });
       setOrganizationId("");
+      setCutoverConfirmOpen(false);
       await Promise.all([
         utils.ops.listMigrationEnrollments.invalidate(),
         utils.ops.listSystemMigrations.invalidate(),
@@ -201,6 +208,7 @@ function EnrollForm() {
         size="sm"
         width="320px"
         fontFamily="mono"
+        aria-label="Organization id"
         placeholder="organization id"
         value={organizationId}
         onChange={(event) => setOrganizationId(event.target.value)}
@@ -210,7 +218,7 @@ function EnrollForm() {
           aria-label="Stage"
           value={stage}
           onChange={(event) =>
-            setStage(event.currentTarget.value as "migrations" | "cutover")
+            setStage(event.currentTarget.value as EnrollmentStage)
           }
         >
           <option value="migrations">Migration</option>
@@ -222,12 +230,32 @@ function EnrollForm() {
         size="sm"
         loading={enroll.isPending}
         disabled={organizationId.trim().length === 0}
-        onClick={() =>
-          enroll.mutate({ organizationId: organizationId.trim(), stage })
-        }
+        onClick={() => {
+          // Cutover enrollment is what lets the next pass change which
+          // tables answer the organization's permission checks, so it takes
+          // the rollback's confirmation; migration enrollment changes no
+          // decision and enrolls directly.
+          if (stage === "cutover") setCutoverConfirmOpen(true);
+          else enroll.mutate({ organizationId: organizationId.trim(), stage });
+        }}
       >
         <UserPlus size={14} /> Enroll
       </Button>
+      <ConfirmDialog
+        open={cutoverConfirmOpen}
+        onClose={() => setCutoverConfirmOpen(false)}
+        onConfirm={() =>
+          enroll.mutate({
+            organizationId: organizationId.trim(),
+            stage: "cutover",
+            confirm: "ENROLL",
+          })
+        }
+        title="Enroll this organization for cutover"
+        description="Once its earlier stages finish, the next pass proves parity and moves this organization's permission checks onto the new engine. Rolling that back afterwards is an operator action of its own."
+        isLoading={enroll.isPending}
+        confirmDisabled={organizationId.trim().length === 0}
+      />
     </HStack>
   );
 }

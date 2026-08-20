@@ -486,23 +486,29 @@ describe("SystemMigrationsService enrollment", () => {
           isSaaS: false,
         });
 
+        // Thunks, not promises: an eagerly created second promise would
+        // reject before its handler attaches, tripping the unhandled-
+        // rejection watchdog even though the test passes.
         for (const attempt of [
-          service.enroll({
-            organizationId: "org_acme",
-            stage: "migrations",
-            actorUserId: "user_alex",
-          }),
-          service.withdraw({
-            organizationId: "org_acme",
-            stage: "migrations",
-            actorUserId: "user_alex",
-          }),
+          () =>
+            service.enroll({
+              organizationId: "org_acme",
+              stage: "migrations",
+              actorUserId: "user_alex",
+            }),
+          () =>
+            service.withdraw({
+              organizationId: "org_acme",
+              stage: "migrations",
+              actorUserId: "user_alex",
+            }),
         ]) {
-          await expect(attempt).rejects.toThrow(
+          const rejection = attempt();
+          await expect(rejection).rejects.toBeInstanceOf(
             MigrationEnrollmentCloudOnlyError,
           );
-          await attempt.catch((error: MigrationEnrollmentCloudOnlyError) => {
-            expect(error.code).toBe("migration_enrollment_cloud_only");
+          await expect(rejection).rejects.toMatchObject({
+            code: "migration_enrollment_cloud_only",
           });
         }
         expect(enrollments.create).not.toHaveBeenCalled();

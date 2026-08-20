@@ -715,13 +715,24 @@ export class GrantsLedgerWriter {
   }
 
   /**
-   * DELETE resource facts. This is `revokeBindings` under the name the
-   * resource tier calls it by — revocation is keyed on grant ids and knows
-   * nothing about tiers, so the command, the synchronous enforcement
-   * (decision 7) and the epoch bump are literally the same ones. What the
-   * enforcement additionally does for a resource id is delete the compat
-   * `ShareLink` head, which is why a revoked link stops resolving before
-   * this returns, queue running or not.
+   * DELETE resource facts. This is the ledger half of `revokeBindings` under
+   * the name the resource tier calls it by — revocation is keyed on grant
+   * ids and knows nothing about tiers, so the command, the synchronous
+   * enforcement (decision 7) and the epoch bump are literally the same ones.
+   * What the enforcement additionally does for a resource id is delete the
+   * compat `ShareLink` head, which is why a revoked link stops resolving
+   * before this returns, queue running or not.
+   *
+   * NO `onLedger` gate, like `attachResourceGrant` and for a stronger
+   * reason: the caller (`share.ledger.repository`) has already routed here
+   * on an UNCACHED cutover read, and the write gate is a different, cached
+   * answer — a stale or failed `false` from it would send a cut-over
+   * organization's revocation to the legacy branch, which deletes only
+   * `RoleBinding` rows: no fact appended, the `Grant` head keeps the grant,
+   * and the fold re-projects the "revoked" link. Revocation must never come
+   * undone, so it goes straight to the append; on an organization that
+   * turns out to be on legacy the fact folds as a no-op and the enforcement
+   * delete is the same delete the legacy path wanted.
    */
   async revokeResourceGrants({
     organizationId,
@@ -734,12 +745,42 @@ export class GrantsLedgerWriter {
     actor: LedgerActor;
     reason?: string;
   }): Promise<void> {
-    await this.revokeBindings({
+    if (grantIds.length === 0) return;
+    await this.appendGrantRevocation({
       organizationId,
       bindingIds: grantIds,
       actor,
       ...(reason ? { reason } : {}),
     });
+  }
+
+  /** The ledger revocation itself: append, enforce synchronously, bump. */
+  private async appendGrantRevocation({
+    organizationId,
+    bindingIds,
+    actor,
+    reason,
+    selector,
+  }: {
+    organizationId: string;
+    bindingIds: string[];
+    actor: LedgerActor;
+    reason?: string;
+    selector?: GrantRevocationSelector;
+  }): Promise<void> {
+    await (await this.commands()).commands.revokeGrants.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId: newLedgerCommandId(),
+      revocations: revocationEntries({ bindingIds, reason, selector }),
+      actor,
+      occurredAtMs: this.now(),
+    });
+    await this.enforcement.enforceGrantRevocation({
+      organizationId,
+      grantIds: bindingIds,
+    });
+    await bumpAuthzEpoch({ organizationId });
   }
 
   /**
@@ -1074,19 +1115,13 @@ export class GrantsLedgerWriter {
       await bumpAuthzEpoch({ organizationId });
       return;
     }
-    await (await this.commands()).commands.revokeGrants.send({
-      tenantId: organizationId,
+    await this.appendGrantRevocation({
       organizationId,
-      commandId: newLedgerCommandId(),
-      revocations: revocationEntries({ bindingIds, reason, selector }),
+      bindingIds,
       actor,
-      occurredAtMs: this.now(),
+      ...(reason ? { reason } : {}),
+      ...(selector ? { selector } : {}),
     });
-    await this.enforcement.enforceGrantRevocation({
-      organizationId,
-      grantIds: bindingIds,
-    });
-    await bumpAuthzEpoch({ organizationId });
   }
 
   /**

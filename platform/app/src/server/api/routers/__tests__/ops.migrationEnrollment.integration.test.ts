@@ -30,19 +30,27 @@ vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 
+/** Which permission each procedure demanded, keyed by tRPC path - so a
+ *  procedure wired to the wrong permission fails an assertion here instead
+ *  of passing through an allow-everything stub unnoticed. */
+const demandedPermissions = vi.hoisted(() => new Map<string, string>());
+
 vi.mock("~/server/api/rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/server/api/rbac")>();
   return {
     ...actual,
     checkOpsPermission:
-      () =>
+      (args: { permission: string }) =>
       async ({
         ctx,
         next,
+        path,
       }: {
         ctx: Record<string, unknown>;
         next: () => unknown;
+        path: string;
       }) => {
+        demandedPermissions.set(path, args.permission);
         ctx.opsScope = { kind: "platform" };
         return next();
       },
@@ -68,6 +76,7 @@ function buildCaller() {
 describe("ops migration enrollment procedures", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    demandedPermissions.clear();
   });
 
   describe("when an operator enrolls an organization", () => {
@@ -77,9 +86,39 @@ describe("ops migration enrollment procedures", () => {
 
       const result = await caller.enrollMigrationTenant({
         organizationId: "org_acme",
-        stage: "cutover",
+        stage: "migrations",
       });
 
+      expect(result).toEqual({ enrolled: true });
+      expect(service.enroll).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        stage: "migrations",
+        actorUserId: "user_alex",
+      });
+      expect(demandedPermissions.get("enrollMigrationTenant")).toBe(
+        "ops:manage",
+      );
+    });
+
+    it("enrolls for cutover only behind its typed confirmation", async () => {
+      // Cutover enrollment has the rollback's blast radius: the next pass
+      // may flip which tables answer the organization's permission checks.
+      service.enroll.mockResolvedValue(undefined);
+      const caller = buildCaller();
+
+      await expect(
+        caller.enrollMigrationTenant({
+          organizationId: "org_acme",
+          stage: "cutover",
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(service.enroll).not.toHaveBeenCalled();
+
+      const result = await caller.enrollMigrationTenant({
+        organizationId: "org_acme",
+        stage: "cutover",
+        confirm: "ENROLL",
+      });
       expect(result).toEqual({ enrolled: true });
       expect(service.enroll).toHaveBeenCalledWith({
         organizationId: "org_acme",
@@ -118,6 +157,9 @@ describe("ops migration enrollment procedures", () => {
         stage: "migrations",
         actorUserId: "user_alex",
       });
+      expect(demandedPermissions.get("withdrawMigrationTenant")).toBe(
+        "ops:manage",
+      );
     });
   });
 
@@ -128,6 +170,9 @@ describe("ops migration enrollment procedures", () => {
       const caller = buildCaller();
 
       await expect(caller.listMigrationEnrollments()).resolves.toEqual(listing);
+      expect(demandedPermissions.get("listMigrationEnrollments")).toBe(
+        "ops:view",
+      );
     });
   });
 });

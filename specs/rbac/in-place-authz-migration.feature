@@ -136,10 +136,10 @@ Feature: In-place authorization data migration
     And the cutover holds "acme" as waiting instead of flipping it
 
   @unit
-  Scenario: The retired cohort environment variables are ignored
-    Given a deployment still sets one of the old cohort environment variables
+  Scenario: Enrollment alone decides which organizations migrate
+    Given a deployment still carries the retired cohort configuration
     When a migration pass runs
-    Then the variable changes nothing about which organizations migrate
+    Then the retired configuration changes nothing about which organizations migrate
     And the pass logs a warning pointing at enrollment on the ops page
 
   @unit
@@ -633,7 +633,7 @@ Feature: In-place authorization data migration
   Scenario: Revocation routing never trusts a cached gate answer
     Given an organization was cut over after this process cached it as legacy
     When one of its share links is revoked
-    Then the routing reads the cutover projection directly
+    Then the routing takes a fresh answer rather than the cached one
     And the revoke is written through the ledger, not the legacy-only branch
 
   @unit
@@ -661,7 +661,7 @@ Feature: In-place authorization data migration
   Scenario: The resource-tier collect never pins an organization's head beyond one read
     Given the process-lifetime collector serves share-link reads
     When a share-link read is collected
-    Then the read runs on a pass-scoped reader that is then dropped
+    Then nothing from that read outlives answering it
     And a rollback is honoured by the organization's next read without a restart
 
   # ============================================================================

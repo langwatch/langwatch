@@ -355,6 +355,26 @@ export class PrismaAuthzGrantsProjectionRepository
     });
   }
 
+  /**
+   * The newest cutover fact's business time, as the fold persisted it — what
+   * the rollback writer floors its own stamp on so cross-pod clock skew can
+   * never stamp the rollback behind the completion it undoes. The read lives
+   * here, next to `enforceCutoverRollback`, because the two are one
+   * contract: the enforcement write above deliberately leaves `changedAt`
+   * untouched, and this is the read that depends on it.
+   */
+  async findCutoverChangedAtMs({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<number | null> {
+    const row = await this.prisma.authzCutoverProjection.findUnique({
+      where: { organizationId },
+      select: { changedAt: true },
+    });
+    return row?.changedAt?.getTime() ?? null;
+  }
+
   async store(
     projection: StoredProjection<AuthzGrantsFoldState>,
     context: ProjectionStoreContext,

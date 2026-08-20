@@ -31,17 +31,17 @@ import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:authz:per-organization-cached-gate");
 
-type CacheEntry = { value: boolean; expiresAt: number };
+type CacheEntry = { isOn: boolean; expiresAt: number };
 
 /**
  * One in-flight read, plus the right to cache what it resolves. `invalidate`
- * flips `stale` on the entry it removes, so a read that started BEFORE the
+ * flips `isStale` on the entry it removes, so a read that started BEFORE the
  * invalidation still answers the callers already coalesced onto it (that
  * answer was unavoidable - the read had begun) but never writes the cache:
  * without the flag, a read racing a projection write could settle AFTER the
  * invalidation and re-cache the pre-write answer for a further TTL.
  */
-type InFlightEntry = { promise: Promise<boolean>; stale: boolean };
+type InFlightEntry = { promise: Promise<boolean>; isStale: boolean };
 
 export type PerOrganizationCachedFlag = {
   /**
@@ -64,13 +64,6 @@ export type PerOrganizationCachedFlag = {
 };
 
 /**
- * One cached boolean per organization. `positiveTtlMs` and `negativeTtlMs`
- * are separate because the two gates need them separate (the cutover gate's
- * two directions cost the same; the fallback gate's positive answer is a
- * one-way latch and can be trusted far longer than its negative one) - a
- * single TTL is just both arguments given the same value.
- */
-/**
  * Hard cap on distinct organizations one gate holds at once.
  *
  * An organization that is only ever read once (a stale customer, a
@@ -82,6 +75,13 @@ export type PerOrganizationCachedFlag = {
  */
 export const MAX_CACHE_ENTRIES = 5_000;
 
+/**
+ * One cached boolean per organization. `positiveTtlMs` and `negativeTtlMs`
+ * are separate because the two gates need them separate (the cutover gate's
+ * two directions cost the same; the fallback gate's positive answer is a
+ * one-way latch and can be trusted far longer than its negative one) - a
+ * single TTL is just both arguments given the same value.
+ */
 export function perOrganizationCachedFlag({
   name,
   positiveTtlMs,
@@ -105,7 +105,7 @@ export function perOrganizationCachedFlag({
   }): Promise<boolean> {
     const entry = cached.get(organizationId);
     if (entry !== undefined) {
-      if (Date.now() < entry.expiresAt) return entry.value;
+      if (Date.now() < entry.expiresAt) return entry.isOn;
       cached.delete(organizationId);
     }
 
@@ -113,7 +113,7 @@ export function perOrganizationCachedFlag({
     if (pending !== undefined) return pending.promise;
 
     const flight: InFlightEntry = {
-      stale: false,
+      isStale: false,
       promise: Promise.resolve(false),
     };
     flight.promise = settle({ organizationId, read, flight });
@@ -139,9 +139,9 @@ export function perOrganizationCachedFlag({
     read: () => Promise<boolean>;
     flight: InFlightEntry;
   }): Promise<boolean> {
-    let value = false;
+    let isOn = false;
     try {
-      value = await read();
+      isOn = await read();
     } catch (error) {
       // Fail safe: the caller's `read` already means "false is the safe
       // direction" for its own gate (legacy stays on, not cut over yet), so
@@ -151,19 +151,19 @@ export function perOrganizationCachedFlag({
         { organizationId, gate: name, error },
         "could not read the per-organization gate; caching the failure briefly and answering false",
       );
-      value = false;
+      isOn = false;
     }
     // Invalidated while this read was in flight: the value predates the
     // write that invalidated it, so hand it to the callers already waiting
     // (they coalesced before the invalidation) but never cache it - the next
     // `get` re-reads the source.
-    if (flight.stale) return value;
+    if (flight.isStale) return isOn;
     if (cached.size >= MAX_CACHE_ENTRIES) evictUntilUnderCap();
     cached.set(organizationId, {
-      value,
-      expiresAt: Date.now() + (value ? positiveTtlMs : negativeTtlMs),
+      isOn,
+      expiresAt: Date.now() + (isOn ? positiveTtlMs : negativeTtlMs),
     });
-    return value;
+    return isOn;
   }
 
   /**
@@ -187,7 +187,7 @@ export function perOrganizationCachedFlag({
     cached.delete(organizationId);
     const pending = inFlight.get(organizationId);
     if (pending !== undefined) {
-      pending.stale = true;
+      pending.isStale = true;
       inFlight.delete(organizationId);
     }
   }

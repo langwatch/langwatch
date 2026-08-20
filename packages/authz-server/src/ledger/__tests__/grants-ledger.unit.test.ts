@@ -128,9 +128,6 @@ describe("grants ledger reducer", () => {
           { kind: "grant_attached", grant: share, actor: ACTOR },
         ]);
         expect(attached.grants[share.grantId]).toEqual(share);
-        expect(attached.grants[share.grantId]?.resource?.projectId).toBe(
-          "proj_chatbot",
-        );
 
         const revoked = apply(
           [

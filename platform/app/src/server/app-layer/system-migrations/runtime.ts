@@ -33,7 +33,10 @@ import { env } from "~/env.mjs";
 import type { Prisma } from "~/generated/prisma/client";
 import { prisma } from "../../db";
 import { tryGetApp } from "../app";
-import { invalidateCutoverGate } from "../authz/cutover-gate";
+import {
+  invalidateCutoverGate,
+  queryCutoverOnEngine,
+} from "../authz/cutover-gate";
 import { bumpAuthzEpoch } from "../authz/epoch";
 import { authzGrantsCommands } from "../authz/ledger";
 import { SYSTEM_ACTORS } from "../authz/ledger-actor";
@@ -206,11 +209,13 @@ async function refuseCutoverRollbackBeforeItStarted({
   record: TenantMigrationRecord;
 }): Promise<void> {
   if (!cutoverReportSaysWaiting(record.report)) return;
-  const projection = await prisma.authzCutoverProjection.findUnique({
-    where: { organizationId: tenantId },
-    select: { onEngine: true },
+  // The gate's own uncached query, so this guard and the request path can
+  // never drift onto different predicates.
+  const onEngine = await queryCutoverOnEngine({
+    prisma,
+    organizationId: tenantId,
   });
-  if (projection?.onEngine === true) return;
+  if (onEngine) return;
   throw new MigrationRollbackCutoverNotStartedError();
 }
 
@@ -251,19 +256,29 @@ async function refuseCutoverRollbackBeforeItStarted({
  * already holding a positive answer stop honouring it within that window.
  * No deploy, no restart.
  */
-async function rollBackAuthzCutover({
+export async function rollBackAuthzCutover({
   tenantId,
   actorUserId,
   decidedAt,
+  sendFact = sendCutoverRollbackFact,
 }: {
   tenantId: string;
   actorUserId: string;
   decidedAt: string;
+  /**
+   * The ledger append alone, injectable so the rollback suite can sever the
+   * queue leg while running THIS function - a copy of the steps drifted
+   * once (it lost the gate invalidation) and a copy can always drift again.
+   * Production never passes it: the default is the real command bus, bound
+   * right here.
+   */
+  sendFact?: CutoverRollbackFactSender;
 }): Promise<void> {
   const organizationId = tenantId;
-  await new PrismaAuthzGrantsProjectionRepository(
+  const projectionRepository = new PrismaAuthzGrantsProjectionRepository(
     prisma,
-  ).enforceCutoverRollback({ organizationId });
+  );
+  await projectionRepository.enforceCutoverRollback({ organizationId });
   invalidateCutoverGate({ organizationId });
   await bumpAuthzEpoch({ organizationId });
 
@@ -280,18 +295,14 @@ async function rollBackAuthzCutover({
     // enforcement write above deliberately leaves it untouched. The command
     // id stays keyed on `decidedAt` alone, so retries of one decision still
     // dedupe.
-    const projection = await prisma.authzCutoverProjection.findUnique({
-      where: { organizationId },
-      select: { changedAt: true },
-    });
-    const changedAtMs = projection?.changedAt?.getTime() ?? null;
-    const flooredAtMs = Number.isFinite(decidedAtMs) ? decidedAtMs : Date.now();
-    await (await authzGrantsCommands()).commands.rollBackCutover.send({
-      tenantId: organizationId,
+    const changedAtMs = await projectionRepository.findCutoverChangedAtMs({
       organizationId,
+    });
+    const flooredAtMs = Number.isFinite(decidedAtMs) ? decidedAtMs : Date.now();
+    await sendFact({
+      organizationId,
+      actorUserId,
       commandId: `cutover:rollback:${organizationId}:${decidedAt}`,
-      actor: { type: "user", id: actorUserId },
-      reason: "operator rollback",
       occurredAtMs:
         changedAtMs === null
           ? flooredAtMs
@@ -304,6 +315,29 @@ async function rollBackAuthzCutover({
     );
   }
 }
+
+type CutoverRollbackFactSender = (args: {
+  organizationId: string;
+  actorUserId: string;
+  commandId: string;
+  occurredAtMs: number;
+}) => Promise<void>;
+
+const sendCutoverRollbackFact: CutoverRollbackFactSender = async ({
+  organizationId,
+  actorUserId,
+  commandId,
+  occurredAtMs,
+}) => {
+  await (await authzGrantsCommands()).commands.rollBackCutover.send({
+    tenantId: organizationId,
+    organizationId,
+    commandId,
+    actor: { type: "user", id: actorUserId },
+    reason: "operator rollback",
+    occurredAtMs,
+  });
+};
 
 /**
  * The genesis import's compensating half, split out because it IS a separate

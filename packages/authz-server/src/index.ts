@@ -37,7 +37,10 @@ export type {
   ScopeLineageRepository,
   ShareLinkRow,
 } from "./authz-read.repository";
-export { AuthzForkService } from "./authz-fork.service";
+export {
+  AuthzForkService,
+  awaitForkComparisonsForTesting,
+} from "./authz-fork.service";
 export type {
   AuthzForkOptions,
   ForkedAnyDecision,

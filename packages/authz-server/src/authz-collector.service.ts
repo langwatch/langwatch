@@ -130,9 +130,18 @@ export class AuthzCollectorService {
   async collectGrants({
     principal,
     organizationId,
+    reader,
   }: {
     principal: AuthzPrincipalRef;
     organizationId: string;
+    /**
+     * An already-open pass, for a caller collecting SEVERAL snapshots that
+     * feed one decision (the api-key ceiling intersects the key's and the
+     * owner's): sharing the pass shares its routing decision, so a gate
+     * expiry between the collects cannot intersect a legacy binding list
+     * with a ledger one. Omitted, the collect opens its own pass.
+     */
+    reader?: AuthzReadRepository;
   }): Promise<CollectedGrants> {
     switch (principal.type) {
       case "anonymous":
@@ -157,13 +166,13 @@ export class AuthzCollectorService {
         return this.collectApiKeyGrants({
           principal,
           organizationId,
-          reader: this.beginPass(),
+          reader: reader ?? this.beginPass(),
         });
       case "user":
         return this.collectUserGrants({
           principal,
           organizationId,
-          reader: this.beginPass(),
+          reader: reader ?? this.beginPass(),
         });
       default: {
         // A principal kind added to the union without a collect path here
@@ -235,8 +244,9 @@ export class AuthzCollectorService {
 
   /** The reader for ONE snapshot: the routing decision behind it is taken
    *  once and held for every read the snapshot is built from. A reader that
-   *  owns a single head offers no `beginPass` and is used directly. */
-  private beginPass(): AuthzReadRepository {
+   *  owns a single head offers no `beginPass` and is used directly. Public
+   *  so a caller pairing snapshots can hand the same pass to each collect. */
+  beginPass(): AuthzReadRepository {
     return this.reader.beginPass?.() ?? this.reader;
   }
 

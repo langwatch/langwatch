@@ -19,7 +19,7 @@ const member = () =>
   vi.fn().mockResolvedValue({ userId: "alice" }) as ReturnType<typeof vi.fn>;
 
 describe("GrantsAuthzReadRepository", () => {
-  describe("findOrganizationRole", () => {
+  describe("when findOrganizationRole reads the membership row", () => {
     it("reads the membership row, which the ledger never projected", async () => {
       const findFirst = vi.fn().mockResolvedValue({ role: "ADMIN" });
       const repository = new GrantsAuthzReadRepository(
@@ -39,7 +39,7 @@ describe("GrantsAuthzReadRepository", () => {
     });
   });
 
-  describe("findUserBindings", () => {
+  describe("when findUserBindings collects a user's grants", () => {
     it("reads the user's own grants at the three binding scopes", async () => {
       const findMany = vi.fn().mockResolvedValue([
         { roleKey: "admin", scopeType: "TEAM", scopeId: "team-1" },
@@ -184,7 +184,7 @@ describe("GrantsAuthzReadRepository", () => {
     });
   });
 
-  describe("findGroupBindings", () => {
+  describe("when findGroupBindings collects a group's grants", () => {
     it("expands the user's groups in this organization and stamps viaGroupId", async () => {
       const groupFindMany = vi
         .fn()
@@ -261,7 +261,7 @@ describe("GrantsAuthzReadRepository", () => {
     });
   });
 
-  describe("findApiKeyBindings", () => {
+  describe("when findApiKeyBindings collects a key's grants", () => {
     it("reads the key's own grants with no membership gate", async () => {
       const findMany = vi
         .fn()
@@ -300,7 +300,7 @@ describe("GrantsAuthzReadRepository", () => {
     });
   });
 
-  describe("findLegacyTeamMemberships", () => {
+  describe("when findLegacyTeamMemberships reads the legacy team rows", () => {
     it("reads the same TeamUser rows as the legacy repository, tenancy-fenced", async () => {
       // Deliberately NOT empty for a cut-over organization: the rows live
       // until contract deletes them, and the engine's org-level union quirk
@@ -350,7 +350,7 @@ describe("GrantsAuthzReadRepository", () => {
     });
   });
 
-  describe("findCustomRolePermissions", () => {
+  describe("when findCustomRolePermissions resolves a principal's role", () => {
     describe("when the principal is a user", () => {
       it("fences on the organization and excludes every API-key system role", async () => {
         const findMany = vi.fn().mockResolvedValue([]);
@@ -557,7 +557,7 @@ describe("GrantsAuthzReadRepository", () => {
     });
   });
 
-  describe("findShareLinks", () => {
+  describe("when findShareLinks resolves a share token", () => {
     const lineageStub = () =>
       vi
         .fn()
@@ -747,7 +747,9 @@ describe("GrantsAuthzReadRepository", () => {
       });
 
       expect(usageFindMany).toHaveBeenCalledWith({
-        where: { grantId: { in: ["grant-1"] } },
+        // The organization bound alongside the ids: a grant-id list alone
+        // is not a tenancy fence.
+        where: { organizationId: "org-1", grantId: { in: ["grant-1"] } },
         select: { grantId: true, viewCount: true },
       });
     });
@@ -824,7 +826,7 @@ describe("GrantsAuthzReadRepository", () => {
     });
   });
 
-  describe("findApiKeyOwner", () => {
+  describe("when findApiKeyOwner reads a key's owner", () => {
     it("distinguishes a service key from a key that is not there", async () => {
       const findUnique = vi
         .fn()
@@ -841,7 +843,7 @@ describe("GrantsAuthzReadRepository", () => {
     });
   });
 
-  describe("findProjectLineage", () => {
+  describe("when findProjectLineage reads a project's lineage", () => {
     it("returns the owning team and organization, null for an unknown project", async () => {
       const findUnique = vi
         .fn()
@@ -862,7 +864,7 @@ describe("GrantsAuthzReadRepository", () => {
     });
   });
 
-  describe("findTeamOrganization", () => {
+  describe("when findTeamOrganization reads a team's organization", () => {
     it("returns the team's organization, null for an unknown team", async () => {
       const findUnique = vi
         .fn()

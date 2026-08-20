@@ -18,8 +18,15 @@ import type {
   TeamBindingWrite,
 } from "@langwatch/authz-server";
 import type { TenantMigrationStatus } from "@langwatch/system-migrations";
-import type { PrismaClient } from "~/generated/prisma/client";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { queryCutoverOnEngine } from "../cutover-gate";
+
+/**
+ * How many guarded budget raises are in flight at once while seeding an
+ * organization's view budgets. Bounded so an organization with thousands of
+ * share links cannot open thousands of concurrent connections.
+ */
+const BUDGET_RAISE_CONCURRENCY = 25;
 
 /**
  * ADR-092 stage B - storage for the in-place TeamUser backfill, the genesis
@@ -334,6 +341,15 @@ export class PrismaAuthzMigrationRepository
    * compares the two counts exactly. The `viewCount: { lt: ... }` predicate
    * is the refund guard: a row already at or above the seeded count (a view
    * consumed since the seed) is left exactly as it is.
+   *
+   * The raise is `update` on the filtered unique, not `updateMany`, for the
+   * same reason the share consume paths are: the query compiler keeps a
+   * filtered-unique `update`'s full WHERE on the UPDATE statement itself,
+   * while `updateMany` resolves the filter in a prior SELECT - a consume
+   * landing between the two would be silently walked back. A raise the guard
+   * refuses surfaces as P2025 and is swallowed as the no-op it means. Raises
+   * run concurrently in bounded batches; each targets a distinct row, so
+   * they cannot contend with each other.
    */
   async seedResourceGrantUsage({
     organizationId,
@@ -352,8 +368,28 @@ export class PrismaAuthzMigrationRepository
       })),
       skipDuplicates: true,
     });
-    for (const seed of seeds) {
-      await this.prisma.grantUsage.updateMany({
+    for (
+      let offset = 0;
+      offset < seeds.length;
+      offset += BUDGET_RAISE_CONCURRENCY
+    ) {
+      await Promise.all(
+        seeds
+          .slice(offset, offset + BUDGET_RAISE_CONCURRENCY)
+          .map((seed) => this.raiseGrantUsageBudget({ organizationId, seed })),
+      );
+    }
+  }
+
+  private async raiseGrantUsageBudget({
+    organizationId,
+    seed,
+  }: {
+    organizationId: string;
+    seed: ResourceGrantUsageSeed;
+  }): Promise<void> {
+    try {
+      await this.prisma.grantUsage.update({
         where: {
           grantId: seed.grantId,
           organizationId,
@@ -362,6 +398,14 @@ export class PrismaAuthzMigrationRepository
         },
         data: { viewCount: seed.viewCount },
       });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        return;
+      }
+      throw error;
     }
   }
 

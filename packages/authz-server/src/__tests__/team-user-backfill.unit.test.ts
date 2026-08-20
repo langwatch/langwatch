@@ -135,7 +135,9 @@ function grantsFor({
   orgAdminBinding,
   legacy,
 }: {
-  repository: FakeMigrationRepository;
+  /** Only the promoted rows are read - narrowed so a stale-snapshot case
+   *  can hand in a view with fewer bindings, no cast needed. */
+  repository: Pick<FakeMigrationRepository, "bindings">;
   userId: string;
   organizationRole: "ADMIN" | "MEMBER";
   orgAdminBinding: boolean;
@@ -671,7 +673,7 @@ describe("TeamUserBackfillMigration", () => {
         grantsFor({
           repository: snapshotSeesPromotedBindings
             ? repository
-            : ({ ...repository, bindings: [] } as typeof repository),
+            : { bindings: [] },
           userId: principal.id,
           organizationRole: "MEMBER",
           orgAdminBinding: false,

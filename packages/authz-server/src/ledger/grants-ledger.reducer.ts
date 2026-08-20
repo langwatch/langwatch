@@ -391,12 +391,26 @@ export function reduceGrantsLedger({
       // the FOLD refuse means no path can put an organization on the engine
       // without a clean proof standing behind it, replay included.
       const refusal = cutoverCompletionRefusal(state.cutover);
+      if (refusal !== null) {
+        // A refusal is a non-event to the monotonic guard: it flips nothing
+        // the guard protects, so `changedAtMs` stays put and a proof whose
+        // business time trails the refused completion (a slower writer, a
+        // skewed clock) still folds instead of being dropped as stale -
+        // advancing the guard here would park the organization forever.
+        // Only the reason is recorded, for the operator. `onEngine` is left
+        // untouched for the same discipline: taking an organization OFF the
+        // engine is `cutover_rolled_back`'s decision, never a side effect.
+        return {
+          ...state,
+          cutover: { ...state.cutover, completionRefusedReason: refusal },
+        };
+      }
       return {
         ...state,
         cutover: {
           ...state.cutover,
-          onEngine: refusal === null,
-          completionRefusedReason: refusal,
+          onEngine: true,
+          completionRefusedReason: null,
           changedAtMs: event.occurredAtMs,
         },
       };

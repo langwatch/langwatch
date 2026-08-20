@@ -38,12 +38,20 @@ class InMemoryStateRepository implements SystemMigrationStateRepository {
   async upsertRecordUnlessRolledBack(
     record: TenantMigrationRecord,
   ): Promise<boolean> {
+    // The production contract: an operator's `rolled_back` pin refuses the
+    // write. The fake honors it so a pass that WOULD overwrite a pin fails
+    // here instead of passing against a stub looser than the real store.
+    const existing = await this.findRecord({
+      migrationName: record.migrationName,
+      tenantId: record.tenantId,
+    });
+    if (existing?.status === "rolled_back") return false;
     await this.upsertRecord(record);
     return true;
   }
 
-  recordCount(): number {
-    return this.rows.size;
+  tenantIdsWithRecords(): string[] {
+    return [...new Set([...this.rows.values()].map((row) => row.tenantId))];
   }
 }
 
@@ -203,8 +211,10 @@ describe("the migration pass under enrollment pacing", () => {
           expect.objectContaining({ tenantId: "acme" }),
         );
       }
-      // The un-enrolled organization was left untouched with no state.
-      expect(state.recordCount()).toBe(2);
+      // The un-enrolled organization was left untouched with no state: only
+      // the enrolled organization holds records. A bare count of 2 could
+      // also be one record per organization, which would mean globex ran.
+      expect(state.tenantIdsWithRecords()).toEqual(["acme"]);
     });
   });
 });

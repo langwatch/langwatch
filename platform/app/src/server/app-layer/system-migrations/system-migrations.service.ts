@@ -60,7 +60,9 @@ export type MigrationEnrollmentRecord = {
   organizationName: string | null;
   stage: MigrationEnrollmentStage;
   enrolledByUserId: string;
-  /** The enroller's name or email; null when neither resolves any more. */
+  /** The enroller's display name; null when it no longer resolves (the user
+   *  id above still identifies them). Never the email - the listing is a
+   *  plain read with no audit trail, so it carries no PII. */
   enrolledByLabel: string | null;
   createdAt: Date;
 };
@@ -427,7 +429,21 @@ export class SystemMigrationsService {
       );
     } else {
       // No second pin, and no second decision moment: this call exists to
-      // finish the one already recorded.
+      // finish the one already recorded. A standing pin with no stamp (the
+      // pin predates the stamp, or its report write was lost) gets THIS
+      // moment persisted onto it - otherwise every retry mints a fresh
+      // decidedAt, and the effect's decidedAt-keyed dedupe treats each retry
+      // as a new decision instead of finishing the recorded one.
+      if (rollbackDecidedAt(priorReport) === null) {
+        await this.deps.state.upsertRecord({
+          ...record,
+          status: "rolled_back",
+          report: {
+            ...priorReport,
+            rolledBack: { by: actorUserId, at: decidedAt },
+          },
+        });
+      }
       logger.warn(
         { migrationName, tenantId, actorUserId, decidedAt },
         "operator retried the rollback of an already pinned tenant",

@@ -2,9 +2,11 @@
  * @vitest-environment node
  *
  * ADR-092 delivery-plan PR 3 — the fork at the two API-key seams. As in
- * rbac.fork.unit.test.ts, every case is built so the resolvers cannot agree:
- * the access exists as a Grant head and as no compat `RoleBinding` row, so the
- * answer names which resolver is primary.
+ * rbac.fork.unit.test.ts, each case pins which resolver is primary: mostly by
+ * construction (the access exists as a Grant head and as no compat
+ * `RoleBinding` row, so the resolvers cannot agree), and where both resolvers
+ * would answer alike — the downgraded-owner deny — by asserting the read only
+ * the engine issues.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetCutoverGateForTesting } from "~/server/app-layer/authz/cutover-gate";
@@ -194,7 +196,7 @@ describe("the fork at the api-key seams", () => {
 
       describe("when the owner has been downgraded", () => {
         it("denies through the ceiling, though the key's own grant allows", async () => {
-          const { prisma } = buildPrisma({
+          const { prisma, grantFindMany } = buildPrisma({
             onEngine: true,
             grants: ["API_KEY"],
           });
@@ -210,6 +212,15 @@ describe("the fork at the api-key seams", () => {
           });
 
           expect(permitted).toBe(false);
+          // Legacy would deny this fixture too (no binding rows exist), so
+          // the deny alone cannot tell the resolvers apart. What can: the
+          // ENGINE's ceiling is a USER-principal read of the grant head,
+          // which the legacy resolver never issues.
+          expect(grantFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+              where: expect.objectContaining({ principalType: "USER" }),
+            }),
+          );
         });
       });
 

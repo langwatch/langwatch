@@ -296,6 +296,40 @@ describe("given an organization the genesis import has not reached", () => {
     });
   });
 
+  describe("when a RESOURCE grant is revoked", () => {
+    /**
+     * The one revocation verb that ignores this fork entirely. The caller
+     * routed here on an uncached cutover read; were the write gate's cached
+     * `false` honored, the "revocation" would delete only `RoleBinding` rows
+     * - no fact appended, the `Grant` head keeps the grant, and the fold
+     * re-projects the revoked link. Revocation must never come undone, so
+     * the fact appends and enforcement runs even with the gate answering
+     * legacy: on a genuinely legacy organization the fact folds as a no-op.
+     */
+    it("appends the fact even when the write gate answers legacy", async () => {
+      const { writer, db, sent } = harness({ onLedger: false });
+
+      await writer.revokeResourceGrants({
+        organizationId: ORG_ID,
+        grantIds: ["share_1"],
+        actor: ACTOR,
+      });
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0]!.verb).toBe("revokeGrants");
+      expect((sent[0]!.data as { revocations: unknown[] }).revocations).toEqual(
+        [{ grantId: "share_1" }],
+      );
+      // Enforcement, not the legacy imperative branch: the Grant head goes
+      // (the legacy branch never touches it), and no legacy audit row is
+      // written - the fact IS the audit trail on this path.
+      expect(db.grant.deleteMany).toHaveBeenCalledWith({
+        where: { organizationId: ORG_ID, id: { in: ["share_1"] } },
+      });
+      expect(db.auditLog.createMany).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when a member is offboarded", () => {
     /** @scenario "An organization that has not completed the genesis import keeps writing legacy rows imperatively" */
     it("deletes the member's grant rows and leaves membership to the caller", async () => {

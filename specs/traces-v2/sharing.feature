@@ -272,7 +272,7 @@ Feature: Share a trace behind a secret, scoped, expiring link
       Given a share link capped at two views that has already been opened once
       And its organization is now served by the authorization engine
       When a visitor presents the link
-      Then the view is allowed and one view remains spent
+      Then the view is allowed and the view budget is now exhausted
       And the next visitor presenting it is refused
 
     @integration

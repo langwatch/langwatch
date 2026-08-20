@@ -3,7 +3,7 @@ import type { MigrationLeaseRepository } from "./lease.repository";
 import type { SystemMigrationStateRepository } from "./state.repository";
 import type { SystemMigration } from "./system-migration";
 import type { TenantSource } from "./tenant-source";
-import type { MigrationPassSummary } from "./types";
+import { isTerminalTenantStatus, type MigrationPassSummary } from "./types";
 
 const logger = createLogger("langwatch:system-migrations");
 
@@ -193,14 +193,11 @@ export class SystemMigrationRunnerService {
       migrationName: migration.name,
       tenantId,
     });
-    // The two terminal states: `finalized` is the one-way latch, and
-    // `rolled_back` is the operator's pin holding a tenant on its legacy
-    // path. Re-running either would undo the operator's decision on the
-    // very next boot.
-    if (
-      existing?.status === "finalized" ||
-      existing?.status === "rolled_back"
-    ) {
+    // Terminal states (`isTerminalTenantStatus`): `finalized` is the
+    // one-way latch, and `rolled_back` is the operator's pin holding a
+    // tenant on its legacy path. Re-running either would undo the
+    // operator's decision on the very next boot.
+    if (isTerminalTenantStatus(existing?.status)) {
       summary.skipped += 1;
       return;
     }
@@ -218,13 +215,13 @@ export class SystemMigrationRunnerService {
       // anything this pass concluded. A refused write is the pin winning -
       // terminal for this tenant this pass; the row stays exactly as the
       // operator left it.
-      const written = await state.upsertRecordUnlessRolledBack({
+      const wasWritten = await state.upsertRecordUnlessRolledBack({
         migrationName: migration.name,
         tenantId,
         status: outcome.status,
         report: outcome.report ?? null,
       });
-      if (!written) {
+      if (!wasWritten) {
         summary.skipped += 1;
         logger.warn(
           { migration: migration.name, tenantId, outcome: outcome.status },

@@ -15,7 +15,10 @@ describe("adminEmailList", () => {
   const original = process.env.ADMIN_EMAILS;
 
   afterEach(() => {
-    process.env.ADMIN_EMAILS = original;
+    // Assigning `undefined` back would store the STRING "undefined";
+    // restoring an unset variable means deleting the key.
+    if (original === undefined) delete process.env.ADMIN_EMAILS;
+    else process.env.ADMIN_EMAILS = original;
   });
 
   describe("given no ADMIN_EMAILS", () => {
@@ -46,7 +49,10 @@ describe("isAdmin", () => {
   });
 
   afterEach(() => {
-    process.env.ADMIN_EMAILS = original;
+    // Assigning `undefined` back would store the STRING "undefined";
+    // restoring an unset variable means deleting the key.
+    if (original === undefined) delete process.env.ADMIN_EMAILS;
+    else process.env.ADMIN_EMAILS = original;
   });
 
   describe("given a user whose email is on the list, in a different case", () => {
@@ -88,7 +94,10 @@ describe("adminEmailList and normalizedAdminEmails (packages/authz-server)", () 
   const original = process.env.ADMIN_EMAILS;
 
   afterEach(() => {
-    process.env.ADMIN_EMAILS = original;
+    // Assigning `undefined` back would store the STRING "undefined";
+    // restoring an unset variable means deleting the key.
+    if (original === undefined) delete process.env.ADMIN_EMAILS;
+    else process.env.ADMIN_EMAILS = original;
   });
 
   it.each([

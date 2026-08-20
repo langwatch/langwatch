@@ -129,7 +129,7 @@ describe("migrationPassCohort on cloud", () => {
   });
 
   describe("when a deployment still sets the retired environment variables", () => {
-    /** @scenario "The retired cohort environment variables are ignored" */
+    /** @scenario "Enrollment alone decides which organizations migrate" */
     it("warns once per variable per pass and lets enrollment decide anyway", async () => {
       process.env.SYSTEM_MIGRATIONS_COHORT = "all";
       process.env.AUTHZ_CUTOVER_COHORT = "none";

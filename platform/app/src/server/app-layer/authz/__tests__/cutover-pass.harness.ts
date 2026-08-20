@@ -26,9 +26,10 @@ import {
   type GrantsLedgerEmitter,
   TeamUserBackfillMigration,
 } from "@langwatch/authz-server/migration";
-import type {
-  SystemMigration,
-  TenantMigrationOutcome,
+import {
+  isTerminalTenantStatus,
+  type SystemMigration,
+  type TenantMigrationOutcome,
 } from "@langwatch/system-migrations";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { createTenantId } from "~/server/event-sourcing";
@@ -355,13 +356,10 @@ export async function runMigrationPassForTenant({
       migrationName: migration.name,
       tenantId: organizationId,
     });
-    // The runner's own skip rule: finalized is the one-way latch and
-    // rolled_back is the operator's pin. Neither is re-run, and neither
-    // produces an outcome for this pass to report.
-    if (
-      previous?.status === "finalized" ||
-      previous?.status === "rolled_back"
-    ) {
+    // The runner's own skip rule, shared as a predicate so the two cannot
+    // drift: neither terminal state is re-run, and neither produces an
+    // outcome for this pass to report.
+    if (isTerminalTenantStatus(previous?.status)) {
       continue;
     }
     const outcome = await migration.migrateTenant({

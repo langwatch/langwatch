@@ -22,6 +22,7 @@
  *
  * @see specs/rbac/in-place-authz-migration.feature
  */
+import { awaitForkComparisonsForTesting } from "@langwatch/authz-server";
 import { GRANTS_CUTOVER_MIGRATION_NAME } from "@langwatch/authz-server/migration";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
@@ -40,10 +41,9 @@ import type { Session } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { PrismaSystemMigrationStateRepository } from "../../system-migrations/repositories/system-migration-state.prisma.repository";
+import { rollBackAuthzCutover } from "../../system-migrations/runtime";
 import { SystemMigrationsService } from "../../system-migrations/system-migrations.service";
 import { resetCutoverGateForTesting } from "../cutover-gate";
-import { bumpAuthzEpoch } from "../epoch";
-import { PrismaAuthzGrantsProjectionRepository } from "../repositories/authz-grants-projection.prisma.repository";
 
 const ns = `authz-cutover-rollback-${nanoid(8)}`;
 
@@ -62,11 +62,12 @@ describe("given a cut-over organization rolled back with the queue stopped", () 
   const session = () => ({ user: { id: userId } }) as unknown as Session;
 
   /**
-   * `system-migrations/runtime.ts`'s `rollBackAuthzCutover`, with its ledger
-   * send captured instead of queued: the synchronous projection flip, then
-   * the epoch bump, then the fact. Same order, and the order is the point -
-   * the enforcement is what has to hold without the fold, so it goes first
-   * and the append is best-effort behind it.
+   * The PRODUCTION effect, `system-migrations/runtime.ts`'s
+   * `rollBackAuthzCutover`, with only its ledger send captured instead of
+   * queued. Every synchronous step - the projection flip, the gate
+   * invalidation, the epoch bump - is the shipped code running in its
+   * shipped order; a reimplemented copy of those steps drifted once (it
+   * lost the gate invalidation), which is why the seam is the send alone.
    */
   const service = () =>
     new SystemMigrationsService({
@@ -89,13 +90,19 @@ describe("given a cut-over organization rolled back with the queue stopped", () 
       audit: async () => undefined,
       runPass: async () => null,
       rollbackEffects: {
-        [GRANTS_CUTOVER_MIGRATION_NAME]: async ({ tenantId, actorUserId }) => {
-          await new PrismaAuthzGrantsProjectionRepository(
-            prisma,
-          ).enforceCutoverRollback({ organizationId: tenantId });
-          await bumpAuthzEpoch({ organizationId: tenantId });
-          appended.push({ organizationId: tenantId, actorUserId });
-        },
+        [GRANTS_CUTOVER_MIGRATION_NAME]: async ({
+          tenantId,
+          actorUserId,
+          decidedAt,
+        }) =>
+          rollBackAuthzCutover({
+            tenantId,
+            actorUserId,
+            decidedAt,
+            sendFact: async ({ organizationId, actorUserId: byUserId }) => {
+              appended.push({ organizationId, actorUserId: byUserId });
+            },
+          }),
       },
     });
 
@@ -208,7 +215,7 @@ describe("given a cut-over organization rolled back with the queue stopped", () 
         "project:delete",
       ),
     ).toEqual({ permitted: true, organizationRole: "MEMBER" });
-    await new Promise((resolve) => setImmediate(resolve));
+    await awaitForkComparisonsForTesting();
 
     await service().rollBack({
       migrationName: GRANTS_CUTOVER_MIGRATION_NAME,
@@ -244,10 +251,11 @@ describe("given a cut-over organization rolled back with the queue stopped", () 
       )?.onEngine,
     ).toBe(false);
 
-    // The gate's cache window, dropped: what a pod holding a positive answer
-    // does within sixty seconds of the flip, done now.
-    resetCutoverGateForTesting();
-
+    // NO reset here, deliberately: the pre-check above cached "on engine"
+    // in this pod's gate, and dropping THIS pod's cache is the rollback's
+    // own job (`invalidateCutoverGate`, step 2). Were the production effect
+    // to lose that step again, the check below would answer from the stale
+    // cache and this test would fail.
     const decision = await resolveProjectPermission(
       { prisma, session: session() },
       project.id,
@@ -256,6 +264,6 @@ describe("given a cut-over organization rolled back with the queue stopped", () 
 
     // Legacy has no binding row granting this, and legacy is answering again.
     expect(decision).toEqual({ permitted: false, organizationRole: "MEMBER" });
-    await new Promise((resolve) => setImmediate(resolve));
+    await awaitForkComparisonsForTesting();
   });
 });

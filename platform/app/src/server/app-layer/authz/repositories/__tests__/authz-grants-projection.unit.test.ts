@@ -768,7 +768,10 @@ describe("PrismaAuthzGrantsProjectionRepository", () => {
           grantIds: ["sl_collided"],
         });
 
-        for (const call of vi.mocked(prisma.shareLink.deleteMany).mock.calls) {
+        const deleteCalls = vi.mocked(prisma.shareLink.deleteMany).mock.calls;
+        // The loop alone would pass vacuously if nothing deleted at all.
+        expect(deleteCalls.length).toBeGreaterThan(0);
+        for (const call of deleteCalls) {
           expect(call[0]).toEqual({
             where: {
               projectId: { in: ["proj_chatbot"] },

@@ -62,6 +62,22 @@ import type { OrganizationRole } from "./authz-read.repository";
 
 const logger = createLogger("langwatch:authz:fork");
 
+/**
+ * Every detached comparison still running, across every service instance -
+ * module scope on purpose, because the composition builds a service per
+ * call and a test cannot reach the instance that ran. Exists for one
+ * consumer: an integration teardown that must not delete the rows a
+ * comparison is still reading.
+ */
+const detachedComparisons = new Set<Promise<void>>();
+
+/** Test hook: resolves once every detached fork comparison has settled. */
+export async function awaitForkComparisonsForTesting(): Promise<void> {
+  while (detachedComparisons.size > 0) {
+    await Promise.allSettled([...detachedComparisons]);
+  }
+}
+
 export type AuthzForkOptions = {
   /** Mirrors isDemoProject()'s dynamic env read. */
   demoProjectId: () => string | undefined;
@@ -330,13 +346,23 @@ export class AuthzForkService {
         decideAt({ type: "team", id: teamId, organizationId }),
       ]),
     );
-    const projectsMap = new Map<string, boolean>();
-    for (const { projectId, teamId } of projects) {
-      const scope: AuthzScopeRef | null = teamId
-        ? { type: "project", id: projectId, teamId, organizationId }
-        : await this.collector.resolveScopeRef({ projectId });
-      projectsMap.set(projectId, decideAt(scope));
-    }
+    // Scope resolution fans out (the shadow service's shape): only projects
+    // arriving without a team need the lookup, and one straggler must not
+    // serialize the rest of the batch behind it.
+    const projectsMap = new Map<string, boolean>(
+      await Promise.all(
+        projects.map(
+          async ({ projectId, teamId }): Promise<[string, boolean]> => [
+            projectId,
+            decideAt(
+              teamId
+                ? { type: "project", id: projectId, teamId, organizationId }
+                : await this.collector.resolveScopeRef({ projectId }),
+            ),
+          ],
+        ),
+      ),
+    );
 
     // One admission decision for the whole batch: the maps are compared as a
     // unit, and half a batch's lines would read as a batch that disagreed.
@@ -499,12 +525,18 @@ export class AuthzForkService {
       });
       return false;
     }
+    // ONE pass for the whole decision: the ceiling intersects the two
+    // snapshots, so they must come off the same head - collected separately,
+    // a gate expiry between them could intersect a legacy binding list with
+    // a ledger one.
+    const pass = this.collector.beginPass();
     const [keyGrants, ownerGrants] = await Promise.all([
-      this.collector.collectGrants({ principal, organizationId }),
+      this.collector.collectGrants({ principal, organizationId, reader: pass }),
       ownerUserId
         ? this.collector.collectGrants({
             principal: { type: "user", id: ownerUserId },
             organizationId,
+            reader: pass,
           })
         : Promise.resolve(null),
     ]);
@@ -658,13 +690,15 @@ export class AuthzForkService {
    *  `finally` is what guarantees the counter comes back down anyway. */
   private runDetached(caller: string, body: () => Promise<void>): void {
     this.inFlightComparisons += 1;
-    void body()
+    const settled = body()
       .catch((error: unknown) => {
         logger.warn({ error, caller }, "authz fork comparison failed");
       })
       .finally(() => {
         this.inFlightComparisons -= 1;
+        detachedComparisons.delete(settled);
       });
+    detachedComparisons.add(settled);
   }
 
   /**

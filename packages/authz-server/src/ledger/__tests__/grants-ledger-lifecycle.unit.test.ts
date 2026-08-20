@@ -61,7 +61,27 @@ describe("grants ledger reducer, migration lifecycle", () => {
         expect(state.cutover.completionRefusedReason).toBe(
           CUTOVER_COMPLETION_REFUSALS.UNPROVEN,
         );
-        expect(state.cutover.changedAtMs).toBe(6);
+        // A refusal changed nothing the monotonic guard protects, so it
+        // does not arm the guard - see the next case for why.
+        expect(state.cutover.changedAtMs).toBeNull();
+      });
+    });
+
+    describe("when a proof's business time trails a refused completion", () => {
+      it("folds the proof instead of dropping it as stale", () => {
+        // The refused completion was stamped by a clock running ahead of the
+        // prover's. Were the refusal to advance `changedAtMs`, this proof
+        // would read as stale, no completion could ever be earned, and the
+        // organization would be parked forever.
+        const state = apply([
+          { kind: "cutover_completed", actor: ACTOR, occurredAtMs: 300_006 },
+          { kind: "migration_parity_proved", diffs: [], occurredAtMs: 6 },
+          { kind: "cutover_completed", actor: ACTOR, occurredAtMs: 300_007 },
+        ]);
+
+        expect(state.cutover.provedAtMs).toBe(6);
+        expect(state.cutover.onEngine).toBe(true);
+        expect(state.cutover.completionRefusedReason).toBeNull();
       });
     });
 

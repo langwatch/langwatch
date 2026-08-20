@@ -308,7 +308,10 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
     });
     if (rows.length === 0) return [];
 
-    const viewCounts = await this.findViewCounts(rows.map((row) => row.id));
+    const viewCounts = await this.findViewCounts({
+      organizationId: resolvedOrganizationId,
+      grantIds: rows.map((row) => row.id),
+    });
     return rows.flatMap((row) => shareLinkRowFrom({ row, viewCounts }));
   }
 
@@ -349,12 +352,18 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
   }
 
   /** The view budget lives on its own table (decision 22); a resource with no
-   *  usage row has been viewed zero times. */
-  private async findViewCounts(
-    grantIds: readonly string[],
-  ): Promise<Map<string, number>> {
+   *  usage row has been viewed zero times. The organization bounds the read:
+   *  a grant-id LIST alone is only as tenant-scoped as its weakest entry, so
+   *  the tenancy guard refuses it without the organization named. */
+  private async findViewCounts({
+    organizationId,
+    grantIds,
+  }: {
+    organizationId: string;
+    grantIds: readonly string[];
+  }): Promise<Map<string, number>> {
     const usages = await this.prisma.grantUsage.findMany({
-      where: { grantId: { in: [...grantIds] } },
+      where: { organizationId, grantId: { in: [...grantIds] } },
       select: { grantId: true, viewCount: true },
     });
     return new Map(usages.map((usage) => [usage.grantId, usage.viewCount]));

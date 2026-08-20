@@ -561,10 +561,12 @@ export class GrantsCutoverMigration implements SystemMigration {
    * where that needs saying. View accounting has never been fold-owned
    * (decision 22): it has a different writer, a different rate, and a
    * projection pass that touched it would reset every budget in the
-   * organization. So the seed is a create-if-absent write here, which is
-   * idempotent for the same reason the fold's writes are - the usage row's id
-   * IS the grant id - and, because it never updates, a re-run can never walk a
-   * view that has since been consumed back off the row.
+   * organization. So the seed's writes are monotonic: a create-if-absent
+   * lands missing rows (idempotent for the same reason the fold's writes are
+   * - the usage row's id IS the grant id), and a guarded raise lifts a row a
+   * held organization's legacy path has since outgrown. The port refuses to
+   * lower a count, so a re-run can never walk a view that has since been
+   * consumed back off the row.
    */
   private async seedShareViewBudgets({
     organizationId,
