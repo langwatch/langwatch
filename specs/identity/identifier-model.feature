@@ -113,7 +113,7 @@ Feature: The identifier model - identity as an event-sourced pipeline
     Then the write is refused naming the model and operation
     And the routing coverage test pins the full mounted surface in CI
 
-  @unimplemented
+  @unit
   Scenario: Email verification completes only with the ceremony's proof
     Given "sam" starts an email verification from a browser holding a PKCE verifier
     When the emailed magic link is opened with a GET request
@@ -121,13 +121,13 @@ Feature: The identifier model - identity as an event-sourced pipeline
     When completion is posted with the token and the matching verifier
     Then the identifier verifies via a verify_identifier command
 
-  @unimplemented
+  @unit
   Scenario: A verification token is pinned to the identifier it was minted for
     Given a verification record minted for identifier "work"
     When completion is posted naming identifier "personal" with that token
     Then the completion is refused and no identifier verifies
 
-  @unimplemented
+  @unit
   Scenario: A mail scanner's prefetch cannot verify an identifier
     Given a verification email delivered through a link-scanning gateway
     When the scanner fetches the magic link

@@ -68,6 +68,7 @@ import { app as gatewayOpenApiApp } from "./routes/gateway-openapi";
 import { app as githubApp } from "./routes/github";
 import { app as healthApp } from "./routes/health";
 import { app as healthChecksApp } from "./routes/health-checks";
+import { app as identityVerificationApp } from "./routes/identity-verification";
 import { app as ingestionRoutesApp } from "./routes/ingest/ingestionRoutes";
 import { app as langyApiApp } from "./routes/langy-api";
 import { app as langyInternalApp } from "./routes/langy-internal";
@@ -204,6 +205,7 @@ export function createApiRouter() {
 
   api.route("/", adminApp);
   api.route("/", bugReportsApp); // /api/bug-reports — public issue-report intake
+  api.route("/", identityVerificationApp); // /api/identity/verify — GET renders, POST completes (D01)
   api.route("/", annotationsApp);
   // ORDERING: authCliApp MUST be registered BEFORE authApp.
   // authApp owns the BetterAuth catch-all (`/auth/*`), which would

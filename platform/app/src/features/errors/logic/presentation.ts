@@ -1518,6 +1518,18 @@ const presentations = {
       "This is a self-hosted deployment, so plans are managed outside the app.",
   },
 
+  // ---- identity ----
+  identity_verification_invalid: {
+    title: "That verification link didn't work",
+    describe: () =>
+      "Open the newest verification email and finish confirming from the place where you requested it.",
+  },
+  identity_verification_expired: {
+    title: "That verification link has expired",
+    describe: () =>
+      "Request a new verification email and use the newest link.",
+  },
+
   // ---- governance ----
   anomaly_rule_not_found: {
     title: "Anomaly rule not found",

@@ -106,6 +106,8 @@ export const APP_ERROR_CODES = [
   "group_not_in_organization",
   "guardrail_attach_forbidden",
   "idempotency_error",
+  "identity_verification_expired",
+  "identity_verification_invalid",
   "ingestion_source_cap_reached",
   "ingestion_source_not_found",
   "insufficient_permissions",
