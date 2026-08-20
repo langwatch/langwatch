@@ -56,6 +56,44 @@ describe("parseCodexRollout", () => {
     });
   });
 
+  describe("given a conversation many times the request-body cap", () => {
+    describe("when it is parsed", () => {
+      /** @scenario "A conversation far above the cap is bounded in one pass" */
+      it("bounds every turn without reading the conversation again per dropped message", () => {
+        // The cost that mattered grows with the NUMBER of messages, not their
+        // size: every message dropped read the whole conversation again. A
+        // long-lived agent session reaches thousands of short exchanges.
+        const TURNS = 400;
+        const body = "y".repeat(400);
+        const lines: unknown[] = [];
+        for (let turn = 0; turn < TURNS; turn++) {
+          lines.push(
+            taskStarted(`trace-${turn}`, `t-${turn}`),
+            turnContext(`t-${turn}`),
+            userMsg(`${body} ${turn}`),
+            agentMessage(`${body} reply ${turn}`),
+            { type: "event_msg", payload: { type: "task_complete" } },
+          );
+        }
+        const transcript = rollout(...lines);
+
+        const startedAt = Date.now();
+        const { turns } = parseCodexRollout(transcript);
+        const elapsedMs = Date.now() - startedAt;
+
+        expect(turns).toHaveLength(TURNS);
+        for (const turn of turns) {
+          expect(JSON.stringify(turn.inputMessages).length).toBeLessThanOrEqual(
+            120_000,
+          );
+        }
+        // Reading the conversation again per dropped message takes seconds on
+        // this transcript, and minutes on a session that ran for weeks.
+        expect(elapsedMs).toBeLessThan(2_000);
+      });
+    });
+  });
+
   describe("given a developer message", () => {
     describe("when it is parsed", () => {
       /** @scenario "The developer message becomes the system prompt in the request body" */

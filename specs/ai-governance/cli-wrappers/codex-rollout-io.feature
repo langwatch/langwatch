@@ -224,3 +224,20 @@ Feature: Codex Path B recovers the full request body from the rollout transcript
       Given a rollout whose first user_message is injected context in a tag
       When the completed turn is harvested
       Then the session-context record carries no title
+
+  Rule: a long session costs no more per turn than a short one
+
+    Codex runs the harvest after every completed turn, so the parse is paid
+    again on every turn. Each turn's request body is capped before it is sent,
+    and the cap measured the whole conversation again after each message it
+    dropped. A session that ran for weeks took four minutes to parse, so codex
+    started the next harvest before the last one finished and that session's
+    conversation never reached the server. Each message is capped and measured
+    once instead, and the total is tracked as messages are dropped.
+
+    @unit
+    Scenario: A conversation far above the cap is bounded in one pass
+      Given a rollout whose conversation is many times the request-body cap
+      When the rollout is parsed
+      Then every turn's request body is within the cap
+      And the parse finishes in seconds rather than minutes
