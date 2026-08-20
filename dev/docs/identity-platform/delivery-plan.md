@@ -19,7 +19,8 @@ If the authz program slips, D01–D04, D11 and D13 can start (they need nothing 
 
 Its delivery plan carries the mirror-image list ("The identity platform — doors left open"):
 
-- **The Redis-loss breaker is a shared primitive.** Ledger PR 1 builds the per-pipeline circuit breaker; ADR-007 carries one shared amendment naming `authz_grants` and expecting `identity` to join. D02 adds the identity pipeline to that amendment with its own volume analysis — it consumes the primitive, it does not build one.
+- **The Redis-loss breaker is doctrine, not a primitive.** Ledger PR 1 shipped ADR-007's shared amendment (naming `authz_grants` and expecting `identity` to join) and deliberately **no breaker code** — no state machine, no probes, and *no in-memory processor, ever* (simplified 2026-08-17). What D02 adds is identity joining the amendment with its own volume analysis, plus the two seam hardenings the doctrine implies (best-effort staging, fail-open secondary storage) — nothing resembling a breaker gets built.
+- **The staged in-place rollout shape** — new native head born clean, adoption by deterministic ids, write gate on migration state, read fork gated per subject, parity-proved flips, rollback as a data flip — is the ledger's merged PR 1→3 arc, and Wave 1 transplants it wholesale (re-tenanted to users).
 - **`@langwatch/system-migrations` (on `main`, #7079)** drives every in-place backfill: leased runner in the worker process, per-tenant state machine `pending → migrated → finalized → rolled_back`, self-proving finalization, parked failures, ops migrations dashboard + operator rollback included. D01's identifier backfill and D04's grandfathering are riders; D09's per-customer progress record is a candidate (open question there).
 - **SCIM converges on `grants.*`** (D08): when connections exist, the reconciler's actor is the connection — `actor: { type: "system", id: <connectionId> }` — which the ledger event shape accommodates with no schema change.
 - **Offboarding is a service seam**: identity deprovision paths call `GrantsService` (revoke/offboard, empty-proof postcondition); no identity imports inside authz packages, no cross-pipeline event subscriptions.
@@ -54,8 +55,8 @@ Nothing a customer can see. Both deliverables exist to make Wave 2 safe.
 
 | # | Needs | What ships | Impact when it lands |
 |---|---|---|---|
-| D01 | — | The identifier model: one user, many verified sign-in methods, event-sourced lifecycle columns on the existing `Account` table, full backfill | No product change yet — but identity state becomes *visible data* for the first time, and every other deliverable builds on it |
-| D02 | D01 | The shared per-pipeline breaker (ledger PR 1) applied to the auth path: Redis down ⇒ sessions go PG-only, identity commands run inline | A Redis outage stops locking every customer out of sign-in; de-risks the D03 cutover before it exists |
+| D01 | — | The identifier model: one user, many verified sign-in methods, a new pure event-truth Postgres `Identifier` projection (born clean; `Account` stays 100% row-truth protocol), full backfill via system-migrations with per-user write gating | No product change yet — but identity state becomes *visible data* for the first time, and every other deliverable builds on it |
+| D02 | D01 | ADR-007's Redis-loss doctrine applied to the auth path: Redis down ⇒ sessions go PG-only, ceremonies complete on the calling path (append + apply), staging best-effort | A Redis outage stops locking every customer out of sign-in; de-risks the D03 cutover before it exists |
 
 ## Wave 2 — the new front door + the invite fix
 
@@ -100,8 +101,8 @@ Parallel tracks; staff in any order capacity allows.
 
 | # | Flag(s) | Exit gate | Rollback | Risk |
 |---|---|---|---|---|
-| D01 | — (additive) | Replay rebuilds lifecycle columns from CH and matches live table; adapter routing-table coverage: every better-auth model+operation explicitly routed, unrouted writes fail | Stop emitting; columns additive, drop later | Low |
-| D02 | `AUTH_REDIS_BREAKER` | Dev-compose Redis-kill: sign-in + attach + detach + session refresh pass; breaker metrics emitted | Breaker off = today's behavior | Medium (touches dispatch) |
+| D01 | — (write gate is data, ships closed) | Replay rebuilds `Identifier` from CH and matches live table; backfill parity self-proving per user; adapter routing-table coverage: every better-auth model+operation explicitly routed, unrouted writes fail | Un-enroll / roll back migration state — adapter stops emitting, protocol writes untouched; table additive, nothing reads it until D03 | Low |
+| D02 | `AUTH_REDIS_FAIL_OPEN` | Dev-compose Redis-kill: sign-in + attach + detach + session refresh pass; staging-drop and fail-open metrics emitted | Flag off = today's behavior | Medium (touches dispatch) |
 | D03 | `IDENTITY_ROUTER_V2` (shadow → enforce) | Zero unexplained shadow mismatches over bake; sign-in success ≥ baseline | Flag off | **Highest** |
 | D04 | `SSOCONN_ROUTING` (shadow → enforce) | Routing parity silent vs `ssoDomain` strings; string writes stopped | Flag off, strings still dual-written | Medium |
 | D05 | `SELF_SERVE_SSO` (per-org) | New enterprise customer onboards with exactly one LangWatch action (approval click); ops surface resolves a real support case | Per-org flag off | Medium |
@@ -116,28 +117,30 @@ Parallel tracks; staff in any order capacity allows.
 
 # Wave 1 — PR breakdown
 
-The program starts here. Same shape as the authz program's plan (`dev/docs/plans/adr-092-authz-delivery-plan.md`): few PRs, gates and flags protect the rollout, not PR boundaries. D01 is two PRs rather than one because the seam is load-bearing: ADR-101's amendment rule says a pipeline with row-truth columns must not enter replay discovery until per-pipeline column scoping exists — the PR boundary *is* that ordering, enforced.
+The program starts here. Same shape as the authz program's plan (`dev/docs/plans/adr-092-authz-delivery-plan.md`): few PRs, gates and data protect the rollout, not PR boundaries — every PR ships gated closed and is production-safe on its own. D01 is two PRs because live path and history are separately provable: PR 1 lands everything dark (the write gate answers false for every user until a backfill exists), PR 2 brings the runner plumbing that opens it per user.
 
 ```text
- PR 1  D01a — the live path                PR 2  D01b — history + replay
- pipeline skeleton + no-op round-trip      backfill rider on system-migrations
- additive Account migration                per-pipeline column scoping in replay
- identity adapter + routing table          022/015 amendment text appended
- lifecycle apply on the calling path  ──►  identity enters replay discovery
- lint rule on lifecycle columns            replay-parity test (the D01 exit gate)
- (identity NOT in replay discovery)
-                                                        │  needs ledger PR 1 (#7143)
-                                                        ▼  merged (breaker primitive)
-                                           PR 3  D02 — auth-path breaker
+ PR 1  D01a — the live path                PR 2  D01b — history + rollout
+ pipeline skeleton + no-op round-trip      user-rooted TenantSource for the runner
+ additive migration: NEW Identifier        backfill rider (adoption events,
+ table (PG) + User.userHashKey             deterministic ids, backdated occurredAt)
+ identity adapter + routing table          org-driven enrollment pacing +
+ fold apply on the calling path       ──►  everyone-else cohort
+ per-user write gate (ships CLOSED —       backfill parity self-proving per user
+ no migration rows exist yet)              (the D01 exit gate) — latch opens the
+ verification ceremony guards              adapter's write gate user by user
+ replay discovery from day one
+                                           PR 3  D02 — auth-path Redis-loss
                                            identity joins ADR-007's Redis-loss
                                            amendment (volume analysis in ADR-2)
-                                           sessions PG-only · inline commands
-                                           flag AUTH_REDIS_BREAKER · Redis-kill test
+                                           sessions PG-only (fail-open seam) ·
+                                           best-effort staging hardened ·
+                                           flag AUTH_REDIS_FAIL_OPEN · Redis-kill test
 ```
 
-- **PR 1 gate:** no-op command round-trip green; adapter routing-table coverage green (every better-auth model+operation explicitly routed, an unrouted write fails at startup); every new identity write demonstrably produces its event. Rollback: revert — columns additive, nothing reads them yet.
-- **PR 2 gate:** the D01 exit gate — replay rebuilds lifecycle columns from CH and matches the live table per tenant (self-proving finalization; disagreement holds the tenant at `migrated` with a diff on the ops migrations page). Rollback: park the migration, stop emitting; columns additive.
-- **PR 3 gate:** the D02 exit gate — dev-compose Redis-kill: sign-in + attach + detach + session refresh pass; breaker metrics emitted. Rollback: `AUTH_REDIS_BREAKER` off = today's behavior. Blocked until the grants ledger's PR 1 (#7143) merges; PRs 1–2 wait on nothing.
+- **PR 1 gate:** no-op command round-trip green; adapter routing-table coverage green (every better-auth model+operation explicitly routed, an unrouted write fails at startup); replay-parity green (rebuild `Identifier` from CH, diff vs live — trivially empty until users latch, structurally proven by test); write gate demonstrably closed by default. Rollback: revert — the table is additive, nothing reads it, no user is latched.
+- **PR 2 gate:** the D01 exit gate — backfill parity: the fold-built `Identifier` rows match what live `Account`/`User` rows imply, per user (self-proving finalization; disagreement holds the user at `migrated` with a diff on the ops migrations page). Rollback: un-enroll / roll back migration state — the write gate closes again for those users, protocol writes never depended on it.
+- **PR 3 gate:** the D02 exit gate — dev-compose Redis-kill: sign-in + attach + detach + session refresh pass; staging-drop and fail-open metrics emitted. Rollback: `AUTH_REDIS_FAIL_OPEN` off = today's behavior. The ledger PR 1 (#7143) dependency is satisfied — it merged 2026-08-18, as doctrine (the ADR-007 amendment), not as a primitive.
 
 D11 (invitations) forks off after PR 2 for a second engineer; D03/D13 start only when the Wave 1 gates are green.
 
@@ -145,7 +148,7 @@ D11 (invitations) forks off after PR 2 for a second engineer; D03/D13 start only
 
 Plain design docs, written before the code they cover:
 
-1. **Identity platform + identifiers** (D01) — **written: [ADR-101](../adr/101-identity-pipeline-and-identifiers.md)**. The identity adapter (R10), the column-truth rule; **explicitly amends ADR-022 (`022-event-log-source-of-truth.md`) and ADR-015 (`015-projection-replay-coordination.md`)** — cite by filename, the numbers are collided in the corpus (handler-written value columns are row-truth, excluded from replay; replay tooling gains per-pipeline column scoping). Carries the payload rule (the email rides in the event where the fact is about one; HMAC-keyed hashes; secrets never) and erasure-as-event-plus-log-wipe (R11). The amendment text lands in the two doctrine files with PR 2 above.
+1. **Identity platform + identifiers** (D01) — **written: [ADR-101](../adr/101-identity-pipeline-and-identifiers.md)** (revised 2026-08-20). The identity adapter (R10) with its per-user write gate; the truth split — a new pure event-truth Postgres `Identifier` projection, `Account` stays 100% row-truth protocol — which leaves **ADR-022 and ADR-015 unamended** (the earlier column-truth carve-out and replay column scoping are deleted from the program); the grants-shaped rollout re-tenanted to users (org-paced enrollment, per-user latch). Carries the payload rule (the email rides in the event where the fact is about one; HMAC-keyed hashes; secrets never) and erasure-as-event-plus-log-wipe (R11).
 2. **Auth-path resilience** (D02) — adds the `identity` pipeline to **ADR-007's shared Redis-loss amendment** (which names `authz_grants` and expects identity to join), with the identity-specific volume and failure-semantics analysis.
 3. **Sign-in router, screens + SSO self-service** (D03/D13–D05) — identifier-first routing, auto-link rules, the first-party screen set; **explicitly amends ADR-027 (`027-license-gated-sso.md`; the number is collided)** (hook → per-method router policy; carries over the constants table and the route-table canary; answers the license-timing question, Open Q11).
 4. **MFA + session shape** (D06) — `amr` semantics incl. the passkey/`phw` decision (Open Q4); the forced re-login.
@@ -180,9 +183,9 @@ Gherkin specs to write fresh (no existing coverage): join-request lifecycle incl
 
 # Flag inventory
 
-`AUTH_REDIS_BREAKER` (D02) · `IDENTITY_ROUTER_V2` (D03 + D13 — router and screens flip together) · `SSOCONN_ROUTING` (D04) · `SELF_SERVE_SSO` per-org (D05) · `MFA_ENROLLMENT_OPEN` (D06) · `PASSKEYS_ENABLED` (D07) · `SCIM_V2_GRANTS` (D08) · invite changes additive (D11) · `JOIN_REQUESTS` (D12) · deploy-time session revoke (D06, one-way).
+`AUTH_REDIS_FAIL_OPEN` (D02) · `IDENTITY_ROUTER_V2` (D03 + D13 — router and screens flip together) · `SSOCONN_ROUTING` (D04) · `SELF_SERVE_SSO` per-org (D05) · `MFA_ENROLLMENT_OPEN` (D06) · `PASSKEYS_ENABLED` (D07) · `SCIM_V2_GRANTS` (D08) · invite changes additive (D11) · `JOIN_REQUESTS` (D12) · deploy-time session revoke (D06, one-way).
 
-House discipline: dashboards before flags flip. Metrics pack per deliverable: routing decisions by outcome, link proposals auto vs confirmed, ceremony success rates, SCIM dead-letters, breaker state transitions, join-request funnel (incl. auto-joins), invite resend/expiry rates, sign-up funnel + orphaned-organization creation rate, per-customer migration progress + shim hits, sign-in success vs baseline.
+House discipline: dashboards before flags flip. Metrics pack per deliverable: routing decisions by outcome, link proposals auto vs confirmed, ceremony success rates, SCIM dead-letters, Redis-loss seam drops/fail-opens, join-request funnel (incl. auto-joins), invite resend/expiry rates, sign-up funnel + orphaned-organization creation rate, per-customer migration progress + shim hits, sign-in success vs baseline.
 
 # Risk register
 
@@ -191,8 +194,8 @@ House discipline: dashboards before flags flip. Metrics pack per deliverable: ro
 | Cutover breaks sign-in fleet-wide | D03 | Shadow bake with zero-mismatch gate; flag off = instant revert; D02 already landed |
 | New front door tanks sign-up conversion | D13 | Sign-up funnel dashboard live before the flip; completion ≥ baseline in the exit gate; flag off restores legacy screens |
 | Domain auto-join admits the wrong person | D12 | Org opt-in only; verified email required; public email domains excluded outright; every auto-join is an audited event admins are notified of |
-| Replay touches row-truth value columns | D01 | ADR-101 pins the column-truth rule + per-pipeline column scoping in replay tooling; replay-parity test in exit gate; lint rule on identity-column writes |
-| Inline processing overloads web role during Redis outage | D02 | Identity volume is hundreds/day; breaker metrics; half-open probes; ADR-2 records the analysis |
+| Replay touches protocol secrets | D01 | Structurally impossible: `Account` is not a projection and never enters replay; `Identifier` carries no secrets and replays whole-row (ADR-101 §3); replay-parity test in exit gate |
+| Calling-path applies overload web role during Redis outage | D02 | Identity volume is hundreds/day; seam timeouts bound latency; drop/fail-open metrics; ADR-2 records the analysis |
 | Session revoke-all strands users mid-work | D06 | Comms + precedent (better-auth cutover); schedule low-traffic window |
 | Customer IdP apps pin legacy Auth0 callback URI | D09 | Resolved (R9): temporary shim with per-org usage metric through grace; removed at D10 |
 | Auth0 retirement stalls on stragglers | D09/D10 | By design: per-tenant, no deadline; D10 is an exit criterion, not a milestone; nudge/escalation ladder in the wizard |

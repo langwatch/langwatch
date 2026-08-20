@@ -10,7 +10,7 @@ Passkeys become first-class identifiers: WebAuthn ceremonies via the official pl
 
 - New dependency `@better-auth/passkey@1.6.23` (pins to core; pulls `@simplewebauthn/*`).
 - Hand-written Prisma model matching the plugin schema: `Passkey` (name, publicKey, userId, credentialID, counter, deviceType, backedUp, transports, aaguid).
-- Mirror rows: `provider="passkey"`, `providerAccountId=credentialID`, maintained by the pipeline from passkey-ceremony events (lifecycle columns owned per the D01 rule).
+- Mirror rows: `Identifier` rows with `provider="passkey"` keyed on the credentialID, maintained by the fold from passkey-ceremony events (pure event-truth, per the D01 truth split).
 - Passkey table writes arrive through the identity adapter (R10) like every other model; ceremony context is stamped by `/passkey/verify-registration`, `/passkey/verify-authentication`, `/passkey/delete-passkey`. The plugin's `registration.afterVerification`/`authentication.afterVerification` callbacks are pre-write — used for gating/enrichment only, never as the event source.
 - Platform and cross-platform authenticators; discoverable-credential (username-less) sign-in where supported.
 - Router integration: passkey appears in the uniform method picker (hook point left by D03).
@@ -35,7 +35,7 @@ Passkeys become first-class identifiers: WebAuthn ceremonies via the official pl
 
 # Exit gate / rollback
 
-- **Exit:** register / sign-in / no-email sign-in / delete round-trips green on platform + cross-platform authenticators; mirror rows consistent with plugin table (replay-parity test covers lifecycle columns).
+- **Exit:** register / sign-in / no-email sign-in / delete round-trips green on platform + cross-platform authenticators; mirror rows consistent with plugin table (replay-parity test covers the `Identifier` projection).
 - **Rollback:** `PASSKEYS_ENABLED` off.
 
 # Security Concerns

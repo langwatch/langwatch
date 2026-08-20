@@ -8,7 +8,7 @@ Replace the `NEXTAUTH_PROVIDER` one-method front door with identifier-first rout
 
 # Requirements
 
-- Router reads `Account` lifecycle columns + domain routing tables (strings until D04; `SSOCONN_ROUTING` takes over after). PG reads only on the hot path.
+- Router reads the `Identifier` projection + domain routing tables (strings until D04; `SSOCONN_ROUTING` takes over after). PG reads only on the hot path. Per-user read fork: resolve the identifier in `Identifier` first and fall back to legacy routing for users whose D01 backfill is not `finalized` — the ledger's cutover-gate discipline, per user.
 - Normalization identical to D01 attach-time: lowercase, plus-strip, fold.
 - Uniform method picker (passkey placeholder until D07 | password | social): same page, same timing, whether or not the account exists — no user-level existence oracle. Domain-level SSO routing is discoverable by design and accepted. D03 owns this contract and the decision engine; the screens that render it are D13, on the same flag.
 - Self-hosted: exactly one ACTIVE connection ⇒ auto-redirect straight to the IdP; deliberate escape hatch `/auth/signin?local=1` (the break-glass binding made real). Env becomes the default method set, not a global gate.
