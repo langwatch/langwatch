@@ -34,7 +34,6 @@ if ! flock -n 9; then
   echo failed > "$STATUS"
   exit 1
 fi
-echo "$EXPECTED_SHA $$" >&9
 
 # Record our own process group so the workflow can kill the whole tree — pnpm,
 # prisma and their children — if the run fails or is cancelled. Read from the
@@ -43,6 +42,7 @@ echo "$EXPECTED_SHA $$" >&9
 PGID_FILE="${STATUS%.status}.pgid"
 ps -o pgid= -p $$ | tr -d '[:space:]' > "$PGID_FILE"
 
+# shellcheck disable=SC2154  # `code` is assigned by the first statement of this trap
 trap 'code=$?; if [ "$code" -ne 0 ]; then echo failed > "$STATUS"; fi' EXIT
 
 # no TTY here: pnpm refuses destructive steps without CI=true
@@ -52,6 +52,14 @@ export CI=true
 # `|| true`: under `set -o pipefail` an unmatched glob would abort the refresh
 # here with no message at all, rather than failing later where the log says why.
 NODE_BIN="$( { ls -d "$HOME"/.nvm/versions/node/*/bin 2>/dev/null || true; } | sort -V | tail -1)"
+# An empty NODE_BIN must not be interpolated into PATH: a leading empty element
+# means the current directory, which at this point is the checkout we just reset
+# to whatever main contains, so a repo-tracked file named `node` or `pnpm` would
+# be executed. Fail loudly instead — without nvm's node nothing below can work.
+if [ -z "$NODE_BIN" ]; then
+  echo "no nvm node found under $HOME/.nvm/versions/node/*/bin"
+  exit 1
+fi
 export PATH="$NODE_BIN:$HOME/bin:$HOME/go/bin:/usr/local/bin:$PATH"
 
 cd "$HOME/langwatch"
@@ -186,4 +194,8 @@ DEV_PID=$!
 echo "$DEV_PID" > "$DEV_ROOT_FILE"
 echo "dev stack root pid: $DEV_PID"
 
-echo done > "$STATUS"
+# Stamp the commit into the status. The workflow compares the whole line against
+# `done <its own sha>`, so a status left by some other run — or the word "done"
+# appearing anywhere in the exec channel's own output — cannot be read as this
+# run finishing.
+echo "done $EXPECTED_SHA" > "$STATUS"

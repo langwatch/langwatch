@@ -22,7 +22,6 @@ permissions:
 env:
   GOLDEN: langwatch-golden-v3
   SNAPSHOT: langwatch-main
-  GOLDEN_URL: https://langwatch-golden-v3.boxd.sh
   # Re-pin when boxd ships a new installer:
   #   curl -fsSL https://boxd.sh/downloads/cli/install.sh | sha256sum
   BOXD_INSTALLER_SHA256: 935d59706c090a6ed8276c6a8635b1e24b5d9748cf14625365bccd445ee16343
@@ -39,9 +38,21 @@ env:
 
 jobs:
   refresh-golden:
-    # BOXD_API_KEY can exec on the shared golden, so it is never exposed to a
-    # ref other than main. Without this, a write-access user could point
-    # workflow_dispatch at a modified branch and run arbitrary code with it.
+    # BOXD_API_KEY can exec on the shared golden, so reaching it must not be
+    # something a branch can grant itself.
+    #
+    # The `if:` below is defence in depth ONLY. It cannot be the control on its
+    # own: workflow_dispatch runs the workflow definition from the ref you pick,
+    # so whoever dispatches a modified branch also gets to delete this line in
+    # the same commit. The credential has to be gated by something outside the
+    # file it protects.
+    #
+    # That gate is the environment: a repo admin must configure `boxd-golden`
+    # with a deployment branch rule of `main` only (and required reviewers), and
+    # hold BOXD_API_KEY as an environment secret rather than a repo secret. Then
+    # a dispatch from any other ref cannot read the credential at all, whatever
+    # the workflow file on that ref says.
+    environment: boxd-golden
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # 45 + 45 + 15 minutes of polling, plus room for the CLI install, the two
@@ -81,13 +92,17 @@ jobs:
             echo "REMOTE_SCRIPT=$DIR/refresh.$RUN.sh"
             echo "REMOTE_STATUS=$DIR/refresh.$RUN.status"
             echo "REMOTE_LOG=$DIR/refresh.$RUN.log"
+            # Derived, so renaming the machine is a one-line change.
+            echo "GOLDEN_URL=https://${GOLDEN}.boxd.sh"
           } >> "$GITHUB_ENV"
 
+      # No `boxd machine get --json` here: the machine record carries env and
+      # config that does not belong in a job log. The exec probe below proves
+      # both things this step needs — the machine is up and the channel works.
       - name: Golden is running and exec channel works
         env:
           BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
         run: |
-          boxd machine get "$GOLDEN" --json
           boxd machine exec --timeout 30 "$GOLDEN" -- echo exec-ok | grep -q exec-ok
 
       - name: Launch refresh on golden (detached)
@@ -108,20 +123,40 @@ jobs:
         env:
           BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
         run: |
+          # The remote log carries pnpm, prisma and dev-stack output from a
+          # machine that has real staging credentials in its .env — prisma
+          # prints DATABASE_URL, password included, in connection errors. Runner
+          # log masking only covers registered secrets, so strip inline URL
+          # credentials before any of it reaches this job's log.
+          tail_remote_log() {
+            boxd machine exec --timeout 60 "$GOLDEN" -- tail -50 "$REMOTE_LOG" 2>/dev/null \
+              | sed -E 's#([a-zA-Z][a-zA-Z0-9+.-]*://[^:/@[:space:]]+:)[^@[:space:]]+@#\1***@#g' \
+              || true
+          }
+          # The status is matched EXACTLY against this run's own sha. `S` is
+          # whatever the exec channel emitted, not just the file: a substring
+          # match would let the word "done" in a CLI banner end the wait while
+          # the refresh was still mid-flight, and the health gate would then run
+          # against the previous stack, which the script has not killed yet.
           DEADLINE=$(( $(date +%s) + REFRESH_WAIT_SECONDS ))
           while [ "$(date +%s)" -lt "$DEADLINE" ]; do
             S=$(boxd machine exec --timeout 30 "$GOLDEN" -- cat "$REMOTE_STATUS" 2>/dev/null || true)
+            S=$(printf '%s' "$S" | tr -d '\r' | tr '\n' ' ' | sed -E 's/^ +| +$//g')
             case "$S" in
-              *done*) echo "refresh done"; exit 0 ;;
-              *failed*)
+              "done $GITHUB_SHA") echo "refresh done"; exit 0 ;;
+              "done "*)
+                echo "status names a different commit: [$S] — expected [done $GITHUB_SHA]"
+                tail_remote_log
+                exit 1 ;;
+              failed)
                 echo "refresh FAILED — log tail:"
-                boxd machine exec --timeout 60 "$GOLDEN" -- tail -50 "$REMOTE_LOG" || true
+                tail_remote_log
                 exit 1 ;;
             esac
             sleep 20
           done
           echo "refresh timed out after ${REFRESH_WAIT_SECONDS}s — log tail:"
-          boxd machine exec --timeout 60 "$GOLDEN" -- tail -50 "$REMOTE_LOG" || true
+          tail_remote_log
           exit 1
 
       - name: Wait for /api/health 204
@@ -136,7 +171,15 @@ jobs:
           echo "app never became healthy within ${HEALTH_WAIT_SECONDS}s"
           exit 1
 
-      - name: Verify golden serves this exact commit
+      # Scope of this gate, stated plainly: it proves the CHECKOUT on the golden
+      # is this commit. It does not prove the running process is serving bytes
+      # built from it — `pnpm dev` compiles lazily, so a stale build can answer
+      # while the working tree is current. What binds the serving process to the
+      # refresh is the port reclaim in the script (nothing from an older stack
+      # is left holding the app ports) plus the health and collector gates
+      # above. Asserting the sha back over HTTP would need the app to expose it;
+      # it does not today.
+      - name: Verify the golden's checkout is this exact commit
         env:
           BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
         run: |
@@ -159,7 +202,13 @@ jobs:
           # six minutes after the CLI returned an error. Treat the save as a
           # request and poll for the result, so a slow snapshot is not reported
           # as a failed refresh.
-          BEFORE=$(boxd snapshots list | awk -v n="$SNAPSHOT" '$1==n {print $2}')
+          # The version/state columns are read positionally. Confirm the command
+          # works and its output still has the shape we parse before betting the
+          # 15-minute poll on it — otherwise a changed column layout shows up as
+          # a slow "did not become ready" instead of an obvious parse failure.
+          LIST=$(boxd snapshots list) || { echo "boxd snapshots list failed"; exit 1; }
+          printf '%s\n' "$LIST" | head -5
+          BEFORE=$(printf '%s\n' "$LIST" | awk -v n="$SNAPSHOT" '$1==n {print $2}')
           echo "version before save: ${BEFORE:-none}"
           boxd snapshots save "$GOLDEN" "$SNAPSHOT" --json \
             || echo "save returned non-zero — polling for the snapshot to become ready"
