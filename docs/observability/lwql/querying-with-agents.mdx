@@ -15,7 +15,7 @@ Teach your agent this loop; it's the same one the API was designed around:
 
 1. **Discover** — `GET /analytics/schema` once, and cache it. It lists every dataset, every column with its type and description, the grain, the join keys, the time column, and a runnable `exampleSql` per dataset.
 2. **Query** — `POST /analytics/query/clickhouse` with one `SELECT`. Filter the dataset's `timeColumn`; prefer the `*_by_minute` datasets for trends.
-3. **Repair** — on a 4xx, read the `code` and `meta`. `lwql_parameter_missing` names the parameters to add; validation violations name the exact table, column, or function that was refused. One edit, retry.
+3. **Repair** — on a 4xx, read `error.code` and `error.meta` (every field is nested under `error`). `lwql_parameter_missing` names the parameters to add; `lwql_not_permitted` and `lwql_unparseable` carry `error.meta.violations`, naming the exact table, column, or function that was refused. One edit, retry. On a 5xx there is nothing to repair — the code is always `internal_error`, so branch on the status: retry a 504 with a narrower query, and treat a 503 as a deployment problem rather than something a different query can fix.
 4. **Sanity-check** — read `diagnostics` before trusting the rows. `POSSIBLE_FANOUT` means a join inflated the aggregates; `UNBOUNDED_TIME_RANGE` means the query read all of history; `RESULT_TRUNCATED` means the answer is incomplete.
 
 ## A system prompt that teaches it
@@ -42,7 +42,7 @@ Rules:
 - Use bound parameters ({name:DateTime}) instead of interpolating values.
 - For time series, prefer trace_metrics_by_minute / model_usage_by_minute /
   evaluation_metrics_by_minute — they are pre-aggregated and fast.
-- On errors, read the "code" and "meta" fields and fix precisely that.
+- On errors, read the "error.code" and "error.meta" fields (they are nested under "error") and fix precisely that. A 5xx always reports "internal_error"; do not try to repair the SQL for one.
 - After each result, check "diagnostics" and "truncated" before presenting
   numbers; mention any diagnostic that affects the answer.
 ````

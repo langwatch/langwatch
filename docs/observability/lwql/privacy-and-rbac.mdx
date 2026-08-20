@@ -26,8 +26,10 @@ Individual columns are gated on the same visibility permissions that govern the 
 | Gate | Governs | Example columns |
 |---|---|---|
 | `input` | Captured user input | `traces.CapturedInput`, `spans.CapturedInput`, `evaluations.CapturedInputs` |
-| `output` | Captured model output | `traces.CapturedOutput`, `spans.CapturedOutput`, `simulations.MessageContents` |
+| `output` | Captured model output | `traces.CapturedOutput`, `spans.CapturedOutput` |
 | `costs` | Cost figures | `traces.TotalCost`, `spans.Cost`, `trace_metrics_by_minute.CostSum` |
+
+A column can sit behind more than one gate, and then it needs *all* of them: `simulations.MessageContents` carries both sides of a conversation, so it is gated on `input` **and** `output` and stays hidden from a caller holding only one.
 
 The gates compose fail-closed:
 

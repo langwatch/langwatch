@@ -25,7 +25,9 @@ For every dataset it returns:
 - **`freshness`** — how far behind live writes the dataset can be.
 - **`exampleSql`** — a runnable query to start from.
 
-Reference datasets by their bare name (`FROM traces`); they resolve to the analytics database your deployment configured.
+The response also carries a top-level `database` — the analytics database your deployment configured — and each dataset's `name` and `exampleSql` are qualified with it (`langwatch_lwql.traces`, `FROM langwatch_lwql.traces`).
+
+You don't have to repeat that qualification. Reference datasets by their bare name (`FROM traces`) and they resolve to the same database, which is why the two spellings you'll see are equivalent.
 
 ## Run a query
 
@@ -134,18 +136,53 @@ Diagnostics are advisory notes about a result that ran successfully but deserves
 
 ## Error codes
 
-Failures carry a stable `code` you (or your agent) can branch on:
+Every failure comes back in the same envelope, with the fields nested under
+`error`:
+
+```json
+{
+  "error": {
+    "type": "https://langwatch.ai/errors/lwql_not_permitted",
+    "code": "lwql_not_permitted",
+    "message": "The statement names something this query may not read",
+    "meta": {
+      "violations": [
+        { "code": "TABLE_NOT_ALLOWED", "detail": "unknown dataset \"internal_billing\"" }
+      ]
+    },
+    "trace_id": "0af7651916cd43dd8448eb211c80319c",
+    "span_id": "b7ad6b7169203331"
+  }
+}
+```
+
+So branch on `error.code`, not `code` — and read `error.meta`, not `meta`.
+
+Every 4xx carries a stable `code`:
 
 | HTTP | Code | Meaning | Fix |
 |---|---|---|---|
-| 400 | `lwql_parameter_missing` | The SQL declares parameters the request didn't supply (`meta.parameters` names them) | Add the values |
+| 400 | `lwql_unparseable` | The statement isn't valid SQL | `error.meta.violations` gives the parse failure |
+| 400 | `lwql_not_permitted` | The statement names a dataset, column, or function outside the allowlist | `error.meta.violations` says exactly what was refused |
+| 400 | `lwql_parameter_missing` | The SQL declares parameters the request didn't supply (`error.meta.parameters` names them) | Add the values |
 | 400 | `lwql_reserved_parameter_supplied` | `period_start`/`period_end` sent under `parameters` | Move them to `timeWindow` |
 | 400 | `lwql_reserved_parameter_type` | A reserved parameter declared as a non-date-time | Declare `:DateTime` |
-| 400 | validation violations | The statement names something outside the allowlist | The violation says exactly what was refused |
 | 401 | `invalid_credentials` | Bad or missing API key | Check `X-Auth-Token` |
 | 403 | `lwql_not_enabled` | LWQL isn't enabled for this project | Ask your admin, or [contact us](/support) |
 | 422 | `query_scan_limit_exceeded` | The query would read more than the scan ceiling | Filter the time column, or use a `*_by_minute` dataset |
-| 5xx | `query_timeout`, `query_memory_exceeded` | A database ceiling killed the query | Narrow or pre-aggregate |
-| 503 | `lwql_unavailable` | This deployment has no LWQL identity provisioned | See [Self-hosted setup](/observability/lwql/self-hosted) |
+| 422 | `query_memory_exceeded` | The query exceeded the memory ceiling | Narrow or pre-aggregate — retrying as-is will fail identically |
+
+<Warning>
+  **5xx responses carry no specific code.** Anything the server treats as its
+  own fault collapses to `"code": "internal_error"` with a generic message,
+  deliberately — a server-side failure must not leak internals to a caller.
+  A query that timed out (504) and a deployment with no LangWatchQL identity
+  provisioned (503) are therefore indistinguishable by `error.code`.
+
+  Branch on the **HTTP status** for these, not the code: a 504 is worth
+  retrying with a narrower query, a 503 usually means the deployment isn't
+  set up — see [Self-hosted setup](/observability/lwql/self-hosted) — and
+  retrying it will not help. Quote `error.trace_id` when you ask us about one.
+</Warning>
 
 Error messages never name hosts, credentials, physical tables, or server internals — what you get is what's safe to show and enough to act on.

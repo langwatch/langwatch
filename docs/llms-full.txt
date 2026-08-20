@@ -219,6 +219,14 @@ langwatch query --format csv ... > costs.csv
 
 Planned niceties: schema-aware autocomplete, `--format table|json|csv`, reading SQL from a file or stdin, and profile-based auth so your key stays out of shell history.
 
+<Warning>
+  The commands above do not exist yet, and the near-miss that *does* ship is a
+  different thing entirely: `langwatch analytics query` is the existing
+  timeseries metrics command (`--metric total-cost` and friends). It takes no
+  SQL and does not go through LWQL. If you try it today expecting the above,
+  you'll get a working command answering a different question.
+</Warning>
+
 ## Until then
 
 `curl` and `jq` cover the same ground — the API is two endpoints:
@@ -311,7 +319,6 @@ Your SQL runs against a curated catalog of views, not raw tables. Each view has 
 | `prompts` | One managed prompt |
 | `prompt_versions` | One version of a managed prompt |
 | `experiments` | One experiment |
-| `batch_evaluations` | One batch evaluation run within an experiment, with score, pass/fail, and cost |
 
 Use the *by-minute* datasets for time-series charts — they're pre-aggregated and orders of magnitude cheaper to scan than the row-level ones.
 
@@ -403,8 +410,10 @@ Individual columns are gated on the same visibility permissions that govern the 
 | Gate | Governs | Example columns |
 |---|---|---|
 | `input` | Captured user input | `traces.CapturedInput`, `spans.CapturedInput`, `evaluations.CapturedInputs` |
-| `output` | Captured model output | `traces.CapturedOutput`, `spans.CapturedOutput`, `simulations.MessageContents` |
+| `output` | Captured model output | `traces.CapturedOutput`, `spans.CapturedOutput` |
 | `costs` | Cost figures | `traces.TotalCost`, `spans.Cost`, `trace_metrics_by_minute.CostSum` |
+
+A column can sit behind more than one gate, and then it needs *all* of them: `simulations.MessageContents` carries both sides of a conversation, so it is gated on `input` **and** `output` and stays hidden from a caller holding only one.
 
 The gates compose fail-closed:
 
@@ -449,7 +458,7 @@ Teach your agent this loop; it's the same one the API was designed around:
 
 1. **Discover** — `GET /analytics/schema` once, and cache it. It lists every dataset, every column with its type and description, the grain, the join keys, the time column, and a runnable `exampleSql` per dataset.
 2. **Query** — `POST /analytics/query/clickhouse` with one `SELECT`. Filter the dataset's `timeColumn`; prefer the `*_by_minute` datasets for trends.
-3. **Repair** — on a 4xx, read the `code` and `meta`. `lwql_parameter_missing` names the parameters to add; validation violations name the exact table, column, or function that was refused. One edit, retry.
+3. **Repair** — on a 4xx, read `error.code` and `error.meta` (every field is nested under `error`). `lwql_parameter_missing` names the parameters to add; `lwql_not_permitted` and `lwql_unparseable` carry `error.meta.violations`, naming the exact table, column, or function that was refused. One edit, retry. On a 5xx there is nothing to repair — the code is always `internal_error`, so branch on the status: retry a 504 with a narrower query, and treat a 503 as a deployment problem rather than something a different query can fix.
 4. **Sanity-check** — read `diagnostics` before trusting the rows. `POSSIBLE_FANOUT` means a join inflated the aggregates; `UNBOUNDED_TIME_RANGE` means the query read all of history; `RESULT_TRUNCATED` means the answer is incomplete.
 
 ## A system prompt that teaches it
@@ -476,7 +485,7 @@ Rules:
 - Use bound parameters ({name:DateTime}) instead of interpolating values.
 - For time series, prefer trace_metrics_by_minute / model_usage_by_minute /
   evaluation_metrics_by_minute — they are pre-aggregated and fast.
-- On errors, read the "code" and "meta" fields and fix precisely that.
+- On errors, read the "error.code" and "error.meta" fields (they are nested under "error") and fix precisely that. A 5xx always reports "internal_error"; do not try to repair the SQL for one.
 - After each result, check "diagnostics" and "truncated" before presenting
   numbers; mention any diagnostic that affects the answer.
 ````
@@ -543,7 +552,14 @@ The application looks for five variables. **All five are required** — with any
 | `LWQL_DATABASE` | The database the LWQL views live in; unqualified names in queries resolve here |
 | `LWQL_TENANT_SETTING` | The custom setting carrying the tenant capability. Must start with `custom_` |
 
-If you set *some* of these, the app logs a warning naming exactly which are absent (variable names only, never values) — check for it when queries unexpectedly return `lwql_unavailable`.
+If you set *some* of these, the app logs a warning naming exactly which are absent (variable names only, never values) — check for it when queries unexpectedly return a 503.
+
+Two more affect provisioning rather than execution, and neither is part of the five:
+
+| Variable | Meaning |
+|---|---|
+| `LWQL_POSTGRES_READER_ROLE` | The PostgreSQL role the approved views' `SELECT` grants are issued to. Leave it unset and a newly added view ships with no grant, so every query touching it fails — see the 503 gotcha below |
+| `SKIP_LWQL_PROVISION` | Set to `true` to skip the provisioning step at boot entirely |
 
 ## What the application provisions itself
 
@@ -572,11 +588,11 @@ The access model itself is deployed out of band (in LangWatch Cloud, by Terrafor
   <Accordion title="Raising the execution-time ceiling has a second half">
     The application's HTTP client waits slightly longer than the default 10-second `max_execution_time`, so server-side timeouts surface as a clean, coded `query_timeout`. If you provision a profile with a **higher** execution ceiling, the driver will abandon the socket first and callers get an anonymous transport failure instead of the coded error. Keep the profile at the default, or raise both together.
   </Accordion>
-  <Accordion title="503 lwql_unavailable with the environment fully set">
+  <Accordion title="A 503 with the environment fully set">
     This also fires when the configured identity exists but the database objects don't — the server answered `UNKNOWN_TABLE`/`UNKNOWN_DATABASE`/`ACCESS_DENIED` for a name the validator had already approved, which can't be the caller's SQL. Check that migrations and `provisionLwql` ran, and that the grants match the current catalog. The underlying reason is in the application logs, never in the API response.
   </Accordion>
   <Accordion title="Distinguishing the three refusals">
-    `401 invalid_credentials` — the key is wrong. `403 lwql_not_enabled` — key is fine, but the `release_lwql_workbench` feature flag is off for the project (a product switch, not a fault). `503 lwql_unavailable` — the deployment has no working LWQL execution path (an operator problem).
+    `401 invalid_credentials` — the key is wrong. `403 lwql_not_enabled` — key is fine, but the `release_lwql_workbench` feature flag is off for the project (a product switch, not a fault). `503` — the deployment has no working LWQL execution path (an operator problem). Note that only the two 4xx cases name themselves in the response: the server raises `LangWatchQLUnavailableError` internally, but every 5xx body collapses to `internal_error`, so identify this one by its status and by the application logs, not by grepping responses for `lwql_unavailable`.
   </Accordion>
   <Accordion title="Connection budgets are shared">
     The LWQL executor keeps its own pool (up to 10 connections) beside the application's ClickHouse client, and each PostgreSQL-engine table keeps a small pool against PostgreSQL. Count both against your servers' connection limits — particularly the PostgreSQL side, where the read-only role's connection limit should leave headroom for the application itself.
@@ -875,22 +891,6 @@ GROUP BY p.PromptHandle, Version
 ORDER BY Traces DESC
 ```
 
-### Compare batch evaluation scores across an experiment's runs
-
-```sql
-SELECT e.ExperimentName,
-       b.EvaluationName,
-       count() AS Rows,
-       round(avg(b.Score), 4) AS AvgScore,
-       round(countIf(b.Passed) / countIf(b.Passed IS NOT NULL), 3) AS PassRate,
-       round(sum(b.Cost), 4) AS CostUSD
-FROM batch_evaluations AS b
-JOIN experiments AS e ON b.ExperimentId = e.ExperimentId
-WHERE b.CreatedAt >= now() - INTERVAL 30 DAY
-GROUP BY e.ExperimentName, b.EvaluationName
-ORDER BY e.ExperimentName, AvgScore DESC
-```
-
 ## Reusable, period-aware statements
 
 Any of the above becomes a reusable report by swapping the hard-coded interval for the reserved time-window parameters, and letting the caller supply the period:
@@ -935,7 +935,9 @@ For every dataset it returns:
 - **`freshness`** — how far behind live writes the dataset can be.
 - **`exampleSql`** — a runnable query to start from.
 
-Reference datasets by their bare name (`FROM traces`); they resolve to the analytics database your deployment configured.
+The response also carries a top-level `database` — the analytics database your deployment configured — and each dataset's `name` and `exampleSql` are qualified with it (`langwatch_lwql.traces`, `FROM langwatch_lwql.traces`).
+
+You don't have to repeat that qualification. Reference datasets by their bare name (`FROM traces`) and they resolve to the same database, which is why the two spellings you'll see are equivalent.
 
 ## Run a query
 
@@ -1044,19 +1046,54 @@ Diagnostics are advisory notes about a result that ran successfully but deserves
 
 ## Error codes
 
-Failures carry a stable `code` you (or your agent) can branch on:
+Every failure comes back in the same envelope, with the fields nested under
+`error`:
+
+```json
+{
+  "error": {
+    "type": "https://langwatch.ai/errors/lwql_not_permitted",
+    "code": "lwql_not_permitted",
+    "message": "The statement names something this query may not read",
+    "meta": {
+      "violations": [
+        { "code": "TABLE_NOT_ALLOWED", "detail": "unknown dataset \"internal_billing\"" }
+      ]
+    },
+    "trace_id": "0af7651916cd43dd8448eb211c80319c",
+    "span_id": "b7ad6b7169203331"
+  }
+}
+```
+
+So branch on `error.code`, not `code` — and read `error.meta`, not `meta`.
+
+Every 4xx carries a stable `code`:
 
 | HTTP | Code | Meaning | Fix |
 |---|---|---|---|
-| 400 | `lwql_parameter_missing` | The SQL declares parameters the request didn't supply (`meta.parameters` names them) | Add the values |
+| 400 | `lwql_unparseable` | The statement isn't valid SQL | `error.meta.violations` gives the parse failure |
+| 400 | `lwql_not_permitted` | The statement names a dataset, column, or function outside the allowlist | `error.meta.violations` says exactly what was refused |
+| 400 | `lwql_parameter_missing` | The SQL declares parameters the request didn't supply (`error.meta.parameters` names them) | Add the values |
 | 400 | `lwql_reserved_parameter_supplied` | `period_start`/`period_end` sent under `parameters` | Move them to `timeWindow` |
 | 400 | `lwql_reserved_parameter_type` | A reserved parameter declared as a non-date-time | Declare `:DateTime` |
-| 400 | validation violations | The statement names something outside the allowlist | The violation says exactly what was refused |
 | 401 | `invalid_credentials` | Bad or missing API key | Check `X-Auth-Token` |
 | 403 | `lwql_not_enabled` | LWQL isn't enabled for this project | Ask your admin, or [contact us](/support) |
 | 422 | `query_scan_limit_exceeded` | The query would read more than the scan ceiling | Filter the time column, or use a `*_by_minute` dataset |
-| 5xx | `query_timeout`, `query_memory_exceeded` | A database ceiling killed the query | Narrow or pre-aggregate |
-| 503 | `lwql_unavailable` | This deployment has no LWQL identity provisioned | See [Self-hosted setup](/observability/lwql/self-hosted) |
+| 422 | `query_memory_exceeded` | The query exceeded the memory ceiling | Narrow or pre-aggregate — retrying as-is will fail identically |
+
+<Warning>
+  **5xx responses carry no specific code.** Anything the server treats as its
+  own fault collapses to `"code": "internal_error"` with a generic message,
+  deliberately — a server-side failure must not leak internals to a caller.
+  A query that timed out (504) and a deployment with no LangWatchQL identity
+  provisioned (503) are therefore indistinguishable by `error.code`.
+
+  Branch on the **HTTP status** for these, not the code: a 504 is worth
+  retrying with a narrower query, a 503 usually means the deployment isn't
+  set up — see [Self-hosted setup](/observability/lwql/self-hosted) — and
+  retrying it will not help. Quote `error.trace_id` when you ask us about one.
+</Warning>
 
 Error messages never name hosts, credentials, physical tables, or server internals — what you get is what's safe to show and enough to act on.
 

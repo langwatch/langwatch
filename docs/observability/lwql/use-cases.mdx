@@ -283,22 +283,6 @@ GROUP BY p.PromptHandle, Version
 ORDER BY Traces DESC
 ```
 
-### Compare batch evaluation scores across an experiment's runs
-
-```sql
-SELECT e.ExperimentName,
-       b.EvaluationName,
-       count() AS Rows,
-       round(avg(b.Score), 4) AS AvgScore,
-       round(countIf(b.Passed) / countIf(b.Passed IS NOT NULL), 3) AS PassRate,
-       round(sum(b.Cost), 4) AS CostUSD
-FROM batch_evaluations AS b
-JOIN experiments AS e ON b.ExperimentId = e.ExperimentId
-WHERE b.CreatedAt >= now() - INTERVAL 30 DAY
-GROUP BY e.ExperimentName, b.EvaluationName
-ORDER BY e.ExperimentName, AvgScore DESC
-```
-
 ## Reusable, period-aware statements
 
 Any of the above becomes a reusable report by swapping the hard-coded interval for the reserved time-window parameters, and letting the caller supply the period:

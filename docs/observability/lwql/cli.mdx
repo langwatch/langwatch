@@ -23,6 +23,14 @@ langwatch query --format csv ... > costs.csv
 
 Planned niceties: schema-aware autocomplete, `--format table|json|csv`, reading SQL from a file or stdin, and profile-based auth so your key stays out of shell history.
 
+<Warning>
+  The commands above do not exist yet, and the near-miss that *does* ship is a
+  different thing entirely: `langwatch analytics query` is the existing
+  timeseries metrics command (`--metric total-cost` and friends). It takes no
+  SQL and does not go through LWQL. If you try it today expecting the above,
+  you'll get a working command answering a different question.
+</Warning>
+
 ## Until then
 
 `curl` and `jq` cover the same ground — the API is two endpoints:

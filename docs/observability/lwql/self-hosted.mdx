@@ -27,7 +27,14 @@ The application looks for five variables. **All five are required** — with any
 | `LWQL_DATABASE` | The database the LWQL views live in; unqualified names in queries resolve here |
 | `LWQL_TENANT_SETTING` | The custom setting carrying the tenant capability. Must start with `custom_` |
 
-If you set *some* of these, the app logs a warning naming exactly which are absent (variable names only, never values) — check for it when queries unexpectedly return `lwql_unavailable`.
+If you set *some* of these, the app logs a warning naming exactly which are absent (variable names only, never values) — check for it when queries unexpectedly return a 503.
+
+Two more affect provisioning rather than execution, and neither is part of the five:
+
+| Variable | Meaning |
+|---|---|
+| `LWQL_POSTGRES_READER_ROLE` | The PostgreSQL role the approved views' `SELECT` grants are issued to. Leave it unset and a newly added view ships with no grant, so every query touching it fails — see the 503 gotcha below |
+| `SKIP_LWQL_PROVISION` | Set to `true` to skip the provisioning step at boot entirely |
 
 ## What the application provisions itself
 
@@ -56,11 +63,11 @@ The access model itself is deployed out of band (in LangWatch Cloud, by Terrafor
   <Accordion title="Raising the execution-time ceiling has a second half">
     The application's HTTP client waits slightly longer than the default 10-second `max_execution_time`, so server-side timeouts surface as a clean, coded `query_timeout`. If you provision a profile with a **higher** execution ceiling, the driver will abandon the socket first and callers get an anonymous transport failure instead of the coded error. Keep the profile at the default, or raise both together.
   </Accordion>
-  <Accordion title="503 lwql_unavailable with the environment fully set">
+  <Accordion title="A 503 with the environment fully set">
     This also fires when the configured identity exists but the database objects don't — the server answered `UNKNOWN_TABLE`/`UNKNOWN_DATABASE`/`ACCESS_DENIED` for a name the validator had already approved, which can't be the caller's SQL. Check that migrations and `provisionLwql` ran, and that the grants match the current catalog. The underlying reason is in the application logs, never in the API response.
   </Accordion>
   <Accordion title="Distinguishing the three refusals">
-    `401 invalid_credentials` — the key is wrong. `403 lwql_not_enabled` — key is fine, but the `release_lwql_workbench` feature flag is off for the project (a product switch, not a fault). `503 lwql_unavailable` — the deployment has no working LWQL execution path (an operator problem).
+    `401 invalid_credentials` — the key is wrong. `403 lwql_not_enabled` — key is fine, but the `release_lwql_workbench` feature flag is off for the project (a product switch, not a fault). `503` — the deployment has no working LWQL execution path (an operator problem). Note that only the two 4xx cases name themselves in the response: the server raises `LangWatchQLUnavailableError` internally, but every 5xx body collapses to `internal_error`, so identify this one by its status and by the application logs, not by grepping responses for `lwql_unavailable`.
   </Accordion>
   <Accordion title="Connection budgets are shared">
     The LWQL executor keeps its own pool (up to 10 connections) beside the application's ClickHouse client, and each PostgreSQL-engine table keeps a small pool against PostgreSQL. Count both against your servers' connection limits — particularly the PostgreSQL side, where the read-only role's connection limit should leave headroom for the application itself.
