@@ -85,7 +85,15 @@ fi
 DEV_PGID_FILE="$WORKDIR/dev-stack.pgid"
 if [ -s "$DEV_PGID_FILE" ]; then
   OLD_PGID="$(cat "$DEV_PGID_FILE")"
-  kill -9 -"$OLD_PGID" 2>/dev/null || true
+  # Process ids are recycled, so a pgid recorded before a reboot can name an
+  # unrelated group by the time we read it. Kill it only if its leader still
+  # looks like a dev stack.
+  LEADER_CMD="$(ps -o cmd= -p "$OLD_PGID" 2>/dev/null || true)"
+  case "$LEADER_CMD" in
+    "") : ;; # already gone
+    *pnpm*dev*) kill -9 -"$OLD_PGID" 2>/dev/null || true ;;
+    *) echo "pgid $OLD_PGID is not a dev stack ($LEADER_CMD) — refusing to kill it" ;;
+  esac
 fi
 
 # Patterns still run, for stacks started before the pgid file existed and for
