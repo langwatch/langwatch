@@ -224,12 +224,13 @@ describe("given an organization whose legacy facts live outside its bindings", (
     expect(resourceGrant?.expiresAt).toEqual(SHARE_EXPIRES_AT);
     expect(resourceGrant?.occurredAt).toEqual(SHARE_LINK_AT);
 
-    // Operator access is the live admin list, never a ledger fact: nothing
-    // the cutover stated lives on any aggregate but this organization's own.
+    // Operator access is the live admin list, never a ledger fact. The org
+    // filter would be the wider net, but sibling suites legitimately import
+    // grants for their own organizations into this shared database - what no
+    // suite may ever write is a platform-scoped cutover grant, for anyone.
     const strayGrants = await prisma.grant.findMany({
       where: {
         source: "cutover-import",
-        organizationId: { not: organization.id },
         scopeType: GrantScopeType.PLATFORM,
       },
     });

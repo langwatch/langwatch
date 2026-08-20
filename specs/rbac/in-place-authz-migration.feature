@@ -537,10 +537,10 @@ Feature: In-place authorization data migration
 
   @unit
   Scenario: Platform operator access is never a ledger fact
-    Given the admin list in the environment is the live authority for operator access
+    Given a platform operator who administers every organization
     When an organization is cut over
-    Then every fact the cutover states belongs to that organization's own aggregate
-    And no fact is stated for any tenant that is not an organization
+    Then who can operate the platform is unchanged
+    And the cutover records access for that organization alone
 
   @unit
   Scenario: A share grant no legacy link accounts for holds the cutover

@@ -50,7 +50,6 @@ class FakeCutoverRepository implements AuthzCutoverRepository {
   memberIds: string[] = [];
   apiKeyIds: string[] = [];
   inventory: OrganizationScopeInventory = { teamIds: [], projects: [] };
-  /** Grant head ids per aggregate. */
   grantHeadIds = new Map<string, string[]>();
   /** What the resource proof's re-read sees; null means "derive it from
    *  what the ledger landed", which is the converged case. */
