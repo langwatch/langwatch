@@ -4,6 +4,11 @@
     "module": "preserve",
     "moduleResolution": "bundler",
     "lib": ["es2020"],
+    // `passport.ts` and `bitset.ts` are the server-only subpaths and use
+    // node:crypto and Buffer. Without this the package's own typecheck was
+    // red on seven errors; browser-safety of the root entry is enforced by
+    // the export barrel and the app's frontend-boundary test, not here.
+    "types": ["node"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
