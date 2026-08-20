@@ -75,7 +75,7 @@ describe("mapAuditRecord", () => {
   it("reports zero cost and tokens rather than estimating them", () => {
     const mapped = mapAuditRecord(record());
 
-    expect(mapped.cost_usd).toBe(0);
+    expect(mapped.cost_usd).toBe("0");
     expect(mapped.tokens_input).toBe(0);
     expect(mapped.tokens_output).toBe(0);
 
@@ -84,7 +84,7 @@ describe("mapAuditRecord", () => {
     const withSize = mapAuditRecord(
       record({ Messages: [{ Size: 4096 }] }) as Record<string, unknown>,
     );
-    expect(withSize.cost_usd).toBe(0);
+    expect(withSize.cost_usd).toBe("0");
     expect(withSize.tokens_input).toBe(0);
   });
 
