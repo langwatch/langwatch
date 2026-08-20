@@ -213,6 +213,7 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     the first page's time anchor is captured once, so walking back
     never re-asks the server and never shows different rows.
 
+    @integration
     Scenario: Events render as a table, newest first
       Given a source has ingested events
       When the admin opens the source's detail page
@@ -221,6 +222,7 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
         the action, its target, its cost and its token usage
       And the time reads relatively, with the exact timestamp on hover
 
+    @integration
     Scenario: The table pages through more events than fit at once
       Given a source has ingested more events than one page holds
       When the admin moves to the next page
@@ -228,11 +230,13 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       And moving back returns to the exact rows they came from,
         re-read from what was already loaded, not from the server
 
+    @integration
     Scenario: Changing rows-per-page starts over from the first page
       Given the admin is a few pages into the events table
       When they pick a different rows-per-page size
       Then the table returns to the first page at the new size
 
+    @integration
     Scenario: A row opens into raw + normalised detail
       When the admin clicks an event row
       Then the row expands to show the normalised event
@@ -241,6 +245,7 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
         panel says so instead of sitting silently empty
       And clicking again folds the detail away
 
+    @integration
     Scenario: Events sharing a timestamp are not lost at a page boundary
       Given several events were stamped with the same millisecond
       And fewer of them than the server's single-fetch maximum
@@ -248,12 +253,14 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       When the admin walks from one page to the next
       Then every one of the tied events appears on exactly one page
 
+    @integration
     Scenario: A failed load is an error, never an empty list
       Given the events request fails
       When the admin views the events section
       Then they see an error message
       And they do NOT see the "no events yet" setup walkthrough
 
+    @integration
     Scenario: The pager offers no control it cannot honour
       When the admin looks at the events table
       Then there are no sortable column headers and no search box
