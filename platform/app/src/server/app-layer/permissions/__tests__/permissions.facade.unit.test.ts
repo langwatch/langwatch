@@ -2,35 +2,31 @@
 
 /**
  * The typed imperative facade (ADR-092 decision 25): the scope argument is
- * derived from the permission's registry tiers, and the runtime decides
- * through the same fork-aware resolvers the declared `.permission()` runs.
- * The `@ts-expect-error` lines are compile-time assertions enforced by
- * `pnpm typecheck:tests`.
+ * derived from the permission's registry tiers, and the service decides
+ * through the injected decision repository — the same one the declared
+ * `.permission()` seam composes. The `@ts-expect-error` lines are
+ * compile-time assertions enforced by `pnpm typecheck:tests`.
  */
 import { PermissionDeniedError } from "@langwatch/authz";
 import { describe, expect, it, vi } from "vitest";
 
-const resolveProjectPermission = vi.fn();
-const resolveTeamPermission = vi.fn();
-const hasOrganizationPermission = vi.fn();
+import type { PermissionDecisionRepository } from "../permission-decision.repository";
+import { PermissionsService } from "../permissions.service";
 
-vi.mock("~/server/api/rbac", () => ({
-  resolveProjectPermission: (...args: unknown[]) =>
-    resolveProjectPermission(...args),
-  resolveTeamPermission: (...args: unknown[]) => resolveTeamPermission(...args),
-  hasOrganizationPermission: (...args: unknown[]) =>
-    hasOrganizationPermission(...args),
-}));
+const repository = {
+  findProjectDecision: vi.fn(),
+  findProjectAnyDecision: vi.fn(),
+  findTeamDecision: vi.fn(),
+  findOrganizationDecision: vi.fn(),
+} satisfies PermissionDecisionRepository;
 
-const { PermissionsService } = await import("../permissions.service");
-
-const service = new PermissionsService({} as never);
+const service = new PermissionsService(repository);
 
 describe("PermissionsService typed facade", () => {
   describe("when an imperative check names its scope id", () => {
     /** @scenario "An imperative check names its scope id to match the permission" */
-    it("decides through the tier's fork-aware resolver", async () => {
-      resolveProjectPermission.mockResolvedValue({
+    it("decides through the tier's repository method", async () => {
+      repository.findProjectDecision.mockResolvedValue({
         permitted: true,
         organizationRole: "MEMBER",
       });
@@ -41,13 +37,16 @@ describe("PermissionsService typed facade", () => {
           projectId: "proj-1",
         }),
       ).resolves.toBe(true);
-      expect(resolveProjectPermission).toHaveBeenCalledWith(
-        expect.anything(),
-        "proj-1",
-        "traces:view",
-      );
+      expect(repository.findProjectDecision).toHaveBeenCalledWith({
+        userId: "alice",
+        projectId: "proj-1",
+        permission: "traces:view",
+      });
 
-      hasOrganizationPermission.mockResolvedValue(false);
+      repository.findOrganizationDecision.mockResolvedValue({
+        permitted: false,
+        organizationRole: null,
+      });
       await expect(
         service.requirePermission({
           userId: "alice",

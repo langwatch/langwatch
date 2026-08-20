@@ -1,30 +1,29 @@
 import {
   type AuthzPermission,
+  type DeclaredScopeId,
   PermissionDeniedError,
   type PermissionScopeArg,
 } from "@langwatch/authz";
-import type { PrismaClient } from "~/generated/prisma/client";
-import { OrganizationUserRole } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
-import {
-  hasOrganizationPermission,
-  resolveProjectPermission,
-  resolveTeamPermission,
-} from "~/server/api/rbac";
-import type { Session } from "~/server/auth";
 import {
   LiteMemberRestrictedError,
   ProjectPermissionDeniedError,
 } from "./errors";
+import type {
+  PermissionDecision,
+  PermissionDecisionRepository,
+} from "./permission-decision.repository";
 
 /**
- * Service responsible for project-level permission enforcement.
+ * Service responsible for permission enforcement.
  *
- * Pure business logic — no tRPC dependency. Safe to call from Hono routes,
+ * Pure business logic — no tRPC dependency, no client: decisions come from
+ * the injected {@link PermissionDecisionRepository} (compose via
+ * `permissionsServiceFor` in `./runtime.ts`). Safe to call from Hono routes,
  * background workers, or any other non-tRPC surface.
  */
 export class PermissionsService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly repository: PermissionDecisionRepository) {}
 
   /**
    * Asserts that a user holds the given permission on a project.
@@ -48,22 +47,15 @@ export class PermissionsService {
     projectId: string;
     permission: Permission;
   }): Promise<void> {
-    const ctx = {
-      prisma: this.prisma,
-      // Minimal session shape — resolveProjectPermission only accesses user.id.
-      // Other Session fields (expires, sessionId, etc.) are not read by the
-      // permission resolver, so we satisfy the interface with an empty expires.
-      session: { user: { id: userId }, expires: "" } satisfies Session,
-    };
-
-    const { permitted, organizationRole } = await resolveProjectPermission(
-      ctx,
-      projectId,
-      permission,
-    );
+    const { permitted, organizationRole } =
+      await this.repository.findProjectDecision({
+        userId,
+        projectId,
+        permission,
+      });
 
     if (!permitted) {
-      if (organizationRole === OrganizationUserRole.EXTERNAL) {
+      if (organizationRole === "EXTERNAL") {
         throw new LiteMemberRestrictedError(
           permission.split(":")[0] ?? "unknown",
         );
@@ -76,13 +68,19 @@ export class PermissionsService {
    * ADR-092 decision 25 — the typed imperative check. The scope argument is
    * derived from the permission's registry tiers: exactly one id, at a tier
    * the permission can be granted at, or the call does not compile. Decides
-   * through the same fork-aware resolvers every declared `.permission()`
-   * runs, so an imperative site and a declared one can never disagree.
+   * through the same repository every declared `.permission()` runs, so an
+   * imperative site and a declared one can never disagree.
    */
   async hasPermission<P extends AuthzPermission>(
     check: { userId: string; permission: P } & PermissionScopeArg<P>,
   ): Promise<boolean> {
-    const { permitted } = await this.decide(check);
+    const scope = scopeOf(check);
+    if (!scope) return false;
+    const { permitted } = await this.getDecision({
+      userId: check.userId,
+      permission: check.permission,
+      scope,
+    });
     return permitted;
   }
 
@@ -94,74 +92,99 @@ export class PermissionsService {
   async requirePermission<P extends AuthzPermission>(
     check: { userId: string; permission: P } & PermissionScopeArg<P>,
   ): Promise<void> {
-    const { tier, id, permitted, organizationRole } = await this.decide(check);
+    const scope = scopeOf(check);
+    if (!scope) {
+      throw new PermissionDeniedError({
+        permission: check.permission,
+        scope: { type: "project", id: "unresolved" },
+        denialReason: "no-binding",
+      });
+    }
+    const { permitted, organizationRole } = await this.getDecision({
+      userId: check.userId,
+      permission: check.permission,
+      scope,
+    });
     if (permitted) return;
-    if (organizationRole === OrganizationUserRole.EXTERNAL) {
+    if (organizationRole === "EXTERNAL") {
       throw new LiteMemberRestrictedError(
         check.permission.split(":")[0] ?? "unknown",
       );
     }
     throw new PermissionDeniedError({
       permission: check.permission,
-      scope: { type: tier, id },
+      scope: { type: scope.tier, id: scope.id },
       denialReason: "no-binding",
     });
   }
 
-  private async decide({
+  /**
+   * The decision at an already-resolved scope — what the declared tRPC seam
+   * calls after `declaredScopeId` picks the tier. Each tier maps to the
+   * repository method whose answer the legacy middleware for that tier gave.
+   */
+  async getDecision({
     userId,
     permission,
-    ...scope
+    scope,
   }: {
     userId: string;
     permission: AuthzPermission;
-  } & Partial<
-    Record<"projectId" | "teamId" | "organizationId", string>
-  >): Promise<{
-    tier: "project" | "team" | "organization";
-    id: string;
-    permitted: boolean;
-    organizationRole: OrganizationUserRole | null;
-  }> {
-    const ctx = {
-      prisma: this.prisma,
-      session: { user: { id: userId }, expires: "" } as Session,
-    };
-    if (scope.projectId) {
-      const decision = await resolveProjectPermission(
-        ctx,
-        scope.projectId,
-        permission,
-      );
-      return { tier: "project", id: scope.projectId, ...decision };
+    scope: DeclaredScopeId;
+  }): Promise<PermissionDecision> {
+    switch (scope.tier) {
+      case "project":
+        return await this.repository.findProjectDecision({
+          userId,
+          projectId: scope.id,
+          permission,
+        });
+      case "team":
+        return await this.repository.findTeamDecision({
+          userId,
+          teamId: scope.id,
+          permission,
+        });
+      case "organization":
+        return await this.repository.findOrganizationDecision({
+          userId,
+          organizationId: scope.id,
+          permission,
+        });
     }
-    if (scope.teamId) {
-      const decision = await resolveTeamPermission(
-        ctx,
-        scope.teamId,
-        permission,
-      );
-      return { tier: "team", id: scope.teamId, ...decision };
-    }
-    if (scope.organizationId) {
-      const permitted = await hasOrganizationPermission(
-        ctx as { prisma: PrismaClient; session: Session },
-        scope.organizationId,
-        permission,
-      );
-      return {
-        tier: "organization",
-        id: scope.organizationId,
-        permitted,
-        organizationRole: null,
-      };
-    }
-    // The types make this unreachable; fail closed if they are bypassed.
-    return {
-      tier: "project",
-      id: "unresolved",
-      permitted: false,
-      organizationRole: null,
-    };
   }
+
+  /**
+   * Any one of `permissions` at the project scope is enough — the decision
+   * behind `.permissionAny()`.
+   */
+  async getProjectAnyDecision({
+    userId,
+    projectId,
+    permissions,
+  }: {
+    userId: string;
+    projectId: string;
+    permissions: readonly AuthzPermission[];
+  }): Promise<PermissionDecision> {
+    return await this.repository.findProjectAnyDecision({
+      userId,
+      projectId,
+      permissions,
+    });
+  }
+}
+
+/**
+ * The typed scope argument is exclusive by construction, so exactly one id is
+ * present; null is the fail-closed answer for the day the types are bypassed.
+ */
+function scopeOf(
+  scope: Partial<Record<"projectId" | "teamId" | "organizationId", string>>,
+): DeclaredScopeId | null {
+  if (scope.projectId) return { tier: "project", id: scope.projectId };
+  if (scope.teamId) return { tier: "team", id: scope.teamId };
+  if (scope.organizationId)
+    return { tier: "organization", id: scope.organizationId };
+  return null;
 }

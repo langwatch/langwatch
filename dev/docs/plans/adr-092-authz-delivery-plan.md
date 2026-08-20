@@ -269,8 +269,13 @@ becomes the ledger. Bill of materials:
 
 Every permission check on every stack becomes a *declaration* in the registry
 vocabulary, typed against the input it reads its scope from, and every
-declarative site funnels through one cutover-aware seam. Decision-neutral at
-deploy: the seam runs the same per-org fork the ten legacy seams run today.
+declarative site funnels through one cutover-aware seam. The seam is layered
+the house way — boundary → service → repository → client: the tRPC middleware
+composes `PermissionsService`, the service takes the
+`ForkAwarePermissionDecisionRepository`, and only the repository touches the
+client and the fork. Decision-neutral at deploy: the repository runs the same
+per-org fork the ten legacy seams run today, and the contract PR rewires only
+the repository.
 
 ```
                  BEFORE                                  AFTER
