@@ -68,9 +68,6 @@ jobs:
           sh /tmp/boxd-install.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      # Per-run paths: a run cancelled by the job timeout can leave its detached
-      # refresh alive on the golden, and shared file names would let the next
-      # run read the dead run's status.
       # Everything the refresh writes goes in a private 0700 directory owned by
       # the refresh user, not a world-writable path — a local user on the golden
       # must not be able to pre-create or symlink a file we open. The names are
