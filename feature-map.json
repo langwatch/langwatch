@@ -1044,8 +1044,8 @@
         },
         {
           "id": "ai-gateway.ingest",
-          "name": "Ingestion Sources",
-          "description": "OCSF-normalised event ingestion: inspect sources, tail events, check health, and recover coding-agent conversation content",
+          "name": "Catalog",
+          "description": "OCSF-normalised event ingestion (admin UI label: Catalog): inspect ingestion sources, tail events, check health, and recover coding-agent conversation content",
           "surfaces": {
             "code": {
               "sdk": {

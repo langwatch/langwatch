@@ -69,7 +69,7 @@ void (async () => {
     await page.goto(`${BASE_URL}/governance/tool-catalog`);
     await page.waitForLoadState("networkidle");
     await page
-      .locator('text="AI Tool Catalog"')
+      .locator('text="AI Tool Tiles"')
       .first()
       .waitFor({ state: "visible", timeout: 10_000 });
     await shoot(page, "01-tool-catalog-landing");
