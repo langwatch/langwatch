@@ -35,6 +35,7 @@ import {
 } from "./hooks";
 import { createIdentityDatabase } from "./identityDatabase";
 import { revokeAllSessionsForUser } from "./revokeSessions";
+import { withRedisFailOpen } from "./secondaryStorageResilience";
 
 const logger = createLogger("langwatch:better-auth");
 
@@ -172,6 +173,19 @@ export const secondaryStorage: BetterAuthOptions["secondaryStorage"] =
         },
       }
     : undefined;
+
+/**
+ * What better-auth is actually configured with: the storage above, made
+ * DOWN-tolerant behind `AUTH_REDIS_FAIL_OPEN` (D02 seam b) — every call gets
+ * a bounded budget and fails open to Postgres-only behavior instead of
+ * holding a sign-in request on a hung Redis. Flag off = the raw storage,
+ * exactly today's behavior. The rate-limit `storage` mode below keys off the
+ * RAW value on purpose: whether Redis is configured is a deployment fact the
+ * wrapper does not change.
+ */
+const resilientSecondaryStorage = withRedisFailOpen(secondaryStorage, {
+  enabled: env.AUTH_REDIS_FAIL_OPEN === true,
+});
 
 const isBuildTime = !!process.env.BUILD_TIME;
 
@@ -424,7 +438,7 @@ export const auth = betterAuth({
     },
   },
 
-  secondaryStorage,
+  secondaryStorage: resilientSecondaryStorage,
   socialProviders,
   plugins,
 

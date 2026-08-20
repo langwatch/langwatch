@@ -359,6 +359,10 @@ export function createEnvConfig() {
       // frontend telemetry volume, and the ingest route it exports to is
       // inert without OTEL_EXPORTER_OTLP_ENDPOINT anyway.
       RUM_ENABLED: z.boolean().optional(),
+      // D02 (identity platform): bounded timeouts + fail-open on better-auth's
+      // Redis secondary storage, so a configured-but-down Redis cannot hold
+      // sign-in hostage. Off = today's behavior (calls wait on Redis).
+      AUTH_REDIS_FAIL_OPEN: z.boolean().optional(),
       // See `rumSampleRatioSchema` above.
       RUM_SAMPLE_RATIO: rumSampleRatioSchema,
       // Controls SSRF blocking for outbound HTTP calls (TS proxy + scenario
@@ -648,6 +652,9 @@ export function createEnvConfig() {
       RUM_ENABLED:
         process.env.RUM_ENABLED === "1" ||
         process.env.RUM_ENABLED?.toLowerCase() === "true",
+      AUTH_REDIS_FAIL_OPEN:
+        process.env.AUTH_REDIS_FAIL_OPEN === "1" ||
+        process.env.AUTH_REDIS_FAIL_OPEN?.toLowerCase() === "true",
       RUM_SAMPLE_RATIO: process.env.RUM_SAMPLE_RATIO,
       BLOCK_LOCAL_HTTP_CALLS:
         process.env.BLOCK_LOCAL_HTTP_CALLS === "1" ||

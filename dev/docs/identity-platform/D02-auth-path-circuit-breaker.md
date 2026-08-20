@@ -50,4 +50,7 @@ Identity fits that doctrine better than grants does, by construction: the sign-i
 
 # Open Questions
 
-- Timeout budgets for seams (a) and (b) (implementation decision, recorded in ADR-2).
+- ~~Timeout budgets for seams (a) and (b)~~ — decided and recorded in
+  ADR-007's identity entry (2026-08-20): staging 2s
+  (`IDENTITY_STAGING_TIMEOUT_MS`), secondary storage 500ms per call
+  (`SECONDARY_STORAGE_TIMEOUT_MS`).

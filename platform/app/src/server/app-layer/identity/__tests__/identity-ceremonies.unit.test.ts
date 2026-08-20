@@ -55,6 +55,8 @@ class InMemoryGuardReads implements IdentityGuardReads {
 function harness(overrides?: {
   appendFails?: boolean;
   stagingFails?: boolean;
+  stagingHangs?: boolean;
+  stagingTimeoutMs?: number;
 }) {
   const store = new InMemoryStateStore();
   const appended: IdentityEvent[][] = [];
@@ -70,10 +72,13 @@ function harness(overrides?: {
   } as unknown as EventStore<IdentityEvent>;
 
   const sender = {
-    send: vi.fn(async (data: unknown) => {
+    send: vi.fn((data: unknown) => {
       order.push("stage");
-      if (overrides?.stagingFails) throw new Error("redis unavailable");
+      if (overrides?.stagingHangs) return new Promise<unknown>(() => {});
+      if (overrides?.stagingFails)
+        return Promise.reject(new Error("redis unavailable"));
       staged.push(data);
+      return Promise.resolve(undefined as unknown);
     }),
   };
 
@@ -90,6 +95,9 @@ function harness(overrides?: {
     projectionStore: trackedStore,
     eventStore: async () => eventStore,
     stagedSender: () => sender,
+    ...(overrides?.stagingTimeoutMs !== undefined
+      ? { stagingTimeoutMs: overrides.stagingTimeoutMs }
+      : {}),
   });
 
   return { ceremonies, store, appended, staged, order, sender };
@@ -143,6 +151,23 @@ describe("identity ceremony dispatch", () => {
       expect(appended).toHaveLength(1);
       expect(order).toEqual(["append", "apply", "stage"]);
       expect(store.stored.get(USER)).toBeDefined();
+    });
+  });
+
+  describe("when GroupQueue staging hangs instead of failing fast", () => {
+    /** @scenario "A hanging Redis cannot fail or stall an identity ceremony" */
+    it("the staging budget drops it; append and apply landed and the ceremony succeeds", async () => {
+      const { ceremonies, appended, store, sender } = harness({
+        stagingHangs: true,
+        stagingTimeoutMs: 20,
+      });
+
+      const events = await ceremonies.attachIdentifier(attachData() as never);
+
+      expect(events).toHaveLength(1);
+      expect(appended).toHaveLength(1);
+      expect(store.stored.size).toBe(1);
+      expect(sender.send).toHaveBeenCalledTimes(1);
     });
   });
 

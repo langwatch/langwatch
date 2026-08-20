@@ -73,6 +73,43 @@ const logger = createLogger("langwatch:identity:ceremonies");
 
 export const IDENTITY_APP_HANDLE_WAIT_MS = 5_000;
 
+/**
+ * The budget for the best-effort GroupQueue staging leg (D02 seam a). The
+ * append and the calling-path apply have already landed when staging runs,
+ * so the only thing a hung Redis could still cost is the CALLER's latency —
+ * this bound is the ceiling on that. An overrun is a drop like any other:
+ * metric + warn, the cursor-guarded fold converges later.
+ */
+export const IDENTITY_STAGING_TIMEOUT_MS = 2_000;
+
+function stagingWithinBudget(
+  work: Promise<unknown>,
+  timeoutMs: number,
+): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () =>
+        reject(
+          new Error(
+            `identity staging exceeded its ${timeoutMs}ms budget; dropped`,
+          ),
+        ),
+      timeoutMs,
+    );
+    timer.unref?.();
+    work.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error as Error);
+      },
+    );
+  });
+}
+
 /** Ceremony paths mint a random command id; retries reuse it. */
 export function newIdentityCommandId(): string {
   return generate("idcmd").toString();
@@ -125,6 +162,8 @@ export interface IdentityCeremoniesDeps {
   projectionStore?: StateProjectionStore<IdentityFoldState>;
   eventStore?: () => Promise<EventStore<IdentityEvent>>;
   stagedSender?: (name: string) => StagedSender | null;
+  /** The staging leg's budget; production uses IDENTITY_STAGING_TIMEOUT_MS. */
+  stagingTimeoutMs?: number;
 }
 
 interface CeremonyVerb<Data> {
@@ -139,6 +178,7 @@ export class IdentityCeremonies {
   private readonly projectionStore: StateProjectionStore<IdentityFoldState>;
   private readonly eventStore: () => Promise<EventStore<IdentityEvent>>;
   private readonly stagedSender: (name: string) => StagedSender | null;
+  private readonly stagingTimeoutMs: number;
   private readonly verbs: {
     attachIdentifier: CeremonyVerb<AttachIdentifierCommandData>;
     verifyIdentifier: CeremonyVerb<VerifyIdentifierCommandData>;
@@ -157,6 +197,7 @@ export class IdentityCeremonies {
     });
     this.eventStore = deps.eventStore ?? resolveEventStore;
     this.stagedSender = deps.stagedSender ?? resolveStagedSender;
+    this.stagingTimeoutMs = deps.stagingTimeoutMs ?? IDENTITY_STAGING_TIMEOUT_MS;
     this.verbs = {
       attachIdentifier: {
         schema: attachIdentifierCommandDataSchema as ZodType<AttachIdentifierCommandData>,
@@ -249,11 +290,13 @@ export class IdentityCeremonies {
       applyTimer();
     }
 
-    // 4. Staging LAST, best-effort — the convergence re-apply.
+    // 4. Staging LAST, best-effort — the convergence re-apply. Bounded (D02
+    // seam a): a hung Redis may cost the caller at most the staging budget,
+    // never an unbounded wait, and an overrun is a drop like any error here.
     try {
       const sender = this.stagedSender(verb.senderName);
       if (!sender) throw new Error("identity pipeline sender unavailable");
-      await sender.send(data);
+      await stagingWithinBudget(sender.send(data), this.stagingTimeoutMs);
     } catch (error) {
       identityStagingDroppedTotal.inc();
       logger.warn(
