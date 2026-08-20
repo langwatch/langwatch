@@ -5,7 +5,7 @@ description: >-
   replication via embedded Keeper
 type: application
 appVersion: 25.10.2.65
-version: 0.3.0
+version: 0.3.1
 home: https://github.com/langwatch/langwatch
 sources:
   - https://github.com/langwatch/langwatch/tree/main/infra/clickhouse-serverless
