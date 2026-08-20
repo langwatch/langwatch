@@ -128,7 +128,7 @@ export const SOURCE_TYPE_OPTIONS = [
     label: "Anthropic Admin API (usage & cost)",
     mode: "pull",
     blurb:
-      "Polls Anthropic's organization usage/cost reports with an Admin API key (sk-ant-admin-...). Pick ONE report per source: usage (token counts, we price them) or cost (invoice amounts, carried verbatim). Never create both for the same org — the same spend would be counted twice.",
+      "Polls Anthropic's organization usage/cost reports with an Admin API key (sk-ant-admin-...). Pick ONE report per source: usage (token counts, we price them) or cost (Anthropic's reported spend, excludes Priority Tier). Never create both for the same org — the same spend would be counted twice.",
     icon: <Anthropic />,
   },
   {

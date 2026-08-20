@@ -1205,7 +1205,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       key: "report",
       label: "Report (usage or cost)",
       placeholder: "cost",
-      hint: "Exactly one per source. `cost` carries Anthropic's invoice amounts verbatim; `usage` pulls token counts that we price ourselves. Never create both reports for the same organization — the same spend would be counted twice.",
+      hint: "Exactly one per source. `cost` carries Anthropic's own reported spend (Priority Tier usage is excluded, so it is close to but not the invoice); `usage` pulls token counts that we price ourselves. Never create both reports for the same organization — the same spend would be counted twice.",
       required: true,
     },
     {
