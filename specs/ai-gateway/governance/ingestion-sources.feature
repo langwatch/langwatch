@@ -197,21 +197,20 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
 
   Rule: The events table pages through everything the source ever ingested
 
-    The server hands out events in cursor pages — newest first, a
-    timestamp cursor, no total count. The table walks that cursor, so
-    every event is reachable, not just the newest batch. Because there
-    is no total, the pager promises only what it can honour: pages
-    already visited plus the next one, and no grand-total line. Order
-    is fixed at newest-first; the table offers no sort headers and no
-    search box, because with cursor pages they could only sort or
-    search the page in hand, which would lie.
+    Every event the source ever ingested is reachable, not just the
+    newest batch. The admin walks pages newest-first; nothing is known
+    about how many events exist in total, so the pager promises only
+    what it can honour: pages already visited plus the next one, and no
+    grand-total line. Order is fixed at newest-first, and there are no
+    sort headers and no search box — either would only act on the page
+    in hand and quietly lie about the rest.
 
-    The walk overlaps each boundary and drops rows it already showed,
-    so events tied on one millisecond survive the page cut — up to the
-    server's single-fetch maximum per tied millisecond; past that the
-    walk moves on rather than looping. Pages once loaded are kept, and
-    the first page's time anchor is captured once, so walking back
-    never re-asks the server and never shows different rows.
+    Two honesty boundaries the scenarios below pin down: events stamped
+    on the same millisecond are never lost to a page cut, up to one
+    fetch's worth per millisecond, past which the walk moves on rather
+    than looping; and pages once seen do not change — walking back
+    shows exactly the rows the admin came from, even while new events
+    keep arriving.
 
     @integration
     Scenario: Events render as a table, newest first

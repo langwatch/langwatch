@@ -566,7 +566,8 @@ function StaleTimestampCallout({
       borderRadius="md"
     >
       <Text fontSize="sm" color="amber.900">
-        <strong>Heads up:</strong> the events list shows {eventsCount} event
+        <strong>Heads up:</strong> the events table below has loaded{" "}
+        {eventsCount} event
         {eventsCount === 1 ? "" : "s"}, but the rolling
         24h&nbsp;/&nbsp;7d&nbsp;/&nbsp;30d health windows are all zero. Your
         events likely have a stale <Code fontSize="xs">startTimeUnixNano</Code>{" "}
