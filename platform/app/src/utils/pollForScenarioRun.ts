@@ -96,7 +96,7 @@ function classifyTerminalStatus(
  * Returns when:
  * - RUN_STARTED exists (scenarioRunId available) -> success (frontend can show progress)
  * - FAILED status -> run_failed with scenarioRunId (ran, did not pass)
- * - ERROR/CANCELLED status -> run_error with scenarioRunId (could not run)
+ * - ERROR/CANCELLED/STALLED status -> run_error with scenarioRunId (could not run)
  * - Timeout reached -> error without scenarioRunId
  *
  * The frontend run page handles showing progress and messages as they arrive,
