@@ -295,6 +295,7 @@ describe("<MediaPart/>", () => {
     it("says the media was not captured, and how large it was", () => {
       render(
         <MediaPart
+          projectId={TEST_PROJECT_ID}
           part={{
             type: "image",
             source: {

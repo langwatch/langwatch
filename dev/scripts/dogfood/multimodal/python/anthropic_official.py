@@ -19,7 +19,10 @@ MODEL = "claude-haiku-4-5-20251001"
 
 
 @langwatch.trace(name="anthropic official sdk")
-def ask(kind: str) -> str:
+def ask(prompt: str, kind: str) -> str:
+    # The traced entry point takes the user's text, so the trace's headline
+    # input is that text and the attachment only ever appears on the model-call
+    # span below. That is the shape a real application produces.
     client = Anthropic()
     langwatch.get_current_trace().update(
         metadata={"labels": ["multimodal-dogfood", "anthropic-python", kind]},
@@ -42,7 +45,7 @@ def ask(kind: str) -> str:
         messages=[
             {
                 "role": "user",
-                "content": [{"type": "text", "text": question(kind)}, media_block],
+                "content": [{"type": "text", "text": prompt}, media_block],
             }
         ],
     )
@@ -53,4 +56,4 @@ if __name__ == "__main__":
     require("ANTHROPIC_API_KEY", "LANGWATCH_API_KEY")
     langwatch.setup(instrumentors=[AnthropicInstrumentor()])
     which = modality()
-    report(f"anthropic-python/{which}", ask(which))
+    report(f"anthropic-python/{which}", ask(question(which), which))

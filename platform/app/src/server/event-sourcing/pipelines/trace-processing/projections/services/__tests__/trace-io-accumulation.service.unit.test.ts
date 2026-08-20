@@ -193,26 +193,34 @@ describe("TraceIOAccumulationService: media refs", () => {
     it("records which side of the conversation each recording came from", () => {
       // A voice agent's span input is the whole transcript, so the caller's
       // recording and the agent's reply both ride the input attribute.
-      const extractor = stubExtractor({
-        input: {
-          raw: [
-            { role: "user", content: [audioPart("spoken")] },
-            { role: "assistant", content: [audioPart("reply")] },
-          ],
-          text: "shipment 4417?",
-          source: "langwatch",
-        },
-        output: {
-          raw: [{ role: "assistant", content: [audioPart("reply")] }],
-          text: "it arrives tomorrow",
-          source: "langwatch",
-        },
-      });
-      const accumulator = new TraceIOAccumulationService(extractor);
+      const accumulator = new TraceIOAccumulationService(
+        stubExtractor({
+          input: {
+            raw: { input: "shipment 4417?" },
+            text: "shipment 4417?",
+            source: "langwatch",
+          },
+          output: {
+            raw: { output: "it arrives tomorrow" },
+            text: "it arrives tomorrow",
+            source: "langwatch",
+          },
+        }),
+      );
 
       const result = accumulator.accumulateIO({
         state: emptyState(),
-        span: rootSpan(),
+        span: rootSpan({
+          spanAttributes: {
+            "langwatch.input": JSON.stringify([
+              { role: "user", content: [audioPart("spoken")] },
+              { role: "assistant", content: [audioPart("reply")] },
+            ]),
+            "langwatch.output": JSON.stringify([
+              { role: "assistant", content: [audioPart("reply")] },
+            ]),
+          },
+        } as never),
       });
 
       expect(JSON.parse(result.inputMediaRefs!)).toEqual([
@@ -361,16 +369,30 @@ describe("TraceIOAccumulationService: media refs", () => {
     source: "langwatch" as const,
   });
 
-  const imageIO = (url: string) => ({
-    raw: [
-      {
-        role: "user",
-        content: [{ type: "image_url", image_url: { url } }],
+  /**
+   * A span the way the wire records it: the picture rides the span attribute,
+   * and what the extraction service reports about the span is a separate
+   * question. Instrumentation for several SDKs reports the text alone.
+   */
+  const spanCarrying = ({
+    spanId,
+    parentSpanId,
+    url,
+  }: {
+    spanId: string;
+    parentSpanId: string | null;
+    url: string;
+  }) =>
+    rootSpan({
+      spanId,
+      parentSpanId,
+      name: parentSpanId === null ? "root" : "llm",
+      spanAttributes: {
+        "langwatch.input": JSON.stringify([
+          { role: "user", content: [{ type: "image_url", image_url: { url } }] },
+        ]),
       },
-    ],
-    text: "",
-    source: "gen_ai" as const,
-  });
+    } as never);
 
   /** Fold a list of spans through the accumulator the way the projection does. */
   function foldSpans(
@@ -404,16 +426,16 @@ describe("TraceIOAccumulationService: media refs", () => {
     return last;
   }
 
-  const childSpan = (spanId: string) =>
-    rootSpan({ spanId, parentSpanId: "s1", name: "llm" } as never);
+  const childCarrying = (spanId: string, url: string) =>
+    spanCarrying({ spanId, parentSpanId: "s1", url });
 
   describe("given a text-only root span and a child model call carrying the image", () => {
     /** @scenario Media on a child span reaches the trace's refs */
     it("keeps the child's image on the trace, whichever span folds first", () => {
-      const rootFirst = foldSpans([
-        { span: rootSpan(), input: textOnlyIO("what is this?") },
-        { span: childSpan("s2"), input: imageIO(IMAGE_URL) },
-      ]);
+      const child = { span: childCarrying("s2", IMAGE_URL) };
+      const root = { span: rootSpan(), input: textOnlyIO("what is this?") };
+
+      const rootFirst = foldSpans([root, child]);
       expect(rootFirst.computedInput).toBe("what is this?");
       expect(JSON.parse(rootFirst.inputMediaRefs!)).toEqual([
         { kind: "image", url: IMAGE_URL, role: "user" },
@@ -421,12 +443,28 @@ describe("TraceIOAccumulationService: media refs", () => {
 
       // Spans arrive in whatever order the queue hands them over, and the root
       // winning the headline text must not wipe what the child contributed.
-      const childFirst = foldSpans([
-        { span: childSpan("s2"), input: imageIO(IMAGE_URL) },
-        { span: rootSpan(), input: textOnlyIO("what is this?") },
-      ]);
+      const childFirst = foldSpans([child, root]);
       expect(childFirst.computedInput).toBe("what is this?");
       expect(JSON.parse(childFirst.inputMediaRefs!)).toEqual([
+        { kind: "image", url: IMAGE_URL, role: "user" },
+      ]);
+    });
+  });
+
+  describe("given instrumentation that reports the text and drops the picture", () => {
+    /** @scenario Media on a child span reaches the trace's refs */
+    it("still finds the picture on the span the customer sent", () => {
+      // What several SDK instrumentations do: the reported messages carry the
+      // question only, while the recorded request carries the attachment too.
+      const result = foldSpans([
+        {
+          span: childCarrying("s2", IMAGE_URL),
+          input: textOnlyIO("what is this?"),
+        },
+      ]);
+
+      expect(result.computedInput).toBe("what is this?");
+      expect(JSON.parse(result.inputMediaRefs!)).toEqual([
         { kind: "image", url: IMAGE_URL, role: "user" },
       ]);
     });
@@ -436,8 +474,15 @@ describe("TraceIOAccumulationService: media refs", () => {
     /** @scenario The headline span's media is preferred over a child's */
     it("puts the winning span's media first", () => {
       const result = foldSpans([
-        { span: childSpan("s2"), input: imageIO(AUDIO_URL) },
-        { span: rootSpan(), input: imageIO(IMAGE_URL) },
+        { span: childCarrying("s2", AUDIO_URL) },
+        {
+          span: spanCarrying({
+            spanId: "s1",
+            parentSpanId: null,
+            url: IMAGE_URL,
+          }),
+          input: textOnlyIO("what is this?"),
+        },
       ]);
 
       expect(JSON.parse(result.inputMediaRefs!)).toEqual([
@@ -451,8 +496,8 @@ describe("TraceIOAccumulationService: media refs", () => {
     /** @scenario One recording reachable through two paths collapses to one ref */
     it("records it once", () => {
       const result = foldSpans([
-        { span: childSpan("s2"), input: imageIO(IMAGE_URL) },
-        { span: childSpan("s3"), input: imageIO(IMAGE_URL) },
+        { span: childCarrying("s2", IMAGE_URL) },
+        { span: childCarrying("s3", IMAGE_URL) },
       ]);
 
       expect(JSON.parse(result.inputMediaRefs!)).toEqual([

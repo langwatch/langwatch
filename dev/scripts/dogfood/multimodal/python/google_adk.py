@@ -28,12 +28,11 @@ USER_ID = "dogfood-user"
 SESSION_ID = "multimodal-dogfood-session"
 
 
-@langwatch.trace(name="google adk")
 def ask(kind: str) -> str:
-    langwatch.get_current_trace().update(
-        metadata={"labels": ["multimodal-dogfood", "google-adk", kind]},
-    )
-
+    # No `@langwatch.trace` wrapper here, unlike the other cells: `Runner.run`
+    # crosses a sync-to-async bridge that drops the OpenTelemetry context, so a
+    # wrapper span lands in a second, separate trace and the real one comes
+    # from the instrumentor alone. Let the instrumentor own the trace.
     agent = Agent(
         name="multimodal_dogfood_agent",
         model=MODEL,

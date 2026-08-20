@@ -463,6 +463,111 @@ describe("trace media extraction at the ingestion edge", () => {
     });
   });
 
+  describe("given a span input recorded in a provider's own vocabulary", () => {
+    /** @scenario "An Anthropic image block inside a span input is externalized before staging" */
+    it("externalizes the bytes of an Anthropic base64 image block", async () => {
+      // What the Anthropic instrumentation records is the request the customer
+      // sent, so the block arrives in Anthropic's shape, not in ours.
+      const span = makeSpan([
+        {
+          key: "langwatch.input",
+          value: {
+            stringValue: JSON.stringify({
+              model: "claude-haiku-4-5-20251001",
+              max_tokens: 1024,
+              messages: [
+                {
+                  role: "user",
+                  content: [
+                    { type: "text", text: "What is in this picture?" },
+                    {
+                      type: "image",
+                      source: {
+                        type: "base64",
+                        media_type: "image/png",
+                        data: PNG_BYTES.toString("base64"),
+                      },
+                    },
+                  ],
+                },
+              ],
+            }),
+          },
+        },
+      ]);
+
+      const result = await maybeExtractSpanMedia({
+        data: makeCommandData(span),
+        deps: enabledDeps(),
+        logger: testLogger,
+      });
+
+      const request = parseAttr(result, "langwatch.input") as {
+        messages: Array<{
+          content: Array<{ source?: { type: string; value: string } }>;
+        }>;
+      };
+      const block = request.messages[0]!.content[1]!;
+      expect(block.source?.type).toBe("url");
+      expect(block.source?.value).toMatch(
+        new RegExp(`^/api/files/${PROJECT}/`),
+      );
+      const id = block.source!.value.split("/").pop()!;
+      expect((await chRowFor(id))?.media_type).toBe("image/png");
+      expect(JSON.stringify(result)).not.toContain(
+        PNG_BYTES.toString("base64"),
+      );
+    });
+
+    /** @scenario "A Gemini inline-data part inside a span input is externalized before staging" */
+    it("externalizes the bytes of a Gemini inline-data part", async () => {
+      const span = makeSpan([
+        {
+          key: "langwatch.input",
+          value: {
+            stringValue: JSON.stringify({
+              model: "gemini-2.5-flash",
+              contents: [
+                {
+                  role: "user",
+                  parts: [
+                    { text: "What is in this picture?" },
+                    {
+                      inline_data: {
+                        mime_type: "image/png",
+                        data: PNG_BYTES.toString("base64"),
+                      },
+                    },
+                  ],
+                },
+              ],
+            }),
+          },
+        },
+      ]);
+
+      const result = await maybeExtractSpanMedia({
+        data: makeCommandData(span),
+        deps: enabledDeps(),
+        logger: testLogger,
+      });
+
+      const request = parseAttr(result, "langwatch.input") as {
+        contents: Array<{
+          parts: Array<{ type?: string; source?: { value: string } }>;
+        }>;
+      };
+      const part = request.contents[0]!.parts[1]!;
+      expect(part.type).toBe("image");
+      expect(part.source?.value).toMatch(new RegExp(`^/api/files/${PROJECT}/`));
+      // The carrier held the bytes, so replacing the source alone would have
+      // left them behind.
+      expect(JSON.stringify(result)).not.toContain(
+        PNG_BYTES.toString("base64"),
+      );
+    });
+  });
+
   describe("given a data-URI image and a PDF file part", () => {
     /** @scenario "A data-URI image inside an image_url part is externalized" */
     it("externalizes the image keeping the image_url shape", async () => {

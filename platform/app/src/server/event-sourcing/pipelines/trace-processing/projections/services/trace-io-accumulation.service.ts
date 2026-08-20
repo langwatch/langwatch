@@ -178,22 +178,42 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
 }
 
 /**
+ * The attributes a side's media can ride on. Both are read for every span,
+ * because the two carry different things: the provider instrumentation writes
+ * the request the customer sent to `langwatch.*`, while `gen_ai.*.messages`
+ * holds what that instrumentation chose to report, which is often the text
+ * alone. Reading only whichever one named the trace loses the picture whenever
+ * the other one is the one holding it.
+ */
+const MEDIA_SOURCE_ATTRS = {
+  input: [ATTR_KEYS.LANGWATCH_INPUT, ATTR_KEYS.GEN_AI_INPUT_MESSAGES],
+  output: [ATTR_KEYS.LANGWATCH_OUTPUT, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES],
+} as const;
+
+/**
  * Fold one span's media into the trace's running refs for a side.
  *
  * A span with no media leaves the refs alone, which is the whole point: the
  * span that names the trace is usually not the span that holds the picture, so
- * winning the headline text must not wipe what another span contributed.
+ * winning the headline text must not wipe what another span contributed. The
+ * winning span's media goes first, so the list thumbnail still prefers the
+ * media of the headline message.
  */
 function accumulateMediaRefs({
   serialized,
-  raw,
+  span,
+  side,
   winning,
 }: {
   serialized: string | null;
-  raw: unknown;
+  span: NormalizedSpan;
+  side: "input" | "output";
   winning: boolean;
 }): string | null {
-  const incoming = collectMediaRefs(raw);
+  const incoming = MEDIA_SOURCE_ATTRS[side].flatMap((key) => {
+    const value = span.spanAttributes[key];
+    return value === undefined || value === null ? [] : collectMediaRefs(value);
+  });
   if (incoming.length === 0) return serialized;
   return serializeMediaRefList(
     mergeMediaRefs({
@@ -322,9 +342,9 @@ export class TraceIOAccumulationService {
       span,
       "input",
     );
+    let inputWins = false;
     if (inputResult) {
-      const inputWins =
-        isRoot || computedInput === null || currentInputIsFallback;
+      inputWins = isRoot || computedInput === null || currentInputIsFallback;
       if (inputWins) {
         // Use the EXTRACTED text: extractRichIOFromSpan already runs
         // messagesToText / extractTextFromPlainJson to pull the clean
@@ -336,11 +356,6 @@ export class TraceIOAccumulationService {
         computedInput = preferText(inputResult.text, inputResult.raw);
         inputIsFallback = false;
       }
-      inputMediaRefs = accumulateMediaRefs({
-        serialized: inputMediaRefs,
-        raw: inputResult.raw,
-        winning: inputWins,
-      });
     } else if (computedInput === null) {
       // Semantic heuristics didn't find anything. Fall back to the
       // service's `text` (best-effort stringification of the wrapper)
@@ -351,25 +366,28 @@ export class TraceIOAccumulationService {
       if (inputFallback) {
         computedInput = preferText(inputFallback.text, inputFallback.raw);
         inputIsFallback = true;
-        inputMediaRefs = accumulateMediaRefs({
-          serialized: inputMediaRefs,
-          raw: inputFallback.raw,
-          winning: true,
-        });
+        inputWins = true;
       }
     }
+    inputMediaRefs = accumulateMediaRefs({
+      serialized: inputMediaRefs,
+      span,
+      side: "input",
+      winning: inputWins,
+    });
 
     const outputResult = this.traceIOExtractionService.extractRichIOFromSpan(
       span,
       "output",
     );
+    let outputWins = false;
     if (outputResult) {
       const isExplicit = outputResult.source === "langwatch";
       // Semantic output must always override a prior fallback, regardless of
       // end-time ordering. The fallback span's endTime can be later than a
       // real semantic gen_ai span that arrives afterward; without this bypass,
       // `shouldOverrideOutput`'s endTime comparison would keep the fallback.
-      const shouldOverride =
+      outputWins =
         currentOutputIsFallback ||
         shouldOverrideOutput({
           isRoot,
@@ -379,7 +397,7 @@ export class TraceIOAccumulationService {
           endTime: span.endTimeUnixMs,
           currentEndTime: outputSpanEndTimeMs,
         });
-      if (shouldOverride) {
+      if (outputWins) {
         // Use the extracted text (unwrapped from common JSON wrappers
         // like `{"output":"..."}`), not the raw payload. See input
         // branch above for the full rationale.
@@ -391,11 +409,6 @@ export class TraceIOAccumulationService {
           : OUTPUT_SOURCE.INFERRED;
         outputIsFallback = false;
       }
-      outputMediaRefs = accumulateMediaRefs({
-        serialized: outputMediaRefs,
-        raw: outputResult.raw,
-        winning: shouldOverride,
-      });
     } else if (computedOutput === null) {
       // No semantic match on any span so far. A stringified-payload fallback
       // is strictly better than leaving ComputedOutput NULL. Tracked via
@@ -408,13 +421,15 @@ export class TraceIOAccumulationService {
         computedOutput = preferText(outputFallback.text, outputFallback.raw);
         outputSpanEndTimeMs = span.endTimeUnixMs;
         outputIsFallback = true;
-        outputMediaRefs = accumulateMediaRefs({
-          serialized: outputMediaRefs,
-          raw: outputFallback.raw,
-          winning: true,
-        });
+        outputWins = true;
       }
     }
+    outputMediaRefs = accumulateMediaRefs({
+      serialized: outputMediaRefs,
+      span,
+      side: "output",
+      winning: outputWins,
+    });
 
     return {
       computedInput,

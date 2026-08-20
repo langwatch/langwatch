@@ -208,9 +208,8 @@ export function mediaPartToMediaData(part: unknown): MediaPartData | null {
             source: {
               type: "data",
               value: p.source.value,
-              // The decoder casts `source` from wire data, so `mimeType` can be
-              // undefined at runtime even though the type says string. Default
-              // it per category — a data: URI built from `undefined`
+              // Wire payloads often omit the media type. Default it per
+              // category. A data: URI built from `undefined`
               // (`data:undefined;…`) is a silently-broken element with no
               // error badge.
               mimeType: p.source.mimeType ?? defaultDataMimeType(p.type),

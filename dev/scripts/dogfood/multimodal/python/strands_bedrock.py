@@ -23,7 +23,7 @@ REGION = "eu-central-1"
 
 
 @langwatch.trace(name="strands bedrock")
-def ask(kind: str) -> str:
+def ask(prompt: str, kind: str) -> str:
     langwatch.get_current_trace().update(
         metadata={"labels": ["multimodal-dogfood", "strands-bedrock", kind]},
     )
@@ -45,7 +45,7 @@ def ask(kind: str) -> str:
             }
         }
 
-    result = agent([{"text": question(kind)}, media_block])
+    result = agent([{"text": prompt}, media_block])
     return str(result)
 
 
@@ -53,4 +53,4 @@ if __name__ == "__main__":
     require("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "LANGWATCH_API_KEY")
     langwatch.setup()
     which = modality()
-    report(f"strands-bedrock/{which}", ask(which))
+    report(f"strands-bedrock/{which}", ask(question(which), which))
