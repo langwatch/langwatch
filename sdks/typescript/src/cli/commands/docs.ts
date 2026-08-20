@@ -8,9 +8,14 @@ const SCENARIO_DOCS_INDEX = "https://langwatch.ai/scenario/llms.txt";
 
 type DocsKind = "langwatch" | "scenario";
 
-export function normalizeDocsUrl(input: string | undefined, kind: DocsKind): string {
-  const indexUrl = kind === "scenario" ? SCENARIO_DOCS_INDEX : LANGWATCH_DOCS_INDEX;
-  const baseUrl = kind === "scenario" ? SCENARIO_DOCS_BASE : LANGWATCH_DOCS_BASE;
+export function normalizeDocsUrl(
+  input: string | undefined,
+  kind: DocsKind,
+): string {
+  const indexUrl =
+    kind === "scenario" ? SCENARIO_DOCS_INDEX : LANGWATCH_DOCS_INDEX;
+  const baseUrl =
+    kind === "scenario" ? SCENARIO_DOCS_BASE : LANGWATCH_DOCS_BASE;
 
   let url = (input ?? "").trim();
   if (url === "") return indexUrl;

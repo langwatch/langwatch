@@ -8,7 +8,11 @@ import { describe, expect, it } from "vitest";
  * exact code that scrubs their report. copy-types.sh refreshes the mirror;
  * this test fails when the canonical package changed without regenerating.
  */
-const MIRRORED_FILES = ["markers.ts", "secrets.ts", "sessionReport.ts"] as const;
+const MIRRORED_FILES = [
+  "markers.ts",
+  "secrets.ts",
+  "sessionReport.ts",
+] as const;
 
 const generatedDir = join(__dirname, "../../../internal/generated/redaction");
 const canonicalDir = join(

@@ -6,15 +6,14 @@
  */
 
 import { describe, expect, it } from "vitest";
-
+import type { LaunchAgentSpec } from "../copilot-app";
 import {
+  type AgentIo,
   CopilotAppAgentError,
   installCopilotAppAgent,
   isCopilotAppAgentInstalled,
   removeCopilotAppAgent,
-  type AgentIo,
 } from "../copilot-app-agent";
-import { type LaunchAgentSpec } from "../copilot-app";
 
 /** `failOn(cmd, args)` returns true when that command should throw. */
 function fakeIo(
@@ -80,16 +79,12 @@ describe("installCopilotAppAgent", () => {
       expect(p).toContain(".config/systemd/user");
       expect(files.get(p)).toContain("ExecStart=");
       expect(
-        runs.some(
-          (r) => r.cmd === "systemctl" && r.args.includes("enable"),
-        ),
+        runs.some((r) => r.cmd === "systemctl" && r.args.includes("enable")),
       ).toBe(true);
       // restart, not `enable --now`: `--now` is a no-op on an already-active
       // unit, which would leave a running app holding the revoked prior key.
       expect(
-        runs.some(
-          (r) => r.cmd === "systemctl" && r.args.includes("restart"),
-        ),
+        runs.some((r) => r.cmd === "systemctl" && r.args.includes("restart")),
       ).toBe(true);
       expect(runs.every((r) => !r.args.includes("--now"))).toBe(true);
     });
@@ -110,7 +105,9 @@ describe("installCopilotAppAgent", () => {
       expect(xml).not.toContain("<Environment>"); // invalid element must be absent
       // the env wrapper is written alongside and referenced by the task
       const wrapperPath = [...files.keys()].find((f) => f.endsWith(".cmd"))!;
-      expect(files.get(wrapperPath)).toContain('set "COPILOT_OTEL_ENABLED=true"');
+      expect(files.get(wrapperPath)).toContain(
+        'set "COPILOT_OTEL_ENABLED=true"',
+      );
       expect(xml).toContain(".cmd");
       expect(
         runs.some((r) => r.cmd === "schtasks" && r.args.includes("/Create")),

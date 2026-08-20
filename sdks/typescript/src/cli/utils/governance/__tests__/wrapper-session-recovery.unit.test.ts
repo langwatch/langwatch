@@ -40,7 +40,9 @@ describe("classifyIngestionSetupError", () => {
   });
 
   it("treats a plain network failure as neither", () => {
-    expect(classifyIngestionSetupError(new Error("ECONNREFUSED"))).toBe("other");
+    expect(classifyIngestionSetupError(new Error("ECONNREFUSED"))).toBe(
+      "other",
+    );
   });
 });
 

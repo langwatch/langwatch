@@ -42,7 +42,7 @@ export const mapRunResultsToRows = (
     const predicted = entry.predicted;
     const output =
       predicted && typeof predicted === "object" && "output" in predicted
-        ? (predicted).output
+        ? predicted.output
         : predicted;
 
     const row: ExperimentRowResult = {

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock createLangWatchApiClient so we can return controlled responses for every
 // endpoint the status command queries. Status hits ~10 resources plus the
@@ -11,7 +11,11 @@ vi.mock("@/internal/api/client", () => ({
 }));
 
 vi.mock("../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 import { statusCommand } from "../status";
@@ -61,7 +65,9 @@ const noExperiments = {
 };
 
 /** A budget row with sane defaults — override just the field under test. */
-const budgetFixture = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+const budgetFixture = (
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> => ({
   id: "bud_1",
   organization_id: "org_1",
   scope_type: "project",
@@ -87,7 +93,10 @@ const budgetFixture = (overrides: Record<string, unknown> = {}): Record<string, 
 const mockGatewayFetch = ({
   budgets = [] as unknown[],
   spendAvailable = true,
-}: { budgets?: unknown[]; spendAvailable?: boolean } = {}) =>
+}: {
+  budgets?: unknown[];
+  spendAvailable?: boolean;
+} = {}) =>
   vi.fn().mockImplementation(async (input: unknown) => {
     const url = String(input);
     if (url.includes("/api/gateway/v1/budgets")) {
@@ -141,7 +150,11 @@ const mockPagedGatewayFetch = (pages: unknown[][]) =>
 const mockAllSuccess = (): void => {
   mockGET.mockImplementation(async (path: string) => {
     if (path.startsWith("/api/experiments")) {
-      return { data: noExperiments, error: undefined, response: { status: 200 } };
+      return {
+        data: noExperiments,
+        error: undefined,
+        response: { status: 200 },
+      };
     }
     return { data: [{ id: "1" }, { id: "2" }], error: undefined };
   });
@@ -168,7 +181,9 @@ describe("statusCommand", () => {
     vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new ProcessExitError((code as number) ?? 0);
     });
-    consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    consoleLogSpy = vi
+      .spyOn(console, "log")
+      .mockImplementation(() => undefined);
     consoleErrorSpy = vi
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
@@ -200,7 +215,10 @@ describe("statusCommand", () => {
         ok: false,
         status: 401,
         statusText: "Unauthorized",
-        json: async () => ({ error: "Unauthorized", message: "Invalid API key" }),
+        json: async () => ({
+          error: "Unauthorized",
+          message: "Invalid API key",
+        }),
       }) as unknown as typeof fetch;
     });
 
@@ -259,7 +277,10 @@ describe("statusCommand", () => {
         ok: false,
         status: 503,
         statusText: "Service Unavailable",
-        json: async () => ({ error: "ServiceUnavailable", message: "Backend down" }),
+        json: async () => ({
+          error: "ServiceUnavailable",
+          message: "Backend down",
+        }),
       }) as unknown as typeof fetch;
     });
 
@@ -344,13 +365,23 @@ describe("statusCommand", () => {
                   runId: "run_1",
                   workflowVersion: null,
                   // No finishedAt/stoppedAt → still running.
-                  timestamps: { createdAt: 1, updatedAt: 2, finishedAt: null, stoppedAt: null },
+                  timestamps: {
+                    createdAt: 1,
+                    updatedAt: 2,
+                    finishedAt: null,
+                    stoppedAt: null,
+                  },
                   progress: 5,
                   total: 10,
                   summary: { evaluations: {} },
                 },
               ],
-              pagination: { page: 1, pageSize: 1, totalHits: 1, hasMore: false },
+              pagination: {
+                page: 1,
+                pageSize: 1,
+                totalHits: 1,
+                hasMore: false,
+              },
             },
             error: undefined,
             response: { status: 200 },
@@ -372,7 +403,12 @@ describe("statusCommand", () => {
                   lastRunAt: new Date().toISOString(),
                 },
               ],
-              pagination: { page: 1, pageSize: 50, totalHits: 1, hasMore: false },
+              pagination: {
+                page: 1,
+                pageSize: 50,
+                totalHits: 1,
+                hasMore: false,
+              },
             },
             error: undefined,
             response: { status: 200 },
@@ -393,7 +429,9 @@ describe("statusCommand", () => {
       expect(out).toContain("Needs Attention:");
       expect(out).toContain("7 traces errored in the last 24h");
       expect(out).toContain('experiment "Eval X" is still running (5/10)');
-      expect(out).toContain("langwatch experiment status eval-x --run-id run_1");
+      expect(out).toContain(
+        "langwatch experiment status eval-x --run-id run_1",
+      );
       expect(out).toContain('budget "prod" (month, project) at 92%');
       expect(out).toContain("blocks on breach");
       expect(out).not.toContain("nothing needs your attention");
@@ -449,7 +487,12 @@ describe("statusCommand", () => {
                   lastRunAt: new Date().toISOString(),
                 },
               ],
-              pagination: { page: 1, pageSize: 50, totalHits: 1, hasMore: false },
+              pagination: {
+                page: 1,
+                pageSize: 50,
+                totalHits: 1,
+                hasMore: false,
+              },
             },
             error: undefined,
             response: { status: 200 },
@@ -534,7 +577,12 @@ describe("statusCommand", () => {
           experimentId: "exp_1",
           runId: "run_1",
           workflowVersion: null,
-          timestamps: { createdAt: 1, updatedAt: 2, finishedAt: null, stoppedAt: null },
+          timestamps: {
+            createdAt: 1,
+            updatedAt: 2,
+            finishedAt: null,
+            stoppedAt: null,
+          },
           progress: 5,
           total: 10,
           summary: { evaluations: {} },
@@ -586,7 +634,12 @@ describe("statusCommand", () => {
                 experimentId: "exp_1",
                 runId: "run_1",
                 workflowVersion: null,
-                timestamps: { createdAt: 1, updatedAt: 2, finishedAt: 3, stoppedAt: null },
+                timestamps: {
+                  createdAt: 1,
+                  updatedAt: 2,
+                  finishedAt: 3,
+                  stoppedAt: null,
+                },
                 progress: 10,
                 total: 10,
                 summary: { evaluations: {} },
@@ -612,7 +665,9 @@ describe("statusCommand", () => {
         mockExperiments({
           experiments: [
             experimentFixture({
-              lastRunAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+              lastRunAt: new Date(
+                Date.now() - 48 * 60 * 60 * 1000,
+              ).toISOString(),
             }),
           ],
           pagination: { page: 1, pageSize: 50, totalHits: 1, hasMore: false },
@@ -631,7 +686,13 @@ describe("statusCommand", () => {
         mockAllSuccess();
         // A limit of 0 admits no spend at all: maximally breached, not 0%.
         global.fetch = mockGatewayFetch({
-          budgets: [budgetFixture({ limit_usd: "0", spent_usd: "0", on_breach: "block" })],
+          budgets: [
+            budgetFixture({
+              limit_usd: "0",
+              spent_usd: "0",
+              on_breach: "block",
+            }),
+          ],
         });
 
         await statusCommand();
@@ -767,7 +828,13 @@ describe("statusCommand", () => {
         global.fetch = mockPagedGatewayFetch([
           [budgetFixture({ name: "quiet", spent_usd: "1" })],
           [budgetFixture({ name: "quieter", spent_usd: "2" })],
-          [budgetFixture({ name: "breached", limit_usd: "100", spent_usd: "150" })],
+          [
+            budgetFixture({
+              name: "breached",
+              limit_usd: "100",
+              spent_usd: "150",
+            }),
+          ],
         ]);
 
         await statusCommand();
@@ -864,7 +931,12 @@ describe("statusCommand", () => {
                 experimentId: "exp_1",
                 runId: "run_1",
                 workflowVersion: null,
-                timestamps: { createdAt: 1, updatedAt: 2, finishedAt: 3, stoppedAt: null },
+                timestamps: {
+                  createdAt: 1,
+                  updatedAt: 2,
+                  finishedAt: 3,
+                  stoppedAt: null,
+                },
                 progress: 10,
                 total: 10,
                 summary: { evaluations: {} },

@@ -6,12 +6,12 @@
  */
 import * as readline from "node:readline";
 import chalk from "chalk";
-import { resolveOutputOptions, type RawOutputFlags } from "../../utils/output";
+import { type RawOutputFlags, resolveOutputOptions } from "../../utils/output";
 import {
-  resolveSkills,
-  SKILLS_BUNDLE,
   type BundledSkill,
   type ForcedClobber,
+  resolveSkills,
+  SKILLS_BUNDLE,
   type SkillFileResult,
 } from "./installer";
 import { throwValidationError } from "./validation";
@@ -50,7 +50,10 @@ export const resolveTargets = ({
   return skills;
 };
 
-const ACTION_COLOR: Record<SkillFileResult["action"], (text: string) => string> = {
+const ACTION_COLOR: Record<
+  SkillFileResult["action"],
+  (text: string) => string
+> = {
   created: chalk.green,
   updated: chalk.green,
   removed: chalk.red,
@@ -77,7 +80,8 @@ export const renderSkillFileResults = ({
     const action =
       (dryRun ? DRY_RUN_ACTION[result.action] : undefined) ?? result.action;
     const color = ACTION_COLOR[result.action];
-    const reason = result.reason !== undefined ? chalk.gray(` — ${result.reason}`) : "";
+    const reason =
+      result.reason !== undefined ? chalk.gray(` — ${result.reason}`) : "";
     console.log(`  ${color(action.padEnd(14))}${result.path}${reason}`);
   }
 };
@@ -98,7 +102,9 @@ const isTableOutput = (options: RawOutputFlags): boolean =>
 export const isInteractiveConsole = (options: RawOutputFlags): boolean => {
   const resolved = resolveOutputOptions({ ...options });
   return (
-    process.stdin.isTTY === true && resolved.format === "table" && !resolved.agent
+    process.stdin.isTTY === true &&
+    resolved.format === "table" &&
+    !resolved.agent
   );
 };
 

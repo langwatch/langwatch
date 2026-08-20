@@ -26,9 +26,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { GovernanceConfig } from "../config";
 import type * as ConfigModule from "../config";
+import type { GovernanceConfig } from "../config";
 
 const answers: string[] = [];
 const lastPrompts: string[] = [];
@@ -145,7 +144,9 @@ describe("maybeOfferIngestionShellRcPersist", () => {
           tool: "claude",
           vars: otelVars,
         });
-        const written = JSON.parse(fs.readFileSync(claudeSettingsPath(), "utf8"));
+        const written = JSON.parse(
+          fs.readFileSync(claudeSettingsPath(), "utf8"),
+        );
         expect(written.env).toEqual(otelVars);
         // The zsh rc must NOT be touched — the whole point of this route is
         // to keep OTEL out of every unrelated shell child.
@@ -190,7 +191,9 @@ describe("maybeOfferIngestionShellRcPersist", () => {
           tool: "claude",
           vars: otelVars,
         });
-        const written = JSON.parse(fs.readFileSync(claudeSettingsPath(), "utf8"));
+        const written = JSON.parse(
+          fs.readFileSync(claudeSettingsPath(), "utf8"),
+        );
         expect(written.model).toBe("claude-sonnet-5");
         expect(written.permissions).toEqual({ allow: ["Bash(git status)"] });
         expect(written.env).toEqual({ ...otelVars, EXISTING_VAR: "keep-me" });
@@ -254,7 +257,9 @@ describe("maybeOfferIngestionShellRcPersist", () => {
         });
         expect(lastPrompts).toHaveLength(0);
         expect(saveConfigMock).not.toHaveBeenCalled();
-        const written = JSON.parse(fs.readFileSync(claudeSettingsPath(), "utf8"));
+        const written = JSON.parse(
+          fs.readFileSync(claudeSettingsPath(), "utf8"),
+        );
         expect(written.env).toEqual(otelVars);
       });
 
@@ -268,7 +273,9 @@ describe("maybeOfferIngestionShellRcPersist", () => {
           tool: "claude",
           vars: otelVars,
         });
-        const written = JSON.parse(fs.readFileSync(claudeSettingsPath(), "utf8"));
+        const written = JSON.parse(
+          fs.readFileSync(claudeSettingsPath(), "utf8"),
+        );
         expect(Object.keys(written.hooks)).toEqual(["SessionStart", "Stop"]);
       });
     });
@@ -295,7 +302,9 @@ describe("maybeOfferIngestionShellRcPersist", () => {
           tool: "claude",
           vars: otelVars,
         });
-        const written = JSON.parse(fs.readFileSync(claudeSettingsPath(), "utf8"));
+        const written = JSON.parse(
+          fs.readFileSync(claudeSettingsPath(), "utf8"),
+        );
         expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
           "http://app.example.com/api/otel",
         );
@@ -438,7 +447,6 @@ describe("maybeOfferIngestionShellRcPersist", () => {
         expect(lastPrompts).toHaveLength(0);
       });
     });
-
   });
 
   describe("when the tool is `opencode` (scoped shell function, no global export)", () => {
@@ -499,7 +507,9 @@ describe("maybeOfferIngestionShellRcPersist", () => {
         const rc = fs.readFileSync(rcFile, "utf8");
         // both blocks present, neither clobbered
         expect(rc).toContain("# >>> langwatch begin >>>");
-        expect(rc).toContain("export OTEL_EXPORTER_OTLP_ENDPOINT=http://gemini");
+        expect(rc).toContain(
+          "export OTEL_EXPORTER_OTLP_ENDPOINT=http://gemini",
+        );
         expect(rc).toContain("# >>> langwatch opencode begin >>>");
         expect(rc).toContain("opencode() {");
       });
@@ -509,7 +519,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
       it("stays quiet — no prompt, no rewrite", async () => {
         const rcFile = path.join(tmpHome, ".zshrc");
         const installed =
-          "# >>> langwatch opencode begin >>>\nopencode() {\n    OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel \\\n    command opencode \"$@\"\n}\n# <<< langwatch opencode end <<<\n";
+          '# >>> langwatch opencode begin >>>\nopencode() {\n    OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel \\\n    command opencode "$@"\n}\n# <<< langwatch opencode end <<<\n';
         fs.writeFileSync(rcFile, installed);
         // No answer queued: a fired prompt would read "" → "yes" → rewrite.
         const { maybeOfferIngestionShellRcPersist } = await import(

@@ -161,7 +161,10 @@ export function claudePluginCliAvailable(): boolean {
 }
 
 function probePluginCli(): boolean {
-  const result = runClaude({ args: ["plugin", "--help"], timeoutMs: PROBE_TIMEOUT_MS });
+  const result = runClaude({
+    args: ["plugin", "--help"],
+    timeoutMs: PROBE_TIMEOUT_MS,
+  });
   if (result.status !== 0) {
     debugLog(`plugin subcommand unavailable: ${result.detail}`);
   }
@@ -191,8 +194,12 @@ function claudePluginsDir(): string {
  */
 export function readClaudePluginState(): ClaudePluginState {
   const pluginsDir = claudePluginsDir();
-  const installed = readJsonObject(path.join(pluginsDir, "installed_plugins.json"));
-  const marketplaces = readJsonObject(path.join(pluginsDir, "known_marketplaces.json"));
+  const installed = readJsonObject(
+    path.join(pluginsDir, "installed_plugins.json"),
+  );
+  const marketplaces = readJsonObject(
+    path.join(pluginsDir, "known_marketplaces.json"),
+  );
   const settings = readJsonObject(claudeSettingsPath());
 
   const marketplaceCandidate = marketplaces[CLAUDE_PLUGIN_MARKETPLACE];
@@ -207,7 +214,8 @@ export function readClaudePluginState(): ClaudePluginState {
     pluginInstalled: hasInstallRecord(installed),
     marketplaceKnown: marketplaceEntry !== null,
     marketplaceOwnedByLangwatch:
-      marketplaceEntry !== null && sourcePointsAtLangwatch(marketplaceEntry.source),
+      marketplaceEntry !== null &&
+      sourcePointsAtLangwatch(marketplaceEntry.source),
     enabled: enabledPlugins[CLAUDE_PLUGIN_REF] === true,
   };
 }
@@ -287,7 +295,8 @@ function pointsAtOwnedRepo(value: unknown): boolean {
   const scp = /^git@([^:]+):(.+)$/.exec(lowered);
   if (scp) {
     return (
-      OWNED_HOSTS.has(scp[1]!) && stripRepoPath(scp[2]!) === CLAUDE_PLUGIN_MARKETPLACE_REPO
+      OWNED_HOSTS.has(scp[1]!) &&
+      stripRepoPath(scp[2]!) === CLAUDE_PLUGIN_MARKETPLACE_REPO
     );
   }
 
@@ -298,7 +307,10 @@ function pointsAtOwnedRepo(value: unknown): boolean {
     // A query or a fragment means the path is not the whole address, and we do
     // not know what the rest of it does.
     if (url.search !== "" || url.hash !== "") return false;
-    return stripRepoPath(url.pathname.toLowerCase()) === CLAUDE_PLUGIN_MARKETPLACE_REPO;
+    return (
+      stripRepoPath(url.pathname.toLowerCase()) ===
+      CLAUDE_PLUGIN_MARKETPLACE_REPO
+    );
   } catch {
     // Not a URL. A bare path is a local checkout, which is never ours.
     return false;
@@ -307,7 +319,10 @@ function pointsAtOwnedRepo(value: unknown): boolean {
 
 /** `/langwatch/agent-plugin.git/` and friends down to `langwatch/agent-plugin`. */
 function stripRepoPath(value: string): string {
-  return value.replace(/^\/+/, "").replace(/\/+$/, "").replace(/\.git$/, "");
+  return value
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "")
+    .replace(/\.git$/, "");
 }
 
 function sourcePointsAtLangwatch(source: unknown): boolean {
@@ -366,7 +381,10 @@ export function ensureLangwatchClaudePlugin({
     }
 
     if (!claudePluginCliAvailable()) {
-      return { action: "unavailable", reason: "this claude has no plugin subcommand" };
+      return {
+        action: "unavailable",
+        reason: "this claude has no plugin subcommand",
+      };
     }
 
     const add = runClaude({
@@ -465,7 +483,9 @@ export function updateLangwatchClaudePlugin({
       timeoutMs: UPDATE_TIMEOUT_MS,
     });
     const refreshFailure =
-      refresh.status === 0 ? null : `the marketplace listing could not be refreshed: ${refresh.detail}`;
+      refresh.status === 0
+        ? null
+        : `the marketplace listing could not be refreshed: ${refresh.detail}`;
     if (refreshFailure) debugLog(refreshFailure);
 
     const installed = readInstalledPluginVersion();
@@ -540,7 +560,10 @@ function updateEligibility(): ClaudePluginUpdateResult | null {
     };
   }
   if (!claudePluginCliAvailable()) {
-    return { action: "unavailable", reason: "this claude has no plugin subcommand" };
+    return {
+      action: "unavailable",
+      reason: "this claude has no plugin subcommand",
+    };
   }
   return null;
 }
@@ -628,15 +651,25 @@ function marketplaceListingDir(): string {
     path.join(claudePluginsDir(), "known_marketplaces.json"),
   );
   const entry = marketplaces[CLAUDE_PLUGIN_MARKETPLACE];
-  if (isPlainObject(entry) && typeof entry.installLocation === "string" && entry.installLocation) {
+  if (
+    isPlainObject(entry) &&
+    typeof entry.installLocation === "string" &&
+    entry.installLocation
+  ) {
     return entry.installLocation;
   }
-  return path.join(claudePluginsDir(), "marketplaces", CLAUDE_PLUGIN_MARKETPLACE);
+  return path.join(
+    claudePluginsDir(),
+    "marketplaces",
+    CLAUDE_PLUGIN_MARKETPLACE,
+  );
 }
 
 function versionOf(document: Record<string, unknown>): string | null {
   const version = document.version;
-  return typeof version === "string" && VERSION_PATTERN.test(version) ? version : null;
+  return typeof version === "string" && VERSION_PATTERN.test(version)
+    ? version
+    : null;
 }
 
 /**
@@ -677,7 +710,9 @@ function stampUpdateCheck(): boolean {
     saveConfig(cfg);
     return true;
   } catch (err) {
-    debugLog(`the update check could not be recorded: ${(err as Error).message}`);
+    debugLog(
+      `the update check could not be recorded: ${(err as Error).message}`,
+    );
     return false;
   }
 }
@@ -721,7 +756,10 @@ export function uninstallLangwatchClaudePlugin(): ClaudePluginRemovalResult {
 
     return disableInSettings()
       ? { action: "disabled" }
-      : { action: "failed", reason: "the plugin could not be uninstalled or disabled" };
+      : {
+          action: "failed",
+          reason: "the plugin could not be uninstalled or disabled",
+        };
   } catch (err) {
     return { action: "failed", reason: (err as Error).message };
   }
@@ -761,7 +799,9 @@ function migrateAwayFromRawHooks(): void {
   try {
     removeSessionContextHooks({ tool: "claude_code" });
   } catch (err) {
-    debugLog(`could not remove the raw hook entries: ${(err as Error).message}`);
+    debugLog(
+      `could not remove the raw hook entries: ${(err as Error).message}`,
+    );
   }
 }
 
@@ -785,7 +825,9 @@ function disableInSettings(): boolean {
     writeAppSettingsFile({ filePath, settings });
     return true;
   } catch (err) {
-    debugLog(`could not disable the plugin in the settings file: ${(err as Error).message}`);
+    debugLog(
+      `could not disable the plugin in the settings file: ${(err as Error).message}`,
+    );
     return false;
   }
 }
@@ -850,7 +892,8 @@ function runClaude({
     if (result.error) {
       return { status: null, detail: result.error.message };
     }
-    const stderr = typeof result.stderr === "string" ? result.stderr.trim() : "";
+    const stderr =
+      typeof result.stderr === "string" ? result.stderr.trim() : "";
     return {
       status: result.status,
       detail: stderr || `exit status ${String(result.status)}`,

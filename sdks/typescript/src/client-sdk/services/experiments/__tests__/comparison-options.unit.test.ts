@@ -5,12 +5,12 @@
  * Spec: specs/experiments/comparison-sdk.feature
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   type ComparisonHarness,
-  THREE_OUTPUTS,
   createExperiment,
   runComparison,
+  THREE_OUTPUTS,
   useComparisonHarness,
 } from "./comparison-harness";
 
@@ -114,7 +114,9 @@ describe("Experiment.compare", () => {
         });
 
         expect(
-          harness.judgeRequests[0]!.data.candidates.map((candidate) => candidate.id)
+          harness.judgeRequests[0]!.data.candidates.map(
+            (candidate) => candidate.id,
+          ),
         ).toEqual(["gpt-5-mini", "claude-sonnet-5"]);
         expect(verdict?.candidates).toEqual(["gpt-5-mini", "claude-sonnet-5"]);
       });
@@ -130,20 +132,20 @@ describe("Experiment.compare", () => {
           async ({ index }) => {
             await Promise.all(
               Object.entries(THREE_OUTPUTS).map(([target, output]) =>
-                experiment.withTarget(target, () => output)
-              )
+                experiment.withTarget(target, () => output),
+              ),
             );
             await experiment.compare({ index });
             if (index === 0) await experiment.compare({ index });
           },
-          { concurrency: 1 }
+          { concurrency: 1 },
         );
 
         const [first, second, other] = harness.judgeRequests;
         expect(first!.data.row_index).toBe(0);
         expect(second!.data.row_index).toBe(0);
         expect(first!.data.candidates.map((candidate) => candidate.id)).toEqual(
-          second!.data.candidates.map((candidate) => candidate.id)
+          second!.data.candidates.map((candidate) => candidate.id),
         );
         expect(other!.data.row_index).toBe(1);
       });

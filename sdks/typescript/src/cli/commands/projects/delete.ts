@@ -1,9 +1,9 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { ProjectsApiService } from "@/client-sdk/services/projects/projects-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the archived project rather than printing it: the output port
@@ -27,7 +27,10 @@ export const deleteProjectCommand = async (
       table: () => {
         console.log();
         console.log(chalk.gray("Project has been archived (soft-deleted)."));
-        console.log(chalk.gray("Archived at: ") + new Date(result.archivedAt).toLocaleString());
+        console.log(
+          chalk.gray("Archived at: ") +
+            new Date(result.archivedAt).toLocaleString(),
+        );
         console.log();
       },
     };

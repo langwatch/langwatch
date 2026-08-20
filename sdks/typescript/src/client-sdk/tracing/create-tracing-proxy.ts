@@ -1,17 +1,21 @@
-import { type LangWatchTracer } from "@/observability-sdk";
 import { SpanKind } from "@opentelemetry/api";
+import type { LangWatchTracer } from "@/observability-sdk";
 
 // Type for decorator methods that receive span as first parameter
-type DecoratorMethodWithSpan<T extends (...args: any[]) => any> =
-  (span: any, ...args: Parameters<T>) => ReturnType<T>;
+type DecoratorMethodWithSpan<T extends (...args: any[]) => any> = (
+  span: any,
+  ...args: Parameters<T>
+) => ReturnType<T>;
 
 // Type for decorator class that maps original methods to span-aware versions
 // Only requires methods that are actually implemented in the decorator
-type DecoratorClass<T> = new (target: T) => Partial<{
-    [K in keyof T]: T[K] extends (...args: any[]) => any
-      ? DecoratorMethodWithSpan<T[K]>
-      : T[K];
-  }>;
+type DecoratorClass<T> = new (
+  target: T,
+) => Partial<{
+  [K in keyof T]: T[K] extends (...args: any[]) => any
+    ? DecoratorMethodWithSpan<T[K]>
+    : T[K];
+}>;
 
 /**
  * Creates a proxy that always creates spans for public methods.
@@ -24,12 +28,8 @@ type DecoratorClass<T> = new (target: T) => Partial<{
  */
 export function createTracingProxy<
   T extends object,
-  D extends DecoratorClass<T> | undefined = undefined
->(
-  target: T,
-  tracer: LangWatchTracer,
-  DecoratorClass?: D,
-): T {
+  D extends DecoratorClass<T> | undefined = undefined,
+>(target: T, tracer: LangWatchTracer, DecoratorClass?: D): T {
   const decorator = DecoratorClass ? new DecoratorClass(target) : null;
 
   return new Proxy(target, {
@@ -51,24 +51,29 @@ export function createTracingProxy<
         return (...args: any[]) => {
           const spanName = `${target.constructor.name}.${prop}`;
 
-          return tracer.withActiveSpan(spanName, {
-            kind: SpanKind.CLIENT,
-            attributes: {
-              'code.function': prop,
-              'code.namespace': target.constructor.name,
+          return tracer.withActiveSpan(
+            spanName,
+            {
+              kind: SpanKind.CLIENT,
+              attributes: {
+                "code.function": prop,
+                "code.namespace": target.constructor.name,
+              },
             },
-          }, (span) => {
-            // If decorator has this method, call it with span as first parameter
-            if (decorator && prop in decorator) {
-              const decoratorMethod = decorator[prop as keyof typeof decorator];
-              if (typeof decoratorMethod === "function") {
-                return decoratorMethod.apply(decorator, [span, ...args]);
+            (span) => {
+              // If decorator has this method, call it with span as first parameter
+              if (decorator && prop in decorator) {
+                const decoratorMethod =
+                  decorator[prop as keyof typeof decorator];
+                if (typeof decoratorMethod === "function") {
+                  return decoratorMethod.apply(decorator, [span, ...args]);
+                }
               }
-            }
 
-            // Default: just call the original method
-            return value.apply(target, args);
-          });
+              // Default: just call the original method
+              return value.apply(target, args);
+            },
+          );
         };
       }
 
@@ -102,14 +107,14 @@ const isBuiltInMethod = (prop: string | symbol): boolean => {
 
   // List of built-in methods that should not be traced
   const builtInMethods = [
-    'toString',
-    'valueOf',
-    'toJSON',
-    'toLocaleString',
-    'hasOwnProperty',
-    'isPrototypeOf',
-    'propertyIsEnumerable',
-    'constructor'
+    "toString",
+    "valueOf",
+    "toJSON",
+    "toLocaleString",
+    "hasOwnProperty",
+    "isPrototypeOf",
+    "propertyIsEnumerable",
+    "constructor",
   ];
 
   return builtInMethods.includes(prop);

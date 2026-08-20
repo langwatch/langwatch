@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { checkBudget, renderBudgetExceeded } from "../budget";
 import type { GovernanceConfig } from "../config";
 
@@ -22,7 +22,10 @@ const status = (code: number, body?: unknown): Response =>
 describe("checkBudget", () => {
   it("returns null when not logged in (no probe call)", async () => {
     const fetchImpl = vi.fn();
-    const res = await checkBudget({ ...baseCfg(""), access_token: undefined }, { fetchImpl });
+    const res = await checkBudget(
+      { ...baseCfg(""), access_token: undefined },
+      { fetchImpl },
+    );
     expect(res).toBeNull();
     expect(fetchImpl).not.toHaveBeenCalled();
   });
@@ -55,24 +58,30 @@ describe("checkBudget", () => {
       request_increase_url: "http://app.example/me/budget/request?abc",
       admin_email: "platform-team@miro.com",
     };
-    const fetchImpl = vi.fn().mockResolvedValue(status(402, { error: payload }));
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(status(402, { error: payload }));
     const res = await checkBudget(baseCfg(), { fetchImpl });
     expect(res).toEqual(payload);
   });
 
   it("returns null on 402 with malformed payload (graceful)", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(status(402, { error: { type: "" } }));
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(status(402, { error: { type: "" } }));
     const res = await checkBudget(baseCfg(), { fetchImpl });
     expect(res).toBeNull();
   });
 
   it("sends Bearer token from cfg.access_token", async () => {
     let seen = "";
-    const fetchImpl = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
-      const headers = init.headers as Record<string, string>;
-      seen = headers.Authorization ?? "";
-      return Promise.resolve(ok({ ok: true }));
-    });
+    const fetchImpl = vi
+      .fn()
+      .mockImplementation((_url: string, init: RequestInit) => {
+        const headers = init.headers as Record<string, string>;
+        seen = headers.Authorization ?? "";
+        return Promise.resolve(ok({ ok: true }));
+      });
     await checkBudget(baseCfg("at_TOKEN"), { fetchImpl });
     expect(seen).toBe("Bearer at_TOKEN");
   });
@@ -92,8 +101,12 @@ describe("renderBudgetExceeded", () => {
   it("renders the spec-canonical Screen-8 box character-for-character", () => {
     const out = renderBudgetExceeded(baseEvent);
     expect(out).toContain("⚠  Budget limit reached");
-    expect(out).toContain("You've used $500.00 of your $500.00 monthly budget.");
-    expect(out).toContain("To continue, ask your team admin to raise your limit.");
+    expect(out).toContain(
+      "You've used $500.00 of your $500.00 monthly budget.",
+    );
+    expect(out).toContain(
+      "To continue, ask your team admin to raise your limit.",
+    );
     expect(out).toContain("Admin: platform-team@miro.com");
     expect(out).toContain("Need urgent access? Request an increase:");
     expect(out).toContain("http://app.example/me/budget/request");
@@ -110,7 +123,10 @@ describe("renderBudgetExceeded", () => {
   });
 
   it("omits the request block when no URL is known at all", () => {
-    const out = renderBudgetExceeded({ ...baseEvent, request_increase_url: "" });
+    const out = renderBudgetExceeded({
+      ...baseEvent,
+      request_increase_url: "",
+    });
     expect(out).not.toContain("Need urgent access?");
   });
 
@@ -137,13 +153,14 @@ describe("renderBudgetExceeded", () => {
       expect(out).toContain(label);
     });
 
-    it.each(["day", "minute", "total"])(
-      "regression: period=%j must not produce naive ${period}ly gibberish",
-      (period) => {
-        const out = renderBudgetExceeded({ ...baseEvent, period });
-        expect(out).not.toContain(`${period}ly budget`);
-      },
-    );
+    it.each([
+      "day",
+      "minute",
+      "total",
+    ])("regression: period=%j must not produce naive ${period}ly gibberish", (period) => {
+      const out = renderBudgetExceeded({ ...baseEvent, period });
+      expect(out).not.toContain(`${period}ly budget`);
+    });
 
     it("falls back to raw period for unknown values (graceful)", () => {
       const out = renderBudgetExceeded({ ...baseEvent, period: "rolling_24h" });
@@ -153,7 +170,7 @@ describe("renderBudgetExceeded", () => {
 
   it("contains no ANSI escape sequences (pipe-safe)", () => {
     const out = renderBudgetExceeded(baseEvent);
-    // eslint-disable-next-line no-control-regex
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping ANSI escape codes from chalk output is the whole point of the regex
     expect(out).not.toMatch(/\[/);
   });
 });

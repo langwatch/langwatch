@@ -1,8 +1,8 @@
 import type fs from "fs";
 import * as yaml from "js-yaml";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { PromptsConfig, PromptsLock, SyncResult } from "../../types";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PromptsApiService } from "@/client-sdk/services/prompts";
+import type { PromptsConfig, PromptsLock, SyncResult } from "../../types";
 
 const { mockWriteFileSync } = vi.hoisted(() => ({
   mockWriteFileSync: vi.fn(),
@@ -30,8 +30,8 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { pushPrompts } from "../push";
 import { FileManager } from "../../utils/fileManager";
+import { pushPrompts } from "../push";
 
 describe("pushPrompts", () => {
   let mockSync: ReturnType<typeof vi.fn>;
@@ -153,7 +153,7 @@ describe("pushPrompts", () => {
 
       const syncCall = mockSync.mock.calls[0]![0];
       expect(syncCall.configData.outputs[0].identifier).toBe(
-        "custom_output_name"
+        "custom_output_name",
       );
     });
 
@@ -204,9 +204,7 @@ describe("pushPrompts", () => {
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
         model: "openai/gpt-4o",
         modelParameters: { temperature: 0.7 },
-        messages: [
-          { role: "system", content: "You are a helpful assistant." },
-        ],
+        messages: [{ role: "system", content: "You are a helpful assistant." }],
       } as any);
 
       mockSync.mockResolvedValue({

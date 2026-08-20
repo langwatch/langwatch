@@ -15,9 +15,10 @@
  *    boot path drags its whole transitive graph into every invocation, and no
  *    test fails. The graph guard below pins the set so it fails loudly.
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { readFileSync, existsSync } from "node:fs";
+
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Append-only across the whole file — never cleared. It records when the
@@ -123,7 +124,11 @@ const resolveImport = (spec: string, importer: string): string | null => {
   else return null; // bare package or node builtin — not traversed
 
   if (base.endsWith(".js")) base = base.slice(0, -3);
-  for (const candidate of [`${base}.ts`, `${base}.tsx`, join(base, "index.ts")]) {
+  for (const candidate of [
+    `${base}.ts`,
+    `${base}.tsx`,
+    join(base, "index.ts"),
+  ]) {
     if (existsSync(candidate)) return candidate;
   }
   return null;
@@ -136,7 +141,8 @@ const resolveImport = (spec: string, importer: string): string | null => {
  * from running past a side-effect import (`import "./compileCache";`) and
  * stealing the next statement's specifier.
  */
-const STATIC_IMPORT = /^import\s+(?!type\s)(?:[^;]*?\sfrom\s+)?["']([^"']+)["']/gm;
+const STATIC_IMPORT =
+  /^import\s+(?!type\s)(?:[^;]*?\sfrom\s+)?["']([^"']+)["']/gm;
 
 const collectBootGraph = (): { local: string[]; bare: string[] } => {
   const local = new Set<string>();
@@ -229,7 +235,9 @@ describe("the CLI boot module graph", () => {
 
       for (const module of heavy) {
         expect(
-          graph.some((entry) => entry === module || entry.startsWith(`${module}/`)),
+          graph.some(
+            (entry) => entry === module || entry.startsWith(`${module}/`),
+          ),
           `"${module}" is now statically imported on the CLI boot path. ${WHY}`,
         ).toBe(false);
       }

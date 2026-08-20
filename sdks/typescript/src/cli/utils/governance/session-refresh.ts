@@ -16,9 +16,9 @@
  * whatever the winner persisted.
  */
 
-import * as deviceFlow from "./device-flow";
 import type { GovernanceConfig } from "./config";
 import { loadConfig, saveConfig } from "./config";
+import * as deviceFlow from "./device-flow";
 
 /**
  * Treat an access token as spent this many seconds before its stated

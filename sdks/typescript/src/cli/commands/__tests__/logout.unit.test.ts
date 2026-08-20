@@ -11,7 +11,10 @@ import * as path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { appSettingsTargetFor, installAppEnv } from "@/cli/utils/governance/app-settings";
+import {
+  appSettingsTargetFor,
+  installAppEnv,
+} from "@/cli/utils/governance/app-settings";
 import {
   buildScopedToolFunction,
   persistBlockToRc,

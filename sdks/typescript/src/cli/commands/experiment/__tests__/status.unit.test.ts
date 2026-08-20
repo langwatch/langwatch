@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as ExperimentsApiModule from "@/client-sdk/services/experiments/experiments-api.service";
 
 const oraMocks = vi.hoisted(() => ({
@@ -6,16 +6,23 @@ const oraMocks = vi.hoisted(() => ({
   succeed: vi.fn(),
 }));
 
-vi.mock("@/client-sdk/services/experiments/experiments-api.service", async (importOriginal) => {
-  const actual = await importOriginal<typeof ExperimentsApiModule>();
-  return {
-    ...actual,
-    ExperimentsApiService: vi.fn(),
-  };
-});
+vi.mock(
+  "@/client-sdk/services/experiments/experiments-api.service",
+  async (importOriginal) => {
+    const actual = await importOriginal<typeof ExperimentsApiModule>();
+    return {
+      ...actual,
+      ExperimentsApiService: vi.fn(),
+    };
+  },
+);
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -54,12 +61,14 @@ describe("experimentStatusCommand()", () => {
     mockListRuns = vi.fn().mockResolvedValue({
       runs: [{ runId: "latest_run" }, { runId: "older_run" }],
     });
-    vi.mocked(ExperimentsApiService).mockImplementation(function () { return ({
-      startRun: vi.fn(),
-      getRunStatus: mockGetRunStatus,
-      getRunResults: mockGetRunResults,
-      listRuns: mockListRuns,
-    }) as unknown as ExperimentsApiService; });
+    vi.mocked(ExperimentsApiService).mockImplementation(function () {
+      return {
+        startRun: vi.fn(),
+        getRunStatus: mockGetRunStatus,
+        getRunResults: mockGetRunResults,
+        listRuns: mockListRuns,
+      } as unknown as ExperimentsApiService;
+    });
     logSpy = vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     vi.spyOn(process, "exit").mockImplementation((code) => {
@@ -86,7 +95,9 @@ describe("experimentStatusCommand()", () => {
       });
       expect(mockGetRunStatus).toHaveBeenCalledWith("latest_run");
       result?.table();
-      const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+      const printed = logSpy.mock.calls
+        .map((c: unknown[]) => String(c[0]))
+        .join("\n");
       expect(printed).toContain("3/3 cells");
     });
 
@@ -121,15 +132,24 @@ describe("experimentStatusCommand()", () => {
         progress: 5,
         total: 5,
         dataset: [1, 2, 3, 4, 5],
-        timestamps: { createdAt: 1, updatedAt: 2, finishedAt: 3, stoppedAt: null },
+        timestamps: {
+          createdAt: 1,
+          updatedAt: 2,
+          finishedAt: 3,
+          stoppedAt: null,
+        },
       });
-      const result = await experimentStatusCommand("doc-qa", { runId: "sdk_run" });
+      const result = await experimentStatusCommand("doc-qa", {
+        runId: "sdk_run",
+      });
       expect(mockGetRunResults).toHaveBeenCalledWith({
         runId: "sdk_run",
         experimentSlug: "doc-qa",
       });
       result?.table();
-      const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+      const printed = logSpy.mock.calls
+        .map((c: unknown[]) => String(c[0]))
+        .join("\n");
       expect(printed).toContain("5/5 cells");
     });
 
@@ -139,7 +159,12 @@ describe("experimentStatusCommand()", () => {
         progress: 5,
         total: 5,
         dataset: [1, 2, 3, 4, 5],
-        timestamps: { createdAt: 1, updatedAt: 2, finishedAt: 3, stoppedAt: null },
+        timestamps: {
+          createdAt: 1,
+          updatedAt: 2,
+          finishedAt: 3,
+          stoppedAt: null,
+        },
       });
       const result = await experimentStatusCommand("doc-qa", {
         runId: "sdk_run",

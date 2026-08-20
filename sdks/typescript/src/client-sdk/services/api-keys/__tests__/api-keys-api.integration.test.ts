@@ -1,18 +1,16 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeAll,
-  beforeEach,
-  afterAll,
-  afterEach,
-} from "vitest";
-import { http, HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import {
-  ApiKeysApiService,
-} from "../api-keys-api.service";
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 import { LangWatchHandledError } from "@/internal/api/errors";
+import { ApiKeysApiService } from "../api-keys-api.service";
 
 const TEST_ENDPOINT = "http://localhost:5560";
 
@@ -66,7 +64,11 @@ describe("ApiKeysApiService", () => {
             return HttpResponse.json({
               data: [
                 apiKeyFixture({ id: "k1", name: "Key 1" }),
-                apiKeyFixture({ id: "k2", name: "Key 2", revokedAt: "2025-03-01T00:00:00Z" }),
+                apiKeyFixture({
+                  id: "k2",
+                  name: "Key 2",
+                  revokedAt: "2025-03-01T00:00:00Z",
+                }),
               ],
             });
           }),
@@ -158,7 +160,11 @@ describe("ApiKeysApiService", () => {
             return HttpResponse.json(
               {
                 token: "sk-lw-scoped_key",
-                apiKey: { id: "key_s", name: "Scoped", createdAt: "2025-06-01T00:00:00Z" },
+                apiKey: {
+                  id: "key_s",
+                  name: "Scoped",
+                  createdAt: "2025-06-01T00:00:00Z",
+                },
               },
               { status: 201 },
             );
@@ -224,7 +230,9 @@ describe("ApiKeysApiService", () => {
       });
 
       it("throws LangWatchHandledError", async () => {
-        await expect(service.revoke("nonexistent")).rejects.toThrow(LangWatchHandledError);
+        await expect(service.revoke("nonexistent")).rejects.toThrow(
+          LangWatchHandledError,
+        );
       });
     });
 
@@ -241,7 +249,9 @@ describe("ApiKeysApiService", () => {
       });
 
       it("throws LangWatchHandledError", async () => {
-        await expect(service.revoke("key_revoked")).rejects.toThrow(LangWatchHandledError);
+        await expect(service.revoke("key_revoked")).rejects.toThrow(
+          LangWatchHandledError,
+        );
       });
     });
   });

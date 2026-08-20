@@ -9,6 +9,7 @@ import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   applyUninstall,
+  type BundledSkill,
   findSkill,
   installSkill,
   isManagedContent,
@@ -19,7 +20,6 @@ import {
   resolveSkillsRoot,
   skillFilePath,
   updateSkill,
-  type BundledSkill,
 } from "../installer";
 
 const skill = (slug: string): BundledSkill => {
@@ -67,14 +67,15 @@ describe("the skills installer, given a temp install root", () => {
   it("installs a feature skill to skills/<slug> and a recipe to skills/recipes/<slug>", () => {
     const tracing = installSkill({ skill: skill("tracing"), root });
     expect(tracing.action).toBe("created");
-    expect(tracing.path).toBe(
-      path.join(root, "skills", "tracing", "SKILL.md"),
-    );
+    expect(tracing.path).toBe(path.join(root, "skills", "tracing", "SKILL.md"));
     expect(fs.readFileSync(tracing.path, "utf8")).toBe(
       renderSkillFile(skill("tracing")),
     );
 
-    const recipe = installSkill({ skill: skill("debug-instrumentation"), root });
+    const recipe = installSkill({
+      skill: skill("debug-instrumentation"),
+      root,
+    });
     expect(recipe.path).toBe(
       path.join(root, "skills", "recipes", "debug-instrumentation", "SKILL.md"),
     );
@@ -86,14 +87,20 @@ describe("the skills installer, given a temp install root", () => {
   });
 
   it("writes nothing in dry-run mode but reports the would-be action", () => {
-    const result = installSkill({ skill: skill("tracing"), root, dryRun: true });
+    const result = installSkill({
+      skill: skill("tracing"),
+      root,
+      dryRun: true,
+    });
     expect(result.action).toBe("created");
     expect(fs.existsSync(result.path)).toBe(false);
   });
 
   it("reports an identical reinstall as unchanged", () => {
     installSkill({ skill: skill("tracing"), root });
-    expect(installSkill({ skill: skill("tracing"), root }).action).toBe("unchanged");
+    expect(installSkill({ skill: skill("tracing"), root }).action).toBe(
+      "unchanged",
+    );
   });
 
   it("refuses to overwrite a differing file without --force, overwrites with it", () => {
@@ -137,7 +144,11 @@ describe("the skills installer, given a temp install root", () => {
       planUninstall({ skill: skill("prompts"), root }),
       planUninstall({ skill: skill("scenarios"), root }), // never installed
     ];
-    expect(plan.map((p) => p.action)).toEqual(["removed", "skipped", "skipped"]);
+    expect(plan.map((p) => p.action)).toEqual([
+      "removed",
+      "skipped",
+      "skipped",
+    ]);
     expect(plan[2]!.reason).toBe("not installed");
 
     applyUninstall({ results: plan, dryRun: true });
@@ -152,13 +163,19 @@ describe("the skills installer, given a temp install root", () => {
     const { path: managed } = installSkill({ skill: skill("tracing"), root });
     editBody(managed);
 
-    expect(planUninstall({ skill: skill("tracing"), root }).action).toBe("skipped");
-    expect(planUninstall({ skill: skill("tracing"), root, yes: true }).action).toBe("removed");
+    expect(planUninstall({ skill: skill("tracing"), root }).action).toBe(
+      "skipped",
+    );
+    expect(
+      planUninstall({ skill: skill("tracing"), root, yes: true }).action,
+    ).toBe("removed");
   });
 
   it("updates only managed files whose content drifted from the bundle", () => {
     const { path: managed } = installSkill({ skill: skill("tracing"), root });
-    expect(updateSkill({ skill: skill("tracing"), root }).action).toBe("unchanged");
+    expect(updateSkill({ skill: skill("tracing"), root }).action).toBe(
+      "unchanged",
+    );
 
     // Simulate an older bundle install: managed marker, stale content.
     fs.writeFileSync(
@@ -180,7 +197,9 @@ describe("the skills installer, given a temp install root", () => {
     const foreign = skillFilePath({ root, skill: skill("prompts") });
     fs.mkdirSync(path.dirname(foreign), { recursive: true });
     fs.writeFileSync(foreign, "# not ours\n", "utf8");
-    expect(updateSkill({ skill: skill("prompts"), root }).action).toBe("skipped");
+    expect(updateSkill({ skill: skill("prompts"), root }).action).toBe(
+      "skipped",
+    );
     expect(fs.readFileSync(foreign, "utf8")).toBe("# not ours\n");
   });
 
@@ -275,12 +294,12 @@ describe("the skills installer, given a temp install root", () => {
       const { path: managed } = installSkill({ skill: skill("tracing"), root });
       fs.appendFileSync(managed, "\nuser notes\n", "utf8");
 
-      expect(planUninstall({ skill: skill("tracing"), root, yes: true }).action).toBe(
-        "skipped",
-      );
-      expect(updateSkill({ skill: skill("tracing"), root, force: true }).action).toBe(
-        "skipped",
-      );
+      expect(
+        planUninstall({ skill: skill("tracing"), root, yes: true }).action,
+      ).toBe("skipped");
+      expect(
+        updateSkill({ skill: skill("tracing"), root, force: true }).action,
+      ).toBe("skipped");
       expect(fs.readFileSync(managed, "utf8")).toContain("user notes");
     });
 
@@ -288,9 +307,9 @@ describe("the skills installer, given a temp install root", () => {
       const { path: managed } = installSkill({ skill: skill("tracing"), root });
       fs.appendFileSync(managed, "\n\n", "utf8");
 
-      expect(planUninstall({ skill: skill("tracing"), root, yes: true }).action).toBe(
-        "removed",
-      );
+      expect(
+        planUninstall({ skill: skill("tracing"), root, yes: true }).action,
+      ).toBe("removed");
     });
   });
 
@@ -303,7 +322,11 @@ describe("the skills installer, given a temp install root", () => {
       fs.mkdirSync(path.dirname(target), { recursive: true });
       fs.symlinkSync(outside, target);
 
-      const result = installSkill({ skill: skill("tracing"), root, force: true });
+      const result = installSkill({
+        skill: skill("tracing"),
+        root,
+        force: true,
+      });
       expect(result.action).toBe("skipped");
       expect(result.failed).toBe(true);
       expect(result.reason).toContain("symbolic link");
@@ -463,10 +486,14 @@ describe("the skills installer, given a temp install root", () => {
         ...skill("tracing"),
         slug: "../../../etc/evil",
       };
-      expect(() => skillFilePath({ root, skill: traversal })).toThrow(/single path segment/);
+      expect(() => skillFilePath({ root, skill: traversal })).toThrow(
+        /single path segment/,
+      );
 
       const nested: BundledSkill = { ...skill("tracing"), slug: "a/b" };
-      expect(() => skillFilePath({ root, skill: nested })).toThrow(/single path segment/);
+      expect(() => skillFilePath({ root, skill: nested })).toThrow(
+        /single path segment/,
+      );
     });
   });
 });

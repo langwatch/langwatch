@@ -1,11 +1,15 @@
-export { PromptsFacade, type GetPromptOptions } from "./prompts.facade";
-export { PromptsApiService } from "./prompts-api.service";
-export { type ConfigData, type SyncAction, type AssignTagResult } from "./prompts-api.service";
-export { PromptsError, PromptsApiError } from "./errors";
+export { PromptsApiError, PromptsError } from "./errors";
 export {
   CompiledPrompt,
   Prompt,
   PromptCompilationError,
   type TemplateVariables,
 } from "./prompt";
+export { type GetPromptOptions, PromptsFacade } from "./prompts.facade";
+export {
+  type AssignTagResult,
+  type ConfigData,
+  PromptsApiService,
+  type SyncAction,
+} from "./prompts-api.service";
 export { FetchPolicy } from "./types";

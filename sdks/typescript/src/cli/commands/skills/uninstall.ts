@@ -68,7 +68,12 @@ export const skillsUninstallCommand = async (
   const failures = applied.filter((result) => result.failed);
 
   await printResult(
-    { dir: root, bundleVersion: SKILLS_BUNDLE_VERSION, dryRun, results: applied },
+    {
+      dir: root,
+      bundleVersion: SKILLS_BUNDLE_VERSION,
+      dryRun,
+      results: applied,
+    },
     {
       ...options,
       table: () => {
@@ -76,7 +81,8 @@ export const skillsUninstallCommand = async (
         // rendering it again would say the same thing twice. A file the
         // filesystem then refused is news, though, so those are always shown.
         if (!confirmed) renderSkillFileResults({ results: applied, dryRun });
-        else if (failures.length > 0) renderSkillFileResults({ results: failures });
+        else if (failures.length > 0)
+          renderSkillFileResults({ results: failures });
       },
     },
   );

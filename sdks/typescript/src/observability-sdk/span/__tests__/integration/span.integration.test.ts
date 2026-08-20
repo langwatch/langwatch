@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { SpanStatusCode, trace } from "@opentelemetry/api";
 import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as semconv from "../../../semconv";
 import type { setupObservability } from "../../../setup/node";
+import { createIntegrationObservability } from "../../../setup/node/__tests__/createIntegrationObservability";
 import { getLangWatchTracer } from "../../../tracer";
 import { createLangWatchSpan } from "../..";
-import { createIntegrationObservability } from "../../../setup/node/__tests__/createIntegrationObservability";
-import * as semconv from "../../../semconv";
-import { SpanStatusCode, trace } from "@opentelemetry/api";
 
 /**
  * Integration tests for LangWatch spans with real OpenTelemetry setup.
@@ -618,7 +618,10 @@ describe("Span Integration Tests", () => {
       langwatchSpan.setAttribute("test.phase", "ok-status");
 
       // Update to error status
-      langwatchSpan.setStatus({ code: SpanStatusCode.ERROR, message: "Test error" }); // ERROR
+      langwatchSpan.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: "Test error",
+      }); // ERROR
       langwatchSpan.setAttribute("test.phase", "error-status");
 
       // Back to OK (should be allowed)

@@ -1,9 +1,9 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const createScenarioCommand = async (
   name: string,
@@ -37,7 +37,9 @@ export const createScenarioCommand = async (
       data: scenario,
       table: () => {
         if (scenario.platformUrl) {
-          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(scenario.platformUrl)}`);
+          console.log(
+            `  ${chalk.bold("View:")}  ${chalk.underline(scenario.platformUrl)}`,
+          );
         }
       },
     };

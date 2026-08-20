@@ -19,7 +19,10 @@ const setMemberDisabled = async ({
     action: disabled ? "disable member" : "enable member",
     pending: `${disabled ? "Disabling" : "Enabling"} member "${userId}"...`,
     run: () =>
-      new OrganizationApiService().updateMember({ userId, input: { disabled } }),
+      new OrganizationApiService().updateMember({
+        userId,
+        input: { disabled },
+      }),
     succeed: (member) =>
       `Member "${userId}" is now ${member.disabled ? chalk.yellow("disabled") : chalk.green("active")}`,
     table: (member) => {
@@ -27,7 +30,10 @@ const setMemberDisabled = async ({
         ["User ID", chalk.gray(member.userId)],
         ["Name", orDash(member.user.name)],
         ["Email", orDash(member.user.email)],
-        ["Status", member.disabled ? chalk.yellow("disabled") : chalk.green("active")],
+        [
+          "Status",
+          member.disabled ? chalk.yellow("disabled") : chalk.green("active"),
+        ],
       ]);
     },
   });

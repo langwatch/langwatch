@@ -1,9 +1,9 @@
 import { createOpenApiHttp } from "openapi-msw";
-import { type paths } from "../../../src/internal/generated/openapi/api-client";
+import type { paths } from "../../../src/internal/generated/openapi/api-client";
 import { promptResponseFactory } from "../../factories/prompt.factory";
 
 export const http = createOpenApiHttp<paths>({
-  baseUrl: process.env.LANGWATCH_ENDPOINT
+  baseUrl: process.env.LANGWATCH_ENDPOINT,
 });
 
 export const handles = [

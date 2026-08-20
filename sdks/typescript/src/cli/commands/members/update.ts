@@ -2,7 +2,12 @@ import chalk from "chalk";
 import { OrganizationApiService } from "@/client-sdk/services/organization/organization-api.service";
 import { parseOrganizationRole } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
-import { orDash, printFacts, runManagement, withParsedFlags } from "../management/_shared";
+import {
+  orDash,
+  printFacts,
+  runManagement,
+  withParsedFlags,
+} from "../management/_shared";
 
 /**
  * Change a member's organization role. Disabling and re-enabling are their own
@@ -29,7 +34,10 @@ export const updateMemberCommand = async ({
         ["User ID", chalk.gray(member.userId)],
         ["Name", orDash(member.user.name)],
         ["Organization role", chalk.cyan(member.role)],
-        ["Status", member.disabled ? chalk.yellow("disabled") : chalk.green("active")],
+        [
+          "Status",
+          member.disabled ? chalk.yellow("disabled") : chalk.green("active"),
+        ],
       ]);
       const orphaned = member.teamsLeftWithoutAdmin ?? [];
       if (orphaned.length > 0) {

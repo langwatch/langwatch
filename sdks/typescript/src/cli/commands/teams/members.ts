@@ -129,7 +129,9 @@ export const removeTeamMemberCommand = async ({
     succeed: () => `Removed member "${userId}" from team "${teamId}"`,
     table: () => {
       console.log();
-      console.log(chalk.gray("The member no longer has access through this team."));
+      console.log(
+        chalk.gray("The member no longer has access through this team."),
+      );
       console.log();
     },
   });

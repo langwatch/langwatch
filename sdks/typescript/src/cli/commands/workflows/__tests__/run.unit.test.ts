@@ -9,9 +9,15 @@
  * driving them) to debug the wrong side of the wire, and it is invisible unless
  * the two paths are exercised separately. So they are, here.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../utils/apiKey", () => ({ resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })) }));
+vi.mock("../../../utils/apiKey", () => ({
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
+}));
 
 vi.mock("ora", () => ({
   default: () => ({
@@ -68,7 +74,9 @@ describe("runWorkflowCommand()", () => {
 
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(reportCommandError).toHaveBeenCalledOnce();
-      const { error } = reportCommandError.mock.calls[0]![0] as { error: Error };
+      const { error } = reportCommandError.mock.calls[0]![0] as {
+        error: Error;
+      };
       expect(error.message).toContain("--input must be valid JSON");
     });
   });
@@ -83,7 +91,10 @@ describe("runWorkflowCommand()", () => {
       );
 
       await expect(
-        runWorkflowCommand({ id: "wf_1", options: { input: '{"valid":true}' } }),
+        runWorkflowCommand({
+          id: "wf_1",
+          options: { input: '{"valid":true}' },
+        }),
       ).rejects.toThrow(ProcessExitError);
 
       expect(reportCommandError).not.toHaveBeenCalled();

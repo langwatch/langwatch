@@ -1,17 +1,18 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { setupObservability } from '../../setup';
-import { InMemoryLogRecordExporter, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
-import { getLangWatchLogger } from '../../../../logger';
-import { resetObservabilitySdkConfig } from '../../../../config.js';
+import {
+  InMemoryLogRecordExporter,
+  SimpleLogRecordProcessor,
+} from "@opentelemetry/sdk-logs";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resetObservabilitySdkConfig } from "../../../../config.js";
+import { getLangWatchLogger } from "../../../../logger";
+import { setupObservability } from "../../setup";
 
 // Integration tests for log records functionality in setupObservability
 function createMockLogger() {
   return { error: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn() };
 }
 
-
-
-describe('setupObservability Integration - Log Records Functionality', () => {
+describe("setupObservability Integration - Log Records Functionality", () => {
   let logRecordExporter: InMemoryLogRecordExporter;
   let logRecordProcessor: SimpleLogRecordProcessor;
   let observabilityHandle: ReturnType<typeof setupObservability>;
@@ -23,18 +24,20 @@ describe('setupObservability Integration - Log Records Functionality', () => {
 
     // Create fresh processor and exporter for each test
     logRecordExporter = new InMemoryLogRecordExporter();
-    logRecordProcessor = new SimpleLogRecordProcessor({ exporter: logRecordExporter });
+    logRecordProcessor = new SimpleLogRecordProcessor({
+      exporter: logRecordExporter,
+    });
 
     // Setup observability with real OpenTelemetry SDK
     observabilityHandle = setupObservability({
       serviceName: "log-records-functionality-test",
-      langwatch: 'disabled', // Disable LangWatch to use only custom processors
+      langwatch: "disabled", // Disable LangWatch to use only custom processors
       logRecordProcessors: [logRecordProcessor],
       debug: { logger: createMockLogger() },
       advanced: { throwOnSetupError: true },
       attributes: {
         "test.suite": "log-records-functionality",
-        "test.environment": "vitest"
+        "test.environment": "vitest",
       },
     });
   });
@@ -46,18 +49,18 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     resetObservabilitySdkConfig();
   });
 
-  it('creates log records with correct attributes', async () => {
-    const logRecordLogger = getLangWatchLogger('test-logger');
+  it("creates log records with correct attributes", async () => {
+    const logRecordLogger = getLangWatchLogger("test-logger");
 
     // Create a log record with attributes
     logRecordLogger.emit({
-      severityText: 'INFO',
+      severityText: "INFO",
       severityNumber: 9, // INFO level
-      body: 'Test log message',
+      body: "Test log message",
       attributes: {
-        'log.source': 'test-integration',
-        'log.category': 'test',
-        'user.id': '12345',
+        "log.source": "test-integration",
+        "log.category": "test",
+        "user.id": "12345",
       },
     });
 
@@ -67,29 +70,29 @@ describe('setupObservability Integration - Log Records Functionality', () => {
 
     const record = exportedLogRecords[0];
     if (!record) {
-      throw new Error('No record found');
+      throw new Error("No record found");
     }
     if (!record.attributes) {
-      throw new Error('No attributes found');
+      throw new Error("No attributes found");
     }
-    expect(record.severityText).toBe('INFO');
+    expect(record.severityText).toBe("INFO");
     expect(record.severityNumber).toBe(9);
-    expect(record.body).toBe('Test log message');
-    expect(record.attributes["log.source"]).toBe('test-integration');
-    expect(record.attributes["log.category"]).toBe('test');
-    expect(record.attributes["user.id"]).toBe('12345');
+    expect(record.body).toBe("Test log message");
+    expect(record.attributes["log.source"]).toBe("test-integration");
+    expect(record.attributes["log.category"]).toBe("test");
+    expect(record.attributes["user.id"]).toBe("12345");
   });
 
-  it('handles log records with custom log record processors', async () => {
-    const logRecordLogger = getLangWatchLogger('custom-processor-test');
+  it("handles log records with custom log record processors", async () => {
+    const logRecordLogger = getLangWatchLogger("custom-processor-test");
 
     const logRecord = {
-      severityText: 'INFO',
+      severityText: "INFO",
       severityNumber: 9,
-      body: 'Custom processor test message',
+      body: "Custom processor test message",
       attributes: {
-        'custom.processor': true,
-        'test.feature': 'custom-processors',
+        "custom.processor": true,
+        "test.feature": "custom-processors",
       },
     };
 
@@ -101,26 +104,26 @@ describe('setupObservability Integration - Log Records Functionality', () => {
 
     const record = exportedLogRecords[0];
     if (!record) {
-      throw new Error('No record found');
+      throw new Error("No record found");
     }
-    expect(record.severityText).toBe('INFO');
+    expect(record.severityText).toBe("INFO");
     expect(record.severityNumber).toBe(9);
-    expect(record.body).toBe('Custom processor test message');
-    expect(record.attributes?.['custom.processor']).toBe(true);
-    expect(record.attributes?.['test.feature']).toBe('custom-processors');
+    expect(record.body).toBe("Custom processor test message");
+    expect(record.attributes?.["custom.processor"]).toBe(true);
+    expect(record.attributes?.["test.feature"]).toBe("custom-processors");
   });
 
-  it('handles different log severity levels', async () => {
-    const logRecordLogger = getLangWatchLogger('severity-test');
+  it("handles different log severity levels", async () => {
+    const logRecordLogger = getLangWatchLogger("severity-test");
 
     // Test different severity levels
     const severityLevels = [
-      { text: 'TRACE', number: 1 },
-      { text: 'DEBUG', number: 5 },
-      { text: 'INFO', number: 9 },
-      { text: 'WARN', number: 13 },
-      { text: 'ERROR', number: 17 },
-      { text: 'FATAL', number: 21 },
+      { text: "TRACE", number: 1 },
+      { text: "DEBUG", number: 5 },
+      { text: "INFO", number: 9 },
+      { text: "WARN", number: 13 },
+      { text: "ERROR", number: 17 },
+      { text: "FATAL", number: 21 },
     ];
 
     for (const level of severityLevels) {
@@ -129,8 +132,8 @@ describe('setupObservability Integration - Log Records Functionality', () => {
         severityNumber: level.number,
         body: `Test ${level.text} message`,
         attributes: {
-          'log.level': level.text,
-          'test.severity': level.number,
+          "log.level": level.text,
+          "test.severity": level.number,
         },
       });
     }
@@ -142,36 +145,38 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     for (let i = 0; i < severityLevels.length; i++) {
       const record = exportedLogRecords[i];
       if (!record) {
-        throw new Error('No record found');
+        throw new Error("No record found");
       }
       if (!record.attributes) {
-        throw new Error('No attributes found');
+        throw new Error("No attributes found");
       }
       expect(record).toBeDefined();
       expect(record.severityText).toBe(severityLevels[i]?.text);
       expect(record.severityNumber).toBe(severityLevels[i]?.number);
       expect(record.body).toBe(`Test ${severityLevels[i]?.text} message`);
       expect(record.attributes["log.level"]).toBe(severityLevels[i]?.text);
-      expect(record.attributes["test.severity"]).toBe(severityLevels[i]?.number);
+      expect(record.attributes["test.severity"]).toBe(
+        severityLevels[i]?.number,
+      );
     }
   });
 
-  it('handles log records with complex attributes', async () => {
-    const logRecordLogger = getLangWatchLogger('complex-attributes');
+  it("handles log records with complex attributes", async () => {
+    const logRecordLogger = getLangWatchLogger("complex-attributes");
 
     // Create a log record with complex attributes
     logRecordLogger.emit({
-      severityText: 'INFO',
+      severityText: "INFO",
       severityNumber: 9,
-      body: 'Complex attribute test',
+      body: "Complex attribute test",
       attributes: {
-        'string.attr': 'string value',
-        'number.attr': 42,
-        'boolean.attr': true,
-        'array.attr': ['item1', 'item2', 'item3'],
-        'object.attr': { key1: 'value1', key2: 'value2' },
-        'null.attr': undefined,
-        'undefined.attr': undefined,
+        "string.attr": "string value",
+        "number.attr": 42,
+        "boolean.attr": true,
+        "array.attr": ["item1", "item2", "item3"],
+        "object.attr": { key1: "value1", key2: "value2" },
+        "null.attr": undefined,
+        "undefined.attr": undefined,
       },
     });
 
@@ -181,83 +186,99 @@ describe('setupObservability Integration - Log Records Functionality', () => {
 
     const record = exportedLogRecords[0];
     if (!record) {
-      throw new Error('No record found');
+      throw new Error("No record found");
     }
-    expect(record.severityText).toBe('INFO');
+    expect(record.severityText).toBe("INFO");
     expect(record.severityNumber).toBe(9);
-    expect(record.body).toBe('Complex attribute test');
+    expect(record.body).toBe("Complex attribute test");
 
     if (!record.attributes) {
-      throw new Error('No attributes found');
+      throw new Error("No attributes found");
     }
-    expect(record.attributes["string.attr"]).toBe('string value');
+    expect(record.attributes["string.attr"]).toBe("string value");
     expect(record.attributes["number.attr"]).toBe(42);
     expect(record.attributes["boolean.attr"]).toBe(true);
-    expect(record.attributes["array.attr"]).toEqual(['item1', 'item2', 'item3']);
-    expect(record.attributes["object.attr"]).toEqual({ key1: 'value1', key2: 'value2' });
+    expect(record.attributes["array.attr"]).toEqual([
+      "item1",
+      "item2",
+      "item3",
+    ]);
+    expect(record.attributes["object.attr"]).toEqual({
+      key1: "value1",
+      key2: "value2",
+    });
     expect(record.attributes["null.attr"]).toBeUndefined();
     expect(record.attributes["undefined.attr"]).toBeUndefined();
   });
 
-  it('handles log records with timestamps', () => {
+  it("handles log records with timestamps", () => {
     const logger = createMockLogger();
-    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
+    setupObservability({
+      langwatch: { apiKey: "test-key" },
+      debug: { logger },
+    });
 
-    const logRecordLogger = getLangWatchLogger('timestamp-test');
+    const logRecordLogger = getLangWatchLogger("timestamp-test");
 
     const now = Date.now();
     const timestamp = new Date(now);
 
     logRecordLogger.emit({
-      severityText: 'INFO',
+      severityText: "INFO",
       severityNumber: 9,
-      body: 'Timestamp test message',
+      body: "Timestamp test message",
       timestamp: timestamp,
       attributes: {
-        'log.timestamp': now,
-        'log.timestamp.iso': timestamp.toISOString(),
+        "log.timestamp": now,
+        "log.timestamp.iso": timestamp.toISOString(),
       },
     });
 
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('handles log records with trace context', () => {
+  it("handles log records with trace context", () => {
     const logger = createMockLogger();
-    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
+    setupObservability({
+      langwatch: { apiKey: "test-key" },
+      debug: { logger },
+    });
 
-    const logRecordLogger = getLangWatchLogger('trace-context-test');
+    const logRecordLogger = getLangWatchLogger("trace-context-test");
 
     // Create a log record that could be associated with a trace
     logRecordLogger.emit({
-      severityText: 'INFO',
+      severityText: "INFO",
       severityNumber: 9,
-      body: 'Trace context test message',
+      body: "Trace context test message",
       attributes: {
-        'trace.id': 'test-trace-id',
-        'span.id': 'test-span-id',
-        'operation.name': 'test-operation',
+        "trace.id": "test-trace-id",
+        "span.id": "test-span-id",
+        "operation.name": "test-operation",
       },
     });
 
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('handles multiple log records from same logger', () => {
+  it("handles multiple log records from same logger", () => {
     const logger = createMockLogger();
-    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
+    setupObservability({
+      langwatch: { apiKey: "test-key" },
+      debug: { logger },
+    });
 
-    const logRecordLogger = getLangWatchLogger('multiple-logs');
+    const logRecordLogger = getLangWatchLogger("multiple-logs");
 
     // Emit multiple log records
     for (let i = 0; i < 5; i++) {
       logRecordLogger.emit({
-        severityText: 'INFO',
+        severityText: "INFO",
         severityNumber: 9,
         body: `Log message ${i + 1}`,
         attributes: {
-          'log.sequence': i,
-          'log.batch': 'multiple-test',
+          "log.sequence": i,
+          "log.batch": "multiple-test",
         },
       });
     }
@@ -265,35 +286,38 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('handles log records with different loggers', () => {
+  it("handles log records with different loggers", () => {
     const logger = createMockLogger();
-    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
+    setupObservability({
+      langwatch: { apiKey: "test-key" },
+      debug: { logger },
+    });
 
     // Create multiple loggers
-    const logger1 = getLangWatchLogger('logger-1');
-    const logger2 = getLangWatchLogger('logger-2');
-    const logger3 = getLangWatchLogger('logger-3');
+    const logger1 = getLangWatchLogger("logger-1");
+    const logger2 = getLangWatchLogger("logger-2");
+    const logger3 = getLangWatchLogger("logger-3");
 
     // Emit logs from different loggers
     logger1.emit({
-      severityText: 'INFO',
+      severityText: "INFO",
       severityNumber: 9,
-      body: 'Message from logger 1',
-      attributes: { 'logger.name': 'logger-1' },
+      body: "Message from logger 1",
+      attributes: { "logger.name": "logger-1" },
     });
 
     logger2.emit({
-      severityText: 'WARN',
+      severityText: "WARN",
       severityNumber: 13,
-      body: 'Message from logger 2',
-      attributes: { 'logger.name': 'logger-2' },
+      body: "Message from logger 2",
+      attributes: { "logger.name": "logger-2" },
     });
 
     logger3.emit({
-      severityText: 'ERROR',
+      severityText: "ERROR",
       severityNumber: 17,
-      body: 'Message from logger 3',
-      attributes: { 'logger.name': 'logger-3' },
+      body: "Message from logger 3",
+      attributes: { "logger.name": "logger-3" },
     });
 
     expect(logger1).toBeDefined();
@@ -301,178 +325,196 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(logger3).toBeDefined();
   });
 
-  it('handles log records with console logging enabled', () => {
+  it("handles log records with console logging enabled", () => {
     const logger = createMockLogger();
     setupObservability({
-      langwatch: { apiKey: 'test-key' },
+      langwatch: { apiKey: "test-key" },
       debug: { logger, consoleLogging: true },
     });
 
-    const logRecordLogger = getLangWatchLogger('console-logging-test');
+    const logRecordLogger = getLangWatchLogger("console-logging-test");
 
     logRecordLogger.emit({
-      severityText: 'INFO',
+      severityText: "INFO",
       severityNumber: 9,
-      body: 'Console logging test message',
+      body: "Console logging test message",
       attributes: {
-        'console.logging': true,
-        'test.feature': 'console-logging',
+        "console.logging": true,
+        "test.feature": "console-logging",
       },
     });
 
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('handles log records with error conditions', () => {
+  it("handles log records with error conditions", () => {
     const logger = createMockLogger();
-    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
+    setupObservability({
+      langwatch: { apiKey: "test-key" },
+      debug: { logger },
+    });
 
-    const logRecordLogger = getLangWatchLogger("error-test")
+    const logRecordLogger = getLangWatchLogger("error-test");
 
     // Test error log records
     logRecordLogger.emit({
-      severityText: 'ERROR',
+      severityText: "ERROR",
       severityNumber: 17,
-      body: 'Error test message',
+      body: "Error test message",
       attributes: {
-        'error.type': 'TestError',
-        'error.message': 'This is a test error',
-        'error.stack': 'Error: Test error\n    at test.js:1:1',
+        "error.type": "TestError",
+        "error.message": "This is a test error",
+        "error.stack": "Error: Test error\n    at test.js:1:1",
       },
     });
 
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('handles log records with performance metrics', () => {
+  it("handles log records with performance metrics", () => {
     const logger = createMockLogger();
-    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
+    setupObservability({
+      langwatch: { apiKey: "test-key" },
+      debug: { logger },
+    });
 
-    const logRecordLogger = getLangWatchLogger('performance-test');
+    const logRecordLogger = getLangWatchLogger("performance-test");
 
     const startTime = Date.now();
 
     logRecordLogger.emit({
-      severityText: 'INFO',
+      severityText: "INFO",
       severityNumber: 9,
-      body: 'Performance test message',
+      body: "Performance test message",
       attributes: {
-        'performance.duration': 150,
-        'performance.operation': 'test-operation',
-        'performance.start_time': startTime,
-        'performance.end_time': startTime + 150,
+        "performance.duration": 150,
+        "performance.operation": "test-operation",
+        "performance.start_time": startTime,
+        "performance.end_time": startTime + 150,
       },
     });
 
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('handles log records with business context', () => {
+  it("handles log records with business context", () => {
     const logger = createMockLogger();
-    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
+    setupObservability({
+      langwatch: { apiKey: "test-key" },
+      debug: { logger },
+    });
 
-    const logRecordLogger = getLangWatchLogger('business-context-test');
+    const logRecordLogger = getLangWatchLogger("business-context-test");
 
     logRecordLogger.emit({
-      severityText: 'INFO',
+      severityText: "INFO",
       severityNumber: 9,
-      body: 'Business context test message',
+      body: "Business context test message",
       attributes: {
-        'business.user_id': 'user-12345',
-        'business.tenant_id': 'tenant-67890',
-        'business.operation': 'user_login',
-        'business.feature': 'authentication',
-        'business.environment': 'production',
+        "business.user_id": "user-12345",
+        "business.tenant_id": "tenant-67890",
+        "business.operation": "user_login",
+        "business.feature": "authentication",
+        "business.environment": "production",
       },
     });
 
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('handles log records with security context', () => {
+  it("handles log records with security context", () => {
     const logger = createMockLogger();
-    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
+    setupObservability({
+      langwatch: { apiKey: "test-key" },
+      debug: { logger },
+    });
 
-    const logRecordLogger = getLangWatchLogger('security-test');
+    const logRecordLogger = getLangWatchLogger("security-test");
 
     logRecordLogger.emit({
-      severityText: 'WARN',
+      severityText: "WARN",
       severityNumber: 13,
-      body: 'Security test message',
+      body: "Security test message",
       attributes: {
-        'security.event_type': 'authentication_failure',
-        'security.user_ip': '192.168.1.100',
-        'security.user_agent': 'Mozilla/5.0...',
-        'security.risk_level': 'medium',
+        "security.event_type": "authentication_failure",
+        "security.user_ip": "192.168.1.100",
+        "security.user_agent": "Mozilla/5.0...",
+        "security.risk_level": "medium",
       },
     });
 
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('handles log records with application metrics', () => {
+  it("handles log records with application metrics", () => {
     const logger = createMockLogger();
-    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
+    setupObservability({
+      langwatch: { apiKey: "test-key" },
+      debug: { logger },
+    });
 
-    const logRecordLogger = getLangWatchLogger('metrics-test');
+    const logRecordLogger = getLangWatchLogger("metrics-test");
 
     logRecordLogger.emit({
-      severityText: 'INFO',
+      severityText: "INFO",
       severityNumber: 9,
-      body: 'Application metrics test message',
+      body: "Application metrics test message",
       attributes: {
-        'metrics.cpu_usage': 45.2,
-        'metrics.memory_usage': 67.8,
-        'metrics.response_time': 125,
-        'metrics.request_count': 1000,
-        'metrics.error_rate': 0.02,
+        "metrics.cpu_usage": 45.2,
+        "metrics.memory_usage": 67.8,
+        "metrics.response_time": 125,
+        "metrics.request_count": 1000,
+        "metrics.error_rate": 0.02,
       },
     });
 
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('handles log records with structured data', () => {
+  it("handles log records with structured data", () => {
     const logger = createMockLogger();
-    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
+    setupObservability({
+      langwatch: { apiKey: "test-key" },
+      debug: { logger },
+    });
 
-    const logRecordLogger = getLangWatchLogger('structured-data-test');
+    const logRecordLogger = getLangWatchLogger("structured-data-test");
 
     const structuredData = {
       user: {
-        id: 'user-123',
-        name: 'John Doe',
-        email: 'john@example.com',
+        id: "user-123",
+        name: "John Doe",
+        email: "john@example.com",
         preferences: {
-          theme: 'dark',
-          language: 'en',
+          theme: "dark",
+          language: "en",
         },
       },
       order: {
-        id: 'order-456',
+        id: "order-456",
         items: [
-          { id: 'item-1', name: 'Product A', price: 29.99 },
-          { id: 'item-2', name: 'Product B', price: 19.99 },
+          { id: "item-1", name: "Product A", price: 29.99 },
+          { id: "item-2", name: "Product B", price: 19.99 },
         ],
         total: 49.98,
       },
     };
 
     logRecordLogger.emit({
-      severityText: 'INFO',
+      severityText: "INFO",
       severityNumber: 9,
-      body: 'Structured data test message',
+      body: "Structured data test message",
       attributes: {
-        'structured_data': JSON.stringify(structuredData),
-        'data_type': 'user_order',
-        'data_version': '1.0',
+        structured_data: JSON.stringify(structuredData),
+        data_type: "user_order",
+        data_version: "1.0",
       },
     });
 
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('handles log records with multiple processors', () => {
+  it("handles log records with multiple processors", () => {
     const logger = createMockLogger();
     const processor1 = {
       onEmit: vi.fn(),
@@ -486,20 +528,20 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     };
 
     setupObservability({
-      langwatch: { apiKey: 'test-key' },
+      langwatch: { apiKey: "test-key" },
       debug: { logger },
-      logRecordProcessors: [processor1, processor2]
+      logRecordProcessors: [processor1, processor2],
     });
 
-    const logRecordLogger = getLangWatchLogger('multiple-processors-test');
+    const logRecordLogger = getLangWatchLogger("multiple-processors-test");
 
     logRecordLogger.emit({
-      severityText: 'INFO',
+      severityText: "INFO",
       severityNumber: 9,
-      body: 'Multiple processors test message',
+      body: "Multiple processors test message",
       attributes: {
-        'test.processors': 2,
-        'test.feature': 'multiple-processors',
+        "test.processors": 2,
+        "test.feature": "multiple-processors",
       },
     });
 
@@ -508,21 +550,21 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(processor2).toBeDefined();
   });
 
-  it('handles log records with different log levels and console logging', () => {
+  it("handles log records with different log levels and console logging", () => {
     const logger = createMockLogger();
     setupObservability({
-      langwatch: { apiKey: 'test-key' },
+      langwatch: { apiKey: "test-key" },
       debug: { logger, consoleTracing: true },
     });
 
-    const logRecordLogger = getLangWatchLogger('console-levels-test');
+    const logRecordLogger = getLangWatchLogger("console-levels-test");
 
     // Test different levels with console logging enabled
     const levels = [
-      { text: 'DEBUG', number: 5 },
-      { text: 'INFO', number: 9 },
-      { text: 'WARN', number: 13 },
-      { text: 'ERROR', number: 17 },
+      { text: "DEBUG", number: 5 },
+      { text: "INFO", number: 9 },
+      { text: "WARN", number: 13 },
+      { text: "ERROR", number: 17 },
     ];
 
     for (const level of levels) {
@@ -531,8 +573,8 @@ describe('setupObservability Integration - Log Records Functionality', () => {
         severityNumber: level.number,
         body: `Console ${level.text} test message`,
         attributes: {
-          'console.logging': true,
-          'log.level': level.text,
+          "console.logging": true,
+          "log.level": level.text,
         },
       });
     }
@@ -540,27 +582,27 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('handles log records with resource attributes', () => {
+  it("handles log records with resource attributes", () => {
     const logger = createMockLogger();
     setupObservability({
-      langwatch: { apiKey: 'test-key' },
+      langwatch: { apiKey: "test-key" },
       debug: { logger },
       attributes: {
-        'service.name': 'test-service',
-        'service.version': '1.0.0',
-        'deployment.environment': 'test',
-      }
+        "service.name": "test-service",
+        "service.version": "1.0.0",
+        "deployment.environment": "test",
+      },
     });
 
-    const logRecordLogger = getLangWatchLogger('resource-attributes-test');
+    const logRecordLogger = getLangWatchLogger("resource-attributes-test");
 
     logRecordLogger.emit({
-      severityText: 'INFO',
+      severityText: "INFO",
       severityNumber: 9,
-      body: 'Resource attributes test message',
+      body: "Resource attributes test message",
       attributes: {
-        'custom.attribute': 'test-value',
-        'test.resource': true,
+        "custom.attribute": "test-value",
+        "test.resource": true,
       },
     });
 

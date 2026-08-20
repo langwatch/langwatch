@@ -1,4 +1,4 @@
-import { type ReadableSpan } from "@opentelemetry/sdk-trace-base";
+import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
 
 export interface Criteria {
   instrumentationScopeName?: Match[];
@@ -38,10 +38,13 @@ export type TraceFilter =
  */
 export function applyFilters(
   filters: TraceFilter[] | undefined,
-  spans: ReadableSpan[]
+  spans: ReadableSpan[],
 ): ReadableSpan[] {
   if (!filters || filters.length === 0) return spans;
-  return filters.reduce((current, rule) => applyFilterRule(rule, current), spans);
+  return filters.reduce(
+    (current, rule) => applyFilterRule(rule, current),
+    spans,
+  );
 }
 
 /**
@@ -70,11 +73,15 @@ export function applyFilters(
  * );
  * ```
  */
-export function applyFilterRule(rule: TraceFilter, spans: ReadableSpan[]): ReadableSpan[] {
+export function applyFilterRule(
+  rule: TraceFilter,
+  spans: ReadableSpan[],
+): ReadableSpan[] {
   if ("preset" in rule && rule.preset) {
     return applyPreset(
-      (rule as { preset: TraceFilter extends { preset: infer P } ? P : never }).preset as any,
-      spans
+      (rule as { preset: TraceFilter extends { preset: infer P } ? P : never })
+        .preset as any,
+      spans,
     );
   }
 
@@ -114,10 +121,11 @@ export function applyFilterRule(rule: TraceFilter, spans: ReadableSpan[]): Reada
  */
 export function applyPreset(
   preset: "vercelAIOnly" | "excludeHttpRequests",
-  spans: ReadableSpan[]
+  spans: ReadableSpan[],
 ): ReadableSpan[] {
   if (preset === "vercelAIOnly") return spans.filter((s) => isVercelAiSpan(s));
-  if (preset === "excludeHttpRequests") return spans.filter((s) => !isHttpRequestSpan(s));
+  if (preset === "excludeHttpRequests")
+    return spans.filter((s) => !isHttpRequestSpan(s));
 
   return spans;
 }
@@ -141,10 +149,15 @@ export function applyPreset(
  * // Returns true if scope is 'ai' AND name starts with 'llm.' OR 'chat.'
  * ```
  */
-export function matchesCriteria(span: ReadableSpan, criteria: Criteria): boolean {
+export function matchesCriteria(
+  span: ReadableSpan,
+  criteria: Criteria,
+): boolean {
   if (criteria.instrumentationScopeName !== void 0) {
     const scopeName = span.instrumentationScope?.name ?? "";
-    const ok = criteria.instrumentationScopeName.some((m) => valueMatches(scopeName, m));
+    const ok = criteria.instrumentationScopeName.some((m) =>
+      valueMatches(scopeName, m),
+    );
     if (!ok) return false;
   }
 

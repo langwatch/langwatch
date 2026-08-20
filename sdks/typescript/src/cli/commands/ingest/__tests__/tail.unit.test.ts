@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-
-import { formatEventLine, pickFreshEvents } from "../tail";
 import type { ActivityEventDetailRow } from "@/cli/utils/governance/cli-api";
+import { formatEventLine, pickFreshEvents } from "../tail";
 
 const mkEvent = (
   overrides: Partial<ActivityEventDetailRow>,
@@ -20,14 +19,17 @@ const mkEvent = (
   ...overrides,
 });
 
-// eslint-disable-next-line no-control-regex -- intentional: stripping ANSI escape codes from chalk output
+// biome-ignore lint/suspicious/noControlCharactersInRegex: intentional: stripping ANSI escape codes from chalk output
 const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 describe("pickFreshEvents", () => {
   describe("when next batch contains nothing newer than the cursor", () => {
     it("returns an empty array", () => {
       const next = [
-        mkEvent({ eventId: "a", eventTimestampIso: "2026-04-27T07:00:00.000Z" }),
+        mkEvent({
+          eventId: "a",
+          eventTimestampIso: "2026-04-27T07:00:00.000Z",
+        }),
       ];
       const fresh = pickFreshEvents(next, {
         cursorIso: "2026-04-27T08:00:00.000Z",
@@ -42,22 +44,38 @@ describe("pickFreshEvents", () => {
       // server returns DESC; the helper must reverse so consumers print
       // chronologically.
       const next = [
-        mkEvent({ eventId: "newest", eventTimestampIso: "2026-04-27T08:00:02.000Z" }),
-        mkEvent({ eventId: "middle", eventTimestampIso: "2026-04-27T08:00:01.000Z" }),
-        mkEvent({ eventId: "oldest", eventTimestampIso: "2026-04-27T08:00:00.000Z" }),
+        mkEvent({
+          eventId: "newest",
+          eventTimestampIso: "2026-04-27T08:00:02.000Z",
+        }),
+        mkEvent({
+          eventId: "middle",
+          eventTimestampIso: "2026-04-27T08:00:01.000Z",
+        }),
+        mkEvent({
+          eventId: "oldest",
+          eventTimestampIso: "2026-04-27T08:00:00.000Z",
+        }),
       ];
       const fresh = pickFreshEvents(next, {
         cursorIso: "2026-04-27T07:00:00.000Z",
         seen: new Set(),
       });
-      expect(fresh.map((e) => e.eventId)).toEqual(["oldest", "middle", "newest"]);
+      expect(fresh.map((e) => e.eventId)).toEqual([
+        "oldest",
+        "middle",
+        "newest",
+      ]);
     });
   });
 
   describe("when next batch contains an event AT the cursor boundary not yet seen", () => {
     it("includes it (handles same-timestamp burst)", () => {
       const next = [
-        mkEvent({ eventId: "boundary-new", eventTimestampIso: "2026-04-27T07:00:00.000Z" }),
+        mkEvent({
+          eventId: "boundary-new",
+          eventTimestampIso: "2026-04-27T07:00:00.000Z",
+        }),
       ];
       const fresh = pickFreshEvents(next, {
         cursorIso: "2026-04-27T07:00:00.000Z",
@@ -70,7 +88,10 @@ describe("pickFreshEvents", () => {
   describe("when next batch contains an event AT the cursor boundary already seen", () => {
     it("excludes it (no double-print on poll)", () => {
       const next = [
-        mkEvent({ eventId: "already-seen", eventTimestampIso: "2026-04-27T07:00:00.000Z" }),
+        mkEvent({
+          eventId: "already-seen",
+          eventTimestampIso: "2026-04-27T07:00:00.000Z",
+        }),
       ];
       const fresh = pickFreshEvents(next, {
         cursorIso: "2026-04-27T07:00:00.000Z",
@@ -83,9 +104,18 @@ describe("pickFreshEvents", () => {
   describe("when next batch mixes already-seen + new events at the boundary", () => {
     it("returns only the unseen ones", () => {
       const next = [
-        mkEvent({ eventId: "new-1", eventTimestampIso: "2026-04-27T07:00:00.000Z" }),
-        mkEvent({ eventId: "seen", eventTimestampIso: "2026-04-27T07:00:00.000Z" }),
-        mkEvent({ eventId: "new-2", eventTimestampIso: "2026-04-27T07:00:00.000Z" }),
+        mkEvent({
+          eventId: "new-1",
+          eventTimestampIso: "2026-04-27T07:00:00.000Z",
+        }),
+        mkEvent({
+          eventId: "seen",
+          eventTimestampIso: "2026-04-27T07:00:00.000Z",
+        }),
+        mkEvent({
+          eventId: "new-2",
+          eventTimestampIso: "2026-04-27T07:00:00.000Z",
+        }),
       ];
       const fresh = pickFreshEvents(next, {
         cursorIso: "2026-04-27T07:00:00.000Z",
@@ -111,8 +141,14 @@ describe("pickFreshEvents", () => {
   describe("input immutability", () => {
     it("does not mutate the next array (.reverse() must be on a copy)", () => {
       const original = [
-        mkEvent({ eventId: "a", eventTimestampIso: "2026-04-27T08:00:01.000Z" }),
-        mkEvent({ eventId: "b", eventTimestampIso: "2026-04-27T08:00:00.000Z" }),
+        mkEvent({
+          eventId: "a",
+          eventTimestampIso: "2026-04-27T08:00:01.000Z",
+        }),
+        mkEvent({
+          eventId: "b",
+          eventTimestampIso: "2026-04-27T08:00:00.000Z",
+        }),
       ];
       const snapshot = original.map((e) => e.eventId);
       pickFreshEvents(original, {

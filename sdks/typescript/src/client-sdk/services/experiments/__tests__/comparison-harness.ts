@@ -92,47 +92,51 @@ export const createHarness = () => {
     }),
   };
 
-  globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url =
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.href
-          : input.url;
-    const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
+  globalThis.fetch = vi.fn(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+      const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
 
-    if (url.includes("/api/experiment/init")) {
-      return new Response(
-        JSON.stringify({
-          slug: "comparison-test",
-          path: "/acme/experiments/comparison-test",
-          id: "experiment-id",
-        }),
-        { status: 200 }
-      );
-    }
+      if (url.includes("/api/experiment/init")) {
+        return new Response(
+          JSON.stringify({
+            slug: "comparison-test",
+            path: "/acme/experiments/comparison-test",
+            id: "experiment-id",
+          }),
+          { status: 200 },
+        );
+      }
 
-    if (url.includes("/evaluate")) {
-      requestOrder.push("judge");
-      judgeRequests.push(body as JudgeRequest);
-      const response = harness.respond(body as JudgeRequest);
-      if (harness.gate) await harness.gate;
-      return new Response(JSON.stringify(response), { status: 200 });
-    }
+      if (url.includes("/evaluate")) {
+        requestOrder.push("judge");
+        judgeRequests.push(body as JudgeRequest);
+        const response = harness.respond(body as JudgeRequest);
+        if (harness.gate) await harness.gate;
+        return new Response(JSON.stringify(response), { status: 200 });
+      }
 
-    if (url.includes("log_results")) {
-      requestOrder.push("batch");
-      loggedEvaluations.push(...((body.evaluations ?? []) as LoggedEvaluation[]));
-      loggedDatasetTargets.push(
-        ((body.dataset ?? []) as { target_id?: string | null }[])
-          .map((entry) => entry.target_id)
-          .filter((target): target is string => typeof target === "string")
-      );
+      if (url.includes("log_results")) {
+        requestOrder.push("batch");
+        loggedEvaluations.push(
+          ...((body.evaluations ?? []) as LoggedEvaluation[]),
+        );
+        loggedDatasetTargets.push(
+          ((body.dataset ?? []) as { target_id?: string | null }[])
+            .map((entry) => entry.target_id)
+            .filter((target): target is string => typeof target === "string"),
+        );
+        return new Response(JSON.stringify({}), { status: 200 });
+      }
+
       return new Response(JSON.stringify({}), { status: 200 });
-    }
-
-    return new Response(JSON.stringify({}), { status: 200 });
-  }) as typeof fetch;
+    },
+  ) as typeof fetch;
 
   return harness;
 };
@@ -194,7 +198,7 @@ export const runComparison = async (
   }: {
     outputs?: Record<string, unknown>;
     options?: Omit<Partial<ComparisonOptions>, "index">;
-  } = {}
+  } = {},
 ): Promise<{ verdict?: ComparisonVerdict; error?: unknown }> => {
   let verdict: ComparisonVerdict | undefined;
   let error: unknown;
@@ -202,8 +206,8 @@ export const runComparison = async (
   await experiment.run([{ question: "What is 2 + 2?" }], async ({ index }) => {
     await Promise.all(
       Object.entries(outputs).map(([target, output]) =>
-        experiment.withTarget(target, () => output)
-      )
+        experiment.withTarget(target, () => output),
+      ),
     );
 
     try {
@@ -220,5 +224,5 @@ export const comparisonEvaluations = (harness: {
   loggedEvaluations: LoggedEvaluation[];
 }): LoggedEvaluation[] =>
   harness.loggedEvaluations.filter(
-    (evaluation) => evaluation.evaluator === "langevals/select_best_compare"
+    (evaluation) => evaluation.evaluator === "langevals/select_best_compare",
   );

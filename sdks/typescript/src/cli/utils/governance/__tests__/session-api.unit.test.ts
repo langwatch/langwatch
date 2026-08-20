@@ -15,13 +15,13 @@ vi.mock("../config", () => ({
   saveConfig: (...args: unknown[]) => saveConfig(...args),
 }));
 
+import type { GovernanceConfig } from "../config";
+import { loadConfig } from "../config";
 import {
   fetchPersonalProject,
   fetchProjectKeyBySlug,
   SessionApiError,
 } from "../session-api";
-import { loadConfig } from "../config";
-import type { GovernanceConfig } from "../config";
 
 const liveSession = (): GovernanceConfig =>
   ({
@@ -88,7 +88,12 @@ describe("session-api request bounds", () => {
           });
         }
         return jsonResponse(200, {
-          project: { id: "p_1", slug: "acme", name: "ACME", api_key: "sk-lw-1" },
+          project: {
+            id: "p_1",
+            slug: "acme",
+            name: "ACME",
+            api_key: "sk-lw-1",
+          },
         });
       };
 

@@ -1,14 +1,14 @@
 import {
+  type Context,
   type Span,
   type SpanOptions,
-  type Context,
   SpanStatusCode,
   type TracerProvider,
   trace,
 } from "@opentelemetry/api";
+import { type AddEvaluationParams, emitEvaluationEvent } from "../evaluation";
 import { createLangWatchSpan } from "../span";
-import { type LangWatchTracer } from "./types";
-import { emitEvaluationEvent, type AddEvaluationParams } from "../evaluation";
+import type { LangWatchTracer } from "./types";
 
 /**
  * Get a LangWatch tracer from the global OpenTelemetry tracer provider.
@@ -61,7 +61,6 @@ export function getLangWatchTracer(
     version,
   );
 }
-
 
 /**
  * Get a LangWatch tracer from a specific OpenTelemetry tracer provider.
@@ -141,7 +140,12 @@ export function getLangWatchTracerFromProvider(
               spanArgs.fn(createLangWatchSpan(span), ...cbArgs);
 
             if (spanArgs.context !== void 0)
-              return target.startActiveSpan(spanArgs.name, options, spanArgs.context, wrappedFn);
+              return target.startActiveSpan(
+                spanArgs.name,
+                options,
+                spanArgs.context,
+                wrappedFn,
+              );
 
             return target.startActiveSpan(spanArgs.name, options, wrappedFn);
           };
@@ -198,14 +202,21 @@ export function getLangWatchTracerFromProvider(
 
             // Call target.startActiveSpan to avoid double-wrapping
             if (spanArgs.context !== void 0)
-              return target.startActiveSpan(spanArgs.name, optionsWithOrigin, spanArgs.context, cb);
+              return target.startActiveSpan(
+                spanArgs.name,
+                optionsWithOrigin,
+                spanArgs.context,
+                cb,
+              );
 
             return target.startActiveSpan(spanArgs.name, optionsWithOrigin, cb);
           };
 
         case "startSpan":
           return (name: string, options?: SpanOptions, context?: Context) =>
-            createLangWatchSpan(target.startSpan(name, withDefaultOrigin(options), context));
+            createLangWatchSpan(
+              target.startSpan(name, withDefaultOrigin(options), context),
+            );
 
         case "addEvaluation":
           return (params: AddEvaluationParams) => {
@@ -224,7 +235,6 @@ export function getLangWatchTracerFromProvider(
   };
 
   // See comment above about why.
-  // eslint-disable-next-line prefer-const
   proxyInstance = new Proxy(tracer, handler) as LangWatchTracer;
   return proxyInstance;
 }

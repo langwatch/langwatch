@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { DEFAULT_PROMPT_MODEL } from "../../constants";
-import { responseFormatToOutputs } from "../responseFormat";
-import { PromptConverter } from "../promptConverter";
+import { describe, expect, it } from "vitest";
 import type { PromptResponse } from "@/client-sdk/services/prompts/types";
+import { DEFAULT_PROMPT_MODEL } from "../../constants";
+import { PromptConverter } from "../promptConverter";
+import { responseFormatToOutputs } from "../responseFormat";
 
 /**
  * End-to-end of the sync data path (no network): a prompt created from the

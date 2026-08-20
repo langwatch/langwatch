@@ -7,20 +7,20 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
+import { skillsGetCommand } from "../get";
+import { skillsInstallCommand } from "../install";
 import {
+  type BundledSkill,
   findSkill,
   installSkill,
   MANAGED_MARKER,
-  skillFilePath,
   SKILLS_BUNDLE,
-  type BundledSkill,
+  skillFilePath,
 } from "../installer";
 import { skillsListCommand } from "../list";
-import { skillsGetCommand } from "../get";
-import { skillsInstallCommand } from "../install";
-import { skillsUpdateCommand } from "../update";
 import { skillsUninstallCommand } from "../uninstall";
-import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
+import { skillsUpdateCommand } from "../update";
 
 const skill = (slug: string): BundledSkill => {
   const found = findSkill(slug);
@@ -37,7 +37,9 @@ describe("the skills commands", () => {
   beforeEach(() => {
     savedExitCode = process.exitCode;
     root = fs.mkdtempSync(path.join(os.tmpdir(), "lw-skills-cmd-"));
-    consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    consoleLogSpy = vi
+      .spyOn(console, "log")
+      .mockImplementation(() => undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     for (const name of AGENT_MODE_ENV_VARS) {
       savedEnv[name] = process.env[name];
@@ -98,16 +100,23 @@ describe("the skills commands", () => {
   });
 
   it("install requires names or --all, and rejects unknown names", async () => {
-    await expect(skillsInstallCommand([], { dir: root })).rejects.toMatchObject({
-      code: "validation_error",
-    });
+    await expect(skillsInstallCommand([], { dir: root })).rejects.toMatchObject(
+      {
+        code: "validation_error",
+      },
+    );
     await expect(
       skillsInstallCommand(["nope"], { dir: root }),
     ).rejects.toMatchObject({ code: "validation_error" });
   });
 
   it("install --all --dry-run reports every skill and writes nothing", async () => {
-    await skillsInstallCommand([], { dir: root, all: true, dryRun: true, output: "json" });
+    await skillsInstallCommand([], {
+      dir: root,
+      all: true,
+      dryRun: true,
+      output: "json",
+    });
     const parsed = JSON.parse(logged()) as {
       dryRun: boolean;
       results: { action: string }[];
@@ -135,7 +144,9 @@ describe("the skills commands", () => {
     const updated = JSON.parse(logged()) as { results: { action: string }[] };
     expect(updated.results[0]!.action).toBe("updated");
     expect(fs.readFileSync(installed, "utf8")).toContain(MANAGED_MARKER);
-    expect(fs.readFileSync(installed, "utf8")).not.toContain("old tracing skill");
+    expect(fs.readFileSync(installed, "utf8")).not.toContain(
+      "old tracing skill",
+    );
 
     consoleLogSpy.mockClear();
     await skillsUninstallCommand(["tracing"], { dir: root, yes: true });
@@ -159,7 +170,11 @@ describe("the skills commands", () => {
 
   it("uninstall --dry-run needs no confirmation and removes nothing", async () => {
     installSkill({ skill: skill("tracing"), root });
-    await skillsUninstallCommand(["tracing"], { dir: root, dryRun: true, output: "json" });
+    await skillsUninstallCommand(["tracing"], {
+      dir: root,
+      dryRun: true,
+      output: "json",
+    });
     const parsed = JSON.parse(logged()) as { results: { action: string }[] };
     expect(parsed.results[0]!.action).toBe("removed");
     expect(
@@ -184,7 +199,12 @@ describe("the skills commands", () => {
       });
 
       const parsed = JSON.parse(logged()) as {
-        results: { slug: string; action: string; reason?: string; failed?: boolean }[];
+        results: {
+          slug: string;
+          action: string;
+          reason?: string;
+          failed?: boolean;
+        }[];
       };
       const tracing = parsed.results.find((r) => r.slug === "tracing")!;
       const prompts = parsed.results.find((r) => r.slug === "prompts")!;
@@ -233,7 +253,11 @@ describe("the skills commands", () => {
     });
 
     it("overwrites once -y is given", async () => {
-      await skillsInstallCommand(["tracing"], { dir: root, force: true, yes: true });
+      await skillsInstallCommand(["tracing"], {
+        dir: root,
+        force: true,
+        yes: true,
+      });
       expect(fs.readFileSync(target, "utf8")).toContain(MANAGED_MARKER);
     });
 
@@ -263,7 +287,11 @@ describe("the skills commands", () => {
         "utf8",
       );
 
-      await skillsInstallCommand(["tracing"], { dir: root, force: true, output: "json" });
+      await skillsInstallCommand(["tracing"], {
+        dir: root,
+        force: true,
+        output: "json",
+      });
       const parsed = JSON.parse(logged()) as { results: { action: string }[] };
       expect(parsed.results[0]!.action).toBe("updated");
       expect(fs.readFileSync(installed.path, "utf8")).toContain(MANAGED_MARKER);
@@ -282,7 +310,12 @@ describe("the skills commands", () => {
         output: "json",
       });
       const parsed = JSON.parse(logged()) as {
-        results: { slug: string; action: string; reason?: string; failed?: boolean }[];
+        results: {
+          slug: string;
+          action: string;
+          reason?: string;
+          failed?: boolean;
+        }[];
       };
 
       const tracing = parsed.results.find((r) => r.slug === "tracing")!;

@@ -24,13 +24,13 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import {
+  type BundledSkill,
   SKILLS_BUNDLE,
   SKILLS_BUNDLE_VERSION,
-  type BundledSkill,
 } from "@/internal/generated/cli/skills.generated";
 import { throwValidationError } from "./validation";
 
-export { SKILLS_BUNDLE, SKILLS_BUNDLE_VERSION, type BundledSkill };
+export { type BundledSkill, SKILLS_BUNDLE, SKILLS_BUNDLE_VERSION };
 
 /**
  * The install root: --dir when given, else ~/.agents.
@@ -87,7 +87,8 @@ export const MANAGED_MARKER = `<!-- managed-by: langwatch-skills v${SKILLS_BUNDL
  * ours than touch one that is not. Moving the notes ABOVE the footer, or
  * removing the footer entirely, restores the expected behaviour.
  */
-const MANAGED_MARKER_RE = /(?:^|\n)<!-- managed-by: langwatch-skills v(\S+) -->\s*$/;
+const MANAGED_MARKER_RE =
+  /(?:^|\n)<!-- managed-by: langwatch-skills v(\S+) -->\s*$/;
 
 /**
  * Defence in depth: a slug becomes a path segment, so it must not be able to
@@ -98,7 +99,12 @@ const MANAGED_MARKER_RE = /(?:^|\n)<!-- managed-by: langwatch-skills v(\S+) -->\
  * the bundle, not a per-file condition to report.
  */
 const assertPathSafeSlug = (slug: string): void => {
-  if (slug === "" || slug.includes("/") || slug.includes("\\") || slug.includes("..")) {
+  if (
+    slug === "" ||
+    slug.includes("/") ||
+    slug.includes("\\") ||
+    slug.includes("..")
+  ) {
     throw new Error(
       `Refusing to build a skill path from slug ${JSON.stringify(slug)}: slugs must be a single path segment with no "/" or "..".`,
     );

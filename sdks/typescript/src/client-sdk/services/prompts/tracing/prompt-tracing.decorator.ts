@@ -1,6 +1,6 @@
-import { type Prompt, type TemplateVariables, type CompiledPrompt } from "../prompt";
-import { shouldCaptureInput, shouldCaptureOutput } from "@/observability-sdk";
 import type { LangWatchSpan } from "@/observability-sdk";
+import { shouldCaptureInput, shouldCaptureOutput } from "@/observability-sdk";
+import type { CompiledPrompt, Prompt, TemplateVariables } from "../prompt";
 
 /**
  * Class that decorates the target prompt,
@@ -12,7 +12,7 @@ export class PromptTracingDecorator {
   private traceCompilation(
     span: LangWatchSpan,
     variables: TemplateVariables,
-    compileFn: () => CompiledPrompt
+    compileFn: () => CompiledPrompt,
   ): CompiledPrompt {
     span.setType("prompt");
 
@@ -21,7 +21,7 @@ export class PromptTracingDecorator {
 
       if (variables) {
         span.setAttribute(
-          'langwatch.prompt.variables',
+          "langwatch.prompt.variables",
           JSON.stringify({
             type: "json",
             value: variables,
@@ -35,7 +35,7 @@ export class PromptTracingDecorator {
     // Only emit combined handle:version format when both are available
     if (result.handle != null && result.version != null) {
       span.setAttribute(
-        'langwatch.prompt.id',
+        "langwatch.prompt.id",
         `${result.handle}:${result.version}`,
       );
     }
@@ -50,19 +50,21 @@ export class PromptTracingDecorator {
     return result;
   }
 
-  compile(span: LangWatchSpan, variables: TemplateVariables = {}): CompiledPrompt {
-    return this.traceCompilation(
-      span,
-      variables,
-      () => this.target.compile(variables),
+  compile(
+    span: LangWatchSpan,
+    variables: TemplateVariables = {},
+  ): CompiledPrompt {
+    return this.traceCompilation(span, variables, () =>
+      this.target.compile(variables),
     );
   }
 
-  compileStrict(span: LangWatchSpan, variables: TemplateVariables): CompiledPrompt {
-    return this.traceCompilation(
-      span,
-      variables,
-      () => this.target.compileStrict(variables),
+  compileStrict(
+    span: LangWatchSpan,
+    variables: TemplateVariables,
+  ): CompiledPrompt {
+    return this.traceCompilation(span, variables, () =>
+      this.target.compileStrict(variables),
     );
   }
 }

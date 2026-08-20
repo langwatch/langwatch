@@ -5,7 +5,12 @@ import {
 } from "@/client-sdk/services/role-bindings/role-bindings-api.service";
 import { parseRole } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
-import { orDash, printFacts, runManagement, withParsedFlags } from "../management/_shared";
+import {
+  orDash,
+  printFacts,
+  runManagement,
+  withParsedFlags,
+} from "../management/_shared";
 
 export interface UpdateRoleBindingOptions {
   role: string;
@@ -48,7 +53,10 @@ export const updateRoleBindingCommand = async ({
         ],
         ["Role", binding.role],
         ["Custom role", orDash(binding.customRoleName)],
-        ["Scope", `${binding.scopeType} ${binding.scopeName ?? binding.scopeId}`],
+        [
+          "Scope",
+          `${binding.scopeType} ${binding.scopeName ?? binding.scopeId}`,
+        ],
       ]);
     },
   });

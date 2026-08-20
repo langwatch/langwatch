@@ -6,13 +6,13 @@
  * Spec: specs/experiments/comparison-sdk.feature
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { ComparisonMetric } from "../types";
 import {
   type ComparisonHarness,
-  THREE_OUTPUTS,
   createExperiment,
   runComparison,
+  THREE_OUTPUTS,
   useComparisonHarness,
 } from "./comparison-harness";
 
@@ -32,11 +32,9 @@ describe("Experiment.compare", () => {
 
         expect(harness.judgeRequests).toHaveLength(1);
         const request = harness.judgeRequests[0]!;
-        expect(request.data.candidates.map((candidate) => candidate.id)).toEqual([
-          "gpt-5-mini",
-          "claude-sonnet-5",
-          "gemini-flash",
-        ]);
+        expect(
+          request.data.candidates.map((candidate) => candidate.id),
+        ).toEqual(["gpt-5-mini", "claude-sonnet-5", "gemini-flash"]);
         expect(request.settings).toEqual({});
         expect(verdict?.candidates).toEqual([
           "gpt-5-mini",
@@ -56,13 +54,15 @@ describe("Experiment.compare", () => {
         const flushedBeforeJudging = harness.requestOrder.indexOf("batch");
         expect(flushedBeforeJudging).toBeGreaterThanOrEqual(0);
         expect(flushedBeforeJudging).toBeLessThan(
-          harness.requestOrder.indexOf("judge")
+          harness.requestOrder.indexOf("judge"),
         );
         expect(harness.loggedDatasetTargets.flat()).toEqual(
-          expect.arrayContaining(Object.keys(THREE_OUTPUTS))
+          expect.arrayContaining(Object.keys(THREE_OUTPUTS)),
         );
         expect(
-          harness.judgeRequests[0]!.data.candidates.map((candidate) => candidate.id)
+          harness.judgeRequests[0]!.data.candidates.map(
+            (candidate) => candidate.id,
+          ),
         ).toEqual(Object.keys(THREE_OUTPUTS));
       });
 
@@ -137,8 +137,8 @@ describe("Experiment.compare", () => {
 
         expect(
           harness.judgeRequests[0]!.data.candidates.map(
-            (candidate) => candidate.output
-          )
+            (candidate) => candidate.output,
+          ),
         ).toEqual(["Four.", "Four.", '{"answer":"Four.","confidence":0.9}']);
       });
     });

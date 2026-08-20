@@ -1,14 +1,13 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the listing rather than printing it: the output port renders it in
@@ -19,8 +18,7 @@ export const listSecretsCommand = async (): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner("Fetching secrets...").start();
 
@@ -31,7 +29,11 @@ export const listSecretsCommand = async (): Promise<CommandResult | void> => {
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "fetch secrets" });
+      failSpinner({
+        spinner,
+        error: new Error(message),
+        action: "fetch secrets",
+      });
       process.exit(1);
     }
 
@@ -43,7 +45,7 @@ export const listSecretsCommand = async (): Promise<CommandResult | void> => {
     }>;
 
     spinner.succeed(
-      `Found ${secrets.length} secret${secrets.length !== 1 ? "s" : ""}`
+      `Found ${secrets.length} secret${secrets.length !== 1 ? "s" : ""}`,
     );
 
     return {
@@ -54,7 +56,7 @@ export const listSecretsCommand = async (): Promise<CommandResult | void> => {
           console.log(chalk.gray("No secrets found."));
           console.log(chalk.gray("Create one with:"));
           console.log(
-            chalk.cyan('  langwatch secret create MY_API_KEY --value "sk-..."')
+            chalk.cyan('  langwatch secret create MY_API_KEY --value "sk-..."'),
           );
           return;
         }

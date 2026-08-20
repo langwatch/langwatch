@@ -6,34 +6,33 @@
  * without commander or the network in the picture. The real CLI running through
  * a real daemon is covered by daemon-cli.integration.test.ts.
  */
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+
 import * as fs from "node:fs";
 import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import { Writable } from "node:stream";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { execViaDaemon, requestStatus, requestStop } from "../client";
 import { secureSocketFile, UntrustedSocketDirError } from "../identity";
 import {
+  type ClientFrame,
+  encodeFrame,
+  FrameDecoder,
+  PROTOCOL_VERSION,
+} from "../protocol";
+import type { CommandExecution, CommandExecutor } from "../runner";
+import {
   cleanStaleSocket,
   createDaemonServer,
   DaemonAlreadyRunningError,
+  type DaemonServer,
   isSocketAlive,
   publishSocket,
   stagingSocketPath,
-  type DaemonServer,
 } from "../server";
-import { encodeFrame, FrameDecoder, PROTOCOL_VERSION, type ClientFrame } from "../protocol";
-import type { CommandExecution, CommandExecutor } from "../runner";
-import { noopTelemetry, type DaemonTelemetry } from "../telemetry";
+import { type DaemonTelemetry, noopTelemetry } from "../telemetry";
 
 const CLI_VERSION = "9.9.9";
 const BUILD = "9.9.9+1234-5678";
@@ -375,7 +374,6 @@ describe("daemon over a unix socket", () => {
 
         const nameAtClose: boolean[] = [];
         // Captured only to delegate back to; the .call below supplies `this`.
-        // eslint-disable-next-line @typescript-eslint/unbound-method
         const realClose = net.Server.prototype.close;
         vi.spyOn(net.Server.prototype, "close").mockImplementation(function (
           this: net.Server,
@@ -404,7 +402,12 @@ describe("daemon over a unix socket", () => {
           executor: scriptedExecutor(() => ({ stdout: '{"traces":[]}\n' })),
         });
 
-        const { outcome, stdout } = await exec(["trace", "search", "--format", "json"]);
+        const { outcome, stdout } = await exec([
+          "trace",
+          "search",
+          "--format",
+          "json",
+        ]);
 
         expect(outcome).toEqual({ served: true, exitCode: 0 });
         expect(stdout).toBe('{"traces":[]}\n');
@@ -649,7 +652,10 @@ describe("daemon over a unix socket", () => {
       });
 
       it("can then be evicted, leaving a clean socket for a fresh daemon", async () => {
-        const stale = await startDaemon({ cliVersion: "0.1.0", build: "0.1.0+1-1" });
+        const stale = await startDaemon({
+          cliVersion: "0.1.0",
+          build: "0.1.0+1-1",
+        });
 
         await exec(["trace", "search"]);
         expect(await requestStop(socketPath)).toBe(true);
@@ -697,7 +703,9 @@ describe("daemon over a unix socket", () => {
   describe("given a daemon warm for identity A", () => {
     describe("when identity B presents its fingerprint", () => {
       it("is refused, so A's credentials can never serve B's request", async () => {
-        const executor = vi.fn(scriptedExecutor(() => ({ stdout: "leaked\n" })));
+        const executor = vi.fn(
+          scriptedExecutor(() => ({ stdout: "leaked\n" })),
+        );
         await startDaemon({ executor });
 
         const { outcome, stdout } = await exec(["trace", "search"], {
@@ -840,7 +848,9 @@ describe("daemon over a unix socket", () => {
   describe("given a socket the caller cannot trust", () => {
     describe("when its directory is writable by other users", () => {
       it("refuses to connect and reports not-served, so the CLI runs in-process", async () => {
-        const executor = vi.fn(scriptedExecutor(() => ({ stdout: "leaked\n" })));
+        const executor = vi.fn(
+          scriptedExecutor(() => ({ stdout: "leaked\n" })),
+        );
         await startDaemon({ executor });
 
         // Anyone who can write the directory can unlink our socket and bind
@@ -860,7 +870,9 @@ describe("daemon over a unix socket", () => {
 
     describe("when the socket itself is world-connectable", () => {
       it("refuses it rather than drive a daemon anyone else can drive too", async () => {
-        const executor = vi.fn(scriptedExecutor(() => ({ stdout: "leaked\n" })));
+        const executor = vi.fn(
+          scriptedExecutor(() => ({ stdout: "leaked\n" })),
+        );
         await startDaemon({ executor });
 
         fs.chmodSync(socketPath, 0o666);
@@ -874,7 +886,9 @@ describe("daemon over a unix socket", () => {
 
     describe("when it is owned by another user", () => {
       it("refuses it, and reports no daemon for status and stop as well", async () => {
-        const executor = vi.fn(scriptedExecutor(() => ({ stdout: "leaked\n" })));
+        const executor = vi.fn(
+          scriptedExecutor(() => ({ stdout: "leaked\n" })),
+        );
         await startDaemon({ executor });
 
         // chown needs root; moving OUR uid makes the same comparison fail.

@@ -58,10 +58,7 @@ export const isValidEvaluatorType = (slug: string): boolean => slug in catalog;
  * next to its live successor ("ragas/response_relevancy") without any
  * special-casing.
  */
-export const closestEvaluatorTypes = (
-  input: string,
-  count = 5,
-): string[] =>
+export const closestEvaluatorTypes = (input: string, count = 5): string[] =>
   Object.keys(catalog)
     .map((slug) => ({ slug, distance: levenshtein(input, slug) }))
     .sort((a, b) => a.distance - b.distance || a.slug.localeCompare(b.slug))

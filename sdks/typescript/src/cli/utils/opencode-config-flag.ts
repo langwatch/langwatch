@@ -30,7 +30,8 @@ export interface OpencodeConfigFlagResult {
 /** Default config.jsonc path under the user's home directory. */
 export function defaultOpencodeConfigPath(): string {
   const xdg = process.env.XDG_CONFIG_HOME;
-  const configHome = xdg && xdg.length > 0 ? xdg : path.join(os.homedir(), ".config");
+  const configHome =
+    xdg && xdg.length > 0 ? xdg : path.join(os.homedir(), ".config");
   return path.join(configHome, "opencode", "opencode.jsonc");
 }
 
@@ -40,9 +41,7 @@ export function defaultOpencodeConfigPath(): string {
  * just a $schema field, so this stays simple — not a full JSONC parser.
  */
 function stripJsoncComments(s: string): string {
-  return s
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/^\s*\/\/.*$/gm, "");
+  return s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 }
 
 /**

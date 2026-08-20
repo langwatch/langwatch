@@ -9,17 +9,18 @@
 import chalk from "chalk";
 
 import {
+  type DaemonStatus,
   requestStatus,
   requestStop,
-  type DaemonStatus,
 } from "../daemon/client";
+import { collectForwardedEnv } from "../daemon/eligibility";
 import {
   inspectSocketTrust,
   isDaemonSupported,
   resolveBuildId,
   resolveIdentity,
-  UntrustedSocketDirError,
   type SocketTrustProblem,
+  UntrustedSocketDirError,
 } from "../daemon/identity";
 import {
   cleanStaleSocket,
@@ -29,7 +30,6 @@ import {
 } from "../daemon/server";
 import { spawnDaemon } from "../daemon/spawn";
 import { warmCommandModules } from "../daemon/warmup";
-import { collectForwardedEnv } from "../daemon/eligibility";
 
 declare const __CLI_VERSION__: string;
 
@@ -61,9 +61,7 @@ function resolveIdleTimeout(option?: string): number {
  * need. `socket-missing` and `socket-dir-missing` are the ordinary empty state
  * and are deliberately NOT in here.
  */
-function describeTrustProblem(
-  problem: SocketTrustProblem,
-): string | null {
+function describeTrustProblem(problem: SocketTrustProblem): string | null {
   switch (problem) {
     case "socket-missing":
     case "socket-dir-missing":
@@ -274,9 +272,7 @@ export async function daemonStatusCommand(options: {
     chalk.gray(`  uptime:       ${Math.round(status.uptimeMs / 1000)}s`),
   );
   console.log(
-    chalk.gray(
-      `  idle timeout: ${Math.round(status.idleTimeoutMs / 1000)}s`,
-    ),
+    chalk.gray(`  idle timeout: ${Math.round(status.idleTimeoutMs / 1000)}s`),
   );
   console.log(chalk.gray(`  served:       ${status.served}`));
   console.log(chalk.gray(`  in flight:    ${status.inflight}`));

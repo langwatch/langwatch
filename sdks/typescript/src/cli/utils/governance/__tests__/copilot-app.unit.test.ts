@@ -10,10 +10,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildCopilotAppEnv,
+  COPILOT_APP_AGENT_LABEL,
   copilotAppCandidatePaths,
   findCopilotApp,
   renderLaunchAgent,
-  COPILOT_APP_AGENT_LABEL,
 } from "../copilot-app";
 
 describe("buildCopilotAppEnv", () => {
@@ -53,7 +53,9 @@ describe("buildCopilotAppEnv", () => {
         captureContent: true,
       });
 
-      expect(env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT).toBe("true");
+      expect(env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT).toBe(
+        "true",
+      );
     });
 
     it("labels the surface copilot-app to distinguish it from the CLI", () => {
@@ -190,7 +192,7 @@ describe("renderLaunchAgent", () => {
         platform: "linux",
         home: "/home/dev",
         execPath: "/usr/bin/github-copilot",
-        env: { WEIRD: 'ends-with-backslash\\', QUOTED: 'has "quote" inside' },
+        env: { WEIRD: "ends-with-backslash\\", QUOTED: 'has "quote" inside' },
       });
 
       const unit = d.files[0]!.content;

@@ -7,27 +7,26 @@
  * TODO: To run against the actual server locally, set CI=false
  */
 
+import { randomUUID } from "crypto";
+import { config } from "dotenv";
+import * as fs from "fs";
+import * as path from "path";
 import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
   describe,
   expect,
   it,
-  afterEach,
-  beforeEach,
-  afterAll,
-  beforeAll,
 } from "vitest";
-import * as fs from "fs";
-import * as path from "path";
-import { randomUUID } from "crypto";
-
-import { config } from "dotenv";
+import { LangWatch } from "../../../dist";
 import {
-  expectations,
   CliRunner,
+  expectations,
   LockFileManager,
   PromptFileManager,
 } from "./helpers";
-import { LangWatch } from "../../../dist";
 import { ApiHelpers } from "./helpers/api-helpers";
 
 config({ path: ".env.test", override: true });
@@ -120,8 +119,9 @@ describe("CLI E2E", () => {
         // Verify prompt file content. Tracks the CLI default template; the
         // template intentionally omits modelParameters.temperature because
         // the gpt-5 family rejects a custom temperature.
-        expect(localPromptFileManagement.getPromptFileContent(promptHandle))
-          .toMatchInlineSnapshot(`
+        expect(
+          localPromptFileManagement.getPromptFileContent(promptHandle),
+        ).toMatchInlineSnapshot(`
           "model: openai/gpt-5.5
           messages:
             - role: system
@@ -171,8 +171,9 @@ describe("CLI E2E", () => {
             { role: "user", content: "You are an updated user message." },
           ],
         });
-        expect(localPromptFileManagement.getPromptFileContent(promptHandle))
-          .toMatchInlineSnapshot(`
+        expect(
+          localPromptFileManagement.getPromptFileContent(promptHandle),
+        ).toMatchInlineSnapshot(`
         "model: gpt-4-turbo
         messages:
           - role: system
@@ -287,8 +288,9 @@ describe("CLI E2E", () => {
           // Verify conflict output
           expect(sync2.output).toContain(`Conflict`);
 
-          expect(localPromptFileManagement.getPromptFileContent(promptHandle))
-            .toMatchInlineSnapshot(`
+          expect(
+            localPromptFileManagement.getPromptFileContent(promptHandle),
+          ).toMatchInlineSnapshot(`
               "model: gpt-4-turbo
               modelParameters:
                 temperature: 0.9

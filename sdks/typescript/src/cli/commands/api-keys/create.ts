@@ -1,5 +1,4 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { ApiKeysApiService } from "@/client-sdk/services/api-keys/api-keys-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import {
@@ -7,8 +6,9 @@ import {
   parsePermissionFlags,
   parsePermissionMode,
 } from "../../utils/managementFlags";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { withParsedFlags } from "../management/_shared";
 
 export interface CreateApiKeyOptions {
@@ -60,7 +60,9 @@ export const createApiKeyCommand = async (
 
   const service = new ApiKeysApiService();
   const keyType = options.keyType ?? "service";
-  const spinner = createSpinner(`Creating ${keyType} API key "${options.name}"...`).start();
+  const spinner = createSpinner(
+    `Creating ${keyType} API key "${options.name}"...`,
+  ).start();
 
   try {
     const result = await service.create({
@@ -81,18 +83,27 @@ export const createApiKeyCommand = async (
       ...(access.bindings.length > 0 ? { bindings: access.bindings } : {}),
     });
 
-    spinner.succeed(`Created ${keyType} API key "${chalk.cyan(result.apiKey.name)}"`);
+    spinner.succeed(
+      `Created ${keyType} API key "${chalk.cyan(result.apiKey.name)}"`,
+    );
 
     return {
       data: result,
       table: () => {
         console.log();
-        console.log(chalk.bold.yellow("⚠  Save the token below NOW. It will not be shown again."));
+        console.log(
+          chalk.bold.yellow(
+            "⚠  Save the token below NOW. It will not be shown again.",
+          ),
+        );
         console.log();
         console.log(`  ${chalk.green(result.token)}`);
         console.log();
         console.log(chalk.gray("API key id: ") + result.apiKey.id);
-        console.log(chalk.gray("Created:    ") + new Date(result.apiKey.createdAt).toLocaleString());
+        console.log(
+          chalk.gray("Created:    ") +
+            new Date(result.apiKey.createdAt).toLocaleString(),
+        );
         console.log();
       },
     };

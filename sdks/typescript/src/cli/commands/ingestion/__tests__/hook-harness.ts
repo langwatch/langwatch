@@ -15,9 +15,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import { afterEach, beforeEach, vi } from "vitest";
-
-import { hookCommand } from "../hook";
 import type { GitRunner } from "../git-context";
+import { hookCommand } from "../hook";
 
 export const ENDPOINT = "http://app.example.com/api/otel";
 export const SESSION_ID = "0199a1f4-2c5e-7a10-9f61-2d7f0a3b5c11";
@@ -75,9 +74,7 @@ export const unreachableCollector: typeof fetch = (async () => {
   throw new Error("connect ECONNREFUSED");
 }) as unknown as typeof fetch;
 
-export const attributesOf = (
-  request: PostedRequest,
-): Record<string, string> =>
+export const attributesOf = (request: PostedRequest): Record<string, string> =>
   Object.fromEntries(
     request.body.resourceLogs[0]!.scopeLogs[0]!.logRecords[0]!.attributes.map(
       (attribute) => [attribute.key, attribute.value.stringValue],
@@ -138,8 +135,7 @@ export const installHookHarness = (): HookHarness => {
   const exits: number[] = [];
   let stateDir = "";
 
-  const collector =
-    (status = 200): typeof fetch =>
+  const collector = (status = 200): typeof fetch =>
     ((url: string, init: { headers: Record<string, string>; body: string }) => {
       posted.push({
         url,
@@ -209,7 +205,8 @@ export const installHookHarness = (): HookHarness => {
         stateDir,
         // Empty by default, so no test ever reads the machine's real
         // registry and finds a name it did not plant.
-        claudeRegistryDir: claudeRegistryDir ?? path.join(stateDir, "claude-sessions"),
+        claudeRegistryDir:
+          claudeRegistryDir ?? path.join(stateDir, "claude-sessions"),
         readCliConfig,
       }),
   };

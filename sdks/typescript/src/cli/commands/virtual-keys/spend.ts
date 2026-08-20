@@ -1,9 +1,9 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export interface VirtualKeySpendOptions {
   from?: string;
@@ -60,8 +60,12 @@ export const virtualKeySpendCommand = async (
       table: () => {
         console.log();
         console.log(`${chalk.bold("Virtual key:")} ${summary.virtual_key_id}`);
-        console.log(`${chalk.bold("Window:")}      ${new Date(summary.window.from).toLocaleString()} → ${new Date(summary.window.to).toLocaleString()}`);
-        console.log(`${chalk.bold("Spent:")}       $${Number.parseFloat(summary.spent_usd).toFixed(4)}`);
+        console.log(
+          `${chalk.bold("Window:")}      ${new Date(summary.window.from).toLocaleString()} → ${new Date(summary.window.to).toLocaleString()}`,
+        );
+        console.log(
+          `${chalk.bold("Spent:")}       $${Number.parseFloat(summary.spent_usd).toFixed(4)}`,
+        );
         console.log(`${chalk.bold("Requests:")}    ${summary.requests}`);
         console.log();
       },

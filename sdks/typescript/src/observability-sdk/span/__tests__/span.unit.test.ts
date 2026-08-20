@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SpanStatusCode } from "@opentelemetry/api";
-import { type SpanType } from "../../span/types";
+import semconv from "@opentelemetry/semantic-conventions/incubating";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  performanceUtils,
   setupTestEnvironment,
   testData,
   testScenarios,
-  performanceUtils
 } from "../../__tests__/test-utils";
 import * as intSemconv from "../../semconv";
-import semconv from "@opentelemetry/semantic-conventions/incubating";
+import type { SpanType } from "../../span/types";
 
 describe("span.ts", () => {
   let testEnv: ReturnType<typeof setupTestEnvironment>;
@@ -48,12 +48,15 @@ describe("span.ts", () => {
       const result = langwatchSpan.setAttribute("test.key", "test-value");
 
       expect(result).toBe(langwatchSpan);
-      expect(mockSpan.setAttribute).toHaveBeenCalledWith("test.key", "test-value");
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        "test.key",
+        "test-value",
+      );
     });
 
     it("supports fluent API for setAttributes", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
-      const attributes = { "key1": "value1", "key2": "value2" };
+      const attributes = { key1: "value1", key2: "value2" };
       const result = langwatchSpan.setAttributes(attributes);
 
       expect(result).toBe(langwatchSpan);
@@ -62,10 +65,14 @@ describe("span.ts", () => {
 
     it("supports fluent API for addEvent", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
-      const result = langwatchSpan.addEvent("test-event", { "event.data": "test" });
+      const result = langwatchSpan.addEvent("test-event", {
+        "event.data": "test",
+      });
 
       expect(result).toBe(langwatchSpan);
-      expect(mockSpan.addEvent).toHaveBeenCalledWith("test-event", { "event.data": "test" });
+      expect(mockSpan.addEvent).toHaveBeenCalledWith("test-event", {
+        "event.data": "test",
+      });
     });
 
     it("supports fluent API for recordException", () => {
@@ -140,19 +147,26 @@ describe("span.ts", () => {
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         intSemconv.ATTR_LANGWATCH_SPAN_TYPE,
-        "llm"
+        "llm",
       );
     });
 
     it("accepts all valid span types", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
-      const validTypes: SpanType[] = ["span", "llm", "chain", "tool", "agent", "guardrail"];
+      const validTypes: SpanType[] = [
+        "span",
+        "llm",
+        "chain",
+        "tool",
+        "agent",
+        "guardrail",
+      ];
 
-      validTypes.forEach(type => {
+      validTypes.forEach((type) => {
         langwatchSpan.setType(type);
         expect(mockSpan.setAttribute).toHaveBeenCalledWith(
           intSemconv.ATTR_LANGWATCH_SPAN_TYPE,
-          type
+          type,
         );
       });
     });
@@ -166,7 +180,7 @@ describe("span.ts", () => {
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         semconv.ATTR_GEN_AI_REQUEST_MODEL,
-        "gpt-4"
+        "gpt-4",
       );
     });
 
@@ -177,7 +191,7 @@ describe("span.ts", () => {
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         semconv.ATTR_GEN_AI_RESPONSE_MODEL,
-        "gpt-4-turbo"
+        "gpt-4-turbo",
       );
     });
   });
@@ -185,7 +199,7 @@ describe("span.ts", () => {
   describe("RAG context methods", () => {
     it("uses the canonical RAG contexts attribute key", () => {
       expect(intSemconv.ATTR_LANGWATCH_RAG_CONTEXTS).toBe(
-        "langwatch.rag.contexts"
+        "langwatch.rag.contexts",
       );
     });
 
@@ -197,7 +211,7 @@ describe("span.ts", () => {
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         intSemconv.ATTR_LANGWATCH_RAG_CONTEXTS,
-        JSON.stringify([ragContext])
+        JSON.stringify([ragContext]),
       );
     });
 
@@ -209,7 +223,7 @@ describe("span.ts", () => {
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         intSemconv.ATTR_LANGWATCH_RAG_CONTEXTS,
-        JSON.stringify(ragContexts)
+        JSON.stringify(ragContexts),
       );
     });
   });
@@ -226,7 +240,7 @@ describe("span.ts", () => {
         JSON.stringify({
           type: "json",
           value: metrics,
-        })
+        }),
       );
     });
 
@@ -241,7 +255,7 @@ describe("span.ts", () => {
         JSON.stringify({
           type: "json",
           value: partialMetrics,
-        })
+        }),
       );
     });
   });
@@ -259,7 +273,7 @@ describe("span.ts", () => {
           JSON.stringify({
             type: "json",
             value: input,
-          })
+          }),
         );
       });
 
@@ -274,7 +288,7 @@ describe("span.ts", () => {
           JSON.stringify({
             type: "text",
             value: input,
-          })
+          }),
         );
       });
 
@@ -291,9 +305,9 @@ describe("span.ts", () => {
             value: [
               { type: "text", value: "item1" },
               { type: "text", value: "item2" },
-              { type: "text", value: "item3" }
+              { type: "text", value: "item3" },
             ],
-          })
+          }),
         );
       });
     });
@@ -310,7 +324,7 @@ describe("span.ts", () => {
           JSON.stringify({
             type: "text",
             value: input,
-          })
+          }),
         );
       });
     });
@@ -327,7 +341,7 @@ describe("span.ts", () => {
           JSON.stringify({
             type: "json",
             value: output,
-          })
+          }),
         );
       });
 
@@ -342,7 +356,7 @@ describe("span.ts", () => {
           JSON.stringify({
             type: "text",
             value: output,
-          })
+          }),
         );
       });
     });
@@ -359,13 +373,11 @@ describe("span.ts", () => {
           JSON.stringify({
             type: "text",
             value: output,
-          })
+          }),
         );
       });
     });
   });
-
-
 
   describe("method chaining", () => {
     it("supports fluent API chaining", () => {
@@ -422,7 +434,7 @@ describe("span.ts", () => {
         JSON.stringify({
           type: "json",
           value: complexInput,
-        })
+        }),
       );
     });
   });
@@ -434,20 +446,18 @@ describe("span.ts", () => {
       // Initially recording
       testScenarios.validateSpanLifecycle(mockSpan, {
         shouldBeRecording: true,
-        shouldBeEnded: false
+        shouldBeEnded: false,
       });
 
       // Set some attributes and events
-      langwatchSpan
-        .setType("llm")
-        .setInput("test input");
+      langwatchSpan.setType("llm").setInput("test input");
 
       // Still recording with data
       testScenarios.validateSpanLifecycle(mockSpan, {
         shouldBeRecording: true,
         shouldHaveAttributes: {
-          [intSemconv.ATTR_LANGWATCH_SPAN_TYPE]: "llm"
-        }
+          [intSemconv.ATTR_LANGWATCH_SPAN_TYPE]: "llm",
+        },
       });
 
       // End the span
@@ -456,7 +466,7 @@ describe("span.ts", () => {
       // Should be ended
       testScenarios.validateSpanLifecycle(mockSpan, {
         shouldBeRecording: false,
-        shouldBeEnded: true
+        shouldBeEnded: true,
       });
     });
 
@@ -500,7 +510,7 @@ describe("span.ts", () => {
             .setType("llm");
           return i;
         },
-        50
+        50,
       );
 
       expect(operations).toHaveLength(50);
@@ -521,8 +531,8 @@ describe("span.ts", () => {
         intSemconv.ATTR_LANGWATCH_INPUT,
         JSON.stringify({
           type: "text",
-          value: "Hello world"
-        })
+          value: "Hello world",
+        }),
       );
 
       // Test explicit json type
@@ -532,8 +542,8 @@ describe("span.ts", () => {
         intSemconv.ATTR_LANGWATCH_INPUT,
         JSON.stringify({
           type: "json",
-          value: obj
-        })
+          value: obj,
+        }),
       );
 
       // Test explicit raw type
@@ -542,8 +552,8 @@ describe("span.ts", () => {
         intSemconv.ATTR_LANGWATCH_INPUT,
         JSON.stringify({
           type: "raw",
-          value: "Raw content"
-        })
+          value: "Raw content",
+        }),
       );
     });
 
@@ -556,8 +566,8 @@ describe("span.ts", () => {
         intSemconv.ATTR_LANGWATCH_OUTPUT,
         JSON.stringify({
           type: "text",
-          value: "Response"
-        })
+          value: "Response",
+        }),
       );
 
       // Test explicit json type
@@ -567,8 +577,8 @@ describe("span.ts", () => {
         intSemconv.ATTR_LANGWATCH_OUTPUT,
         JSON.stringify({
           type: "json",
-          value: obj
-        })
+          value: obj,
+        }),
       );
 
       // Test explicit raw type
@@ -577,8 +587,8 @@ describe("span.ts", () => {
         intSemconv.ATTR_LANGWATCH_OUTPUT,
         JSON.stringify({
           type: "raw",
-          value: "Raw response"
-        })
+          value: "Raw response",
+        }),
       );
     });
 
@@ -592,8 +602,8 @@ describe("span.ts", () => {
         intSemconv.ATTR_LANGWATCH_INPUT,
         JSON.stringify({
           type: "text",
-          value: JSON.stringify(obj) // Objects are JSON stringified
-        })
+          value: JSON.stringify(obj), // Objects are JSON stringified
+        }),
       );
 
       // String that would auto-detect as "text", but explicit "json" should be preferred
@@ -602,8 +612,8 @@ describe("span.ts", () => {
         intSemconv.ATTR_LANGWATCH_OUTPUT,
         JSON.stringify({
           type: "json",
-          value: "Hello world"
-        })
+          value: "Hello world",
+        }),
       );
     });
 
@@ -612,7 +622,7 @@ describe("span.ts", () => {
 
       const messages = [
         { role: "user", content: "Hello" },
-        { role: "assistant", content: "Hi!" }
+        { role: "assistant", content: "Hi!" },
       ];
 
       (langwatchSpan.setInput as any)("chat_messages", messages);
@@ -620,8 +630,8 @@ describe("span.ts", () => {
         intSemconv.ATTR_LANGWATCH_INPUT,
         JSON.stringify({
           type: "chat_messages",
-          value: messages
-        })
+          value: messages,
+        }),
       );
 
       (langwatchSpan.setOutput as any)("chat_messages", messages);
@@ -629,8 +639,8 @@ describe("span.ts", () => {
         intSemconv.ATTR_LANGWATCH_OUTPUT,
         JSON.stringify({
           type: "chat_messages",
-          value: messages
-        })
+          value: messages,
+        }),
       );
     });
 
@@ -639,7 +649,7 @@ describe("span.ts", () => {
 
       const list = [
         { type: "text", value: "Item 1" },
-        { type: "text", value: "Item 2" }
+        { type: "text", value: "Item 2" },
       ];
 
       (langwatchSpan.setInput as any)("list", list);
@@ -647,8 +657,8 @@ describe("span.ts", () => {
         intSemconv.ATTR_LANGWATCH_INPUT,
         JSON.stringify({
           type: "list",
-          value: list
-        })
+          value: list,
+        }),
       );
 
       (langwatchSpan.setOutput as any)("list", list);
@@ -656,8 +666,8 @@ describe("span.ts", () => {
         intSemconv.ATTR_LANGWATCH_OUTPUT,
         JSON.stringify({
           type: "list",
-          value: list
-        })
+          value: list,
+        }),
       );
     });
 
@@ -670,8 +680,8 @@ describe("span.ts", () => {
         intSemconv.ATTR_LANGWATCH_INPUT,
         JSON.stringify({
           type: "json",
-          value: "test"
-        })
+          value: "test",
+        }),
       );
 
       (langwatchSpan.setOutput as any)("invalid_type", "test");
@@ -679,8 +689,8 @@ describe("span.ts", () => {
         intSemconv.ATTR_LANGWATCH_OUTPUT,
         JSON.stringify({
           type: "json",
-          value: "test"
-        })
+          value: "test",
+        }),
       );
     });
   });

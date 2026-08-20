@@ -1,9 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  LangWatch,
-  ProjectsApiService,
-  TeamsApiService,
-} from "../index";
+import { LangWatch, ProjectsApiService, TeamsApiService } from "../index";
 
 /**
  * Teams and projects are how an integration provisions the tenant it is

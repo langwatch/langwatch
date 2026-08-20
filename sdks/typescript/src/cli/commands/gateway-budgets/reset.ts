@@ -1,9 +1,9 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { GatewayBudgetsApiService } from "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Moves the period boundary; never mutates recorded spend. With

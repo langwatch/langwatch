@@ -12,8 +12,8 @@
 import { buildProgram } from "../program";
 import { buildCatalog, renderHelpTree } from "../utils/commandCatalog";
 import {
-  hasExplicitFormatRequest,
   type CommandResult,
+  hasExplicitFormatRequest,
   type RawOutputFlags,
 } from "../utils/output";
 

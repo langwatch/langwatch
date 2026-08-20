@@ -43,7 +43,10 @@ function firstMeaningful(...candidates: Array<unknown>): string | undefined {
   return undefined;
 }
 
-function collectAllOwnPropertyNames(value: unknown, seen = new Set<unknown>()): string[] {
+function collectAllOwnPropertyNames(
+  value: unknown,
+  seen = new Set<unknown>(),
+): string[] {
   if (!value || typeof value !== "object" || seen.has(value)) return [];
   seen.add(value);
   const names = new Set<string>();
@@ -154,17 +157,22 @@ export function formatApiErrorMessage({
     const causeMsg =
       cause instanceof Error
         ? cause.message
-        : cause && typeof cause === "object" &&
+        : cause &&
+            typeof cause === "object" &&
             typeof (cause as { message?: unknown }).message === "string"
           ? (cause as { message: string }).message
           : undefined;
     const causeCode =
-      cause && typeof cause === "object" &&
+      cause &&
+      typeof cause === "object" &&
       typeof (cause as { code?: unknown }).code === "string"
         ? (cause as { code: string }).code
         : undefined;
 
-    const detail = [causeCode, causeMsg && causeMsg !== base ? causeMsg : undefined]
+    const detail = [
+      causeCode,
+      causeMsg && causeMsg !== base ? causeMsg : undefined,
+    ]
       .filter((s): s is string => typeof s === "string" && s.length > 0)
       .join(": ");
     const formatted = detail ? `${base} (${detail})` : base;
@@ -173,7 +181,8 @@ export function formatApiErrorMessage({
     // "unknown scheme"` when the URL has no/invalid scheme (e.g. the user
     // set LANGWATCH_ENDPOINT=localhost:5570 instead of http://localhost:5570).
     // Add a hint — the raw phrase tells the user nothing actionable.
-    const combined = `${base} ${causeMsg ?? ""} ${causeCode ?? ""}`.toLowerCase();
+    const combined =
+      `${base} ${causeMsg ?? ""} ${causeCode ?? ""}`.toLowerCase();
     if (
       combined.includes("unknown scheme") ||
       combined.includes("err_invalid_url") ||
@@ -193,7 +202,8 @@ export function formatApiErrorMessage({
     if (zod) return zod;
 
     // Most specific fields first.
-    const fromMessage = typeof body.message === "string" ? body.message : undefined;
+    const fromMessage =
+      typeof body.message === "string" ? body.message : undefined;
     const fromError = typeof body.error === "string" ? body.error : undefined;
 
     // Two envelopes name the failure in different fields: the framework one
@@ -222,13 +232,20 @@ export function formatApiErrorMessage({
       return sentenceForCode(codeField);
     }
 
-    const fromDetail = typeof body.detail === "string" ? body.detail : undefined;
-    const fromReason = typeof body.reason === "string" ? body.reason : undefined;
+    const fromDetail =
+      typeof body.detail === "string" ? body.detail : undefined;
+    const fromReason =
+      typeof body.reason === "string" ? body.reason : undefined;
 
     // 1. Top-level meaningful fields take priority. If the server gave us a
     //    descriptive `message`/`error`/`detail`/`reason`, use that — even if
     //    `body.error` is an object with its own (potentially generic) message.
-    const meaningful = firstMeaningful(fromMessage, fromError, fromDetail, fromReason);
+    const meaningful = firstMeaningful(
+      fromMessage,
+      fromError,
+      fromDetail,
+      fromReason,
+    );
     if (meaningful) {
       if (
         fromError &&
@@ -256,8 +273,10 @@ export function formatApiErrorMessage({
       const nestedZod = formatZodIssues(nested);
       if (nestedZod) return nestedZod;
 
-      const fromNestedMsg = typeof nested.message === "string" ? nested.message : undefined;
-      const fromNestedErr = typeof nested.error === "string" ? nested.error : undefined;
+      const fromNestedMsg =
+        typeof nested.message === "string" ? nested.message : undefined;
+      const fromNestedErr =
+        typeof nested.error === "string" ? nested.error : undefined;
       const nestedMeaningful = firstMeaningful(fromNestedMsg, fromNestedErr);
       if (nestedMeaningful) {
         return nestedMeaningful;

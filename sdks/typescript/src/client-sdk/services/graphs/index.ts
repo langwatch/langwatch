@@ -1,8 +1,8 @@
 export {
-  GraphsApiService,
-  GraphsApiError,
-  type GraphResponse,
   type CreateGraphBody,
-  type UpdateGraphBody,
   type GraphDeleteResponse,
+  type GraphResponse,
+  GraphsApiError,
+  GraphsApiService,
+  type UpdateGraphBody,
 } from "./graphs-api.service";

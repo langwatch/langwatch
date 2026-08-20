@@ -31,7 +31,12 @@ export class DatasetApiError extends DatasetError {
   readonly operation: string;
   readonly originalError?: unknown;
 
-  constructor(message: string, status: number, operation: string, originalError?: unknown) {
+  constructor(
+    message: string,
+    status: number,
+    operation: string,
+    originalError?: unknown,
+  ) {
     super(message);
     this.name = "DatasetApiError";
     this.status = status;
@@ -66,7 +71,8 @@ export class DatasetPlanLimitError extends DatasetError {
 
     if (originalError != null && typeof originalError === "object") {
       const err = originalError as Record<string, unknown>;
-      this.limitType = typeof err.limitType === "string" ? err.limitType : "datasets";
+      this.limitType =
+        typeof err.limitType === "string" ? err.limitType : "datasets";
       this.current = typeof err.current === "number" ? err.current : undefined;
       this.max = typeof err.max === "number" ? err.max : undefined;
     } else {

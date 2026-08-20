@@ -1,17 +1,23 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ModelProvidersApiError } from "@/client-sdk/services/model-providers/model-providers-api.service";
 
-vi.mock("@/client-sdk/services/model-providers/model-providers-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return {
-    ...actual,
-    ModelProvidersApiService: vi.fn(),
-  };
-});
+vi.mock(
+  "@/client-sdk/services/model-providers/model-providers-api.service",
+  async (importOriginal) => {
+    const actual = (await importOriginal()) as Record<string, unknown>;
+    return {
+      ...actual,
+      ModelProvidersApiService: vi.fn(),
+    };
+  },
+);
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -48,10 +54,12 @@ describe("listModelProvidersCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockList = vi.fn();
-    vi.mocked(ModelProvidersApiService).mockImplementation(function () { return ({
-      list: mockList,
-      set: vi.fn(),
-    }) as unknown as ModelProvidersApiService; });
+    vi.mocked(ModelProvidersApiService).mockImplementation(function () {
+      return {
+        list: mockList,
+        set: vi.fn(),
+      } as unknown as ModelProvidersApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -75,14 +83,15 @@ describe("listModelProvidersCommand()", () => {
 
       await listModelProvidersCommand();
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(process.exit).not.toHaveBeenCalled();
     });
   });
 
   describe("when a machine format is requested", () => {
     it("returns the raw provider map as the payload instead of printing", async () => {
-      const providers = { openai: { provider: "openai", enabled: true, customKeys: {} } };
+      const providers = {
+        openai: { provider: "openai", enabled: true, customKeys: {} },
+      };
       mockList.mockResolvedValue(providers);
 
       const result = await listModelProvidersCommand();
@@ -100,7 +109,9 @@ describe("listModelProvidersCommand()", () => {
         new ModelProvidersApiError("Network error", "list model providers"),
       );
 
-      await expect(listModelProvidersCommand()).rejects.toThrow(ProcessExitError);
+      await expect(listModelProvidersCommand()).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });
@@ -111,10 +122,12 @@ describe("setModelProviderCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSet = vi.fn();
-    vi.mocked(ModelProvidersApiService).mockImplementation(function () { return ({
-      list: vi.fn(),
-      set: mockSet,
-    }) as unknown as ModelProvidersApiService; });
+    vi.mocked(ModelProvidersApiService).mockImplementation(function () {
+      return {
+        list: vi.fn(),
+        set: mockSet,
+      } as unknown as ModelProvidersApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -126,9 +139,12 @@ describe("setModelProviderCommand()", () => {
 
       await setModelProviderCommand("openai", { enabled: true });
 
-      expect(mockSet).toHaveBeenCalledWith("openai", expect.objectContaining({
-        enabled: true,
-      }));
+      expect(mockSet).toHaveBeenCalledWith(
+        "openai",
+        expect.objectContaining({
+          enabled: true,
+        }),
+      );
     });
   });
 
@@ -136,12 +152,18 @@ describe("setModelProviderCommand()", () => {
     it("maps the key to the correct field", async () => {
       mockSet.mockResolvedValue({});
 
-      await setModelProviderCommand("openai", { enabled: true, apiKey: "sk-test" });
-
-      expect(mockSet).toHaveBeenCalledWith("openai", expect.objectContaining({
+      await setModelProviderCommand("openai", {
         enabled: true,
-        customKeys: { OPENAI_API_KEY: "sk-test" },
-      }));
+        apiKey: "sk-test",
+      });
+
+      expect(mockSet).toHaveBeenCalledWith(
+        "openai",
+        expect.objectContaining({
+          enabled: true,
+          customKeys: { OPENAI_API_KEY: "sk-test" },
+        }),
+      );
     });
   });
 

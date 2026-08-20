@@ -1,32 +1,32 @@
-import * as semconv from "@opentelemetry/semantic-conventions/incubating";
-import {
-  type Span,
-  type SpanContext,
-  type SpanStatus,
-  type Attributes,
-  type AttributeValue,
-  type Link,
-  type Exception,
+import type {
+  Attributes,
+  AttributeValue,
+  Exception,
+  Link,
+  Span,
+  SpanContext,
+  SpanStatus,
 } from "@opentelemetry/api";
-import {
-  type SimpleChatMessage,
-  type LangWatchSpan,
-  type LangWatchSpanMetrics,
-  type LangWatchSpanRAGContext,
-  type SpanType,
-} from "./types";
-import { type Prompt } from "@/client-sdk/services/prompts";
-import { type ChatMessage, type SpanInputOutput } from "../../internal/generated/types/tracer";
+import * as semconv from "@opentelemetry/semantic-conventions/incubating";
+import type { Prompt } from "@/client-sdk/services/prompts";
+import type {
+  ChatMessage,
+  SpanInputOutput,
+} from "../../internal/generated/types/tracer";
+import { type AddEvaluationParams, emitEvaluationEvent } from "../evaluation";
+import type { SemConvAttributeKey, SemConvAttributes } from "../semconv";
 import * as intSemconv from "../semconv/attributes";
 import { processSpanInputOutput } from "./input-output";
-import type { SemConvAttributeKey, SemConvAttributes } from "../semconv";
-import {
-  emitEvaluationEvent,
-  type AddEvaluationParams,
-} from "../evaluation";
+import type {
+  LangWatchSpan,
+  LangWatchSpanMetrics,
+  LangWatchSpanRAGContext,
+  SimpleChatMessage,
+  SpanType,
+} from "./types";
 
 class LangWatchSpanInternal implements LangWatchSpan {
-  constructor(private span: Span) { }
+  constructor(private span: Span) {}
   setAttributes(attributes: SemConvAttributes): this {
     this.span.setAttributes(attributes);
     return this;
@@ -120,7 +120,7 @@ class LangWatchSpanInternal implements LangWatchSpan {
   setRAGContexts(ragContexts: LangWatchSpanRAGContext[]): this {
     return this.setAttribute(
       intSemconv.ATTR_LANGWATCH_RAG_CONTEXTS,
-      JSON.stringify(ragContexts)
+      JSON.stringify(ragContexts),
     );
   }
 
@@ -134,13 +134,16 @@ class LangWatchSpanInternal implements LangWatchSpan {
       JSON.stringify({
         type: "json",
         value: metrics,
-      })
+      }),
     );
   }
 
   setInput(type: "text", input: string): this;
   setInput(type: "raw", input: any): this;
-  setInput(type: "chat_messages", input: ChatMessage[] | SimpleChatMessage[]): this;
+  setInput(
+    type: "chat_messages",
+    input: ChatMessage[] | SimpleChatMessage[],
+  ): this;
   setInput(type: "list", input: SpanInputOutput[]): this;
   setInput(type: "json", input: any): this;
   setInput(input: any): this;
@@ -148,13 +151,16 @@ class LangWatchSpanInternal implements LangWatchSpan {
     const spanInput = processSpanInputOutput(typeOrInput, input);
     return this.setAttribute(
       intSemconv.ATTR_LANGWATCH_INPUT,
-      JSON.stringify(spanInput)
+      JSON.stringify(spanInput),
     );
   }
 
   setOutput(type: "text", output: string): this;
   setOutput(type: "raw", output: any): this;
-  setOutput(type: "chat_messages", output: ChatMessage[] | SimpleChatMessage[]): this;
+  setOutput(
+    type: "chat_messages",
+    output: ChatMessage[] | SimpleChatMessage[],
+  ): this;
   setOutput(type: "list", output: SpanInputOutput[]): this;
   setOutput(type: "json", output: any): this;
   setOutput(output: any): this;
@@ -162,7 +168,7 @@ class LangWatchSpanInternal implements LangWatchSpan {
     const spanOutput = processSpanInputOutput(typeOrOutput, output);
     return this.setAttribute(
       intSemconv.ATTR_LANGWATCH_OUTPUT,
-      JSON.stringify(spanOutput)
+      JSON.stringify(spanOutput),
     );
   }
 }

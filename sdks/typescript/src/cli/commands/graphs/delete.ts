@@ -1,12 +1,11 @@
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
 import { scopedApiKey } from "@/internal/credentialContext";
-import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 import type { CommandResult } from "../../utils/output";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 /**
  * Returns the deletion outcome rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
@@ -22,18 +21,25 @@ export const deleteGraphCommand = async (
   const spinner = createSpinner(`Deleting graph "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/graphs/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-      headers: buildAuthHeaders({ apiKey }),
-    });
+    const response = await fetch(
+      `${endpoint}/api/graphs/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE",
+        headers: buildAuthHeaders({ apiKey }),
+      },
+    );
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: `delete graph "${id}"` });
+      failSpinner({
+        spinner,
+        error: new Error(message),
+        action: `delete graph "${id}"`,
+      });
       process.exit(1);
     }
 
-    const result = await response.json() as { id: string; deleted: boolean };
+    const result = (await response.json()) as { id: string; deleted: boolean };
     spinner.succeed(`Graph "${id}" deleted`);
 
     return {

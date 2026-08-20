@@ -1,19 +1,17 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../utils/spinner";
-import { resolveCredentials } from "../utils/apiKey";
-import {
-  createLangWatchApiClient,
-} from "@/internal/api/client";
-import { buildAuthHeaders, isPersonalAccessToken } from "@/internal/api/auth";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import { printResult, type RawOutputFlags } from "../utils/output";
-import { buildProgram } from "../program";
-import { buildCatalog, renderStatusSummary } from "../utils/commandCatalog";
-import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import { GatewayBudgetsApiService } from "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service";
+import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
+import { buildAuthHeaders, isPersonalAccessToken } from "@/internal/api/auth";
+import { createLangWatchApiClient } from "@/internal/api/client";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { buildProgram } from "../program";
+import { resolveCredentials } from "../utils/apiKey";
+import { buildCatalog, renderStatusSummary } from "../utils/commandCatalog";
+import { printResult, type RawOutputFlags } from "../utils/output";
+import { createSpinner } from "../utils/spinner";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Budgets at or above this utilization are worth a human's attention. */
@@ -71,7 +69,10 @@ class CallTimeoutError extends Error {
  * settle. A timeout is reported the same way any other section failure is —
  * as an `errors` entry — so it withholds the all-clear rather than hiding.
  */
-async function withTimeout<T>(operation: () => Promise<T>, ms: number): Promise<T> {
+async function withTimeout<T>(
+  operation: () => Promise<T>,
+  ms: number,
+): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
@@ -90,7 +91,9 @@ async function withTimeout<T>(operation: () => Promise<T>, ms: number): Promise<
 /** A timeout is a first-class, self-explanatory reason — don't run it through
  * the API-body formatter, which has nothing to add to it. */
 const describeFailure = (error: unknown): string =>
-  error instanceof CallTimeoutError ? error.message : formatApiErrorMessage({ error });
+  error instanceof CallTimeoutError
+    ? error.message
+    : formatApiErrorMessage({ error });
 
 export interface RunningExperiment {
   slug: string;
@@ -146,7 +149,9 @@ export interface StatusDocument {
   resources: Record<string, { count: number; error?: string; status?: number }>;
 }
 
-export const statusCommand = async (options?: RawOutputFlags): Promise<void> => {
+export const statusCommand = async (
+  options?: RawOutputFlags,
+): Promise<void> => {
   await resolveCredentials();
 
   const apiClient = createLangWatchApiClient();
@@ -154,7 +159,10 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
   const endpoint = resolveControlPlaneUrl();
   const spinner = createSpinner("Fetching project status...").start();
 
-  const results: Record<string, { count: number; error?: string; status?: number }> = {};
+  const results: Record<
+    string,
+    { count: number; error?: string; status?: number }
+  > = {};
   const attention: AttentionReport = {
     erroredTraces24h: null,
     runningExperiments: null,
@@ -163,7 +171,9 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     advisories: {},
   };
 
-  async function fetchCount(url: string): Promise<{ data: unknown; error?: unknown; status?: number }> {
+  async function fetchCount(
+    url: string,
+  ): Promise<{ data: unknown; error?: unknown; status?: number }> {
     const response = await fetch(`${endpoint}${url}`, {
       headers: buildAuthHeaders({ apiKey }),
     });
@@ -174,7 +184,11 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       } catch {
         body = undefined;
       }
-      return { data: null, error: body ?? response.statusText, status: response.status };
+      return {
+        data: null,
+        error: body ?? response.statusText,
+        status: response.status,
+      };
     }
     const data = await response.json();
     return { data, error: undefined };
@@ -199,7 +213,9 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
 
   async function fetchRunningExperiments(): Promise<RunningExperiment[]> {
     const service = new ExperimentsApiService();
-    const list = await service.listExperiments({ pageSize: EXPERIMENT_PAGE_SIZE });
+    const list = await service.listExperiments({
+      pageSize: EXPERIMENT_PAGE_SIZE,
+    });
     // "Running" is a property of a run, and runs are only listed per
     // experiment — so check the latest run of just the most recently active
     // experiments rather than fanning out over all of them.
@@ -212,7 +228,8 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       .filter((experiment) => experiment.lastRunAt !== null)
       .sort(
         (a, b) =>
-          new Date(b.lastRunAt ?? 0).getTime() - new Date(a.lastRunAt ?? 0).getTime(),
+          new Date(b.lastRunAt ?? 0).getTime() -
+          new Date(a.lastRunAt ?? 0).getTime(),
       );
     const candidates = recent.slice(0, RUNNING_EXPERIMENT_CANDIDATES);
 
@@ -241,7 +258,9 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     // the gaps must be on the record too: silently dropping them is how a
     // running experiment the scan never looked at turns into a green
     // "nothing needs your attention".
-    const failedChecks = checks.filter((check) => check.status === "rejected").length;
+    const failedChecks = checks.filter(
+      (check) => check.status === "rejected",
+    ).length;
     const gaps: string[] = [];
     // `GET /api/experiments` is ordered by `updatedAt desc`, NOT by `lastRunAt`
     // — so a running experiment whose row has a stale `updatedAt` can sit past
@@ -354,7 +373,9 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
             // it below the threshold is how a `block` budget that rejects every
             // single request turns into a green tick.
             utilizationPct:
-              effectiveLimit <= 0 ? 100 : Math.round((spent / effectiveLimit) * 100),
+              effectiveLimit <= 0
+                ? 100
+                : Math.round((spent / effectiveLimit) * 100),
             spentUsd: budget.spent_usd,
             limitUsd: budget.limit_usd,
             onBreach: budget.on_breach,
@@ -423,7 +444,10 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
   // RunningExperiment[] | BudgetAtRisk[], so an inferred `fn` is a union of
   // thunks. The result is assigned through a keyed cast below, which is where
   // the per-key types are reconciled.
-  const sectionFetchers: { key: AttentionSectionKey; fn: () => Promise<unknown> }[] = [
+  const sectionFetchers: {
+    key: AttentionSectionKey;
+    fn: () => Promise<unknown>;
+  }[] = [
     { key: "erroredTraces24h", fn: fetchErroredTraces24h },
     { key: "runningExperiments", fn: fetchRunningExperiments },
     { key: "budgetsAtRisk", fn: fetchBudgetsAtRisk },
@@ -434,8 +458,10 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       try {
         const result = await withTimeout(fn, LIST_CALL_TIMEOUT_MS);
         const { data, error } = result;
-        const status = (result as { status?: number; response?: { status?: number } }).status
-          ?? (result as { response?: { status?: number } }).response?.status;
+        const status =
+          (result as { status?: number; response?: { status?: number } })
+            .status ??
+          (result as { response?: { status?: number } }).response?.status;
         if (error) {
           results[key] = {
             count: 0,
@@ -446,11 +472,20 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         }
         if (Array.isArray(data)) {
           results[key] = { count: data.length };
-        } else if (data && typeof data === "object" && "data" in (data as Record<string, unknown>)) {
+        } else if (
+          data &&
+          typeof data === "object" &&
+          "data" in (data as Record<string, unknown>)
+        ) {
           const arr = (data as { data: unknown[] }).data;
           results[key] = { count: Array.isArray(arr) ? arr.length : 0 };
-        } else if (data && typeof data === "object" && "pagination" in (data as Record<string, unknown>)) {
-          const pagination = (data as { pagination: { total: number } }).pagination;
+        } else if (
+          data &&
+          typeof data === "object" &&
+          "pagination" in (data as Record<string, unknown>)
+        ) {
+          const pagination = (data as { pagination: { total: number } })
+            .pagination;
           results[key] = { count: pagination.total };
         } else {
           results[key] = { count: 0 };
@@ -494,23 +529,49 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       // over a grid of red error messages. (Machine formats print the document
       // and exit 0 — the per-resource errors are IN the document.)
       if (errorCount === totalCount && totalCount > 0) {
-        const sampleError = Object.values(results).find((r) => r.error)?.error ?? "";
+        const sampleError =
+          Object.values(results).find((r) => r.error)?.error ?? "";
         const statuses = Object.values(results)
           .map((r) => r.status)
           .filter((s): s is number => typeof s === "number");
-        const allUnauthorized = statuses.length > 0 && statuses.every((s) => s === 401 || s === 403);
+        const allUnauthorized =
+          statuses.length > 0 && statuses.every((s) => s === 401 || s === 403);
         console.log();
         console.log(chalk.red("  ✗ Could not fetch any project resources."));
         console.log(chalk.gray(`    Reason: ${sampleError}`));
         console.log();
-        if (allUnauthorized && isPersonalAccessToken(apiKey) && !process.env.LANGWATCH_PROJECT_ID) {
-          console.log(chalk.gray(`    Your PAT requires ${chalk.cyan("LANGWATCH_PROJECT_ID")} to be set.`));
-          console.log(chalk.gray(`    Set it via: ${chalk.cyan("export LANGWATCH_PROJECT_ID=<your-project-id>")}`));
-          console.log(chalk.gray(`    Or add to .env: ${chalk.cyan("LANGWATCH_PROJECT_ID=<your-project-id>")}`));
+        if (
+          allUnauthorized &&
+          isPersonalAccessToken(apiKey) &&
+          !process.env.LANGWATCH_PROJECT_ID
+        ) {
+          console.log(
+            chalk.gray(
+              `    Your PAT requires ${chalk.cyan("LANGWATCH_PROJECT_ID")} to be set.`,
+            ),
+          );
+          console.log(
+            chalk.gray(
+              `    Set it via: ${chalk.cyan("export LANGWATCH_PROJECT_ID=<your-project-id>")}`,
+            ),
+          );
+          console.log(
+            chalk.gray(
+              `    Or add to .env: ${chalk.cyan("LANGWATCH_PROJECT_ID=<your-project-id>")}`,
+            ),
+          );
         } else if (allUnauthorized) {
-          console.log(chalk.gray(`    Your API key appears to be invalid or revoked. Re-run ${chalk.cyan("langwatch login")} or check ${chalk.cyan("LANGWATCH_API_KEY")}.`));
+          console.log(
+            chalk.gray(
+              `    Your API key appears to be invalid or revoked. Re-run ${chalk.cyan("langwatch login")} or check ${chalk.cyan("LANGWATCH_API_KEY")}.`,
+            ),
+          );
         } else {
-          console.log(chalk.gray(`    Check ${chalk.cyan("LANGWATCH_API_KEY")} (current endpoint: ${chalk.cyan(endpoint)}).`));
+          console.log(
+            chalk.gray(
+              `    Check ${chalk.cyan("LANGWATCH_API_KEY")} (current endpoint: ${chalk.cyan(endpoint)}).`,
+            ),
+          );
         }
         console.log();
         process.exit(1);
@@ -521,12 +582,18 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       console.log(chalk.bold("  Needs Attention:"));
 
       let flagged = 0;
-      if (attention.erroredTraces24h !== null && attention.erroredTraces24h > 0) {
+      if (
+        attention.erroredTraces24h !== null &&
+        attention.erroredTraces24h > 0
+      ) {
         flagged++;
         console.log(
           chalk.red(
             `    ⚠ ${attention.erroredTraces24h} trace${attention.erroredTraces24h === 1 ? "" : "s"} errored in the last 24h`,
-          ) + chalk.gray(`  →  langwatch trace search  (defaults to the last 24h)`),
+          ) +
+            chalk.gray(
+              `  →  langwatch trace search  (defaults to the last 24h)`,
+            ),
         );
       }
       for (const experiment of attention.runningExperiments ?? []) {
@@ -538,7 +605,10 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         console.log(
           chalk.yellow(
             `    ⚠ experiment "${experiment.name ?? experiment.slug}" is still running${progress}`,
-          ) + chalk.gray(`  →  langwatch experiment status ${experiment.slug} --run-id ${experiment.runId}`),
+          ) +
+            chalk.gray(
+              `  →  langwatch experiment status ${experiment.slug} --run-id ${experiment.runId}`,
+            ),
         );
       }
       for (const budget of attention.budgetsAtRisk ?? []) {
@@ -578,12 +648,18 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         budgetsAtRisk: "gateway budgets",
       };
       for (const [key, message] of Object.entries(attention.errors)) {
-        console.log(chalk.gray(`    (could not check ${sectionLabels[key] ?? key}: ${message})`));
+        console.log(
+          chalk.gray(
+            `    (could not check ${sectionLabels[key] ?? key}: ${message})`,
+          ),
+        );
       }
       // Advisories read differently on purpose: "note" is a standing limit of
       // the API, not a check that failed this run, and it does not gate the ✓.
       for (const [key, message] of Object.entries(attention.advisories)) {
-        console.log(chalk.gray(`    (note — ${sectionLabels[key] ?? key}: ${message})`));
+        console.log(
+          chalk.gray(`    (note — ${sectionLabels[key] ?? key}: ${message})`),
+        );
       }
 
       console.log();
@@ -595,7 +671,9 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         const countStr = r.error
           ? chalk.red(r.error)
           : chalk.cyan(String(r.count));
-        console.log(`    ${chalk.gray(key + ":")} ${" ".repeat(14 - key.length)}${countStr}`);
+        console.log(
+          `    ${chalk.gray(key + ":")} ${" ".repeat(14 - key.length)}${countStr}`,
+        );
       }
 
       console.log();
@@ -607,7 +685,11 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         console.log(chalk.gray(`    ${line}`));
       }
       console.log();
-      console.log(chalk.gray("  Run `langwatch commands` for the full catalog (args, flags, hints)."));
+      console.log(
+        chalk.gray(
+          "  Run `langwatch commands` for the full catalog (args, flags, hints).",
+        ),
+      );
       console.log();
     },
   });

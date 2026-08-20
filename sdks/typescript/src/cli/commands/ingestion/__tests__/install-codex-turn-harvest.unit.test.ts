@@ -60,8 +60,7 @@ const origConfig = process.env.LANGWATCH_CLI_CONFIG;
 const stdout = (): string =>
   stdoutSpy.mock.calls.map((call: unknown[]) => String(call[0])).join("");
 
-const readConfigToml = (): string =>
-  fs.readFileSync(codexConfigPath, "utf8");
+const readConfigToml = (): string => fs.readFileSync(codexConfigPath, "utf8");
 
 const runCodexInstall = async (
   overrides: Record<string, unknown> = {},

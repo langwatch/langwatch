@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/client-sdk/services/prompts", () => ({
   PromptsApiService: vi.fn(),
@@ -6,7 +6,11 @@ vi.mock("@/client-sdk/services/prompts", () => ({
 }));
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("readline", () => ({
@@ -16,9 +20,9 @@ vi.mock("readline", () => ({
   createInterface: vi.fn(),
 }));
 
-import { tagDeleteCommand } from "../delete";
-import { PromptsApiService } from "@/client-sdk/services/prompts";
 import * as readline from "readline";
+import { PromptsApiService } from "@/client-sdk/services/prompts";
+import { tagDeleteCommand } from "../delete";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -44,8 +48,11 @@ describe("tagDeleteCommand", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDeleteTag = vi.fn();
-    vi.mocked(PromptsApiService).mockImplementation(
-      function () { return ({ deleteTag: mockDeleteTag }) as unknown as InstanceType<typeof PromptsApiService>; });
+    vi.mocked(PromptsApiService).mockImplementation(function () {
+      return { deleteTag: mockDeleteTag } as unknown as InstanceType<
+        typeof PromptsApiService
+      >;
+    });
     vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new ProcessExitError(code as number);
     });
@@ -70,7 +77,9 @@ describe("tagDeleteCommand", () => {
       const result = await tagDeleteCommand("canary");
       result?.table();
 
-      expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Deleted tag: canary"));
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("Deleted tag: canary"),
+      );
     });
   });
 
@@ -88,7 +97,9 @@ describe("tagDeleteCommand", () => {
 
       await tagDeleteCommand("canary");
 
-      expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Aborted"));
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("Aborted"),
+      );
     });
 
     it("exits with code 0 (returns without error)", async () => {
@@ -115,7 +126,9 @@ describe("tagDeleteCommand", () => {
       const result = await tagDeleteCommand("canary", { force: true });
       result?.table();
 
-      expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Deleted tag: canary"));
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("Deleted tag: canary"),
+      );
     });
   });
 });

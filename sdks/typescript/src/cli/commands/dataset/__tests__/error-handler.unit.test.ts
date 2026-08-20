@@ -1,5 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
 import type { Ora } from "ora";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  vi,
+} from "vitest";
 import {
   DatasetApiError,
   DatasetNotFoundError,
@@ -17,11 +25,11 @@ describe("handleDatasetCommandError", () => {
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {
       /* suppress */
     });
-    processExitSpy = vi
-      .spyOn(process, "exit")
-      .mockImplementation(((_code?: number | string | null) => {
-        throw new Error("process.exit called");
-      }) as (code?: number | string | null) => never);
+    processExitSpy = vi.spyOn(process, "exit").mockImplementation(((
+      _code?: number | string | null,
+    ) => {
+      throw new Error("process.exit called");
+    }) as (code?: number | string | null) => never);
     spinnerFail = vi.fn();
     spinner = { fail: spinnerFail } as unknown as Ora;
   });
@@ -30,7 +38,10 @@ describe("handleDatasetCommandError", () => {
     vi.restoreAllMocks();
   });
 
-  function callHandler(error: unknown, context: string): { spinnerCalls: string[]; errorCalls: string[] } {
+  function callHandler(
+    error: unknown,
+    context: string,
+  ): { spinnerCalls: string[]; errorCalls: string[] } {
     try {
       handleDatasetCommandError({ spinner, error, context });
     } catch {
@@ -44,7 +55,10 @@ describe("handleDatasetCommandError", () => {
 
   describe("when the error is a DatasetNotFoundError", () => {
     it("prefixes the spinner fail with 'Not found:'", () => {
-      const { spinnerCalls } = callHandler(new DatasetNotFoundError("my-ds"), "fetch dataset");
+      const { spinnerCalls } = callHandler(
+        new DatasetNotFoundError("my-ds"),
+        "fetch dataset",
+      );
       expect(spinnerCalls.join("\n")).toContain("Not found");
       expect(spinnerCalls.join("\n")).toContain("my-ds");
     });
@@ -87,7 +101,10 @@ describe("handleDatasetCommandError", () => {
 
   describe("when the error is unknown", () => {
     it("includes the operation context in the spinner fail message", () => {
-      const { spinnerCalls } = callHandler(new Error("something broke"), "delete dataset");
+      const { spinnerCalls } = callHandler(
+        new Error("something broke"),
+        "delete dataset",
+      );
       expect(spinnerCalls.join("\n")).toContain("delete dataset");
       expect(spinnerCalls.join("\n")).toContain("something broke");
     });
@@ -95,7 +112,11 @@ describe("handleDatasetCommandError", () => {
 
   it("always calls process.exit(1)", () => {
     try {
-      handleDatasetCommandError({ spinner, error: new Error("x"), context: "y" });
+      handleDatasetCommandError({
+        spinner,
+        error: new Error("x"),
+        context: "y",
+      });
     } catch {
       /* ignore */
     }

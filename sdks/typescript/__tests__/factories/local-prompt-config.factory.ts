@@ -1,5 +1,5 @@
 import { Factory } from "fishery";
-import { type LocalPromptConfig } from "../../src/cli/types";
+import type { LocalPromptConfig } from "../../src/cli/types";
 
 /**
  * Factory for creating LocalPromptConfig objects (local configuration structure)

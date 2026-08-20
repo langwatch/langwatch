@@ -1,17 +1,23 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentsApiError } from "@/client-sdk/services/agents/agents-api.service";
 
-vi.mock("@/client-sdk/services/agents/agents-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return {
-    ...actual,
-    AgentsApiService: vi.fn(),
-  };
-});
+vi.mock(
+  "@/client-sdk/services/agents/agents-api.service",
+  async (importOriginal) => {
+    const actual = (await importOriginal()) as Record<string, unknown>;
+    return {
+      ...actual,
+      AgentsApiService: vi.fn(),
+    };
+  },
+);
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -23,10 +29,10 @@ vi.mock("ora", () => ({
 }));
 
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
-import { listAgentsCommand } from "../list";
-import { getAgentCommand } from "../get";
 import { createAgentCommand } from "../create";
 import { deleteAgentCommand } from "../delete";
+import { getAgentCommand } from "../get";
+import { listAgentsCommand } from "../list";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -60,13 +66,15 @@ describe("listAgentsCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockList = vi.fn();
-    vi.mocked(AgentsApiService).mockImplementation(function () { return ({
-      list: mockList,
-      get: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    }) as unknown as AgentsApiService; });
+    vi.mocked(AgentsApiService).mockImplementation(function () {
+      return {
+        list: mockList,
+        get: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as AgentsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -94,7 +102,6 @@ describe("listAgentsCommand()", () => {
 
       await listAgentsCommand();
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(process.exit).not.toHaveBeenCalled();
     });
   });
@@ -133,13 +140,15 @@ describe("getAgentCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGet = vi.fn();
-    vi.mocked(AgentsApiService).mockImplementation(function () { return ({
-      list: vi.fn(),
-      get: mockGet,
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    }) as unknown as AgentsApiService; });
+    vi.mocked(AgentsApiService).mockImplementation(function () {
+      return {
+        list: vi.fn(),
+        get: mockGet,
+        create: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as AgentsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -157,11 +166,11 @@ describe("getAgentCommand()", () => {
 
   describe("when agent is not found", () => {
     it("exits with code 1", async () => {
-      mockGet.mockRejectedValue(
-        new AgentsApiError("Not found", "get agent"),
-      );
+      mockGet.mockRejectedValue(new AgentsApiError("Not found", "get agent"));
 
-      await expect(getAgentCommand("nonexistent")).rejects.toThrow(ProcessExitError);
+      await expect(getAgentCommand("nonexistent")).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });
@@ -172,13 +181,15 @@ describe("createAgentCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreate = vi.fn();
-    vi.mocked(AgentsApiService).mockImplementation(function () { return ({
-      list: vi.fn(),
-      get: vi.fn(),
-      create: mockCreate,
-      update: vi.fn(),
-      delete: vi.fn(),
-    }) as unknown as AgentsApiService; });
+    vi.mocked(AgentsApiService).mockImplementation(function () {
+      return {
+        list: vi.fn(),
+        get: vi.fn(),
+        create: mockCreate,
+        update: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as AgentsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -228,13 +239,15 @@ describe("deleteAgentCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDelete = vi.fn();
-    vi.mocked(AgentsApiService).mockImplementation(function () { return ({
-      list: vi.fn(),
-      get: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: mockDelete,
-    }) as unknown as AgentsApiService; });
+    vi.mocked(AgentsApiService).mockImplementation(function () {
+      return {
+        list: vi.fn(),
+        get: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        delete: mockDelete,
+      } as unknown as AgentsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -256,7 +269,9 @@ describe("deleteAgentCommand()", () => {
         new AgentsApiError("Not found", "delete agent"),
       );
 
-      await expect(deleteAgentCommand("nonexistent")).rejects.toThrow(ProcessExitError);
+      await expect(deleteAgentCommand("nonexistent")).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });

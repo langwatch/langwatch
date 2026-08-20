@@ -11,13 +11,14 @@
  *
  * Split out of `output-port.unit.test.ts`, which pins the port itself.
  */
-import { describe, it, expect } from "vitest";
+
 import { Command } from "commander";
+import { describe, expect, it } from "vitest";
 import {
   assertFormatIsSupported,
+  emitsResult,
   registerOutputOptions,
   resolveActionOutputOptions,
-  emitsResult,
 } from "../output";
 import { installOutputHarness } from "./output-harness";
 
@@ -38,19 +39,27 @@ describe("assertFormatIsSupported", () => {
         const legacy = legacyCommand();
         legacy.setOptionValue("output", "json");
 
-        await assertFormatIsSupported(legacy, resolveActionOutputOptions(legacy));
+        await assertFormatIsSupported(
+          legacy,
+          resolveActionOutputOptions(legacy),
+        );
 
         expect(exited).toEqual([1]);
         // Rendered as the human block on stderr here: no output scope has been
         // applied in this unit, so errorOutput takes its non-machine path.
-        expect(warned.join("") + logged.join("")).toContain("does not emit structured output");
+        expect(warned.join("") + logged.join("")).toContain(
+          "does not emit structured output",
+        );
       });
 
       it("refuses a --jq expression it would otherwise never parse", async () => {
         const legacy = legacyCommand();
         legacy.setOptionValue("jq", ".anything[0]");
 
-        await assertFormatIsSupported(legacy, resolveActionOutputOptions(legacy));
+        await assertFormatIsSupported(
+          legacy,
+          resolveActionOutputOptions(legacy),
+        );
 
         expect(exited).toEqual([1]);
       });
@@ -106,7 +115,10 @@ describe("assertFormatIsSupported", () => {
         payload.setOptionValue("json", '{"a":1}');
         payload.setOptionValue("output", "yaml");
 
-        await assertFormatIsSupported(payload, resolveActionOutputOptions(payload));
+        await assertFormatIsSupported(
+          payload,
+          resolveActionOutputOptions(payload),
+        );
 
         expect(exited).toEqual([1]);
       });

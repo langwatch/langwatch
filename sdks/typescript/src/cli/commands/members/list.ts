@@ -48,7 +48,9 @@ export const listMembersCommand = async (
           Name: orDash(member.user.name),
           Email: orDash(member.user.email),
           Role: member.role,
-          Status: member.disabled ? chalk.yellow("disabled") : chalk.green("active"),
+          Status: member.disabled
+            ? chalk.yellow("disabled")
+            : chalk.green("active"),
         })),
         headers: ["User ID", "Name", "Email", "Role", "Status"],
         colorMap: { "User ID": chalk.gray, Name: chalk.cyan },

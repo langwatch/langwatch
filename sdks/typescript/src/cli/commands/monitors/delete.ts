@@ -1,24 +1,22 @@
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
 import { scopedApiKey } from "@/internal/credentialContext";
-import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
-import { buildAuthHeaders } from "@/internal/api/auth";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 /**
  * Returns the deletion outcome rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
  */
 export const deleteMonitorCommand = async (
-  id: string
+  id: string,
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Deleting monitor "${id}"...`).start();
 
@@ -34,7 +32,11 @@ export const deleteMonitorCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "delete monitor" });
+      failSpinner({
+        spinner,
+        error: new Error(message),
+        action: "delete monitor",
+      });
       process.exit(1);
     }
 

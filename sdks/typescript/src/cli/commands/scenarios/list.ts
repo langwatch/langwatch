@@ -1,10 +1,10 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const listScenariosCommand = async (): Promise<CommandResult | void> => {
   await resolveCredentials();
@@ -39,7 +39,10 @@ export const listScenariosCommand = async (): Promise<CommandResult | void> => {
         const tableData = scenarios.map((scenario) => ({
           Name: scenario.name,
           ID: scenario.id,
-          Labels: scenario.labels.length > 0 ? scenario.labels.join(", ") : chalk.gray("—"),
+          Labels:
+            scenario.labels.length > 0
+              ? scenario.labels.join(", ")
+              : chalk.gray("—"),
           Criteria: `${scenario.criteria.length}`,
         }));
 

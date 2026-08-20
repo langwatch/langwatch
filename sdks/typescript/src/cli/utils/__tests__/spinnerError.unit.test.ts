@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
 import type { Ora } from "ora";
+import { describe, expect, it, vi } from "vitest";
 import { failSpinner } from "../spinnerError";
 
 const makeSpinner = () => {
@@ -16,7 +16,7 @@ const makeSpinner = () => {
 // Stripping ANSI color codes keeps assertions focused on message content
 // rather than `chalk`'s terminal escape sequences.
 const stripAnsi = (s: string): string =>
-  // eslint-disable-next-line no-control-regex
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping ANSI escape codes from chalk output is the whole point of the regex
   s.replace(/\u001b\[[0-9;]*m/g, "");
 
 describe("failSpinner", () => {
@@ -80,7 +80,9 @@ describe("failSpinner", () => {
       failSpinner({ spinner, error: err, action: "fetch trace" });
 
       const rendered = stripAnsi(String(calls[0]));
-      expect(rendered.split("\n")[0]).toBe("Failed to fetch trace: Record missing");
+      expect(rendered.split("\n")[0]).toBe(
+        "Failed to fetch trace: Record missing",
+      );
       // The Details block renders key/value pairs without a colon ("code  X").
       expect(rendered).toMatch(/code\s+NotFoundError/);
     });
@@ -94,7 +96,9 @@ describe("failSpinner", () => {
           this.name = "PromptsError";
         }
       }
-      const err = new PromptsError("Failed to sync prompt: Internal server error");
+      const err = new PromptsError(
+        "Failed to sync prompt: Internal server error",
+      );
       const { spinner, calls } = makeSpinner();
       failSpinner({ spinner, error: err, action: "sync prompt" });
       expect(stripAnsi(String(calls[0]))).toBe(

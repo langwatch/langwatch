@@ -1,9 +1,9 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { ModelProvidersApiService } from "@/client-sdk/services/model-providers/model-providers-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns what was configured rather than printing it: the output port renders
@@ -24,7 +24,9 @@ export const setModelProviderCommand = async (
   await resolveCredentials();
 
   const service = new ModelProvidersApiService();
-  const spinner = createSpinner(`Configuring model provider "${provider}"...`).start();
+  const spinner = createSpinner(
+    `Configuring model provider "${provider}"...`,
+  ).start();
 
   try {
     const customKeys: Record<string, string> = {};
@@ -38,7 +40,8 @@ export const setModelProviderCommand = async (
         groq: "GROQ_API_KEY",
         cohere: "COHERE_API_KEY",
       };
-      const keyField = keyFieldMap[provider] ?? `${provider.toUpperCase()}_API_KEY`;
+      const keyField =
+        keyFieldMap[provider] ?? `${provider.toUpperCase()}_API_KEY`;
       customKeys[keyField] = options.apiKey;
     }
 
@@ -48,9 +51,7 @@ export const setModelProviderCommand = async (
       ...(options.defaultModel && { defaultModel: options.defaultModel }),
     });
 
-    spinner.succeed(
-      `Configured model provider "${chalk.cyan(provider)}"`,
-    );
+    spinner.succeed(`Configured model provider "${chalk.cyan(provider)}"`);
 
     return {
       data: {

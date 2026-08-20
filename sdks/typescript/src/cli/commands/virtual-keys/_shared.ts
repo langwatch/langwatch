@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type {
   VirtualKey,
   VirtualKeyBudgetInput,
@@ -6,7 +7,6 @@ import type {
   VirtualKeyScope,
   VirtualKeyScopeType,
 } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { normalizeEndpoint } from "@/internal/endpoint";
 
 /**
@@ -45,17 +45,23 @@ export function parseScopeArg(raw: string): VirtualKeyScope {
   const trimmed = raw.trim();
   const colon = trimmed.indexOf(":");
   if (colon < 1 || colon === trimmed.length - 1) {
-    throw new Error(`--scope value "${raw}" must be in the form TYPE:id (e.g. org:acme, team:platform, project:demo)`);
+    throw new Error(
+      `--scope value "${raw}" must be in the form TYPE:id (e.g. org:acme, team:platform, project:demo)`,
+    );
   }
   // Case-insensitive for the human typing it; the wire value is lowercase.
   const typeRaw = trimmed.slice(0, colon).toLowerCase();
   const scopeId = trimmed.slice(colon + 1).trim();
   const scopeType: VirtualKeyScopeType | null =
-    typeRaw === "org" ? "organization" :
-    (SCOPE_TYPES as readonly string[]).includes(typeRaw) ? (typeRaw as VirtualKeyScopeType) :
-    null;
+    typeRaw === "org"
+      ? "organization"
+      : (SCOPE_TYPES as readonly string[]).includes(typeRaw)
+        ? (typeRaw as VirtualKeyScopeType)
+        : null;
   if (!scopeType) {
-    throw new Error(`--scope type "${typeRaw}" must be one of org | organization | team | project`);
+    throw new Error(
+      `--scope type "${typeRaw}" must be one of org | organization | team | project`,
+    );
   }
   if (!scopeId) {
     throw new Error(`--scope value "${raw}" is missing the id after the colon`);
@@ -72,7 +78,11 @@ export function formatScope(scope: VirtualKeyScope): string {
   return `${prefix}:${scope.scope_id}`;
 }
 
-const ROUTING_MODES: VirtualKeyRoutingMode[] = ["none", "fallback_all", "policy"];
+const ROUTING_MODES: VirtualKeyRoutingMode[] = [
+  "none",
+  "fallback_all",
+  "policy",
+];
 const BUDGET_WINDOWS = ["day", "week", "month"] as const;
 const BUDGET_BREACHES = ["block", "warn"] as const;
 
@@ -80,7 +90,9 @@ const BUDGET_BREACHES = ["block", "warn"] as const;
 export function parseRoutingModeArg(raw: string): VirtualKeyRoutingMode {
   const mode = raw.toLowerCase();
   if (!(ROUTING_MODES as readonly string[]).includes(mode)) {
-    throw new Error("--routing-mode must be one of none | fallback_all | policy");
+    throw new Error(
+      "--routing-mode must be one of none | fallback_all | policy",
+    );
   }
   return mode as VirtualKeyRoutingMode;
 }
@@ -105,7 +117,9 @@ export function buildBudgetFlags(
 ): VirtualKeyBudgetInput | null | undefined {
   if (options.clearBudget) {
     if (options.budgetLimit || options.budgetWindow || options.budgetBreach) {
-      throw new Error("--clear-budget cannot be combined with the other --budget-* flags");
+      throw new Error(
+        "--clear-budget cannot be combined with the other --budget-* flags",
+      );
     }
     return null;
   }

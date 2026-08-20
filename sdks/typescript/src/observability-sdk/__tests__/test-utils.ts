@@ -1,19 +1,19 @@
-import { vi, expect } from "vitest";
 import {
+  type Attributes,
+  type AttributeValue,
+  type Context,
+  type Exception,
+  type Link,
   type Span,
   type SpanContext,
+  SpanKind,
+  type SpanOptions,
   type SpanStatus,
-  type Link,
-  type Exception,
-  type AttributeValue,
-  type Attributes,
+  type SpanStatusCode,
   type Tracer,
   type TracerProvider,
-  type SpanOptions,
-  type Context,
-  SpanKind,
-  type SpanStatusCode,
 } from "@opentelemetry/api";
+import { expect, vi } from "vitest";
 import { createLangWatchSpan } from "../span";
 import { getLangWatchTracerFromProvider } from "../tracer";
 
@@ -23,7 +23,11 @@ import { getLangWatchTracerFromProvider } from "../tracer";
 export class MockSpan implements Span {
   private _name: string;
   private _attributes: Record<string, AttributeValue> = {};
-  private _events: Array<{ name: string; attributes?: Attributes; timestamp?: number }> = [];
+  private _events: Array<{
+    name: string;
+    attributes?: Attributes;
+    timestamp?: number;
+  }> = [];
   private _status?: SpanStatus;
   private _ended = false;
   private _links: Link[] = [];
@@ -47,19 +51,24 @@ export class MockSpan implements Span {
     return this;
   });
 
-  public readonly addEvent = vi.fn((name: string, attributes?: Attributes, timestamp?: number) => {
-    this._events.push({ name, attributes, timestamp });
-    return this;
-  });
+  public readonly addEvent = vi.fn(
+    (name: string, attributes?: Attributes, timestamp?: number) => {
+      this._events.push({ name, attributes, timestamp });
+      return this;
+    },
+  );
 
   public readonly recordException = vi.fn((exception: Exception) => {
-    const exceptionName = typeof exception === "object" && exception !== null && "name" in exception
-      ? (exception as any).name
-      : "Error";
-    const exceptionMessage = typeof exception === "object" && exception !== null && "message" in exception
-      ? (exception as any).message
-      // eslint-disable-next-line @typescript-eslint/no-base-to-string
-      : String(exception);
+    const exceptionName =
+      typeof exception === "object" && exception !== null && "name" in exception
+        ? (exception as any).name
+        : "Error";
+    const exceptionMessage =
+      typeof exception === "object" &&
+      exception !== null &&
+      "message" in exception
+        ? (exception as any).message
+        : String(exception);
 
     this._events.push({
       name: "exception",
@@ -137,7 +146,11 @@ export class MockSpan implements Span {
     return { ...this._attributes };
   }
 
-  get events(): Array<{ name: string; attributes?: Attributes; timestamp?: number }> {
+  get events(): Array<{
+    name: string;
+    attributes?: Attributes;
+    timestamp?: number;
+  }> {
     return [...this._events];
   }
 
@@ -164,7 +177,7 @@ export class MockSpan implements Span {
   }
 
   public expectEvent(name: string, attributes?: Partial<Attributes>): void {
-    const event = this._events.find(e => e.name === name);
+    const event = this._events.find((e) => e.name === name);
     expect(event).toBeDefined();
 
     if (attributes && event) {
@@ -197,16 +210,18 @@ export class MockSpan implements Span {
   }
 
   public hasEvent(name: string): boolean {
-    return this._events.some(event => event.name === name);
+    return this._events.some((event) => event.name === name);
   }
 
-  public getEvent(name: string): { name: string; attributes?: Attributes; timestamp?: number } | undefined {
-    return this._events.find(event => event.name === name);
+  public getEvent(
+    name: string,
+  ): { name: string; attributes?: Attributes; timestamp?: number } | undefined {
+    return this._events.find((event) => event.name === name);
   }
 
   public getEventCount(name?: string): number {
     if (name) {
-      return this._events.filter(event => event.name === name).length;
+      return this._events.filter((event) => event.name === name).length;
     }
     return this._events.length;
   }
@@ -218,44 +233,48 @@ export class MockSpan implements Span {
 export class MockTracer implements Tracer {
   private _spans: MockSpan[] = [];
 
-  public readonly startSpan = vi.fn((name: string, _options?: SpanOptions, _context?: Context): MockSpan => {
-    const span = new MockSpan(name);
-    this._spans.push(span);
-    return span;
-  });
+  public readonly startSpan = vi.fn(
+    (name: string, _options?: SpanOptions, _context?: Context): MockSpan => {
+      const span = new MockSpan(name);
+      this._spans.push(span);
+      return span;
+    },
+  );
 
-  public readonly startActiveSpan = vi.fn(<F extends (span: Span, ...args: any[]) => any>(
-    name: string,
-    fnOrOptions: F | SpanOptions,
-    optionsOrContextOrFn?: SpanOptions | Context | F,
-    contextOrFn?: Context | F,
-    fn?: F
-  ): ReturnType<F> => {
-    // Normalize arguments to match OpenTelemetry API
-    let actualFn: F;
-    let options: SpanOptions | undefined;
-    let context: Context | undefined;
+  public readonly startActiveSpan = vi.fn(
+    <F extends (span: Span, ...args: any[]) => any>(
+      name: string,
+      fnOrOptions: F | SpanOptions,
+      optionsOrContextOrFn?: SpanOptions | Context | F,
+      contextOrFn?: Context | F,
+      fn?: F,
+    ): ReturnType<F> => {
+      // Normalize arguments to match OpenTelemetry API
+      let actualFn: F;
+      let options: SpanOptions | undefined;
+      let context: Context | undefined;
 
-    if (typeof fnOrOptions === "function") {
-      actualFn = fnOrOptions;
-    } else if (typeof optionsOrContextOrFn === "function") {
-      options = fnOrOptions;
-      actualFn = optionsOrContextOrFn;
-    } else if (typeof contextOrFn === "function") {
-      options = fnOrOptions;
-      context = optionsOrContextOrFn as Context;
-      actualFn = contextOrFn;
-    } else if (typeof fn === "function") {
-      options = fnOrOptions;
-      context = optionsOrContextOrFn as Context;
-      actualFn = fn;
-    } else {
-      throw new Error("No callback function provided");
-    }
+      if (typeof fnOrOptions === "function") {
+        actualFn = fnOrOptions;
+      } else if (typeof optionsOrContextOrFn === "function") {
+        options = fnOrOptions;
+        actualFn = optionsOrContextOrFn;
+      } else if (typeof contextOrFn === "function") {
+        options = fnOrOptions;
+        context = optionsOrContextOrFn as Context;
+        actualFn = contextOrFn;
+      } else if (typeof fn === "function") {
+        options = fnOrOptions;
+        context = optionsOrContextOrFn as Context;
+        actualFn = fn;
+      } else {
+        throw new Error("No callback function provided");
+      }
 
-    const span = this.startSpan(name, options, context);
-    return actualFn(span) as ReturnType<F>;
-  });
+      const span = this.startSpan(name, options, context);
+      return actualFn(span) as ReturnType<F>;
+    },
+  );
 
   // Getters for test assertions
   get spans(): MockSpan[] {
@@ -263,7 +282,7 @@ export class MockTracer implements Tracer {
   }
 
   public getSpan(name: string): MockSpan | undefined {
-    return this._spans.find(span => span.name === name);
+    return this._spans.find((span) => span.name === name);
   }
 
   public getSpanCount(): number {
@@ -281,20 +300,25 @@ export class MockTracer implements Tracer {
 export class MockTracerProvider implements TracerProvider {
   private _tracers = new Map<string, MockTracer>();
 
-  public readonly getTracer = vi.fn((name: string, version?: string): MockTracer => {
-    const key = `${name}@${version ?? "latest"}`;
-    if (!this._tracers.has(key)) {
-      this._tracers.set(key, new MockTracer());
-    }
-    return this._tracers.get(key)!;
-  });
+  public readonly getTracer = vi.fn(
+    (name: string, version?: string): MockTracer => {
+      const key = `${name}@${version ?? "latest"}`;
+      if (!this._tracers.has(key)) {
+        this._tracers.set(key, new MockTracer());
+      }
+      return this._tracers.get(key)!;
+    },
+  );
 
   // Getters for test assertions
   get tracers(): Map<string, MockTracer> {
     return new Map(this._tracers);
   }
 
-  public getTracerByName(name: string, version?: string): MockTracer | undefined {
+  public getTracerByName(
+    name: string,
+    version?: string,
+  ): MockTracer | undefined {
     const key = `${name}@${version ?? "latest"}`;
     return this._tracers.get(key);
   }
@@ -393,7 +417,11 @@ export const matchers = {
   /**
    * Assert that a span has a specific attribute with expected value
    */
-  toHaveAttribute: (span: MockSpan, key: string, expectedValue?: AttributeValue) => {
+  toHaveAttribute: (
+    span: MockSpan,
+    key: string,
+    expectedValue?: AttributeValue,
+  ) => {
     const actualValue = span.getAttributeValue(key);
     const hasAttribute = actualValue !== undefined;
 
@@ -409,7 +437,8 @@ export const matchers = {
 
     return {
       pass: hasAttribute,
-      message: () => `Expected span to have attribute "${key}" but it was not found`,
+      message: () =>
+        `Expected span to have attribute "${key}" but it was not found`,
     };
   },
 
@@ -420,7 +449,8 @@ export const matchers = {
     const hasEvent = span.hasEvent(eventName);
     return {
       pass: hasEvent,
-      message: () => `Expected span to have event "${eventName}" but it was not found`,
+      message: () =>
+        `Expected span to have event "${eventName}" but it was not found`,
     };
   },
 
@@ -439,7 +469,8 @@ export const matchers = {
    */
   toHaveStatus: (span: MockSpan, expectedStatus: SpanStatus) => {
     const actualStatus = span.status;
-    const hasCorrectStatus = actualStatus?.code === expectedStatus.code &&
+    const hasCorrectStatus =
+      actualStatus?.code === expectedStatus.code &&
       actualStatus?.message === expectedStatus.message;
 
     return {
@@ -471,7 +502,7 @@ export function setupTestEnvironment() {
  * Utility to create a promise that resolves after all microtasks
  */
 export function flushPromises(): Promise<void> {
-  return new Promise(resolve => setImmediate(resolve));
+  return new Promise((resolve) => setImmediate(resolve));
 }
 
 /**
@@ -485,7 +516,7 @@ export function createRejectedPromise(error: Error): Promise<never> {
  * Utility to create a delayed promise
  */
 export function createDelayedPromise<T>(value: T, delay = 0): Promise<T> {
-  return new Promise(resolve => setTimeout(() => resolve(value), delay));
+  return new Promise((resolve) => setTimeout(() => resolve(value), delay));
 }
 
 /**
@@ -506,7 +537,11 @@ export const testScenarios = {
    */
   createTracerTest: (tracerName = "test-tracer", version?: string) => {
     const mockProvider = new MockTracerProvider();
-    const langwatchTracer = getLangWatchTracerFromProvider(mockProvider, tracerName, version);
+    const langwatchTracer = getLangWatchTracerFromProvider(
+      mockProvider,
+      tracerName,
+      version,
+    );
     const mockTracer = mockProvider.getTracerByName(tracerName, version)!;
     return { mockProvider, langwatchTracer, mockTracer };
   },
@@ -520,7 +555,7 @@ export const testScenarios = {
       expectSuccess?: boolean;
       expectedError?: Error;
       timeout?: number;
-    } = {}
+    } = {},
   ) => {
     const { expectSuccess = true, expectedError, timeout = 1000 } = options;
 
@@ -531,8 +566,8 @@ export const testScenarios = {
       result = await Promise.race([
         operation(),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Test timeout')), timeout)
-        )
+          setTimeout(() => reject(new Error("Test timeout")), timeout),
+        ),
       ]);
     } catch (e) {
       error = e as Error;
@@ -554,17 +589,20 @@ export const testScenarios = {
   /**
    * Validates span lifecycle
    */
-  validateSpanLifecycle: (span: MockSpan, expectedStates: {
-    shouldBeRecording?: boolean;
-    shouldBeEnded?: boolean;
-    shouldHaveAttributes?: Record<string, AttributeValue>;
-    shouldHaveEvents?: string[];
-  }) => {
+  validateSpanLifecycle: (
+    span: MockSpan,
+    expectedStates: {
+      shouldBeRecording?: boolean;
+      shouldBeEnded?: boolean;
+      shouldHaveAttributes?: Record<string, AttributeValue>;
+      shouldHaveEvents?: string[];
+    },
+  ) => {
     const {
       shouldBeRecording,
       shouldBeEnded,
       shouldHaveAttributes,
-      shouldHaveEvents
+      shouldHaveEvents,
     } = expectedStates;
 
     if (shouldBeRecording !== undefined) {
@@ -582,11 +620,11 @@ export const testScenarios = {
     }
 
     if (shouldHaveEvents) {
-      shouldHaveEvents.forEach(eventName => {
+      shouldHaveEvents.forEach((eventName) => {
         span.expectEvent(eventName);
       });
     }
-  }
+  },
 };
 
 /**
@@ -596,7 +634,9 @@ export const performanceUtils = {
   /**
    * Measures execution time of an operation
    */
-  measureTime: async <T>(operation: () => Promise<T> | T): Promise<{ result: T; duration: number }> => {
+  measureTime: async <T>(
+    operation: () => Promise<T> | T,
+  ): Promise<{ result: T; duration: number }> => {
     const start = performance.now();
     const result = await operation();
     const duration = performance.now() - start;
@@ -608,20 +648,25 @@ export const performanceUtils = {
    */
   createConcurrentOperations: <T>(
     operationFactory: (index: number) => Promise<T>,
-    count: number
+    count: number,
   ): Promise<T[]> => {
-    const operations = Array.from({ length: count }, (_, i) => operationFactory(i));
+    const operations = Array.from({ length: count }, (_, i) =>
+      operationFactory(i),
+    );
     return Promise.all(operations);
   },
 
   /**
    * Validates performance expectations
    */
-  expectPerformance: (duration: number, expectations: {
-    maxDuration?: number;
-    minDuration?: number;
-    averageOf?: number[];
-  }) => {
+  expectPerformance: (
+    duration: number,
+    expectations: {
+      maxDuration?: number;
+      minDuration?: number;
+      averageOf?: number[];
+    },
+  ) => {
     const { maxDuration, minDuration, averageOf } = expectations;
 
     if (maxDuration !== undefined) {
@@ -633,12 +678,13 @@ export const performanceUtils = {
     }
 
     if (averageOf) {
-      const average = averageOf.reduce((sum, d) => sum + d, 0) / averageOf.length;
+      const average =
+        averageOf.reduce((sum, d) => sum + d, 0) / averageOf.length;
       // Allow 50% variance from average
       expect(duration).toBeLessThanOrEqual(average * 1.5);
       expect(duration).toBeGreaterThanOrEqual(average * 0.5);
     }
-  }
+  },
 };
 
 /**
@@ -651,7 +697,7 @@ export const errorTestUtils = {
   testErrorPropagation: async (
     operation: () => Promise<any>,
     expectedError: Error,
-    cleanupValidation?: () => void
+    cleanupValidation?: () => void,
   ) => {
     await expect(operation()).rejects.toThrow(expectedError);
     if (cleanupValidation) {
@@ -665,19 +711,19 @@ export const errorTestUtils = {
   testPartialFailure: async <T>(
     operations: Array<() => Promise<T>>,
     failureIndices: number[],
-    expectedError: Error
+    expectedError: Error,
   ) => {
-    const results = await Promise.allSettled(operations.map(op => op()));
+    const results = await Promise.allSettled(operations.map((op) => op()));
 
     results.forEach((result, index) => {
       if (failureIndices.includes(index)) {
-        expect(result.status).toBe('rejected');
-        if (result.status === 'rejected') {
+        expect(result.status).toBe("rejected");
+        if (result.status === "rejected") {
           expect(result.reason.message).toBe(expectedError.message);
         }
       } else {
-        expect(result.status).toBe('fulfilled');
+        expect(result.status).toBe("fulfilled");
       }
     });
-  }
+  },
 };

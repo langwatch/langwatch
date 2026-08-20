@@ -53,7 +53,9 @@ export const memberAccessCommand = async (
 
       if (rows.length === 0) {
         console.log(
-          chalk.gray("  No group or direct bindings beyond the organization role."),
+          chalk.gray(
+            "  No group or direct bindings beyond the organization role.",
+          ),
         );
         console.log();
         return;

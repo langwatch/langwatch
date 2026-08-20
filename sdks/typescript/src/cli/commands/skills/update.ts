@@ -9,10 +9,10 @@ import { printResult, type RawOutputFlags } from "../../utils/output";
 import {
   planForcedClobbers,
   resolveSkillsRoot,
-  skillFilePath,
-  updateSkill,
   SKILLS_BUNDLE,
   SKILLS_BUNDLE_VERSION,
+  skillFilePath,
+  updateSkill,
 } from "./installer";
 import {
   announceRoot,
@@ -76,7 +76,9 @@ export const skillsUpdateCommand = async (
       ...options,
       table: () => {
         if (targets.length === 0) {
-          console.log("No installed skills found. Run `langwatch skills install --all`.");
+          console.log(
+            "No installed skills found. Run `langwatch skills install --all`.",
+          );
           return;
         }
         renderSkillFileResults({ results, dryRun });

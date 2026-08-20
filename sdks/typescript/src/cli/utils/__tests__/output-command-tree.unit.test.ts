@@ -7,8 +7,9 @@
  *
  * Split out of `output-port.unit.test.ts`, which pins the port itself.
  */
-import { describe, it, expect } from "vitest";
-import { Command } from "commander";
+
+import type { Command } from "commander";
+import { describe, expect, it } from "vitest";
 import { isOutputAware } from "../output";
 
 describe("the real command tree", () => {
@@ -57,7 +58,9 @@ describe("the real command tree", () => {
       ["secret", "update"],
     ];
 
-    it.each(wired)("marks `%s %s` as speaking the output contract", async (group, name) => {
+    it.each(
+      wired,
+    )("marks `%s %s` as speaking the output contract", async (group, name) => {
       const { buildProgram } = await import("../../program.js");
       const command = findCommand(buildProgram(), [group, name]);
 
@@ -138,14 +141,29 @@ describe("the real command tree", () => {
 
       // Launchers and passthroughs: they exec another tool and own its stdio.
       ...(
-        ["claude", "codex", "cursor", "gemini", "opencode", "copilot", "code", "open"] as const
+        [
+          "claude",
+          "codex",
+          "cursor",
+          "gemini",
+          "opencode",
+          "copilot",
+          "code",
+          "open",
+        ] as const
       ).map((n) => [n, "launches another tool and owns its stdio"] as const),
       // Local machine setup: mints a key and installs an OS login agent;
       // progress prose, no structured result document.
-      ["copilot-app connect", "interactive install flow: writes an OS login agent"],
+      [
+        "copilot-app connect",
+        "interactive install flow: writes an OS login agent",
+      ],
       // Agent-only signal: prints the resource id for the relay to intercept;
       // it has no -o json data mode because it returns no platform result.
-      ["navigate open", "signal command: prints the resource id, no data payload"],
+      [
+        "navigate open",
+        "signal command: prints the resource id, no data payload",
+      ],
       ["docs", "prints fetched markdown verbatim"],
       ["scenario-docs", "prints fetched markdown verbatim"],
 
@@ -167,7 +185,13 @@ describe("the real command tree", () => {
         (n) => [n, "owns its --json"] as const,
       ),
       ...(
-        ["ingest codex", "ingest health", "ingest install", "ingest list", "ingest tail"] as const
+        [
+          "ingest codex",
+          "ingest health",
+          "ingest install",
+          "ingest list",
+          "ingest tail",
+        ] as const
       ).map((n) => [n, "owns its --json"] as const),
       ["governance status", "owns its --json"],
       ...(
@@ -214,7 +238,8 @@ describe("the real command tree", () => {
 
       const unaccounted = leafPaths(root).filter(
         (path) =>
-          !holdouts.has(path) && !isOutputAware(findCommand(root, path.split(" "))!),
+          !holdouts.has(path) &&
+          !isOutputAware(findCommand(root, path.split(" "))!),
       );
 
       expect(
@@ -236,7 +261,9 @@ describe("the real command tree", () => {
         return isOutputAware(findCommand(root, path.split(" "))!);
       });
 
-      expect(stale, "holdouts that no longer exist or are now wired").toEqual([]);
+      expect(stale, "holdouts that no longer exist or are now wired").toEqual(
+        [],
+      );
     });
   });
 });

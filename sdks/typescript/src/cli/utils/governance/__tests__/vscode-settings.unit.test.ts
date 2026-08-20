@@ -14,10 +14,10 @@ import { buildOtelEnvBlock } from "../otel-env-block";
 import {
   clearVscodeTerminalOtelEnv,
   removeVscodeTerminalOtelEnv,
-  vscodeTerminalEnvHasAnyClear,
-  vscodeUserSettingsPath,
   VSCODE_TELEMETRY_ENV_KEYS,
   type VscodePlatform,
+  vscodeTerminalEnvHasAnyClear,
+  vscodeUserSettingsPath,
 } from "../vscode-settings";
 
 let home: string;
@@ -41,13 +41,13 @@ describe("vscodeUserSettingsPath()", () => {
     ["darwin", "Library/Application Support/Code/User/settings.json"],
     ["linux", ".config/Code/User/settings.json"],
     ["win32", "AppData/Roaming/Code/User/settings.json"],
-  ] as [VscodePlatform, string][])(
-    "resolves the User settings.json for %s",
-    (platform, tail) => {
-      const p = vscodeUserSettingsPath(platform, home);
-      expect(p).toContain(tail.replace(/\//g, path.sep));
-    },
-  );
+  ] as [
+    VscodePlatform,
+    string,
+  ][])("resolves the User settings.json for %s", (platform, tail) => {
+    const p = vscodeUserSettingsPath(platform, home);
+    expect(p).toContain(tail.replace(/\//g, path.sep));
+  });
 
   it("returns null for an unsupported platform", () => {
     expect(vscodeUserSettingsPath("aix" as VscodePlatform, home)).toBeNull();
@@ -58,7 +58,11 @@ describe("clearVscodeTerminalOtelEnv()", () => {
   describe("when settings.json does not exist yet", () => {
     /** @scenario Setting up code clears the telemetry env from VS Code integrated terminals */
     it("creates it with every telemetry key nulled under the terminal env", () => {
-      const p = clearVscodeTerminalOtelEnv({ platform: "darwin", home, keys: KEYS });
+      const p = clearVscodeTerminalOtelEnv({
+        platform: "darwin",
+        home,
+        keys: KEYS,
+      });
 
       expect(p).not.toBeNull();
       const s = readJson(p!);
@@ -175,9 +179,17 @@ describe("clearVscodeTerminalOtelEnv()", () => {
 describe("removeVscodeTerminalOtelEnv()", () => {
   describe("given a settings.json with the cleared keys installed", () => {
     it("removes only our keys and drops the now-empty env object", () => {
-      const p = clearVscodeTerminalOtelEnv({ platform: "darwin", home, keys: KEYS })!;
+      const p = clearVscodeTerminalOtelEnv({
+        platform: "darwin",
+        home,
+        keys: KEYS,
+      })!;
 
-      const changed = removeVscodeTerminalOtelEnv({ platform: "darwin", home, keys: KEYS });
+      const changed = removeVscodeTerminalOtelEnv({
+        platform: "darwin",
+        home,
+        keys: KEYS,
+      });
 
       expect(changed).toBe(true);
       const s = readJson(p);
@@ -191,7 +203,8 @@ describe("removeVscodeTerminalOtelEnv()", () => {
       clearVscodeTerminalOtelEnv({ platform: "darwin", home, keys: KEYS });
       // user adds their own terminal var alongside ours
       const s0 = readJson(p);
-      (s0["terminal.integrated.env.osx"] as Record<string, unknown>).MY_OWN = "keep";
+      (s0["terminal.integrated.env.osx"] as Record<string, unknown>).MY_OWN =
+        "keep";
       fs.writeFileSync(p, JSON.stringify(s0));
 
       removeVscodeTerminalOtelEnv({ platform: "darwin", home, keys: KEYS });

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
 import { Prompt, PromptCompilationError } from "../prompt";
 
@@ -11,7 +11,7 @@ function promptWithTemplate(template: string): Prompt {
     promptResponseFactory.build({
       prompt: template,
       messages: [{ role: "system", content: template }],
-    })
+    }),
   );
 }
 
@@ -21,7 +21,7 @@ describe("Prompt", () => {
       describe("when template has if/else conditions", () => {
         it("renders the matching branch", () => {
           const prompt = promptWithTemplate(
-            "{% if tone == 'formal' %}Dear user{% else %}Hey{% endif %}, welcome!"
+            "{% if tone == 'formal' %}Dear user{% else %}Hey{% endif %}, welcome!",
           );
 
           const result = prompt.compile({ tone: "formal" });
@@ -33,7 +33,7 @@ describe("Prompt", () => {
       describe("when template has for loops over arrays", () => {
         it("renders each item with separator", () => {
           const prompt = promptWithTemplate(
-            "Topics: {% for item in topics %}{{ item }}{% unless forloop.last %}, {% endunless %}{% endfor %}"
+            "Topics: {% for item in topics %}{{ item }}{% unless forloop.last %}, {% endunless %}{% endfor %}",
           );
 
           const result = prompt.compile({
@@ -47,7 +47,7 @@ describe("Prompt", () => {
       describe("when template has assign tags", () => {
         it("renders assigned and input variables", () => {
           const prompt = promptWithTemplate(
-            "{% assign greeting = 'Hello' %}{{ greeting }}, {{ name }}!"
+            "{% assign greeting = 'Hello' %}{{ greeting }}, {{ name }}!",
           );
 
           const result = prompt.compile({ name: "Alice" });
@@ -59,7 +59,7 @@ describe("Prompt", () => {
       describe("when template has filters", () => {
         it("applies upcase and truncate filters", () => {
           const prompt = promptWithTemplate(
-            "{{ name | upcase }} - {{ description | truncate: 22 }}"
+            "{{ name | upcase }} - {{ description | truncate: 22 }}",
           );
 
           const result = prompt.compile({
@@ -74,7 +74,7 @@ describe("Prompt", () => {
       describe("when template has nested conditions and loops", () => {
         it("renders only items matching the condition", () => {
           const prompt = promptWithTemplate(
-            "{% for user in users %}{% if user.active %}{{ user.name }}{% endif %}{% endfor %}"
+            "{% for user in users %}{% if user.active %}{{ user.name }}{% endif %}{% endfor %}",
           );
 
           const result = prompt.compile({
@@ -92,7 +92,7 @@ describe("Prompt", () => {
       describe("when template has undefined variables in Liquid tags", () => {
         it("tolerates them and renders remaining content", () => {
           const prompt = promptWithTemplate(
-            "{% if mood == 'happy' %}Great!{% endif %} Hello"
+            "{% if mood == 'happy' %}Great!{% endif %} Hello",
           );
 
           const result = prompt.compile({});
@@ -106,7 +106,7 @@ describe("Prompt", () => {
       describe("when template has undefined variables in Liquid tags", () => {
         it("throws a PromptCompilationError", () => {
           const prompt = promptWithTemplate(
-            "{% if mood == 'happy' %}Great!{% endif %}"
+            "{% if mood == 'happy' %}Great!{% endif %}",
           );
 
           expect(() => {

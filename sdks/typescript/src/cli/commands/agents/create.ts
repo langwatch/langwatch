@@ -1,10 +1,10 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the created agent rather than printing it: the output port renders it
@@ -38,7 +38,9 @@ export const createAgentCommand = async (
       data: agent,
       table: () => {
         if (agent.platformUrl) {
-          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(agent.platformUrl)}`);
+          console.log(
+            `  ${chalk.bold("View:")}  ${chalk.underline(agent.platformUrl)}`,
+          );
         }
       },
     };

@@ -33,7 +33,10 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const SDK_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const SDK_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
 const CLI_ENTRY = path.join(SDK_ROOT, "dist", "cli", "index.js");
 const BINARY = path.join(SDK_ROOT, "dist", "bin", "langwatch");
 const HOOK = path.join(SDK_ROOT, "scripts", "startup-require-hook.cjs");
@@ -56,7 +59,9 @@ if (cliArgs.length === 0) cliArgs.push("--help");
 label ??= cliArgs.join("-").replace(/^-+/, "").replaceAll("/", "-") || "help";
 
 if (!fs.existsSync(CLI_ENTRY)) {
-  console.error(`dist not built: ${CLI_ENTRY} missing. Run \`pnpm build\` first.`);
+  console.error(
+    `dist not built: ${CLI_ENTRY} missing. Run \`pnpm build\` first.`,
+  );
   process.exit(1);
 }
 fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -97,7 +102,11 @@ const timeRuns = (command, commandArgs) => {
     if (result.error) throw result.error;
     samples.push(elapsed);
   }
-  return { median: median(samples), min: Math.min(...samples), max: Math.max(...samples) };
+  return {
+    median: median(samples),
+    min: Math.min(...samples),
+    max: Math.max(...samples),
+  };
 };
 
 // ----------------------------------------------- cpuprofile → speedscope ----
@@ -142,7 +151,11 @@ const convertCpuProfile = (cpuprofile, name) => {
     const cached = stackCache.get(leafId);
     if (cached) return cached;
     const ids = [];
-    for (let id = leafId; id !== undefined && !ids.includes(id); id = parentById.get(id)) {
+    for (
+      let id = leafId;
+      id !== undefined && !ids.includes(id);
+      id = parentById.get(id)
+    ) {
       ids.push(id);
     }
     const stack = ids.reverse().map(frameIndex);
@@ -151,7 +164,9 @@ const convertCpuProfile = (cpuprofile, name) => {
   };
 
   const samples = (cpuprofile.samples ?? []).map(stackFor);
-  const weights = (cpuprofile.timeDeltas ?? []).map((delta) => Math.max(delta, 0));
+  const weights = (cpuprofile.timeDeltas ?? []).map((delta) =>
+    Math.max(delta, 0),
+  );
   const endValue = weights.reduce((sum, weight) => sum + weight, 0);
 
   return {
@@ -190,9 +205,15 @@ const renderTopTables = (tree) => {
     const nm = id.split("node_modules/");
     return nm.length > 1 ? nm[nm.length - 1] : id.replace(SDK_ROOT, "<sdk>");
   };
-  const byTotal = [...tree.flat].sort((a, b) => b.totalMs - a.totalMs).slice(0, 30);
-  const bySelf = [...tree.flat].sort((a, b) => b.selfMs - a.selfMs).slice(0, 30);
-  lines.push(`node boot (preload → first require): ${tree.nodeBootMs.toFixed(1)}ms`);
+  const byTotal = [...tree.flat]
+    .sort((a, b) => b.totalMs - a.totalMs)
+    .slice(0, 30);
+  const bySelf = [...tree.flat]
+    .sort((a, b) => b.selfMs - a.selfMs)
+    .slice(0, 30);
+  lines.push(
+    `node boot (preload → first require): ${tree.nodeBootMs.toFixed(1)}ms`,
+  );
   lines.push(`modules loaded: ${tree.moduleCount}`);
   pushTable("TOP 30 BY TOTAL TIME (load + everything it pulled in)", byTotal);
   pushTable("TOP 30 BY SELF TIME (its own parse/eval only)", bySelf);
@@ -200,18 +221,25 @@ const renderTopTables = (tree) => {
 };
 
 // ------------------------------------------------------------------ run ----
-console.log(`profiling: langwatch ${cliArgs.join(" ")}  (LANGWATCH_NO_DAEMON=1, ${runs} wall runs)`);
+console.log(
+  `profiling: langwatch ${cliArgs.join(" ")}  (LANGWATCH_NO_DAEMON=1, ${runs} wall runs)`,
+);
 
 // 1. require tree
 const treePath = path.join(OUT_DIR, `${label}-require-tree.json`);
-const treeResult = runNode(["--require", HOOK], { LANGWATCH_STARTUP_TREE_OUT: treePath });
+const treeResult = runNode(["--require", HOOK], {
+  LANGWATCH_STARTUP_TREE_OUT: treePath,
+});
 if (treeResult.status !== 0 && !fs.existsSync(treePath)) {
   console.error(`require-tree run failed (exit ${treeResult.status})`);
   process.exit(treeResult.status ?? 1);
 }
 const tree = JSON.parse(fs.readFileSync(treePath, "utf8"));
 const treeText = renderTopTables(tree);
-fs.writeFileSync(path.join(OUT_DIR, `${label}-require-tree.txt`), treeText + "\n");
+fs.writeFileSync(
+  path.join(OUT_DIR, `${label}-require-tree.txt`),
+  treeText + "\n",
+);
 console.log(treeText);
 
 // 2. CPU profile → speedscope
@@ -220,10 +248,17 @@ const profResult = runNode(["--cpu-prof", `--cpu-prof-dir=${profDir}`]);
 if (profResult.status !== 0) {
   console.error(`cpu-prof run failed (exit ${profResult.status})`);
 } else {
-  const profFile = fs.readdirSync(profDir).find((f) => f.endsWith(".cpuprofile"));
+  const profFile = fs
+    .readdirSync(profDir)
+    .find((f) => f.endsWith(".cpuprofile"));
   if (profFile) {
-    const cpuprofile = JSON.parse(fs.readFileSync(path.join(profDir, profFile), "utf8"));
-    const speedscope = convertCpuProfile(cpuprofile, `langwatch ${cliArgs.join(" ")}`);
+    const cpuprofile = JSON.parse(
+      fs.readFileSync(path.join(profDir, profFile), "utf8"),
+    );
+    const speedscope = convertCpuProfile(
+      cpuprofile,
+      `langwatch ${cliArgs.join(" ")}`,
+    );
     const out = path.join(OUT_DIR, `${label}-speedscope.json`);
     fs.writeFileSync(out, JSON.stringify(speedscope));
     console.log(`\nspeedscope: ${out}`);

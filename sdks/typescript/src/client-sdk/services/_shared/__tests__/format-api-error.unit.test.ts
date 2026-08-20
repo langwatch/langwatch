@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
@@ -8,24 +8,31 @@ import {
 describe("formatApiErrorMessage", () => {
   describe("when given a null or undefined error", () => {
     it("returns a generic message with status when available", () => {
-      expect(formatApiErrorMessage({ error: null, options: { status: 503 } })).toBe(
-        "Request failed with status 503",
-      );
+      expect(
+        formatApiErrorMessage({ error: null, options: { status: 503 } }),
+      ).toBe("Request failed with status 503");
     });
 
     it("returns a generic message without status", () => {
-      expect(formatApiErrorMessage({ error: undefined })).toBe("Unknown error occurred");
+      expect(formatApiErrorMessage({ error: undefined })).toBe(
+        "Unknown error occurred",
+      );
     });
   });
 
   describe("when given a string error", () => {
     it("returns the string directly", () => {
-      expect(formatApiErrorMessage({ error: "Something broke" })).toBe("Something broke");
+      expect(formatApiErrorMessage({ error: "Something broke" })).toBe(
+        "Something broke",
+      );
     });
 
     it("annotates a generic string with the status", () => {
       expect(
-        formatApiErrorMessage({ error: "Internal server error", options: { status: 500 } }),
+        formatApiErrorMessage({
+          error: "Internal server error",
+          options: { status: 500 },
+        }),
       ).toBe("Internal server error (status 500)");
     });
   });
@@ -33,7 +40,9 @@ describe("formatApiErrorMessage", () => {
   describe("when given an Error instance", () => {
     it("returns the Error message", () => {
       const err = new Error("fetch failed: ECONNREFUSED");
-      expect(formatApiErrorMessage({ error: err })).toBe("fetch failed: ECONNREFUSED");
+      expect(formatApiErrorMessage({ error: err })).toBe(
+        "fetch failed: ECONNREFUSED",
+      );
     });
 
     it("appends cause.code for node fetch transport failures", () => {
@@ -151,7 +160,10 @@ describe("formatApiErrorMessage", () => {
 
     it("serialises the raw body when no meaningful fields are present", () => {
       const body = { code: "UNEXPECTED", details: { traceId: "abc" } };
-      const formatted = formatApiErrorMessage({ error: body, options: { status: 500 } });
+      const formatted = formatApiErrorMessage({
+        error: body,
+        options: { status: 500 },
+      });
       expect(formatted).toContain("UNEXPECTED");
       expect(formatted).toContain("traceId");
       expect(formatted).toContain("500");
@@ -212,8 +224,14 @@ describe("formatApiErrorMessage", () => {
   });
 
   it("never swallows the body when only generic labels are present", () => {
-    const body = { error: "Internal server error", message: "Internal server error" };
-    const formatted = formatApiErrorMessage({ error: body, options: { status: 500 } });
+    const body = {
+      error: "Internal server error",
+      message: "Internal server error",
+    };
+    const formatted = formatApiErrorMessage({
+      error: body,
+      options: { status: 500 },
+    });
     expect(formatted.toLowerCase()).toContain("server returned");
     expect(formatted).toContain("500");
   });
@@ -222,9 +240,9 @@ describe("formatApiErrorMessage", () => {
 describe("formatApiErrorForOperation", () => {
   it("prepends the operation context", () => {
     const body = { error: "NotFoundError", message: "Prompt not found" };
-    expect(formatApiErrorForOperation({ operation: "fetch prompt", error: body })).toBe(
-      "Failed to fetch prompt: NotFoundError: Prompt not found",
-    );
+    expect(
+      formatApiErrorForOperation({ operation: "fetch prompt", error: body }),
+    ).toBe("Failed to fetch prompt: NotFoundError: Prompt not found");
   });
 });
 

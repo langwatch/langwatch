@@ -103,7 +103,9 @@ function formatUsedUsd(n: number): string {
 export function formatLoginCeremony(input: LoginCeremonyInput): string[] {
   const lines: string[] = [];
 
-  const orgSuffix = input.organizationName ? ` @ ${input.organizationName}` : "";
+  const orgSuffix = input.organizationName
+    ? ` @ ${input.organizationName}`
+    : "";
   lines.push(`✓ Logged in as ${input.email}${orgSuffix}`);
 
   // AI tools (coding assistants). Fall back to the built-in wrappers when the
@@ -112,9 +114,7 @@ export function formatLoginCeremony(input: LoginCeremonyInput): string[] {
     input.tools && input.tools.length > 0 ? input.tools : DEFAULT_TOOLS;
   lines.push("");
   lines.push("Your AI tools (run any of these):");
-  const cmdWidth = Math.max(
-    ...tools.map((t) => `langwatch ${t.slug}`.length),
-  );
+  const cmdWidth = Math.max(...tools.map((t) => `langwatch ${t.slug}`.length));
   for (const tool of tools) {
     const cmd = `langwatch ${tool.slug}`;
     const labelSuffix = tool.displayName ? `  # ${tool.displayName}` : "";
@@ -134,7 +134,8 @@ export function formatLoginCeremony(input: LoginCeremonyInput): string[] {
         annotations.push(p.displayName);
       }
       if (p.configured === false) annotations.push("(not configured yet)");
-      const suffix = annotations.length > 0 ? `  ${annotations.join("  ")}` : "";
+      const suffix =
+        annotations.length > 0 ? `  ${annotations.join("  ")}` : "";
       lines.push(`  • ${padded}${suffix}`);
     }
   }

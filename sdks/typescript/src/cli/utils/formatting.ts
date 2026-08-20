@@ -4,7 +4,7 @@ import chalk from "chalk";
  * Strips ANSI escape codes from a string for accurate length calculation.
  */
 export const stripAnsi = (str: string): string => {
-  // eslint-disable-next-line no-control-regex
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping ANSI escape codes from chalk output is the whole point of the regex
   return str.replace(/\u001b\[[0-9;]*m/g, "");
 };
 

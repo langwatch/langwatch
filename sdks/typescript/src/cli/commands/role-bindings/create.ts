@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import {
-  RoleBindingsApiService,
   type CreateRoleBindingInput,
+  RoleBindingsApiService,
 } from "@/client-sdk/services/role-bindings/role-bindings-api.service";
 import {
   composeRoleBindingPrincipal,
@@ -9,7 +9,12 @@ import {
   parseScopeType,
 } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
-import { orDash, printFacts, runManagement, withParsedFlags } from "../management/_shared";
+import {
+  orDash,
+  printFacts,
+  runManagement,
+  withParsedFlags,
+} from "../management/_shared";
 
 export interface CreateRoleBindingOptions {
   principalType: string;
@@ -58,7 +63,10 @@ export const createRoleBindingCommand = async (
         ],
         ["Role", binding.role],
         ["Custom role", orDash(binding.customRoleName)],
-        ["Scope", `${binding.scopeType} ${binding.scopeName ?? binding.scopeId}`],
+        [
+          "Scope",
+          `${binding.scopeType} ${binding.scopeName ?? binding.scopeId}`,
+        ],
       ]);
       if (binding.hasLegacyAccessNotice) {
         console.log(

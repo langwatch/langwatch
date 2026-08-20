@@ -3,21 +3,22 @@
  * authentication, authorization, network failures, rate limiting,
  * and plan-limit responses.
  */
+
+import { spawn } from "child_process";
+import * as fs from "fs";
+import http from "http";
+import type { AddressInfo } from "net";
+import * as os from "os";
+import * as path from "path";
 import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
   describe,
   expect,
   it,
-  beforeAll,
-  afterAll,
-  beforeEach,
-  afterEach,
 } from "vitest";
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
-import http from "http";
-import { spawn } from "child_process";
-import type { AddressInfo } from "net";
 
 const CLI_PATH = path.resolve(__dirname, "../../../../dist/cli/index.js");
 
@@ -30,7 +31,11 @@ let server: http.Server;
 let baseUrl = "";
 const responseQueue = new Map<string, FakeResponse[]>();
 
-function pushResponse(method: string, pathPattern: string, response: FakeResponse) {
+function pushResponse(
+  method: string,
+  pathPattern: string,
+  response: FakeResponse,
+) {
   const key = `${method.toUpperCase()} ${pathPattern}`;
   const list = responseQueue.get(key) ?? [];
   list.push(response);
@@ -64,7 +69,9 @@ beforeAll(async () => {
     const key = matchKey(req.method ?? "GET", urlPath);
     if (!key) {
       res.writeHead(404, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "test-fallback", message: "no handler" }));
+      res.end(
+        JSON.stringify({ error: "test-fallback", message: "no handler" }),
+      );
       return;
     }
     const queue = responseQueue.get(key) ?? [];
@@ -174,10 +181,7 @@ describe("CLI error edge cases", () => {
         },
       });
 
-      const result = await runCli(
-        ["dataset", "create", "my-dataset"],
-        testDir,
-      );
+      const result = await runCli(["dataset", "create", "my-dataset"], testDir);
 
       expect(result.exitCode).toBe(1);
       expect(result.combined.toLowerCase()).toMatch(
@@ -225,7 +229,9 @@ describe("CLI error edge cases", () => {
       server.removeAllListeners("request");
       server.on("request", (_req, res) => {
         res.writeHead(502, { "Content-Type": "text/html" });
-        res.end("<html><body>Bad Gateway — upstream nginx rejected</body></html>");
+        res.end(
+          "<html><body>Bad Gateway — upstream nginx rejected</body></html>",
+        );
       });
       try {
         const result = await runCli(["prompt", "list"], testDir);

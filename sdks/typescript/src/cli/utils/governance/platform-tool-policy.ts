@@ -46,7 +46,10 @@ const DEFAULTS: PlatformToolPolicy = {
   allowOtelDirect: true,
 };
 
-export const PLATFORM_TOOL_POLICIES: Record<PlatformToolSlug, PlatformToolPolicy> = {
+export const PLATFORM_TOOL_POLICIES: Record<
+  PlatformToolSlug,
+  PlatformToolPolicy
+> = {
   claude: { ...DEFAULTS },
   codex: { ...DEFAULTS },
   gemini: { ...DEFAULTS },

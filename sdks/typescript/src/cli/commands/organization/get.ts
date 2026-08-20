@@ -13,7 +13,8 @@ export const getOrganizationCommand = async (): Promise<CommandResult | void> =>
     action: "fetch the organization",
     pending: "Fetching organization...",
     run: () => new OrganizationApiService().get(),
-    succeed: (organization) => `Organization "${chalk.cyan(organization.name)}"`,
+    succeed: (organization) =>
+      `Organization "${chalk.cyan(organization.name)}"`,
     table: (organization) => {
       printFacts([
         ["ID", chalk.gray(organization.id)],

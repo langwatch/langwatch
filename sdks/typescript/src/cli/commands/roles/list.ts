@@ -2,7 +2,12 @@ import chalk from "chalk";
 import { RolesApiService } from "@/client-sdk/services/roles/roles-api.service";
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
-import { counted, orDash, printEmpty, runManagement } from "../management/_shared";
+import {
+  counted,
+  orDash,
+  printEmpty,
+  runManagement,
+} from "../management/_shared";
 
 export const listRolesCommand = async (): Promise<CommandResult | void> =>
   runManagement({

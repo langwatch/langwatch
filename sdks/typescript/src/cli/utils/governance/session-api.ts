@@ -23,11 +23,7 @@
  */
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
-import {
-  type GovernanceConfig,
-  loadConfig,
-  saveConfig,
-} from "./config";
+import { type GovernanceConfig, loadConfig, saveConfig } from "./config";
 import { refreshSession as sharedRefreshSession } from "./session-refresh";
 
 export interface SessionApiOptions {
@@ -70,7 +66,9 @@ const EXPIRY_MARGIN_SECONDS = 30;
 
 function isExpired(cfg: GovernanceConfig): boolean {
   if (!cfg.expires_at) return false;
-  return cfg.expires_at <= Math.floor(Date.now() / 1000) + EXPIRY_MARGIN_SECONDS;
+  return (
+    cfg.expires_at <= Math.floor(Date.now() / 1000) + EXPIRY_MARGIN_SECONDS
+  );
 }
 
 /**

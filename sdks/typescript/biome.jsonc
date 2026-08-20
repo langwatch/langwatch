@@ -1,0 +1,128 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
+
+  // Nested under /biome.jsonc, which is a marker rather than a ruleset -- see
+  // the comment there for why it has to exist. Everything below is still the
+  // whole of this project's configuration; `extends: "//"` inherits only the
+  // vcs block.
+  "root": false,
+  "extends": "//",
+
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignoreUnknown": false,
+    "includes": [
+      "**",
+      // Published-tarball output, never hand-edited.
+      "!dist",
+      "!coverage",
+      // Standalone example projects with their own package-lock.json,
+      // not part of this workspace's install or lint surface.
+      "!examples",
+      // api-client.ts, the evaluators/filters/skills/feature-map/prompt
+      // bundles, and everything else copy-types.sh and the openapi
+      // generator write: machine output, regenerated on every install.
+      "!**/generated",
+      "!**/*.generated.ts"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "suspicious": {
+        // The eslint config this replaces turned the same rule off: the
+        // SDK's public surface (config objects, provider payloads,
+        // dynamic OTel attributes) is untyped-by-design at the
+        // boundary, and it stayed that way switching linters.
+        "noExplicitAny": "off",
+
+        // This rule is syntactic only -- it has no type information, so it
+        // cannot see past the declaration line. The codebase's repeated
+        // `let x; try { x = await fn(); } catch { process.exit(1); }` idiom
+        // (roughly 15 sites) declares without an initializer and assigns
+        // exactly once on the success path; TypeScript's control-flow
+        // analysis for uninitialized `let`s infers the real type from that
+        // assignment with no implicit-any, which `tsc --noEmit` (strict
+        // mode, part of this same CI job) already confirms by passing
+        // clean. Annotating every site by hand would just restate what tsc
+        // already infers.
+        "noImplicitAnyLet": "off"
+      },
+      "style": {
+        "useImportType": "warn"
+      },
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": {
+          "level": "warn",
+          "options": {
+            "ignoreRestSiblings": true
+          }
+        }
+      },
+      "complexity": {
+        // Proven unsafe here, not just theoretically: biome's own "safe fix"
+        // rewrote `vi.fn().mockImplementation(function () { return {...}; })`
+        // to an arrow (`() => ({...})`) throughout the test suite. A mocked
+        // class instantiated with `new` in the code under test -- every
+        // `ApiService`, `NodeSDK`, exporter, etc. -- needs a constructible
+        // mock; an arrow function can never be called with `new`, so the
+        // "equivalent" rewrite turned `new AgentsApiService()` into a runtime
+        // TypeError in 26 test files (209 tests) before this was caught by
+        // running the suite, not just `tsc`. The rule cannot see whether a
+        // function expression is later used as a constructor, so it applies
+        // this transform even when it changes behavior.
+        "useArrowFunction": "off"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "arrowParentheses": "always",
+      "bracketSameLine": false,
+      "bracketSpacing": true,
+      "jsxQuoteStyle": "double",
+      "quoteProperties": "asNeeded",
+      "semicolons": "always",
+      "trailingCommas": "all"
+    }
+  },
+  "overrides": [
+    {
+      // codex-rollout.ts is a dispatcher: every handler is declared `: void`
+      // and its branches read `return this.onXxx(payload);` to delegate and
+      // exit in one line -- the return value is never used, only the early
+      // exit is. That is idiomatic JS/TS (returning the result of a void
+      // function from a void function is legal and type-checks clean); the
+      // rule just cannot tell "delegate and exit" from "use this value"
+      // without seeing the callee's return type. Scoped to this one file
+      // because it is a real bug everywhere else noVoidTypeReturn stayed on.
+      "includes": ["src/cli/utils/governance/codex-rollout.ts"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noVoidTypeReturn": "off"
+          }
+        }
+      }
+    }
+  ],
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  }
+}

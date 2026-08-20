@@ -1,18 +1,26 @@
 import { z } from "zod";
 import {
-  chatMessageSchema,
-  spanInputOutputSchema,
   type ChatMessage,
+  chatMessageSchema,
   type SpanInputOutput,
+  spanInputOutputSchema,
 } from "../../internal/generated/types/tracer";
-import { type SimpleChatMessage, type JsonSerializable, type InputOutputType, INPUT_OUTPUT_TYPES } from "./types";
+import {
+  INPUT_OUTPUT_TYPES,
+  type InputOutputType,
+  type JsonSerializable,
+  type SimpleChatMessage,
+} from "./types";
 
 /**
  * Zod schema for simple chat messages (less strict than the generated one)
  */
 const simpleChatMessageSchema = z.object({
   role: z.string(),
-  content: z.union([z.string(), z.array(z.any())]).nullable().optional()
+  content: z
+    .union([z.string(), z.array(z.any())])
+    .nullable()
+    .optional(),
 });
 
 const simpleChatMessageArraySchema = z.array(simpleChatMessageSchema);
@@ -21,7 +29,7 @@ const simpleChatMessageArraySchema = z.array(simpleChatMessageSchema);
  * Utility function to create a safe fallback value
  */
 function createSafeFallbackValue(value: unknown): string {
-  if (typeof value === 'object' && value !== null) {
+  if (typeof value === "object" && value !== null) {
     try {
       return JSON.stringify(value);
     } catch {
@@ -35,7 +43,10 @@ function createSafeFallbackValue(value: unknown): string {
 /**
  * Utility function to create a safe SpanInputOutput fallback
  */
-function createSafeSpanInputOutput(type: "text" | "raw", value: unknown): SpanInputOutput {
+function createSafeSpanInputOutput(
+  type: "text" | "raw",
+  value: unknown,
+): SpanInputOutput {
   const safeValue = createSafeFallbackValue(value);
   return { type, value: safeValue } as SpanInputOutput;
 }
@@ -51,15 +62,21 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isChatMessage(value: unknown): value is ChatMessage | SimpleChatMessage {
+function isChatMessage(
+  value: unknown,
+): value is ChatMessage | SimpleChatMessage {
   if (!isObject(value)) return false;
   return (
     typeof value.role === "string" &&
-    (typeof value.content === "string" || value.content === null || value.content === undefined)
+    (typeof value.content === "string" ||
+      value.content === null ||
+      value.content === undefined)
   );
 }
 
-function isChatMessageArray(value: unknown): value is (ChatMessage | SimpleChatMessage)[] {
+function isChatMessageArray(
+  value: unknown,
+): value is (ChatMessage | SimpleChatMessage)[] {
   return Array.isArray(value) && value.every(isChatMessage);
 }
 
@@ -73,13 +90,19 @@ function processChatMessages(value: unknown): SpanInputOutput {
   // Strategy 1: Try strict schema first
   const strictResult = z.array(chatMessageSchema).safeParse(messages);
   if (strictResult.success) {
-    return { type: "chat_messages", value: strictResult.data } as SpanInputOutput;
+    return {
+      type: "chat_messages",
+      value: strictResult.data,
+    } as SpanInputOutput;
   }
 
   // Strategy 2: Try simple schema
   const simpleResult = simpleChatMessageArraySchema.safeParse(messages);
   if (simpleResult.success) {
-    return { type: "chat_messages", value: simpleResult.data } as SpanInputOutput;
+    return {
+      type: "chat_messages",
+      value: simpleResult.data,
+    } as SpanInputOutput;
   }
 
   // Strategy 3: Fallback to text
@@ -103,7 +126,10 @@ function convertToSpanInputOutput(value: unknown): SpanInputOutput {
     }
 
     // Handle chat messages (single message or array)
-    if (isChatMessage(value) || (Array.isArray(value) && value.length > 0 && isChatMessageArray(value))) {
+    if (
+      isChatMessage(value) ||
+      (Array.isArray(value) && value.length > 0 && isChatMessageArray(value))
+    ) {
       return processChatMessages(value);
     }
 
@@ -111,7 +137,7 @@ function convertToSpanInputOutput(value: unknown): SpanInputOutput {
     if (Array.isArray(value)) {
       return spanInputOutputSchema.parse({
         type: "list",
-        value: value.map(item => convertToSpanInputOutput(item))
+        value: value.map((item) => convertToSpanInputOutput(item)),
       });
     }
 
@@ -143,7 +169,10 @@ export function isValidInputOutputType(type: string): type is InputOutputType {
 /**
  * Validates a value for a specific input/output type using Zod schemas
  */
-function validateValueForInputOutputType(type: InputOutputType, value: unknown): unknown {
+function validateValueForInputOutputType(
+  type: InputOutputType,
+  value: unknown,
+): unknown {
   switch (type) {
     case "chat_messages": {
       const messages = Array.isArray(value) ? value : [value];
@@ -166,7 +195,9 @@ function validateValueForInputOutputType(type: InputOutputType, value: unknown):
 
     case "list": {
       const listResult = z.array(spanInputOutputSchema).safeParse(value);
-      return listResult.success ? listResult.data : [{ type: "text", value: createSafeFallbackValue(value) }];
+      return listResult.success
+        ? listResult.data
+        : [{ type: "text", value: createSafeFallbackValue(value) }];
     }
 
     case "json": {
@@ -182,7 +213,9 @@ function validateValueForInputOutputType(type: InputOutputType, value: unknown):
     case "text":
     case "raw": {
       const stringResult = z.string().safeParse(value);
-      return stringResult.success ? stringResult.data : createSafeFallbackValue(value);
+      return stringResult.success
+        ? stringResult.data
+        : createSafeFallbackValue(value);
     }
 
     case "guardrail_result":
@@ -212,7 +245,7 @@ function validateValueForInputOutputType(type: InputOutputType, value: unknown):
  */
 export function processSpanInputOutput(
   typeOrValue: unknown,
-  value?: unknown
+  value?: unknown,
 ): SpanInputOutput {
   try {
     // If explicit type is provided, prefer it over auto-detection
@@ -221,8 +254,13 @@ export function processSpanInputOutput(
       const validatedValue = validateValueForInputOutputType(type, value);
 
       // Final validation with spanInputOutputSchema
-      const result = spanInputOutputSchema.safeParse({ type, value: validatedValue });
-      return result.success ? result.data : createSafeSpanInputOutput("raw", validatedValue);
+      const result = spanInputOutputSchema.safeParse({
+        type,
+        value: validatedValue,
+      });
+      return result.success
+        ? result.data
+        : createSafeSpanInputOutput("raw", validatedValue);
     }
 
     // Auto-detect type when no explicit type is provided
@@ -245,4 +283,4 @@ export type SpanInputOutputMethod<T> = {
   (type: "guardrail_result", value: unknown): T;
   (type: "evaluation_result", value: unknown): T;
   (value: unknown): T;
-}
+};

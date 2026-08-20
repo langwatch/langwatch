@@ -8,7 +8,7 @@
  *
  * Split out of `output-port.unit.test.ts`, which pins the port itself.
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { applyJq } from "../output";
 
 describe("applyJq", () => {
@@ -56,7 +56,9 @@ describe("applyJq", () => {
       [".traces + 1"],
       [".traces(x)"],
     ])("throws rather than answering null for %s", (expression) => {
-      expect(() => applyJq(expression, DATA)).toThrow(/unsupported syntax|must start with/);
+      expect(() => applyJq(expression, DATA)).toThrow(
+        /unsupported syntax|must start with/,
+      );
     });
   });
 

@@ -24,12 +24,13 @@
  * back inside a 404 message is a real thing servers do, and it must not reach a
  * terminal, a log, or an agent's context.
  */
-import chalk from "chalk";
+
 import {
+  type CliHandledError,
   handledErrorFromThrown,
   toCliErrorDocument,
-  type CliHandledError,
 } from "@langwatch/langy/cards/handled-error";
+import chalk from "chalk";
 import { redactSecrets } from "../telemetry/events";
 import { withFallbackSuggestions } from "./errorSuggestions";
 import {
@@ -46,12 +47,12 @@ import {
  * (spinner.ts, apiKey.ts, daemon/execution.ts, tests) keep their imports.
  */
 export {
+  type CliOutputFormat,
   currentOutputScope,
   getOutputFormat,
   resolveOutputFormat,
   setOutputFormat,
   withOutputScope,
-  type CliOutputFormat,
 } from "./outputScope";
 
 /**
@@ -123,7 +124,7 @@ const detailLines = (domain: CliHandledError): string[] => {
   for (const [key, value] of Object.entries(domain.meta)) {
     if (value === null || value === undefined) continue;
     const rendered =
-      typeof value === "string" ? value : JSON.stringify(value) ?? "";
+      typeof value === "string" ? value : (JSON.stringify(value) ?? "");
     if (!rendered) continue;
     details.push([key, rendered]);
   }
@@ -151,7 +152,8 @@ const detailLines = (domain: CliHandledError): string[] => {
   return [
     "Details:",
     ...details.map(
-      ([key, value]) => `  ${chalk.dim(key.padEnd(width))}  ${chalk.dim(value)}`,
+      ([key, value]) =>
+        `  ${chalk.dim(key.padEnd(width))}  ${chalk.dim(value)}`,
     ),
   ];
 };

@@ -1,13 +1,12 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the secret's metadata rather than printing it: the output port
@@ -21,8 +20,7 @@ export const getSecretCommand = async (
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Fetching secret "${id}"...`).start();
 
@@ -33,7 +31,11 @@ export const getSecretCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "fetch secret" });
+      failSpinner({
+        spinner,
+        error: new Error(message),
+        action: "fetch secret",
+      });
       process.exit(1);
     }
 
@@ -54,14 +56,14 @@ export const getSecretCommand = async (
         console.log(`  ${chalk.gray("ID:")}      ${chalk.green(secret.id)}`);
         console.log(`  ${chalk.gray("Name:")}    ${chalk.cyan(secret.name)}`);
         console.log(
-          `  ${chalk.gray("Created:")} ${new Date(secret.createdAt).toLocaleString()}`
+          `  ${chalk.gray("Created:")} ${new Date(secret.createdAt).toLocaleString()}`,
         );
         console.log(
-          `  ${chalk.gray("Updated:")} ${new Date(secret.updatedAt).toLocaleString()}`
+          `  ${chalk.gray("Updated:")} ${new Date(secret.updatedAt).toLocaleString()}`,
         );
         console.log();
         console.log(
-          chalk.gray("  (Secret values are never returned for security)")
+          chalk.gray("  (Secret values are never returned for security)"),
         );
         console.log();
       },

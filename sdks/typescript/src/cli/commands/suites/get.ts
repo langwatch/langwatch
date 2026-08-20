@@ -1,9 +1,9 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { SuitesApiService } from "@/client-sdk/services/suites";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the suite rather than printing it: the output port renders it in
@@ -27,14 +27,28 @@ export const getSuiteCommand = async (
       table: () => {
         console.log();
         console.log(chalk.bold("  Suite Details:"));
-        console.log(`    ${chalk.gray("ID:")}          ${chalk.green(suite.id)}`);
-        console.log(`    ${chalk.gray("Name:")}        ${chalk.cyan(suite.name)}`);
-        console.log(`    ${chalk.gray("Slug:")}        ${chalk.yellow(suite.slug)}`);
-        console.log(`    ${chalk.gray("Description:")} ${suite.description ?? chalk.gray("—")}`);
+        console.log(
+          `    ${chalk.gray("ID:")}          ${chalk.green(suite.id)}`,
+        );
+        console.log(
+          `    ${chalk.gray("Name:")}        ${chalk.cyan(suite.name)}`,
+        );
+        console.log(
+          `    ${chalk.gray("Slug:")}        ${chalk.yellow(suite.slug)}`,
+        );
+        console.log(
+          `    ${chalk.gray("Description:")} ${suite.description ?? chalk.gray("—")}`,
+        );
         console.log(`    ${chalk.gray("Repeat:")}      ${suite.repeatCount}`);
-        console.log(`    ${chalk.gray("Labels:")}      ${suite.labels.length > 0 ? suite.labels.join(", ") : chalk.gray("—")}`);
-        console.log(`    ${chalk.gray("Created:")}     ${new Date(suite.createdAt).toLocaleString()}`);
-        console.log(`    ${chalk.gray("Updated:")}     ${new Date(suite.updatedAt).toLocaleString()}`);
+        console.log(
+          `    ${chalk.gray("Labels:")}      ${suite.labels.length > 0 ? suite.labels.join(", ") : chalk.gray("—")}`,
+        );
+        console.log(
+          `    ${chalk.gray("Created:")}     ${new Date(suite.createdAt).toLocaleString()}`,
+        );
+        console.log(
+          `    ${chalk.gray("Updated:")}     ${new Date(suite.updatedAt).toLocaleString()}`,
+        );
 
         console.log();
         console.log(chalk.bold("  Scenarios:"));
@@ -45,12 +59,16 @@ export const getSuiteCommand = async (
         console.log();
         console.log(chalk.bold("  Targets:"));
         for (const target of suite.targets) {
-          console.log(`    ${chalk.gray("•")} ${target.type}:${target.referenceId}`);
+          console.log(
+            `    ${chalk.gray("•")} ${target.type}:${target.referenceId}`,
+          );
         }
 
         if (suite.platformUrl) {
           console.log();
-          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(suite.platformUrl)}`);
+          console.log(
+            `  ${chalk.bold("View:")}  ${chalk.underline(suite.platformUrl)}`,
+          );
         }
 
         console.log();

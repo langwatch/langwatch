@@ -1,7 +1,16 @@
 import { EventEmitter } from "node:events";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 // The tunnel path verifies the binary it is about to run on every start, and
 // the mock below points at the node executable. Verification fails closed on
@@ -32,14 +41,16 @@ afterAll(() => {
   });
 });
 
-vi.mock("@/client-sdk/services/agents/agents-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return {
-    ...actual,
-    AgentsApiService: vi.fn(),
-  };
-});
+vi.mock(
+  "@/client-sdk/services/agents/agents-api.service",
+  async (importOriginal) => {
+    const actual = (await importOriginal()) as Record<string, unknown>;
+    return {
+      ...actual,
+      AgentsApiService: vi.fn(),
+    };
+  },
+);
 
 vi.mock("../../../utils/apiKey", () => ({
   resolveCredentials: vi.fn(async () => ({
@@ -126,9 +137,11 @@ describe("agent dev session", () => {
       data: [makeAgent()],
       pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
     });
-    mockUpdate = vi.fn().mockImplementation((_id, params) =>
-      Promise.resolve(makeAgent({ config: params.config })),
-    );
+    mockUpdate = vi
+      .fn()
+      .mockImplementation((_id, params) =>
+        Promise.resolve(makeAgent({ config: params.config })),
+      );
     vi.mocked(AgentsApiService).mockImplementation(function () {
       return {
         list: mockList,
@@ -183,7 +196,10 @@ describe("agent dev session", () => {
       });
 
       const written = (
-        mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
+        mockUpdate.mock.calls[0] as [
+          string,
+          { config: Record<string, unknown> },
+        ]
       )[1].config;
       mockGet.mockResolvedValue(makeAgent({ config: written }));
 
@@ -191,7 +207,10 @@ describe("agent dev session", () => {
 
       expect(mockUpdate).toHaveBeenCalledTimes(2);
       const restored = (
-        mockUpdate.mock.calls[1] as [string, { config: Record<string, unknown> }]
+        mockUpdate.mock.calls[1] as [
+          string,
+          { config: Record<string, unknown> },
+        ]
       )[1].config;
       expect(restored.url).toBe("https://staging.example.com/agent");
       expect(restored.devTunnel).toBeUndefined();
@@ -279,7 +298,10 @@ describe("agent dev session", () => {
 
       expect(quickMock).not.toHaveBeenCalled();
       const written = (
-        mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
+        mockUpdate.mock.calls[0] as [
+          string,
+          { config: Record<string, unknown> },
+        ]
       )[1].config;
       expect(written.url).toBe("https://my-own-tunnel.example.com/agent");
       // The auth proxy sits outside a bring-your-own tunnel's chain, so no
@@ -357,7 +379,10 @@ describe("agent dev session", () => {
         agent: "agent_abc123",
       });
       const written = (
-        mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
+        mockUpdate.mock.calls[0] as [
+          string,
+          { config: Record<string, unknown> },
+        ]
       )[1].config;
       mockGet.mockResolvedValue(makeAgent({ config: written }));
 

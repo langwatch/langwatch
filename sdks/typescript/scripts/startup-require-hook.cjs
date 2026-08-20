@@ -58,7 +58,8 @@ Module._load = function (request, parent, isMain) {
   }
 
   // Cached loads return in microseconds; recording them is pure noise.
-  if (Module._cache[id]) return originalLoad.call(this, request, parent, isMain);
+  if (Module._cache[id])
+    return originalLoad.call(this, request, parent, isMain);
 
   const frame = { id, start: performance.now(), childTime: 0 };
   stack.push(frame);
@@ -119,6 +120,8 @@ process.on("exit", () => {
   try {
     fs.writeFileSync(out, JSON.stringify(payload, null, 2));
   } catch (error) {
-    process.stderr.write(`startup-require-hook: cannot write ${out}: ${error}\n`);
+    process.stderr.write(
+      `startup-require-hook: cannot write ${out}: ${error}\n`,
+    );
   }
 });

@@ -53,9 +53,7 @@ export function copilotManagedSettingsPaths(
       ];
     case "win32": {
       const programData = process.env.ProgramData ?? "C:\\ProgramData";
-      return [
-        path.join(programData, "GitHubCopilot", "managed-settings.json"),
-      ];
+      return [path.join(programData, "GitHubCopilot", "managed-settings.json")];
     }
     default:
       return ["/etc/github-copilot/policy.d"];

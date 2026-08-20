@@ -13,13 +13,17 @@ export const messageSchema = z.object({
 /**
  * Zod schema for response format configuration
  */
-export const responseFormatSchema = z.object({
-  type: z.literal("json_schema"),
-  json_schema: z.object({
-    name: z.string(),
-    schema: z.record(z.string(), z.unknown()),
-  }).nullable(),
-}).optional();
+export const responseFormatSchema = z
+  .object({
+    type: z.literal("json_schema"),
+    json_schema: z
+      .object({
+        name: z.string(),
+        schema: z.record(z.string(), z.unknown()),
+      })
+      .nullable(),
+  })
+  .optional();
 
 /**
  * Zod schema for core prompt data - the essential fields needed for functionality

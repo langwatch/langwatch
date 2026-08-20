@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { escapeCsvField, toCsv, toJsonl } from "../download";
+import { describe, expect, it } from "vitest";
 import type { DatasetRecordResponse } from "@/client-sdk/services/datasets/types";
+import { escapeCsvField, toCsv, toJsonl } from "../download";
 
 describe("escapeCsvField()", () => {
   describe("when given a plain string", () => {
@@ -43,7 +43,9 @@ describe("escapeCsvField()", () => {
 });
 
 describe("toCsv()", () => {
-  const makeRecord = (entry: Record<string, unknown>): DatasetRecordResponse => ({
+  const makeRecord = (
+    entry: Record<string, unknown>,
+  ): DatasetRecordResponse => ({
     id: "rec-1",
     datasetId: "ds-1",
     projectId: "proj-1",
@@ -93,7 +95,9 @@ describe("toCsv()", () => {
 });
 
 describe("toJsonl()", () => {
-  const makeRecord = (entry: Record<string, unknown>): DatasetRecordResponse => ({
+  const makeRecord = (
+    entry: Record<string, unknown>,
+  ): DatasetRecordResponse => ({
     id: "rec-1",
     datasetId: "ds-1",
     projectId: "proj-1",
@@ -113,7 +117,10 @@ describe("toJsonl()", () => {
       const lines = result.split("\n");
 
       expect(lines).toHaveLength(2);
-      expect(JSON.parse(lines[0]!)).toEqual({ input: "hello", output: "world" });
+      expect(JSON.parse(lines[0]!)).toEqual({
+        input: "hello",
+        output: "world",
+      });
       expect(JSON.parse(lines[1]!)).toEqual({ input: "foo", output: "bar" });
     });
   });

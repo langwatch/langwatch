@@ -4,11 +4,11 @@
 // without ever finishing is reported as "interrupted": the SDK process likely
 // died before sending finished_at/stopped_at.
 
-import type { ExperimentRunSummary } from "./platformTypes";
 import {
-  ExperimentTimeoutError,
   ExperimentRunFailedError,
+  ExperimentTimeoutError,
 } from "./platformErrors";
+import type { ExperimentRunSummary } from "./platformTypes";
 
 export const INTERRUPTED_THRESHOLD_MS = 5 * 60 * 1000;
 
@@ -110,7 +110,10 @@ export const pollExperimentRun = async ({
     }
 
     if (status.status === "failed") {
-      throw new ExperimentRunFailedError(runId, status.error ?? "Unknown error");
+      throw new ExperimentRunFailedError(
+        runId,
+        status.error ?? "Unknown error",
+      );
     }
 
     if (status.status === "stopped") {

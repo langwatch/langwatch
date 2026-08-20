@@ -1,10 +1,10 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { AnnotationsApiService } from "@/client-sdk/services/annotations/annotations-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { formatTable, formatRelativeTime } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
+import { formatRelativeTime, formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the listing rather than printing it: the output port renders it in
@@ -30,7 +30,7 @@ export const listAnnotationsCommand = async (options: {
     // Handle both array and {data: [...]} response shapes
     const annotations = Array.isArray(result)
       ? result
-      : (result as unknown as { data: typeof result }).data ?? [];
+      : ((result as unknown as { data: typeof result }).data ?? []);
 
     spinner.succeed(
       `Found ${annotations.length} annotation${annotations.length !== 1 ? "s" : ""}`,
@@ -57,7 +57,8 @@ export const listAnnotationsCommand = async (options: {
           ID: a.id ?? "—",
           "Trace ID": a.traceId ? a.traceId.substring(0, 20) : "—",
           Comment: truncate(a.comment ?? "—", 40),
-          Rating: a.isThumbsUp === true ? "👍" : a.isThumbsUp === false ? "👎" : "—",
+          Rating:
+            a.isThumbsUp === true ? "👍" : a.isThumbsUp === false ? "👎" : "—",
           Created: a.createdAt ? formatRelativeTime(a.createdAt) : "—",
         }));
 

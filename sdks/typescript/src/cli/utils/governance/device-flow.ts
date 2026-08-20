@@ -94,9 +94,7 @@ export interface ExchangeApiKeyResult {
   endpoint?: string;
 }
 
-export type ExchangeResult =
-  | ExchangeDeviceSessionResult
-  | ExchangeApiKeyResult;
+export type ExchangeResult = ExchangeDeviceSessionResult | ExchangeApiKeyResult;
 
 /**
  * Back-compat alias for the device-session shape. Pre-`f9fcc3927` server
@@ -104,10 +102,9 @@ export type ExchangeResult =
  * below maps that to `{ kind: 'device_session', ... }` so callers can
  * always assume the discriminated form.
  */
-export type LegacyExchangeResult = Omit<
-  ExchangeDeviceSessionResult,
-  "kind"
-> & { kind?: "device_session" };
+export type LegacyExchangeResult = Omit<ExchangeDeviceSessionResult, "kind"> & {
+  kind?: "device_session";
+};
 
 export interface RefreshResult {
   access_token: string;
@@ -116,7 +113,16 @@ export interface RefreshResult {
 }
 
 export class DeviceFlowError extends Error {
-  constructor(public readonly kind: "pending" | "denied" | "expired" | "slow_down" | "unauthorized" | "other", message: string) {
+  constructor(
+    public readonly kind:
+      | "pending"
+      | "denied"
+      | "expired"
+      | "slow_down"
+      | "unauthorized"
+      | "other",
+    message: string,
+  ) {
     super(message);
     this.name = "DeviceFlowError";
   }
@@ -143,7 +149,11 @@ export async function startDeviceCode(
 ): Promise<DeviceCode> {
   const body: Record<string, unknown> = {};
   if (init.credentialType) body.credential_type = init.credentialType;
-  const dc = await postJSON<DeviceCode>(opts, "/api/auth/cli/device-code", body);
+  const dc = await postJSON<DeviceCode>(
+    opts,
+    "/api/auth/cli/device-code",
+    body,
+  );
   if (!dc.interval || dc.interval <= 0) dc.interval = 5;
   return dc;
 }
@@ -195,13 +205,11 @@ export async function exchange(
   });
   switch (res.status) {
     case 200: {
-      const body = (await res.json()) as
-        | ExchangeResult
-        | LegacyExchangeResult;
+      const body = (await res.json()) as ExchangeResult | LegacyExchangeResult;
       // Pre-f9fcc3927 servers returned the device-session shape without
       // a `kind` field. Normalise so callers can always discriminate.
       if (!("kind" in body) || !body.kind) {
-        return { kind: "device_session", ...(body) };
+        return { kind: "device_session", ...body };
       }
       return body as ExchangeResult;
     }
@@ -215,7 +223,10 @@ export async function exchange(
       throw new DeviceFlowError("slow_down", "polling too fast");
     default: {
       const body = await res.text().catch(() => "");
-      throw new DeviceFlowError("other", `unexpected status ${res.status}: ${body.slice(0, 256)}`);
+      throw new DeviceFlowError(
+        "other",
+        `unexpected status ${res.status}: ${body.slice(0, 256)}`,
+      );
     }
   }
 }
@@ -261,13 +272,21 @@ export async function refresh(
   opts: DeviceFlowOptions,
   refreshToken: string,
 ): Promise<RefreshResult> {
-  const res = await rawPost(opts, "/api/auth/cli/refresh", { refresh_token: refreshToken });
+  const res = await rawPost(opts, "/api/auth/cli/refresh", {
+    refresh_token: refreshToken,
+  });
   if (res.status === 401) {
-    throw new DeviceFlowError("unauthorized", "session revoked — re-authenticate");
+    throw new DeviceFlowError(
+      "unauthorized",
+      "session revoked — re-authenticate",
+    );
   }
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new DeviceFlowError("other", `refresh failed (${res.status}): ${body.slice(0, 256)}`);
+    throw new DeviceFlowError(
+      "other",
+      `refresh failed (${res.status}): ${body.slice(0, 256)}`,
+    );
   }
   return (await res.json()) as RefreshResult;
 }
@@ -290,19 +309,33 @@ export async function logout(
   // 401/404 mean "already gone" — that's success for logout.
   if (res.status === 200 || res.status === 401 || res.status === 404) return;
   const text = await res.text().catch(() => "");
-  throw new DeviceFlowError("other", `logout failed (${res.status}): ${text.slice(0, 256)}`);
+  throw new DeviceFlowError(
+    "other",
+    `logout failed (${res.status}): ${text.slice(0, 256)}`,
+  );
 }
 
-async function postJSON<T>(opts: DeviceFlowOptions, path: string, body: unknown): Promise<T> {
+async function postJSON<T>(
+  opts: DeviceFlowOptions,
+  path: string,
+  body: unknown,
+): Promise<T> {
   const res = await rawPost(opts, path, body);
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new DeviceFlowError("other", `${path} → ${res.status}: ${text.slice(0, 256)}`);
+    throw new DeviceFlowError(
+      "other",
+      `${path} → ${res.status}: ${text.slice(0, 256)}`,
+    );
   }
   return (await res.json()) as T;
 }
 
-function rawPost(opts: DeviceFlowOptions, path: string, body: unknown): Promise<Response> {
+function rawPost(
+  opts: DeviceFlowOptions,
+  path: string,
+  body: unknown,
+): Promise<Response> {
   const url = normalizeEndpoint(opts.baseUrl) + path;
   const f = opts.fetchImpl ?? fetch;
   return f(url, {

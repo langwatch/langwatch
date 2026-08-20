@@ -1,31 +1,35 @@
-import { type LangwatchApiClient } from "@/internal/api/client";
-import { isLangWatchHandledError } from "@/internal/api/errors";
-import { type Logger } from "@/logger";
-import {
-  type Dataset,
-  type DatasetEntry,
-  type DatasetMetadata,
-  type GetDatasetApiResponse,
-  type GetDatasetOptions,
-  type ListDatasetsOptions,
-  type ListDatasetsApiResponse,
-  type ListRecordsOptions,
-  type ListRecordsApiResponse,
-  type CreateDatasetOptions,
-  type UpdateDatasetOptions,
-  type CreateFromUploadOptions,
-  type CreateFromUploadResponse,
-  type BatchCreateRecordsResponse,
-  type DeleteRecordsResponse,
-  type UploadResponse,
-  type DatasetRecordResponse,
-} from "./types";
-import { DatasetApiError, DatasetNotFoundError, DatasetPlanLimitError } from "./errors";
-import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
-import { tracer } from "./tracing";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import type { LangwatchApiClient } from "@/internal/api/client";
+import { isLangWatchHandledError } from "@/internal/api/errors";
 import { resolveEndpoint } from "@/internal/endpoint";
+import type { Logger } from "@/logger";
+import {
+  DatasetApiError,
+  DatasetNotFoundError,
+  DatasetPlanLimitError,
+} from "./errors";
+import { tracer } from "./tracing";
+import type {
+  BatchCreateRecordsResponse,
+  CreateDatasetOptions,
+  CreateFromUploadOptions,
+  CreateFromUploadResponse,
+  Dataset,
+  DatasetEntry,
+  DatasetMetadata,
+  DatasetRecordResponse,
+  DeleteRecordsResponse,
+  GetDatasetApiResponse,
+  GetDatasetOptions,
+  ListDatasetsApiResponse,
+  ListDatasetsOptions,
+  ListRecordsApiResponse,
+  ListRecordsOptions,
+  UpdateDatasetOptions,
+  UploadResponse,
+} from "./types";
 
 type DatasetServiceConfig = {
   langwatchApiClient: LangwatchApiClient;
@@ -53,6 +57,7 @@ export class DatasetService {
      * Wraps the service in a tracing proxy that automatically creates
      * OpenTelemetry spans for all public methods.
      */
+    // biome-ignore lint/correctness/noConstructorReturn: the proxy substitution is the pattern -- callers must get the instrumented proxy back, not `this`.
     return createTracingProxy(this as DatasetService, tracer);
   }
 
@@ -63,7 +68,12 @@ export class DatasetService {
    * @param status - The HTTP status code
    * @param slugOrId - The dataset identifier (only passed for operations targeting an existing resource)
    */
-  private handleApiError(operation: string, error: unknown, status: number, slugOrId?: string): never {
+  private handleApiError(
+    operation: string,
+    error: unknown,
+    status: number,
+    slugOrId?: string,
+  ): never {
     if (status === 404 && slugOrId) {
       throw new DatasetNotFoundError(slugOrId);
     }
@@ -107,7 +117,7 @@ export class DatasetService {
    * Wrapper for API calls to endpoints not yet in the generated OpenAPI types.
    * Quarantines `as any` casts to a single location.
    */
-  private async untypedRequest<M extends 'GET' | 'POST' | 'PATCH' | 'DELETE'>(
+  private async untypedRequest<M extends "GET" | "POST" | "PATCH" | "DELETE">(
     method: M,
     path: string,
     options?: Record<string, unknown>,
@@ -135,8 +145,16 @@ export class DatasetService {
    * was; the transport change is invisible to it.
    */
   private async asResponseEnvelope(
-    request: Promise<{ data?: unknown; error?: unknown; response: { status: number } }>,
-  ): Promise<{ data?: unknown; error?: unknown; response: { status: number } }> {
+    request: Promise<{
+      data?: unknown;
+      error?: unknown;
+      response: { status: number };
+    }>,
+  ): Promise<{
+    data?: unknown;
+    error?: unknown;
+    response: { status: number };
+  }> {
     try {
       return await request;
     } catch (error) {
@@ -157,7 +175,12 @@ export class DatasetService {
     slugOrId?: string,
   ): T {
     if (response.error) {
-      this.handleApiError(operation, response.error, response.response.status, slugOrId);
+      this.handleApiError(
+        operation,
+        response.error,
+        response.response.status,
+        slugOrId,
+      );
     }
     return response.data as T;
   }
@@ -171,7 +194,7 @@ export class DatasetService {
    */
   async getDataset<T extends Record<string, unknown> = Record<string, unknown>>(
     slugOrId: string,
-    _options?: GetDatasetOptions
+    _options?: GetDatasetOptions,
   ): Promise<Dataset<T>> {
     this.config.logger.debug(`Fetching dataset: ${slugOrId}`);
 
@@ -182,7 +205,11 @@ export class DatasetService {
             slugOrId,
           },
         },
-      }) as Promise<{ data?: unknown; error?: unknown; response: { status: number } }>,
+      }) as Promise<{
+        data?: unknown;
+        error?: unknown;
+        response: { status: number };
+      }>,
     );
 
     const data = this.unwrapResponse<GetDatasetApiResponse>(
@@ -201,7 +228,7 @@ export class DatasetService {
     }));
 
     this.config.logger.debug(
-      `Fetched dataset ${slugOrId} with ${entries.length} entries`
+      `Fetched dataset ${slugOrId} with ${entries.length} entries`,
     );
 
     return {
@@ -218,10 +245,12 @@ export class DatasetService {
   /**
    * Lists all datasets for the project, with optional pagination.
    */
-  async listDatasets(options?: ListDatasetsOptions): Promise<ListDatasetsApiResponse> {
+  async listDatasets(
+    options?: ListDatasetsOptions,
+  ): Promise<ListDatasetsApiResponse> {
     this.config.logger.debug("Listing datasets");
 
-    const response = await this.untypedRequest('GET', '/api/dataset', {
+    const response = await this.untypedRequest("GET", "/api/dataset", {
       params: {
         query: {
           page: options?.page,
@@ -242,7 +271,7 @@ export class DatasetService {
   async createDataset(options: CreateDatasetOptions): Promise<DatasetMetadata> {
     this.config.logger.debug(`Creating dataset: ${options.name}`);
 
-    const response = await this.untypedRequest('POST', '/api/dataset', {
+    const response = await this.untypedRequest("POST", "/api/dataset", {
       body: {
         name: options.name,
         columnTypes: options.columnTypes ?? [],
@@ -258,15 +287,22 @@ export class DatasetService {
   /**
    * Updates a dataset by its slug or ID.
    */
-  async updateDataset(slugOrId: string, options: UpdateDatasetOptions): Promise<DatasetMetadata> {
+  async updateDataset(
+    slugOrId: string,
+    options: UpdateDatasetOptions,
+  ): Promise<DatasetMetadata> {
     this.config.logger.debug(`Updating dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest('PATCH', '/api/dataset/{slugOrId}', {
-      params: {
-        path: { slugOrId },
+    const response = await this.untypedRequest(
+      "PATCH",
+      "/api/dataset/{slugOrId}",
+      {
+        params: {
+          path: { slugOrId },
+        },
+        body: options,
       },
-      body: options,
-    });
+    );
 
     return this.unwrapResponse<DatasetMetadata>(
       response,
@@ -281,11 +317,15 @@ export class DatasetService {
   async deleteDataset(slugOrId: string): Promise<DatasetMetadata> {
     this.config.logger.debug(`Deleting dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest('DELETE', '/api/dataset/{slugOrId}', {
-      params: {
-        path: { slugOrId },
+    const response = await this.untypedRequest(
+      "DELETE",
+      "/api/dataset/{slugOrId}",
+      {
+        params: {
+          path: { slugOrId },
+        },
       },
-    });
+    );
 
     return this.unwrapResponse<DatasetMetadata>(
       response,
@@ -301,14 +341,20 @@ export class DatasetService {
     slugOrId: string,
     entries: Record<string, unknown>[],
   ): Promise<BatchCreateRecordsResponse> {
-    this.config.logger.debug(`Creating ${entries.length} records in dataset: ${slugOrId}`);
+    this.config.logger.debug(
+      `Creating ${entries.length} records in dataset: ${slugOrId}`,
+    );
 
-    const response = await this.untypedRequest('POST', '/api/dataset/{slugOrId}/records', {
-      params: {
-        path: { slugOrId },
+    const response = await this.untypedRequest(
+      "POST",
+      "/api/dataset/{slugOrId}/records",
+      {
+        params: {
+          path: { slugOrId },
+        },
+        body: { entries },
       },
-      body: { entries },
-    });
+    );
 
     return this.unwrapResponse<BatchCreateRecordsResponse>(
       response,
@@ -325,14 +371,20 @@ export class DatasetService {
     recordId: string,
     entry: Record<string, unknown>,
   ): Promise<DatasetRecordResponse> {
-    this.config.logger.debug(`Updating record ${recordId} in dataset: ${slugOrId}`);
+    this.config.logger.debug(
+      `Updating record ${recordId} in dataset: ${slugOrId}`,
+    );
 
-    const response = await this.untypedRequest('PATCH', '/api/dataset/{slugOrId}/records/{recordId}', {
-      params: {
-        path: { slugOrId, recordId },
+    const response = await this.untypedRequest(
+      "PATCH",
+      "/api/dataset/{slugOrId}/records/{recordId}",
+      {
+        params: {
+          path: { slugOrId, recordId },
+        },
+        body: { entry },
       },
-      body: { entry },
-    });
+    );
 
     return this.unwrapResponse<DatasetRecordResponse>(
       response,
@@ -348,14 +400,20 @@ export class DatasetService {
     slugOrId: string,
     recordIds: string[],
   ): Promise<DeleteRecordsResponse> {
-    this.config.logger.debug(`Deleting ${recordIds.length} records from dataset: ${slugOrId}`);
+    this.config.logger.debug(
+      `Deleting ${recordIds.length} records from dataset: ${slugOrId}`,
+    );
 
-    const response = await this.untypedRequest('DELETE', '/api/dataset/{slugOrId}/records', {
-      params: {
-        path: { slugOrId },
+    const response = await this.untypedRequest(
+      "DELETE",
+      "/api/dataset/{slugOrId}/records",
+      {
+        params: {
+          path: { slugOrId },
+        },
+        body: { recordIds },
       },
-      body: { recordIds },
-    });
+    );
 
     return this.unwrapResponse<DeleteRecordsResponse>(
       response,
@@ -377,15 +435,19 @@ export class DatasetService {
   ): Promise<ListRecordsApiResponse> {
     this.config.logger.debug(`Listing records for dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest('GET', '/api/dataset/{slugOrId}/records', {
-      params: {
-        path: { slugOrId },
-        query: {
-          page: options?.page,
-          limit: options?.limit,
+    const response = await this.untypedRequest(
+      "GET",
+      "/api/dataset/{slugOrId}/records",
+      {
+        params: {
+          path: { slugOrId },
+          query: {
+            page: options?.page,
+            limit: options?.limit,
+          },
         },
       },
-    });
+    );
 
     return this.unwrapResponse<ListRecordsApiResponse>(
       response,
@@ -503,12 +565,17 @@ export class DatasetService {
   /**
    * Append strategy: try uploading to existing dataset; if not found, create from file.
    */
-  private async _uploadAppend(slugOrId: string, file: File | Blob): Promise<UploadResponse> {
+  private async _uploadAppend(
+    slugOrId: string,
+    file: File | Blob,
+  ): Promise<UploadResponse> {
     try {
       return await this.uploadFile(slugOrId, file);
     } catch (error) {
       if (error instanceof DatasetNotFoundError) {
-        return this.toUploadResponse(await this.createDatasetFromUpload({ name: slugOrId, file }));
+        return this.toUploadResponse(
+          await this.createDatasetFromUpload({ name: slugOrId, file }),
+        );
       }
       throw error;
     }
@@ -517,14 +584,19 @@ export class DatasetService {
   /**
    * Replace strategy: if dataset exists, delete all records then upload; if not found, create from file.
    */
-  private async _uploadReplace(slugOrId: string, file: File | Blob): Promise<UploadResponse> {
+  private async _uploadReplace(
+    slugOrId: string,
+    file: File | Blob,
+  ): Promise<UploadResponse> {
     try {
       await this.getDataset(slugOrId);
       await this._deleteAllRecords(slugOrId);
       return await this.uploadFile(slugOrId, file);
     } catch (error) {
       if (error instanceof DatasetNotFoundError) {
-        return this.toUploadResponse(await this.createDatasetFromUpload({ name: slugOrId, file }));
+        return this.toUploadResponse(
+          await this.createDatasetFromUpload({ name: slugOrId, file }),
+        );
       }
       throw error;
     }
@@ -533,7 +605,10 @@ export class DatasetService {
   /**
    * Error strategy: if dataset exists, throw 409; if not found, create from file.
    */
-  private async _uploadError(slugOrId: string, file: File | Blob): Promise<UploadResponse> {
+  private async _uploadError(
+    slugOrId: string,
+    file: File | Blob,
+  ): Promise<UploadResponse> {
     let datasetExists = false;
     try {
       await this.getDataset(slugOrId);
@@ -552,7 +627,9 @@ export class DatasetService {
       );
     }
 
-    return this.toUploadResponse(await this.createDatasetFromUpload({ name: slugOrId, file }));
+    return this.toUploadResponse(
+      await this.createDatasetFromUpload({ name: slugOrId, file }),
+    );
   }
 
   /**
@@ -566,7 +643,10 @@ export class DatasetService {
 
     let iteration = 0;
     while (iteration < MAX_DELETE_ITERATIONS) {
-      const page = await this.listRecords(slugOrId, { page: 1, limit: BATCH_SIZE });
+      const page = await this.listRecords(slugOrId, {
+        page: 1,
+        limit: BATCH_SIZE,
+      });
       if (page.data.length === 0) {
         return;
       }

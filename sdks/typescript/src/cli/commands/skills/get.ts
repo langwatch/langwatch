@@ -37,7 +37,9 @@ export const skillsGetCommand = async (
         slug: skill.isRecipe ? `recipes/${skill.slug}` : skill.slug,
         name: skill.name,
         description: skill.description,
-        ...(skill.userPrompt !== undefined ? { userPrompt: skill.userPrompt } : {}),
+        ...(skill.userPrompt !== undefined
+          ? { userPrompt: skill.userPrompt }
+          : {}),
         body: skill.body,
       },
       { ...options, table: () => process.stdout.write(skill.body) },

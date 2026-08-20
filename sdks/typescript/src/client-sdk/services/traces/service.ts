@@ -1,7 +1,11 @@
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
-import { type InternalConfig } from "@/client-sdk/types";
-import { type GetTraceParams, TracesError, type GetTraceResponse } from "./types";
+import type { InternalConfig } from "@/client-sdk/types";
 import { tracer } from "./tracing";
+import {
+  type GetTraceParams,
+  type GetTraceResponse,
+  TracesError,
+} from "./types";
 
 /**
  * Service for managing trace resources via the Langwatch API.
@@ -22,10 +26,8 @@ export class TracesService {
     /**
      * Wraps the service in a tracing proxy via the decorator.
      */
-    return createTracingProxy(
-      this as TracesService,
-      tracer,
-    );
+    // biome-ignore lint/correctness/noConstructorReturn: the proxy substitution is the pattern -- callers must get the instrumented proxy back, not `this`.
+    return createTracingProxy(this as TracesService, tracer);
   }
 
   /**
@@ -38,14 +40,10 @@ export class TracesService {
     const errorMessage =
       typeof error === "string"
         ? error
-        : error?.error ?? error?.message ?? "Unknown error occurred";
+        : (error?.error ?? error?.message ?? "Unknown error occurred");
     const message = `Failed to ${operation}: ${errorMessage}`;
 
-    throw new TracesError(
-      message,
-      operation,
-      error,
-    );
+    throw new TracesError(message, operation, error);
   }
 
   /**
@@ -59,14 +57,17 @@ export class TracesService {
     traceId: string,
     params?: GetTraceParams,
   ): Promise<GetTraceResponse> {
-    const { data, error } = await this.config.langwatchApiClient.GET("/api/trace/{id}", {
-      params: {
-        path: {
-          id: traceId,
+    const { data, error } = await this.config.langwatchApiClient.GET(
+      "/api/trace/{id}",
+      {
+        params: {
+          path: {
+            id: traceId,
+          },
         },
+        query: params,
       },
-      query: params,
-    });
+    );
 
     if (error) {
       this.handleApiError("get trace", error);

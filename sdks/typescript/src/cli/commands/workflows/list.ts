@@ -1,10 +1,10 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { WorkflowsApiService } from "@/client-sdk/services/workflows/workflows-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { formatTable, formatRelativeTime } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
+import { formatRelativeTime, formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const listWorkflowsCommand = async (): Promise<CommandResult | void> => {
   await resolveCredentials();

@@ -11,7 +11,7 @@
  * Not named `*.test.ts` on purpose — vitest's `include` is `src/**\/*.test.ts`,
  * so this module is imported by the suites rather than collected as one.
  */
-import { beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
 import { AGENT_MODE_ENV_VARS } from "../output";
 
 export interface OutputHarness {

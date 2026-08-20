@@ -1,10 +1,10 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { PromptsApiService } from "@/client-sdk/services/prompts";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the versions rather than printing them: the output port renders them
@@ -23,7 +23,7 @@ export const promptVersionsCommand = async (
     const versions = await service.getVersions(handle);
 
     spinner.succeed(
-      `Found ${versions.length} version${versions.length !== 1 ? "s" : ""} for "${handle}"`
+      `Found ${versions.length} version${versions.length !== 1 ? "s" : ""} for "${handle}"`,
     );
 
     return {
@@ -61,8 +61,8 @@ export const promptVersionsCommand = async (
         console.log();
         console.log(
           chalk.gray(
-            `  Tip: Restore a version with: langwatch prompt restore ${handle} <versionId>`
-          )
+            `  Tip: Restore a version with: langwatch prompt restore ${handle} <versionId>`,
+          ),
         );
         console.log();
       },

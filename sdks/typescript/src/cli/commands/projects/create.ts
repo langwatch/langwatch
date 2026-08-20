@@ -1,9 +1,9 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { ProjectsApiService } from "@/client-sdk/services/projects/projects-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export interface CreateProjectOptions {
   name: string;
@@ -40,12 +40,16 @@ export const createProjectCommand = async (
     process.exit(1);
   }
   if (!options.teamId && !options.newTeamName) {
-    console.error(chalk.red("Error: either --team-id or --new-team-name is required"));
+    console.error(
+      chalk.red("Error: either --team-id or --new-team-name is required"),
+    );
     process.exit(1);
   }
 
   const service = new ProjectsApiService();
-  const spinner = createSpinner(`Creating project "${options.name}"...`).start();
+  const spinner = createSpinner(
+    `Creating project "${options.name}"...`,
+  ).start();
 
   try {
     const project = await service.create({
@@ -70,16 +74,26 @@ export const createProjectCommand = async (
       data: project,
       table: () => {
         console.log();
-        console.log(chalk.bold.yellow("⚠  Save the service API key below NOW. It will not be shown again."));
+        console.log(
+          chalk.bold.yellow(
+            "⚠  Save the service API key below NOW. It will not be shown again.",
+          ),
+        );
         console.log();
         console.log(`  ${chalk.green(project.serviceApiKey)}`);
         console.log();
-        console.log(chalk.gray("Use it to authenticate project-scoped operations:"));
-        console.log(chalk.cyan(`  export LANGWATCH_API_KEY="${project.serviceApiKey}"`));
+        console.log(
+          chalk.gray("Use it to authenticate project-scoped operations:"),
+        );
+        console.log(
+          chalk.cyan(`  export LANGWATCH_API_KEY="${project.serviceApiKey}"`),
+        );
         console.log();
         console.log(chalk.gray("Project id:         ") + project.id);
         console.log(chalk.gray("Slug:               ") + project.slug);
-        console.log(chalk.gray("Service API key id: ") + project.serviceApiKeyId);
+        console.log(
+          chalk.gray("Service API key id: ") + project.serviceApiKeyId,
+        );
         console.log();
       },
     };

@@ -7,7 +7,7 @@
  * - A saved evaluation with slug "test-evaluation" (or TEST_EVALUATION_SLUG env var)
  */
 
-import { describe, it, expect, beforeAll } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { LangWatch } from "@/client-sdk";
 import {
   ExperimentNotFoundError,
@@ -20,8 +20,7 @@ const shouldRun =
 
 describe.skipIf(!shouldRun)("Platform Experiments Integration", () => {
   let langwatch: LangWatch;
-  const testSlug =
-    process.env.TEST_EVALUATION_SLUG ?? "test-evaluation";
+  const testSlug = process.env.TEST_EVALUATION_SLUG ?? "test-evaluation";
 
   beforeAll(() => {
     langwatch = new LangWatch({
@@ -33,7 +32,7 @@ describe.skipIf(!shouldRun)("Platform Experiments Integration", () => {
   describe("error handling", () => {
     it("throws ExperimentNotFoundError for non-existent slug", async () => {
       await expect(
-        langwatch.experiments.run("non-existent-evaluation-slug-12345")
+        langwatch.experiments.run("non-existent-evaluation-slug-12345"),
       ).rejects.toThrow(ExperimentNotFoundError);
     });
 
@@ -43,9 +42,9 @@ describe.skipIf(!shouldRun)("Platform Experiments Integration", () => {
         endpoint: process.env.LANGWATCH_ENDPOINT,
       });
 
-      await expect(
-        invalidClient.experiments.run(testSlug)
-      ).rejects.toThrow(ExperimentsApiError);
+      await expect(invalidClient.experiments.run(testSlug)).rejects.toThrow(
+        ExperimentsApiError,
+      );
     });
   });
 
@@ -97,7 +96,7 @@ describe.skipIf(!shouldRun)("Platform Experiments Integration", () => {
       // Progress should increase (or stay same)
       for (let i = 1; i < progressUpdates.length; i++) {
         expect(progressUpdates[i]!.completed).toBeGreaterThanOrEqual(
-          progressUpdates[i - 1]!.completed
+          progressUpdates[i - 1]!.completed,
         );
       }
     }, 300000);

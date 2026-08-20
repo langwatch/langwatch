@@ -1,10 +1,16 @@
-import { PromptsApiService, type AssignTagResult } from "./prompts-api.service";
-import { Prompt } from "./prompt";
-import type { CreatePromptBody, UpdatePromptBody, PromptData, TagDefinition, CreatedTag } from "./types";
-import { FetchPolicy } from "./types";
-import { type InternalConfig } from "@/client-sdk/types";
-import { LocalPromptsService } from "./local-prompts.service";
+import type { InternalConfig } from "@/client-sdk/types";
 import { PromptsError } from "./errors";
+import { LocalPromptsService } from "./local-prompts.service";
+import { Prompt } from "./prompt";
+import { type AssignTagResult, PromptsApiService } from "./prompts-api.service";
+import type {
+  CreatedTag,
+  CreatePromptBody,
+  PromptData,
+  TagDefinition,
+  UpdatePromptBody,
+} from "./types";
+import { FetchPolicy } from "./types";
 
 /**
  * Options for fetching a prompt.
@@ -34,12 +40,17 @@ interface PromptsFacadeDependencies {
  * Facade for prompt operations in the LangWatch SDK.
  * Provides a simplified interface for common prompt management tasks.
  */
-export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">{
+export class PromptsFacade
+  implements Pick<PromptsApiService, "sync" | "delete">
+{
   private readonly promptsApiService: PromptsApiService;
   private readonly localPromptsService: LocalPromptsService;
   private readonly cache = new Map<string, CacheEntry>();
   readonly tags: {
-    assign(id: string, params: { tag: string; versionId: string }): Promise<AssignTagResult>;
+    assign(
+      id: string,
+      params: { tag: string; versionId: string },
+    ): Promise<AssignTagResult>;
     list(): Promise<TagDefinition[]>;
     create(params: { name: string }): Promise<CreatedTag>;
     delete(tagName: string): Promise<void>;
@@ -47,8 +58,10 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
   };
 
   constructor(config: InternalConfig & PromptsFacadeDependencies) {
-    this.promptsApiService = config.promptsApiService ?? new PromptsApiService(config);
-    this.localPromptsService = config.localPromptsService ?? new LocalPromptsService();
+    this.promptsApiService =
+      config.promptsApiService ?? new PromptsApiService(config);
+    this.localPromptsService =
+      config.localPromptsService ?? new LocalPromptsService();
     this.tags = {
       assign: (id, { tag, versionId }) =>
         this.promptsApiService.assignTag({ id, tag, versionId }),
@@ -82,10 +95,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
    * @returns The Prompt instance.
    * @throws {PromptsError} If the prompt is not found or the API call fails.
    */
-  async get(
-    handleOrId: string,
-    options?: GetPromptOptions,
-  ): Promise<Prompt> {
+  async get(handleOrId: string, options?: GetPromptOptions): Promise<Prompt> {
     const fetchPolicy = options?.fetchPolicy ?? FetchPolicy.MATERIALIZED_FIRST;
 
     switch (fetchPolicy) {
@@ -121,14 +131,19 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
     options?: GetPromptOptions,
   ): Promise<Prompt> {
     try {
-      const serverPrompt = await this.promptsApiService.get(handleOrId, options);
+      const serverPrompt = await this.promptsApiService.get(
+        handleOrId,
+        options,
+      );
       return new Prompt(serverPrompt);
     } catch {
       const localPrompt = await this.localPromptsService.get(handleOrId);
       if (localPrompt) {
         return new Prompt(localPrompt);
       }
-      throw new PromptsError(`Prompt "${handleOrId}" not found locally or on server`);
+      throw new PromptsError(
+        `Prompt "${handleOrId}" not found locally or on server`,
+      );
     }
   }
 
@@ -137,12 +152,17 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
     if (localPrompt) {
       return new Prompt(localPrompt);
     }
-    throw new PromptsError(`Prompt "${handleOrId}" not found in materialized files`);
+    throw new PromptsError(
+      `Prompt "${handleOrId}" not found in materialized files`,
+    );
   }
 
-  private buildCacheKey(handleOrId: string, options?: GetPromptOptions): string {
-    const tagSegment = options?.tag != null ? `::tag:${options.tag}` : '';
-    return `${handleOrId}::version:${options?.version ?? ''}${tagSegment}`;
+  private buildCacheKey(
+    handleOrId: string,
+    options?: GetPromptOptions,
+  ): string {
+    const tagSegment = options?.tag != null ? `::tag:${options.tag}` : "";
+    return `${handleOrId}::version:${options?.version ?? ""}${tagSegment}`;
   }
 
   private async getCacheTtl(
@@ -159,7 +179,10 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
     }
 
     try {
-      const serverPrompt = await this.promptsApiService.get(handleOrId, options);
+      const serverPrompt = await this.promptsApiService.get(
+        handleOrId,
+        options,
+      );
       this.cache.set(cacheKey, { data: serverPrompt, timestamp: now });
       return new Prompt(serverPrompt);
     } catch {
@@ -167,7 +190,9 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
       if (localPrompt) {
         return new Prompt(localPrompt);
       }
-      throw new PromptsError(`Prompt "${handleOrId}" not found locally or on server`);
+      throw new PromptsError(
+        `Prompt "${handleOrId}" not found locally or on server`,
+      );
     }
   }
 
@@ -189,7 +214,10 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
    * @throws {PromptsError} If the API call fails.
    */
   async update(handleOrId: string, newData: UpdatePromptBody): Promise<Prompt> {
-    const serverPrompt = await this.promptsApiService.update(handleOrId, newData);
+    const serverPrompt = await this.promptsApiService.update(
+      handleOrId,
+      newData,
+    );
     return new Prompt(serverPrompt);
   }
 

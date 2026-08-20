@@ -27,7 +27,11 @@ describe("parsePermissionFlags", () => {
     /** @scenario Repeated permission flags compose into one permission set */
     it("composes the pairs into one set, in the order given, and names the shape it expects", () => {
       expect(
-        parsePermissionFlags(["project:view", "trace:manage", "dataset:create"]),
+        parsePermissionFlags([
+          "project:view",
+          "trace:manage",
+          "dataset:create",
+        ]),
       ).toEqual(["project:view", "trace:manage", "dataset:create"]);
 
       // The same pair twice is one permission, not two.

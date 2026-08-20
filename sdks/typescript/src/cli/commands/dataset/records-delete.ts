@@ -1,13 +1,13 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
 import {
   commandValidationError,
   reportCommandError,
 } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
-import { createDatasetService } from "./service-factory";
+import { createSpinner } from "../../utils/spinner";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /**
  * Deletes one or more records from a dataset by their IDs.

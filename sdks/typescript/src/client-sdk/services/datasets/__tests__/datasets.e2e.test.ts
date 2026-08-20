@@ -4,7 +4,7 @@
  * These tests run against a real LangWatch backend.
  * Set LANGWATCH_API_KEY and optionally LANGWATCH_ENDPOINT environment variables.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LangWatch } from "@/client-sdk";
 import { DatasetNotFoundError, DatasetValidationError } from "../errors";
 
@@ -110,7 +110,7 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
       if (idx !== -1) createdSlugs.splice(idx, 1);
 
       await expect(langwatch.datasets.get(datasetSlug)).rejects.toThrow(
-        DatasetNotFoundError
+        DatasetNotFoundError,
       );
     });
   });
@@ -166,7 +166,7 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
       const result = await langwatch.datasets.updateRecord(
         recordSlug,
         recordId,
-        { input: "updated-input", output: "updated-output" }
+        { input: "updated-input", output: "updated-output" },
       );
 
       expect(result.id).toBe(recordId);
@@ -180,7 +180,7 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
       const idsToDelete = recordIds.slice(1); // delete last 2
       const result = await langwatch.datasets.deleteRecords(
         recordSlug,
-        idsToDelete
+        idsToDelete,
       );
 
       expect(result.deletedCount).toBe(2);
@@ -208,14 +208,14 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
       const file = new File(
         ["input,output\nhello,world\nfoo,bar"],
         "data.csv",
-        { type: "text/csv" }
+        { type: "text/csv" },
       );
 
       const result = await langwatch.datasets.upload(uploadSlug, file);
 
       // Upload to existing dataset returns records array
       expect(
-        result.records?.length ?? result.recordsCreated
+        result.records?.length ?? result.recordsCreated,
       ).toBeGreaterThanOrEqual(2);
     });
 
@@ -224,11 +224,9 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
       const before = await langwatch.datasets.listRecords(uploadSlug);
       expect(before.pagination.total).toBeGreaterThanOrEqual(2);
 
-      const file = new File(
-        ["input,output\nreplaced,data"],
-        "replace.csv",
-        { type: "text/csv" }
-      );
+      const file = new File(["input,output\nreplaced,data"], "replace.csv", {
+        type: "text/csv",
+      });
 
       await langwatch.datasets.upload(uploadSlug, file, {
         ifExists: "replace",
@@ -250,11 +248,9 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
       if (idx !== -1) createdSlugs.splice(idx, 1);
 
       const newSlug = `${slug}-upload-new`;
-      const file = new File(
-        ["input,output\nnew,dataset"],
-        "new.csv",
-        { type: "text/csv" }
-      );
+      const file = new File(["input,output\nnew,dataset"], "new.csv", {
+        type: "text/csv",
+      });
 
       const result = await langwatch.datasets.upload(newSlug, file, {
         ifExists: "append",
@@ -275,13 +271,13 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
   describe("Error handling", () => {
     it("throws DatasetNotFoundError for non-existent dataset", async () => {
       await expect(
-        langwatch.datasets.get("does-not-exist-ever-" + Date.now())
+        langwatch.datasets.get("does-not-exist-ever-" + Date.now()),
       ).rejects.toThrow(DatasetNotFoundError);
     });
 
     it("throws DatasetValidationError for create with empty name", () => {
       expect(() => langwatch.datasets.create({ name: "" })).toThrow(
-        DatasetValidationError
+        DatasetValidationError,
       );
     });
   });

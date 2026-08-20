@@ -1,13 +1,13 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import {
   type BudgetScopeKind,
   GatewayBudgetsApiService,
 } from "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export interface ListGatewayBudgetsOptions {
   scopeType?: string;
@@ -66,7 +66,9 @@ export const listGatewayBudgetsCommand = async (
     // listing's spend unreal.
     const spend_available = budgets.every((b) => b.spent_usd !== null);
 
-    spinner.succeed(`Found ${budgets.length} budget${budgets.length !== 1 ? "s" : ""}`);
+    spinner.succeed(
+      `Found ${budgets.length} budget${budgets.length !== 1 ? "s" : ""}`,
+    );
 
     return {
       data: { budgets, spend_available },
@@ -76,7 +78,9 @@ export const listGatewayBudgetsCommand = async (
           console.log(chalk.gray("No gateway budgets configured."));
           console.log(chalk.gray("Create one with:"));
           console.log(
-            chalk.cyan('  langwatch gateway-budgets create --scope project --project <id> --window day --limit 100 --name "daily cap"'),
+            chalk.cyan(
+              '  langwatch gateway-budgets create --scope project --project <id> --window day --limit 100 --name "daily cap"',
+            ),
           );
           return;
         }
@@ -98,12 +102,19 @@ export const listGatewayBudgetsCommand = async (
           const isPerPerson = b.scope_type === "attributed_user";
           const seatsSeen = b.end_users_seen ?? 0;
           const seatsOver = b.end_users_over ?? 0;
-          const effectiveLimit = isGroup ? limit * (b.member_count ?? 0) : limit;
+          const effectiveLimit = isGroup
+            ? limit * (b.member_count ?? 0)
+            : limit;
           // A zero effective limit admits no spend at all: maximally
           // breached, not 0% utilized (matches `langwatch status`).
           const pct = effectiveLimit > 0 ? (spent / effectiveLimit) * 100 : 100;
           const pctLabel = `${pct.toFixed(0)}%`;
-          const coloredPct = pct >= 100 ? chalk.red(pctLabel) : pct >= 80 ? chalk.yellow(pctLabel) : chalk.green(pctLabel);
+          const coloredPct =
+            pct >= 100
+              ? chalk.red(pctLabel)
+              : pct >= 80
+                ? chalk.yellow(pctLabel)
+                : chalk.green(pctLabel);
           const seatsLabel = `${seatsOver} of ${seatsSeen} over cap`;
           const spentLabel = !spend_available
             ? chalk.gray("unavailable")
@@ -117,7 +128,10 @@ export const listGatewayBudgetsCommand = async (
             Name: b.name,
             Scope: `${b.scope_type}:${b.scope_id.slice(0, 10)}...`,
             Window: b.window,
-            Breach: b.on_breach === "block" ? chalk.red("block") : chalk.yellow("warn"),
+            Breach:
+              b.on_breach === "block"
+                ? chalk.red("block")
+                : chalk.yellow("warn"),
             Limit: isGroup
               ? `$${limit.toFixed(2)}/member x${b.member_count ?? 0}`
               : isPerPerson
@@ -132,7 +146,18 @@ export const listGatewayBudgetsCommand = async (
 
         formatTable({
           data: tableData,
-          headers: ["ID", "Name", "Scope", "Window", "Breach", "Limit", "Spent", "Provider", "Resets", "Archived"],
+          headers: [
+            "ID",
+            "Name",
+            "Scope",
+            "Window",
+            "Breach",
+            "Limit",
+            "Spent",
+            "Provider",
+            "Resets",
+            "Archived",
+          ],
           colorMap: { Name: chalk.cyan, ID: chalk.gray },
         });
 

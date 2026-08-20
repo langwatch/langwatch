@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * How `langwatch gateway-budgets list` renders a per-person template.
@@ -74,7 +74,7 @@ async function renderedTable(
   } finally {
     spy.mockRestore();
   }
-  // eslint-disable-next-line no-control-regex
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping ANSI escape codes from chalk output is the whole point of the regex
   return lines.join("\n").replace(/\[[0-9;]*m/g, "");
 }
 

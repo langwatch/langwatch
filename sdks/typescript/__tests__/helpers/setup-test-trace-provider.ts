@@ -1,9 +1,9 @@
 import { trace } from "@opentelemetry/api";
 import {
   InMemorySpanExporter,
-  SimpleSpanProcessor,
   NodeTracerProvider,
   type ReadableSpan,
+  SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-node";
 
 export function setupTestTraceProvider() {
@@ -15,7 +15,9 @@ export function setupTestTraceProvider() {
 
   trace.setGlobalTracerProvider(tracerProvider);
 
-  async function findFinishedSpanByName(name: string): Promise<ReadableSpan | undefined> {
+  async function findFinishedSpanByName(
+    name: string,
+  ): Promise<ReadableSpan | undefined> {
     await spanProcessor.forceFlush();
     return spanExporter.getFinishedSpans().find((span) => span.name === name);
   }

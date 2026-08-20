@@ -12,8 +12,9 @@
  * validates a document the caller wrote, which is a different job from reading
  * a single colon-separated flag.
  */
-import { ORGANIZATION_ROLES } from "@/client-sdk/services/_shared/management-types";
+
 import type { ManagementRole } from "@/client-sdk/services/_shared/management-types";
+import { ORGANIZATION_ROLES } from "@/client-sdk/services/_shared/management-types";
 import type { InviteInput } from "@/client-sdk/services/organization/organization-api.service";
 import {
   ManagementFlagError,
@@ -97,7 +98,9 @@ export interface InviteFlagInput {
 export const composeInvitesFromFlags = (
   options: InviteFlagInput,
 ): InviteInput[] => {
-  const emails = (options.email ?? []).map((email) => email.trim()).filter(Boolean);
+  const emails = (options.email ?? [])
+    .map((email) => email.trim())
+    .filter(Boolean);
   if (emails.length === 0) {
     throw new ManagementFlagError(
       "No invites given. Pass --email (repeatable) with --role and --team, or a JSON batch with --json, --file or --stdin.",

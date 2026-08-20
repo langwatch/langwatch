@@ -1,8 +1,8 @@
 import { setTimeout as wait } from "node:timers/promises";
 import chalk from "chalk";
-import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
-import { listIngestionSources } from "@/cli/utils/governance/cli-api";
 import { reportCommandError } from "@/cli/utils/errorOutput";
+import { listIngestionSources } from "@/cli/utils/governance/cli-api";
+import { isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
 import { normalizeEndpoint } from "@/internal/endpoint";
 
 /**
@@ -27,9 +27,14 @@ export async function ingestListCommand(options: {
 
   let sources;
   try {
-    sources = await listIngestionSources(cfg, { includeArchived: !!options.all });
+    sources = await listIngestionSources(cfg, {
+      includeArchived: !!options.all,
+    });
   } catch (err) {
-    reportCommandError({ error: err, format: options.json ? "json" : undefined });
+    reportCommandError({
+      error: err,
+      format: options.json ? "json" : undefined,
+    });
     process.exit(1);
   }
 
@@ -141,6 +146,6 @@ function printTable(rows: string[][]): void {
 }
 
 function stripAnsi(s: string): string {
-  // eslint-disable-next-line no-control-regex -- intentional: stripping ANSI escape codes from chalk output for column-width math
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional: stripping ANSI escape codes from chalk output for column-width math
   return s.replace(/\x1b\[[0-9;]*m/g, "");
 }

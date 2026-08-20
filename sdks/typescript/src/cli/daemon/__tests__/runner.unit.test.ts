@@ -9,10 +9,11 @@
  * settles at all is bounded by the abandon grace, after which the daemon stops
  * being a daemon rather than corrupt anybody.
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The executor builds the commander tree per request; these tests are about
 // the window/timeout lifecycle, not parsing, so the program is a stub.
@@ -157,7 +158,9 @@ describe("createCommandExecutor", () => {
         requestTimeoutMs: 5_000,
       });
 
-      const running = executor(request({ requestId: "r1", cwd: doomed, sink: collect().sink }));
+      const running = executor(
+        request({ requestId: "r1", cwd: doomed, sink: collect().sink }),
+      );
 
       await expect(running.completed).rejects.toThrow();
       // The command never started: no program was built, no window is held.
@@ -178,7 +181,9 @@ describe("createCommandExecutor", () => {
       });
       const out = collect();
 
-      const running = executor(request({ requestId: "r1", cwd: dirA, sink: out.sink }));
+      const running = executor(
+        request({ requestId: "r1", cwd: dirA, sink: out.sink }),
+      );
       const code = await running.completed;
 
       expect(code).toBe(124);
@@ -196,7 +201,8 @@ describe("createCommandExecutor", () => {
       });
 
       await expect(
-        executor(request({ requestId: "r1", cwd: dirA, sink: collect().sink })).completed,
+        executor(request({ requestId: "r1", cwd: dirA, sink: collect().sink }))
+          .completed,
       ).resolves.toBe(124);
 
       // Releasing here would admit the next caller and chdir underneath work
@@ -221,12 +227,16 @@ describe("createCommandExecutor", () => {
         onWedged: vi.fn(),
       });
 
-      const first = executor(request({ requestId: "r1", cwd: dirA, sink: collect().sink }));
+      const first = executor(
+        request({ requestId: "r1", cwd: dirA, sink: collect().sink }),
+      );
       await expect(first.completed).resolves.toBe(124);
 
       // A different-tuple caller arrives while the abandoned work runs on.
       mockedBuildProgram.mockReturnValue(okProgram());
-      const second = executor(request({ requestId: "r2", cwd: dirB, sink: collect().sink }));
+      const second = executor(
+        request({ requestId: "r2", cwd: dirB, sink: collect().sink }),
+      );
       await new Promise((resolve) => setTimeout(resolve, 20));
 
       // It waits its turn rather than moving the ground under r1.
@@ -252,7 +262,9 @@ describe("createCommandExecutor", () => {
         onWedged: vi.fn(),
       });
 
-      const running = executor(request({ requestId: "r1", cwd: dirA, sink: collect().sink }));
+      const running = executor(
+        request({ requestId: "r1", cwd: dirA, sink: collect().sink }),
+      );
       // Let the command actually start and take the window.
       await new Promise((resolve) => setTimeout(resolve, 10));
       expect(window.inflightCount).toBe(1);
@@ -266,7 +278,9 @@ describe("createCommandExecutor", () => {
       await vi.waitFor(() => expect(window.inflightCount).toBe(0));
 
       // ...and only now can a different-tuple caller take the window.
-      const releaseB = await window.acquire({ request: { cwd: dirB, env: {}, colorLevel: 0 } });
+      const releaseB = await window.acquire({
+        request: { cwd: dirB, env: {}, colorLevel: 0 },
+      });
       releaseB();
     });
   });
@@ -284,7 +298,8 @@ describe("createCommandExecutor", () => {
       });
 
       await expect(
-        executor(request({ requestId: "r1", cwd: dirA, sink: collect().sink })).completed,
+        executor(request({ requestId: "r1", cwd: dirA, sink: collect().sink }))
+          .completed,
       ).resolves.toBe(124);
 
       await vi.waitFor(() =>
@@ -334,7 +349,9 @@ describe("createCommandExecutor", () => {
         onWedged: wedged,
       });
 
-      const running = executor(request({ requestId: "r1", cwd: dirA, sink: collect().sink }));
+      const running = executor(
+        request({ requestId: "r1", cwd: dirA, sink: collect().sink }),
+      );
       // Let the executor reach its `await window.acquire(...)`.
       await Promise.resolve();
 
@@ -369,12 +386,16 @@ describe("createCommandExecutor", () => {
         onWedged: vi.fn(),
       });
 
-      const first = executor(request({ requestId: "r1", cwd: dirA, sink: collect().sink }));
+      const first = executor(
+        request({ requestId: "r1", cwd: dirA, sink: collect().sink }),
+      );
       await new Promise((resolve) => setTimeout(resolve, 10));
       expect(window.inflightCount).toBe(1);
 
       // Different cwd: queues behind the hung window-A request.
-      const second = executor(request({ requestId: "r2", cwd: dirB, sink: collect().sink }));
+      const second = executor(
+        request({ requestId: "r2", cwd: dirB, sink: collect().sink }),
+      );
       await new Promise((resolve) => setTimeout(resolve, 10));
       expect(window.queuedCount).toBe(1);
 
@@ -393,7 +414,9 @@ describe("createCommandExecutor", () => {
       // Once r1's work finally settles, window B is takeable again.
       hung.resume();
       await vi.waitFor(() => expect(window.inflightCount).toBe(0));
-      const releaseB = await window.acquire({ request: { cwd: dirB, env: {}, colorLevel: 0 } });
+      const releaseB = await window.acquire({
+        request: { cwd: dirB, env: {}, colorLevel: 0 },
+      });
       releaseB();
     });
   });

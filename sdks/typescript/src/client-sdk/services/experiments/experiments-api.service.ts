@@ -1,13 +1,13 @@
-import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
-import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import type { InternalConfig } from "@/client-sdk/types";
+import {
+  createLangWatchApiClient,
+  type LangwatchApiClient,
+} from "@/internal/api/client";
+import type { paths } from "@/internal/generated/openapi/api-client";
 
 export interface ExperimentRunStartResponse {
   runId: string;
@@ -229,9 +229,13 @@ export class ExperimentsApiService {
   }
 
   private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: extractStatusFromResponse(error),
+      },
+    });
     throw new ExperimentsApiServiceError(message, operation, error);
   }
 
@@ -394,12 +398,11 @@ export class ExperimentsApiService {
     const search = new URLSearchParams();
     if (experimentSlug) search.set("experimentSlug", experimentSlug);
     const qs = search.toString() ? `?${search.toString()}` : "";
-    const body = await this.getUndeclaredEndpoint<
-      ExperimentRunResultsResponse | null
-    >({
-      path: `/api/experiments/runs/${encodeURIComponent(runId)}/results${qs}`,
-      operation: `get run results for "${runId}"`,
-    });
+    const body =
+      await this.getUndeclaredEndpoint<ExperimentRunResultsResponse | null>({
+        path: `/api/experiments/runs/${encodeURIComponent(runId)}/results${qs}`,
+        operation: `get run results for "${runId}"`,
+      });
     if (body === null) {
       this.handleApiError(`get run results for "${runId}"`, {
         response: { status: 404 },
@@ -460,12 +463,11 @@ export class ExperimentsApiService {
     const search = new URLSearchParams();
     if (experimentSlug) search.set("experimentSlug", experimentSlug);
     const qs = search.toString() ? `?${search.toString()}` : "";
-    const body = await this.getUndeclaredEndpoint<
-      ExperimentRunResultsResponse | null
-    >({
-      path: `/api/evaluations/v3/runs/${encodeURIComponent(runId)}/results${qs}`,
-      operation: `get run results for "${runId}"`,
-    });
+    const body =
+      await this.getUndeclaredEndpoint<ExperimentRunResultsResponse | null>({
+        path: `/api/evaluations/v3/runs/${encodeURIComponent(runId)}/results${qs}`,
+        operation: `get run results for "${runId}"`,
+      });
     if (body === null) {
       this.handleApiError(`get run results for "${runId}"`, {
         response: { status: 404 },

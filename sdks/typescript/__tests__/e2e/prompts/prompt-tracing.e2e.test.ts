@@ -1,11 +1,11 @@
-import { describe, expect, it, beforeAll, beforeEach } from "vitest";
+import type { ReadableSpan } from "@opentelemetry/sdk-trace-node";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { attributes, type LangWatch } from "../../../dist/index.js";
+import { promptResponseFactory } from "../../factories/prompt.factory.js";
 import { getLangwatchSDK } from "../../helpers/get-sdk.js";
 import { setupTestTraceProvider } from "../../helpers/setup-test-trace-provider.js";
-import { type ReadableSpan } from "@opentelemetry/sdk-trace-node";
-import { type LangWatch, attributes } from "../../../dist/index.js";
-import { promptResponseFactory } from "../../factories/prompt.factory.js";
-import { handles } from "./handlers.js";
 import { server } from "../setup/msw-setup.js";
+import { handles } from "./handlers.js";
 
 const { spanExporter, findFinishedSpanByName } = setupTestTraceProvider();
 
@@ -16,7 +16,7 @@ describe("Prompt tracing", () => {
     const { LangWatch } = await getLangwatchSDK();
     langwatch = new LangWatch({
       apiKey: process.env.LANGWATCH_API_KEY,
-      endpoint: process.env.LANGWATCH_ENDPOINT
+      endpoint: process.env.LANGWATCH_ENDPOINT,
     });
   });
 
@@ -35,7 +35,7 @@ describe("Prompt tracing", () => {
       getSpan = await findFinishedSpanByName("PromptsApiService.get");
     });
 
-    it('creates 1 span', () => {
+    it("creates 1 span", () => {
       const allSpans = spanExporter.getFinishedSpans();
       expect(allSpans.length).toBe(1);
     });

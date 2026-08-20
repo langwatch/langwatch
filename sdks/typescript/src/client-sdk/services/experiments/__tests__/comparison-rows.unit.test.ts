@@ -5,14 +5,14 @@
  * Spec: specs/experiments/comparison-sdk.feature
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ComparisonError } from "../errors";
 import type { Experiment } from "../experiment";
 import {
   type ComparisonHarness,
-  THREE_OUTPUTS,
   comparisonEvaluations,
   createExperiment,
+  THREE_OUTPUTS,
   useComparisonHarness,
 } from "./comparison-harness";
 
@@ -36,7 +36,7 @@ describe("Experiment.compare", () => {
         experiment.withTarget("gpt-5-mini", () => `${item.answer}.`),
         experiment.withTarget(
           "claude-sonnet-5",
-          () => `The answer is ${item.answer}.`
+          () => `The answer is ${item.answer}.`,
         ),
       ]);
 
@@ -51,12 +51,12 @@ describe("Experiment.compare", () => {
             await answerEachRow(experiment, item);
             await experiment.compare();
           },
-          { concurrency: 3 }
+          { concurrency: 3 },
         );
 
         expect(harness.judgeRequests).toHaveLength(3);
         expect(
-          harness.judgeRequests.map((request) => request.data.row_index).sort()
+          harness.judgeRequests.map((request) => request.data.row_index).sort(),
         ).toEqual([0, 1, 2]);
         for (const request of harness.judgeRequests) {
           const city = CITIES[request.data.row_index!]!.answer;
@@ -78,7 +78,7 @@ describe("Experiment.compare", () => {
             await answerEachRow(experiment, item);
             if (index === 2) await experiment.compare({ index: 0 });
           },
-          { concurrency: 1 }
+          { concurrency: 1 },
         );
 
         expect(harness.judgeRequests).toHaveLength(1);
@@ -100,14 +100,14 @@ describe("Experiment.compare", () => {
         await experiment.withTarget("gpt-5-mini", () => "Amsterdam.");
         await experiment.withTarget(
           "claude-sonnet-5",
-          () => "The answer is Amsterdam."
+          () => "The answer is Amsterdam.",
         );
 
         const error = await experiment.compare().catch((err: unknown) => err);
 
         expect(error).toBeInstanceOf(ComparisonError);
         expect((error as ComparisonError).message).toContain(
-          "Pass index explicitly"
+          "Pass index explicitly",
         );
         expect((error as ComparisonError).message).toContain("run()");
         expect(harness.judgeRequests).toHaveLength(0);
@@ -118,7 +118,7 @@ describe("Experiment.compare", () => {
         await experiment.withTarget("gpt-5-mini", () => "Amsterdam.");
         await experiment.withTarget(
           "claude-sonnet-5",
-          () => "The answer is Amsterdam."
+          () => "The answer is Amsterdam.",
         );
 
         const verdict = await experiment.compare({ index: 0 });
@@ -144,12 +144,12 @@ describe("Experiment.compare", () => {
           async ({ index }) => {
             await Promise.all(
               Object.entries(THREE_OUTPUTS).map(([target, output]) =>
-                experiment.withTarget(target, () => output)
-              )
+                experiment.withTarget(target, () => output),
+              ),
             );
             await experiment.compare({ index });
           },
-          { concurrency: 2 }
+          { concurrency: 2 },
         );
 
         // Both rows reach the judge before either verdict comes back, which
@@ -159,7 +159,9 @@ describe("Experiment.compare", () => {
         await running;
 
         const recorded = comparisonEvaluations(harness);
-        expect(recorded.map((evaluation) => evaluation.index).sort()).toEqual([0, 1]);
+        expect(recorded.map((evaluation) => evaluation.index).sort()).toEqual([
+          0, 1,
+        ]);
         for (const evaluation of recorded) {
           expect(evaluation).toMatchObject({
             evaluator: "langevals/select_best_compare",

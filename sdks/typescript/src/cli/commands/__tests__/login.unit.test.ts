@@ -69,7 +69,9 @@ describe("loginCommand", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    loadConfig.mockReturnValue({ control_plane_url: "https://app.langwatch.ai" });
+    loadConfig.mockReturnValue({
+      control_plane_url: "https://app.langwatch.ai",
+    });
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.spyOn(process, "exit").mockImplementation((code) => {

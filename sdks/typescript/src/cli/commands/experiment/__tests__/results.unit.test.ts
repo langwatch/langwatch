@@ -1,21 +1,28 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ExperimentsApiServiceError } from "@/client-sdk/services/experiments/experiments-api.service";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as EvaluationsApiModule from "@/client-sdk/services/experiments/experiments-api.service";
+import { ExperimentsApiServiceError } from "@/client-sdk/services/experiments/experiments-api.service";
 
 const oraMocks = vi.hoisted(() => ({
   fail: vi.fn(),
 }));
 
-vi.mock("@/client-sdk/services/experiments/experiments-api.service", async (importOriginal) => {
-  const actual = await importOriginal<typeof EvaluationsApiModule>();
-  return {
-    ...actual,
-    ExperimentsApiService: vi.fn(),
-  };
-});
+vi.mock(
+  "@/client-sdk/services/experiments/experiments-api.service",
+  async (importOriginal) => {
+    const actual = await importOriginal<typeof EvaluationsApiModule>();
+    return {
+      ...actual,
+      ExperimentsApiService: vi.fn(),
+    };
+  },
+);
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -59,9 +66,28 @@ const sampleResults = {
     { index: 2, entry: { input: "passed but low score" } },
   ],
   evaluations: [
-    { evaluator: "quality", index: 0, status: "processed", score: 0.9, passed: true },
-    { evaluator: "quality", index: 2, status: "processed", score: 0.2, passed: false, details: "low score" },
-    { evaluator: "safety", index: 0, status: "processed", score: 1.0, passed: true },
+    {
+      evaluator: "quality",
+      index: 0,
+      status: "processed",
+      score: 0.9,
+      passed: true,
+    },
+    {
+      evaluator: "quality",
+      index: 2,
+      status: "processed",
+      score: 0.2,
+      passed: false,
+      details: "low score",
+    },
+    {
+      evaluator: "safety",
+      index: 0,
+      status: "processed",
+      score: 1.0,
+      passed: true,
+    },
   ],
   timestamps: { createdAt: 0, updatedAt: 0 },
 };
@@ -88,11 +114,41 @@ const comparisonResults = {
     { index: 1, targetId: "target_b", entry: { input: "q2" } },
   ],
   evaluations: [
-    { evaluator: "quality", targetId: "target_a", index: 0, status: "processed", score: 0.9, passed: true },
-    { evaluator: "quality", targetId: "target_b", index: 0, status: "processed", score: 0.4, passed: true },
+    {
+      evaluator: "quality",
+      targetId: "target_a",
+      index: 0,
+      status: "processed",
+      score: 0.9,
+      passed: true,
+    },
+    {
+      evaluator: "quality",
+      targetId: "target_b",
+      index: 0,
+      status: "processed",
+      score: 0.4,
+      passed: true,
+    },
     // Keyed to the comparison, not to a target — no dataset row matches this.
-    { evaluator: "target_comparison", targetId: "target_comparison", index: 0, status: "processed", score: 1, label: "target_a", details: "A was clearer." },
-    { evaluator: "target_comparison", targetId: "target_comparison", index: 1, status: "processed", score: 1, label: "target_b", details: "B was more accurate." },
+    {
+      evaluator: "target_comparison",
+      targetId: "target_comparison",
+      index: 0,
+      status: "processed",
+      score: 1,
+      label: "target_a",
+      details: "A was clearer.",
+    },
+    {
+      evaluator: "target_comparison",
+      targetId: "target_comparison",
+      index: 1,
+      status: "processed",
+      score: 1,
+      label: "target_b",
+      details: "B was more accurate.",
+    },
   ],
   timestamps: { createdAt: 0, updatedAt: 0 },
 };
@@ -109,12 +165,14 @@ describe("experimentResultsCommand()", () => {
     mockListRuns = vi.fn().mockResolvedValue({
       runs: [{ runId: "run_1" }, { runId: "older_run" }],
     });
-    vi.mocked(ExperimentsApiService).mockImplementation(function () { return ({
-      startRun: vi.fn(),
-      getRunStatus: vi.fn(),
-      getRunResults: mockGetRunResults,
-      listRuns: mockListRuns,
-    }) as unknown as ExperimentsApiService; });
+    vi.mocked(ExperimentsApiService).mockImplementation(function () {
+      return {
+        startRun: vi.fn(),
+        getRunStatus: vi.fn(),
+        getRunResults: mockGetRunResults,
+        listRuns: mockListRuns,
+      } as unknown as ExperimentsApiService;
+    });
     logSpy = vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -208,7 +266,7 @@ describe("experimentResultsCommand()", () => {
         const printed = logSpy.mock.calls
           .map((c: unknown[]) => String(c[0]))
           .join("\n")
-          // eslint-disable-next-line no-control-regex
+          // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping ANSI escape codes from chalk output is the whole point of the regex
           .replace(/\[[0-9;]*m/g, "");
         expect(printed).toMatch(/\b1\b/);
         expect(printed).toMatch(/\b2\b/);
@@ -225,11 +283,14 @@ describe("experimentResultsCommand()", () => {
           options: { evaluator: "quality" },
         });
         result?.table();
-        const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
-        expect(printed).toContain("quality");
-        const headerLine = logSpy.mock.calls
+        const printed = logSpy.mock.calls
           .map((c: unknown[]) => String(c[0]))
-          .find((line: string) => line.includes("Target")) ?? "";
+          .join("\n");
+        expect(printed).toContain("quality");
+        const headerLine =
+          logSpy.mock.calls
+            .map((c: unknown[]) => String(c[0]))
+            .find((line: string) => line.includes("Target")) ?? "";
         expect(headerLine).not.toContain("safety");
       });
     });
@@ -250,7 +311,9 @@ describe("experimentResultsCommand()", () => {
           options: { limit: "5" },
         });
         result?.table();
-        const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+        const printed = logSpy.mock.calls
+          .map((c: unknown[]) => String(c[0]))
+          .join("\n");
         expect(printed).toContain("Showing 5 of 50");
       });
     });
@@ -269,9 +332,13 @@ describe("experimentResultsCommand()", () => {
             stoppedAt: null,
           },
         });
-        const result = await experimentResultsCommand({ experimentSlug: "doc-qa" });
+        const result = await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+        });
         result?.table();
-        const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+        const printed = logSpy.mock.calls
+          .map((c: unknown[]) => String(c[0]))
+          .join("\n");
         expect(printed).toContain("Run status: running");
         expect(printed).toContain("partial results");
       });
@@ -315,7 +382,9 @@ describe("experimentResultsCommand()", () => {
           options: { runId: "interrupted" },
         });
         result?.table();
-        const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+        const printed = logSpy.mock.calls
+          .map((c: unknown[]) => String(c[0]))
+          .join("\n");
         expect(printed).toContain("interrupted");
         expect(printed).not.toContain("No rows matched the filter");
         expect(printed).not.toContain("still in progress");
@@ -436,10 +505,30 @@ const comparisonFailedResults = {
     { index: 0, targetId: "target_b", entry: { input: "q1" } },
   ],
   evaluations: [
-    { evaluator: "quality", targetId: "target_a", index: 0, status: "processed", score: 0.9, passed: true },
-    { evaluator: "quality", targetId: "target_b", index: 0, status: "processed", score: 0.8, passed: true },
+    {
+      evaluator: "quality",
+      targetId: "target_a",
+      index: 0,
+      status: "processed",
+      score: 0.9,
+      passed: true,
+    },
+    {
+      evaluator: "quality",
+      targetId: "target_b",
+      index: 0,
+      status: "processed",
+      score: 0.8,
+      passed: true,
+    },
     // Row-independent, and the only thing that went wrong.
-    { evaluator: "target_comparison", targetId: "target_comparison", index: 0, status: "error", details: "judge timed out" },
+    {
+      evaluator: "target_comparison",
+      targetId: "target_comparison",
+      index: 0,
+      status: "error",
+      details: "judge timed out",
+    },
   ],
   timestamps: { createdAt: 0, updatedAt: 0 },
 };
@@ -473,11 +562,15 @@ describe("experimentResultsCommand() — failures the row join cannot see", () =
       const result = (await experimentResultsCommand({
         experimentSlug: "exp",
         options: { filter: "failed" },
-      })) as { data: { dataset: unknown[]; evaluations: { evaluator: string }[] } };
+      })) as {
+        data: { dataset: unknown[]; evaluations: { evaluator: string }[] };
+      };
 
       expect(result.data.dataset.length).toBeGreaterThan(0);
       expect(
-        result.data.evaluations.some((e) => e.evaluator === "target_comparison"),
+        result.data.evaluations.some(
+          (e) => e.evaluator === "target_comparison",
+        ),
       ).toBe(true);
     });
   });

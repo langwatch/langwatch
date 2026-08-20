@@ -1,13 +1,16 @@
-import type { paths, components } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
-import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import type { InternalConfig } from "@/client-sdk/types";
+import {
+  createLangWatchApiClient,
+  type LangwatchApiClient,
+} from "@/internal/api/client";
+import type {
+  components,
+  paths,
+} from "@/internal/generated/openapi/api-client";
 
 export type AnnotationResponse = components["schemas"]["Annotation"];
 
@@ -34,9 +37,13 @@ export class AnnotationsApiService {
   }
 
   private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: extractStatusFromResponse(error),
+      },
+    });
     throw new AnnotationsApiError(message, operation, error);
   }
 
@@ -50,8 +57,7 @@ export class AnnotationsApiService {
     const { data, error } = await this.apiClient.GET("/api/annotations/{id}", {
       params: { path: { id } },
     });
-    if (error)
-      this.handleApiError(`fetch annotation with ID "${id}"`, error);
+    if (error) this.handleApiError(`fetch annotation with ID "${id}"`, error);
     return data;
   }
 
@@ -67,7 +73,10 @@ export class AnnotationsApiService {
     return data;
   }
 
-  async create(traceId: string, params: CreateAnnotationBody): Promise<AnnotationResponse> {
+  async create(
+    traceId: string,
+    params: CreateAnnotationBody,
+  ): Promise<AnnotationResponse> {
     const { data, error } = await this.apiClient.POST(
       "/api/annotations/trace/{id}",
       {
@@ -86,8 +95,7 @@ export class AnnotationsApiService {
         params: { path: { id } },
       },
     );
-    if (error)
-      this.handleApiError(`delete annotation with ID "${id}"`, error);
+    if (error) this.handleApiError(`delete annotation with ID "${id}"`, error);
     return data;
   }
 }

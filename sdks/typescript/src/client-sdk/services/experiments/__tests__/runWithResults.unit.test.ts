@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { ExperimentsFacade } from "../experiments.facade";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createLangWatchApiClient } from "@/internal/api/client";
 import { NoOpLogger } from "@/logger";
+import { ExperimentsFacade } from "../experiments.facade";
 import {
   ExperimentNotFoundError,
   ExperimentsApiError,

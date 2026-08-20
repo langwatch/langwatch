@@ -51,7 +51,9 @@ export function failSpinner({
   const [headline = "", ...block] = rendered.split("\n");
   const sentence = headline.replace(/^Error: /, "");
   const message = [
-    /^failed to /i.test(sentence) ? sentence : `Failed to ${action}: ${sentence}`,
+    /^failed to /i.test(sentence)
+      ? sentence
+      : `Failed to ${action}: ${sentence}`,
     ...block,
   ].join("\n");
 

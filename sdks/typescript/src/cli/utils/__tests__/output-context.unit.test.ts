@@ -4,15 +4,16 @@
  * `--agent`), agent-mode detection, and `applyOutputContext` pushing the
  * resolved context into the error/colour machinery.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import chalk from "chalk";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getOutputFormat } from "../errorOutput";
 import {
   AGENT_MODE_ENV_VARS,
   applyOutputContext,
   isAgentModeEnv,
   resolveOutputOptions,
 } from "../output";
-import { getOutputFormat } from "../errorOutput";
 
 /** Agent-mode env vars from the host (e.g. CLAUDECODE under Claude Code) must not leak into tests. */
 let savedAgentEnv: Record<string, string | undefined> = {};
@@ -56,13 +57,17 @@ describe("resolveOutputOptions flag normalisation", () => {
       // is still load-bearing for `trace export`: its own `-o, --output
       // <file>` wins the conflict check in registerOutputOptions, and the
       // preAction hook feeds EVERY command's options through this function.
-      expect(resolveOutputOptions({ output: "out.csv", format: "jsonl" }).format).toBe("table");
+      expect(
+        resolveOutputOptions({ output: "out.csv", format: "jsonl" }).format,
+      ).toBe("table");
     });
   });
 
   describe("given the new contract", () => {
     it("lets -o/--output beat the legacy -f/--format", () => {
-      expect(resolveOutputOptions({ output: "json", format: "table" }).format).toBe("json");
+      expect(
+        resolveOutputOptions({ output: "json", format: "table" }).format,
+      ).toBe("json");
     });
 
     it("implies json from --json <fields> and splits the list", () => {
@@ -91,13 +96,12 @@ describe("resolveOutputOptions flag normalisation", () => {
 });
 
 describe("agent-mode detection", () => {
-  it.each(AGENT_MODE_ENV_VARS.map((name) => [name]))(
-    "activates on the %s env var",
-    (name) => {
-      expect(isAgentModeEnv({ [name]: "1" })).toBe(true);
-      expect(resolveOutputOptions({}, { [name]: "1" }).format).toBe("agents");
-    },
-  );
+  it.each(
+    AGENT_MODE_ENV_VARS.map((name) => [name]),
+  )("activates on the %s env var", (name) => {
+    expect(isAgentModeEnv({ [name]: "1" })).toBe(true);
+    expect(resolveOutputOptions({}, { [name]: "1" }).format).toBe("agents");
+  });
 
   it("ignores env values that mean 'off'", () => {
     for (const value of ["", "0", "false"]) {
@@ -120,8 +124,12 @@ describe("agent-mode detection", () => {
   });
 
   it("lets an explicit --json/-f json beat the agent default", () => {
-    expect(resolveOutputOptions({ agent: true, json: true }, {}).format).toBe("json");
-    expect(resolveOutputOptions({ agent: true, format: "json" }, {}).format).toBe("json");
+    expect(resolveOutputOptions({ agent: true, json: true }, {}).format).toBe(
+      "json",
+    );
+    expect(
+      resolveOutputOptions({ agent: true, format: "json" }, {}).format,
+    ).toBe("json");
   });
 });
 

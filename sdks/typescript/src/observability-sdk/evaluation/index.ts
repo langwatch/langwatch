@@ -13,7 +13,7 @@
   backend collector path parses both.
 */
 
-import { type Span, isSpanContextValid } from "@opentelemetry/api";
+import { isSpanContextValid, type Span } from "@opentelemetry/api";
 import { generate as generateKsuid } from "xksuid";
 import { ATTR_LANGWATCH_EVALUATION_CUSTOM } from "../semconv/attributes";
 

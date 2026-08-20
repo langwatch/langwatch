@@ -1,8 +1,8 @@
 export {
-  ExperimentError,
-  ExperimentInitError,
-  ExperimentApiError,
-  TargetMetadataConflictError,
   ComparisonError,
   EvaluatorError,
+  ExperimentApiError,
+  ExperimentError,
+  ExperimentInitError,
+  TargetMetadataConflictError,
 } from "./experiment.error";

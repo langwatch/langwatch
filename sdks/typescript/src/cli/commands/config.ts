@@ -13,7 +13,11 @@
  */
 
 import chalk from "chalk";
-import { loadConfig, saveConfig, configPath } from "@/cli/utils/governance/config";
+import {
+  configPath,
+  loadConfig,
+  saveConfig,
+} from "@/cli/utils/governance/config";
 import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
 import { normalizeEndpoint } from "@/internal/endpoint";
 
@@ -119,13 +123,18 @@ export const configListCommand = async (): Promise<void> => {
     default: "(built-in default)",
   };
 
-  console.log(`endpoint    = ${endpoint.url}  ${chalk.gray(sourceLabel[endpoint.source])}`);
+  console.log(
+    `endpoint    = ${endpoint.url}  ${chalk.gray(sourceLabel[endpoint.source])}`,
+  );
   console.log(`gateway-url = ${cfg.gateway_url}`);
   // The env opt-out wins over the persisted one when both are set; say so,
   // or "daemon = on" would read as though the daemon were in play.
   const daemonEnv = process.env.LANGWATCH_NO_DAEMON;
   const daemonEnvOff =
-    daemonEnv !== undefined && daemonEnv !== "" && daemonEnv !== "0" && daemonEnv !== "false";
+    daemonEnv !== undefined &&
+    daemonEnv !== "" &&
+    daemonEnv !== "0" &&
+    daemonEnv !== "false";
   console.log(
     `daemon      = ${cfg.daemon ?? "on"}${daemonEnvOff ? chalk.gray("  (overridden by LANGWATCH_NO_DAEMON)") : ""}`,
   );
@@ -135,6 +144,8 @@ export const configListCommand = async (): Promise<void> => {
   // Use `langwatch whoami` for session introspection (which also avoids
   // printing secrets).
   if (cfg.access_token) {
-    console.log(chalk.gray("device session: present (use `langwatch whoami` to inspect)"));
+    console.log(
+      chalk.gray("device session: present (use `langwatch whoami` to inspect)"),
+    );
   }
 };

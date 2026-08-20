@@ -1,10 +1,9 @@
-import { describe, expect, it, afterEach, beforeEach, vi } from "vitest";
 import { Console } from "node:console";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-
 import chalk from "chalk";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { disableOutputColor } from "../../utils/errorOutput";
 import {
@@ -12,8 +11,8 @@ import {
   ExecutionWindow,
   installProcessInterceptors,
   isDaemonExitSignal,
-  withExecutionContext,
   type OutputStream,
+  withExecutionContext,
 } from "../execution";
 
 const collectingSink = (): {
@@ -138,16 +137,22 @@ describe("process interceptors", () => {
       const second = collectingSink();
 
       await Promise.all([
-        withExecutionContext(new ExecutionContext("a", first.sink), async () => {
-          cliConsole.log("a1");
-          await new Promise((resolve) => setTimeout(resolve, 5));
-          cliConsole.log("a2");
-        }),
-        withExecutionContext(new ExecutionContext("b", second.sink), async () => {
-          await new Promise((resolve) => setTimeout(resolve, 1));
-          cliConsole.log("b1");
-          cliConsole.error("b-err");
-        }),
+        withExecutionContext(
+          new ExecutionContext("a", first.sink),
+          async () => {
+            cliConsole.log("a1");
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            cliConsole.log("a2");
+          },
+        ),
+        withExecutionContext(
+          new ExecutionContext("b", second.sink),
+          async () => {
+            await new Promise((resolve) => setTimeout(resolve, 1));
+            cliConsole.log("b1");
+            cliConsole.error("b-err");
+          },
+        ),
       ]);
 
       expect(first.stdout()).toBe("a1\na2\n");
@@ -168,16 +173,22 @@ describe("process interceptors", () => {
         const human = collectingSink();
 
         await Promise.all([
-          withExecutionContext(new ExecutionContext("agent", agent.sink), async () => {
-            disableOutputColor();
-            cliConsole.error(chalk.red("agent error"));
-            await new Promise((resolve) => setTimeout(resolve, 5));
-            cliConsole.error(chalk.red("agent later"));
-          }),
-          withExecutionContext(new ExecutionContext("human", human.sink), async () => {
-            await new Promise((resolve) => setTimeout(resolve, 1));
-            cliConsole.error(chalk.red("human error"));
-          }),
+          withExecutionContext(
+            new ExecutionContext("agent", agent.sink),
+            async () => {
+              disableOutputColor();
+              cliConsole.error(chalk.red("agent error"));
+              await new Promise((resolve) => setTimeout(resolve, 5));
+              cliConsole.error(chalk.red("agent later"));
+            },
+          ),
+          withExecutionContext(
+            new ExecutionContext("human", human.sink),
+            async () => {
+              await new Promise((resolve) => setTimeout(resolve, 1));
+              cliConsole.error(chalk.red("human error"));
+            },
+          ),
         ]);
 
         expect(agent.stderr()).toBe("agent error\nagent later\n");
@@ -325,7 +336,11 @@ describe("ExecutionWindow", () => {
 
     it("applies the caller's env overlay", async () => {
       const release = await window.acquire({
-        request: { cwd: dirA, env: { LANGWATCH_API_KEY: "sk-caller" }, colorLevel: 0 },
+        request: {
+          cwd: dirA,
+          env: { LANGWATCH_API_KEY: "sk-caller" },
+          colorLevel: 0,
+        },
       });
 
       expect(process.env.LANGWATCH_API_KEY).toBe("sk-caller");
@@ -338,7 +353,11 @@ describe("ExecutionWindow", () => {
       delete process.env.LANGWATCH_LEAKED;
 
       const release = await scoped.acquire({
-        request: { cwd: dirA, env: { LANGWATCH_API_KEY: "sk-caller" }, colorLevel: 0 },
+        request: {
+          cwd: dirA,
+          env: { LANGWATCH_API_KEY: "sk-caller" },
+          colorLevel: 0,
+        },
       });
 
       expect(process.env.LANGWATCH_LEAKED).toBeUndefined();
@@ -393,13 +412,17 @@ describe("ExecutionWindow", () => {
       // reused window would otherwise keep the previous caller's level.
       const savedLevel = chalk.level;
       try {
-        const first = await window.acquire({ request: { cwd: dirA, env: {}, colorLevel: 3 } });
+        const first = await window.acquire({
+          request: { cwd: dirA, env: {}, colorLevel: 3 },
+        });
         expect(chalk.level).toBe(3);
 
         chalk.level = 0; // what the just-finished --agent request left behind
         first();
 
-        const second = await window.acquire({ request: { cwd: dirA, env: {}, colorLevel: 3 } });
+        const second = await window.acquire({
+          request: { cwd: dirA, env: {}, colorLevel: 3 },
+        });
         expect(chalk.level).toBe(3);
         second();
       } finally {
@@ -455,9 +478,13 @@ describe("ExecutionWindow", () => {
         request: { cwd: dirA, env: {}, colorLevel: 0 },
       });
 
-      const pendingB = window.acquire({ request: { cwd: dirB, env: {}, colorLevel: 0 } });
+      const pendingB = window.acquire({
+        request: { cwd: dirB, env: {}, colorLevel: 0 },
+      });
       // Arrives after B, but matches the ACTIVE window. It must not jump B.
-      const pendingA2 = window.acquire({ request: { cwd: dirA, env: {}, colorLevel: 0 } });
+      const pendingA2 = window.acquire({
+        request: { cwd: dirA, env: {}, colorLevel: 0 },
+      });
 
       await Promise.resolve();
       expect(window.queuedCount).toBe(2);
@@ -497,7 +524,9 @@ describe("ExecutionWindow", () => {
 
       // The window still drains correctly for the next caller.
       releaseA();
-      const releaseB = await window.acquire({ request: { cwd: dirB, env: {}, colorLevel: 0 } });
+      const releaseB = await window.acquire({
+        request: { cwd: dirB, env: {}, colorLevel: 0 },
+      });
       expect(fs.realpathSync(process.cwd())).toBe(fs.realpathSync(dirB));
       releaseB();
     });

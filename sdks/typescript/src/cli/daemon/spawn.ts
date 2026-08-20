@@ -5,7 +5,7 @@
 import { spawn } from "node:child_process";
 import * as os from "node:os";
 
-import { identityEnv, type DaemonIdentity } from "./identity";
+import { type DaemonIdentity, identityEnv } from "./identity";
 
 /**
  * The environment a spawned daemon is allowed to inherit from its spawner.

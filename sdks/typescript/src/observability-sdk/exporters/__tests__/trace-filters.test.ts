@@ -1,17 +1,17 @@
-import { describe, it, expect } from "vitest";
+import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
+import { describe, expect, it } from "vitest";
 import {
-  applyFilters,
   applyFilterRule,
+  applyFilters,
   applyPreset,
-  matchesCriteria,
-  valueMatches,
-  isVercelAiSpan,
-  isHttpRequestSpan,
-  type TraceFilter,
   type Criteria,
+  isHttpRequestSpan,
+  isVercelAiSpan,
   type Match,
+  matchesCriteria,
+  type TraceFilter,
+  valueMatches,
 } from "../trace-filters";
-import { type ReadableSpan } from "@opentelemetry/sdk-trace-base";
 
 function createMockSpan(name: string, scopeName: string): ReadableSpan {
   return {
@@ -217,7 +217,10 @@ describe("trace-filters", () => {
     });
 
     it("handles missing instrumentationScope", () => {
-      const span = { name: "operation", instrumentationScope: undefined } as any;
+      const span = {
+        name: "operation",
+        instrumentationScope: undefined,
+      } as any;
       const criteria: Criteria = {
         instrumentationScopeName: [{ equals: "" }],
       };
@@ -255,13 +258,25 @@ describe("trace-filters", () => {
 
   describe("isHttpRequestSpan", () => {
     it("returns true for HTTP verb patterns", () => {
-      expect(isHttpRequestSpan(createMockSpan("GET /api/users", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("POST /data", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("PUT /resource/123", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("DELETE /item", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("PATCH /update", "http"))).toBe(true);
+      expect(isHttpRequestSpan(createMockSpan("GET /api/users", "http"))).toBe(
+        true,
+      );
+      expect(isHttpRequestSpan(createMockSpan("POST /data", "http"))).toBe(
+        true,
+      );
+      expect(
+        isHttpRequestSpan(createMockSpan("PUT /resource/123", "http")),
+      ).toBe(true);
+      expect(isHttpRequestSpan(createMockSpan("DELETE /item", "http"))).toBe(
+        true,
+      );
+      expect(isHttpRequestSpan(createMockSpan("PATCH /update", "http"))).toBe(
+        true,
+      );
       expect(isHttpRequestSpan(createMockSpan("OPTIONS /", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("HEAD /check", "http"))).toBe(true);
+      expect(isHttpRequestSpan(createMockSpan("HEAD /check", "http"))).toBe(
+        true,
+      );
     });
 
     it("is case-insensitive for HTTP verbs", () => {
@@ -271,9 +286,15 @@ describe("trace-filters", () => {
     });
 
     it("returns false for non-HTTP patterns", () => {
-      expect(isHttpRequestSpan(createMockSpan("chat.completion", "ai"))).toBe(false);
-      expect(isHttpRequestSpan(createMockSpan("database query", "db"))).toBe(false);
-      expect(isHttpRequestSpan(createMockSpan("GETAWAY", "custom"))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan("chat.completion", "ai"))).toBe(
+        false,
+      );
+      expect(isHttpRequestSpan(createMockSpan("database query", "db"))).toBe(
+        false,
+      );
+      expect(isHttpRequestSpan(createMockSpan("GETAWAY", "custom"))).toBe(
+        false,
+      );
       expect(isHttpRequestSpan(createMockSpan("", ""))).toBe(false);
     });
 
@@ -301,7 +322,10 @@ describe("trace-filters", () => {
     it("applies excludeHttpRequests preset", () => {
       const result = applyPreset("excludeHttpRequests", spans);
       expect(result).toHaveLength(2);
-      expect(result.map((s) => s.name)).toEqual(["chat.completion", "custom.operation"]);
+      expect(result.map((s) => s.name)).toEqual([
+        "chat.completion",
+        "custom.operation",
+      ]);
     });
   });
 
@@ -317,7 +341,9 @@ describe("trace-filters", () => {
       const rule: TraceFilter = { preset: "vercelAIOnly" };
       const result = applyFilterRule(rule, spans);
       expect(result).toHaveLength(2);
-      expect(result.every((s) => s.instrumentationScope.name === "ai")).toBe(true);
+      expect(result.every((s) => s.instrumentationScope.name === "ai")).toBe(
+        true,
+      );
     });
 
     it("applies include rule", () => {
@@ -326,7 +352,9 @@ describe("trace-filters", () => {
       };
       const result = applyFilterRule(rule, spans);
       expect(result).toHaveLength(2);
-      expect(result.every((s) => s.instrumentationScope.name === "ai")).toBe(true);
+      expect(result.every((s) => s.instrumentationScope.name === "ai")).toBe(
+        true,
+      );
     });
 
     it("applies exclude rule", () => {
@@ -335,7 +363,9 @@ describe("trace-filters", () => {
       };
       const result = applyFilterRule(rule, spans);
       expect(result).toHaveLength(3);
-      expect(result.every((s) => s.instrumentationScope.name !== "http")).toBe(true);
+      expect(result.every((s) => s.instrumentationScope.name !== "http")).toBe(
+        true,
+      );
     });
 
     it("returns all spans when rule has no matching condition", () => {
@@ -367,7 +397,9 @@ describe("trace-filters", () => {
       const filters: TraceFilter[] = [{ preset: "vercelAIOnly" }];
       const result = applyFilters(filters, spans);
       expect(result).toHaveLength(2);
-      expect(result.every((s) => s.instrumentationScope.name === "ai")).toBe(true);
+      expect(result.every((s) => s.instrumentationScope.name === "ai")).toBe(
+        true,
+      );
     });
 
     it("applies multiple filters sequentially (AND semantics)", () => {
@@ -424,7 +456,11 @@ describe("trace-filters", () => {
 
       const filters: TraceFilter[] = [
         { preset: "excludeHttpRequests" },
-        { include: { instrumentationScopeName: [{ equals: "ai" }, { equals: "app" }] } },
+        {
+          include: {
+            instrumentationScopeName: [{ equals: "ai" }, { equals: "app" }],
+          },
+        },
         { exclude: { name: [{ matches: /embeddings/ }] } },
       ];
 
@@ -444,7 +480,9 @@ describe("trace-filters", () => {
       ];
 
       const filters: TraceFilter[] = [
-        { include: { name: [{ equals: "chat.completion", ignoreCase: true }] } },
+        {
+          include: { name: [{ equals: "chat.completion", ignoreCase: true }] },
+        },
       ];
 
       const result = applyFilters(filters, spans);
@@ -456,4 +494,3 @@ describe("trace-filters", () => {
     });
   });
 });
-

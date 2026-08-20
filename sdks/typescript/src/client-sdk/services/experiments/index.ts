@@ -23,85 +23,80 @@
  * ```
  */
 
+export {
+  ComparisonError,
+  EvaluatorError,
+  ExperimentApiError,
+  ExperimentError,
+  ExperimentInitError,
+  TargetMetadataConflictError,
+} from "./errors";
 export { Experiment } from "./experiment";
 export { ExperimentsFacade } from "./experiments.facade";
+export type {
+  ExperimentListPagination,
+  ExperimentListResponse,
+  ExperimentRunDatasetEntry,
+  ExperimentRunEvaluation,
+  ExperimentRunResultsResponse,
+  ExperimentRunStartRequest,
+  ExperimentRunStartResponse,
+  ExperimentRunStatusResponse,
+  ExperimentRunSummaryEntry,
+  ExperimentRunsListResponse,
+  ExperimentSummary,
+  ExperimentV3RunStatusResponse,
+} from "./experiments-api.service";
 export {
   ExperimentsApiService,
   ExperimentsApiServiceError,
 } from "./experiments-api.service";
-export type {
-  ExperimentRunStartResponse,
-  ExperimentRunStartRequest,
-  ExperimentRunStatusResponse,
-  ExperimentV3RunStatusResponse,
-  ExperimentSummary,
-  ExperimentListResponse,
-  ExperimentListPagination,
-  ExperimentRunSummaryEntry,
-  ExperimentRunsListResponse,
-  ExperimentRunDatasetEntry,
-  ExperimentRunEvaluation,
-  ExperimentRunResultsResponse,
-} from "./experiments-api.service";
-
 export { mapRunResultsToRows } from "./mapResults";
+export {
+  ExperimentNotFoundError,
+  ExperimentRunFailedError,
+  ExperimentsApiError,
+  ExperimentsError,
+  ExperimentTimeoutError,
+} from "./platformErrors";
 
+// Platform experiment types (Experiments Workbench)
+export type {
+  ExperimentRowResult,
+  ExperimentRunResult,
+  ExperimentRunSummary,
+  ExperimentRunWithResults,
+  RunExperimentOptions,
+  RunWithResultsOptions,
+} from "./platformTypes";
+export type { PollExperimentRunResult, PollRunStatus } from "./run-status";
+// Run polling
+export {
+  DEFAULT_POLL_INTERVAL,
+  DEFAULT_POLL_TIMEOUT,
+  pollExperimentRun,
+} from "./run-status";
 // SDK-defined experiment types
 export type {
-  EvaluationStatus,
-  TargetType,
-  TargetMetadata,
-  TargetInfo,
-  EvaluationResult,
-  BatchEntry,
   Batch,
+  BatchEntry,
   ComparisonMetric,
   ComparisonOptions,
   ComparisonStatus,
   ComparisonVerdict,
+  EvaluateOptions,
+  EvaluationResult,
+  EvaluationStatus,
   ExperimentInitOptions,
   LogOptions,
-  EvaluateOptions,
-  RunOptions,
   RunCallback,
   RunContext,
-  TargetContext,
+  RunOptions,
   TargetCallback,
-  TargetResult,
+  TargetContext,
   TargetExecutionContext,
+  TargetInfo,
+  TargetMetadata,
+  TargetResult,
+  TargetType,
 } from "./types";
-
-export {
-  ExperimentError,
-  ExperimentInitError,
-  ExperimentApiError,
-  TargetMetadataConflictError,
-  ComparisonError,
-  EvaluatorError,
-} from "./errors";
-
-// Platform experiment types (Experiments Workbench)
-export type {
-  ExperimentRunSummary,
-  RunExperimentOptions,
-  ExperimentRunResult,
-  RunWithResultsOptions,
-  ExperimentRowResult,
-  ExperimentRunWithResults,
-} from "./platformTypes";
-
-// Run polling
-export {
-  pollExperimentRun,
-  DEFAULT_POLL_INTERVAL,
-  DEFAULT_POLL_TIMEOUT,
-} from "./run-status";
-export type { PollRunStatus, PollExperimentRunResult } from "./run-status";
-
-export {
-  ExperimentsError,
-  ExperimentNotFoundError,
-  ExperimentTimeoutError,
-  ExperimentRunFailedError,
-  ExperimentsApiError,
-} from "./platformErrors";

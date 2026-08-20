@@ -73,9 +73,7 @@ export const getOutputFormat = (): CliOutputFormat =>
  * that already holds its own `--format` (and a test that passes one) does not
  * depend on the program hook having run.
  */
-export const resolveOutputFormat = (
-  explicit?: string,
-): CliOutputFormat => {
+export const resolveOutputFormat = (explicit?: string): CliOutputFormat => {
   if (explicit === undefined) return getOutputFormat();
   if (explicit === "json") return "json";
   if (explicit === "agents") return "agents";

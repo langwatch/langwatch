@@ -6,8 +6,11 @@ import type { ExperimentRunResult } from "./platformTypes";
  * Shared between platform runs (`langwatch.experiments.run`) and SDK-driven
  * experiments (`langwatch.experiments.init` → `experiment.printSummary()`).
  */
-export function printSummary(result: Omit<ExperimentRunResult, "printSummary" | "toString">): void {
-  const { runId, status, passed, failed, passRate, duration, runUrl, summary } = result;
+export function printSummary(
+  result: Omit<ExperimentRunResult, "printSummary" | "toString">,
+): void {
+  const { runId, status, passed, failed, passRate, duration, runUrl, summary } =
+    result;
 
   console.log("\n" + "═".repeat(60));
   console.log("  EXPERIMENT RESULTS");
@@ -27,7 +30,9 @@ export function printSummary(result: Omit<ExperimentRunResult, "printSummary" | 
     console.log("─".repeat(60));
     console.log("  TARGETS:");
     for (const target of summary.targets) {
-      console.log(`    ${target.name}: ${target.passed} passed, ${target.failed} failed`);
+      console.log(
+        `    ${target.name}: ${target.passed} passed, ${target.failed} failed`,
+      );
       if (target.avgLatency) {
         console.log(`      Avg latency: ${target.avgLatency.toFixed(0)}ms`);
       }
@@ -41,7 +46,9 @@ export function printSummary(result: Omit<ExperimentRunResult, "printSummary" | 
     console.log("─".repeat(60));
     console.log("  EVALUATORS:");
     for (const evaluator of summary.evaluators) {
-      console.log(`    ${evaluator.name}: ${evaluator.passRate.toFixed(1)}% pass rate`);
+      console.log(
+        `    ${evaluator.name}: ${evaluator.passRate.toFixed(1)}% pass rate`,
+      );
       if (evaluator.avgScore !== undefined) {
         console.log(`      Avg score: ${evaluator.avgScore.toFixed(2)}`);
       }

@@ -18,12 +18,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   verifyWebhookSignature,
-  WebhookSignatureVerificationError,
   WEBHOOK_DELIVERY_ID_HEADER,
   WEBHOOK_EVENT_ID_HEADER,
   WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS,
   WEBHOOK_SIGNATURE_HEADER,
   type WebhookSignatureFailureCode,
+  WebhookSignatureVerificationError,
 } from "../verify-signature";
 
 /** Repo root, seven levels up from `src/client-sdk/services/webhooks/__tests__`. */
@@ -109,15 +109,14 @@ describe("Feature: verifying a LangWatch webhook delivery", () => {
   });
 
   describe("given the vectors generated from the sender", () => {
-    describe.each(vectors.verification)(
-      "when the delivery is $name",
-      (vector: VerificationVector) => {
-        /** @scenario Both SDK verifiers reach the sender's verdict on every generated case */
-        it(`concludes ${vector.expected} because ${vector.why}`, () => {
-          expect(outcomeOf(vector)).toBe(vector.expected);
-        });
-      },
-    );
+    describe.each(
+      vectors.verification,
+    )("when the delivery is $name", (vector: VerificationVector) => {
+      /** @scenario Both SDK verifiers reach the sender's verdict on every generated case */
+      it(`concludes ${vector.expected} because ${vector.why}`, () => {
+        expect(outcomeOf(vector)).toBe(vector.expected);
+      });
+    });
 
     /** @scenario Both SDK verifiers reach the sender's verdict on every generated case */
     it("exercises all four verdicts rather than only the happy one", () => {

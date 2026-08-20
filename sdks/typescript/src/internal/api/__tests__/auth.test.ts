@@ -1,5 +1,9 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { buildAuthHeaders, isPersonalAccessToken, isUserScopedApiKey } from "../auth";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  buildAuthHeaders,
+  isPersonalAccessToken,
+  isUserScopedApiKey,
+} from "../auth";
 
 describe("isUserScopedApiKey", () => {
   describe("when given an old pat-lw- token", () => {
@@ -10,7 +14,9 @@ describe("isUserScopedApiKey", () => {
 
   describe("when given a new sk-lw- token with underscore", () => {
     it("returns true (user-scoped API key)", () => {
-      expect(isUserScopedApiKey("sk-lw-abcdef1234567890_secretvalue")).toBe(true);
+      expect(isUserScopedApiKey("sk-lw-abcdef1234567890_secretvalue")).toBe(
+        true,
+      );
     });
   });
 

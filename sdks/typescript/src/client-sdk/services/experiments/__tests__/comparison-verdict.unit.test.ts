@@ -5,14 +5,14 @@
  * Spec: specs/experiments/comparison-sdk.feature
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   type ComparisonHarness,
-  type JudgeResponse,
-  THREE_OUTPUTS,
   comparisonEvaluations,
   createExperiment,
+  type JudgeResponse,
   runComparison,
+  THREE_OUTPUTS,
   useComparisonHarness,
 } from "./comparison-harness";
 
@@ -49,17 +49,20 @@ describe("Experiment.compare", () => {
       it("keeps the verdict off the row's targets even when compared from inside a target block", async () => {
         const experiment = await createExperiment();
 
-        await experiment.run([{ question: "What is 2 + 2?" }], async ({ index }) => {
-          await Promise.all(
-            Object.entries(THREE_OUTPUTS).map(([target, output]) =>
-              experiment.withTarget(target, () => output)
-            )
-          );
-          await experiment.withTarget("verdict-wrapper", async () => {
-            await experiment.compare({ index });
-            return null;
-          });
-        });
+        await experiment.run(
+          [{ question: "What is 2 + 2?" }],
+          async ({ index }) => {
+            await Promise.all(
+              Object.entries(THREE_OUTPUTS).map(([target, output]) =>
+                experiment.withTarget(target, () => output),
+              ),
+            );
+            await experiment.withTarget("verdict-wrapper", async () => {
+              await experiment.compare({ index });
+              return null;
+            });
+          },
+        );
 
         const recorded = comparisonEvaluations(harness);
         expect(recorded).toHaveLength(1);
@@ -86,7 +89,9 @@ describe("Experiment.compare", () => {
           reasoning: "It shows the working, the others only state the result.",
           candidates: ["gpt-5-mini", "claude-sonnet-5", "gemini-flash"],
         });
-        expect(comparisonEvaluations(harness)[0]!.label).toBe("claude-sonnet-5");
+        expect(comparisonEvaluations(harness)[0]!.label).toBe(
+          "claude-sonnet-5",
+        );
       });
     });
 
@@ -146,7 +151,11 @@ describe("Experiment.compare", () => {
           entryStatus: string;
         }[] = [
           {
-            respond: () => ({ status: "processed", score: 1, label: "gpt-5-mini" }),
+            respond: () => ({
+              status: "processed",
+              score: 1,
+              label: "gpt-5-mini",
+            }),
             status: "decided",
             entryStatus: "processed",
           },
@@ -156,7 +165,10 @@ describe("Experiment.compare", () => {
             entryStatus: "processed",
           },
           {
-            respond: () => ({ status: "skipped", details: "No stable answer." }),
+            respond: () => ({
+              status: "skipped",
+              details: "No stable answer.",
+            }),
             status: "inconclusive",
             entryStatus: "skipped",
           },
@@ -166,8 +178,16 @@ describe("Experiment.compare", () => {
             entryStatus: "error",
           },
           {
-            respond: () => ({ status: "processed", score: 1, label: "gpt-5-mini" }),
-            outputs: { ...THREE_OUTPUTS, "claude-sonnet-5": null, "gemini-flash": null },
+            respond: () => ({
+              status: "processed",
+              score: 1,
+              label: "gpt-5-mini",
+            }),
+            outputs: {
+              ...THREE_OUTPUTS,
+              "claude-sonnet-5": null,
+              "gemini-flash": null,
+            },
             status: "skipped",
             entryStatus: "skipped",
           },
@@ -184,7 +204,7 @@ describe("Experiment.compare", () => {
 
           expect(verdict?.status).toBe(testCase.status);
           expect(comparisonEvaluations(harness)[0]!.status).toBe(
-            testCase.entryStatus
+            testCase.entryStatus,
           );
         }
       });

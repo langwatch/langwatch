@@ -489,7 +489,8 @@ describe("writeCodexGatewayBlock", () => {
     expect(result.action).toBe("unchanged");
     expect(result.profileAction).toBe("unchanged");
     const contents = fs.readFileSync(filePath, "utf8");
-    const beginCount = (contents.match(/langwatch gateway begin/g) ?? []).length;
+    const beginCount = (contents.match(/langwatch gateway begin/g) ?? [])
+      .length;
     expect(beginCount).toBe(1);
   });
 
@@ -541,9 +542,9 @@ describe("codexTraceEndpoint", () => {
 
 describe("codexOtelBlockHasAuthHeader", () => {
   it("returns false when the file is missing", () => {
-    expect(
-      codexOtelBlockHasAuthHeader(path.join(tmp, "nope.toml")),
-    ).toBe(false);
+    expect(codexOtelBlockHasAuthHeader(path.join(tmp, "nope.toml"))).toBe(
+      false,
+    );
   });
 
   it("returns false for an endpoint-only block, true once the header lands", () => {
@@ -628,7 +629,9 @@ describe("removeCodexGatewayBlock / removeCodexGatewayProfileFile", () => {
     const filePath = path.join(tmp, "config.toml");
     expect(removeCodexGatewayBlock(filePath)).toBe(false);
     expect(
-      removeCodexGatewayProfileFile(path.join(tmp, "langwatch-gateway.config.toml")),
+      removeCodexGatewayProfileFile(
+        path.join(tmp, "langwatch-gateway.config.toml"),
+      ),
     ).toBe(false);
   });
 
@@ -643,7 +646,10 @@ describe("removeCodexGatewayBlock / removeCodexGatewayProfileFile", () => {
     );
     writeCodexGatewayBlock(
       { gatewayUrl: "https://gateway.langwatch.ai" },
-      { filePath, profilePath: path.join(tmp, "langwatch-gateway.config.toml") },
+      {
+        filePath,
+        profilePath: path.join(tmp, "langwatch-gateway.config.toml"),
+      },
     );
 
     removeCodexGatewayBlock(filePath);

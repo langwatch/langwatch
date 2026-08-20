@@ -1,12 +1,12 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import {
   type BudgetOnBreach,
   GatewayBudgetsApiService,
 } from "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export interface UpdateGatewayBudgetOptions {
   name?: string;
@@ -71,11 +71,15 @@ export const updateGatewayBudgetCommand = async (
       table: () => {
         console.log();
         console.log(`${chalk.bold("ID:")}       ${budget.id}`);
-        console.log(`${chalk.bold("Scope:")}    ${budget.scope_type}:${budget.scope_id}`);
+        console.log(
+          `${chalk.bold("Scope:")}    ${budget.scope_type}:${budget.scope_id}`,
+        );
         console.log(`${chalk.bold("Window:")}   ${budget.window}`);
         console.log(`${chalk.bold("Limit:")}    $${budget.limit_usd}`);
         console.log(`${chalk.bold("Breach:")}   ${budget.on_breach}`);
-        console.log(`${chalk.bold("Timezone:")} ${budget.timezone ?? chalk.gray("—")}`);
+        console.log(
+          `${chalk.bold("Timezone:")} ${budget.timezone ?? chalk.gray("—")}`,
+        );
         console.log();
       },
     };

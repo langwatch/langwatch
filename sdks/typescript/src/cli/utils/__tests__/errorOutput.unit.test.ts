@@ -1,24 +1,22 @@
 /**
  * How a failure is rendered, in each of the two shapes a caller can ask for.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import chalk from "chalk";
+
 import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
+import chalk from "chalk";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LangWatchHandledError } from "@/internal/api/errors";
-import {
-  ExecutionContext,
-  withExecutionContext,
-} from "../../daemon/execution";
+import { ExecutionContext, withExecutionContext } from "../../daemon/execution";
 import {
   commandValidationError,
   currentOutputScope,
   disableOutputColor,
   getOutputFormat,
   readCommandError,
-  reportCommandError,
   renderErrorAsJson,
   renderErrorForHumans,
+  reportCommandError,
   resolveOutputFormat,
   setOutputFormat,
 } from "../errorOutput";
@@ -60,7 +58,9 @@ describe("given a failure the platform named", () => {
     it("leads with the platform's sentence", () => {
       const rendered = renderErrorForHumans(readCommandError(handledError()));
 
-      expect(rendered.split("\n")[0]).toBe("Error: Dataset not found: sales-q3");
+      expect(rendered.split("\n")[0]).toBe(
+        "Error: Dataset not found: sales-q3",
+      );
     });
 
     it("prints the code, the status and the trace id under Details", () => {
@@ -81,7 +81,9 @@ describe("given a failure the platform named", () => {
     it("names the chain when the failure had a cause", () => {
       const rendered = renderErrorForHumans(
         readCommandError(
-          handledError({ reasons: [{ kind: "gateway_timeout" }, { kind: "unknown" }] }),
+          handledError({
+            reasons: [{ kind: "gateway_timeout" }, { kind: "unknown" }],
+          }),
         ),
       );
 
@@ -91,11 +93,15 @@ describe("given a failure the platform named", () => {
     it("prints the trace link when the route sent one", () => {
       const rendered = renderErrorForHumans(
         readCommandError(
-          handledError({ traceUrl: "https://grafana.example.com/explore?traceId=4bf" }),
+          handledError({
+            traceUrl: "https://grafana.example.com/explore?traceId=4bf",
+          }),
         ),
       );
 
-      expect(rendered).toContain("https://grafana.example.com/explore?traceId=4bf");
+      expect(rendered).toContain(
+        "https://grafana.example.com/explore?traceId=4bf",
+      );
     });
   });
 
@@ -284,7 +290,9 @@ describe("given a failure on a command path that has no spinner", () => {
     it("puts the structured document on stdout and only prose on stderr", () => {
       reportCommandError({ error: handledError(), format: "json" });
 
-      const stdout = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+      const stdout = logSpy.mock.calls
+        .map((c: unknown[]) => String(c[0]))
+        .join("\n");
       const parsed = readCliErrorDocument(stdout);
 
       expect(parsed?.kind).toBe("dataset_not_found");
@@ -298,7 +306,9 @@ describe("given a failure on a command path that has no spinner", () => {
       reportCommandError({ error: handledError() });
 
       expect(logSpy).not.toHaveBeenCalled();
-      const stderr = errorSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+      const stderr = errorSpy.mock.calls
+        .map((c: unknown[]) => String(c[0]))
+        .join("\n");
       expect(stderr).toContain("Dataset not found: sales-q3");
     });
   });
@@ -310,7 +320,9 @@ describe("given a failure on a command path that has no spinner", () => {
         format: "json",
       });
 
-      const stdout = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+      const stdout = logSpy.mock.calls
+        .map((c: unknown[]) => String(c[0]))
+        .join("\n");
       const parsed = readCliErrorDocument(stdout);
 
       expect(parsed?.kind).toBe("validation_error");
@@ -336,7 +348,9 @@ describe("given a failure the platform sent advice with", () => {
       const rendered = renderErrorForHumans(readCommandError(advised()));
 
       expect(rendered).toContain("Suggestions:");
-      expect(rendered).toContain("  - Raise the budget in the gateway settings");
+      expect(rendered).toContain(
+        "  - Raise the budget in the gateway settings",
+      );
       expect(rendered).toContain(
         "Docs: https://langwatch.ai/docs/ai-gateway/budgets",
       );
@@ -367,12 +381,16 @@ describe("given a failure the platform sent NO advice with", () => {
 
       expect(rendered).toContain("Suggestions:");
       expect(rendered).toContain("langwatch login");
-      expect(rendered).toContain("Docs: https://langwatch.ai/docs/integration/cli");
+      expect(rendered).toContain(
+        "Docs: https://langwatch.ai/docs/integration/cli",
+      );
     });
 
     it("fills the JSON document from the same table", () => {
       const parsed = readCliErrorDocument(
-        renderErrorAsJson(readCommandError(handledError({ code: "missing_api_key" }))),
+        renderErrorAsJson(
+          readCommandError(handledError({ code: "missing_api_key" })),
+        ),
       );
 
       expect(parsed?.suggestions?.length).toBeGreaterThan(0);
@@ -413,8 +431,7 @@ describe("given a failure the platform sent NO advice with", () => {
  * so the second writer cannot clobber the first request's error rendering.
  */
 describe("given two concurrent daemon requests in one window", () => {
-  const contextFor = (id: string) =>
-    new ExecutionContext(id, () => undefined);
+  const contextFor = (id: string) => new ExecutionContext(id, () => undefined);
 
   describe("when they were invoked with different formats", () => {
     it("renders each request's errors in its OWN format", async () => {

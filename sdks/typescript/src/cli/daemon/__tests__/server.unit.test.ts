@@ -8,15 +8,16 @@
  * filesystem that refuses to hard-link a socket, and no filesystem a test can
  * create here behaves that way.
  */
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import * as fs from "node:fs";
+
 // The mock factory below needs the module's type. A top-level `import type`
 // gives it that without an inline `import()` annotation: the CLI's exception
 // for inline imports covers load-bearing LAZY RUNTIME imports that keep the
 // boot graph small, not a type argument, which costs nothing to hoist.
 import type * as NodeFs from "node:fs";
+import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MAX_STAGING_OVERHEAD_BYTES } from "../identity";
 import {

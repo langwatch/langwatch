@@ -1,18 +1,18 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import {
   CURSOR_WALK_PAGE_SIZE,
   collectCursorPages,
   walkCursorPages,
 } from "@/client-sdk/services/_shared/collect-cursor-pages";
+import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import {
-  idempotentCreateInit,
-  mutationInit,
   type IdempotentCreateOptions,
+  idempotentCreateInit,
   type MutationOptions,
+  mutationInit,
   type ObservedRequestInit,
 } from "@/client-sdk/services/_shared/mutation-options";
-import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 
 export type BudgetScopeKind =
@@ -24,7 +24,14 @@ export type BudgetScopeKind =
   | "group"
   | "attributed_user";
 
-export type BudgetWindow = "minute" | "hour" | "day" | "week" | "month" | "total" | "manual";
+export type BudgetWindow =
+  | "minute"
+  | "hour"
+  | "day"
+  | "week"
+  | "month"
+  | "total"
+  | "manual";
 export type BudgetOnBreach = "block" | "warn";
 
 export interface GatewayBudget {
@@ -170,9 +177,14 @@ export class GatewayBudgetsApiService {
   private readonly apiKey: string;
   private readonly projectId: string | undefined;
 
-  constructor(config?: { endpoint?: string; apiKey?: string; projectId?: string }) {
+  constructor(config?: {
+    endpoint?: string;
+    apiKey?: string;
+    projectId?: string;
+  }) {
     this.endpoint = resolveEndpoint(config?.endpoint);
-    this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
+    this.apiKey =
+      config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     this.projectId = config?.projectId ?? process.env.LANGWATCH_PROJECT_ID;
   }
 
@@ -243,7 +255,8 @@ export class GatewayBudgetsApiService {
       params.set("scope_type", options.scopeTypes.join(","));
     }
     if (options?.cursor) params.set("cursor", options.cursor);
-    if (options?.limit !== undefined) params.set("limit", String(options.limit));
+    if (options?.limit !== undefined)
+      params.set("limit", String(options.limit));
     const query = params.toString() !== "" ? `?${params.toString()}` : "";
     const { data, spend_available, next_cursor } = await this.request<{
       data: GatewayBudget[];
@@ -381,15 +394,16 @@ export class GatewayBudgetsApiService {
     const { budget } = await this.request<{ budget: GatewayBudget }>(
       `update gateway budget "${id}"`,
       `/api/gateway/v1/budgets/${encodeURIComponent(id)}`,
-      { method: "PATCH", body: JSON.stringify(input), ...mutationInit(options) },
+      {
+        method: "PATCH",
+        body: JSON.stringify(input),
+        ...mutationInit(options),
+      },
     );
     return budget;
   }
 
-  async archive(
-    id: string,
-    options?: MutationOptions,
-  ): Promise<GatewayBudget> {
+  async archive(id: string, options?: MutationOptions): Promise<GatewayBudget> {
     const { budget } = await this.request<{ budget: GatewayBudget }>(
       `archive gateway budget "${id}"`,
       `/api/gateway/v1/budgets/${encodeURIComponent(id)}`,

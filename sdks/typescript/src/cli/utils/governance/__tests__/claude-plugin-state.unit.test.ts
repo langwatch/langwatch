@@ -9,12 +9,10 @@
  * Feature: specs/ai-governance/cli-wrappers/claude-plugin-install.feature
  */
 
+import type * as ChildProcessModule from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-
 import { describe, expect, it, vi } from "vitest";
-
-import type * as ChildProcessModule from "node:child_process";
 
 import { installClaudePluginHarness } from "./claude-plugin-test-helpers";
 
@@ -51,7 +49,9 @@ describe("claudePluginCliAvailable", () => {
       claudePluginCliAvailable();
       claudePluginCliAvailable();
       claudePluginCliAvailable();
-      expect(commandsRun().filter((c) => c === "plugin --help")).toHaveLength(1);
+      expect(commandsRun().filter((c) => c === "plugin --help")).toHaveLength(
+        1,
+      );
     });
   });
 

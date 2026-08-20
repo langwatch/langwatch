@@ -200,7 +200,11 @@ describe("appEnvHasAllVars", () => {
       fs.writeFileSync(
         target.path,
         JSON.stringify(
-          { env: { OTEL_EXPORTER_OTLP_ENDPOINT: otelVars.OTEL_EXPORTER_OTLP_ENDPOINT } },
+          {
+            env: {
+              OTEL_EXPORTER_OTLP_ENDPOINT: otelVars.OTEL_EXPORTER_OTLP_ENDPOINT,
+            },
+          },
           null,
           2,
         ),
@@ -275,7 +279,11 @@ describe("removeAppEnvVars", () => {
       fs.mkdirSync(path.dirname(target.path), { recursive: true });
       fs.writeFileSync(
         target.path,
-        JSON.stringify({ env: { ...otelVars }, model: "claude-sonnet-5" }, null, 2),
+        JSON.stringify(
+          { env: { ...otelVars }, model: "claude-sonnet-5" },
+          null,
+          2,
+        ),
       );
 
       removeAppEnvVars(target, Object.keys(otelVars));
@@ -290,7 +298,11 @@ describe("removeAppEnvVars", () => {
     it("returns false and leaves a file with no langwatch keys untouched", () => {
       const target = appSettingsTargetFor("claude")!;
       fs.mkdirSync(path.dirname(target.path), { recursive: true });
-      const original = JSON.stringify({ env: { USER: "x" }, model: "m" }, null, 2);
+      const original = JSON.stringify(
+        { env: { USER: "x" }, model: "m" },
+        null,
+        2,
+      );
       fs.writeFileSync(target.path, original);
 
       const changed = removeAppEnvVars(target, Object.keys(otelVars));

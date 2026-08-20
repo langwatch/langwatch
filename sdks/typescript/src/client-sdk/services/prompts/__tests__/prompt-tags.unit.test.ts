@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { PromptsApiService } from "../prompts-api.service";
-import { PromptsFacade } from "../prompts.facade";
-import { PromptsApiError } from "../errors";
-import { mock, type MockProxy } from "vitest-mock-extended";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { type MockProxy, mock } from "vitest-mock-extended";
 import type { InternalConfig } from "@/client-sdk/types";
 import type { LangwatchApiClient } from "@/internal/api/client";
+import { PromptsApiError } from "../errors";
 import type { LocalPromptsService } from "../local-prompts.service";
+import { PromptsFacade } from "../prompts.facade";
+import { PromptsApiService } from "../prompts-api.service";
 
 describe("Prompt Tags", () => {
   describe("tags.assign()", () => {
@@ -140,7 +140,6 @@ describe("Prompt Tags", () => {
           versionId: "prompt_version_abc123",
         });
 
-        // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(promptsApiService.assignTag).toHaveBeenCalledWith({
           id: "pizza-prompt",
           tag: "production",

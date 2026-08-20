@@ -1,21 +1,31 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { AnalyticsApiService } from "@/client-sdk/services/analytics/analytics-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { toTimeseriesShape } from "./timeseriesShape";
 
-const METRIC_PRESETS: Record<string, { metric: string; aggregation: string }> = {
-  "trace-count": { metric: "metadata.trace_id", aggregation: "cardinality" },
-  "user-count": { metric: "metadata.user_id", aggregation: "cardinality" },
-  "total-cost": { metric: "performance.total_cost", aggregation: "sum" },
-  "avg-latency": { metric: "performance.completion_time", aggregation: "avg" },
-  "p95-latency": { metric: "performance.completion_time", aggregation: "p95" },
-  "total-tokens": { metric: "performance.total_tokens", aggregation: "sum" },
-  "avg-tokens": { metric: "performance.total_tokens", aggregation: "avg" },
-  "eval-pass-rate": { metric: "evaluations.evaluation_pass_rate", aggregation: "avg" },
-};
+const METRIC_PRESETS: Record<string, { metric: string; aggregation: string }> =
+  {
+    "trace-count": { metric: "metadata.trace_id", aggregation: "cardinality" },
+    "user-count": { metric: "metadata.user_id", aggregation: "cardinality" },
+    "total-cost": { metric: "performance.total_cost", aggregation: "sum" },
+    "avg-latency": {
+      metric: "performance.completion_time",
+      aggregation: "avg",
+    },
+    "p95-latency": {
+      metric: "performance.completion_time",
+      aggregation: "p95",
+    },
+    "total-tokens": { metric: "performance.total_tokens", aggregation: "sum" },
+    "avg-tokens": { metric: "performance.total_tokens", aggregation: "avg" },
+    "eval-pass-rate": {
+      metric: "evaluations.evaluation_pass_rate",
+      aggregation: "avg",
+    },
+  };
 
 // Natural-language requests often arrive as `--metric latency` or `--metric
 // errors`. Keep those useful aliases at the CLI boundary instead of forwarding
@@ -73,11 +83,11 @@ export const queryAnalyticsCommand = async (options: {
   const startDate = options.startDate
     ? new Date(options.startDate).getTime()
     : sevenDaysAgo;
-  const endDate = options.endDate
-    ? new Date(options.endDate).getTime()
-    : now;
+  const endDate = options.endDate ? new Date(options.endDate).getTime() : now;
 
-  const spinner = createSpinner(`Querying ${metric} (${aggregation})...`).start();
+  const spinner = createSpinner(
+    `Querying ${metric} (${aggregation})...`,
+  ).start();
 
   try {
     const result = await service.timeseries({
@@ -90,7 +100,12 @@ export const queryAnalyticsCommand = async (options: {
         },
       ],
       groupBy: options.groupBy as "metadata.model" | undefined,
-      timeScale: options.timeScale === "full" ? "full" : options.timeScale ? Number(options.timeScale) : undefined,
+      timeScale:
+        options.timeScale === "full"
+          ? "full"
+          : options.timeScale
+            ? Number(options.timeScale)
+            : undefined,
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     });
 
@@ -130,7 +145,9 @@ export const queryAnalyticsCommand = async (options: {
               console.log(`  ${chalk.gray(dateStr)}: ${chalk.gray("no data")}`);
             } else {
               const values = entries
-                .map(([key, value]) => `${chalk.cyan(key)}: ${formatValue(value)}`)
+                .map(
+                  ([key, value]) => `${chalk.cyan(key)}: ${formatValue(value)}`,
+                )
                 .join(", ");
               console.log(`  ${chalk.gray(dateStr)}: ${values}`);
             }
@@ -150,7 +167,9 @@ export const queryAnalyticsCommand = async (options: {
 
             if (entries.length > 0) {
               const values = entries
-                .map(([key, value]) => `${chalk.cyan(key)}: ${formatValue(value)}`)
+                .map(
+                  ([key, value]) => `${chalk.cyan(key)}: ${formatValue(value)}`,
+                )
                 .join(", ");
               console.log(`  ${chalk.gray(dateStr)}: ${values}`);
             }
@@ -158,7 +177,11 @@ export const queryAnalyticsCommand = async (options: {
         }
 
         console.log();
-        console.log(chalk.gray("Available presets: " + Object.keys(METRIC_PRESETS).join(", ")));
+        console.log(
+          chalk.gray(
+            "Available presets: " + Object.keys(METRIC_PRESETS).join(", "),
+          ),
+        );
         console.log(
           chalk.gray(
             `Use ${chalk.cyan("langwatch analytics query --metric <preset> -f json")} for raw data`,

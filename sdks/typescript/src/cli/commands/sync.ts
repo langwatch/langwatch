@@ -1,15 +1,12 @@
 import chalk from "chalk";
-import {
-  PromptsApiService,
-  PromptsError,
-} from "@/client-sdk/services/prompts";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
 import type { SyncResult } from "../types";
+import { resolveCredentials } from "../utils/apiKey";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
-import { resolveCredentials } from "../utils/apiKey";
 import { pullPrompts } from "./pull";
 import { pushPrompts } from "./push";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const syncCommand = async (): Promise<void> => {
   console.log("🔄 Starting sync...");
@@ -58,9 +55,9 @@ export const syncCommand = async (): Promise<void> => {
         console.log(
           chalk.green(
             `✓ Pulled ${chalk.cyan(`${name}@${versionSpec}`)} ${chalk.gray(
-              `(version ${version})`
-            )} → ${chalk.gray(displayPath)}`
-          )
+              `(version ${version})`,
+            )} → ${chalk.gray(displayPath)}`,
+          ),
         );
       }
     }
@@ -71,9 +68,9 @@ export const syncCommand = async (): Promise<void> => {
         console.log(
           chalk.green(
             `✓ Pushed ${chalk.cyan(name)} ${chalk.gray(
-              `(version ${version})`
-            )} from ${chalk.gray(localPath)}`
-          )
+              `(version ${version})`,
+            )} from ${chalk.gray(localPath)}`,
+          ),
         );
       }
     }
@@ -83,8 +80,8 @@ export const syncCommand = async (): Promise<void> => {
       for (const name of result.cleaned) {
         console.log(
           chalk.yellow(
-            `✓ Cleaned ${chalk.cyan(name)} (no longer in dependencies)`
-          )
+            `✓ Cleaned ${chalk.cyan(name)} (no longer in dependencies)`,
+          ),
         );
       }
     }
@@ -125,11 +122,7 @@ export const syncCommand = async (): Promise<void> => {
       console.error(chalk.red(`Error: ${error.message}`));
     } else {
       console.error(
-        chalk.red(
-          `Unexpected error: ${
-            formatApiErrorMessage({ error })
-          }`
-        )
+        chalk.red(`Unexpected error: ${formatApiErrorMessage({ error })}`),
       );
     }
     process.exit(1);

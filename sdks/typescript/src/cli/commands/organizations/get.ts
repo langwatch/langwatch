@@ -17,7 +17,8 @@ export const getOrganizationByIdCommand = async ({
     action: "fetch organization",
     pending: `Fetching organization "${id}"...`,
     run: () => instanceAdminService(instanceKey).get(id),
-    succeed: (result) => `Organization "${chalk.cyan(result.organization.name)}"`,
+    succeed: (result) =>
+      `Organization "${chalk.cyan(result.organization.name)}"`,
     table: (result) => {
       printFacts([
         ["ID", chalk.gray(result.organization.id)],

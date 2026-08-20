@@ -11,8 +11,8 @@ import { FEATURE_MAP } from "../../../../internal/generated/cli/feature-map.gene
 import { buildProgram } from "../../../program";
 import {
   buildCatalog,
-  flattenCatalog,
   type CatalogEntry,
+  flattenCatalog,
 } from "../../../utils/commandCatalog";
 
 // program.ts reads the tsup-injected __CLI_VERSION__ build constant; under
@@ -154,9 +154,7 @@ describe("the management command tree", () => {
       // Canary: an empty list would make the check below pass vacuously.
       expect(managementLeaves.length).toBeGreaterThanOrEqual(40);
 
-      const undeclared = managementLeaves.filter(
-        (path) => !declared.has(path),
-      );
+      const undeclared = managementLeaves.filter((path) => !declared.has(path));
       expect(
         undeclared,
         [

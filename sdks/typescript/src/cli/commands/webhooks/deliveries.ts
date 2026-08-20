@@ -1,10 +1,10 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { WebhooksApiService } from "@/client-sdk/services/webhooks/webhooks-api.service";
 import { checkOrgApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * The most recent delivery attempts for one endpoint, one page at a time.
@@ -26,7 +26,9 @@ export const webhookDeliveriesCommand = async (
       limit: options.limit !== undefined ? Number(options.limit) : undefined,
     });
     const deliveries = page.data;
-    spinner.succeed(`${deliveries.length} attempt${deliveries.length !== 1 ? "s" : ""}${page.next_cursor ? " (more available)" : ""}`);
+    spinner.succeed(
+      `${deliveries.length} attempt${deliveries.length !== 1 ? "s" : ""}${page.next_cursor ? " (more available)" : ""}`,
+    );
     return {
       data: page,
       table: () => {
@@ -41,12 +43,33 @@ export const webhookDeliveriesCommand = async (
             "Fired at": new Date(d.fired_at).toLocaleString(),
             Attempt: String(d.attempt),
             Events: String(d.event_count),
-            Outcome: d.outcome === "success" ? chalk.green(d.outcome) : d.outcome === "retryable" ? chalk.yellow(d.outcome) : chalk.red(d.outcome),
-            Status: d.response_status !== null ? String(d.response_status) : chalk.gray("-"),
-            "Latency ms": d.latency_ms !== null ? String(d.latency_ms) : chalk.gray("-"),
-            Error: d.error ? (d.error.length > 40 ? `${d.error.slice(0, 37)}...` : d.error) : "",
+            Outcome:
+              d.outcome === "success"
+                ? chalk.green(d.outcome)
+                : d.outcome === "retryable"
+                  ? chalk.yellow(d.outcome)
+                  : chalk.red(d.outcome),
+            Status:
+              d.response_status !== null
+                ? String(d.response_status)
+                : chalk.gray("-"),
+            "Latency ms":
+              d.latency_ms !== null ? String(d.latency_ms) : chalk.gray("-"),
+            Error: d.error
+              ? d.error.length > 40
+                ? `${d.error.slice(0, 37)}...`
+                : d.error
+              : "",
           })),
-          headers: ["Fired at", "Attempt", "Events", "Outcome", "Status", "Latency ms", "Error"],
+          headers: [
+            "Fired at",
+            "Attempt",
+            "Events",
+            "Outcome",
+            "Status",
+            "Latency ms",
+            "Error",
+          ],
         });
         if (page.next_cursor) {
           console.log();

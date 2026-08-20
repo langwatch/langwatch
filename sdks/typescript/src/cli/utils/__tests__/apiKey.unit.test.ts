@@ -6,8 +6,9 @@
  *
  * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
 import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // A developer's local .env must not decide whether these tests see a key; the
 // scoped loader's `parse` results are stubbed per test below.
@@ -31,22 +32,24 @@ vi.mock("../governance/config", () => ({
 // Keep SessionApiError real (the resolver branches on `err.status`), mock only
 // the network call.
 vi.mock("../governance/session-api", async () => {
-  const actual =
-    await vi.importActual<typeof import("../governance/session-api")>(
-      "../governance/session-api",
-    );
-  return { SessionApiError: actual.SessionApiError, fetchPersonalProject: vi.fn() };
+  const actual = await vi.importActual<
+    typeof import("../governance/session-api")
+  >("../governance/session-api");
+  return {
+    SessionApiError: actual.SessionApiError,
+    fetchPersonalProject: vi.fn(),
+  };
 });
 
 import { config } from "dotenv";
+import { resolveCredentials, SESSION_REVALIDATE_WINDOW_MS } from "../apiKey";
+import { setOutputFormat } from "../errorOutput";
 import { loadConfig, saveConfig } from "../governance/config";
 import {
   fetchPersonalProject,
   SessionApiError,
 } from "../governance/session-api";
 import { maybePrintIdentityNotice } from "../identityNotice";
-import { resolveCredentials, SESSION_REVALIDATE_WINDOW_MS } from "../apiKey";
-import { setOutputFormat } from "../errorOutput";
 
 const mockedDotenvConfig = vi.mocked(config);
 const mockedLoadConfig = vi.mocked(loadConfig);
@@ -111,11 +114,9 @@ describe("resolveCredentials()", () => {
     mockedNotice.mockClear();
     logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    exitSpy = vi
-      .spyOn(process, "exit")
-      .mockImplementation((() => {
-        throw new Error("process.exit called");
-      }) as never);
+    exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called");
+    }) as never);
   });
 
   afterEach(() => {
@@ -151,7 +152,9 @@ describe("resolveCredentials()", () => {
     /** @scenario LANGWATCH_API_KEY beats the stored device session */
     it("prefers the environment over a stored device session", async () => {
       process.env.LANGWATCH_API_KEY = "sk-from-env";
-      mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()) as never);
+      mockedLoadConfig.mockReturnValue(
+        loggedInConfig(freshPersonal()) as never,
+      );
 
       const resolved = await resolveCredentials();
 
@@ -162,7 +165,9 @@ describe("resolveCredentials()", () => {
 
     /** @scenario a device session resolves the personal project API key when no env var is set */
     it("falls back to the device session's personal project key", async () => {
-      mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()) as never);
+      mockedLoadConfig.mockReturnValue(
+        loggedInConfig(freshPersonal()) as never,
+      );
 
       const resolved = await resolveCredentials();
 
@@ -199,7 +204,9 @@ describe("resolveCredentials()", () => {
   describe("session-liveness gate (revocation cannot be bypassed by the cached key)", () => {
     /** @scenario a device session uses the cached key without a network call while validation is fresh */
     it("uses the cached key without revalidating inside the window", async () => {
-      mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()) as never);
+      mockedLoadConfig.mockReturnValue(
+        loggedInConfig(freshPersonal()) as never,
+      );
 
       const resolved = await resolveCredentials();
 
@@ -209,7 +216,9 @@ describe("resolveCredentials()", () => {
 
     /** @scenario a stale cached key is revalidated before use */
     it("revalidates a stale cached key through the session endpoint", async () => {
-      mockedLoadConfig.mockReturnValue(loggedInConfig(stalePersonal()) as never);
+      mockedLoadConfig.mockReturnValue(
+        loggedInConfig(stalePersonal()) as never,
+      );
       mockedFetchPersonalProject.mockResolvedValue({
         id: "proj_1",
         slug: "personal-x",
@@ -243,7 +252,9 @@ describe("resolveCredentials()", () => {
 
     /** @scenario a transient/offline revalidation keeps the last-known key without extending trust */
     it("keeps the last-known key on a transient/offline error without extending the clock", async () => {
-      mockedLoadConfig.mockReturnValue(loggedInConfig(stalePersonal()) as never);
+      mockedLoadConfig.mockReturnValue(
+        loggedInConfig(stalePersonal()) as never,
+      );
       mockedFetchPersonalProject.mockRejectedValue(new Error("network down"));
 
       const resolved = await resolveCredentials();
@@ -255,7 +266,9 @@ describe("resolveCredentials()", () => {
     });
 
     it("keeps a legacy-server key (404) and quiets the clock", async () => {
-      mockedLoadConfig.mockReturnValue(loggedInConfig(stalePersonal()) as never);
+      mockedLoadConfig.mockReturnValue(
+        loggedInConfig(stalePersonal()) as never,
+      );
       mockedFetchPersonalProject.mockResolvedValue(null as never); // 404: endpoint missing
 
       const resolved = await resolveCredentials();
@@ -274,7 +287,9 @@ describe("resolveCredentials()", () => {
   describe("daemon discipline (no resolved key in the shared env)", () => {
     /** @scenario the resolved session key never touches the shared process env */
     it("does not materialize the session key into process.env", async () => {
-      mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()) as never);
+      mockedLoadConfig.mockReturnValue(
+        loggedInConfig(freshPersonal()) as never,
+      );
 
       await resolveCredentials();
 
@@ -365,7 +380,7 @@ describe("resolveCredentials()", () => {
         // codes are stripped so a color-forcing environment cannot skew it.
         const stderr = errorSpy.mock.calls
           .map((c: unknown[]) =>
-            // eslint-disable-next-line no-control-regex -- intentional: stripping ANSI escape codes from chalk output
+            // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional: stripping ANSI escape codes from chalk output
             String(c[0]).replace(/\u001b\[[0-9;]*m/g, ""),
           )
           .join("\n");

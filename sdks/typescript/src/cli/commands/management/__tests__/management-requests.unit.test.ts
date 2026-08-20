@@ -66,11 +66,17 @@ let logged: string[];
 
 /** The next response `fetch` answers with. */
 const respondWith = (body: unknown): void => {
-  mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => body });
+  mockFetch.mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => body,
+  });
 };
 
 /** The URL and parsed body of the nth request made. */
-const requestAt = (index: number): { url: string; body: unknown; init: RequestInit } => {
+const requestAt = (
+  index: number,
+): { url: string; body: unknown; init: RequestInit } => {
   const [url, init] = mockFetch.mock.calls[index] as [string, RequestInit];
   return {
     url,
@@ -157,7 +163,10 @@ describe("role-bindings update", () => {
 
       mockFetch.mockClear();
       respondWith(binding);
-      await updateRoleBindingCommand({ id: "rb_1", options: { role: "admin" } });
+      await updateRoleBindingCommand({
+        id: "rb_1",
+        options: { role: "admin" },
+      });
       expect(lastRequest().body).toEqual({ role: "ADMIN" });
     });
   });
@@ -339,7 +348,10 @@ describe("invites create", () => {
         mkdtempSync(join(tmpdir(), "lw-invites-")),
         "invites.json",
       );
-      writeFileSync(file, JSON.stringify((fromFlags.body as { invites: unknown[] }).invites));
+      writeFileSync(
+        file,
+        JSON.stringify((fromFlags.body as { invites: unknown[] }).invites),
+      );
 
       mockFetch.mockClear();
       respondWith(created);
@@ -351,17 +363,18 @@ describe("invites create", () => {
         (fromFlags.body as { invites: unknown[] }).invites,
       );
       const listeners = new Map<string, (chunk?: Buffer) => void>();
-      const stdinOn = vi
-        .spyOn(process.stdin, "on")
-        .mockImplementation(((event: string, listener: (chunk?: Buffer) => void) => {
-          listeners.set(event, listener);
-          if (event === "error") {
-            // Every listener is registered by now; feed the document through.
-            listeners.get("data")?.(Buffer.from(stdinChunks));
-            listeners.get("end")?.();
-          }
-          return process.stdin;
-        }) as typeof process.stdin.on);
+      const stdinOn = vi.spyOn(process.stdin, "on").mockImplementation(((
+        event: string,
+        listener: (chunk?: Buffer) => void,
+      ) => {
+        listeners.set(event, listener);
+        if (event === "error") {
+          // Every listener is registered by now; feed the document through.
+          listeners.get("data")?.(Buffer.from(stdinChunks));
+          listeners.get("end")?.();
+        }
+        return process.stdin;
+      }) as typeof process.stdin.on);
 
       mockFetch.mockClear();
       respondWith(created);

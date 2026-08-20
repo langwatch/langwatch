@@ -11,11 +11,9 @@
  * Feature: specs/ai-governance/cli-wrappers/claude-plugin-update.feature
  */
 
-import { mkdirSync } from "node:fs";
-
-import { describe, expect, it, vi } from "vitest";
-
 import type * as ChildProcessModule from "node:child_process";
+import { mkdirSync } from "node:fs";
+import { describe, expect, it, vi } from "vitest";
 
 import { installClaudePluginHarness } from "./claude-plugin-test-helpers";
 
@@ -186,7 +184,10 @@ describe("updateLangwatchClaudePlugin", () => {
     /** @scenario "A marketplace of our name that somebody else registered is left alone" */
     it("does not update through a marketplace pointing somewhere else", async () => {
       seedInstalledPlugin({ version: "0.1.0" });
-      seedMarketplace({ repo: "someone-else/plugins", publishedVersion: "0.2.0" });
+      seedMarketplace({
+        repo: "someone-else/plugins",
+        publishedVersion: "0.2.0",
+      });
       const { updateLangwatchClaudePlugin } = await loadModule();
 
       expect(updateLangwatchClaudePlugin().action).toBe("unavailable");
@@ -200,7 +201,10 @@ describe("updateLangwatchClaudePlugin", () => {
       // `{ source: "git", url }`. A lookalike can arrive as either.
       const lookalikes = [
         { source: "github", repo: "langwatch/agent-plugin.evil" },
-        { source: "git", url: "https://github.com/langwatch/agent-plugin.evil" },
+        {
+          source: "git",
+          url: "https://github.com/langwatch/agent-plugin.evil",
+        },
       ] as const;
 
       for (const source of lookalikes) {
@@ -240,7 +244,9 @@ describe("updateLangwatchClaudePlugin", () => {
       // sibling `.tmp` and renames it, so a DIRECTORY sitting on that name
       // fails the write for any user, root included, which a read-only file
       // would not.
-      mkdirSync(`${process.env.LANGWATCH_CLI_CONFIG!}.tmp`, { recursive: true });
+      mkdirSync(`${process.env.LANGWATCH_CLI_CONFIG!}.tmp`, {
+        recursive: true,
+      });
       const { updateLangwatchClaudePlugin } = await loadModule();
 
       // A stamp that cannot land is a check with no memory, and a check with
@@ -371,7 +377,9 @@ describe("updateLangwatchClaudePlugin", () => {
 
       spawnSyncMock.mockClear();
       const next = await loadModule();
-      expect(next.updateLangwatchClaudePlugin().action).toBe("checked_recently");
+      expect(next.updateLangwatchClaudePlugin().action).toBe(
+        "checked_recently",
+      );
       expect(commandsRun()).toEqual([]);
     });
 

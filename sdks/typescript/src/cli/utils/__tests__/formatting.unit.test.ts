@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { stripAnsi, formatTable, formatRelativeTime } from "../formatting";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { formatRelativeTime, formatTable, stripAnsi } from "../formatting";
 
 describe("stripAnsi()", () => {
   it("removes ANSI color codes from a string", () => {
@@ -24,22 +24,30 @@ describe("stripAnsi()", () => {
 describe("formatRelativeTime()", () => {
   describe("when given a valid past date", () => {
     it("returns years for dates over a year ago", () => {
-      const twoYearsAgo = new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString();
+      const twoYearsAgo = new Date(
+        Date.now() - 2 * 365 * 24 * 60 * 60 * 1000,
+      ).toISOString();
       expect(formatRelativeTime(twoYearsAgo)).toBe("2y ago");
     });
 
     it("returns months for dates over a month ago", () => {
-      const threeMonthsAgo = new Date(Date.now() - 3 * 30 * 24 * 60 * 60 * 1000).toISOString();
+      const threeMonthsAgo = new Date(
+        Date.now() - 3 * 30 * 24 * 60 * 60 * 1000,
+      ).toISOString();
       expect(formatRelativeTime(threeMonthsAgo)).toBe("3mo ago");
     });
 
     it("returns days for dates over a day ago", () => {
-      const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
+      const fiveDaysAgo = new Date(
+        Date.now() - 5 * 24 * 60 * 60 * 1000,
+      ).toISOString();
       expect(formatRelativeTime(fiveDaysAgo)).toBe("5d ago");
     });
 
     it("returns hours for dates over an hour ago", () => {
-      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      const twoHoursAgo = new Date(
+        Date.now() - 2 * 60 * 60 * 1000,
+      ).toISOString();
       expect(formatRelativeTime(twoHoursAgo)).toBe("2h ago");
     });
 
@@ -123,17 +131,16 @@ describe("formatTable()", () => {
 
     it("pads columns to align with the longest value", () => {
       formatTable({
-        data: [
-          { Col: "short" },
-          { Col: "a longer value" },
-        ],
+        data: [{ Col: "short" }, { Col: "a longer value" }],
         headers: ["Col"],
       });
 
       const headerLine = stripAnsi(consoleOutput[0]!);
       const separatorLine = stripAnsi(consoleOutput[1]!);
       // separator should be at least as wide as the longest value
-      expect(separatorLine.length).toBeGreaterThanOrEqual("a longer value".length);
+      expect(separatorLine.length).toBeGreaterThanOrEqual(
+        "a longer value".length,
+      );
       // header should be padded to match
       expect(headerLine.length).toBe(separatorLine.length);
     });

@@ -1,14 +1,13 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { redactTriggerListSecrets } from "./redact";
 
 /**
@@ -30,11 +29,15 @@ export const listTriggersCommand = async (): Promise<CommandResult | void> => {
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "fetch triggers" });
+      failSpinner({
+        spinner,
+        error: new Error(message),
+        action: "fetch triggers",
+      });
       process.exit(1);
     }
 
-    const triggers = await response.json() as Array<{
+    const triggers = (await response.json()) as Array<{
       id: string;
       name: string;
       action: string;
@@ -42,7 +45,9 @@ export const listTriggersCommand = async (): Promise<CommandResult | void> => {
       alertType: string | null;
     }>;
 
-    spinner.succeed(`Found ${triggers.length} trigger${triggers.length !== 1 ? "s" : ""}`);
+    spinner.succeed(
+      `Found ${triggers.length} trigger${triggers.length !== 1 ? "s" : ""}`,
+    );
 
     return {
       // See ./redact.ts — actionParams is plaintext and never shown to humans.
@@ -52,7 +57,11 @@ export const listTriggersCommand = async (): Promise<CommandResult | void> => {
           console.log();
           console.log(chalk.gray("No triggers found."));
           console.log(chalk.gray("Create one with:"));
-          console.log(chalk.cyan('  langwatch trigger create "My Alert" --action SEND_EMAIL'));
+          console.log(
+            chalk.cyan(
+              '  langwatch trigger create "My Alert" --action SEND_EMAIL',
+            ),
+          );
           return;
         }
 

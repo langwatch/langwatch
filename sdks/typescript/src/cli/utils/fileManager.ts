@@ -1,12 +1,17 @@
-import * as fs from "fs";
-import * as path from "path";
-import * as yaml from "js-yaml";
 import chalk from "chalk";
-import type { PromptsConfig, LocalPromptConfig, MaterializedPrompt, PromptsLock } from "../types";
-import { localPromptConfigSchema } from "../types-prompt";
+import * as fs from "fs";
+import * as yaml from "js-yaml";
+import * as path from "path";
 import { PromptConverter } from "@/cli/utils/promptConverter";
-import { PromptFileNotFoundError } from "./errors/prompt-not-found.error";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import type {
+  LocalPromptConfig,
+  MaterializedPrompt,
+  PromptsConfig,
+  PromptsLock,
+} from "../types";
+import { localPromptConfigSchema } from "../types-prompt";
+import { PromptFileNotFoundError } from "./errors/prompt-not-found.error";
 
 export class FileManager {
   private static readonly PROMPTS_CONFIG_FILE = "prompts.json";
@@ -28,13 +33,13 @@ export class FileManager {
 
   /** Reset the cached project root. Tests use this to exercise different cwds. */
   static _resetProjectRootCache(): void {
-    this._projectRoot = undefined;
-    this._projectRootCwd = undefined;
+    FileManager._projectRoot = undefined;
+    FileManager._projectRootCwd = undefined;
   }
 
   private static cacheProjectRoot(cwd: string, root: string): string {
-    this._projectRoot = root;
-    this._projectRootCwd = cwd;
+    FileManager._projectRoot = root;
+    FileManager._projectRootCwd = cwd;
     return root;
   }
 
@@ -45,14 +50,16 @@ export class FileManager {
   ];
 
   private static hasProjectMarker(dir: string): boolean {
-    return this.PROJECT_MARKERS.some((m) => fs.existsSync(path.join(dir, m)));
+    return FileManager.PROJECT_MARKERS.some((m) =>
+      fs.existsSync(path.join(dir, m)),
+    );
   }
 
   private static findProjectRoot(): string {
     const cwd = process.cwd();
 
-    if (this._projectRoot && this._projectRootCwd === cwd) {
-      return this._projectRoot;
+    if (FileManager._projectRoot && FileManager._projectRootCwd === cwd) {
+      return FileManager._projectRoot;
     }
 
     const fsRoot = path.parse(cwd).root;
@@ -64,22 +71,22 @@ export class FileManager {
     let topProjectDir: string | null = null;
     let scan = cwd;
     while (scan !== fsRoot) {
-      if (this.hasProjectMarker(scan)) {
+      if (FileManager.hasProjectMarker(scan)) {
         topProjectDir = scan;
       }
       scan = path.dirname(scan);
     }
 
     if (!topProjectDir) {
-      return this.cacheProjectRoot(cwd, cwd);
+      return FileManager.cacheProjectRoot(cwd, cwd);
     }
 
     // Walk up from cwd looking for prompts.json, capped at the project boundary.
     let currentDir = cwd;
     while (true) {
-      const configPath = path.join(currentDir, this.PROMPTS_CONFIG_FILE);
+      const configPath = path.join(currentDir, FileManager.PROMPTS_CONFIG_FILE);
       if (fs.existsSync(configPath)) {
-        return this.cacheProjectRoot(cwd, currentDir);
+        return FileManager.cacheProjectRoot(cwd, currentDir);
       }
       if (currentDir === topProjectDir) break;
       currentDir = path.dirname(currentDir);
@@ -89,28 +96,34 @@ export class FileManager {
     // creates it where the user actually ran the command. This also keeps
     // concurrent test workdirs isolated: each tempdir gets its own prompts.json
     // instead of all pointing at a shared repo-root file.
-    return this.cacheProjectRoot(cwd, cwd);
+    return FileManager.cacheProjectRoot(cwd, cwd);
   }
 
   static getPromptsConfigPath(): string {
-    return path.join(this.findProjectRoot(), this.PROMPTS_CONFIG_FILE);
+    return path.join(
+      FileManager.findProjectRoot(),
+      FileManager.PROMPTS_CONFIG_FILE,
+    );
   }
 
   static getPromptsLockPath(): string {
-    return path.join(this.findProjectRoot(), this.PROMPTS_LOCK_FILE);
+    return path.join(
+      FileManager.findProjectRoot(),
+      FileManager.PROMPTS_LOCK_FILE,
+    );
   }
 
   static getPromptsDir(): string {
-    return path.join(this.findProjectRoot(), this.PROMPTS_DIR);
+    return path.join(FileManager.findProjectRoot(), FileManager.PROMPTS_DIR);
   }
 
   static getMaterializedDir(): string {
-    return path.join(this.getPromptsDir(), this.MATERIALIZED_DIR);
+    return path.join(FileManager.getPromptsDir(), FileManager.MATERIALIZED_DIR);
   }
 
   static ensureDirectories(): void {
-    const promptsDir = this.getPromptsDir();
-    const materializedDir = this.getMaterializedDir();
+    const promptsDir = FileManager.getPromptsDir();
+    const materializedDir = FileManager.getMaterializedDir();
 
     if (!fs.existsSync(promptsDir)) {
       fs.mkdirSync(promptsDir, { recursive: true });
@@ -122,7 +135,7 @@ export class FileManager {
   }
 
   static loadPromptsConfig(): PromptsConfig {
-    const configPath = this.getPromptsConfigPath();
+    const configPath = FileManager.getPromptsConfigPath();
 
     if (!fs.existsSync(configPath)) {
       return { prompts: {} };
@@ -132,22 +145,24 @@ export class FileManager {
       const content = fs.readFileSync(configPath, "utf-8");
       return JSON.parse(content) as PromptsConfig;
     } catch (error) {
-      throw new Error(`Failed to parse prompts.json: ${formatApiErrorMessage({ error })}`);
+      throw new Error(
+        `Failed to parse prompts.json: ${formatApiErrorMessage({ error })}`,
+      );
     }
   }
 
   static savePromptsConfig(config: PromptsConfig): void {
-    const configPath = this.getPromptsConfigPath();
+    const configPath = FileManager.getPromptsConfigPath();
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
   }
 
   static initializePromptsConfig(): { created: boolean; path: string } {
-    const configPath = this.getPromptsConfigPath();
+    const configPath = FileManager.getPromptsConfigPath();
     const existed = fs.existsSync(configPath);
 
     if (!existed) {
       const emptyConfig: PromptsConfig = { prompts: {} };
-      this.savePromptsConfig(emptyConfig);
+      FileManager.savePromptsConfig(emptyConfig);
       return { created: true, path: configPath };
     }
 
@@ -160,7 +175,7 @@ export class FileManager {
     if (!fs.existsSync(lockPath)) {
       return {
         lockfileVersion: 1,
-        prompts: {}
+        prompts: {},
       };
     }
 
@@ -168,25 +183,27 @@ export class FileManager {
       const content = fs.readFileSync(lockPath, "utf-8");
       return JSON.parse(content) as PromptsLock;
     } catch (error) {
-      throw new Error(`Failed to parse prompts-lock.json: ${formatApiErrorMessage({ error })}`);
+      throw new Error(
+        `Failed to parse prompts-lock.json: ${formatApiErrorMessage({ error })}`,
+      );
     }
-  }
+  };
 
   static savePromptsLock(lock: PromptsLock): void {
-    const lockPath = this.getPromptsLockPath();
+    const lockPath = FileManager.getPromptsLockPath();
     fs.writeFileSync(lockPath, JSON.stringify(lock, null, 2) + "\n");
   }
 
   static initializePromptsLock(): { created: boolean; path: string } {
-    const lockPath = this.getPromptsLockPath();
+    const lockPath = FileManager.getPromptsLockPath();
     const existed = fs.existsSync(lockPath);
 
     if (!existed) {
       const emptyLock: PromptsLock = {
         lockfileVersion: 1,
-        prompts: {}
+        prompts: {},
       };
-      this.savePromptsLock(emptyLock);
+      FileManager.savePromptsLock(emptyLock);
       return { created: true, path: lockPath };
     }
 
@@ -207,28 +224,39 @@ export class FileManager {
       // Validate with zod and provide nice error messages
       const result = localPromptConfigSchema.safeParse(rawData);
 
-            if (!result.success) {
+      if (!result.success) {
         // Format zod errors nicely (manually since z.prettifyError might not be available)
         const prettyError = result.error.issues
-          .map(issue => `✖ ${issue.message}${issue.path.length > 0 ? `\n  → at ${issue.path.join('.')}` : ''}`)
-          .join('\n');
+          .map(
+            (issue) =>
+              `✖ ${issue.message}${issue.path.length > 0 ? `\n  → at ${issue.path.join(".")}` : ""}`,
+          )
+          .join("\n");
 
         throw new Error(
-          `Invalid prompt configuration in ${chalk.yellow(filePath)}:\n${prettyError}`
+          `Invalid prompt configuration in ${chalk.yellow(filePath)}:\n${prettyError}`,
         );
       }
 
       return result.data;
     } catch (error) {
-      if (error instanceof Error && error.message.includes("Invalid prompt configuration")) {
+      if (
+        error instanceof Error &&
+        error.message.includes("Invalid prompt configuration")
+      ) {
         throw error; // Re-throw zod validation errors as-is
       }
-      throw new Error(`Failed to parse local prompt file ${filePath}: ${formatApiErrorMessage({ error })}`);
+      throw new Error(
+        `Failed to parse local prompt file ${filePath}: ${formatApiErrorMessage({ error })}`,
+      );
     }
-  }
+  };
 
-    static saveMaterializedPrompt(name: string, prompt: MaterializedPrompt): string {
-    const materializedDir = this.getMaterializedDir();
+  static saveMaterializedPrompt(
+    name: string,
+    prompt: MaterializedPrompt,
+  ): string {
+    const materializedDir = FileManager.getMaterializedDir();
     const parts = name.split("/");
     const fileName = `${parts[parts.length - 1]}.prompt.yaml`;
 
@@ -240,7 +268,11 @@ export class FileManager {
       }
     }
 
-    const filePath = path.join(materializedDir, ...parts.slice(0, -1), fileName);
+    const filePath = path.join(
+      materializedDir,
+      ...parts.slice(0, -1),
+      fileName,
+    );
 
     // Convert to YAML format using the converter
     const yamlContent = PromptConverter.fromMaterializedToYaml(prompt);
@@ -248,7 +280,7 @@ export class FileManager {
     const yamlString = yaml.dump(yamlContent, {
       lineWidth: -1,
       noRefs: true,
-      sortKeys: false
+      sortKeys: false,
     });
 
     fs.writeFileSync(filePath, yamlString);
@@ -286,16 +318,18 @@ export class FileManager {
 
     walkDir(promptsDir);
     return files;
-  }
+  };
 
   static promptNameFromPath(filePath: string): string {
-    const promptsDir = this.getPromptsDir();
+    const promptsDir = FileManager.getPromptsDir();
     const relativePath = path.relative(promptsDir, filePath);
     return relativePath.replace(/\.prompt\.yaml$/, "");
   }
 
-  static cleanupOrphanedMaterializedFiles(currentDependencies: Set<string>): string[] {
-    const materializedDir = this.getMaterializedDir();
+  static cleanupOrphanedMaterializedFiles(
+    currentDependencies: Set<string>,
+  ): string[] {
+    const materializedDir = FileManager.getMaterializedDir();
 
     if (!fs.existsSync(materializedDir)) {
       return [];
@@ -338,8 +372,16 @@ export class FileManager {
     return cleaned;
   }
 
-  static updateLockEntry(lock: PromptsLock, name: string, prompt: MaterializedPrompt, materializedPath: string): void {
-    const relativePath = path.relative(this.findProjectRoot(), materializedPath);
+  static updateLockEntry(
+    lock: PromptsLock,
+    name: string,
+    prompt: MaterializedPrompt,
+    materializedPath: string,
+  ): void {
+    const relativePath = path.relative(
+      FileManager.findProjectRoot(),
+      materializedPath,
+    );
 
     lock.prompts[name] = {
       version: prompt.version,
@@ -355,7 +397,10 @@ export class FileManager {
   }
 
   static addToGitignore(entry: string): { added: boolean; existed: boolean } {
-    const gitignorePath = path.join(this.findProjectRoot(), ".gitignore");
+    const gitignorePath = path.join(
+      FileManager.findProjectRoot(),
+      ".gitignore",
+    );
 
     // Check if .gitignore exists
     if (!fs.existsSync(gitignorePath)) {
@@ -366,7 +411,7 @@ export class FileManager {
 
     // Read existing .gitignore
     const content = fs.readFileSync(gitignorePath, "utf-8");
-    const lines = content.split("\n").map(line => line.trim());
+    const lines = content.split("\n").map((line) => line.trim());
 
     // Check if entry already exists
     if (lines.includes(entry)) {
@@ -374,7 +419,9 @@ export class FileManager {
     }
 
     // Add entry to .gitignore
-    const newContent = content.endsWith("\n") ? `${content}${entry}\n` : `${content}\n${entry}\n`;
+    const newContent = content.endsWith("\n")
+      ? `${content}${entry}\n`
+      : `${content}\n${entry}\n`;
     fs.writeFileSync(gitignorePath, newContent);
 
     return { added: true, existed: false };

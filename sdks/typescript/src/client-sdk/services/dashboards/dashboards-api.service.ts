@@ -1,12 +1,12 @@
 import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
-import { type InternalConfig } from "@/client-sdk/types";
-import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import type { InternalConfig } from "@/client-sdk/types";
+import {
+  createLangWatchApiClient,
+  type LangwatchApiClient,
+} from "@/internal/api/client";
 
 export interface DashboardSummary {
   id: string;
@@ -47,9 +47,13 @@ export class DashboardsApiService {
   }
 
   private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: extractStatusFromResponse(error),
+      },
+    });
     throw new DashboardsApiError(message, operation, error);
   }
 
@@ -85,9 +89,12 @@ export class DashboardsApiService {
   }
 
   async delete(id: string): Promise<{ id: string; name: string }> {
-    const { data, error } = await this.apiClient.DELETE("/api/dashboards/{id}", {
-      params: { path: { id } },
-    });
+    const { data, error } = await this.apiClient.DELETE(
+      "/api/dashboards/{id}",
+      {
+        params: { path: { id } },
+      },
+    );
     if (error) this.handleApiError(`delete dashboard "${id}"`, error);
     return data as unknown as { id: string; name: string };
   }

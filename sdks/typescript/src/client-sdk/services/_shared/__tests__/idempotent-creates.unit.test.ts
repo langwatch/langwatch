@@ -10,7 +10,7 @@
  *
  * Spec: specs/ai-gateway/idempotency.feature
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GatewayBudgetsApiService } from "../../gateway-budgets/gateway-budgets-api.service";
 import { VirtualKeysApiService } from "../../virtual-keys/virtual-keys-api.service";

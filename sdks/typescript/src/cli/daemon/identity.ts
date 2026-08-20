@@ -136,7 +136,8 @@ export function daemonSocketDir(): string {
   const leaf = `langwatch-${uid}`;
 
   const runtimeDir = process.env.XDG_RUNTIME_DIR;
-  if (runtimeDir && runtimeDir.trim() !== "") return path.join(runtimeDir, leaf);
+  if (runtimeDir && runtimeDir.trim() !== "")
+    return path.join(runtimeDir, leaf);
 
   const home = os.homedir();
   if (home !== "") {

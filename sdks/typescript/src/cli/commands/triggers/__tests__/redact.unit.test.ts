@@ -8,16 +8,20 @@
  * auto-activates from CLAUDECODE), so it must not be the one place the secret
  * appears. These tests fail loudly if that ever regresses.
  */
-import { describe, it, expect } from "vitest";
-import { redactTriggerSecrets, redactTriggerListSecrets } from "../redact";
+import { describe, expect, it } from "vitest";
+import { redactTriggerListSecrets, redactTriggerSecrets } from "../redact";
 
-const WEBHOOK = "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXX";
+const WEBHOOK =
+  "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXX";
 
 const trigger = () => ({
   id: "trg_1",
   name: "alert me",
   action: "SEND_SLACK_MESSAGE",
-  actionParams: { slackWebhook: WEBHOOK, headers: { Authorization: "Bearer sk-live-abc" } },
+  actionParams: {
+    slackWebhook: WEBHOOK,
+    headers: { Authorization: "Bearer sk-live-abc" },
+  },
   active: true,
 });
 
@@ -36,7 +40,10 @@ describe("redactTriggerSecrets", () => {
     it("keeps the key names so the shape stays readable", () => {
       const redacted = redactTriggerSecrets(trigger());
 
-      expect(Object.keys(redacted.actionParams)).toEqual(["slackWebhook", "headers"]);
+      expect(Object.keys(redacted.actionParams)).toEqual([
+        "slackWebhook",
+        "headers",
+      ]);
     });
 
     it("leaves every non-secret field untouched", () => {
@@ -59,8 +66,15 @@ describe("redactTriggerSecrets", () => {
   });
 
   describe("given a trigger with no actionParams", () => {
-    it.each([[null], [undefined], [{}]])("returns it unharmed for %s", (params) => {
-      const input = { id: "trg_2", actionParams: params as Record<string, unknown> | null };
+    it.each([
+      [null],
+      [undefined],
+      [{}],
+    ])("returns it unharmed for %s", (params) => {
+      const input = {
+        id: "trg_2",
+        actionParams: params as Record<string, unknown> | null,
+      };
 
       expect(() => redactTriggerSecrets(input)).not.toThrow();
       expect(redactTriggerSecrets(input).id).toBe("trg_2");
@@ -74,10 +88,16 @@ describe("redactTriggerSecrets", () => {
   describe("given a payload whose declared type omits actionParams", () => {
     it("still strips the field the API actually returned", () => {
       const declared: { id: string; name: string } = JSON.parse(
-        JSON.stringify({ id: "trg_3", name: "x", actionParams: { slackWebhook: WEBHOOK } }),
+        JSON.stringify({
+          id: "trg_3",
+          name: "x",
+          actionParams: { slackWebhook: WEBHOOK },
+        }),
       );
 
-      expect(JSON.stringify(redactTriggerSecrets(declared))).not.toContain(WEBHOOK);
+      expect(JSON.stringify(redactTriggerSecrets(declared))).not.toContain(
+        WEBHOOK,
+      );
     });
   });
 });

@@ -1,13 +1,13 @@
-import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
-import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import type { InternalConfig } from "@/client-sdk/types";
+import {
+  createLangWatchApiClient,
+  type LangwatchApiClient,
+} from "@/internal/api/client";
+import type { paths } from "@/internal/generated/openapi/api-client";
 
 export type TraceSearchBody = NonNullable<
   paths["/api/traces/search"]["post"]["requestBody"]
@@ -62,21 +62,31 @@ export class TracesApiService {
     response?: Response,
   ): never {
     const status = response?.status ?? extractStatusFromResponse(error);
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status,
-    } });
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status,
+      },
+    });
     throw new TracesApiError(message, operation, error, status);
   }
 
   async search(params: TraceSearchBody): Promise<TraceSearchResponse> {
-    const { data, error, response } = await this.apiClient.POST("/api/traces/search", {
-      body: params,
-    });
+    const { data, error, response } = await this.apiClient.POST(
+      "/api/traces/search",
+      {
+        body: params,
+      },
+    );
     if (error) this.handleApiError("search traces", error, response);
     return data;
   }
 
-  async get(traceId: string, options?: { format?: "digest" | "json" }): Promise<TraceGetResponse> {
+  async get(
+    traceId: string,
+    options?: { format?: "digest" | "json" },
+  ): Promise<TraceGetResponse> {
     const { data, error, response } = await this.apiClient.GET(
       "/api/traces/{traceId}",
       {

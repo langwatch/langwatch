@@ -11,6 +11,13 @@
  * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
  * Feature: specs/ai-governance/cli-onboarding/login-unified.feature
  */
+
+import { spawn } from "node:child_process";
+import * as fs from "node:fs";
+import * as http from "node:http";
+import type { AddressInfo } from "node:net";
+import * as os from "node:os";
+import * as path from "node:path";
 import {
   afterAll,
   afterEach,
@@ -20,12 +27,6 @@ import {
   expect,
   it,
 } from "vitest";
-import { spawn } from "node:child_process";
-import * as fs from "node:fs";
-import * as http from "node:http";
-import * as os from "node:os";
-import * as path from "node:path";
-import type { AddressInfo } from "node:net";
 
 const CLI_PATH = path.resolve(__dirname, "../../../../dist/cli/index.js");
 

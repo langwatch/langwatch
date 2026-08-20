@@ -1,11 +1,11 @@
 import chalk from "chalk";
-import { createSpinner } from "../utils/spinner";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
 import { resolveCredentials } from "../utils/apiKey";
-import { formatTable, formatRelativeTime } from "../utils/formatting";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
-import { failSpinner } from "../utils/spinnerError";
+import { formatRelativeTime, formatTable } from "../utils/formatting";
 import type { CommandResult } from "../utils/output";
+import { createSpinner } from "../utils/spinner";
+import { failSpinner } from "../utils/spinnerError";
 
 export const listCommand = async (): Promise<CommandResult | void> => {
   try {
@@ -49,7 +49,8 @@ export const listCommand = async (): Promise<CommandResult | void> => {
 
           // Format prompts for table display
           const tableData = prompts.map((prompt) => ({
-            Name: prompt.handle ?? `${prompt.name} ` + chalk.gray(`(${prompt.id})`),
+            Name:
+              prompt.handle ?? `${prompt.name} ` + chalk.gray(`(${prompt.id})`),
             Version: prompt.version ? `${prompt.version}` : "N/A",
             Model: prompt.model ?? "N/A",
             Tags:
@@ -91,11 +92,7 @@ export const listCommand = async (): Promise<CommandResult | void> => {
       console.error(chalk.red(`Error: ${error.message}`));
     } else {
       console.error(
-        chalk.red(
-          `Unexpected error: ${
-            formatApiErrorMessage({ error })
-          }`,
-        ),
+        chalk.red(`Unexpected error: ${formatApiErrorMessage({ error })}`),
       );
     }
     process.exit(1);

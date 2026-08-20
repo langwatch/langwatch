@@ -32,10 +32,10 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import {
-	appSettingsTargetFor,
-	readAppSettingsFile,
-	readAppSettingsFileForUpdate,
-	writeAppSettingsFile,
+  appSettingsTargetFor,
+  readAppSettingsFile,
+  readAppSettingsFileForUpdate,
+  writeAppSettingsFile,
 } from "./app-settings";
 
 /** The agents whose session context rides on a command hook. */
@@ -55,59 +55,59 @@ const HOOK_EVENTS = ["SessionStart", "Stop"] as const;
 const HOOK_TIMEOUT_SECONDS = 10;
 
 export interface HooksTarget {
-	/** Absolute path of the hook file. */
-	path: string;
-	/** The same path with the home directory collapsed, for display. */
-	displayPath: string;
+  /** Absolute path of the hook file. */
+  path: string;
+  /** The same path with the home directory collapsed, for display. */
+  displayPath: string;
 }
 
 interface ToolSpec {
-	/** The tool argument `langwatch ingest hook` is called with. */
-	hookArgument: string;
-	/** Where the hook declarations live, resolved at call time. */
-	resolveTarget: () => HooksTarget;
+  /** The tool argument `langwatch ingest hook` is called with. */
+  hookArgument: string;
+  /** Where the hook declarations live, resolved at call time. */
+  resolveTarget: () => HooksTarget;
 }
 
 const TARGETS: Record<HookedTool, ToolSpec> = {
-	claude_code: {
-		hookArgument: "claude-code",
-		resolveTarget: () => {
-			// app-settings owns the claude settings location, and always has one.
-			const target = appSettingsTargetFor("claude")!;
-			return { path: target.path, displayPath: target.displayPath };
-		},
-	},
-	codex: {
-		hookArgument: "codex",
-		resolveTarget: () => {
-			// CODEX_HOME relocates the whole config directory, hooks included.
-			const home = process.env.CODEX_HOME?.trim();
-			if (home) {
-				const file = path.join(home, "hooks.json");
-				return { path: file, displayPath: file };
-			}
-			return {
-				path: path.join(os.homedir(), ".codex", "hooks.json"),
-				displayPath: "~/.codex/hooks.json",
-			};
-		},
-	},
+  claude_code: {
+    hookArgument: "claude-code",
+    resolveTarget: () => {
+      // app-settings owns the claude settings location, and always has one.
+      const target = appSettingsTargetFor("claude")!;
+      return { path: target.path, displayPath: target.displayPath };
+    },
+  },
+  codex: {
+    hookArgument: "codex",
+    resolveTarget: () => {
+      // CODEX_HOME relocates the whole config directory, hooks included.
+      const home = process.env.CODEX_HOME?.trim();
+      if (home) {
+        const file = path.join(home, "hooks.json");
+        return { path: file, displayPath: file };
+      }
+      return {
+        path: path.join(os.homedir(), ".codex", "hooks.json"),
+        displayPath: "~/.codex/hooks.json",
+      };
+    },
+  },
 };
 
 /** The command an installed hook entry runs, for one agent. */
 export function sessionContextHookCommand(tool: HookedTool): string {
-	return `${OWNED_COMMAND_PREFIX} ${TARGETS[tool].hookArgument}`;
+  return `${OWNED_COMMAND_PREFIX} ${TARGETS[tool].hookArgument}`;
 }
 
 /** Where a tool's hooks live, for the logout scan's label. */
 export function sessionContextHooksTarget(tool: HookedTool): HooksTarget {
-	return TARGETS[tool].resolveTarget();
+  return TARGETS[tool].resolveTarget();
 }
 
 export type SessionContextHooksAction = "created" | "updated" | "unchanged";
 
 export interface SessionContextHooksInstallResult extends HooksTarget {
-	action: SessionContextHooksAction;
+  action: SessionContextHooksAction;
 }
 
 /**
@@ -119,30 +119,30 @@ export interface SessionContextHooksInstallResult extends HooksTarget {
  * replaces it wholesale, and the user's own hooks live in there too.
  */
 export function installSessionContextHooks({
-	tool,
-	filePath,
+  tool,
+  filePath,
 }: {
-	tool: HookedTool;
-	filePath?: string;
+  tool: HookedTool;
+  filePath?: string;
 }): SessionContextHooksInstallResult {
-	const target = resolveTarget({ tool, filePath });
-	const existedBefore = fs.existsSync(target.path);
+  const target = resolveTarget({ tool, filePath });
+  const existedBefore = fs.existsSync(target.path);
 
-	const document = readAppSettingsFileForUpdate(target.path);
-	const before = JSON.stringify(document);
+  const document = readAppSettingsFileForUpdate(target.path);
+  const before = JSON.stringify(document);
 
-	const hooks = isPlainObject(document.hooks) ? document.hooks : {};
-	for (const event of HOOK_EVENTS) {
-		hooks[event] = mergeHookEntries(hooks[event], tool);
-	}
-	document.hooks = hooks;
+  const hooks = isPlainObject(document.hooks) ? document.hooks : {};
+  for (const event of HOOK_EVENTS) {
+    hooks[event] = mergeHookEntries(hooks[event], tool);
+  }
+  document.hooks = hooks;
 
-	if (JSON.stringify(document) === before) {
-		return { action: "unchanged", ...target };
-	}
+  if (JSON.stringify(document) === before) {
+    return { action: "unchanged", ...target };
+  }
 
-	writeAppSettingsFile({ filePath: target.path, settings: document });
-	return { action: existedBefore ? "updated" : "created", ...target };
+  writeAppSettingsFile({ filePath: target.path, settings: document });
+  return { action: existedBefore ? "updated" : "created", ...target };
 }
 
 /**
@@ -150,17 +150,17 @@ export function installSessionContextHooks({
  * by the logout scan to decide whether there is anything to offer.
  */
 export function hasSessionContextHooks({
-	tool,
-	filePath,
+  tool,
+  filePath,
 }: {
-	tool: HookedTool;
-	filePath?: string;
+  tool: HookedTool;
+  filePath?: string;
 }): boolean {
-	const document = readAppSettingsFile(resolveTarget({ tool, filePath }).path);
-	if (!isPlainObject(document.hooks)) return false;
-	return Object.values(document.hooks).some(
-		(entries) => Array.isArray(entries) && entries.some(isLangwatchHookEntry),
-	);
+  const document = readAppSettingsFile(resolveTarget({ tool, filePath }).path);
+  if (!isPlainObject(document.hooks)) return false;
+  return Object.values(document.hooks).some(
+    (entries) => Array.isArray(entries) && entries.some(isLangwatchHookEntry),
+  );
 }
 
 /**
@@ -173,48 +173,48 @@ export function hasSessionContextHooks({
  * to strip our entries from JSON we could not read without losing the rest.
  */
 export function removeSessionContextHooks({
-	tool,
-	filePath,
+  tool,
+  filePath,
 }: {
-	tool: HookedTool;
-	filePath?: string;
+  tool: HookedTool;
+  filePath?: string;
 }): boolean {
-	const target = resolveTarget({ tool, filePath });
+  const target = resolveTarget({ tool, filePath });
 
-	let raw: string;
-	try {
-		raw = fs.readFileSync(target.path, "utf8");
-	} catch {
-		return false; // ENOENT
-	}
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(raw) as unknown;
-	} catch {
-		return false; // malformed, do not touch
-	}
-	if (!isPlainObject(parsed)) return false;
+  let raw: string;
+  try {
+    raw = fs.readFileSync(target.path, "utf8");
+  } catch {
+    return false; // ENOENT
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    return false; // malformed, do not touch
+  }
+  if (!isPlainObject(parsed)) return false;
 
-	const document: Record<string, unknown> = { ...parsed };
-	if (!isPlainObject(document.hooks)) return false;
-	const hooks: Record<string, unknown> = { ...document.hooks };
+  const document: Record<string, unknown> = { ...parsed };
+  if (!isPlainObject(document.hooks)) return false;
+  const hooks: Record<string, unknown> = { ...document.hooks };
 
-	let removed = false;
-	for (const [event, entries] of Object.entries(hooks)) {
-		if (!Array.isArray(entries)) continue;
-		const kept = entries.filter((entry) => !isLangwatchHookEntry(entry));
-		if (kept.length === entries.length) continue;
-		removed = true;
-		if (kept.length === 0) delete hooks[event];
-		else hooks[event] = kept;
-	}
-	if (!removed) return false;
+  let removed = false;
+  for (const [event, entries] of Object.entries(hooks)) {
+    if (!Array.isArray(entries)) continue;
+    const kept = entries.filter((entry) => !isLangwatchHookEntry(entry));
+    if (kept.length === entries.length) continue;
+    removed = true;
+    if (kept.length === 0) delete hooks[event];
+    else hooks[event] = kept;
+  }
+  if (!removed) return false;
 
-	if (Object.keys(hooks).length === 0) delete document.hooks;
-	else document.hooks = hooks;
+  if (Object.keys(hooks).length === 0) delete document.hooks;
+  else document.hooks = hooks;
 
-	writeAppSettingsFile({ filePath: target.path, settings: document });
-	return true;
+  writeAppSettingsFile({ filePath: target.path, settings: document });
+  return true;
 }
 
 /**
@@ -223,51 +223,54 @@ export function removeSessionContextHooks({
  * exactly one current entry, and the user's entries keep their order.
  */
 function mergeHookEntries(raw: unknown, tool: HookedTool): unknown[] {
-	const entries = Array.isArray(raw) ? (raw as unknown[]) : [];
-	const ours = entries.filter(isLangwatchHookEntry);
-	const desired = sessionContextHookEntry(tool);
+  const entries = Array.isArray(raw) ? (raw as unknown[]) : [];
+  const ours = entries.filter(isLangwatchHookEntry);
+  const desired = sessionContextHookEntry(tool);
 
-	if (ours.length === 1 && JSON.stringify(ours[0]) === JSON.stringify(desired)) {
-		return entries;
-	}
-	return [...entries.filter((entry) => !isLangwatchHookEntry(entry)), desired];
+  if (
+    ours.length === 1 &&
+    JSON.stringify(ours[0]) === JSON.stringify(desired)
+  ) {
+    return entries;
+  }
+  return [...entries.filter((entry) => !isLangwatchHookEntry(entry)), desired];
 }
 
 /** No matcher: every session start counts, whatever started it. */
 function sessionContextHookEntry(tool: HookedTool): Record<string, unknown> {
-	return {
-		hooks: [
-			{
-				type: "command",
-				command: sessionContextHookCommand(tool),
-				timeout: HOOK_TIMEOUT_SECONDS,
-			},
-		],
-	};
+  return {
+    hooks: [
+      {
+        type: "command",
+        command: sessionContextHookCommand(tool),
+        timeout: HOOK_TIMEOUT_SECONDS,
+      },
+    ],
+  };
 }
 
 function isLangwatchHookEntry(entry: unknown): boolean {
-	if (!isPlainObject(entry) || !Array.isArray(entry.hooks)) return false;
-	return entry.hooks.some((hook) => {
-		if (!isPlainObject(hook)) return false;
-		const command = hook.command;
-		return (
-			typeof command === "string" && command.startsWith(OWNED_COMMAND_PREFIX)
-		);
-	});
+  if (!isPlainObject(entry) || !Array.isArray(entry.hooks)) return false;
+  return entry.hooks.some((hook) => {
+    if (!isPlainObject(hook)) return false;
+    const command = hook.command;
+    return (
+      typeof command === "string" && command.startsWith(OWNED_COMMAND_PREFIX)
+    );
+  });
 }
 
 function resolveTarget({
-	tool,
-	filePath,
+  tool,
+  filePath,
 }: {
-	tool: HookedTool;
-	filePath: string | undefined;
+  tool: HookedTool;
+  filePath: string | undefined;
 }): HooksTarget {
-	if (filePath) return { path: filePath, displayPath: filePath };
-	return TARGETS[tool].resolveTarget();
+  if (filePath) return { path: filePath, displayPath: filePath };
+  return TARGETS[tool].resolveTarget();
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-	return value !== null && typeof value === "object" && !Array.isArray(value);
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }

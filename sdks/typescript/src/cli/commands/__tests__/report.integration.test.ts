@@ -1,8 +1,8 @@
-import { createServer, type Server } from "node:http";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AddressInfo } from "node:net";
 import {
   afterAll,
   afterEach,
@@ -38,11 +38,15 @@ describe("langwatch report", () => {
           headers: { ...req.headers },
           body: data.length > 0 ? JSON.parse(data) : undefined,
         });
-        res.writeHead(respondWith.status, { "content-type": "application/json" });
+        res.writeHead(respondWith.status, {
+          "content-type": "application/json",
+        });
         res.end(respondWith.body);
       });
     });
-    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
     endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   });
 
@@ -125,7 +129,10 @@ describe("langwatch report", () => {
     /** @scenario "Summary can be read from a file for long content" */
     it("reads the summary from a file", async () => {
       const notesPath = join(tempDir, "notes.md");
-      writeFileSync(notesPath, "long write-up of the confusing evaluator setup");
+      writeFileSync(
+        notesPath,
+        "long write-up of the confusing evaluator setup",
+      );
       await reportCommand({
         userApproved: true,
         endpoint,
@@ -199,7 +206,11 @@ describe("langwatch report", () => {
             content: "auth failed for extremely-unique-token-value-98765 twice",
           }),
         );
-        await reportCommand({ userApproved: true, endpoint, session: sessionPath });
+        await reportCommand({
+          userApproved: true,
+          endpoint,
+          session: sessionPath,
+        });
         expect(JSON.stringify(received[0]?.body)).not.toContain(
           "extremely-unique-token-value-98765",
         );

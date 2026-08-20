@@ -1,10 +1,10 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
-import type { CommandResult } from "../../utils/output";
 import { formatTable } from "../../utils/formatting";
-import { createDatasetService } from "./service-factory";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /**
  * Truncates a string to a maximum length, adding ellipsis if truncated.
@@ -36,7 +36,9 @@ export const recordsListCommand = async (
   }
 
   const service = createDatasetService();
-  const spinner = createSpinner(`Fetching records from "${slugOrId}"...`).start();
+  const spinner = createSpinner(
+    `Fetching records from "${slugOrId}"...`,
+  ).start();
 
   try {
     const result = await service.listRecords(slugOrId, { page, limit });
@@ -57,7 +59,9 @@ export const recordsListCommand = async (
 
         const entryKeys = new Set<string>();
         records.forEach((record) => {
-          Object.keys(record.entry).forEach((key) => entryKeys.add(key));
+          Object.keys(record.entry).forEach((key) => {
+            entryKeys.add(key);
+          });
         });
         const headers = ["ID", ...Array.from(entryKeys)];
 

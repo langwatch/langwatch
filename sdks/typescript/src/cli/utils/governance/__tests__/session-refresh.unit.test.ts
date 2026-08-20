@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-
-import { DeviceFlowError } from "../device-flow";
 import type { GovernanceConfig } from "../config";
+import { DeviceFlowError } from "../device-flow";
 import {
   canRefreshSession,
   isAccessTokenExpired,
@@ -140,7 +139,11 @@ describe("refreshSession", () => {
     });
 
     expect(outcome.status).toBe("refreshed");
-    expect(refreshImpl).toHaveBeenNthCalledWith(2, expect.anything(), "lw_rt_sibling");
+    expect(refreshImpl).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      "lw_rt_sibling",
+    );
     expect(cfg.access_token).toBe("lw_at_new");
   });
 

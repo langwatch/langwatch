@@ -74,7 +74,7 @@ export function humanMetric(metric: string): string {
  * period, and a total is the only reading of several groups that is true
  * regardless of which groups happened to be present on a given day.
  */
-function valueOf(bucket: AnalyticsBucket): number {
+function sumBucketMeasures(bucket: AnalyticsBucket): number {
   let total = 0;
   for (const [key, raw] of Object.entries(bucket)) {
     if (key === "date") continue;
@@ -102,7 +102,7 @@ function pointsOf(buckets: readonly AnalyticsBucket[]): TimeseriesPoint[] {
   for (const bucket of buckets) {
     const t = dayOf(bucket);
     if (t === null) continue;
-    points.push({ t, v: valueOf(bucket) });
+    points.push({ t, v: sumBucketMeasures(bucket) });
   }
   return points;
 }

@@ -8,21 +8,22 @@
  *      at that server via env vars.
  *   3. Asserts on the CLI stdout/stderr the user would actually see.
  */
+
+import { spawn } from "child_process";
+import * as fs from "fs";
+import http from "http";
+import type { AddressInfo } from "net";
+import * as os from "os";
+import * as path from "path";
 import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
   describe,
   expect,
   it,
-  beforeAll,
-  afterAll,
-  beforeEach,
-  afterEach,
 } from "vitest";
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
-import http from "http";
-import { spawn } from "child_process";
-import type { AddressInfo } from "net";
 
 const CLI_PATH = path.resolve(__dirname, "../../../../dist/cli/index.js");
 
@@ -35,7 +36,11 @@ let server: http.Server;
 let baseUrl = "";
 const responseQueue = new Map<string, FakeResponse[]>();
 
-function pushResponse(method: string, pathPattern: string, response: FakeResponse) {
+function pushResponse(
+  method: string,
+  pathPattern: string,
+  response: FakeResponse,
+) {
   const key = `${method.toUpperCase()} ${pathPattern}`;
   const list = responseQueue.get(key) ?? [];
   list.push(response);
@@ -69,11 +74,16 @@ beforeAll(async () => {
     const key = matchKey(req.method ?? "GET", urlPath);
     if (!key) {
       res.writeHead(404, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "test-fallback", message: "no handler" }));
+      res.end(
+        JSON.stringify({ error: "test-fallback", message: "no handler" }),
+      );
       return;
     }
     const queue = responseQueue.get(key) ?? [];
-    const next = queue.shift() ?? { status: 500, body: { error: "no response queued" } };
+    const next = queue.shift() ?? {
+      status: 500,
+      body: { error: "no response queued" },
+    };
     if (queue.length === 0) responseQueue.delete(key);
     else responseQueue.set(key, queue);
     res.writeHead(next.status, { "Content-Type": "application/json" });
@@ -101,7 +111,11 @@ interface CliResult {
   exitCode: number | null;
 }
 
-function runCli(args: string[], cwd: string, timeoutMs = 15000): Promise<CliResult> {
+function runCli(
+  args: string[],
+  cwd: string,
+  timeoutMs = 15000,
+): Promise<CliResult> {
   return new Promise((resolve) => {
     const child = spawn("node", [CLI_PATH, ...args], {
       cwd,
@@ -174,9 +188,7 @@ describe("CLI surfaces meaningful error messages from the API", () => {
       const result = await runCli(["prompt", "sync"], testDir);
 
       expect(result.exitCode).toBe(1);
-      expect(result.combined.toLowerCase()).toContain(
-        "handle already exists",
-      );
+      expect(result.combined.toLowerCase()).toContain("handle already exists");
       expect(result.combined.toLowerCase()).not.toContain(
         "failed to sync prompt: internal server error",
       );

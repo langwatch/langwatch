@@ -1,17 +1,23 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SuitesApiError } from "@/client-sdk/services/suites/suites-api.service";
 
-vi.mock("@/client-sdk/services/suites/suites-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return {
-    ...actual,
-    SuitesApiService: vi.fn(),
-  };
-});
+vi.mock(
+  "@/client-sdk/services/suites/suites-api.service",
+  async (importOriginal) => {
+    const actual = (await importOriginal()) as Record<string, unknown>;
+    return {
+      ...actual,
+      SuitesApiService: vi.fn(),
+    };
+  },
+);
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -25,11 +31,11 @@ vi.mock("ora", () => ({
 }));
 
 import { SuitesApiService } from "@/client-sdk/services/suites/suites-api.service";
-import { listSuitesCommand } from "../list";
-import { getSuiteCommand } from "../get";
 import { createSuiteCommand } from "../create";
 import { deleteSuiteCommand } from "../delete";
 import { duplicateSuiteCommand } from "../duplicate";
+import { getSuiteCommand } from "../get";
+import { listSuitesCommand } from "../list";
 import { runSuiteCommand } from "../run";
 
 class ProcessExitError extends Error {
@@ -69,8 +75,18 @@ const makeRunResult = (overrides = {}) => ({
   jobCount: 2,
   skippedArchived: { scenarios: [], targets: [] },
   items: [
-    { scenarioRunId: "run_1", scenarioId: "scenario_1", target: { type: "http" as const, referenceId: "agent_xyz" }, name: "Test Scenario" },
-    { scenarioRunId: "run_2", scenarioId: "scenario_2", target: { type: "http" as const, referenceId: "agent_xyz" }, name: "Another Scenario" },
+    {
+      scenarioRunId: "run_1",
+      scenarioId: "scenario_1",
+      target: { type: "http" as const, referenceId: "agent_xyz" },
+      name: "Test Scenario",
+    },
+    {
+      scenarioRunId: "run_2",
+      scenarioId: "scenario_2",
+      target: { type: "http" as const, referenceId: "agent_xyz" },
+      name: "Another Scenario",
+    },
   ],
   ...overrides,
 });
@@ -81,15 +97,17 @@ describe("listSuitesCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAll = vi.fn();
-    vi.mocked(SuitesApiService).mockImplementation(function () { return ({
-      getAll: mockGetAll,
-      get: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      duplicate: vi.fn(),
-      run: vi.fn(),
-      delete: vi.fn(),
-    }) as unknown as SuitesApiService; });
+    vi.mocked(SuitesApiService).mockImplementation(function () {
+      return {
+        getAll: mockGetAll,
+        get: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        duplicate: vi.fn(),
+        run: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as SuitesApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -111,7 +129,6 @@ describe("listSuitesCommand()", () => {
 
       await listSuitesCommand();
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(process.exit).not.toHaveBeenCalled();
     });
   });
@@ -147,15 +164,17 @@ describe("getSuiteCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGet = vi.fn();
-    vi.mocked(SuitesApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
-      get: mockGet,
-      create: vi.fn(),
-      update: vi.fn(),
-      duplicate: vi.fn(),
-      run: vi.fn(),
-      delete: vi.fn(),
-    }) as unknown as SuitesApiService; });
+    vi.mocked(SuitesApiService).mockImplementation(function () {
+      return {
+        getAll: vi.fn(),
+        get: mockGet,
+        create: vi.fn(),
+        update: vi.fn(),
+        duplicate: vi.fn(),
+        run: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as SuitesApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -189,7 +208,9 @@ describe("getSuiteCommand()", () => {
         new SuitesApiError("Not found", "GET /api/suites/nonexistent"),
       );
 
-      await expect(getSuiteCommand("nonexistent")).rejects.toThrow(ProcessExitError);
+      await expect(getSuiteCommand("nonexistent")).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });
@@ -200,15 +221,17 @@ describe("createSuiteCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreate = vi.fn();
-    vi.mocked(SuitesApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
-      get: vi.fn(),
-      create: mockCreate,
-      update: vi.fn(),
-      duplicate: vi.fn(),
-      run: vi.fn(),
-      delete: vi.fn(),
-    }) as unknown as SuitesApiService; });
+    vi.mocked(SuitesApiService).mockImplementation(function () {
+      return {
+        getAll: vi.fn(),
+        get: vi.fn(),
+        create: mockCreate,
+        update: vi.fn(),
+        duplicate: vi.fn(),
+        run: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as SuitesApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -257,15 +280,17 @@ describe("deleteSuiteCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDelete = vi.fn();
-    vi.mocked(SuitesApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
-      get: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      duplicate: vi.fn(),
-      run: vi.fn(),
-      delete: mockDelete,
-    }) as unknown as SuitesApiService; });
+    vi.mocked(SuitesApiService).mockImplementation(function () {
+      return {
+        getAll: vi.fn(),
+        get: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        duplicate: vi.fn(),
+        run: vi.fn(),
+        delete: mockDelete,
+      } as unknown as SuitesApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -287,7 +312,9 @@ describe("deleteSuiteCommand()", () => {
         new SuitesApiError("Not found", "DELETE /api/suites/nonexistent"),
       );
 
-      await expect(deleteSuiteCommand("nonexistent")).rejects.toThrow(ProcessExitError);
+      await expect(deleteSuiteCommand("nonexistent")).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });
@@ -298,15 +325,17 @@ describe("duplicateSuiteCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDuplicate = vi.fn();
-    vi.mocked(SuitesApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
-      get: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      duplicate: mockDuplicate,
-      run: vi.fn(),
-      delete: vi.fn(),
-    }) as unknown as SuitesApiService; });
+    vi.mocked(SuitesApiService).mockImplementation(function () {
+      return {
+        getAll: vi.fn(),
+        get: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        duplicate: mockDuplicate,
+        run: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as SuitesApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -314,7 +343,9 @@ describe("duplicateSuiteCommand()", () => {
 
   describe("when suite is duplicated successfully", () => {
     it("creates a copy", async () => {
-      mockDuplicate.mockResolvedValue(makeSuite({ name: "Test Suite (copy)", id: "suite_new123" }));
+      mockDuplicate.mockResolvedValue(
+        makeSuite({ name: "Test Suite (copy)", id: "suite_new123" }),
+      );
 
       await duplicateSuiteCommand("suite_abc123");
 
@@ -341,15 +372,17 @@ describe("runSuiteCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRun = vi.fn();
-    vi.mocked(SuitesApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
-      get: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      duplicate: vi.fn(),
-      run: mockRun,
-      delete: vi.fn(),
-    }) as unknown as SuitesApiService; });
+    vi.mocked(SuitesApiService).mockImplementation(function () {
+      return {
+        getAll: vi.fn(),
+        get: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        duplicate: vi.fn(),
+        run: mockRun,
+        delete: vi.fn(),
+      } as unknown as SuitesApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -392,7 +425,10 @@ describe("runSuiteCommand()", () => {
   describe("when a --param pair has no equals sign", () => {
     it("refuses the command instead of scheduling a run", async () => {
       await expect(
-        runSuiteCommand({ id: "suite_abc123", options: { param: ["account_tier"] } }),
+        runSuiteCommand({
+          id: "suite_abc123",
+          options: { param: ["account_tier"] },
+        }),
       ).rejects.toThrow(ProcessExitError);
 
       expect(mockRun).not.toHaveBeenCalled();
@@ -404,18 +440,24 @@ describe("runSuiteCommand()", () => {
       const result = makeRunResult();
       mockRun.mockResolvedValue(result);
 
-      await runSuiteCommand({ id: "suite_abc123", options: { format: "json" } });
+      await runSuiteCommand({
+        id: "suite_abc123",
+        options: { format: "json" },
+      });
 
-      expect(console.log).toHaveBeenCalledWith(
-        JSON.stringify(result, null, 2),
-      );
+      expect(console.log).toHaveBeenCalledWith(JSON.stringify(result, null, 2));
     });
   });
 
   describe("when run has skipped archived references", () => {
     it("shows warning about skipped items", async () => {
       mockRun.mockResolvedValue(
-        makeRunResult({ skippedArchived: { scenarios: ["old_scenario"], targets: ["old_agent"] } }),
+        makeRunResult({
+          skippedArchived: {
+            scenarios: ["old_scenario"],
+            targets: ["old_agent"],
+          },
+        }),
       );
 
       await runSuiteCommand({ id: "suite_abc123", options: {} });
@@ -451,10 +493,15 @@ describe("runSuiteCommand()", () => {
   describe("when API call fails", () => {
     it("exits with code 1", async () => {
       mockRun.mockRejectedValue(
-        new SuitesApiError("Suite not found", "POST /api/suites/nonexistent/run"),
+        new SuitesApiError(
+          "Suite not found",
+          "POST /api/suites/nonexistent/run",
+        ),
       );
 
-      await expect(runSuiteCommand({ id: "nonexistent", options: {} })).rejects.toThrow(ProcessExitError);
+      await expect(
+        runSuiteCommand({ id: "nonexistent", options: {} }),
+      ).rejects.toThrow(ProcessExitError);
     });
   });
 });

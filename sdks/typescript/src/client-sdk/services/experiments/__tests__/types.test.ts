@@ -1,14 +1,14 @@
 /**
  * Unit tests for evaluation types and Zod schemas
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  evaluationStatusSchema,
-  targetTypeSchema,
-  targetMetadataSchema,
-  targetInfoSchema,
-  evaluationResultSchema,
   batchEntrySchema,
+  evaluationResultSchema,
+  evaluationStatusSchema,
+  targetInfoSchema,
+  targetMetadataSchema,
+  targetTypeSchema,
 } from "../types";
 
 describe("Evaluation Types", () => {

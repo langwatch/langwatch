@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { trace } from '@opentelemetry/api';
-import { setupObservability } from '../../setup';
-import { isConcreteProvider } from '../../../utils';
-import { resetObservabilitySdkConfig } from '../../../../config.js';
+import { trace } from "@opentelemetry/api";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { resetObservabilitySdkConfig } from "../../../../config.js";
+import { isConcreteProvider } from "../../../utils";
+import { setupObservability } from "../../setup";
 
 // Integration tests for NodeSDK initialization in setupObservability
 function createMockLogger() {
@@ -15,11 +15,14 @@ afterEach(() => {
   resetObservabilitySdkConfig();
 });
 
-describe('setupObservability Integration - NodeSDK Initialization', () => {
-  it('initializes NodeSDK when no global provider exists', async () => {
+describe("setupObservability Integration - NodeSDK Initialization", () => {
+  it("initializes NodeSDK when no global provider exists", async () => {
     const logger = createMockLogger();
-    const handle = setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
-    expect(typeof handle.shutdown).toBe('function');
+    const handle = setupObservability({
+      langwatch: { apiKey: "test-key" },
+      debug: { logger },
+    });
+    expect(typeof handle.shutdown).toBe("function");
 
     // Check that the global tracer provider is no longer a no-op
     expect(isConcreteProvider(trace.getTracerProvider())).toBe(true);
@@ -28,6 +31,8 @@ describe('setupObservability Integration - NodeSDK Initialization', () => {
     await expect(handle.shutdown()).resolves.toBeUndefined();
 
     // Optionally, check that logger.info was called for NodeSDK init
-    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('NodeSDK started successfully'));
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.stringContaining("NodeSDK started successfully"),
+    );
   });
 });

@@ -10,7 +10,7 @@
  */
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
-import { type GovernanceConfig } from "./config";
+import type { GovernanceConfig } from "./config";
 
 export interface BudgetExceededPayload {
   type: string;
@@ -40,7 +40,8 @@ export async function checkBudget(
 ): Promise<BudgetExceededPayload | null> {
   if (!cfg.access_token) return null;
   const f = opts.fetchImpl ?? fetch;
-  const url = normalizeEndpoint(cfg.control_plane_url) + "/api/auth/cli/budget/status";
+  const url =
+    normalizeEndpoint(cfg.control_plane_url) + "/api/auth/cli/budget/status";
   let res: Response;
   try {
     res = await f(url, {
@@ -96,7 +97,9 @@ export function renderBudgetExceeded(
   const lines: string[] = [];
   lines.push("⚠  Budget limit reached");
   lines.push("");
-  lines.push(`   You've used $${e.spent_usd} of your $${e.limit_usd} ${periodLabel} budget.`);
+  lines.push(
+    `   You've used $${e.spent_usd} of your $${e.limit_usd} ${periodLabel} budget.`,
+  );
   lines.push("   To continue, ask your team admin to raise your limit.");
   lines.push("");
   if (e.admin_email) {

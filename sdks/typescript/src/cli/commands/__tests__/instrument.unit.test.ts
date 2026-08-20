@@ -5,9 +5,8 @@
  * mocked so each scope rule is pinned at the command level.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import * as configMod from "../../utils/governance/config";
 import type { GovernanceConfig } from "../../utils/governance/config";
+import * as configMod from "../../utils/governance/config";
 import { installTelemetryWiring } from "../../utils/governance/instrument-wiring";
 import {
   clearToolProjectPin,
@@ -21,7 +20,12 @@ vi.mock("../../utils/governance/config", async () => {
   const actual = await vi.importActual<typeof configMod>(
     "../../utils/governance/config",
   );
-  return { ...actual, loadConfig: vi.fn(), saveConfig: vi.fn(), isLoggedIn: vi.fn() };
+  return {
+    ...actual,
+    loadConfig: vi.fn(),
+    saveConfig: vi.fn(),
+    isLoggedIn: vi.fn(),
+  };
 });
 
 vi.mock("../../utils/governance/instrument-wiring", () => ({
@@ -77,7 +81,9 @@ beforeEach(() => {
   };
   asMock(configMod.loadConfig).mockReturnValue(cfg);
   asMock(configMod.isLoggedIn).mockReturnValue(true);
-  asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue(personalCredential);
+  asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue(
+    personalCredential,
+  );
   asMock(installTelemetryWiring).mockReturnValue({
     labels: ["~/.codex/config.toml"],
     warnings: [],
@@ -161,7 +167,9 @@ describe("instrumentCommand", () => {
         "does not allow codex to send telemetry directly",
       );
       expect(pinToolToProject).not.toHaveBeenCalled();
-      expect(telemetryRefreshMod.resolveIngestionCredential).not.toHaveBeenCalled();
+      expect(
+        telemetryRefreshMod.resolveIngestionCredential,
+      ).not.toHaveBeenCalled();
       expect(installTelemetryWiring).not.toHaveBeenCalled();
     });
 
@@ -273,7 +281,9 @@ describe("instrumentCommand", () => {
       /** @scenario "--project mints a device-scoped project key and pins the tool" */
       it("pins the tool via a fresh project key and reports the destination", async () => {
         asMock(pinToolToProject).mockResolvedValue({ label: "acme-app" });
-        asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue({
+        asMock(
+          telemetryRefreshMod.resolveIngestionCredential,
+        ).mockResolvedValue({
           token: "ik-lw-proj00000000000_secret",
           endpoint: "http://app.example.com/api/otel",
           minted: false,

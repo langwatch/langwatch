@@ -4,10 +4,10 @@
  * These tests run against a real LangWatch backend.
  * Set LANGWATCH_API_KEY and optionally LANGWATCH_ENDPOINT environment variables.
  */
-import { describe, it, expect, beforeAll, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { LangWatch } from "@/client-sdk";
-import { Experiment } from "../experiment";
 import { ExperimentInitError, TargetMetadataConflictError } from "../errors";
+import { Experiment } from "../experiment";
 
 // Skip if no API key (CI environments without backend)
 const SKIP_INTEGRATION = !process.env.LANGWATCH_API_KEY;
@@ -37,9 +37,12 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
 
     it("accepts custom runId", async () => {
       const customRunId = "my-custom-run-123";
-      const evaluation = await langwatch.experiments.init(`test-custom-run-${Date.now()}`, {
-        runId: customRunId,
-      });
+      const evaluation = await langwatch.experiments.init(
+        `test-custom-run-${Date.now()}`,
+        {
+          runId: customRunId,
+        },
+      );
 
       expect(evaluation.runId).toBe(customRunId);
     });
@@ -51,7 +54,7 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
       });
 
       await expect(
-        badLangwatch.experiments.init("test-bad-key")
+        badLangwatch.experiments.init("test-bad-key"),
       ).rejects.toThrow(ExperimentInitError);
     });
   });
@@ -59,7 +62,9 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
   describe("run()", () => {
     /** @scenario "Run evaluation over dataset with automatic tracing" */
     it("executes callback for each dataset item", async () => {
-      const evaluation = await langwatch.experiments.init(`test-run-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(
+        `test-run-${Date.now()}`,
+      );
       const dataset = [
         { question: "What is 2+2?", expected: "4" },
         { question: "What is 3+3?", expected: "6" },
@@ -78,7 +83,9 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
 
     /** @scenario "Parallel execution with concurrency control" */
     it("respects concurrency limit", async () => {
-      const evaluation = await langwatch.experiments.init(`test-concurrency-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(
+        `test-concurrency-${Date.now()}`,
+      );
       const dataset = Array.from({ length: 10 }, (_, i) => ({ id: i }));
 
       let maxConcurrent = 0;
@@ -95,14 +102,16 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
 
           currentConcurrent--;
         },
-        { concurrency: 3 }
+        { concurrency: 3 },
       );
 
       expect(maxConcurrent).toBeLessThanOrEqual(3);
     });
 
     it("handles errors in callback gracefully", async () => {
-      const evaluation = await langwatch.experiments.init(`test-errors-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(
+        `test-errors-${Date.now()}`,
+      );
       const dataset = [{ id: 1 }, { id: 2 }, { id: 3 }];
 
       const processed: number[] = [];
@@ -121,7 +130,9 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
 
   describe("log()", () => {
     it("logs metrics to the API", async () => {
-      const evaluation = await langwatch.experiments.init(`test-log-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(
+        `test-log-${Date.now()}`,
+      );
       const dataset = [{ question: "test" }];
 
       await evaluation.run(dataset, async ({ index }) => {
@@ -134,7 +145,9 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
     });
 
     it("logs with target and metadata", async () => {
-      const evaluation = await langwatch.experiments.init(`test-targets-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(
+        `test-targets-${Date.now()}`,
+      );
       const dataset = [{ question: "test" }];
 
       await evaluation.run(dataset, async ({ index }) => {
@@ -167,10 +180,11 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
       console.log = (...args: unknown[]) => {
         captured.push(args.map(String).join(" "));
       };
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       const origExit = process.exit;
       let exitedWith: number | string | null | undefined = null;
-      (process as unknown as { exit: (c?: number) => void }).exit = ((c?: number) => {
+      (process as unknown as { exit: (c?: number) => void }).exit = ((
+        c?: number,
+      ) => {
         exitedWith = c;
       }) as never;
       try {
@@ -183,7 +197,9 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
     }
 
     it("prints a CI-friendly summary after run completes against real server", async () => {
-      const evaluation = await langwatch.experiments.init(`test-print-summary-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(
+        `test-print-summary-${Date.now()}`,
+      );
       const dataset = [
         { q: "What is 2+2?" },
         { q: "What is 3+3?" },
@@ -211,7 +227,9 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
     });
 
     it("does not exit when every evaluation passed (real server flow)", async () => {
-      const evaluation = await langwatch.experiments.init(`test-print-summary-pass-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(
+        `test-print-summary-pass-${Date.now()}`,
+      );
       const dataset = [{ q: "a" }, { q: "b" }];
 
       await evaluation.run(dataset, async ({ index }) => {
@@ -233,7 +251,9 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
   describe("target registration", () => {
     /** @scenario "Target metadata validation" */
     it("throws on conflicting metadata for same target", async () => {
-      const evaluation = await langwatch.experiments.init(`test-conflict-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(
+        `test-conflict-${Date.now()}`,
+      );
 
       // Register target first
       evaluation.log("m1", {
@@ -255,7 +275,9 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
     });
 
     it("allows same target without metadata after registration", async () => {
-      const evaluation = await langwatch.experiments.init(`test-no-conflict-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(
+        `test-no-conflict-${Date.now()}`,
+      );
       const dataset = [{ q: "test" }];
 
       await evaluation.run(dataset, async ({ index }) => {
@@ -281,10 +303,16 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
 
   describe("withTarget()", () => {
     it("creates separate span for each target", async () => {
-      const evaluation = await langwatch.experiments.init(`test-withTarget-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(
+        `test-withTarget-${Date.now()}`,
+      );
       const dataset = [{ question: "What is AI?" }];
 
-      const results: Array<{ target: string; duration: number; spanId: string }> = [];
+      const results: Array<{
+        target: string;
+        duration: number;
+        spanId: string;
+      }> = [];
 
       await evaluation.run(dataset, async () => {
         const gpt4Result = await evaluation.withTarget(
@@ -293,7 +321,7 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
           async () => {
             await new Promise((resolve) => setTimeout(resolve, 50));
             return { response: "GPT-4 response" };
-          }
+          },
         );
 
         results.push({
@@ -308,7 +336,7 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
           async () => {
             await new Promise((resolve) => setTimeout(resolve, 30));
             return { response: "Claude response" };
-          }
+          },
         );
 
         results.push({
@@ -330,7 +358,9 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
     });
 
     it("auto-infers target in log() calls inside withTarget()", async () => {
-      const evaluation = await langwatch.experiments.init(`test-withTarget-infer-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(
+        `test-withTarget-infer-${Date.now()}`,
+      );
       const dataset = [{ question: "Test" }];
 
       // Track logged targets (via internal inspection or API verification)
@@ -338,17 +368,25 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
       let loggedInClaude = false;
 
       await evaluation.run(dataset, async () => {
-        await evaluation.withTarget("gpt-4", { model: "openai/gpt-4" }, async () => {
-          // Log WITHOUT specifying target - should be inferred as "gpt-4"
-          evaluation.log("quality", { score: 0.95 });
-          loggedInGpt4 = true;
-        });
+        await evaluation.withTarget(
+          "gpt-4",
+          { model: "openai/gpt-4" },
+          async () => {
+            // Log WITHOUT specifying target - should be inferred as "gpt-4"
+            evaluation.log("quality", { score: 0.95 });
+            loggedInGpt4 = true;
+          },
+        );
 
-        await evaluation.withTarget("claude-3", { model: "anthropic/claude-3" }, async () => {
-          // Log WITHOUT specifying target - should be inferred as "claude-3"
-          evaluation.log("quality", { score: 0.85 });
-          loggedInClaude = true;
-        });
+        await evaluation.withTarget(
+          "claude-3",
+          { model: "anthropic/claude-3" },
+          async () => {
+            // Log WITHOUT specifying target - should be inferred as "claude-3"
+            evaluation.log("quality", { score: 0.85 });
+            loggedInClaude = true;
+          },
+        );
       });
 
       expect(loggedInGpt4).toBe(true);
@@ -357,14 +395,20 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
     });
 
     it("captures duration automatically in dataset entry", async () => {
-      const evaluation = await langwatch.experiments.init(`test-withTarget-latency-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(
+        `test-withTarget-latency-${Date.now()}`,
+      );
       const dataset = [{ question: "Test" }];
 
       await evaluation.run(dataset, async () => {
-        const result = await evaluation.withTarget("gpt-4", { model: "openai/gpt-4" }, async () => {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-          return "done";
-        });
+        const result = await evaluation.withTarget(
+          "gpt-4",
+          { model: "openai/gpt-4" },
+          async () => {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            return "done";
+          },
+        );
 
         // Duration should be captured and >= our delay
         expect(result.duration).toBeGreaterThanOrEqual(100);
@@ -379,7 +423,9 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
 
     /** @scenario "Parallel target execution within single dataset item" */
     it("runs targets in parallel with Promise.all", async () => {
-      const evaluation = await langwatch.experiments.init(`test-withTarget-parallel-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(
+        `test-withTarget-parallel-${Date.now()}`,
+      );
       const dataset = [{ question: "Test" }];
 
       let parallelStartTime = 0;
@@ -390,16 +436,24 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
 
         // Run both targets in parallel
         const [gpt4Result, claudeResult] = await Promise.all([
-          evaluation.withTarget("gpt-4", { model: "openai/gpt-4" }, async () => {
-            await new Promise((resolve) => setTimeout(resolve, 100));
-            evaluation.log("quality", { score: 0.95 });
-            return "gpt4";
-          }),
-          evaluation.withTarget("claude-3", { model: "anthropic/claude-3" }, async () => {
-            await new Promise((resolve) => setTimeout(resolve, 100));
-            evaluation.log("quality", { score: 0.85 });
-            return "claude";
-          }),
+          evaluation.withTarget(
+            "gpt-4",
+            { model: "openai/gpt-4" },
+            async () => {
+              await new Promise((resolve) => setTimeout(resolve, 100));
+              evaluation.log("quality", { score: 0.95 });
+              return "gpt4";
+            },
+          ),
+          evaluation.withTarget(
+            "claude-3",
+            { model: "anthropic/claude-3" },
+            async () => {
+              await new Promise((resolve) => setTimeout(resolve, 100));
+              evaluation.log("quality", { score: 0.85 });
+              return "claude";
+            },
+          ),
         ]);
 
         parallelEndTime = Date.now();
@@ -415,7 +469,9 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
     });
 
     it("isolates context between concurrent withTarget blocks", async () => {
-      const evaluation = await langwatch.experiments.init(`test-withTarget-isolation-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(
+        `test-withTarget-isolation-${Date.now()}`,
+      );
       const dataset = [{ question: "Test" }];
 
       // Track that both withTarget blocks executed successfully
@@ -446,14 +502,19 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
     });
 
     it("works with overloaded signature (no metadata)", async () => {
-      const evaluation = await langwatch.experiments.init(`test-withTarget-overload-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(
+        `test-withTarget-overload-${Date.now()}`,
+      );
       const dataset = [{ question: "Test" }];
 
       await evaluation.run(dataset, async () => {
         // Call withTarget without metadata argument
-        const result = await evaluation.withTarget("simple-target", async () => {
-          return "simple result";
-        });
+        const result = await evaluation.withTarget(
+          "simple-target",
+          async () => {
+            return "simple result";
+          },
+        );
 
         expect(result.result).toBe("simple result");
         expect(result.duration).toBeGreaterThan(0);
@@ -461,20 +522,24 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
     });
 
     it("propagates errors from callback", async () => {
-      const evaluation = await langwatch.experiments.init(`test-withTarget-error-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(
+        `test-withTarget-error-${Date.now()}`,
+      );
       const dataset = [{ question: "Test" }];
 
       await evaluation.run(dataset, async () => {
         await expect(
           evaluation.withTarget("error-target", null, async () => {
             throw new Error("Test error");
-          })
+          }),
         ).rejects.toThrow("Test error");
       });
     });
 
     it("captures correct item data for each target in concurrent execution", async () => {
-      const evaluation = await langwatch.experiments.init(`test-withTarget-race-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(
+        `test-withTarget-race-${Date.now()}`,
+      );
 
       // Use distinct questions to verify correct association
       const dataset = [
@@ -483,26 +548,53 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
         { question: "Question C" },
       ];
 
-      const results: Array<{ index: number; target: string; question: string; response: string }> = [];
+      const results: Array<{
+        index: number;
+        target: string;
+        question: string;
+        response: string;
+      }> = [];
 
       await evaluation.run(
         dataset,
         async ({ item, index }) => {
           // Run all targets in parallel for this item
           await Promise.all([
-            evaluation.withTarget("gpt-4", { model: "openai/gpt-4" }, async () => {
-              await new Promise((resolve) => setTimeout(resolve, Math.random() * 50));
-              results.push({ index, target: "gpt-4", question: item.question, response: `GPT-4: ${item.question}` });
-              return { output: `GPT-4: ${item.question}` };
-            }),
-            evaluation.withTarget("claude", { model: "anthropic/claude-3" }, async () => {
-              await new Promise((resolve) => setTimeout(resolve, Math.random() * 50));
-              results.push({ index, target: "claude", question: item.question, response: `Claude: ${item.question}` });
-              return { output: `Claude: ${item.question}` };
-            }),
+            evaluation.withTarget(
+              "gpt-4",
+              { model: "openai/gpt-4" },
+              async () => {
+                await new Promise((resolve) =>
+                  setTimeout(resolve, Math.random() * 50),
+                );
+                results.push({
+                  index,
+                  target: "gpt-4",
+                  question: item.question,
+                  response: `GPT-4: ${item.question}`,
+                });
+                return { output: `GPT-4: ${item.question}` };
+              },
+            ),
+            evaluation.withTarget(
+              "claude",
+              { model: "anthropic/claude-3" },
+              async () => {
+                await new Promise((resolve) =>
+                  setTimeout(resolve, Math.random() * 50),
+                );
+                results.push({
+                  index,
+                  target: "claude",
+                  question: item.question,
+                  response: `Claude: ${item.question}`,
+                });
+                return { output: `Claude: ${item.question}` };
+              },
+            ),
           ]);
         },
-        { concurrency: 3 }
+        { concurrency: 3 },
       );
 
       // Should have 6 results (3 items × 2 targets)
@@ -559,21 +651,38 @@ describe("Evaluation Unit", () => {
     it("sends correct entry data for each target in concurrent execution", async () => {
       // This test verifies the fix for the race condition where concurrent
       // withTarget() calls would capture wrong item data due to shared state
-      const capturedBodies: Array<{ dataset: Array<{ index: number; target_id: string; entry: unknown; predicted: unknown }> }> = [];
+      const capturedBodies: Array<{
+        dataset: Array<{
+          index: number;
+          target_id: string;
+          entry: unknown;
+          predicted: unknown;
+        }>;
+      }> = [];
 
       // Mock fetch to capture API calls
       const originalFetch = globalThis.fetch;
-      globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
-        const urlStr = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-        if (urlStr.includes("experiment/init")) {
-          return new Response(JSON.stringify({ slug: "test", path: "/test" }), { status: 200 });
-        }
-        if (urlStr.includes("log_results")) {
-          capturedBodies.push(JSON.parse(options?.body as string));
+      globalThis.fetch = vi.fn(
+        async (input: RequestInfo | URL, options?: RequestInit) => {
+          const urlStr =
+            typeof input === "string"
+              ? input
+              : input instanceof URL
+                ? input.href
+                : input.url;
+          if (urlStr.includes("experiment/init")) {
+            return new Response(
+              JSON.stringify({ slug: "test", path: "/test" }),
+              { status: 200 },
+            );
+          }
+          if (urlStr.includes("log_results")) {
+            capturedBodies.push(JSON.parse(options?.body as string));
+            return new Response(JSON.stringify({}), { status: 200 });
+          }
           return new Response(JSON.stringify({}), { status: 200 });
-        }
-        return new Response(JSON.stringify({}), { status: 200 });
-      }) as typeof fetch;
+        },
+      ) as typeof fetch;
 
       try {
         const langwatch = new LangWatch({
@@ -587,24 +696,33 @@ describe("Evaluation Unit", () => {
           { question: "Question C" },
         ];
 
-        const evaluation = await langwatch.experiments.init("test-entry-capture");
+        const evaluation =
+          await langwatch.experiments.init("test-entry-capture");
 
         await evaluation.run(
           dataset,
           async ({ item }) => {
             // Run targets in parallel - this is where the race condition would occur
             await Promise.all([
-              evaluation.withTarget("gpt-4", { model: "openai/gpt-4" }, async () => {
-                await new Promise((r) => setTimeout(r, Math.random() * 50));
-                return `GPT-4: ${item.question}`;
-              }),
-              evaluation.withTarget("claude", { model: "anthropic/claude" }, async () => {
-                await new Promise((r) => setTimeout(r, Math.random() * 50));
-                return `Claude: ${item.question}`;
-              }),
+              evaluation.withTarget(
+                "gpt-4",
+                { model: "openai/gpt-4" },
+                async () => {
+                  await new Promise((r) => setTimeout(r, Math.random() * 50));
+                  return `GPT-4: ${item.question}`;
+                },
+              ),
+              evaluation.withTarget(
+                "claude",
+                { model: "anthropic/claude" },
+                async () => {
+                  await new Promise((r) => setTimeout(r, Math.random() * 50));
+                  return `Claude: ${item.question}`;
+                },
+              ),
             ]);
           },
-          { concurrency: 3 }
+          { concurrency: 3 },
         );
 
         // Wait for final flush
@@ -617,13 +735,17 @@ describe("Evaluation Unit", () => {
         expect(allEntries.length).toBe(6);
 
         // No entries should have null entry
-        const nullEntries = allEntries.filter((e) => e.entry === null || e.entry === undefined);
+        const nullEntries = allEntries.filter(
+          (e) => e.entry === null || e.entry === undefined,
+        );
         expect(nullEntries.length).toBe(0);
 
         // Verify each entry has the correct question for its index
         for (const entry of allEntries) {
           const expectedQuestion = dataset[entry.index]?.question;
-          expect((entry.entry as { question: string }).question).toBe(expectedQuestion);
+          expect((entry.entry as { question: string }).question).toBe(
+            expectedQuestion,
+          );
         }
 
         // Verify predicted outputs match the question

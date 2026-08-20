@@ -1,11 +1,11 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import type { CommandResult } from "../../utils/output";
-import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import { createCommandEvents } from "../../telemetry/events";
-import { createDatasetService } from "./service-factory";
+import { resolveCredentials } from "../../utils/apiKey";
+import { formatRelativeTime, formatTable } from "../../utils/formatting";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /**
  * Lists all datasets for the current project.
@@ -50,7 +50,9 @@ export const listCommand = async (): Promise<CommandResult | void> => {
           console.log(chalk.gray("No datasets found."));
           console.log(chalk.gray("Create your first dataset with:"));
           console.log(
-            chalk.cyan('  langwatch dataset create "My Dataset" --columns input:string,output:string'),
+            chalk.cyan(
+              '  langwatch dataset create "My Dataset" --columns input:string,output:string',
+            ),
           );
         } else {
           console.log();

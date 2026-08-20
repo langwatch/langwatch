@@ -77,7 +77,9 @@ function hashCredential(value: string): string {
 
 function loadState(): NoticeState {
   try {
-    return JSON.parse(fs.readFileSync(noticeStatePath(), "utf8")) as NoticeState;
+    return JSON.parse(
+      fs.readFileSync(noticeStatePath(), "utf8"),
+    ) as NoticeState;
   } catch {
     return {};
   }
@@ -182,7 +184,10 @@ export async function maybePrintIdentityNotice({
       if (!projectName) {
         projectName = await fetchProjectName(apiKey, endpoint, fetchImpl);
         if (projectName) {
-          state.projectNames = { ...state.projectNames, [nameKey]: projectName };
+          state.projectNames = {
+            ...state.projectNames,
+            [nameKey]: projectName,
+          };
         }
       }
     }

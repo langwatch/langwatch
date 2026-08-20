@@ -1,21 +1,18 @@
-import {
-  type AnyValue,
-  type Logger,
-} from "@opentelemetry/api-logs";
-import {
-  type EmitOptions,
-  type LangWatchLogger,
-  type LangWatchLogRecord,
-  type LangWatchSpanGenAIAssistantMessageEventBody,
-  type LangWatchSpanGenAIChoiceEventBody,
-  type LangWatchSpanGenAISystemMessageEventBody,
-  type LangWatchSpanGenAIToolMessageEventBody,
-  type LangWatchSpanGenAIUserMessageEventBody,
-} from "./types";
-import { shouldCaptureOutput } from "../config";
-import * as intSemconv from "../semconv";
-import { type SemConvLogRecordAttributes } from "../semconv";
 import { context } from "@opentelemetry/api";
+import type { AnyValue, Logger } from "@opentelemetry/api-logs";
+import { shouldCaptureOutput } from "../config";
+import type { SemConvLogRecordAttributes } from "../semconv";
+import * as intSemconv from "../semconv";
+import type {
+  EmitOptions,
+  LangWatchLogger,
+  LangWatchLogRecord,
+  LangWatchSpanGenAIAssistantMessageEventBody,
+  LangWatchSpanGenAIChoiceEventBody,
+  LangWatchSpanGenAISystemMessageEventBody,
+  LangWatchSpanGenAIToolMessageEventBody,
+  LangWatchSpanGenAIUserMessageEventBody,
+} from "./types";
 
 /**
  * Internal implementation of {@link LangWatchLogger}.
@@ -59,7 +56,10 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
   ): void {
     this.emitGenAIEvent(
       intSemconv.LOG_EVNT_GEN_AI_SYSTEM_MESSAGE,
-      { ...body, role: body.role ?? "system" } satisfies LangWatchSpanGenAISystemMessageEventBody,
+      {
+        ...body,
+        role: body.role ?? "system",
+      } satisfies LangWatchSpanGenAISystemMessageEventBody,
       {
         ...attributes,
         "gen_ai.system": system,
@@ -74,7 +74,10 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
   ) {
     this.emitGenAIEvent(
       intSemconv.LOG_EVNT_GEN_AI_USER_MESSAGE,
-      { ...body, role: body.role ?? "user" } satisfies LangWatchSpanGenAIUserMessageEventBody,
+      {
+        ...body,
+        role: body.role ?? "user",
+      } satisfies LangWatchSpanGenAIUserMessageEventBody,
       {
         ...attributes,
         "gen_ai.system": system,
@@ -89,7 +92,10 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
   ) {
     this.emitGenAIEvent(
       intSemconv.LOG_EVNT_GEN_AI_ASSISTANT_MESSAGE,
-      { ...body, role: body.role ?? "assistant" } satisfies LangWatchSpanGenAIAssistantMessageEventBody,
+      {
+        ...body,
+        role: body.role ?? "assistant",
+      } satisfies LangWatchSpanGenAIAssistantMessageEventBody,
       {
         ...attributes,
         "gen_ai.system": system,

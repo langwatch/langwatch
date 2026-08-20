@@ -6,16 +6,16 @@
  * silently drift from what the CLI registers or the map declares.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { FEATURE_MAP } from "../../../internal/generated/cli/feature-map.generated";
 import { buildProgram } from "../../program";
 import {
   buildCatalog,
+  type CatalogEntry,
   flattenCatalog,
   PLUMBING_COMMANDS,
   renderHelpTree,
   renderStatusSummary,
-  type CatalogEntry,
 } from "../commandCatalog";
-import { FEATURE_MAP } from "../../../internal/generated/cli/feature-map.generated";
 import { AGENT_MODE_ENV_VARS } from "../output";
 
 // program.ts reads the tsup-injected __CLI_VERSION__ build constant; under
@@ -29,7 +29,10 @@ interface RawFeature {
 
 const featureMapCliCommands = (): string[] => {
   const flatten = (features: RawFeature[]): RawFeature[] =>
-    features.flatMap((feature) => [feature, ...flatten(feature.children ?? [])]);
+    features.flatMap((feature) => [
+      feature,
+      ...flatten(feature.children ?? []),
+    ]);
   return flatten(FEATURE_MAP.features as RawFeature[]).flatMap(
     (feature) => feature.surfaces?.code?.cli ?? [],
   );
@@ -71,14 +74,22 @@ describe("buildCatalog", () => {
 
   it("excludes the hidden gateway wrappers and hidden primitives", () => {
     const paths = flat.map((entry) => entry.path);
-    for (const hidden of ["claude", "codex", "cursor", "gemini", "ingest install"]) {
+    for (const hidden of [
+      "claude",
+      "codex",
+      "cursor",
+      "gemini",
+      "ingest install",
+    ]) {
       expect(paths).not.toContain(hidden);
     }
   });
 
   it("contains every CLI command the feature map declares (catalog completeness)", () => {
     const paths = new Set(flat.map((entry) => entry.path));
-    const missing = featureMapCliCommands().filter((command) => !paths.has(command));
+    const missing = featureMapCliCommands().filter(
+      (command) => !paths.has(command),
+    );
     expect(
       missing,
       `Feature-map CLI commands missing from the live catalog — fix program.ts or feature-map.json:\n  ${missing.join("\n  ")}`,
@@ -105,7 +116,9 @@ describe("buildCatalog", () => {
     expect(traceSearch?.hint).toContain("langwatch trace search");
     expect(traceSearch?.skill).toBe("tracing");
 
-    const analyticsQuery = flat.find((entry) => entry.path === "analytics query");
+    const analyticsQuery = flat.find(
+      (entry) => entry.path === "analytics query",
+    );
     expect(analyticsQuery?.skill).toBe("analytics");
   });
 
@@ -180,15 +193,23 @@ describe("renderStatusSummary", () => {
   it("lists resource groups with their descriptions", () => {
     const lines = summary();
     expect(lines.some((line) => line.startsWith("langwatch trace"))).toBe(true);
-    expect(lines.some((line) => line.includes("Search and inspect traces"))).toBe(true);
-    expect(lines.some((line) => line.startsWith("langwatch virtual-keys"))).toBe(true);
+    expect(
+      lines.some((line) => line.includes("Search and inspect traces")),
+    ).toBe(true);
+    expect(
+      lines.some((line) => line.startsWith("langwatch virtual-keys")),
+    ).toBe(true);
   });
 
   it("excludes CLI plumbing", () => {
     const lines = summary();
     for (const plumbing of PLUMBING_COMMANDS) {
-      expect(lines.some((line) => line.startsWith(`langwatch ${plumbing} `))).toBe(false);
-      expect(lines.some((line) => line === `langwatch ${plumbing}`)).toBe(false);
+      expect(
+        lines.some((line) => line.startsWith(`langwatch ${plumbing} `)),
+      ).toBe(false);
+      expect(lines.some((line) => line === `langwatch ${plumbing}`)).toBe(
+        false,
+      );
     }
   });
 

@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  type ExperimentRunResultsResponse,
   ExperimentsApiService,
   ExperimentsApiServiceError,
-  type ExperimentRunResultsResponse,
 } from "../experiments-api.service";
 
 const mockFetch = vi.fn();
@@ -81,7 +81,9 @@ describe("ExperimentsApiService.getRunResults()", () => {
           .catch((e) => e);
 
         expect(err).toBeInstanceOf(ExperimentsApiServiceError);
-        expect((err as ExperimentsApiServiceError).operation).toContain("missing");
+        expect((err as ExperimentsApiServiceError).operation).toContain(
+          "missing",
+        );
       });
     });
 
@@ -95,7 +97,9 @@ describe("ExperimentsApiService.getRunResults()", () => {
           .catch((e) => e);
 
         expect(err).toBeInstanceOf(ExperimentsApiServiceError);
-        expect((err as ExperimentsApiServiceError).operation).toContain("ghost");
+        expect((err as ExperimentsApiServiceError).operation).toContain(
+          "ghost",
+        );
       });
     });
 

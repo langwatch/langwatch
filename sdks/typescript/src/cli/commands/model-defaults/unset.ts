@@ -1,14 +1,12 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-
 import {
   type ModelDefaultScopeType,
   ModelDefaultsApiService,
 } from "@/client-sdk/services/model-defaults/model-defaults-api.service";
-
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 type ScopeKind = "project" | "team" | "organization";
 
@@ -28,7 +26,10 @@ function resolveScope(
   const kind: ScopeKind = options.scope ?? "project";
 
   if (options.scopeId) {
-    return { scopeType: kind.toUpperCase() as ModelDefaultScopeType, scopeId: options.scopeId };
+    return {
+      scopeType: kind.toUpperCase() as ModelDefaultScopeType,
+      scopeId: options.scopeId,
+    };
   }
   if (kind === "project") {
     return { scopeType: "PROJECT", scopeId: snapshotScope.projectId };
@@ -107,7 +108,13 @@ export const unsetModelDefaultCommand = async (
         `Deleted config ${chalk.green(current.id)} (no keys left) at ${target.scopeType.toLowerCase()}:${target.scopeId}`,
       );
       return {
-        data: { id: current.id, key, scope: target, deleted: true, noop: false },
+        data: {
+          id: current.id,
+          key,
+          scope: target,
+          deleted: true,
+          noop: false,
+        },
         table: () => {
           // Nothing further to print: the spinner line above was the whole
           // human output before the migration, and stays so.

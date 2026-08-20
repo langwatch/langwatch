@@ -11,9 +11,10 @@
  * `output-jq.unit.test.ts`; the wiring into the real tree lives in
  * `output-command-tree.unit.test.ts`.
  */
-import { describe, it, expect } from "vitest";
+
 import { Command } from "commander";
-import { isOutputAware, registerOutputOptions, emitsResult } from "../output";
+import { describe, expect, it } from "vitest";
+import { emitsResult, isOutputAware, registerOutputOptions } from "../output";
 import { installOutputHarness } from "./output-harness";
 
 const { logged } = installOutputHarness();
@@ -81,9 +82,12 @@ describe("emitsResult", () => {
   describe("when --json selects fields", () => {
     it("projects dotted paths rather than null-filling them", async () => {
       const program = buildProgram(registerListing);
-      await program.parseAsync(["list", "--json", "name,config.evaluatorType"], {
-        from: "user",
-      });
+      await program.parseAsync(
+        ["list", "--json", "name,config.evaluatorType"],
+        {
+          from: "user",
+        },
+      );
       expect(JSON.parse(logged[0]!)).toEqual([
         { name: "first", "config.evaluatorType": "llm" },
         { name: "second", "config.evaluatorType": "regex" },

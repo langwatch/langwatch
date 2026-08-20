@@ -1,15 +1,17 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { AnnotationsApiService } from "@/client-sdk/services/annotations/annotations-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the annotation rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts).
  */
-export const getAnnotationCommand = async (id: string): Promise<CommandResult | void> => {
+export const getAnnotationCommand = async (
+  id: string,
+): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new AnnotationsApiService();
@@ -26,7 +28,9 @@ export const getAnnotationCommand = async (id: string): Promise<CommandResult | 
         console.log(chalk.bold.cyan(`Annotation ${annotation.id ?? id}`));
         console.log(chalk.gray("─".repeat(40)));
         console.log(`  ${chalk.gray("ID:")}        ${annotation.id ?? "—"}`);
-        console.log(`  ${chalk.gray("Trace ID:")} ${annotation.traceId ?? "—"}`);
+        console.log(
+          `  ${chalk.gray("Trace ID:")} ${annotation.traceId ?? "—"}`,
+        );
         console.log(
           `  ${chalk.gray("Rating:")}   ${annotation.isThumbsUp === true ? "👍 Thumbs Up" : annotation.isThumbsUp === false ? "👎 Thumbs Down" : "—"}`,
         );

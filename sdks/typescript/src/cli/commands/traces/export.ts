@@ -1,14 +1,16 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import fs from "fs";
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
+import {
+  type CommandEvents,
+  createCommandEvents,
+} from "../../telemetry/events";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
+import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
-import { createCommandEvents, type CommandEvents } from "../../telemetry/events";
-import { buildAuthHeaders } from "@/internal/api/auth";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { parseOriginOption } from "./origin-filter";
 
 /** Rows are serialised in chunks so the progress bar moves as the file is built. */
@@ -81,9 +83,7 @@ export const exportTracesCommand = async (options: {
   const startDate = options.startDate
     ? new Date(options.startDate).getTime()
     : now - 7 * 24 * 60 * 60 * 1000; // 7 days ago
-  const endDate = options.endDate
-    ? new Date(options.endDate).getTime()
-    : now;
+  const endDate = options.endDate ? new Date(options.endDate).getTime() : now;
 
   const limit = options.limit ? Number(options.limit) : 1000;
   if (!Number.isSafeInteger(limit) || limit <= 0) {
@@ -131,7 +131,9 @@ export const exportTracesCommand = async (options: {
           format: "json",
           ...(options.includeSpans ? { includeSpans: true } : {}),
           ...(scrollId ? { scrollId } : {}),
-          ...(originFilter ? { filters: { "traces.origin": originFilter } } : {}),
+          ...(originFilter
+            ? { filters: { "traces.origin": originFilter } }
+            : {}),
         }),
       });
 
@@ -154,7 +156,11 @@ export const exportTracesCommand = async (options: {
         });
         await events.flush();
 
-        failSpinner({ spinner, error: new Error(message), action: "export traces" });
+        failSpinner({
+          spinner,
+          error: new Error(message),
+          action: "export traces",
+        });
         process.exit(1);
       }
 
@@ -182,7 +188,9 @@ export const exportTracesCommand = async (options: {
       if (!scrollId || exhausted || traces.length >= limit) break;
     }
 
-    spinner.succeed(`Exported ${traces.length} trace${traces.length !== 1 ? "s" : ""}${matched > traces.length ? ` (${matched} total)` : ""}`);
+    spinner.succeed(
+      `Exported ${traces.length} trace${traces.length !== 1 ? "s" : ""}${matched > traces.length ? ` (${matched} total)` : ""}`,
+    );
 
     // Serialising each trace is real per-row work, so this progress is genuinely
     // the file being built — not a bar invented for the sake of having one.

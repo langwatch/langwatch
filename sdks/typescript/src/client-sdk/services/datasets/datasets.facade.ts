@@ -1,21 +1,21 @@
-import { type LangwatchApiClient } from "@/internal/api/client";
-import { type Logger } from "@/logger";
+import type { LangwatchApiClient } from "@/internal/api/client";
+import type { Logger } from "@/logger";
 import { DatasetService } from "./dataset.service";
 import { DatasetValidationError } from "./errors";
-import {
-  type Dataset,
-  type DatasetMetadata,
-  type GetDatasetOptions,
-  type ListDatasetsOptions,
-  type ListDatasetsApiResponse,
-  type ListRecordsOptions,
-  type ListRecordsApiResponse,
-  type CreateDatasetOptions,
-  type UpdateDatasetOptions,
-  type BatchCreateRecordsResponse,
-  type DeleteRecordsResponse,
-  type UploadResponse,
-  type DatasetRecordResponse,
+import type {
+  BatchCreateRecordsResponse,
+  CreateDatasetOptions,
+  Dataset,
+  DatasetMetadata,
+  DatasetRecordResponse,
+  DeleteRecordsResponse,
+  GetDatasetOptions,
+  ListDatasetsApiResponse,
+  ListDatasetsOptions,
+  ListRecordsApiResponse,
+  ListRecordsOptions,
+  UpdateDatasetOptions,
+  UploadResponse,
 } from "./types";
 
 type DatasetsFacadeConfig = {
@@ -123,7 +123,7 @@ export class DatasetsFacade {
    */
   get = <T extends Record<string, unknown> = Record<string, unknown>>(
     slugOrId: string,
-    options?: GetDatasetOptions
+    options?: GetDatasetOptions,
   ): Promise<Dataset<T>> => {
     return this.#datasetService.getDataset<T>(slugOrId, options);
   };
@@ -135,7 +135,10 @@ export class DatasetsFacade {
    * @param options - Fields to update (name, columnTypes)
    * @returns The updated dataset metadata
    */
-  update = (slugOrId: string, options: UpdateDatasetOptions): Promise<DatasetMetadata> => {
+  update = (
+    slugOrId: string,
+    options: UpdateDatasetOptions,
+  ): Promise<DatasetMetadata> => {
     if (options.name == null && options.columnTypes == null) {
       throw new DatasetValidationError(
         "At least one field (name or columnTypes) must be provided for update",

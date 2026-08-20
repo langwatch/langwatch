@@ -1,28 +1,36 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import {
   SuitesApiService,
   type SuiteTarget,
 } from "@/client-sdk/services/suites";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
-import { resolveOutputFormat } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { resolveCredentials } from "../../utils/apiKey";
 import { fetchBatchRuns, tallyBatchRuns } from "../../utils/batchRunProgress";
+import { resolveOutputFormat } from "../../utils/errorOutput";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 function parseTarget(targetStr: string): SuiteTarget {
   const colonIndex = targetStr.indexOf(":");
   if (colonIndex === -1) {
-    console.error(chalk.red(`Error: Invalid target format "${targetStr}". Use <type>:<referenceId> (e.g., http:agent_abc123)`));
+    console.error(
+      chalk.red(
+        `Error: Invalid target format "${targetStr}". Use <type>:<referenceId> (e.g., http:agent_abc123)`,
+      ),
+    );
     process.exit(1);
   }
   const type = targetStr.slice(0, colonIndex);
   const referenceId = targetStr.slice(colonIndex + 1);
   if (!["prompt", "http", "code", "workflow"].includes(type)) {
-    console.error(chalk.red(`Error: Invalid target type "${type}". Must be one of: prompt, http, code, workflow`));
+    console.error(
+      chalk.red(
+        `Error: Invalid target type "${type}". Must be one of: prompt, http, code, workflow`,
+      ),
+    );
     process.exit(1);
   }
   return { type: type as SuiteTarget["type"], referenceId };
@@ -30,15 +38,28 @@ function parseTarget(targetStr: string): SuiteTarget {
 
 export const runScenarioCommand = async (
   id: string,
-  options: { target: string; wait?: boolean; format?: string; param?: string[] },
+  options: {
+    target: string;
+    wait?: boolean;
+    format?: string;
+    param?: string[];
+  },
 ): Promise<void> => {
   await resolveCredentials();
 
   const parameters = parseRunParameterFlags({ pairs: options.param });
 
   if (!options.target) {
-    console.error(chalk.red("Error: --target is required. Specify what to run the scenario against."));
-    console.error(chalk.gray("  Example: langwatch scenario run <id> --target http:agent_abc123"));
+    console.error(
+      chalk.red(
+        "Error: --target is required. Specify what to run the scenario against.",
+      ),
+    );
+    console.error(
+      chalk.gray(
+        "  Example: langwatch scenario run <id> --target http:agent_abc123",
+      ),
+    );
     console.error(chalk.gray("  Target types: http, code, workflow, prompt"));
     process.exit(1);
   }
@@ -47,7 +68,9 @@ export const runScenarioCommand = async (
   const suitesService = new SuitesApiService();
 
   // Create a temporary suite to execute this scenario
-  const spinner = createSpinner(`Preparing scenario run for "${id}"...`).start();
+  const spinner = createSpinner(
+    `Preparing scenario run for "${id}"...`,
+  ).start();
 
   try {
     // Create an ephemeral suite for this single scenario run
@@ -76,14 +99,22 @@ export const runScenarioCommand = async (
 
     if (!options.wait) {
       console.log();
-      console.log(`  ${chalk.gray("Batch Run ID:")} ${chalk.green(result.batchRunId)}`);
-      console.log(`  ${chalk.gray("Suite ID:")}     ${chalk.gray(suite.id)} ${chalk.gray("(ephemeral)")}`);
-      console.log();
       console.log(
-        chalk.gray(`View results in the LangWatch dashboard under Simulations.`),
+        `  ${chalk.gray("Batch Run ID:")} ${chalk.green(result.batchRunId)}`,
       );
       console.log(
-        chalk.gray(`Or re-run with ${chalk.cyan("--wait")} to poll for completion.`),
+        `  ${chalk.gray("Suite ID:")}     ${chalk.gray(suite.id)} ${chalk.gray("(ephemeral)")}`,
+      );
+      console.log();
+      console.log(
+        chalk.gray(
+          `View results in the LangWatch dashboard under Simulations.`,
+        ),
+      );
+      console.log(
+        chalk.gray(
+          `Or re-run with ${chalk.cyan("--wait")} to poll for completion.`,
+        ),
       );
 
       await suitesService.delete(suite.id).catch(() => undefined);
@@ -92,7 +123,9 @@ export const runScenarioCommand = async (
 
     // Poll for completion
     console.log();
-    const pollSpinner = createSpinner("Waiting for scenario run to complete...").start();
+    const pollSpinner = createSpinner(
+      "Waiting for scenario run to complete...",
+    ).start();
 
     const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = resolveControlPlaneUrl();
@@ -114,7 +147,9 @@ export const runScenarioCommand = async (
         // document above must keep stdout to itself.
         if (resolveOutputFormat() === "text") {
           console.log(
-            chalk.yellow(`Check results in the dashboard. Batch ID: ${result.batchRunId}`),
+            chalk.yellow(
+              `Check results in the dashboard. Batch ID: ${result.batchRunId}`,
+            ),
           );
         }
         await suitesService.delete(suite.id).catch(() => undefined);
@@ -149,8 +184,7 @@ export const runScenarioCommand = async (
             // `--wait` exists to report the verdict. Exiting 0 on a failed
             // run hides it from every machine caller — see suites/run.ts.
             process.exitCode = 1;
-          }
-          else {
+          } else {
             pollSpinner.succeed(
               `Scenario run completed: ${chalk.green(`${passed}/${total} passed`)}`,
             );
@@ -174,7 +208,9 @@ export const runScenarioCommand = async (
     }
 
     console.log();
-    console.log(`  ${chalk.gray("Batch Run ID:")} ${chalk.green(result.batchRunId)}`);
+    console.log(
+      `  ${chalk.gray("Batch Run ID:")} ${chalk.green(result.batchRunId)}`,
+    );
     console.log();
 
     // Clean up ephemeral suite

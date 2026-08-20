@@ -1,10 +1,10 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
+import { formatRelativeTime, formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
-import { formatTable, formatRelativeTime } from "../../utils/formatting";
-import { createDatasetService } from "./service-factory";
+import { createSpinner } from "../../utils/spinner";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /** How many records the human table previews before it says "and N more". */
 const PREVIEW_LIMIT = 10;
@@ -27,7 +27,9 @@ const buildDatasetPreviewRows = (
 
   const allKeys = new Set<string>();
   previewEntries.forEach((entry) => {
-    Object.keys(entry.entry).forEach((key) => allKeys.add(key));
+    Object.keys(entry.entry).forEach((key) => {
+      allKeys.add(key);
+    });
   });
   const headers = Array.from(allKeys);
 
@@ -53,7 +55,9 @@ const buildDatasetPreviewRows = (
 /**
  * Gets dataset details by slug or ID, showing metadata and a preview of records.
  */
-export const getCommand = async (slugOrId: string): Promise<CommandResult | void> => {
+export const getCommand = async (
+  slugOrId: string,
+): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = createDatasetService();
@@ -92,14 +96,18 @@ export const getCommand = async (slugOrId: string): Promise<CommandResult | void
         }
         const viewUrl = dataset.platformUrl;
         if (viewUrl) {
-          console.log(`  ${chalk.bold("View:")}       ${chalk.underline(viewUrl)}`);
+          console.log(
+            `  ${chalk.bold("View:")}       ${chalk.underline(viewUrl)}`,
+          );
         }
 
         if (dataset.entries.length > 0) {
           console.log();
           console.log(chalk.bold(`Preview (first ${PREVIEW_LIMIT} records):`));
 
-          const { headers, tableData } = buildDatasetPreviewRows(dataset.entries);
+          const { headers, tableData } = buildDatasetPreviewRows(
+            dataset.entries,
+          );
           formatTable({ data: tableData, headers });
 
           if (dataset.entries.length > PREVIEW_LIMIT) {

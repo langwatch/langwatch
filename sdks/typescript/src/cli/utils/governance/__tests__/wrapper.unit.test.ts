@@ -2,540 +2,545 @@ import { describe, expect, it } from "vitest";
 import type { GovernanceConfig } from "../config";
 import { envForTool } from "../tool-env";
 import {
-	buildShellReapply,
-	preflightWrapper,
-	shouldForgetGatewayPin,
+  buildShellReapply,
+  preflightWrapper,
+  shouldForgetGatewayPin,
 } from "../wrapper";
 
 const cfg: GovernanceConfig = {
-	gateway_url: "http://gw.example.com",
-	control_plane_url: "http://app.example.com",
-	default_personal_vk: {
-		id: "vk_x",
-		secret: "lw_vk_test_x",
-		prefix: "lw_vk_t",
-	},
+  gateway_url: "http://gw.example.com",
+  control_plane_url: "http://app.example.com",
+  default_personal_vk: {
+    id: "vk_x",
+    secret: "lw_vk_test_x",
+    prefix: "lw_vk_t",
+  },
 };
 
 const okFetch: typeof fetch = async () => new Response(null, { status: 200 });
 const refusedFetch: typeof fetch = async () => {
-	throw new Error("connect ECONNREFUSED 127.0.0.1:5563");
+  throw new Error("connect ECONNREFUSED 127.0.0.1:5563");
 };
 const five03Fetch: typeof fetch = async () =>
-	new Response("upstream", { status: 503 });
+  new Response("upstream", { status: 503 });
 
 // `names` are the configured credential families (what the gateway can route
 // through). Publishes every common coding-assistant tile by default so the
 // per-tool coding-tile gate passes; pass `tools` to test the no-tile path.
 const bootstrapWith =
-	(
-		names: string[],
-		adminEmail: string | null = "admin@acme.test",
-		tools: string[] = ["claude", "codex", "gemini", "cursor", "opencode"],
-	) =>
-	async () => ({
-		tools: tools.map((slug) => ({ slug, displayName: slug })),
-		providers: names.map((name) => ({
-			name,
-			displayName: name,
-			configured: true,
-		})),
-		gatewayProviders: names,
-		budget: { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "month" },
-		adminEmail,
-	});
+  (
+    names: string[],
+    adminEmail: string | null = "admin@acme.test",
+    tools: string[] = ["claude", "codex", "gemini", "cursor", "opencode"],
+  ) =>
+  async () => ({
+    tools: tools.map((slug) => ({ slug, displayName: slug })),
+    providers: names.map((name) => ({
+      name,
+      displayName: name,
+      configured: true,
+    })),
+    gatewayProviders: names,
+    budget: { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "month" },
+    adminEmail,
+  });
 
 describe("envForTool", () => {
-	it("claude → ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN", () => {
-		const env = envForTool(cfg, "claude").vars;
-		expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
-		expect(env.ANTHROPIC_AUTH_TOKEN).toBe("lw_vk_test_x");
-	});
+  it("claude → ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN", () => {
+    const env = envForTool(cfg, "claude").vars;
+    expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
+    expect(env.ANTHROPIC_AUTH_TOKEN).toBe("lw_vk_test_x");
+  });
 
-	// Regression: claude-code 2.x warns "Both ANTHROPIC_AUTH_TOKEN and
-	// ANTHROPIC_API_KEY set, auth may not work as expected" when a
-	// legacy ANTHROPIC_API_KEY is already exported in the user's
-	// shell. The wrapper has to clear that twin from the inherited env
-	// before spawn so the child only sees the gateway-routed
-	// ANTHROPIC_AUTH_TOKEN. Asserted by listing the key in the per-tool
-	// clears array.
-	it("claude → clears ANTHROPIC_API_KEY (gateway auth uses AUTH_TOKEN, twin would conflict)", () => {
-		const result = envForTool(cfg, "claude");
-		expect(result.clears).toEqual(["ANTHROPIC_API_KEY"]);
-	});
+  // Regression: claude-code 2.x warns "Both ANTHROPIC_AUTH_TOKEN and
+  // ANTHROPIC_API_KEY set, auth may not work as expected" when a
+  // legacy ANTHROPIC_API_KEY is already exported in the user's
+  // shell. The wrapper has to clear that twin from the inherited env
+  // before spawn so the child only sees the gateway-routed
+  // ANTHROPIC_AUTH_TOKEN. Asserted by listing the key in the per-tool
+  // clears array.
+  it("claude → clears ANTHROPIC_API_KEY (gateway auth uses AUTH_TOKEN, twin would conflict)", () => {
+    const result = envForTool(cfg, "claude");
+    expect(result.clears).toEqual(["ANTHROPIC_API_KEY"]);
+  });
 
-	it("codex → OPENAI_BASE_URL + OPENAI_API_KEY", () => {
-		const env = envForTool(cfg, "codex").vars;
-		expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com");
-		expect(env.OPENAI_API_KEY).toBe("lw_vk_test_x");
-	});
+  it("codex → OPENAI_BASE_URL + OPENAI_API_KEY", () => {
+    const env = envForTool(cfg, "codex").vars;
+    expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com");
+    expect(env.OPENAI_API_KEY).toBe("lw_vk_test_x");
+  });
 
-	// codex sets OPENAI_API_KEY directly (the gateway auth is on the
-	// same standard env var the openai SDK reads); there's no legacy
-	// twin to scrub, so clears stays empty.
-	it("codex → no clears (OPENAI_API_KEY is both legacy and gateway-routed)", () => {
-		const result = envForTool(cfg, "codex");
-		expect(result.clears ?? []).toEqual([]);
-	});
+  // codex sets OPENAI_API_KEY directly (the gateway auth is on the
+  // same standard env var the openai SDK reads); there's no legacy
+  // twin to scrub, so clears stays empty.
+  it("codex → no clears (OPENAI_API_KEY is both legacy and gateway-routed)", () => {
+    const result = envForTool(cfg, "codex");
+    expect(result.clears ?? []).toEqual([]);
+  });
 
-	it("cursor → both Anthropic + OpenAI pairs", () => {
-		const env = envForTool(cfg, "cursor").vars;
-		expect(env.ANTHROPIC_BASE_URL).toBeDefined();
-		expect(env.OPENAI_BASE_URL).toBeDefined();
-		expect(env.ANTHROPIC_AUTH_TOKEN).toBe("lw_vk_test_x");
-		expect(env.OPENAI_API_KEY).toBe("lw_vk_test_x");
-	});
+  it("cursor → both Anthropic + OpenAI pairs", () => {
+    const env = envForTool(cfg, "cursor").vars;
+    expect(env.ANTHROPIC_BASE_URL).toBeDefined();
+    expect(env.OPENAI_BASE_URL).toBeDefined();
+    expect(env.ANTHROPIC_AUTH_TOKEN).toBe("lw_vk_test_x");
+    expect(env.OPENAI_API_KEY).toBe("lw_vk_test_x");
+  });
 
-	// Same warning surface as claude: cursor embeds Anthropic SDKs that
-	// would pick up a legacy ANTHROPIC_API_KEY in preference to the
-	// gateway-routed ANTHROPIC_AUTH_TOKEN and bypass the gateway. Scrub.
-	it("cursor → clears ANTHROPIC_API_KEY (same legacy-twin scrub as claude)", () => {
-		const result = envForTool(cfg, "cursor");
-		expect(result.clears).toEqual(["ANTHROPIC_API_KEY"]);
-	});
+  // Same warning surface as claude: cursor embeds Anthropic SDKs that
+  // would pick up a legacy ANTHROPIC_API_KEY in preference to the
+  // gateway-routed ANTHROPIC_AUTH_TOKEN and bypass the gateway. Scrub.
+  it("cursor → clears ANTHROPIC_API_KEY (same legacy-twin scrub as claude)", () => {
+    const result = envForTool(cfg, "cursor");
+    expect(result.clears).toEqual(["ANTHROPIC_API_KEY"]);
+  });
 
-	// Verified empirically against gemini-cli 0.46-preview: the binary
-	// reads GOOGLE_GEMINI_BASE_URL, NOT the previous GOOGLE_GENAI_API_BASE
-	// guess. POSTs `{BASE}/v1beta/models/{m}:generateContent`, prepending
-	// the API version itself. The base must therefore be the bare gateway
-	// URL with no `/v1beta` suffix; appending one doubles the prefix to
-	// `/v1beta/v1beta/` and the gateway 404s the routing call (which
-	// surfaces on the cli side as "Unexpected end of JSON input").
-	it("gemini → GOOGLE_GEMINI_BASE_URL=$gw (no /v1beta suffix) + GEMINI_API_KEY + GOOGLE_API_KEY", () => {
-		const env = envForTool(cfg, "gemini").vars;
-		expect(env.GOOGLE_GEMINI_BASE_URL).toBe("http://gw.example.com");
-		expect(env.GEMINI_API_KEY).toBe("lw_vk_test_x");
-		expect(env.GOOGLE_API_KEY).toBe("lw_vk_test_x");
-		expect(env.GOOGLE_GENAI_API_BASE).toBeUndefined();
-	});
+  // Verified empirically against gemini-cli 0.46-preview: the binary
+  // reads GOOGLE_GEMINI_BASE_URL, NOT the previous GOOGLE_GENAI_API_BASE
+  // guess. POSTs `{BASE}/v1beta/models/{m}:generateContent`, prepending
+  // the API version itself. The base must therefore be the bare gateway
+  // URL with no `/v1beta` suffix; appending one doubles the prefix to
+  // `/v1beta/v1beta/` and the gateway 404s the routing call (which
+  // surfaces on the cli side as "Unexpected end of JSON input").
+  it("gemini → GOOGLE_GEMINI_BASE_URL=$gw (no /v1beta suffix) + GEMINI_API_KEY + GOOGLE_API_KEY", () => {
+    const env = envForTool(cfg, "gemini").vars;
+    expect(env.GOOGLE_GEMINI_BASE_URL).toBe("http://gw.example.com");
+    expect(env.GEMINI_API_KEY).toBe("lw_vk_test_x");
+    expect(env.GOOGLE_API_KEY).toBe("lw_vk_test_x");
+    expect(env.GOOGLE_GENAI_API_BASE).toBeUndefined();
+  });
 
-	// gemini-cli reads GEMINI_API_KEY / GOOGLE_API_KEY directly; the
-	// gateway routing token IS what we write to both, so there's no
-	// legacy twin to scrub. Verifies the no-op explicitly so a future
-	// refactor that adds an erroneous scrub here is caught.
-	it("gemini → no clears (auth env names are the gateway-routed ones)", () => {
-		const result = envForTool(cfg, "gemini");
-		expect(result.clears ?? []).toEqual([]);
-	});
+  // gemini-cli reads GEMINI_API_KEY / GOOGLE_API_KEY directly; the
+  // gateway routing token IS what we write to both, so there's no
+  // legacy twin to scrub. Verifies the no-op explicitly so a future
+  // refactor that adds an erroneous scrub here is caught.
+  it("gemini → no clears (auth env names are the gateway-routed ones)", () => {
+    const result = envForTool(cfg, "gemini");
+    expect(result.clears ?? []).toEqual([]);
+  });
 
-	// opencode 1.x uses the Vercel AI SDK, which posts to
-	// `{BASE}/messages` and `{BASE}/chat/completions` WITHOUT prepending
-	// /v1. So opencode needs the base to ALREADY include /v1, unlike
-	// claude-code + codex which append it themselves. Also opencode's
-	// anthropic-provider auto-detect gates on ANTHROPIC_API_KEY, not
-	// ANTHROPIC_AUTH_TOKEN — both must be set or `--model anthropic/...`
-	// fails ProviderModelNotFoundError at init time.
-	it("opencode → both Anthropic + OpenAI pairs with /v1 suffix + ANTHROPIC_API_KEY for provider auto-detect", () => {
-		const env = envForTool(cfg, "opencode").vars;
-		expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com/v1");
-		expect(env.OPENAI_API_KEY).toBe("lw_vk_test_x");
-		expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com/v1");
-		expect(env.ANTHROPIC_AUTH_TOKEN).toBe("lw_vk_test_x");
-		expect(env.ANTHROPIC_API_KEY).toBe("lw_vk_test_x");
-	});
+  // opencode 1.x uses the Vercel AI SDK, which posts to
+  // `{BASE}/messages` and `{BASE}/chat/completions` WITHOUT prepending
+  // /v1. So opencode needs the base to ALREADY include /v1, unlike
+  // claude-code + codex which append it themselves. Also opencode's
+  // anthropic-provider auto-detect gates on ANTHROPIC_API_KEY, not
+  // ANTHROPIC_AUTH_TOKEN — both must be set or `--model anthropic/...`
+  // fails ProviderModelNotFoundError at init time.
+  it("opencode → both Anthropic + OpenAI pairs with /v1 suffix + ANTHROPIC_API_KEY for provider auto-detect", () => {
+    const env = envForTool(cfg, "opencode").vars;
+    expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com/v1");
+    expect(env.OPENAI_API_KEY).toBe("lw_vk_test_x");
+    expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com/v1");
+    expect(env.ANTHROPIC_AUTH_TOKEN).toBe("lw_vk_test_x");
+    expect(env.ANTHROPIC_API_KEY).toBe("lw_vk_test_x");
+  });
 
-	// opencode INTENTIONALLY sets both ANTHROPIC_AUTH_TOKEN and
-	// ANTHROPIC_API_KEY (the Vercel AI SDK's anthropic-provider
-	// auto-detect gates on _API_KEY; the gateway routes on _AUTH_TOKEN).
-	// Scrubbing either one would break opencode at provider-init time.
-	// Pinned with an empty-clears assertion so anyone copy-pasting the
-	// claude scrub here would fail this test.
-	it("opencode → no clears (both Anthropic keys are intentionally set)", () => {
-		const result = envForTool(cfg, "opencode");
-		expect(result.clears ?? []).toEqual([]);
-	});
+  // opencode INTENTIONALLY sets both ANTHROPIC_AUTH_TOKEN and
+  // ANTHROPIC_API_KEY (the Vercel AI SDK's anthropic-provider
+  // auto-detect gates on _API_KEY; the gateway routes on _AUTH_TOKEN).
+  // Scrubbing either one would break opencode at provider-init time.
+  // Pinned with an empty-clears assertion so anyone copy-pasting the
+  // claude scrub here would fail this test.
+  it("opencode → no clears (both Anthropic keys are intentionally set)", () => {
+    const result = envForTool(cfg, "opencode");
+    expect(result.clears ?? []).toEqual([]);
+  });
 
-	// Regression: claude + codex must NOT carry the /v1 suffix. Their
-	// CLIs append /v1 themselves; a double /v1 would 404.
-	it("claude + codex base URLs stay /v1-less (CLI appends /v1 itself)", () => {
-		expect(envForTool(cfg, "claude").vars.ANTHROPIC_BASE_URL).toBe(
-			"http://gw.example.com",
-		);
-		expect(envForTool(cfg, "codex").vars.OPENAI_BASE_URL).toBe(
-			"http://gw.example.com",
-		);
-	});
+  // Regression: claude + codex must NOT carry the /v1 suffix. Their
+  // CLIs append /v1 themselves; a double /v1 would 404.
+  it("claude + codex base URLs stay /v1-less (CLI appends /v1 itself)", () => {
+    expect(envForTool(cfg, "claude").vars.ANTHROPIC_BASE_URL).toBe(
+      "http://gw.example.com",
+    );
+    expect(envForTool(cfg, "codex").vars.OPENAI_BASE_URL).toBe(
+      "http://gw.example.com",
+    );
+  });
 
-	/** @scenario Gateway mode points copilot's BYOK provider at the LangWatch gateway */
-	it("copilot → COPILOT_PROVIDER_TYPE=openai + /v1 base + VK as API key", () => {
-		const env = envForTool(cfg, "copilot").vars;
-		expect(env.COPILOT_PROVIDER_TYPE).toBe("openai");
-		expect(env.COPILOT_PROVIDER_BASE_URL).toBe("http://gw.example.com/v1");
-		expect(env.COPILOT_PROVIDER_API_KEY).toBe("lw_vk_test_x");
-	});
+  /** @scenario Gateway mode points copilot's BYOK provider at the LangWatch gateway */
+  it("copilot → COPILOT_PROVIDER_TYPE=openai + /v1 base + VK as API key", () => {
+    const env = envForTool(cfg, "copilot").vars;
+    expect(env.COPILOT_PROVIDER_TYPE).toBe("openai");
+    expect(env.COPILOT_PROVIDER_BASE_URL).toBe("http://gw.example.com/v1");
+    expect(env.COPILOT_PROVIDER_API_KEY).toBe("lw_vk_test_x");
+  });
 
-	/** @scenario Gateway mode does not enable copilot's own OTel export */
-	it("copilot → gateway env never enables copilot's own OTel export (no-double-trace)", () => {
-		const env = envForTool(cfg, "copilot").vars;
-		expect(env.COPILOT_OTEL_ENABLED).toBeUndefined();
-		expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBeUndefined();
-	});
+  /** @scenario Gateway mode does not enable copilot's own OTel export */
+  it("copilot → gateway env never enables copilot's own OTel export (no-double-trace)", () => {
+    const env = envForTool(cfg, "copilot").vars;
+    expect(env.COPILOT_OTEL_ENABLED).toBeUndefined();
+    expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBeUndefined();
+  });
 
-	it("copilot → gateway clears every Path B telemetry var inherited from the shell", () => {
-		// A hand-exported OTel block (pre-persist manual setup) would
-		// double-trace in gateway mode; the clears list is derived from the
-		// same builder that installs the Path B block so they cannot drift.
-		const clears = envForTool(cfg, "copilot").clears ?? [];
-		expect(clears).toContain("COPILOT_OTEL_ENABLED");
-		expect(clears).toContain("COPILOT_OTEL_EXPORTER_TYPE");
-		expect(clears).toContain("OTEL_EXPORTER_OTLP_ENDPOINT");
-		expect(clears).toContain("OTEL_EXPORTER_OTLP_HEADERS");
-		expect(clears).toContain("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT");
-	});
+  it("copilot → gateway clears every Path B telemetry var inherited from the shell", () => {
+    // A hand-exported OTel block (pre-persist manual setup) would
+    // double-trace in gateway mode; the clears list is derived from the
+    // same builder that installs the Path B block so they cannot drift.
+    const clears = envForTool(cfg, "copilot").clears ?? [];
+    expect(clears).toContain("COPILOT_OTEL_ENABLED");
+    expect(clears).toContain("COPILOT_OTEL_EXPORTER_TYPE");
+    expect(clears).toContain("OTEL_EXPORTER_OTLP_ENDPOINT");
+    expect(clears).toContain("OTEL_EXPORTER_OTLP_HEADERS");
+    expect(clears).toContain(
+      "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT",
+    );
+  });
 
-	it("unknown tool → empty env", () => {
-		const env = envForTool(cfg, "nonsense").vars;
-		expect(env).toEqual({});
-	});
+  it("unknown tool → empty env", () => {
+    const env = envForTool(cfg, "nonsense").vars;
+    expect(env).toEqual({});
+  });
 
-	it("config without personal VK → empty env (wrapper exits with login error)", () => {
-		const noVk: GovernanceConfig = { ...cfg, default_personal_vk: undefined };
-		const env = envForTool(noVk, "claude").vars;
-		expect(env).toEqual({});
-	});
+  it("config without personal VK → empty env (wrapper exits with login error)", () => {
+    const noVk: GovernanceConfig = { ...cfg, default_personal_vk: undefined };
+    const env = envForTool(noVk, "claude").vars;
+    expect(env).toEqual({});
+  });
 
-	it("never injects OTEL_*_EXPORTER for any wrapped tool (gateway captures I/O; OTLP would double-trace)", () => {
-		const cfgWithIk: GovernanceConfig = {
-			...cfg,
-			default_personal_ingest_keys: {
-				claude_code: { id: "ik_c", secret: "sk-lw-x", prefix: "sk-lw-" },
-				codex: { id: "ik_co", secret: "sk-lw-y", prefix: "sk-lw-" },
-				gemini: { id: "ik_g", secret: "sk-lw-z", prefix: "sk-lw-" },
-				opencode: { id: "ik_o", secret: "sk-lw-w", prefix: "sk-lw-" },
-			},
-		};
-		for (const tool of [
-			"claude",
-			"codex",
-			"gemini",
-			"cursor",
-			"opencode",
-			"copilot",
-		]) {
-			const env = envForTool(cfgWithIk, tool).vars;
-			expect(env.OTEL_TRACES_EXPORTER).toBeUndefined();
-			expect(env.OTEL_LOGS_EXPORTER).toBeUndefined();
-			expect(env.OTEL_METRICS_EXPORTER).toBeUndefined();
-			expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBeUndefined();
-			expect(env.CLAUDE_CODE_ENABLE_TELEMETRY).toBeUndefined();
-			expect(env.GEMINI_TELEMETRY_ENABLED).toBeUndefined();
-		}
-	});
+  it("never injects OTEL_*_EXPORTER for any wrapped tool (gateway captures I/O; OTLP would double-trace)", () => {
+    const cfgWithIk: GovernanceConfig = {
+      ...cfg,
+      default_personal_ingest_keys: {
+        claude_code: { id: "ik_c", secret: "sk-lw-x", prefix: "sk-lw-" },
+        codex: { id: "ik_co", secret: "sk-lw-y", prefix: "sk-lw-" },
+        gemini: { id: "ik_g", secret: "sk-lw-z", prefix: "sk-lw-" },
+        opencode: { id: "ik_o", secret: "sk-lw-w", prefix: "sk-lw-" },
+      },
+    };
+    for (const tool of [
+      "claude",
+      "codex",
+      "gemini",
+      "cursor",
+      "opencode",
+      "copilot",
+    ]) {
+      const env = envForTool(cfgWithIk, tool).vars;
+      expect(env.OTEL_TRACES_EXPORTER).toBeUndefined();
+      expect(env.OTEL_LOGS_EXPORTER).toBeUndefined();
+      expect(env.OTEL_METRICS_EXPORTER).toBeUndefined();
+      expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBeUndefined();
+      expect(env.CLAUDE_CODE_ENABLE_TELEMETRY).toBeUndefined();
+      expect(env.GEMINI_TELEMETRY_ENABLED).toBeUndefined();
+    }
+  });
 
-	it("strips trailing slash from gateway_url", () => {
-		const trailing: GovernanceConfig = {
-			...cfg,
-			gateway_url: "http://gw.example.com/",
-		};
-		const env = envForTool(trailing, "claude").vars;
-		expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
-	});
+  it("strips trailing slash from gateway_url", () => {
+    const trailing: GovernanceConfig = {
+      ...cfg,
+      gateway_url: "http://gw.example.com/",
+    };
+    const env = envForTool(trailing, "claude").vars;
+    expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
+  });
 });
 
 describe("buildShellReapply", () => {
-	// Gateway spawns go through `$SHELL -i -c`, which sources the rc. A
-	// previously persisted Path-B function (`copilot() { OTEL… command
-	// copilot }`) re-injects the exporter env AT INVOCATION — after these
-	// exports — so without `unset -f` the gateway captures server-side AND
-	// the tool emits OTel for the same calls.
-	describe("when a scoped-function tool runs in gateway mode", () => {
-		/** @scenario A gateway copilot run with a persisted rc function emits no OTLP */
-		it("prepends unset -f for copilot so the rc function cannot re-inject OTel", () => {
-			const reapply = buildShellReapply({
-				tool: "copilot",
-				clears: [],
-				vars: { COPILOT_PROVIDER_TYPE: "openai" },
-			});
-			expect(reapply.startsWith("unset -f copilot 2>/dev/null; ")).toBe(true);
-		});
+  // Gateway spawns go through `$SHELL -i -c`, which sources the rc. A
+  // previously persisted Path-B function (`copilot() { OTEL… command
+  // copilot }`) re-injects the exporter env AT INVOCATION — after these
+  // exports — so without `unset -f` the gateway captures server-side AND
+  // the tool emits OTel for the same calls.
+  describe("when a scoped-function tool runs in gateway mode", () => {
+    /** @scenario A gateway copilot run with a persisted rc function emits no OTLP */
+    it("prepends unset -f for copilot so the rc function cannot re-inject OTel", () => {
+      const reapply = buildShellReapply({
+        tool: "copilot",
+        clears: [],
+        vars: { COPILOT_PROVIDER_TYPE: "openai" },
+      });
+      expect(reapply.startsWith("unset -f copilot 2>/dev/null; ")).toBe(true);
+    });
 
-		/** @scenario A gateway opencode run with a persisted rc function emits no OTLP */
-		it("prepends unset -f for opencode (pre-existing double-trace hole, fixed generically)", () => {
-			const reapply = buildShellReapply({
-				tool: "opencode",
-				clears: [],
-				vars: {},
-			});
-			expect(reapply).toContain("unset -f opencode");
-		});
+    /** @scenario A gateway opencode run with a persisted rc function emits no OTLP */
+    it("prepends unset -f for opencode (pre-existing double-trace hole, fixed generically)", () => {
+      const reapply = buildShellReapply({
+        tool: "opencode",
+        clears: [],
+        vars: {},
+      });
+      expect(reapply).toContain("unset -f opencode");
+    });
 
-		/** @scenario A gateway gemini run with a persisted rc function emits no OTLP */
-		it("prepends unset -f for gemini", () => {
-			const reapply = buildShellReapply({
-				tool: "gemini",
-				clears: [],
-				vars: {},
-			});
-			expect(reapply).toContain("unset -f gemini");
-		});
+    /** @scenario A gateway gemini run with a persisted rc function emits no OTLP */
+    it("prepends unset -f for gemini", () => {
+      const reapply = buildShellReapply({
+        tool: "gemini",
+        clears: [],
+        vars: {},
+      });
+      expect(reapply).toContain("unset -f gemini");
+    });
 
-		/** @scenario Gateway runs still honor the user's alias for the tool */
-		it("removes only the function, never aliases (no unalias in the prefix)", () => {
-			const reapply = buildShellReapply({
-				tool: "copilot",
-				clears: [],
-				vars: {},
-			});
-			expect(reapply).not.toContain("unalias");
-		});
-	});
+    /** @scenario Gateway runs still honor the user's alias for the tool */
+    it("removes only the function, never aliases (no unalias in the prefix)", () => {
+      const reapply = buildShellReapply({
+        tool: "copilot",
+        clears: [],
+        vars: {},
+      });
+      expect(reapply).not.toContain("unalias");
+    });
+  });
 
-	describe("when the tool runs in ingestion mode", () => {
-		/** @scenario Ingestion runs leave the persisted function in place */
-		it("neutralizes the stale function for this run without touching the rc file", () => {
-			// The persisted function froze an OLD run's env (stale token,
-			// possibly capture-on when the user has since opted out) and its
-			// env-prefix would win over this run's exports at invocation time.
-			// Unset it in the session; the rc block itself stays for bare runs.
-			const reapply = buildShellReapply({
-				tool: "copilot",
-				clears: [],
-				vars: { COPILOT_OTEL_ENABLED: "true" },
-			});
-			expect(reapply).toContain("unset -f copilot");
-			// buildShellReapply produces a shell prefix only — it never writes
-			// or removes rc content (no file I/O in this module path).
-			expect(reapply).not.toContain(">>");
-		});
+  describe("when the tool runs in ingestion mode", () => {
+    /** @scenario Ingestion runs leave the persisted function in place */
+    it("neutralizes the stale function for this run without touching the rc file", () => {
+      // The persisted function froze an OLD run's env (stale token,
+      // possibly capture-on when the user has since opted out) and its
+      // env-prefix would win over this run's exports at invocation time.
+      // Unset it in the session; the rc block itself stays for bare runs.
+      const reapply = buildShellReapply({
+        tool: "copilot",
+        clears: [],
+        vars: { COPILOT_OTEL_ENABLED: "true" },
+      });
+      expect(reapply).toContain("unset -f copilot");
+      // buildShellReapply produces a shell prefix only — it never writes
+      // or removes rc content (no file I/O in this module path).
+      expect(reapply).not.toContain(">>");
+    });
 
-		it("lets this run's freshly-resolved env win over a stale persisted function", () => {
-			const reapply = buildShellReapply({
-				tool: "copilot",
-				clears: [],
-				vars: { OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer fresh" },
-			});
-			// unset -f comes FIRST, exports after — the fresh token wins.
-			expect(reapply.indexOf("unset -f copilot")).toBeLessThan(
-				reapply.indexOf("export OTEL_EXPORTER_OTLP_HEADERS"),
-			);
-		});
-	});
+    it("lets this run's freshly-resolved env win over a stale persisted function", () => {
+      const reapply = buildShellReapply({
+        tool: "copilot",
+        clears: [],
+        vars: { OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer fresh" },
+      });
+      // unset -f comes FIRST, exports after — the fresh token wins.
+      expect(reapply.indexOf("unset -f copilot")).toBeLessThan(
+        reapply.indexOf("export OTEL_EXPORTER_OTLP_HEADERS"),
+      );
+    });
+  });
 
-	describe("when the tool has no scoped shell function (claude)", () => {
-		it("emits only clears + exports", () => {
-			const reapply = buildShellReapply({
-				tool: "claude",
-				clears: ["ANTHROPIC_API_KEY"],
-				vars: { ANTHROPIC_BASE_URL: "http://gw" },
-			});
-			expect(reapply).toBe(
-				"unset ANTHROPIC_API_KEY; export ANTHROPIC_BASE_URL='http://gw'",
-			);
-		});
-	});
+  describe("when the tool has no scoped shell function (claude)", () => {
+    it("emits only clears + exports", () => {
+      const reapply = buildShellReapply({
+        tool: "claude",
+        clears: ["ANTHROPIC_API_KEY"],
+        vars: { ANTHROPIC_BASE_URL: "http://gw" },
+      });
+      expect(reapply).toBe(
+        "unset ANTHROPIC_API_KEY; export ANTHROPIC_BASE_URL='http://gw'",
+      );
+    });
+  });
 });
 
 describe("preflightWrapper", () => {
-	describe("given the personal VK is missing", () => {
-		it("fails fast with a model-providers setup hint", async () => {
-			const noVk: GovernanceConfig = { ...cfg, default_personal_vk: undefined };
-			const r = await preflightWrapper(noVk, "claude", {
-				fetchImpl: okFetch,
-				bootstrapImpl: bootstrapWith(["anthropic"]),
-			});
-			expect(r.ok).toBe(false);
-			expect(r.message).toContain("No personal virtual key");
-			expect(r.message).toContain("/settings/model-providers");
-			expect(r.message).not.toContain("/settings/providers\n"); // exact URL check
-			expect(r.message).toContain("langwatch login --device");
-			expect(r.message).toContain("admin@acme.test"); // contact footer
-			// Structural, not transient: worth forgetting a pinned gateway choice.
-			expect(r.retryable).toBeFalsy();
-		});
-	});
+  describe("given the personal VK is missing", () => {
+    it("fails fast with a model-providers setup hint", async () => {
+      const noVk: GovernanceConfig = { ...cfg, default_personal_vk: undefined };
+      const r = await preflightWrapper(noVk, "claude", {
+        fetchImpl: okFetch,
+        bootstrapImpl: bootstrapWith(["anthropic"]),
+      });
+      expect(r.ok).toBe(false);
+      expect(r.message).toContain("No personal virtual key");
+      expect(r.message).toContain("/settings/model-providers");
+      expect(r.message).not.toContain("/settings/providers\n"); // exact URL check
+      expect(r.message).toContain("langwatch login --device");
+      expect(r.message).toContain("admin@acme.test"); // contact footer
+      // Structural, not transient: worth forgetting a pinned gateway choice.
+      expect(r.retryable).toBeFalsy();
+    });
+  });
 
-	describe("given the gateway is unreachable", () => {
-		it("surfaces the network error without naming a specific run command", async () => {
-			const r = await preflightWrapper(cfg, "claude", {
-				fetchImpl: refusedFetch,
-				bootstrapImpl: bootstrapWith(["anthropic"]),
-			});
-			expect(r.ok).toBe(false);
-			expect(r.message).toContain("Cannot reach AI Gateway");
-			expect(r.message).toContain("ECONNREFUSED");
-			expect(r.message).toContain("LangWatch gateway is running");
-			// Deployment shape varies (helm / docker-compose / npx / make);
-			// never recommend a dev-only command like `make service`.
-			expect(r.message).not.toContain("make service");
-			expect(r.message).toContain("admin@acme.test");
-			// Transient: a retry may succeed, so a pinned gateway choice is kept.
-			expect(r.retryable).toBe(true);
-		});
+  describe("given the gateway is unreachable", () => {
+    it("surfaces the network error without naming a specific run command", async () => {
+      const r = await preflightWrapper(cfg, "claude", {
+        fetchImpl: refusedFetch,
+        bootstrapImpl: bootstrapWith(["anthropic"]),
+      });
+      expect(r.ok).toBe(false);
+      expect(r.message).toContain("Cannot reach AI Gateway");
+      expect(r.message).toContain("ECONNREFUSED");
+      expect(r.message).toContain("LangWatch gateway is running");
+      // Deployment shape varies (helm / docker-compose / npx / make);
+      // never recommend a dev-only command like `make service`.
+      expect(r.message).not.toContain("make service");
+      expect(r.message).toContain("admin@acme.test");
+      // Transient: a retry may succeed, so a pinned gateway choice is kept.
+      expect(r.retryable).toBe(true);
+    });
 
-		it("treats non-2xx as fatal too", async () => {
-			const r = await preflightWrapper(cfg, "claude", {
-				fetchImpl: five03Fetch,
-				bootstrapImpl: bootstrapWith(["anthropic"]),
-			});
-			expect(r.ok).toBe(false);
-			expect(r.message).toContain("returned HTTP 503");
-			expect(r.message).not.toContain("make service");
-			expect(r.retryable).toBe(true);
-		});
+    it("treats non-2xx as fatal too", async () => {
+      const r = await preflightWrapper(cfg, "claude", {
+        fetchImpl: five03Fetch,
+        bootstrapImpl: bootstrapWith(["anthropic"]),
+      });
+      expect(r.ok).toBe(false);
+      expect(r.message).toContain("returned HTTP 503");
+      expect(r.message).not.toContain("make service");
+      expect(r.retryable).toBe(true);
+    });
 
-		it("falls back to generic admin line when bootstrap has no admin email", async () => {
-			const r = await preflightWrapper(cfg, "claude", {
-				fetchImpl: refusedFetch,
-				bootstrapImpl: bootstrapWith(["anthropic"], null),
-			});
-			expect(r.ok).toBe(false);
-			expect(r.message).toContain("contact your LangWatch admin");
-			expect(r.message).not.toMatch(/admin@/);
-		});
-	});
+    it("falls back to generic admin line when bootstrap has no admin email", async () => {
+      const r = await preflightWrapper(cfg, "claude", {
+        fetchImpl: refusedFetch,
+        bootstrapImpl: bootstrapWith(["anthropic"], null),
+      });
+      expect(r.ok).toBe(false);
+      expect(r.message).toContain("contact your LangWatch admin");
+      expect(r.message).not.toMatch(/admin@/);
+    });
+  });
 
-	describe("given the org has no matching upstream provider", () => {
-		it("blocks claude when only openai is configured", async () => {
-			const r = await preflightWrapper(cfg, "claude", {
-				fetchImpl: okFetch,
-				bootstrapImpl: bootstrapWith(["openai"]),
-			});
-			expect(r.ok).toBe(false);
-			expect(r.message).toContain("`anthropic`");
-			expect(r.message).toContain("/settings/model-providers");
-			expect(r.message).toContain("admin@acme.test");
-			// Structural: the org has nothing to route to, so a pinned gateway
-			// choice is forgotten to re-offer direct OTLP next run.
-			expect(r.retryable).toBeFalsy();
-		});
+  describe("given the org has no matching upstream provider", () => {
+    it("blocks claude when only openai is configured", async () => {
+      const r = await preflightWrapper(cfg, "claude", {
+        fetchImpl: okFetch,
+        bootstrapImpl: bootstrapWith(["openai"]),
+      });
+      expect(r.ok).toBe(false);
+      expect(r.message).toContain("`anthropic`");
+      expect(r.message).toContain("/settings/model-providers");
+      expect(r.message).toContain("admin@acme.test");
+      // Structural: the org has nothing to route to, so a pinned gateway
+      // choice is forgotten to re-offer direct OTLP next run.
+      expect(r.retryable).toBeFalsy();
+    });
 
-		it("passes cursor when either anthropic OR openai is present", async () => {
-			const r = await preflightWrapper(cfg, "cursor", {
-				fetchImpl: okFetch,
-				bootstrapImpl: bootstrapWith(["openai"]),
-			});
-			expect(r.ok).toBe(true);
-		});
+    it("passes cursor when either anthropic OR openai is present", async () => {
+      const r = await preflightWrapper(cfg, "cursor", {
+        fetchImpl: okFetch,
+        bootstrapImpl: bootstrapWith(["openai"]),
+      });
+      expect(r.ok).toBe(true);
+    });
 
-		it("passes gemini when google or gemini family is present", async () => {
-			const r = await preflightWrapper(cfg, "gemini", {
-				fetchImpl: okFetch,
-				bootstrapImpl: bootstrapWith(["google"]),
-			});
-			expect(r.ok).toBe(true);
-		});
+    it("passes gemini when google or gemini family is present", async () => {
+      const r = await preflightWrapper(cfg, "gemini", {
+        fetchImpl: okFetch,
+        bootstrapImpl: bootstrapWith(["google"]),
+      });
+      expect(r.ok).toBe(true);
+    });
 
-		/** @scenario Copilot's provider families accept either an OpenAI or Anthropic upstream */
-		it("passes copilot when either anthropic OR openai is present", async () => {
-			const r = await preflightWrapper(cfg, "copilot", {
-				fetchImpl: okFetch,
-				bootstrapImpl: bootstrapWith(
-					["anthropic"],
-					"admin@acme.test",
-					["claude", "codex", "gemini", "cursor", "opencode", "copilot"],
-				),
-			});
-			expect(r.ok).toBe(true);
-		});
-	});
+    /** @scenario Copilot's provider families accept either an OpenAI or Anthropic upstream */
+    it("passes copilot when either anthropic OR openai is present", async () => {
+      const r = await preflightWrapper(cfg, "copilot", {
+        fetchImpl: okFetch,
+        bootstrapImpl: bootstrapWith(["anthropic"], "admin@acme.test", [
+          "claude",
+          "codex",
+          "gemini",
+          "cursor",
+          "opencode",
+          "copilot",
+        ]),
+      });
+      expect(r.ok).toBe(true);
+    });
+  });
 
-	describe("given the org has a configured credential but no model_provider tile", () => {
-		/** @scenario "Gateway works from a configured credential without a provider tile" */
-		it("passes when a coding-assistant tile exists and the credential family is configured", async () => {
-			const r = await preflightWrapper(cfg, "codex", {
-				fetchImpl: okFetch,
-				bootstrapImpl: async () => ({
-					// codex coding tile published (gateway enabled for the tool)...
-					tools: [{ slug: "codex", displayName: "Codex" }],
-					// ...no model_provider catalog tile (mint-your-own-VK list empty)...
-					providers: [],
-					// ...but the org has a live openai credential the gateway can route.
-					gatewayProviders: ["openai"],
-					budget: { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "month" },
-					adminEmail: "admin@acme.test",
-				}),
-			});
-			expect(r.ok).toBe(true);
-		});
-	});
+  describe("given the org has a configured credential but no model_provider tile", () => {
+    /** @scenario "Gateway works from a configured credential without a provider tile" */
+    it("passes when a coding-assistant tile exists and the credential family is configured", async () => {
+      const r = await preflightWrapper(cfg, "codex", {
+        fetchImpl: okFetch,
+        bootstrapImpl: async () => ({
+          // codex coding tile published (gateway enabled for the tool)...
+          tools: [{ slug: "codex", displayName: "Codex" }],
+          // ...no model_provider catalog tile (mint-your-own-VK list empty)...
+          providers: [],
+          // ...but the org has a live openai credential the gateway can route.
+          gatewayProviders: ["openai"],
+          budget: { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "month" },
+          adminEmail: "admin@acme.test",
+        }),
+      });
+      expect(r.ok).toBe(true);
+    });
+  });
 
-	describe("given the org has no coding-assistant tile for the tool", () => {
-		/** @scenario "Gateway is blocked when the tool has no coding-assistant tile" */
-		it("blocks the gateway and points at the tool catalog even when credentials exist", async () => {
-			const r = await preflightWrapper(cfg, "codex", {
-				fetchImpl: okFetch,
-				bootstrapImpl: async () => ({
-					// some other tool is published, but not codex
-					tools: [{ slug: "claude", displayName: "Claude" }],
-					providers: [],
-					gatewayProviders: ["openai"],
-					budget: { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "month" },
-					adminEmail: "admin@acme.test",
-				}),
-			});
-			expect(r.ok).toBe(false);
-			expect(r.message).toContain("isn't enabled for `codex`");
-			expect(r.message).toContain("/governance/tool-catalog");
-			// Structural (not transient) so a pinned gateway choice is forgotten.
-			expect(r.retryable).toBeFalsy();
-		});
-	});
+  describe("given the org has no coding-assistant tile for the tool", () => {
+    /** @scenario "Gateway is blocked when the tool has no coding-assistant tile" */
+    it("blocks the gateway and points at the tool catalog even when credentials exist", async () => {
+      const r = await preflightWrapper(cfg, "codex", {
+        fetchImpl: okFetch,
+        bootstrapImpl: async () => ({
+          // some other tool is published, but not codex
+          tools: [{ slug: "claude", displayName: "Claude" }],
+          providers: [],
+          gatewayProviders: ["openai"],
+          budget: { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "month" },
+          adminEmail: "admin@acme.test",
+        }),
+      });
+      expect(r.ok).toBe(false);
+      expect(r.message).toContain("isn't enabled for `codex`");
+      expect(r.message).toContain("/governance/tool-catalog");
+      // Structural (not transient) so a pinned gateway choice is forgotten.
+      expect(r.retryable).toBeFalsy();
+    });
+  });
 
-	describe("given all probes pass", () => {
-		it("returns ok=true", async () => {
-			const r = await preflightWrapper(cfg, "claude", {
-				fetchImpl: okFetch,
-				bootstrapImpl: bootstrapWith(["anthropic", "openai"]),
-			});
-			expect(r.ok).toBe(true);
-		});
-	});
+  describe("given all probes pass", () => {
+    it("returns ok=true", async () => {
+      const r = await preflightWrapper(cfg, "claude", {
+        fetchImpl: okFetch,
+        bootstrapImpl: bootstrapWith(["anthropic", "openai"]),
+      });
+      expect(r.ok).toBe(true);
+    });
+  });
 
-	describe("given a legacy server without tools / gatewayProviders fields", () => {
-		it("skips the coding-tile gate and checks the provider tile list instead", async () => {
-			const r = await preflightWrapper(cfg, "codex", {
-				fetchImpl: okFetch,
-				bootstrapImpl: async () => ({
-					providers: [
-						{ name: "openai", displayName: "OpenAI", configured: true },
-					],
-					budget: { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "month" },
-					adminEmail: "admin@acme.test",
-				}),
-			});
-			expect(r.ok).toBe(true);
-		});
-	});
+  describe("given a legacy server without tools / gatewayProviders fields", () => {
+    it("skips the coding-tile gate and checks the provider tile list instead", async () => {
+      const r = await preflightWrapper(cfg, "codex", {
+        fetchImpl: okFetch,
+        bootstrapImpl: async () => ({
+          providers: [
+            { name: "openai", displayName: "OpenAI", configured: true },
+          ],
+          budget: { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "month" },
+          adminEmail: "admin@acme.test",
+        }),
+      });
+      expect(r.ok).toBe(true);
+    });
+  });
 
-	describe("given bootstrap is unavailable (older server / network blip)", () => {
-		it("degrades to provider-check-skipped rather than blocking", async () => {
-			const r = await preflightWrapper(cfg, "claude", {
-				fetchImpl: okFetch,
-				bootstrapImpl: async () => {
-					throw new Error("bootstrap unreachable");
-				},
-			});
-			expect(r.ok).toBe(true);
-		});
-	});
+  describe("given bootstrap is unavailable (older server / network blip)", () => {
+    it("degrades to provider-check-skipped rather than blocking", async () => {
+      const r = await preflightWrapper(cfg, "claude", {
+        fetchImpl: okFetch,
+        bootstrapImpl: async () => {
+          throw new Error("bootstrap unreachable");
+        },
+      });
+      expect(r.ok).toBe(true);
+    });
+  });
 });
 
 describe("shouldForgetGatewayPin", () => {
-	describe("when the user pinned the gateway path", () => {
-		it("forgets the pin on a structural failure (no provider / no VK)", () => {
-			expect(
-				shouldForgetGatewayPin({ pinnedMode: "gateway", retryable: false }),
-			).toBe(true);
-			expect(
-				shouldForgetGatewayPin({ pinnedMode: "gateway", retryable: undefined }),
-			).toBe(true);
-		});
+  describe("when the user pinned the gateway path", () => {
+    it("forgets the pin on a structural failure (no provider / no VK)", () => {
+      expect(
+        shouldForgetGatewayPin({ pinnedMode: "gateway", retryable: false }),
+      ).toBe(true);
+      expect(
+        shouldForgetGatewayPin({ pinnedMode: "gateway", retryable: undefined }),
+      ).toBe(true);
+    });
 
-		it("keeps the pin on a transient gateway-down failure", () => {
-			expect(
-				shouldForgetGatewayPin({ pinnedMode: "gateway", retryable: true }),
-			).toBe(false);
-		});
-	});
+    it("keeps the pin on a transient gateway-down failure", () => {
+      expect(
+        shouldForgetGatewayPin({ pinnedMode: "gateway", retryable: true }),
+      ).toBe(false);
+    });
+  });
 
-	describe("when the gateway path was not pinned", () => {
-		it("never forgets a non-existent or ingestion pin", () => {
-			expect(
-				shouldForgetGatewayPin({ pinnedMode: undefined, retryable: false }),
-			).toBe(false);
-			expect(
-				shouldForgetGatewayPin({ pinnedMode: "ingestion", retryable: false }),
-			).toBe(false);
-		});
-	});
+  describe("when the gateway path was not pinned", () => {
+    it("never forgets a non-existent or ingestion pin", () => {
+      expect(
+        shouldForgetGatewayPin({ pinnedMode: undefined, retryable: false }),
+      ).toBe(false);
+      expect(
+        shouldForgetGatewayPin({ pinnedMode: "ingestion", retryable: false }),
+      ).toBe(false);
+    });
+  });
 });

@@ -1,15 +1,14 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { SuitesApiService } from "@/client-sdk/services/suites";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
-import { resolveOutputFormat } from "../../utils/errorOutput";
-import { buildAuthHeaders } from "@/internal/api/auth";
-
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { SuitesApiService } from "@/client-sdk/services/suites";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { resolveCredentials } from "../../utils/apiKey";
 import { fetchBatchRuns, tallyBatchRuns } from "../../utils/batchRunProgress";
+import { resolveOutputFormat } from "../../utils/errorOutput";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const runSuiteCommand = async ({
   id,
@@ -39,20 +38,33 @@ export const runSuiteCommand = async ({
       return;
     }
 
-    if (result.skippedArchived.scenarios.length > 0 || result.skippedArchived.targets.length > 0) {
+    if (
+      result.skippedArchived.scenarios.length > 0 ||
+      result.skippedArchived.targets.length > 0
+    ) {
       console.log();
       console.log(chalk.yellow("  Skipped archived references:"));
       if (result.skippedArchived.scenarios.length > 0) {
-        console.log(chalk.yellow(`    Scenarios: ${result.skippedArchived.scenarios.join(", ")}`));
+        console.log(
+          chalk.yellow(
+            `    Scenarios: ${result.skippedArchived.scenarios.join(", ")}`,
+          ),
+        );
       }
       if (result.skippedArchived.targets.length > 0) {
-        console.log(chalk.yellow(`    Targets: ${result.skippedArchived.targets.join(", ")}`));
+        console.log(
+          chalk.yellow(
+            `    Targets: ${result.skippedArchived.targets.join(", ")}`,
+          ),
+        );
       }
     }
 
     if (!options.wait) {
       console.log();
-      console.log(`  ${chalk.gray("Batch Run ID:")} ${chalk.green(result.batchRunId)}`);
+      console.log(
+        `  ${chalk.gray("Batch Run ID:")} ${chalk.green(result.batchRunId)}`,
+      );
       console.log(`  ${chalk.gray("Jobs:")}         ${result.jobCount}`);
       console.log();
       console.log(
@@ -74,13 +86,17 @@ export const runSuiteCommand = async ({
     // already over.
     if (result.jobCount === 0) {
       console.log();
-      console.log(chalk.yellow("  No jobs were scheduled — nothing to wait for."));
+      console.log(
+        chalk.yellow("  No jobs were scheduled — nothing to wait for."),
+      );
       return;
     }
 
     // Poll for completion
     console.log();
-    const pollSpinner = createSpinner("Waiting for suite run to complete...").start();
+    const pollSpinner = createSpinner(
+      "Waiting for suite run to complete...",
+    ).start();
 
     const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = resolveControlPlaneUrl();
@@ -175,7 +191,9 @@ export const runSuiteCommand = async ({
     }
 
     console.log();
-    console.log(`  ${chalk.gray("Batch Run ID:")} ${chalk.green(result.batchRunId)}`);
+    console.log(
+      `  ${chalk.gray("Batch Run ID:")} ${chalk.green(result.batchRunId)}`,
+    );
     console.log();
   } catch (error) {
     failSpinner({ spinner, error, action: "run suite" });

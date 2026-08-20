@@ -124,9 +124,9 @@ jobs:
       # lockfile that no longer matches the repo.
       #
       # Dropping it rather than rescoping it, because nothing in this package
-      # uses it: `lint` is `eslint .` and `typecheck` is `tsc --noEmit`, and
-      # the SDK references neither `tsgo` nor native-preview anywhere. It was
-      # installing a toolchain no step invokes.
+      # uses it: `lint` is `biome check .` and `typecheck` is `tsc --noEmit`,
+      # and the SDK references neither `tsgo` nor native-preview anywhere. It
+      # was installing a toolchain no step invokes.
       - name: Run lint check
         run: pnpm run lint
 
