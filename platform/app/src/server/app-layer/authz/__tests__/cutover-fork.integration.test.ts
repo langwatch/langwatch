@@ -183,11 +183,18 @@ describe("given an organization whose cutover pass runs to a clean proof", () =>
     });
     expect(record?.status).toBe("finalized");
 
-    // The parity proof is a FACT, and its empty diff list is what the proof
-    // says: the two heads agreed on every permission at every scope.
+    // Two parity FACTS, each with the empty diff list that is its whole
+    // point: stage B's (the promoted bindings answer identically at the
+    // scopes they replace) and the cutover's (the two heads agreed on every
+    // permission at every scope).
     const parity = commandsOfType(PROVE_MIGRATION_PARITY_COMMAND_TYPE);
-    expect(parity).toHaveLength(1);
-    expect(parity[0]!.data).toMatchObject({ diffs: [] });
+    expect(parity.map((command) => command.commandId).sort()).toEqual([
+      `backfill-b:parity:${organization.id}`,
+      expect.stringMatching(/^cutover:parity:/),
+    ]);
+    for (const proof of parity) {
+      expect(proof.data).toMatchObject({ diffs: [] });
+    }
 
     // ...and the cutover is the fact that follows it, carrying its actor.
     const cutover = commandsOfType(COMPLETE_CUTOVER_COMMAND_TYPE);

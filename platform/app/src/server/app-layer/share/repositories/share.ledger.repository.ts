@@ -60,6 +60,17 @@ function isUniqueConstraintViolation(error: unknown): boolean {
   );
 }
 
+/** Prisma's record-not-found failure (P2025) — what a conditioned `update`
+ *  raises when its filter matches no row, read off the code for the same
+ *  reason as above. */
+function isRecordNotFound(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: unknown }).code === "P2025"
+  );
+}
+
 export class LedgerShareRepository implements ShareRepository {
   private readonly legacy: ShareRepository;
   private readonly prisma: PrismaClient;
@@ -345,24 +356,35 @@ export class LedgerShareRepository implements ShareRepository {
     maxViews: number | null;
   }): Promise<boolean> {
     const capped = maxViews != null;
+    // `update` with the cap in its (filtered-unique) where, NOT `updateMany`:
+    // Prisma 7's compiler splits a conditional `updateMany` into a SELECT of
+    // matching ids and an UPDATE keyed on those ids ALONE — the cap condition
+    // does not ride the UPDATE statement, so concurrent viewers who all
+    // passed the SELECT all increment past the cap (read-then-write, not
+    // compare-and-swap). `update` keeps its full filter on the UPDATE itself,
+    // where Postgres re-evaluates it against the current row after the lock
+    // wait — the atomicity the cap depends on — and reports the loser's zero
+    // rows as P2025. The project predicate is part of the row's tenancy, not
+    // decoration: it is what the resource fact is anchored to, and every
+    // other query in this repository already fences on it.
     const increment = async (
       db: Prisma.TransactionClient,
     ): Promise<boolean> => {
-      const result = await db.grantUsage.updateMany({
-        where: {
-          grantId,
-          organizationId,
-          // The project is part of the row's tenancy, not decoration: it is
-          // what the resource fact is anchored to, and every other query in
-          // this repository already fences on it. Naming it here keeps the
-          // conditional consume from ever counting a view against a row that
-          // belongs to a different project.
-          projectId,
-          ...(capped ? { viewCount: { lt: maxViews } } : {}),
-        },
-        data: { viewCount: { increment: 1 }, lastViewedAt: new Date() },
-      });
-      return result.count > 0;
+      try {
+        await db.grantUsage.update({
+          where: {
+            grantId,
+            organizationId,
+            projectId,
+            ...(capped ? { viewCount: { lt: maxViews } } : {}),
+          },
+          data: { viewCount: { increment: 1 }, lastViewedAt: new Date() },
+        });
+        return true;
+      } catch (error) {
+        if (isRecordNotFound(error)) return false;
+        throw error;
+      }
     };
     // The mirror is the legacy repository's own conditional consume — same
     // statement, same cap condition — issued on THIS transaction's client,
@@ -372,14 +394,21 @@ export class LedgerShareRepository implements ShareRepository {
     // compat row — the fold writes every other column of it and never this
     // one (decision 22).
     const mirror = async (db: Prisma.TransactionClient): Promise<void> => {
-      await db.shareLink.updateMany({
-        where: {
-          id: grantId,
-          projectId,
-          ...(capped ? { viewCount: { lt: maxViews } } : {}),
-        },
-        data: { viewCount: { increment: 1 } },
-      });
+      try {
+        await db.shareLink.update({
+          where: {
+            id: grantId,
+            projectId,
+            ...(capped ? { viewCount: { lt: maxViews } } : {}),
+          },
+          data: { viewCount: { increment: 1 } },
+        });
+      } catch (error) {
+        // A compat row already at (or past) the cap, or deleted meanwhile:
+        // the mirror matching nothing is the old `updateMany`'s zero-row
+        // outcome, not a failure of the consume.
+        if (!isRecordNotFound(error)) throw error;
+      }
     };
 
     try {

@@ -81,7 +81,13 @@ function buildPrisma({
       count: vi.fn().mockResolvedValue(0),
     },
     customRole: { findFirst: vi.fn().mockResolvedValue(null) },
-    teamUser: { findFirst: vi.fn().mockResolvedValue(null) },
+    teamUser: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      // The grants-head reader consults the same TeamUser rows as the legacy
+      // one (the org-level union quirk stays live on both heads until
+      // contract); none exist in these fixtures.
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     user: { findFirst: vi.fn().mockResolvedValue(null) },
     grant: { findMany: grantFindMany },
     role: { findMany: vi.fn().mockResolvedValue([]) },

@@ -12,10 +12,10 @@
  * cached forever.
  *
  * Caching, coalescing and the fail-safe/warn behaviour live in
- * ./per-organization-cached-gate.ts, shared with ./legacy-fallback-gate.ts;
+ * ./per-organization-cached-gate.ts, shared with ./ledger-write-gate.ts;
  * this module supplies only the query and the TTL.
  *
- * Browser-safety: same posture as ./legacy-fallback-gate.ts and ./shadow.ts -
+ * Browser-safety: same posture as ./shadow.ts -
  * no module-scope Prisma or Redis; the caller hands in its client. rbac.ts
  * stays importable for its enums.
  */

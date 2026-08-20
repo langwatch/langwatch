@@ -1,5 +1,5 @@
 /**
- * The shape ./cutover-gate.ts and ./legacy-fallback-gate.ts both are: a
+ * The shape ./cutover-gate.ts and ./ledger-write-gate.ts both are: a
  * boolean answer, asked once per permission check, cached per organization
  * with a TTL so a rollback or a finalization takes effect fleet-wide without
  * a deploy. This module owns that shape once; each gate supplies only its own

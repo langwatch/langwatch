@@ -207,13 +207,16 @@ describe("given an organization whose legacy facts live outside its bindings", (
   /** @scenario "Cutover imports the legacy facts that only exist outside bindings" */
   it("states each of them as a grant carrying its source row's business time", async () => {
     // The zero-binding admin, stated by the genesis import in the same pass.
+    // `legacy-admin`, not `admin`: the fact is dormant by vocabulary - the
+    // collector translates no binding out of it - so storing it changes no
+    // decision until contract gives it the fallback's actual bag.
     const adminGrant = await prisma.grant.findFirst({
       where: {
         organizationId: organization.id,
         principalType: GrantPrincipalType.USER,
         principalId: adminUserId,
         scopeType: GrantScopeType.ORGANIZATION,
-        roleKey: "admin",
+        roleKey: "legacy-admin",
       },
     });
     expect(adminGrant).not.toBeNull();

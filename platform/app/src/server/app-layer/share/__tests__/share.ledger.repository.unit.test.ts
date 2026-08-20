@@ -44,6 +44,10 @@ const shareRow = (overrides: Partial<ShareLink> = {}): ShareLink =>
     ...overrides,
   }) as ShareLink;
 
+/** What a conditioned `update` raises when its filter matches no row. */
+const recordNotFound = () =>
+  Object.assign(new Error("record not found"), { code: "P2025" });
+
 const spyLegacy = (): ShareRepository =>
   ({
     findByToken: vi.fn().mockResolvedValue(null),
@@ -67,7 +71,7 @@ function buildRepository({
   onEngine: boolean;
   grantIds?: string[];
   usage?: {
-    updateMany?: ReturnType<typeof vi.fn>;
+    update?: ReturnType<typeof vi.fn>;
     create?: ReturnType<typeof vi.fn>;
   };
   compat?: {
@@ -83,22 +87,22 @@ function buildRepository({
   // root client's own write surfaces stay separate mocks so a test can
   // prove the writes never bypass the transaction.
   const grantUsage = {
-    updateMany: usage?.updateMany ?? vi.fn().mockResolvedValue({ count: 1 }),
+    update: usage?.update ?? vi.fn().mockResolvedValue(undefined),
     create: usage?.create ?? vi.fn().mockResolvedValue(undefined),
   };
-  const compatMirror = vi.fn().mockResolvedValue({ count: 1 });
+  const compatMirror = vi.fn().mockResolvedValue(undefined);
   const rootGrantUsage = {
-    updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    update: vi.fn().mockResolvedValue(undefined),
     create: vi.fn().mockResolvedValue(undefined),
   };
   const shareLink = {
     findFirst:
       compat?.findFirst ?? vi.fn().mockResolvedValue({ id: "share_1" }),
     findMany: compat?.findMany ?? vi.fn().mockResolvedValue([]),
-    updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    update: vi.fn().mockResolvedValue(undefined),
   };
   const transaction = vi.fn(async (run: (tx: unknown) => Promise<unknown>) =>
-    run({ grantUsage, shareLink: { updateMany: compatMirror } }),
+    run({ grantUsage, shareLink: { update: compatMirror } }),
   );
   const cutoverFindUnique = vi.fn().mockResolvedValue({ onEngine });
   const prisma = {
@@ -513,7 +517,7 @@ describe("LedgerShareRepository", () => {
           onEngine: true,
           grantIds: ["share_1"],
           usage: {
-            updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+            update: vi.fn().mockRejectedValue(recordNotFound()),
             create,
           },
         });
@@ -544,19 +548,19 @@ describe("LedgerShareRepository", () => {
         });
         // Neither write may bypass the transaction: a crash between the
         // consume and the mirror is exactly the drift this pins out.
-        expect(rootGrantUsage.updateMany).not.toHaveBeenCalled();
+        expect(rootGrantUsage.update).not.toHaveBeenCalled();
         expect(rootGrantUsage.create).not.toHaveBeenCalled();
-        expect(shareLink.updateMany).not.toHaveBeenCalled();
+        expect(shareLink.update).not.toHaveBeenCalled();
         expect(legacy.consumeView).not.toHaveBeenCalled();
       });
 
       it("increments the usage row while the link is uncapped", async () => {
-        const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+        const update = vi.fn().mockResolvedValue(undefined);
         const create = vi.fn();
         const { repository, legacy, compatMirror } = buildRepository({
           onEngine: true,
           grantIds: ["share_1"],
-          usage: { updateMany, create },
+          usage: { update, create },
         });
 
         const consumed = await repository.consumeView({
@@ -566,7 +570,7 @@ describe("LedgerShareRepository", () => {
         });
 
         expect(consumed).toBe(true);
-        expect(updateMany).toHaveBeenCalledWith({
+        expect(update).toHaveBeenCalledWith({
           where: {
             grantId: "share_1",
             organizationId: ORGANIZATION_ID,
@@ -586,10 +590,10 @@ describe("LedgerShareRepository", () => {
       it("retries the conditioned increment in its own transaction after losing the create race", async () => {
         // The guarded create's unique violation aborts the transaction it
         // ran in, so the single conditioned retry must open a fresh one.
-        const updateMany = vi
+        const update = vi
           .fn()
-          .mockResolvedValueOnce({ count: 0 })
-          .mockResolvedValueOnce({ count: 1 });
+          .mockRejectedValueOnce(recordNotFound())
+          .mockResolvedValueOnce(undefined);
         const create = vi
           .fn()
           .mockRejectedValue(
@@ -598,7 +602,7 @@ describe("LedgerShareRepository", () => {
         const { repository, transaction, compatMirror } = buildRepository({
           onEngine: true,
           grantIds: ["share_1"],
-          usage: { updateMany, create },
+          usage: { update, create },
         });
 
         const consumed = await repository.consumeView({
@@ -609,12 +613,12 @@ describe("LedgerShareRepository", () => {
 
         expect(consumed).toBe(true);
         expect(transaction).toHaveBeenCalledTimes(2);
-        expect(updateMany).toHaveBeenCalledTimes(2);
+        expect(update).toHaveBeenCalledTimes(2);
         expect(compatMirror).toHaveBeenCalledTimes(1);
       });
 
       it("mirrors nothing when the retry finds the cap already spent", async () => {
-        const updateMany = vi.fn().mockResolvedValue({ count: 0 });
+        const update = vi.fn().mockRejectedValue(recordNotFound());
         const create = vi
           .fn()
           .mockRejectedValue(
@@ -623,7 +627,7 @@ describe("LedgerShareRepository", () => {
         const { repository, compatMirror } = buildRepository({
           onEngine: true,
           grantIds: ["share_1"],
-          usage: { updateMany, create },
+          usage: { update, create },
         });
 
         const consumed = await repository.consumeView({
@@ -637,11 +641,11 @@ describe("LedgerShareRepository", () => {
       });
 
       it("fences the increment on the cap when the link is capped", async () => {
-        const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+        const update = vi.fn().mockResolvedValue(undefined);
         const { repository } = buildRepository({
           onEngine: true,
           grantIds: ["share_1"],
-          usage: { updateMany },
+          usage: { update },
         });
 
         await repository.consumeView({
@@ -650,7 +654,7 @@ describe("LedgerShareRepository", () => {
           maxViews: 3,
         });
 
-        expect(updateMany).toHaveBeenCalledWith({
+        expect(update).toHaveBeenCalledWith({
           where: {
             grantId: "share_1",
             organizationId: ORGANIZATION_ID,
@@ -668,7 +672,7 @@ describe("LedgerShareRepository", () => {
         const { repository, legacy } = buildRepository({
           onEngine: true,
           grantIds: [],
-          usage: { updateMany: vi.fn(), create },
+          usage: { update: vi.fn(), create },
         });
 
         const consumed = await repository.consumeView({

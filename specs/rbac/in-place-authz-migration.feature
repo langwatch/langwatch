@@ -19,8 +19,10 @@ Feature: In-place authorization data migration
   #
   # Per-organization state machine, one-way:
   #
-  #   pending ──► migrated ──► finalized      (parity clean: legacy fallback
-  #     │             │  ▲          │           no longer consulted)
+  #   pending ──► migrated ──► finalized      (parity clean at the team and
+  #     │             │  ▲          │           project scopes the bindings
+  #     │             │  │          │           replace; the legacy fallback
+  #     │             │  │          │           stays live until contract)
   #     │             │  │          ▼
   #     │             └──┼───►  rolled_back   (operator only: back on the
   #     │                │                     legacy path, and pinned there)
@@ -249,17 +251,18 @@ Feature: In-place authorization data migration
   Scenario: Legacy membership rows resolve identically before finalization
     When the migration verifies "acme"
     Then every member's effective decisions are computed twice, with and
-      without the legacy rows
+      without the legacy rows, at the team and project scopes the promoted
+      bindings replace
     And "acme" is finalized only when the two runs agree on every decision
 
   @unit
-  Scenario: An organization relying on the legacy org-level union is held, not broken
+  Scenario: The legacy org-level union keeps working through finalization
     Given "sam"'s legacy team row grants an organization-level permission that
       no binding grants
     When the migration verifies "acme"
-    Then "acme" is recorded as migrated with the disagreement in its report
-    And "acme" is not finalized
-    And "sam" keeps that permission because the legacy path stays live
+    Then "acme" is finalized on the team and project scopes its bindings replace
+    And "sam" keeps that organization-level permission, because the union
+      stays live until the contract change deletes the rows themselves
 
   @unit
   Scenario: A proof interrupted by shutdown parks the organization
@@ -269,23 +272,16 @@ Feature: In-place authorization data migration
     And the next pass verifies "acme" from the start
 
   @unit
-  Scenario: A finalized organization stops consulting the legacy fallback
-    Given "acme" was finalized
-    When a permission check runs for a member of "acme"
-    Then the answer comes from role bindings alone
-    And the legacy team rows are not read
-
-  @unit
-  Scenario: An organization that is not finalized keeps today's behaviour exactly
-    Given "acme" is pending, migrated, or parked
+  Scenario: The legacy team rows keep answering until contract deletes them
+    Given "acme" may be pending, migrated, parked, or finalized
     When a permission check runs for a member of "acme"
     Then the legacy fallback participates exactly as it does today
+    And it retires only when the contract change deletes the rows themselves
 
   @unit
-  Scenario: A held organization heals itself once the gap is granted
-    Given "acme" was held for a disagreement on one permission
-    And an admin later grants that permission through a binding
-    When a later migration pass verifies "acme"
+  Scenario: A held organization heals itself on a later pass
+    Given "acme" was held because a swept scope still disagreed
+    When a later migration pass verifies "acme" and the disagreement is gone
     Then "acme" is finalized without any manual state change
 
   # ============================================================================

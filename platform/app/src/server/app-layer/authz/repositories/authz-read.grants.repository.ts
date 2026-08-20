@@ -149,16 +149,48 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
   }
 
   /**
-   * A cut-over organization has no legacy fallback by definition: its backfill
-   * finalized (which switched the fallback off for it) before its cutover
-   * could even be attempted, and the cutover imported every fact those rows
-   * carried. Constant, not a query.
+   * The same `TeamUser` read the legacy repository performs, on purpose. The
+   * rows live until contract deletes them, and the engine's org-level union
+   * quirk keeps inferring organization-scope answers from them — the
+   * dormant-fact principle (delivery plan decision 13): the genesis-minted
+   * org-member floor grant that will replace the union is stored but not yet
+   * load-bearing, so the inference must keep running IDENTICALLY over both
+   * heads. Returning nothing here made the two readers disagree at
+   * organization scope for every ordinary member, which no parity proof
+   * could ever clear. The quirk, the rows and this read all retire together
+   * at contract.
    */
-  async findLegacyTeamMemberships(_args: {
+  async findLegacyTeamMemberships({
+    userId,
+    organizationId,
+  }: {
     userId: string;
     organizationId: string;
   }): Promise<LegacyTeamMembership[]> {
-    return [];
+    const rows = await this.prisma.teamUser.findMany({
+      // A stale cross-org TeamUser row must not confer access any more than a
+      // stale grant: the team belongs to the organization AND the user is a
+      // current member of it (legacy parity, rbac.ts's TeamUser fallback).
+      where: {
+        userId,
+        team: {
+          organizationId,
+          organization: { members: { some: { userId } } },
+        },
+      },
+      select: {
+        teamId: true,
+        role: true,
+        assignedRoleId: true,
+        team: { select: { isPersonal: true } },
+      },
+    });
+    return rows.map((row) => ({
+      teamId: row.teamId,
+      role: row.role,
+      customRoleId: row.assignedRoleId ?? null,
+      isPersonal: row.team.isPersonal,
+    }));
   }
 
   /**
@@ -427,8 +459,8 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
  * performs onto the compat head: admin→ADMIN, member→MEMBER, viewer→VIEWER,
  * custom:<id>→(CUSTOM, id).
  *
- * A row this cannot translate - `lite-member`, a null key (RESOURCE and
- * PLATFORM rows), anything else - is SKIPPED, not defaulted. Those are the
+ * A row this cannot translate - `lite-member`, `legacy-admin`, a null key
+ * (RESOURCE and PLATFORM rows), anything else - is SKIPPED, not defaulted. Those are the
  * dormant head-only facts the cutover imports (dev/docs/plans/adr-092-authz-delivery-plan.md,
  * decision 13, the dormant-fact principle): they are stored so contract can make them load-bearing, and
  * until then their decisions are still inferred from membership by the engine's

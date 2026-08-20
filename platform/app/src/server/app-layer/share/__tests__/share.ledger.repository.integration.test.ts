@@ -75,7 +75,13 @@ describe("given a cut-over organization's capped share link", () => {
     });
 
   const usage = () =>
-    prisma.grantUsage.findUnique({ where: { grantId: shareLinkId } });
+    prisma.grantUsage.findFirst({
+      where: {
+        grantId: shareLinkId,
+        organizationId: organization.id,
+        projectId: project.id,
+      },
+    });
 
   const consume = () =>
     repository().consumeView({
@@ -149,7 +155,7 @@ describe("given a cut-over organization's capped share link", () => {
     resetCutoverGateForTesting();
     // Every case starts from the handed-over budget, whatever the last one
     // spent.
-    await prisma.grantUsage.deleteMany({ where: { grantId: shareLinkId } });
+    await cleanupTestRows(prisma, [["grantUsage", { grantId: shareLinkId }]]);
     await prisma.grantUsage.create({
       data: {
         grantId: shareLinkId,
@@ -228,7 +234,9 @@ describe("given a cut-over organization's capped share link", () => {
 
     describe("when the link has no usage row at all", () => {
       it("creates it on the first view rather than losing the count", async () => {
-        await prisma.grantUsage.deleteMany({ where: { grantId: shareLinkId } });
+        await cleanupTestRows(prisma, [
+          ["grantUsage", { grantId: shareLinkId }],
+        ]);
 
         expect(await consume()).toBe(true);
 
@@ -238,7 +246,9 @@ describe("given a cut-over organization's capped share link", () => {
       it("lets exactly one of two simultaneous first views create it", async () => {
         // The race the create exists to resolve: the unique violation on the
         // primary key is what tells the loser it was a race and not a cap.
-        await prisma.grantUsage.deleteMany({ where: { grantId: shareLinkId } });
+        await cleanupTestRows(prisma, [
+          ["grantUsage", { grantId: shareLinkId }],
+        ]);
 
         const outcomes = await Promise.all([consume(), consume()]);
 

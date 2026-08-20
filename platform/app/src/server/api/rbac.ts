@@ -8,7 +8,6 @@ import {
 } from "~/generated/prisma/client";
 import { cutoverOnEngine } from "~/server/app-layer/authz/cutover-gate";
 import { authzForkFor } from "~/server/app-layer/authz/fork";
-import { legacyTeamFallbackDisabled } from "~/server/app-layer/authz/legacy-fallback-gate";
 import { authzShadowFor } from "~/server/app-layer/authz/shadow";
 import {
   LiteMemberRestrictedError,
@@ -890,12 +889,13 @@ async function checkPermissionFromBindings({
   });
 
   if (bindings.length === 0) {
-    // Fall back to legacy TeamUser for users not yet migrated to RoleBindings
-    // - unless stage B's in-place migration finalized this organization, in
-    // which case bindings are the whole story (parity proven per org).
-    if (await legacyTeamFallbackDisabled({ prisma, organizationId })) {
-      return false;
-    }
+    // Fall back to legacy TeamUser for users not yet migrated to RoleBindings.
+    // The fallback stays live for EVERY organization — backfilled, cut over,
+    // or untouched — until contract deletes the rows: stage B's finalization
+    // proves the promoted bindings answer identically at the scopes they
+    // replace, and the engine keeps inferring from the same rows on both
+    // heads (the dormant-fact principle), so switching this off early made
+    // the readers disagree instead of making the rows dead.
     const teamScope = scopes.find(
       (s) => s.scopeType === RoleBindingScopeType.TEAM,
     );
@@ -1570,11 +1570,6 @@ async function hasOrganizationPermissionLegacy(
   if (!bindingScopeCanGrant(RoleBindingScopeType.TEAM, permission)) {
     return false;
   }
-  if (
-    await legacyTeamFallbackDisabled({ prisma: ctx.prisma, organizationId })
-  ) {
-    return false;
-  }
   const teamMemberships = await ctx.prisma.teamUser.findMany({
     where: { userId, team: { organizationId, isPersonal: false } },
     select: { role: true, assignedRoleId: true },
@@ -1739,13 +1734,9 @@ async function loadScopeResolution(
 
   // Legacy fallback: a user with NO RoleBindings anywhere in the org falls back
   // to their TeamUser role. Mirrored here so the batch paths keep exact parity
-  // with the per-call helpers - including the stage-B per-organization gate.
-  const needsLegacyFallback =
-    bindings.length === 0 &&
-    !(await legacyTeamFallbackDisabled({
-      prisma: ctx.prisma,
-      organizationId: args.organizationId,
-    }));
+  // with the per-call helpers. The fallback stays live until contract deletes
+  // the rows — see the same note in checkPermissionFromBindings.
+  const needsLegacyFallback = bindings.length === 0;
   const legacyTeamUser = needsLegacyFallback
     ? await ctx.prisma.teamUser.findMany({
         where: { userId, team: { organizationId: args.organizationId } },

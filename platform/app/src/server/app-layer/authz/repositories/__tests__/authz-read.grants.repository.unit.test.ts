@@ -301,15 +301,52 @@ describe("GrantsAuthzReadRepository", () => {
   });
 
   describe("findLegacyTeamMemberships", () => {
-    it("is empty by construction - a cut-over organization has no fallback", async () => {
-      const repository = new GrantsAuthzReadRepository(clientFor({}));
+    it("reads the same TeamUser rows as the legacy repository, tenancy-fenced", async () => {
+      // Deliberately NOT empty for a cut-over organization: the rows live
+      // until contract deletes them, and the engine's org-level union quirk
+      // must keep inferring from them identically over both heads (the
+      // dormant-fact principle) - an empty answer here made the two readers
+      // disagree at organization scope for every ordinary member.
+      const findMany = vi.fn().mockResolvedValue([
+        {
+          teamId: "team-1",
+          role: "MEMBER",
+          assignedRoleId: null,
+          team: { isPersonal: false },
+        },
+      ]);
+      const repository = new GrantsAuthzReadRepository(
+        clientFor({ teamUser: { findMany } }),
+      );
 
       expect(
         await repository.findLegacyTeamMemberships({
           userId: "alice",
           organizationId: "org-1",
         }),
-      ).toEqual([]);
+      ).toEqual([
+        {
+          teamId: "team-1",
+          role: "MEMBER",
+          customRoleId: null,
+          isPersonal: false,
+        },
+      ]);
+      expect(findMany).toHaveBeenCalledWith({
+        where: {
+          userId: "alice",
+          team: {
+            organizationId: "org-1",
+            organization: { members: { some: { userId: "alice" } } },
+          },
+        },
+        select: {
+          teamId: true,
+          role: true,
+          assignedRoleId: true,
+          team: { select: { isPersonal: true } },
+        },
+      });
     });
   });
 

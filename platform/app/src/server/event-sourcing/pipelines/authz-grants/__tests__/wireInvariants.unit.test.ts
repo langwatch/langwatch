@@ -190,11 +190,44 @@ describe("the grants ledger's wire boundary", () => {
       ).toBe(false);
     });
 
-    it("refuses a `project` principal outside RESOURCE scope", () => {
+    it("refuses a `project` principal at TEAM scope", () => {
       expect(
         parse({}, { principal: { type: "project", id: "proj_chatbot" } })
           .success,
       ).toBe(false);
+    });
+
+    it("refuses a `project` principal on a FOREIGN project", () => {
+      // A project principal on someone else's project would be a standing
+      // cross-project credential nobody holds. Only the self-grant is legal.
+      expect(
+        parse(
+          {},
+          {
+            principal: { type: "project", id: "proj_chatbot" },
+            roleKey: "admin",
+            scope: { type: "PROJECT", id: "proj_agents" },
+          },
+        ).success,
+      ).toBe(false);
+    });
+
+    it("accepts the project-credential self-grant", () => {
+      // The one non-RESOURCE placement a project principal has: its own
+      // project's scope - `Project.apiKey` acting as the project it belongs
+      // to, imported by the cutover and dormant until the contract PR's edge
+      // identity resolves credentials through it.
+      expect(
+        parse(
+          {},
+          {
+            principal: { type: "project", id: "proj_chatbot" },
+            roleKey: "admin",
+            scope: { type: "PROJECT", id: "proj_chatbot" },
+            source: "cutover-import",
+          },
+        ).success,
+      ).toBe(true);
     });
   });
 

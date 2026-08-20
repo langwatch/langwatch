@@ -23,6 +23,13 @@ vi.mock("~/server/app-layer/system-migrations/runtime", () => ({
   systemMigrationsService: service,
 }));
 
+// The tRPC audit middleware writes through the real Prisma client; without
+// this stub the suite only passes on a machine whose dev Postgres happens to
+// answer. Same stub every sibling router test carries.
+vi.mock("@ee/audit-log/auditLog", () => ({
+  auditLog: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("~/server/api/rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/server/api/rbac")>();
   return {

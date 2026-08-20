@@ -1,6 +1,6 @@
 /**
- * The shape ./cutover-gate.ts and ./legacy-fallback-gate.ts both delegate to.
- * ./cutover-gate.unit.test.ts and rbac.legacy-fallback-gate.unit.test.ts
+ * The shape ./cutover-gate.ts and ./ledger-write-gate.ts both delegate to.
+ * ./cutover-gate.unit.test.ts and ledger-write-gate.unit.test.ts
  * already cover the per-gate TTL/fail-safe contract through the two public
  * gates; this suite covers the behaviours that live in the shared helper
  * itself and previously had no test anywhere: a read that throws is LOGGED,

@@ -451,7 +451,12 @@ describe("GrantsGenesisImportMigration", () => {
       expect(orgScoped).toEqual([
         expect.objectContaining({
           principal: { type: "user", id: "user_robin" },
-          roleKey: "admin",
+          // Dormant by vocabulary: `legacy-admin` translates into no binding,
+          // so the fact is stored without changing a single decision until
+          // contract gives it the fallback's actual bag. A translatable
+          // `admin` key here made the engine out-grant the legacy resolver
+          // and fail the cutover parity proof for every such organization.
+          roleKey: "legacy-admin",
           occurredAtMs: ROW_CREATED_AT_MS,
         }),
       ]);
