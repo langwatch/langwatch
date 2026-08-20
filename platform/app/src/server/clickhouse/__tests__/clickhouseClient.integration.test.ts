@@ -316,6 +316,31 @@ describe("ClickHouse routing via env vars", () => {
     });
   });
 
+  describe("when the tenant is the platform aggregate", () => {
+    /** @scenario The platform tenant routes like an organization */
+    it("routes by name, with no project or organization of that id", async () => {
+      const { getClickHouseClientForTenant, PLATFORM_TENANT_ID } = await import(
+        "../clickhouseClient"
+      );
+
+      // Nothing named "platform" exists in either table: the grants ledger's
+      // operator facts belong to no customer, and this used to be refused.
+      const [project, organization] = await Promise.all([
+        prisma.project.findUnique({ where: { id: PLATFORM_TENANT_ID } }),
+        prisma.organization.findUnique({ where: { id: PLATFORM_TENANT_ID } }),
+      ]);
+      expect(project).toBeNull();
+      expect(organization).toBeNull();
+
+      const client = await getClickHouseClientForTenant(PLATFORM_TENANT_ID);
+
+      // Same path as an organization: the env-var list is consulted first
+      // (proven above for real orgs), and with no CLICKHOUSE_URL__*__platform
+      // set it falls back to shared like any org outside the list.
+      expect(client).toBe(sharedClient);
+    });
+  });
+
   describe("when the tenant names neither a project nor an organization", () => {
     /** @scenario A tenant that names neither a project nor an organization is refused */
     it("refuses rather than falling back to the shared client", async () => {

@@ -84,6 +84,21 @@ const customClientCache = new Map<string, ClickHouseClient>();
 const tenantOrgCache = new Map<string, string>();
 
 /**
+ * The one tenant that is not a customer: the grants ledger's PLATFORM
+ * aggregate (ADR-092), which holds the operator facts that belong to no
+ * organization at all. It has no row behind it in either direction, so it is
+ * routed by name rather than by lookup — as one key, because a single global
+ * aggregate split across instances is an aggregate nobody can read whole.
+ *
+ * Declared here rather than imported from `@langwatch/authz-server/migration`
+ * so routing does not drag that entry, and `node:crypto` with it, into the
+ * module graph of every server process that reads a trace.
+ * `__tests__/platformTenantRouting.unit.test.ts` pins the two equal, so the
+ * duplication cannot drift.
+ */
+export const PLATFORM_TENANT_ID = "platform";
+
+/**
  * Returns the appropriate ClickHouse client for a given tenant.
  *
  * A tenant is usually a project, and was only ever a project until the grants
@@ -102,6 +117,16 @@ const tenantOrgCache = new Map<string, string>();
 export async function getClickHouseClientForTenant(
   tenantId: string,
 ): Promise<ClickHouseClient | null> {
+  // The platform tenant is a routing key in its own right, not a lookup: it
+  // has no row in either table, so it goes down the same road every other
+  // tenant does, one step further along. An operator who ever wants the
+  // platform ledger on its own instance configures
+  // CLICKHOUSE_URL__<label>__platform and this picks it up, exactly as it
+  // would for an organization.
+  if (tenantId === PLATFORM_TENANT_ID) {
+    return getClickHouseClientForOrganization(tenantId);
+  }
+
   let orgId = tenantOrgCache.get(tenantId);
 
   if (!orgId) {
