@@ -470,8 +470,12 @@ test_lwql() {
     pass "restricted identity denied system.users"
   fi
 
-  # Flag-off AC: the endpoint refuses (here: unauthenticated → 401) while the
-  # backend objects above all stand provisioned.
+  # The endpoint stays shut while the backend objects above all stand
+  # provisioned. Asserted unauthenticated, so this pins the auth gate, not the
+  # `release_lwql_workbench` flag — minting a project API key inside the
+  # cluster to reach the flag branch belongs with the endpoint's own tests,
+  # which cover it. What it does prove here is that provisioning the access
+  # model does not, by itself, open the route.
   local http_code
   http_code=$(kc exec "$app_pod" -- curl -s -o /dev/null -w '%{http_code}' \
     -X POST -H 'Content-Type: application/json' -d '{"sql":"SELECT 1"}' \

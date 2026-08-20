@@ -1976,7 +1976,7 @@ clickhouse:
 # single-node ClickHouse are the supported shapes.
 ## @section LangWatchQL (LWQL)
 lwql:
-  ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, views) on install/upgrade. The feature flag still gates the endpoint.
+  ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, views) when the application starts. The feature flag still gates the endpoint.
   enabled: true
 
 # =============================================================================

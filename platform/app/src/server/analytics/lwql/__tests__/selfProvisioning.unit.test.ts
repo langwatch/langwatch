@@ -26,6 +26,7 @@ import { describe, expect, it } from "vitest";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import { lwqlPostgresViews } from "../catalog/types";
 import { productionLangWatchQLNames } from "../productionProvisioning";
+import { qualified } from "../provisioning";
 import {
   LWQL_SELF_PROVISION_DEFAULTS,
   lwqlDerivedConnectionFromEnv,
@@ -99,6 +100,39 @@ describe("lwqlDerivedConnectionFromEnv", () => {
         LWQL_DATABASE: "elsewhere",
       }),
     ).toBeNull();
+  });
+
+  // The split-brain this guard exists to prevent: `provisionLwql` builds the
+  // access model on the connection derived here, so a deployment that also set
+  // `LWQL_CLICKHOUSE_URL` would provision one server and query another, and
+  // every query would fail against a server holding none of the objects.
+  // Refused rather than silently overridden, so the operator is told which
+  // variable to drop.
+  it("refuses a LWQL_CLICKHOUSE_URL pointing somewhere other than the admin URL", () => {
+    expect(
+      lwqlDerivedConnectionFromEnv({
+        ...ENABLED_ENV,
+        LWQL_CLICKHOUSE_URL: "http://elsewhere.internal:8123/",
+      }),
+    ).toBeNull();
+    expect(
+      lwqlDerivedConnectionFromEnv({
+        ...ENABLED_ENV,
+        LWQL_CLICKHOUSE_URL: "not a url",
+      }),
+    ).toBeNull();
+  });
+
+  // Same origin, spelled the way an operator would rather than the way the
+  // derivation normalises it (admin credentials, a database path, no trailing
+  // slash) — that is agreement, not a conflict, and must still resolve.
+  it("accepts a LWQL_CLICKHOUSE_URL naming the admin URL's own server", () => {
+    expect(
+      lwqlDerivedConnectionFromEnv({
+        ...ENABLED_ENV,
+        LWQL_CLICKHOUSE_URL: "http://ch.internal:8123",
+      })?.url,
+    ).toBe("http://ch.internal:8123/");
   });
 
   it.each([
@@ -241,20 +275,28 @@ describe("selfHostedClickHouseProvisioningStatements", () => {
     expect(collection).toContain("password='reader-secret'");
   });
 
-  it("provisions every catalog view with its grant", () => {
-    const statements = selfHostedStatements();
-    const grants = statements.filter((statement) =>
-      statement.startsWith("GRANT SELECT ON langwatch."),
-    );
-    // One whole-object grant per view plus the key map and the engine tables;
-    // the exact partition is the view layer's contract — here it is enough
-    // that no view ships without one.
-    expect(grants.length).toBeGreaterThan(0);
-    const views = statements.filter((statement) =>
-      statement.startsWith("CREATE OR REPLACE VIEW"),
-    );
-    expect(views.length).toBeGreaterThan(0);
-  });
+  // Per catalog entry, not a count: a `toBeGreaterThan(0)` over the whole set
+  // stays green when a single view or its grant goes missing, which is the
+  // one failure this test exists to catch. `it.each` so the report names the
+  // view that regressed rather than "provisions every catalog view".
+  it.each(LWQL_VIEW_CATALOG.map((view) => [view.name, view] as const))(
+    "provisions the %s view with its own grant",
+    (_name, view) => {
+      const statements = selfHostedStatements();
+      const target = qualified(NAMES, view.name);
+
+      expect(
+        statements.filter(
+          (statement) =>
+            statement.startsWith("CREATE OR REPLACE VIEW") &&
+            statement.includes(target),
+        ),
+      ).toHaveLength(1);
+      expect(statements).toContain(
+        `GRANT SELECT ON ${target} TO ${NAMES.restrictedUser}`,
+      );
+    },
+  );
 });
 
 describe("selfHostedPostgresReaderStatements", () => {

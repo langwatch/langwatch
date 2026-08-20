@@ -177,11 +177,20 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/** Runs statements one at a time, logging which one failed before rethrowing. */
-async function runClickHouseStatements(
-  client: ClickHouseClient,
-  statements: string[],
-): Promise<void> {
+/**
+ * One statement per round trip rather than a single batched command: a failure
+ * here is an operator's problem to fix, and ClickHouse reports only that *the*
+ * command failed. Sending them individually is what lets the log name which
+ * one, which is the difference between an actionable error and "provisioning
+ * failed".
+ */
+async function runClickHouseStatements({
+  client,
+  statements,
+}: {
+  client: ClickHouseClient;
+  statements: string[];
+}): Promise<void> {
   for (const [index, statement] of statements.entries()) {
     try {
       await client.command({ query: statement });
@@ -242,9 +251,9 @@ async function selfProvisionAll({
     ]);
 
     await withAdminClickHouseClient(async (client) => {
-      await runClickHouseStatements(
+      await runClickHouseStatements({
         client,
-        selfHostedClickHouseProvisioningStatements({
+        statements: selfHostedClickHouseProvisioningStatements({
           names,
           restrictedPassword: selfProvision.connection.password,
           sourceDatabase,
@@ -253,7 +262,7 @@ async function selfProvisionAll({
             readerPassword: selfProvision.postgresReaderPassword,
           },
         }),
-      );
+      });
 
       // Same non-fatal contract as the explicit path: the backfill is
       // convergent, so a slow key-map table must not undo the provisioning
@@ -329,10 +338,10 @@ export default async function execute() {
   }
 
   await withAdminClickHouseClient(async (client) => {
-    await runClickHouseStatements(
+    await runClickHouseStatements({
       client,
-      productionClickHouseObjectStatements({ names, sourceDatabase }),
-    );
+      statements: productionClickHouseObjectStatements({ names, sourceDatabase }),
+    });
 
     // Fatal, exactly like the views above. The inline sync on project
     // creation only ever covers projects created *after* a failure, so a

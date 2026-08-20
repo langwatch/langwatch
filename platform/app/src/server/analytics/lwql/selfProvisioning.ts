@@ -143,6 +143,27 @@ export function lwqlDerivedConnectionFromEnv(
   url.pathname = "/";
   url.search = "";
 
+  // Same refusal as `LWQL_DATABASE` above, for the same reason: provisioning
+  // creates the access model on this derived server, so querying a different
+  // one would find none of it. Compared by origin, because the derived URL is
+  // normalised (trailing slash, no credentials) and an operator's value
+  // usually is not.
+  if (env.LWQL_CLICKHOUSE_URL) {
+    let explicitOrigin: string | null = null;
+    try {
+      explicitOrigin = new URL(env.LWQL_CLICKHOUSE_URL).origin;
+    } catch {
+      explicitOrigin = null;
+    }
+    if (explicitOrigin !== url.origin) {
+      logger.error(
+        { derivedOrigin: url.origin },
+        "LWQL_SELF_PROVISION cannot target a ClickHouse other than CLICKHOUSE_URL's own: provisioning would create the access model on one server while queries ran against another. Unset LWQL_CLICKHOUSE_URL, or configure the five LWQL_* variables explicitly without LWQL_SELF_PROVISION",
+      );
+      return null;
+    }
+  }
+
   return {
     url: url.toString(),
     username:
