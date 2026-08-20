@@ -30,7 +30,6 @@ import { createLogger } from "@langwatch/observability";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { env } from "~/env.mjs";
-import { hasOrganizationPermission } from "~/server/api/rbac";
 import {
   createServiceApp,
   handlerManagedAuth,
@@ -55,6 +54,7 @@ import {
   verifyGithubInstallState,
 } from "~/server/app-layer/github/githubInstallState";
 import { parseGithubPullRequestEvent } from "~/server/app-layer/github/githubPullRequestEvent";
+import { hasOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 
@@ -199,7 +199,7 @@ async function handleInstall(c: any): Promise<Response> {
   // for every write to the connection.
   if (
     !(await hasOrganizationPermission(
-      { prisma, session },
+      { session },
       organizationId,
       "organization:manage",
     ))
@@ -330,7 +330,7 @@ async function rejectUnauthorizedSetup({
   // the installation is the write the permission exists to gate.
   if (
     !(await hasOrganizationPermission(
-      { prisma, session },
+      { session },
       state.organizationId,
       "organization:manage",
     ))

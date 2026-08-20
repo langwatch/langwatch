@@ -39,7 +39,7 @@ import {
   timeseriesSeriesInput,
 } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
-import { hasProjectPermission, isDemoProject } from "~/server/api/rbac";
+import { isDemoProject } from "~/server/api/rbac";
 import {
   createServiceApp,
   handlerManagedAuth,
@@ -61,6 +61,7 @@ import {
   generateTrackedEventId,
   recordTrackedEventSpan,
 } from "~/server/app-layer/events/track-event.service";
+import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { ProjectService } from "~/server/app-layer/projects/project.service";
 import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import { getServerAuthSession } from "~/server/auth";
@@ -124,25 +125,20 @@ const logger = createLogger("langwatch:misc");
 // enforces the per-route ceiling and returns 403 on denial.
 const authMiddleware = createUnifiedAuthMiddleware({ prisma });
 const requireAnalyticsView = requireApiKeyPermission({
-  prisma,
   permission: "analytics:view",
 });
 const requireWorkflowsManage = requireApiKeyPermission({
-  prisma,
   permission: "workflows:manage",
 });
 // DSPy step logging + experiment bootstrapping are experiment writes, gated on
 // the dedicated experiments permission rather than the workflow studio's.
 const requireExperimentsManage = requireApiKeyPermission({
-  prisma,
   permission: "experiments:manage",
 });
 const requireTracesCreate = requireApiKeyPermission({
-  prisma,
   permission: "traces:create",
 });
 const requireTriggersManage = requireApiKeyPermission({
-  prisma,
   permission: "triggers:manage",
 });
 
@@ -927,11 +923,7 @@ secured
     if (
       !project ||
       project.archivedAt !== null ||
-      !(await hasProjectPermission(
-        { prisma, session },
-        projectId,
-        "project:view",
-      ))
+      !(await hasProjectPermission({ session }, projectId, "project:view"))
     ) {
       // Single 403 whether the project is missing, archived, or simply
       // inaccessible — never disclose existence of a project the caller can't reach.

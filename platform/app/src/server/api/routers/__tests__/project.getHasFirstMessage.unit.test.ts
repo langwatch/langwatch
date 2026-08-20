@@ -5,15 +5,21 @@ import { projectRouter } from "../project";
 
 const mockGetById = vi.fn();
 
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({
-    projects: {
-      getById: mockGetById,
-    },
-  }),
-}));
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsService } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: () => ({
+      permissions: appPermissionsService(),
+      projects: {
+        getById: mockGetById,
+      },
+    }),
+  };
+});
 
 vi.mock("nanoid", () => ({
   nanoid: vi.fn(() => "mock-nano-id"),

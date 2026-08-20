@@ -24,9 +24,9 @@ import {
   type StudioServerEvent,
   studioClientEventSchema,
 } from "~/optimization_studio/types/events";
-import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
+import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { DatasetNotReadyError } from "~/server/datasets/errors";
 import { prisma } from "~/server/db";
@@ -64,7 +64,7 @@ secured
     }
 
     const hasPermission = await hasProjectPermission(
-      { prisma, session },
+      { session },
       projectId,
       "workflows:manage",
     );
@@ -157,7 +157,7 @@ secured
       }
 
       const hasPermission = await hasProjectPermission(
-        { prisma, session },
+        { session },
         projectId,
         "workflows:manage",
       );

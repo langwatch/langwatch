@@ -16,11 +16,18 @@ import { teamRouter } from "../team";
 // The org-permission middleware/guard is real authorization the page already
 // passes for an org admin; it's mocked to a pass-through so these tests isolate
 // the member-resolution read path.
+// The declared permission seam resolves its service from the App.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return appPermissionsMock();
+});
+
 vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
-    hasOrganizationPermission: vi.fn().mockResolvedValue(true),
     hasOrganizationPermission: vi.fn().mockResolvedValue(true),
   };
 });

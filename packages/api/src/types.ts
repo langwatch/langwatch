@@ -1,3 +1,4 @@
+import type { AuthzPermission } from "@langwatch/authz";
 import type { Context, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { DescribeRouteOptions } from "hono-openapi";
@@ -147,6 +148,15 @@ export interface EndpointConfig<
    * - A `MiddlewareHandler` -- use a custom auth middleware for this endpoint.
    */
   auth?: "default" | "none" | MiddlewareHandler;
+  /**
+   * The permission this endpoint requires, in the authz registry vocabulary.
+   * Enforced by the FRAMEWORK: the service's `permissionEnforcer` middleware
+   * is mounted between auth and the endpoint's own `middleware`, so a custom
+   * middleware array can never displace the check while the declared
+   * permission still reads as guarded. Requires `permissionEnforcer` on the
+   * service config — declaring one without the other fails `build()`.
+   */
+  permission?: AuthzPermission;
   /** Resource limit type — requires `_legacy.resourceLimitMiddleware` on the service. */
   resourceLimit?: string;
   /** Additional middleware to run for this endpoint (after auth, before handler). */
@@ -202,6 +212,14 @@ export interface ServiceConfig {
   basePath?: string;
   /** Default auth middleware applied to every endpoint (unless overridden). */
   auth?: MiddlewareHandler;
+  /**
+   * Builds the enforcement middleware for an endpoint's declared
+   * `permission`. Injected by the host — the platform passes one backed by
+   * its app-composed permissions service — and mounted by the framework
+   * right after auth for every endpoint that declares a permission, so the
+   * declaration and its enforcement cannot be torn apart.
+   */
+  permissionEnforcer?: (permission: AuthzPermission) => MiddlewareHandler;
   /** Disable the built-in tracer middleware. Set to `false` to opt out. */
   tracer?: false;
   /** Disable the built-in logger middleware. Set to `false` to opt out. */

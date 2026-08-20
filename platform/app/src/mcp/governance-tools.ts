@@ -53,7 +53,8 @@ type McpServerLike = {
 
 import { IngestionKeyService } from "../../ee/governance/services/ingestionKey.service";
 import { IngestionTemplateService } from "../../ee/governance/services/ingestionTemplate.service";
-import { hasOrganizationPermission, type Permission } from "../server/api/rbac";
+import type { Permission } from "../server/api/rbac";
+import { hasOrganizationPermission } from "../server/app-layer/permissions/imperative";
 
 const SURFACE = "mcp" as const;
 
@@ -117,7 +118,6 @@ export function registerGovernanceMcpTools(
     }
     const allowed = await hasOrganizationPermission(
       {
-        prisma: ctx.prisma,
         session: { user: { id: rctx.callerUserId } } as any,
       },
       rctx.organizationId,
@@ -139,7 +139,6 @@ export function registerGovernanceMcpTools(
     if (!rctx.callerUserId) return null;
     const allowed = await hasOrganizationPermission(
       {
-        prisma: ctx.prisma,
         session: { user: { id: rctx.callerUserId } } as any,
       },
       rctx.organizationId,

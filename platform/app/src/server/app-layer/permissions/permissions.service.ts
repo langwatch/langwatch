@@ -5,6 +5,11 @@ import {
   type PermissionScopeArg,
 } from "@langwatch/authz";
 import type { Permission } from "~/server/api/rbac";
+import type {
+  ApiKeyPermissionCheck,
+  CredentialDecisionRepository,
+  ProjectScope,
+} from "./credential-decision.repository";
 import {
   LiteMemberRestrictedError,
   ProjectPermissionDeniedError,
@@ -15,6 +20,16 @@ import type {
 } from "./permission-decision.repository";
 
 /**
+ * The answer for a credential check scoped to a project the request names
+ * only by id. `project_not_found` covers both a missing project and one in
+ * another organization — its existence is not the caller's to learn.
+ */
+export type ApiKeyProjectDecision =
+  | { outcome: "project_not_found" }
+  | { outcome: "denied" }
+  | { outcome: "allowed"; scope: ProjectScope };
+
+/**
  * Service responsible for permission enforcement.
  *
  * Pure business logic — no tRPC dependency, no client: decisions come from
@@ -23,7 +38,21 @@ import type {
  * background workers, or any other non-tRPC surface.
  */
 export class PermissionsService {
-  constructor(private readonly repository: PermissionDecisionRepository) {}
+  private readonly repository: PermissionDecisionRepository;
+  private readonly credentials: CredentialDecisionRepository;
+
+  constructor({
+    decisions,
+    credentials,
+  }: {
+    /** User-grant decisions (tRPC declarations, session surfaces). */
+    decisions: PermissionDecisionRepository;
+    /** API-key credential decisions (REST key middlewares, ceilings). */
+    credentials: CredentialDecisionRepository;
+  }) {
+    this.repository = decisions;
+    this.credentials = credentials;
+  }
 
   /**
    * Asserts that a user holds the given permission on a project.
@@ -152,6 +181,48 @@ export class PermissionsService {
           permission,
         });
     }
+  }
+
+  /**
+   * Whether an API-key credential holds `permission` at `scope` —
+   * `effective = ApiKey.bindings ∩ owning user's bindings`. The check behind
+   * every REST credential authorization (org apps, the API-key ceiling, the
+   * management API).
+   */
+  async hasApiKeyPermission(check: ApiKeyPermissionCheck): Promise<boolean> {
+    return await this.credentials.findApiKeyDecision(check);
+  }
+
+  /**
+   * An API-key credential's decision for a project it names only by id:
+   * resolves the project's tenancy coordinates, refuses cross-organization
+   * ids as not-found, then checks the permission at the project's scope.
+   */
+  async getApiKeyProjectDecision({
+    apiKeyId,
+    userId,
+    organizationId,
+    projectId,
+    permission,
+  }: {
+    apiKeyId: string;
+    userId: string | null;
+    organizationId: string;
+    projectId: string;
+    permission: AuthzPermission;
+  }): Promise<ApiKeyProjectDecision> {
+    const scope = await this.credentials.findProjectScope({ projectId });
+    if (!scope || scope.organizationId !== organizationId) {
+      return { outcome: "project_not_found" };
+    }
+    const allowed = await this.credentials.findApiKeyDecision({
+      apiKeyId,
+      userId,
+      organizationId,
+      scope: { type: "project", id: scope.projectId, teamId: scope.teamId },
+      permission,
+    });
+    return allowed ? { outcome: "allowed", scope } : { outcome: "denied" };
   }
 
   /**

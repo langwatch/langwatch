@@ -34,9 +34,9 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
   requireEnterprisePlan,
 } from "~/server/api/enterprise";
-import { hasOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { hasOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { featureFlagService } from "~/server/featureFlag";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
 

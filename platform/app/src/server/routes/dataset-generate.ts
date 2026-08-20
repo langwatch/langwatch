@@ -16,8 +16,8 @@ import {
   type UIMessage,
 } from "ai";
 import { tools } from "~/app/api/dataset/generate/tools";
-import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
@@ -54,7 +54,7 @@ secured
     }
 
     const hasPermission = await hasProjectPermission(
-      { prisma, session },
+      { session },
       projectId,
       "datasets:manage",
     );

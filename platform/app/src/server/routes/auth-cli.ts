@@ -54,12 +54,12 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
 } from "~/server/api/enterprise";
 import type { Permission } from "~/server/api/rbac";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { getApp, tryGetApp } from "~/server/app-layer/app";
 import {
   hasOrganizationPermission,
   hasProjectPermission,
-} from "~/server/api/rbac";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { getApp, tryGetApp } from "~/server/app-layer/app";
+} from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
@@ -381,7 +381,6 @@ async function refuseProjectKeyHandout(
   }
   const canWriteProject = await hasProjectPermission(
     {
-      prisma,
       session: { user: { id: userId } },
     } as Parameters<typeof hasProjectPermission>[0],
     project.id,
@@ -1662,7 +1661,7 @@ async function ensureGovernancePermissionOr403(
   permission: Permission,
 ): Promise<Response | null> {
   const allowed = await hasOrganizationPermission(
-    { prisma, session: { user: { id: tokenRecord.user_id } } } as any,
+    { session: { user: { id: tokenRecord.user_id } } } as any,
     tokenRecord.organization_id,
     permission,
   );
@@ -2067,7 +2066,6 @@ async function mintProjectIngestionKey(
 
   const allowed = await hasProjectPermission(
     {
-      prisma,
       session: { user: { id: tokenRecord.user_id } },
     } as Parameters<typeof hasProjectPermission>[0],
     project.id,

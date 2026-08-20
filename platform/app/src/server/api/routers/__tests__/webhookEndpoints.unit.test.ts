@@ -54,11 +54,19 @@ vi.mock("../../rbac", async (importOriginal) => {
 });
 
 const getActivePlan = vi.fn();
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({ planProvider: { getActivePlan } }),
-}));
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsService } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: () => ({
+      permissions: appPermissionsService(),
+      planProvider: { getActivePlan },
+    }),
+  };
+});
 
 const ENDPOINT_ROW = {
   id: "whep_1",

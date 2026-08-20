@@ -2,6 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { appFromContext } from "~/app/api/middleware/app-context";
 import { handledErrorResponseBody } from "~/app/api/middleware/error-handler";
 import {
   type ApiErrorEnvelope,
@@ -18,6 +19,7 @@ import type { Permission } from "~/server/api/rbac";
 // A pure rule with a type-only dependency of its own, so reading it here adds
 // no module cycle back into the Langy feature.
 import { classifyForLangy } from "~/server/app-layer/langy/langyPermissionPolicy";
+import { type App, getApp } from "~/server/app-layer/app";
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
 import { getTokenType } from "./api-key-token.utils";
 import {
@@ -629,18 +631,22 @@ export function collectAuthDiagnostics(c: {
  * Throws `ApiKeyPermissionDeniedError` when denied.
  */
 export async function enforceApiKeyCeiling({
-  prisma,
   resolved,
   permission,
+  app,
 }: {
-  prisma: PrismaClient;
   resolved: ResolvedToken;
   permission: Permission;
+  /**
+   * The App to decide through — pass `appFromContext(c)` where a Hono
+   * context is in hand; handlers without one fall back to the process
+   * singleton (the same instance in production).
+   */
+  app?: App;
 }): Promise<void> {
   if (resolved.type !== "apiKey") return;
 
-  const allowed = await resolveApiKeyPermission({
-    prisma,
+  const allowed = await (app ?? getApp()).permissions.hasApiKeyPermission({
     apiKeyId: resolved.apiKeyId,
     userId: resolved.userId,
     organizationId: resolved.organizationId,
@@ -730,11 +736,9 @@ export function apiKeyCeilingDenialResponse(error: unknown): {
  * from context.
  */
 export function requireApiKeyPermission({
-  prisma,
   permission,
   errorEnvelope = "legacy",
 }: {
-  prisma: PrismaClient;
   permission: Permission;
   errorEnvelope?: ApiErrorEnvelope;
 }): MiddlewareHandler {
@@ -746,7 +750,11 @@ export function requireApiKeyPermission({
     }
 
     try {
-      await enforceApiKeyCeiling({ prisma, resolved, permission });
+      await enforceApiKeyCeiling({
+        resolved,
+        permission,
+        app: appFromContext(c),
+      });
     } catch (error) {
       if (!HandledError.isHandled(error)) throw error;
       // The ceiling refuses BENEATH the family's own error handler, so it has

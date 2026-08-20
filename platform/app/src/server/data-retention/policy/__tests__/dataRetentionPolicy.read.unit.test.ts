@@ -7,7 +7,15 @@ const rbacMocks = vi.hoisted(() => ({
   batchScopePermissions: vi.fn(),
 }));
 
-vi.mock("~/server/api/rbac", () => rbacMocks);
+vi.mock("~/server/app-layer/permissions/imperative", () => ({
+  hasOrganizationPermission: rbacMocks.hasOrganizationPermission,
+  hasProjectPermission: rbacMocks.hasProjectPermission,
+}));
+
+// batchScopePermissions stays a legacy rbac read (it is the seam itself).
+vi.mock("~/server/api/rbac", () => ({
+  batchScopePermissions: rbacMocks.batchScopePermissions,
+}));
 
 const appMocks = vi.hoisted(() => ({
   getResolvedForProject: vi.fn(),

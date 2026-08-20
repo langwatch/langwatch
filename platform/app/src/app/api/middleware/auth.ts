@@ -56,5 +56,5 @@ export function requirePermission(
   permission: AuthzPermission,
   errorEnvelope: ApiErrorEnvelope = "legacy",
 ): MiddlewareHandler {
-  return createRequireApiKeyPermission({ prisma, permission, errorEnvelope });
+  return createRequireApiKeyPermission({ permission, errorEnvelope });
 }

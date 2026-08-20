@@ -10,7 +10,7 @@ import {
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { getUserProtectionsForProject } from "../utils";
 
-vi.mock("../rbac", () => ({
+vi.mock("~/server/app-layer/permissions/imperative", () => ({
   hasProjectPermission: vi.fn(() => Promise.resolve(true)),
   isDemoProject: vi.fn(() => false),
 }));

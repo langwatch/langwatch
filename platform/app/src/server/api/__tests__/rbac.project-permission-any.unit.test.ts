@@ -18,6 +18,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { checkDeclaredPermissionAny } from "~/server/app-layer/authz/trpc-middleware";
+import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
 import type { Session } from "~/server/auth";
 import type { Permission } from "../rbac";
 
@@ -69,7 +70,12 @@ const runGate = ({
     next,
     run: () =>
       middleware({
-        ctx: { prisma, session, permissionChecked: false } as never,
+        ctx: {
+          prisma,
+          session,
+          permissionChecked: false,
+          app: { permissions: permissionsServiceFor(prisma as never) },
+        } as never,
         input: { projectId: PROJECT_ID },
         next,
       } as never),

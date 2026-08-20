@@ -22,7 +22,7 @@ vi.mock("~/server/auth", () => ({
 }));
 
 const hasProjectPermission = vi.fn();
-vi.mock("~/server/api/rbac", () => ({
+vi.mock("~/server/app-layer/permissions/imperative", () => ({
   hasProjectPermission: (...args: unknown[]) => hasProjectPermission(...args),
 }));
 

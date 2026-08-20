@@ -3,14 +3,14 @@ import {
   OrganizationUserRole,
   type PrismaClient,
 } from "~/generated/prisma/client";
-
-import type { Session } from "~/server/auth";
 import {
   hasOrganizationPermission,
   hasProjectPermission,
   hasTeamPermission,
-  type Permission,
-} from "../api/rbac";
+} from "~/server/app-layer/permissions/imperative";
+
+import type { Session } from "~/server/auth";
+import type { Permission } from "../api/rbac";
 import { resolveApiKeyPermission } from "../rbac/role-binding-resolver";
 import {
   GatewayGuardrailProjectMismatchError,

@@ -148,6 +148,12 @@ class ServiceBuilder<TProject, TProviders extends Record<string, unknown>> {
             `"${endpoint.config.resourceLimit}" but the service has no resourceLimitMiddleware`,
         );
       }
+      if (endpoint.config.permission && !this._config.permissionEnforcer) {
+        throw new Error(
+          `Endpoint ${endpoint.method.toUpperCase()} ${endpoint.path} declares permission ` +
+            `"${endpoint.config.permission}" but the service has no permissionEnforcer`,
+        );
+      }
     }
   }
 }

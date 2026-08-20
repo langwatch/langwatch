@@ -286,7 +286,6 @@ describe("Langy session key (caller-scoped)", () => {
         for (const permission of required) {
           await expect(
             enforceApiKeyCeiling({
-              prisma,
               resolved: resolved!,
               permission: permission as Permission,
             }),
@@ -318,7 +317,7 @@ describe("Langy session key (caller-scoped)", () => {
           "evaluations:manage",
         ] as const) {
           await expect(
-            enforceApiKeyCeiling({ prisma, resolved: resolved!, permission }),
+            enforceApiKeyCeiling({ resolved: resolved!, permission }),
           ).rejects.toThrow();
         }
       });

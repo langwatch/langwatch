@@ -1,10 +1,10 @@
 import type { PrismaClient } from "~/generated/prisma/client";
-import type { Session } from "~/server/auth";
 import {
   hasOrganizationPermission,
   hasProjectPermission,
   hasTeamPermission,
-} from "../api/rbac";
+} from "~/server/app-layer/permissions/imperative";
+import type { Session } from "~/server/auth";
 import { ModelProviderScopeForbiddenError } from "./errors";
 
 /**
@@ -54,7 +54,7 @@ async function canManageScope(
   if (!ctx.session) return false;
   if (scope.scopeType === "ORGANIZATION") {
     return hasOrganizationPermission(
-      { prisma: ctx.prisma, session: ctx.session },
+      { session: ctx.session },
       scope.scopeId,
       "organization:manage",
     );
@@ -105,7 +105,7 @@ async function canReadScope(ctx: RBACContext, scope: Scope): Promise<boolean> {
   if (!ctx.session) return false;
   if (scope.scopeType === "ORGANIZATION") {
     return hasOrganizationPermission(
-      { prisma: ctx.prisma, session: ctx.session },
+      { session: ctx.session },
       scope.scopeId,
       "organization:view",
     );

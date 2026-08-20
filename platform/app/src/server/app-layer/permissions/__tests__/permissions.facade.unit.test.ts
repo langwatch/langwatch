@@ -10,6 +10,7 @@
 import { PermissionDeniedError } from "@langwatch/authz";
 import { describe, expect, it, vi } from "vitest";
 
+import type { CredentialDecisionRepository } from "../credential-decision.repository";
 import type { PermissionDecisionRepository } from "../permission-decision.repository";
 import { PermissionsService } from "../permissions.service";
 
@@ -20,7 +21,12 @@ const repository = {
   findOrganizationDecision: vi.fn(),
 } satisfies PermissionDecisionRepository;
 
-const service = new PermissionsService(repository);
+const credentials = {
+  findApiKeyDecision: vi.fn(),
+  findProjectScope: vi.fn(),
+} satisfies CredentialDecisionRepository;
+
+const service = new PermissionsService({ decisions: repository, credentials });
 
 describe("PermissionsService typed facade", () => {
   describe("when an imperative check names its scope id", () => {

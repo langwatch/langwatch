@@ -7,7 +7,7 @@ const rbacMocks = vi.hoisted(() => ({
   hasProjectPermission: vi.fn(),
 }));
 
-vi.mock("~/server/api/rbac", () => rbacMocks);
+vi.mock("~/server/app-layer/permissions/imperative", () => rbacMocks);
 
 const planMocks = vi.hoisted(() => ({
   getActivePlan: vi.fn(),
@@ -124,7 +124,7 @@ describe("assertCanWriteRetentionScope", () => {
       ).resolves.toBeUndefined();
 
       expect(rbacMocks.hasOrganizationPermission).toHaveBeenCalledWith(
-        { prisma, session },
+        { session },
         "org_1",
         "organization:manage",
       );
@@ -157,7 +157,6 @@ describe("assertCanDisableRetention", () => {
     it("allows disabling retention", () => {
       process.env.ADMIN_EMAILS = "ops@langwatch.ai,admin@langwatch.ai";
       const adminCtx = {
-        prisma,
         session: { user: { id: "u1", email: "admin@langwatch.ai" } },
       } as any;
       expect(() => assertCanDisableRetention(adminCtx)).not.toThrow();
@@ -168,7 +167,6 @@ describe("assertCanDisableRetention", () => {
     it("throws FORBIDDEN with platform-administrator wording", () => {
       process.env.ADMIN_EMAILS = "ops@langwatch.ai";
       const orgAdminCtx = {
-        prisma,
         session: { user: { id: "u2", email: "owner@acme.com" } },
       } as any;
       try {

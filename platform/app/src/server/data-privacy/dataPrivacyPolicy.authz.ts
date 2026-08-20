@@ -4,7 +4,7 @@ import {
   hasOrganizationPermission,
   hasProjectPermission,
   hasTeamPermission,
-} from "~/server/api/rbac";
+} from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
 import type {
   DataPrivacyScope,
@@ -54,7 +54,7 @@ async function canWriteScope(
           )?.organizationId;
     if (!organizationId) return false;
     return hasOrganizationPermission(
-      { prisma: ctx.prisma, session: ctx.session },
+      { session: ctx.session },
       organizationId,
       "organization:manage",
     );
