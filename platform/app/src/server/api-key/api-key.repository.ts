@@ -45,8 +45,6 @@ export class ApiKeyRepository {
      * rather than `prisma` above, which may be one.
      */
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-    // Listing reads go through the per-organization fork (ADR-092,
-    // delivery-plan PR 3 follow-up).
     private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
       prisma,
     ),

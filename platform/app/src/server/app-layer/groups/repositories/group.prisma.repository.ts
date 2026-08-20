@@ -42,8 +42,6 @@ export class PrismaGroupRepository implements GroupRepository {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-    // Listing reads go through the per-organization fork (ADR-092,
-    // delivery-plan PR 3 follow-up).
     private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
       prisma,
     ),
