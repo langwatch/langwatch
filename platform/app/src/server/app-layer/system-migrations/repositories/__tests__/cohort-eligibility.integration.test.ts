@@ -85,8 +85,10 @@ describe("given organizations of every eligibility kind", () => {
       enrolledOrgId,
       excludedOrgId,
     ].filter((id): id is string => typeof id === "string");
+    // The tenancy guard requires the organizationId key on this model's
+    // deletes, so the sweep names the rows by owner as well as by migration.
     await prisma.systemMigrationEnrollment.deleteMany({
-      where: { migrationName: MIGRATION },
+      where: { organizationId: { in: orgIds }, migrationName: MIGRATION },
     });
     await prisma.subscription.deleteMany({
       where: { organizationId: { in: orgIds } },
