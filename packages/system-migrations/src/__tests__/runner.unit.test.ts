@@ -38,44 +38,44 @@ class FakeStateRepository implements SystemMigrationStateRepository {
 }
 
 class FakeLeaseRepository implements MigrationLeaseRepository {
-  private holder: symbol | null = null;
   private readonly self = Symbol("lease-holder");
+  private readonly holders: Map<string, symbol>;
 
-  static shared(): [FakeLeaseRepository, FakeLeaseRepository] {
-    const first = new FakeLeaseRepository();
-    const second = new FakeLeaseRepository();
-    const state = { holder: null as symbol | null };
-    for (const repo of [first, second]) {
-      repo.acquire = async () => {
-        if (state.holder !== null && state.holder !== repo.self) return false;
-        state.holder = repo.self;
-        return true;
-      };
-      repo.renew = async () => state.holder === repo.self;
-      repo.release = async () => {
-        if (state.holder === repo.self) state.holder = null;
-      };
-    }
-    return [first, second];
+  constructor(holders?: Map<string, symbol>) {
+    this.holders = holders ?? new Map();
   }
 
-  async acquire(): Promise<boolean> {
-    if (this.holder !== null && this.holder !== this.self) return false;
-    this.holder = this.self;
+  /** Two repositories over one holder table: two processes, one Redis. */
+  static shared(): [FakeLeaseRepository, FakeLeaseRepository] {
+    const holders = new Map<string, symbol>();
+    return [
+      new FakeLeaseRepository(holders),
+      new FakeLeaseRepository(holders),
+    ];
+  }
+
+  async acquire({ name }: { name: string; ttlMs: number }): Promise<boolean> {
+    const holder = this.holders.get(name);
+    if (holder !== undefined && holder !== this.self) return false;
+    this.holders.set(name, this.self);
     return true;
   }
 
-  async renew(): Promise<boolean> {
-    return this.holder === this.self;
+  async renew({ name }: { name: string; ttlMs: number }): Promise<boolean> {
+    return this.holders.get(name) === this.self;
   }
 
-  async release(): Promise<void> {
-    if (this.holder === this.self) this.holder = null;
+  async release({ name }: { name: string }): Promise<void> {
+    if (this.holders.get(name) === this.self) this.holders.delete(name);
   }
 
-  /** Hand the lease to somebody else, so renewals start coming back false. */
-  stealForAnotherProcess(): void {
-    this.holder = Symbol("other-process");
+  /** Hand one claim to somebody else, so its renewals come back false. */
+  stealForAnotherProcess(name: string): void {
+    this.holders.set(name, Symbol("other-process"));
+  }
+
+  heldNames(): string[] {
+    return [...this.holders.keys()];
   }
 }
 
@@ -112,8 +112,8 @@ describe("SystemMigrationRunnerService", () => {
   });
 
   describe("when two processes boot at the same moment", () => {
-    /** @scenario "One process drives the migration at a time" */
-    it("lets exactly one acquire the lease while the other stands down", async () => {
+    /** @scenario "Each organization is claimed by one process at a time" */
+    it("lets exactly one claim each organization while the other moves on", async () => {
       const [leaseA, leaseB] = FakeLeaseRepository.shared();
       const touched: string[] = [];
       const migration = migrationOf("m1", async ({ tenantId }) => {
@@ -145,9 +145,44 @@ describe("SystemMigrationRunnerService", () => {
         ),
       ]);
 
-      expect(summaryA?.finalized).toBe(1);
-      expect(summaryB).toBeNull();
+      expect(summaryA.finalized).toBe(1);
+      // B's pass ran - it did not stand down - but left "acme" to A.
+      expect(summaryB.claimed).toBe(1);
+      expect(summaryB.finalized).toBe(0);
       expect(touched).toEqual(["acme"]);
+    });
+  });
+
+  describe("when several organizations are pending", () => {
+    /** @scenario "A pass migrates several organizations at once" */
+    it("works them concurrently, so one slow organization never holds up the rest", async () => {
+      let inFlight = 0;
+      let peak = 0;
+      const migration = migrationOf("m1", async ({ tenantId }) => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise((resolve) =>
+          setTimeout(resolve, tenantId === "org-00" ? 40 : 5),
+        );
+        inFlight -= 1;
+        return finalized;
+      });
+      const ids = Array.from(
+        { length: 12 },
+        (_, i) => `org-${String(i).padStart(2, "0")}`,
+      );
+      const runner = new SystemMigrationRunnerService({
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(ids),
+        cohort: () => true,
+        migrations: [migration],
+      });
+
+      const summary = await runner.runPass();
+
+      expect(summary.finalized).toBe(12);
+      expect(peak).toBeGreaterThan(1);
     });
   });
 
@@ -417,37 +452,54 @@ describe("SystemMigrationRunnerService", () => {
     });
   });
 
-  describe("when the lease is lost while one tenant is still migrating", () => {
-    /** @scenario "The pass keeps its lease while one large organization migrates" */
-    it("stops at the next tenant rather than double-driving the fleet", async () => {
+  describe("when a claim is lost while one tenant is still migrating", () => {
+    /** @scenario "The pass keeps its claim while one large organization migrates" */
+    it("stops that tenant's remaining migrations and carries on with the rest", async () => {
       const lease = new FakeLeaseRepository();
       const touched: string[] = [];
-      const migration = migrationOf("m1", async ({ tenantId }) => {
-        touched.push(tenantId);
-        // Outlive the renew interval, then lose the lease to another driver
-        // mid-tenant - the case a between-tenants renewal cannot detect.
-        if (tenantId === "acme") {
-          lease.stealForAnotherProcess();
+      const migrationBody = async ({
+        tenantId,
+        name,
+      }: {
+        tenantId: string;
+        name: string;
+      }) => {
+        touched.push(`${name}:${tenantId}`);
+        // Outlive the renew interval, then lose the claim to another driver
+        // mid-tenant - the case a between-migrations renewal cannot detect.
+        if (tenantId === "acme" && name === "m1") {
+          lease.stealForAnotherProcess("tenant:acme");
           await new Promise((resolve) => setTimeout(resolve, 30));
         }
         return finalized;
-      });
+      };
       const runner = new SystemMigrationRunnerService({
         state,
         lease,
         tenants: tenantSourceOf(["acme", "globex"]),
         cohort: () => true,
-        migrations: [migration],
+        migrations: [
+          migrationOf("m1", ({ tenantId }) =>
+            migrationBody({ tenantId, name: "m1" }),
+          ),
+          migrationOf("m2", ({ tenantId }) =>
+            migrationBody({ tenantId, name: "m2" }),
+          ),
+        ],
         leaseTtlMs: 50,
         leaseRenewIntervalMs: 5,
       });
 
       const summary = await runner.runPass();
 
-      expect(touched).toEqual(["acme"]);
-      expect(summary?.tenantsSeen).toBe(1);
+      // The stolen claim stops "acme" before m2; "globex" is unaffected.
+      expect(touched).toContain("m1:acme");
+      expect(touched).not.toContain("m2:acme");
+      expect(touched).toContain("m1:globex");
+      expect(touched).toContain("m2:globex");
+      expect(summary.tenantsSeen).toBe(2);
       expect(
-        await state.findRecord({ migrationName: "m1", tenantId: "globex" }),
+        await state.findRecord({ migrationName: "m2", tenantId: "acme" }),
       ).toBeNull();
     });
   });
@@ -488,7 +540,7 @@ describe("SystemMigrationRunnerService", () => {
   });
 
   describe("when the pass is aborted", () => {
-    it("stops between tenants and releases the lease", async () => {
+    it("stops between tenants and releases every claim", async () => {
       const controller = new AbortController();
       const lease = new FakeLeaseRepository();
       const migration = migrationOf("m1", async () => {
@@ -499,6 +551,9 @@ describe("SystemMigrationRunnerService", () => {
         state,
         lease,
         tenants: tenantSourceOf(["acme", "globex"]),
+        // Serial on purpose: with a wider pool "globex" is already in
+        // flight before the abort lands, which is fine but not this test.
+        tenantConcurrency: 1,
         cohort: () => true,
         migrations: [migration],
       });
@@ -509,7 +564,8 @@ describe("SystemMigrationRunnerService", () => {
       expect(
         await state.findRecord({ migrationName: "m1", tenantId: "globex" }),
       ).toBeNull();
-      expect(await lease.acquire()).toBe(true);
+      // Every claim released, aborted mid-pass or not.
+      expect(lease.heldNames()).toEqual([]);
     });
   });
 

@@ -607,7 +607,7 @@ export async function runSystemMigrationTargetedPass({
   organizationId: string;
   migrationName: string;
   signal?: AbortSignal;
-}): Promise<MigrationPassSummary | null> {
+}): Promise<MigrationPassSummary> {
   const redis = tryGetApp()?.redis ?? null;
   const runner = new SystemMigrationRunnerService({
     state: systemMigrationState,
@@ -639,7 +639,7 @@ export async function runSystemMigrationPass(args?: {
    * no-op. Callers that run after startup (the ops action) can omit it.
    */
   redis?: Redis | Cluster | null;
-}): Promise<MigrationPassSummary | null> {
+}): Promise<MigrationPassSummary> {
   warnWhenRetiredCohortVariablesAreSet();
   const redis = args?.redis ?? tryGetApp()?.redis ?? null;
   const runner = new SystemMigrationRunnerService({

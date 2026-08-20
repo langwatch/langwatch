@@ -17,10 +17,13 @@ function serviceWith({
   eligible = organizations(10),
   isSaaS = true,
   privateDataplaneOrganizationIds = [],
+  migrationNames = [MIGRATION],
 }: {
   eligible?: Array<{ id: string; name: string }>;
   isSaaS?: boolean;
   privateDataplaneOrganizationIds?: string[];
+  /** Registered migrations, in the order they run per organization. */
+  migrationNames?: string[];
 } = {}) {
   const findCohortEligibleOrganizations = vi
     .fn<SystemMigrationEnrollmentStore["findCohortEligibleOrganizations"]>()
@@ -38,15 +41,14 @@ function serviceWith({
       findRecord: vi.fn(),
       upsertRecord: vi.fn(),
     },
-    migrations: () => [
-      {
-        name: MIGRATION,
-        title: MIGRATION,
-        description: MIGRATION,
+    migrations: () =>
+      migrationNames.map((name) => ({
+        name,
+        title: name,
+        description: name,
         requiresOperatorConfirmation: false,
         runsAutomaticallyOnSelfHosted: false,
-      },
-    ],
+      })),
     isSaaS: () => isSaaS,
     enrollments: {
       findAll: vi.fn(),
@@ -120,8 +122,40 @@ describe("SystemMigrationsService.enrollCohort", () => {
 
         expect(findCohortEligibleOrganizations).toHaveBeenCalledWith({
           migrationName: MIGRATION,
+          enrolledForMigrationName: undefined,
           excludeOrganizationIds: ["org_isolated_inc"],
         });
+      });
+
+      /** @scenario "A later step's cohort samples only organizations enrolled for the step before it" */
+      it("pools a later step from the step before it, and the first step from everyone", async () => {
+        const { service, findCohortEligibleOrganizations } = serviceWith({
+          migrationNames: ["authz-team-user-backfill", MIGRATION],
+        });
+
+        await service.enrollCohort({
+          migrationName: MIGRATION,
+          sampleSize: 5,
+          actorUserId: "user_ops",
+        });
+        expect(findCohortEligibleOrganizations).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            migrationName: MIGRATION,
+            enrolledForMigrationName: "authz-team-user-backfill",
+          }),
+        );
+
+        await service.enrollCohort({
+          migrationName: "authz-team-user-backfill",
+          sampleSize: 5,
+          actorUserId: "user_ops",
+        });
+        expect(findCohortEligibleOrganizations).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            migrationName: "authz-team-user-backfill",
+            enrolledForMigrationName: undefined,
+          }),
+        );
       });
     });
 

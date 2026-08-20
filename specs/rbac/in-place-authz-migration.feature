@@ -43,11 +43,19 @@ Feature: In-place authorization data migration
   # ============================================================================
 
   @unit
-  Scenario: One process drives the migration at a time
+  Scenario: Each organization is claimed by one process at a time
     Given two worker processes boot at the same moment
-    When both attempt to start the migration pass
-    Then exactly one acquires the lease and processes organizations
-    And the other stands down without touching any state
+    When both passes reach "acme" together
+    Then exactly one claims "acme" and migrates it
+    And the other leaves "acme" to the claim holder and moves on
+    And neither pass stands down as a whole
+
+  @unit
+  Scenario: A pass migrates several organizations at once
+    Given a fleet of pending organizations
+    When a migration pass runs
+    Then organizations migrate concurrently, several at a time
+    And one slow organization never holds up the rest of the fleet
 
   @unit
   Scenario: A self-hosted installation migrates every organization automatically
@@ -100,12 +108,12 @@ Feature: In-place authorization data migration
     And a pass that errors on "acme" cannot park over the rollback either
 
   @unit
-  Scenario: The pass keeps its lease while one large organization migrates
-    Given migrating "acme" takes longer than a single lease term
+  Scenario: The pass keeps its claim while one large organization migrates
+    Given migrating "acme" takes longer than a single claim term
     When the pass is working through "acme"
-    Then the lease is renewed for as long as the pass runs
-    And a lease lost to another process stops this pass at the next
-      organization
+    Then "acme"'s claim is renewed for as long as its migration runs
+    And a claim lost to another process stops work on "acme" only, while the
+      pass carries on with the other organizations
 
   # ============================================================================
   # Enrollment and self-hosted release pacing
@@ -217,6 +225,13 @@ Feature: In-place authorization data migration
     And the cohort is drawn entirely from organizations with no enrollment row
 
   @unit
+  Scenario: A later step's cohort samples only organizations enrolled for the step before it
+    Given "acme" is enrolled for the team backfill and "globex" is not
+    When an operator enrolls a cohort for the grants import
+    Then "acme" can be picked and "globex" cannot
+    And the first step's cohort keeps sampling from every organization
+
+  @unit
   Scenario: A cohort larger than the eligible pool enrolls the whole pool
     Given fewer eligible organizations remain than the requested cohort size
     When an operator enrolls the cohort
@@ -323,10 +338,10 @@ Feature: In-place authorization data migration
 
   @unit
   Scenario: A targeted run while a pass is already running is refused
-    Given a migration pass holds the fleet-wide lease
-    When an operator runs a migration for one organization now
+    Given a migration pass holds "acme"'s claim
+    When an operator runs a migration for "acme" now
     Then the run is refused with error code "migration_pass_already_running"
-    And the operator can simply retry once the pass concludes
+    And the operator can simply retry once that pass concludes
 
   # ============================================================================
   # The backfill (runbook M1)

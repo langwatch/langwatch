@@ -168,10 +168,9 @@ export class MigrationRunRequiresEnrollmentError extends HandledError {
 }
 
 /**
- * A targeted run refused because another pass holds the fleet-wide lease.
- * Not a failure of anything: the running pass may well be processing the
- * very organization the operator asked about, and the operator's action is
- * simply to retry once it concludes.
+ * A targeted run refused because another pass holds this organization's
+ * claim - it is being migrated right now. Not a failure of anything: the
+ * operator's action is simply to retry once that pass concludes.
  */
 export class MigrationPassAlreadyRunningError extends HandledError {
   declare readonly code: "migration_pass_already_running";
@@ -179,7 +178,7 @@ export class MigrationPassAlreadyRunningError extends HandledError {
   constructor() {
     super(
       "migration_pass_already_running",
-      "A migration pass is already running; try again once it concludes",
+      "This organization is already being migrated; try again once that pass concludes",
       { httpStatus: 409, fault: "customer" },
     );
     this.name = "MigrationPassAlreadyRunningError";

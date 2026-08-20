@@ -68,4 +68,6 @@ export type MigrationPassSummary = {
   parked: number;
   /** Finalized or rolled back before this pass, or outside the cohort. */
   skipped: number;
+  /** Claimed by another process's pass, so left to that process. */
+  claimed: number;
 };

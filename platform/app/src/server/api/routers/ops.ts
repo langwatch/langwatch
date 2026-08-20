@@ -1621,9 +1621,9 @@ export const opsRouter = createTRPCRouter({
   /**
    * Kick a migration pass now instead of waiting for the next worker boot -
    * the lever for processing a fresh enrollment right away or re-verifying
-   * held tenants after remediation. Fire-and-forget: the fleet-wide lease already
-   * guarantees a single driver, so the worst case for a double click is a
-   * pass that stands down immediately.
+   * held tenants after remediation. Fire-and-forget: per-organization claims
+   * already keep two passes off the same organization, so the worst case for
+   * a double click is a pass that finds everything claimed and does nothing.
    */
   runSystemMigrationPass: protectedProcedure
     .use(opsManagePermission)

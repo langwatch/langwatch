@@ -113,5 +113,23 @@ describe("given organizations of every eligibility kind", () => {
       expect(poolIds.has(enrolledOrgId)).toBe(false);
       expect(poolIds.has(excludedOrgId)).toBe(false);
     });
+
+    /** @scenario "A later step's cohort samples only organizations enrolled for the step before it" */
+    it("narrows to the predecessor's enrollment when one is named", async () => {
+      const laterStep = `${MIGRATION}-later`;
+      // Only the organization already enrolled for MIGRATION (the
+      // predecessor here) may enter the later step's pool; the plain
+      // organization, eligible for the first step, is not enrolled for the
+      // predecessor and stays out.
+      const pool = await repository.findCohortEligibleOrganizations({
+        migrationName: laterStep,
+        enrolledForMigrationName: MIGRATION,
+        excludeOrganizationIds: [],
+      });
+      const poolIds = new Set(pool.map((organization) => organization.id));
+
+      expect(poolIds.has(enrolledOrgId)).toBe(true);
+      expect(poolIds.has(plainOrgId)).toBe(false);
+    });
   });
 });

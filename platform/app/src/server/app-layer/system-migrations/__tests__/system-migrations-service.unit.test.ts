@@ -79,7 +79,7 @@ function targetedPassStub() {
       (args: {
         organizationId: string;
         migrationName: string;
-      }) => Promise<MigrationPassSummary | null>
+      }) => Promise<MigrationPassSummary>
     >()
     .mockResolvedValue({
       tenantsSeen: 1,
@@ -87,6 +87,7 @@ function targetedPassStub() {
       held: 0,
       parked: 0,
       skipped: 0,
+      claimed: 0,
     });
 }
 
@@ -852,12 +853,19 @@ describe("SystemMigrationsService.runForOrganization", () => {
     });
   });
 
-  describe("when another pass holds the fleet-wide lease", () => {
+  describe("when another pass holds the organization's claim", () => {
     /** @scenario "A targeted run while a pass is already running is refused" */
     it("refuses with migration_pass_already_running", async () => {
       const { service } = serviceWith({
         record: null,
-        runTargetedPass: targetedPassStub().mockResolvedValue(null),
+        runTargetedPass: targetedPassStub().mockResolvedValue({
+          tenantsSeen: 1,
+          finalized: 0,
+          held: 0,
+          parked: 0,
+          skipped: 0,
+          claimed: 1,
+        }),
       });
 
       await expect(

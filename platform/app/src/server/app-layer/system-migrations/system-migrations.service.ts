@@ -88,6 +88,9 @@ export interface SystemMigrationEnrollmentStore {
   }): Promise<void>;
   findCohortEligibleOrganizations(args: {
     migrationName: string;
+    /** When set, the pool is restricted to organizations already enrolled
+     *  for this migration - a later step samples the step before it. */
+    enrolledForMigrationName?: string;
     excludeOrganizationIds: string[];
   }): Promise<Array<{ id: string; name: string }>>;
   createMany(args: {
@@ -211,17 +214,18 @@ export class SystemMigrationsService {
         action: string;
         args?: Record<string, unknown>;
       }) => Promise<void>;
-      runPass: () => Promise<MigrationPassSummary | null>;
+      runPass: () => Promise<MigrationPassSummary>;
       /**
-       * One migration for one organization, now, under the same fleet-wide
-       * lease as a full pass (null when another pass holds it). The
+       * One migration for one organization, now, under the same
+       * per-organization claim as a full pass (the summary's `claimed`
+       * says another pass is already working the organization). The
        * composition supplies it because only the composition can build a
        * runner scoped to a single (tenant, migration) pair.
        */
       runTargetedPass: (args: {
         organizationId: string;
         migrationName: string;
-      }) => Promise<MigrationPassSummary | null>;
+      }) => Promise<MigrationPassSummary>;
       /**
        * Whether a migration's stored report means it merely WAITED, per
        * migration name. The state machine has no waiting status, so a
@@ -433,9 +437,19 @@ export class SystemMigrationsService {
   }> {
     if (!this.deps.isSaaS()) throw new MigrationEnrollmentCloudOnlyError();
     this.requireRegisteredMigration(migrationName);
+    // The steps run as an ordered pipeline per organization, so a later
+    // step's pool is the step before it: an organization enrolled for a
+    // step whose predecessor nothing will ever run would sit pending
+    // forever. The first step keeps sampling the whole installation.
+    const ordered = this.deps.migrations();
+    const index = ordered.findIndex(
+      (migration) => migration.name === migrationName,
+    );
+    const previous = index > 0 ? ordered[index - 1] : undefined;
     const eligible =
       await this.deps.enrollments.findCohortEligibleOrganizations({
         migrationName,
+        enrolledForMigrationName: previous?.name,
         excludeOrganizationIds: this.deps.privateDataplaneOrganizationIds(),
       });
     const picked = sample({ pool: eligible, count: sampleSize });
@@ -550,7 +564,7 @@ export class SystemMigrationsService {
       organizationId,
       migrationName,
     });
-    if (summary === null) throw new MigrationPassAlreadyRunningError();
+    if (summary.claimed > 0) throw new MigrationPassAlreadyRunningError();
     const record = await this.deps.state.findRecord({
       migrationName,
       tenantId: organizationId,

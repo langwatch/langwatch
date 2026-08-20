@@ -201,6 +201,17 @@ describe("authzGrantsState projection", () => {
     });
   }
 
+  describe("when a backed-up organization has many events queued", () => {
+    it("declares batch coalescing, so a backlog drains in load/apply/store cycles rather than one queue dispatch per event", () => {
+      // The state-projection lane defaults to one event per dispatch; on a
+      // loaded queue that is seconds per fact, and a genesis import's few
+      // hundred facts overran the convergence budget and parked the
+      // organization on every pass. The declaration is what turns on the
+      // queue's batch path - without it the executor's batching is dead code.
+      expect(projection.options?.coalesceMaxBatch ?? 1).toBeGreaterThan(1);
+    });
+  });
+
   describe("when events fold through the reducer", () => {
     it("attaches, learns the organization, and carries the envelope's business time onto the fact", () => {
       const state = projection.apply(

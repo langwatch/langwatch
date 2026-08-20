@@ -146,14 +146,18 @@ export class PrismaSystemMigrationEnrollmentRepository {
    * The cohort's eligible pool for one migration: organizations with no
    * enrollment row for it, no active enterprise subscription, and not on the
    * caller's exclusion list (the private-dataplane organizations, whose ids
-   * the composition reads from the environment). Ids and names only - the
+   * the composition reads from the environment). A later pipeline step
+   * passes `enrolledForMigrationName` and the pool narrows to organizations
+   * already enrolled for that predecessor. Ids and names only - the
    * service samples from this in memory, so the pool never needs an order.
    */
   async findCohortEligibleOrganizations({
     migrationName,
+    enrolledForMigrationName,
     excludeOrganizationIds,
   }: {
     migrationName: string;
+    enrolledForMigrationName?: string;
     excludeOrganizationIds: string[];
   }): Promise<Array<{ id: string; name: string }>> {
     // The enrollment table has no relation to Organization (a plain string
@@ -163,9 +167,19 @@ export class PrismaSystemMigrationEnrollmentRepository {
       where: { migrationName },
       select: { organizationId: true },
     });
+    const pool =
+      enrolledForMigrationName === undefined
+        ? undefined
+        : (
+            await this.prisma.systemMigrationEnrollment.findMany({
+              where: { migrationName: enrolledForMigrationName },
+              select: { organizationId: true },
+            })
+          ).map((row) => row.organizationId);
     return this.prisma.organization.findMany({
       where: {
         id: {
+          ...(pool === undefined ? {} : { in: pool }),
           notIn: [
             ...excludeOrganizationIds,
             ...enrolled.map((row) => row.organizationId),
