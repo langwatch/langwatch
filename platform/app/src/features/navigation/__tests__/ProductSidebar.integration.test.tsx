@@ -60,6 +60,12 @@ vi.mock("~/utils/compat/next-router", () => ({
   }),
 }));
 
+// The sidebar marks its entries against the address in the address bar, not
+// the route pattern, so this is the one the fixtures below set.
+vi.mock("~/utils/compat/next-navigation", () => ({
+  usePathname: () => mockPathname,
+}));
+
 vi.mock("~/hooks/useRequiredSession", () => ({
   useRequiredSession: () => ({
     data: {

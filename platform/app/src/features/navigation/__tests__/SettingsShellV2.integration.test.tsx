@@ -46,9 +46,20 @@ const organization = {
   teams: [team],
 };
 
+// The real resolver, so `router.pathname` carries the route pattern here
+// exactly as it does in the app. Returning the address instead hid a bug
+// where the settings menu matched its entries against the pattern: one
+// `/settings/*` pattern covers nearly every settings page, so none matched.
+const { resolvePathname } = await vi.hoisted(
+  async () =>
+    await vi.importActual<typeof import("~/utils/compat/next-router")>(
+      "~/utils/compat/next-router",
+    ),
+);
+
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
-    pathname: mockPathname,
+    pathname: resolvePathname(mockPathname),
     query: {},
     asPath: mockPathname,
     push: pushMock,
@@ -413,6 +424,19 @@ describe("the settings shell in a new navigation mode", () => {
       expect(entries.indexOf("API Keys")).toBeLessThan(
         entries.indexOf("Members"),
       );
+    });
+
+    /** @scenario The menu marks the page that is open */
+    it("marks the entry of the page on screen, and only that one", () => {
+      mockPathname = "/settings/email-suppressions";
+      renderSettings();
+
+      const marked = within(screen.getByTestId("sidebar-scroll-region"))
+        .getAllByRole("link")
+        .filter((link) => link.getAttribute("aria-current") === "page")
+        .map((link) => link.textContent?.trim());
+
+      expect(marked).toEqual(["Email Suppressions"]);
     });
 
     it("hides the enterprise entries outside an enterprise plan", () => {

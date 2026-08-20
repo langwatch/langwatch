@@ -35,6 +35,7 @@ import {
   UsersRound,
   Workflow,
 } from "lucide-react";
+import { isPathUnder } from "~/features/navigation/products";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
@@ -60,6 +61,28 @@ export interface SettingsMenuItem {
   icon: LucideIcon;
   /** Enterprise-plan entry; renders the quiet grey pill. */
   isEnterprise?: boolean;
+}
+
+/**
+ * Whether a settings entry is the page on screen.
+ *
+ * `pathname` is the address in the address bar, never the route pattern the
+ * compat router resolves: `/settings/*` is one registered pattern, so every
+ * settings page but General and Audit Log reports the same
+ * `/settings/[[...path]]` and no entry matched.
+ *
+ * Spec: specs/navigation/settings-shell-v2.feature
+ */
+export function isSettingsMenuItemActive({
+  item,
+  pathname,
+}: {
+  item: SettingsMenuItem;
+  pathname: string;
+}): boolean {
+  if (item.alsoActiveAt?.includes(pathname)) return true;
+  if (item.isExactMatch) return pathname === item.href;
+  return isPathUnder({ pathname, base: item.includePath ?? item.href });
 }
 
 export interface SettingsMenuGroup {

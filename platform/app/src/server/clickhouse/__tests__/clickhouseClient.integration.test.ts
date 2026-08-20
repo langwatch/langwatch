@@ -14,7 +14,10 @@ import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "~/server/db";
-import { startTestClickHouseEndpoints } from "~/test-utils/clickhouseTestEndpoints";
+import {
+  privateRouteOrgId,
+  startTestClickHouseEndpoints,
+} from "~/test-utils/clickhouseTestEndpoints";
 
 const TEST_TABLE = "routing_test";
 
@@ -22,11 +25,13 @@ let sharedClient: ClickHouseClient;
 let privateClient: ClickHouseClient;
 
 // The org IDs we'll use — set the env var BEFORE importing clickhouseClient
-const PRIVATE_ORG_ID = `test-private-org-${nanoid(6)}`;
-const SHARED_ORG_ID = `test-shared-org-${nanoid(6)}`;
+const PRIVATE_ORG_ID = privateRouteOrgId("test-private-org");
+const SHARED_ORG_ID = privateRouteOrgId("test-shared-org");
 // An organization that owns no project, because it is the tenant itself: the
 // grants ledger's aggregate is one organization (ADR-092 §13).
-const PRIVATE_ORG_ID_WITHOUT_PROJECTS = `test-private-org-tenant-${nanoid(6)}`;
+const PRIVATE_ORG_ID_WITHOUT_PROJECTS = privateRouteOrgId(
+  "test-private-org-tenant",
+);
 
 // Table names stay unqualified throughout: each endpoint's client carries its
 // own database in the connection URL, and that is precisely the separation
