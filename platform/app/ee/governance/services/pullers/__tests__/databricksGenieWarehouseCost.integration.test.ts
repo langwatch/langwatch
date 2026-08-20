@@ -361,14 +361,25 @@ describe("a source that names a warehouse", () => {
     // The statement's end is read, and reconstructed when the row has none —
     // an in-flight statement with a null end_time would otherwise drop out of
     // the denominator entirely.
-    expect(sql).toContain("end_time");
+    expect(sql).toMatch(/COALESCE\(\s*end_time,/);
     expect(sql).toContain("execution_duration_ms");
 
-    // One row per hour the statement was awake in, not one per statement.
-    expect(sql).toMatch(/explode\(\s*sequence\(/);
+    // One row per hour the statement was awake in, not one per statement, and
+    // the span it is cut into runs from the statement's own start. Naming the
+    // bound matters more than naming the alias: bucketing every statement back
+    // into its start hour would keep all the aliases below and change only
+    // this line, which is exactly the defect this test exists to catch.
+    expect(sql).toMatch(
+      /explode\(\s*sequence\(\s*date_trunc\('HOUR',\s*r\.start_time\)/,
+    );
 
-    // And the share's numerator is the part of the runtime inside THAT hour.
+    // And the share's numerator is the part of the runtime inside THAT hour,
+    // divided with `div`. Spark's `/` returns a DOUBLE; a float here is money
+    // computed in floating point, which the rest of this path is built to
+    // avoid.
     expect(sql).toContain("execution_ms_in_hour");
+    expect(sql).toMatch(/r\.execution_duration_ms\s*\*[\s\S]{0,200}?\bdiv\b/);
+    expect(sql).not.toMatch(/r\.execution_duration_ms\s*\//);
 
     // The hour each row belongs to travels with it. Without it the allocator
     // cannot tell one statement's two hours from one hour's two SKUs, and it
