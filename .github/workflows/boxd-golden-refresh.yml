@@ -29,8 +29,9 @@ env:
   # Poll budgets, in seconds. They must sum to less than timeout-minutes below,
   # with headroom for the gates and the snapshot save, so that a stuck refresh
   # ends in this workflow's own diagnostics instead of a bare job cancellation.
-  REFRESH_WAIT_SECONDS: "3300" # 55 min
+  REFRESH_WAIT_SECONDS: "2700" # 45 min (a full cold refresh was observed at ~31)
   HEALTH_WAIT_SECONDS: "1200" # 20 min
+  SNAPSHOT_WAIT_SECONDS: "900" # 15 min
 
 jobs:
   refresh-golden:
@@ -146,8 +147,31 @@ jobs:
         env:
           BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
         run: |
-          boxd snapshots save "$GOLDEN" "$SNAPSHOT" --json
+          # `boxd snapshots save` gives up on its own client-side timeout while
+          # the snapshot is still being written — observed becoming ready about
+          # six minutes after the CLI returned an error. Treat the save as a
+          # request and poll for the result, so a slow snapshot is not reported
+          # as a failed refresh.
+          BEFORE=$(boxd snapshots list | awk -v n="$SNAPSHOT" '$1==n {print $2}')
+          echo "version before save: ${BEFORE:-none}"
+          boxd snapshots save "$GOLDEN" "$SNAPSHOT" --json \
+            || echo "save returned non-zero — polling for the snapshot to become ready"
+          DEADLINE=$(( $(date +%s) + SNAPSHOT_WAIT_SECONDS ))
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            ROW=$(boxd snapshots list | awk -v n="$SNAPSHOT" '$1==n {print $2, $3}')
+            echo "snapshot: ${ROW:-absent}"
+            # A new version in ready state is the only success: without the
+            # version check, an older ready snapshot would pass this gate while
+            # today's save was still pending.
+            case "$ROW" in
+              "$BEFORE "*) : ;;
+              *" ready") echo "snapshot ready"; boxd snapshots list; exit 0 ;;
+            esac
+            sleep 30
+          done
+          echo "snapshot did not become ready within ${SNAPSHOT_WAIT_SECONDS}s"
           boxd snapshots list
+          exit 1
 
       # Best effort: on cancellation the runner kills the steps above, but the
       # detached refresh keeps running on the golden. Kill only this run's own
