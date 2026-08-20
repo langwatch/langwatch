@@ -340,13 +340,13 @@ async function resolveWorkspaceToken(params: {
  *   it cannot invent or lose one, so a statement's total share is unaffected
  *   and only its per-hour split is approximate.
  *
- *   A statement still running when the chunk's upper edge falls loses the tail
- *   past that edge, and the hours in it under-count their denominator, which
- *   over-states everyone else's share of those hours. At the top of the sweep
- *   this heals: the settling lag re-reads those hours and the later answer
- *   overwrites. At an interior chunk boundary during a backfill it does not —
- *   the cost of chunking a backfill, bounded to statements longer than the
- *   settling lag that also straddle a 7-day edge.
+ *   A statement still running when the chunk's upper edge falls is priced from
+ *   both sides — this chunk emits the hours below the edge, the next one emits
+ *   the hours above it, and the sweep adds them. What does not survive is a
+ *   tail whose chunk is HELD: an hour there with no bill yet stops the sweep,
+ *   the question is emitted with the part that did price, and the re-read drops
+ *   the hint rather than restating it. Bounded to statements that straddle a
+ *   chunk edge AND run into an hour the workspace has not billed.
  *
  *   The look-back that catches statements which began BEFORE the window is
  *   bounded (`WAREHOUSE_COST_STRADDLE_LOOKBACK_MS`). A statement running longer
