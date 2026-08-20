@@ -448,7 +448,7 @@ sidebarTitle: Handing the reins to your agent
 keywords: langwatchql, lwql, agent, claude code, cursor, llm, sql, analytics
 ---
 
-LWQL was designed to be driven by an agent as much as by a person. Every part of the surface is machine-legible: the schema endpoint describes each dataset down to column descriptions and units, errors carry stable codes with the exact parameter names that were missing, and diagnostics tell the agent when its answer is technically correct but probably not what was meant.
+LWQL was designed to be driven by an agent. Every part of the surface is machine-legible: the schema endpoint describes each dataset down to column descriptions and units, errors carry stable codes with the exact parameter names that were missing, and diagnostics tell the agent when its answer is technically correct but probably not what was meant.
 
 That means you can hand your coding agent — Claude Code, Cursor, or anything that can make HTTP calls — an API key and a question like *"why did our LLM costs spike on Tuesday?"* and let it figure out the SQL.
 
