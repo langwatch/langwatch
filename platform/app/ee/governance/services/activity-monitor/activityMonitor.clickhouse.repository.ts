@@ -107,9 +107,7 @@ const spendByDepartmentRowSchema = z.object({
   requests: z.string(),
   lastActivityMs: z.string(),
 });
-export type SpendByDepartmentChRow = z.infer<
-  typeof spendByDepartmentRowSchema
->;
+export type SpendByDepartmentChRow = z.infer<typeof spendByDepartmentRowSchema>;
 
 // -- 4. Spend by team source --
 
@@ -120,9 +118,7 @@ const spendByTeamSourceRowSchema = z.object({
   thisRequests: z.string(),
   lastActivityMs: z.string(),
 });
-export type SpendByTeamSourceChRow = z.infer<
-  typeof spendByTeamSourceRowSchema
->;
+export type SpendByTeamSourceChRow = z.infer<typeof spendByTeamSourceRowSchema>;
 
 // -- 5. Spend over time --
 
@@ -148,10 +144,7 @@ const pushedEventRowSchema = z.object({
   eventType: z.string().catch(""),
   actor: z.string().catch(""),
   target: z.string().nullable().catch(null),
-  costUsd: z
-    .union([z.string(), z.number()])
-    .transform(String)
-    .catch("0"),
+  costUsd: z.union([z.string(), z.number()]).transform(String).catch("0"),
   tokensInput: chNumeric,
   tokensOutput: chNumeric,
   occurredMs: z.string(),
@@ -230,9 +223,7 @@ export class ActivityMonitorClickHouseRepository {
       },
       format: "JSONEachRow",
     });
-    const rows = summarySpendRowSchema
-      .array()
-      .parse(await result.json());
+    const rows = summarySpendRowSchema.array().parse(await result.json());
     return rows[0] ?? EMPTY_SUMMARY_SPEND;
   }
 
@@ -700,9 +691,7 @@ export class ActivityMonitorClickHouseRepository {
       },
       format: "JSONEachRow",
     });
-    const rows = windowCountRowSchema
-      .array()
-      .parse(await result.json());
+    const rows = windowCountRowSchema.array().parse(await result.json());
     return rows[0];
   }
 
@@ -741,9 +730,7 @@ export class ActivityMonitorClickHouseRepository {
       },
       format: "JSONEachRow",
     });
-    const rows = windowCountRowSchema
-      .array()
-      .parse(await result.json());
+    const rows = windowCountRowSchema.array().parse(await result.json());
     return rows[0];
   }
 
@@ -788,9 +775,7 @@ export class ActivityMonitorClickHouseRepository {
       },
       format: "JSONEachRow",
     });
-    const rows = windowCountRowSchema
-      .array()
-      .parse(await result.json());
+    const rows = windowCountRowSchema.array().parse(await result.json());
     return rows[0];
   }
 }

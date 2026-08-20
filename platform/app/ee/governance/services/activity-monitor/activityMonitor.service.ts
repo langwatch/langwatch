@@ -31,6 +31,7 @@
  *   - specs/ai-gateway/governance/architecture-invariants.feature
  *     (single trace store, reserved namespaces)
  */
+import type { ClickHouseClient } from "@clickhouse/client";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 
@@ -53,14 +54,15 @@ import {
 
 // Re-export shared types so existing consumers (router, tests) don't break.
 export type {
-  SpendSortField,
   SortDir,
   SpendOverTimeGroupBy,
+  SpendSortField,
 } from "./activityMonitor.clickhouse.repository";
+
 import type {
-  SpendSortField,
   SortDir,
   SpendOverTimeGroupBy,
+  SpendSortField,
 } from "./activityMonitor.clickhouse.repository";
 
 // ---------------------------------------------------------------------------
