@@ -123,10 +123,17 @@ async function main() {
   // Seed RoleBinding rows. RoleBinding has no natural unique key Prisma
   // knows about (uniqueness is enforced via partial indexes in
   // migrations), so we deleteMany + create to stay idempotent.
-  const teams = await prisma.team.findMany({
-    where: { id: { in: owner.teamMemberships.map((m) => m.teamId) } },
-    select: { id: true, organizationId: true },
-  });
+  // Multitenancy guard rejects a Team findMany without an organizationId,
+  // even when the id filter is an empty list, so query per org.
+  const teamIds = owner.teamMemberships.map((m) => m.teamId);
+  const teams: { id: string; organizationId: string }[] = [];
+  for (const m of owner.orgMemberships) {
+    const orgTeams = await prisma.team.findMany({
+      where: { organizationId: m.organizationId, id: { in: teamIds } },
+      select: { id: true, organizationId: true },
+    });
+    teams.push(...orgTeams);
+  }
   // Multitenancy guard rejects deleteMany without organizationId, so
   // loop per org instead of one global wipe.
   for (const m of owner.orgMemberships) {
