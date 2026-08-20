@@ -44,7 +44,7 @@ function compilerBin(): string {
   return existsSync(real) ? real : resolve(APP_ROOT, "node_modules/.bin/tsc");
 }
 
-/** The set of files a project puts in its program. */
+/** Roots and everything they reach, which is what coverage means here. */
 function programFiles(project: string): Set<string> {
   const stdout = execFileSync(
     compilerBin(),
