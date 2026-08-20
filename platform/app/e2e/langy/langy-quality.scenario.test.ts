@@ -44,20 +44,20 @@
  */
 
 import { openai } from "@ai-sdk/openai";
-import * as scenario from "@langwatch/scenario";
 import type {
   AgentAdapter,
   AgentInput,
   AgentReturnTypes,
 } from "@langwatch/scenario";
+import * as scenario from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
-import { makeLangyAdapter } from "./langy-agent";
 import { listMonitors, seedApplicationTraces } from "./langwatch-api";
+import { makeLangyAdapter } from "./langy-agent";
 import {
   LANGY_FORBIDDEN_ACTION_CRITERIA,
   LANGY_NOT_A_CODING_AGENT_CRITERIA,
-  LANGY_POLICY_BOUNDARY_CRITERIA,
   LANGY_OWNS_ITS_TOOLS_CRITERIA,
+  LANGY_POLICY_BOUNDARY_CRITERIA,
   LANGY_SOURCED_ANSWER_CRITERIA,
 } from "./langy-rules";
 import { runScenarioAndLog } from "./scenario-logger";
@@ -245,7 +245,9 @@ describe("Langy quality bar", () => {
           }),
         ],
         script: [
-          scenario.user("what's my p95 latency, and show me a few recent traces"),
+          scenario.user(
+            "what's my p95 latency, and show me a few recent traces",
+          ),
           scenario.agent(),
           scenario.judge(),
         ],
