@@ -227,6 +227,29 @@ describe("given events stamped with the same millisecond straddling a page bound
   });
 });
 
+describe("given the page stays mounted while the source it addresses changes", () => {
+  it("throws away the old source's pages and loads the new source's events", async () => {
+    // Multi-hop history navigation lands on another :id without a remount;
+    // the pager must not keep showing the previous source's events.
+    const sourceA = fakeServer([
+      makeEvent("a1", BASE_TS, { actor: "actor-source-a@acme.test" }),
+    ]);
+    const sourceB = fakeServer([
+      makeEvent("b1", BASE_TS, { actor: "actor-source-b@acme.test" }),
+    ]);
+    const view = renderTable({ fetchPage: sourceA, pageSize: 10 });
+    await screen.findByText("actor-source-a@acme.test");
+
+    view.rerender(
+      <ChakraProvider value={defaultSystem}>
+        <Harness fetchPage={sourceB} pageSize={10} />
+      </ChakraProvider>,
+    );
+    await screen.findByText("actor-source-b@acme.test");
+    expect(screen.queryByText("actor-source-a@acme.test")).toBeNull();
+  });
+});
+
 describe("given the events request fails", () => {
   /** @scenario "A failed load is an error, never an empty list" */
   it("shows an error and never the empty-state walkthrough", async () => {

@@ -87,6 +87,27 @@ export function useSourceEventsPager<R extends PagerRow>({
   // in a world that no longer exists and must be discarded.
   const generationRef = useRef(0);
 
+  const reset = useCallback(() => {
+    generationRef.current += 1;
+    setPages(null);
+    setPage(1);
+    setHasMore(false);
+    setError(null);
+    setIsFetching(false);
+  }, []);
+
+  // `fetchPage` closes over the org and source ids, so a new identity
+  // means the walk now addresses different data — everything loaded so
+  // far belongs to the previous source and must go. Without this, a
+  // param-only route change (multi-hop history navigation between two
+  // detail pages) keeps showing the old source's events.
+  const previousFetchPageRef = useRef(fetchPage);
+  useEffect(() => {
+    if (previousFetchPageRef.current === fetchPage) return;
+    previousFetchPageRef.current = fetchPage;
+    reset();
+  }, [fetchPage, reset]);
+
   const fetchNextPage = useCallback(
     async (currentPages: R[][] | null, currentPageSize: number) => {
       const generation = generationRef.current;
@@ -134,15 +155,13 @@ export function useSourceEventsPager<R extends PagerRow>({
     [pages, isFetching, hasMore, pageSize, fetchNextPage],
   );
 
-  const setPageSize = useCallback((size: number) => {
-    generationRef.current += 1;
-    setPages(null);
-    setPage(1);
-    setHasMore(false);
-    setError(null);
-    setIsFetching(false);
-    setPageSizeState(size);
-  }, []);
+  const setPageSize = useCallback(
+    (size: number) => {
+      reset();
+      setPageSizeState(size);
+    },
+    [reset],
+  );
 
   const loadedPages = pages?.length ?? 0;
   const loadedCount = pages?.reduce((sum, p) => sum + p.length, 0) ?? 0;
