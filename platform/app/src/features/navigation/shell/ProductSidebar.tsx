@@ -1,6 +1,6 @@
 import { Badge, Box, Kbd, VStack } from "@chakra-ui/react";
 import { ArrowLeft, ExternalLink, Search } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { MainMenuSections } from "~/components/MainMenu";
 import { PersonalSidebarLinks } from "~/components/PersonalSidebar";
 import { SidebarSection } from "~/components/sidebar/SidebarSection";
@@ -9,6 +9,7 @@ import { SupportMenu } from "~/components/sidebar/SupportMenu";
 import { SideMenuDensityProvider } from "~/components/sidebar/sideMenuDensity";
 import { ThemeToggle } from "~/components/sidebar/ThemeToggle";
 import { UsageIndicator } from "~/components/sidebar/UsageIndicator";
+import { useRevealActiveEntryOnLoad } from "~/components/sidebar/useRevealActiveEntryOnLoad";
 import { useCommandBar } from "~/features/command-bar";
 import { getCommandBarShortcut } from "~/features/command-bar/utils/platform";
 import { APP_HEADER_HEIGHT } from "~/features/langy/logic/langyPanelLayout";
@@ -304,6 +305,9 @@ function SidebarContent({
   surface: SidebarSurface;
   showExpanded: boolean;
 }) {
+  const scrollRegionRef = useRef<HTMLDivElement>(null);
+  useRevealActiveEntryOnLoad(scrollRegionRef);
+
   return (
     <VStack
       paddingTop={2}
@@ -314,10 +318,20 @@ function SidebarContent({
       width={SHELL_SIDEBAR_WIDTH_EXPANDED}
       justifyContent="space-between"
     >
+      {/* The way back out of Settings sits above the scroll region, so a
+          long settings menu never scrolls it out of the column. */}
+      {surface === "settings" && (
+        <Box width="full" paddingX={3}>
+          <SettingsBackEntry showLabel={showExpanded} />
+        </Box>
+      )}
+
       {/* The scroll region spans the full column and carries the
           horizontal inset itself, so its scrollbar runs against the
           content panel instead of floating a padding away from it. */}
       <VStack
+        ref={scrollRegionRef}
+        data-testid="sidebar-scroll-region"
         width="full"
         paddingX={3}
         gap={0.5}
@@ -339,9 +353,6 @@ function SidebarContent({
           "&::-webkit-scrollbar-track": { background: "transparent" },
         }}
       >
-        {surface === "settings" && (
-          <SettingsBackEntry showLabel={showExpanded} />
-        )}
         <QuickSearchMenuItem showLabel={showExpanded} />
         <Box height={2} width="full" flexShrink={0} />
         <ProductSidebarBody surface={surface} showExpanded={showExpanded} />

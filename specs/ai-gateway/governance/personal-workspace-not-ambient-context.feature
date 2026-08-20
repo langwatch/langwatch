@@ -123,6 +123,39 @@ Feature: A personal workspace is never the ambient context for organization work
       # held to the membership test.
 
   # ============================================================================
+  # An organization admin reaches every team of the organization
+  # ============================================================================
+
+  Rule: an admin keeps a selection in any team they are allowed to open
+
+    An organization admin can open every team of the organization and every
+    project in it, whether or not they were added to that team. So a project
+    an admin picks stays picked on the pages that follow, including the pages
+    that name no project in their address and the app root.
+
+    A member is unchanged: they keep only the teams they were added to.
+
+    Background:
+      Given ada is an admin of "ACME"
+      And ada belongs to the shared team holding "acme-app", and not to
+        "ACME Platform"
+
+    @integration
+    Scenario: The admin's picked project survives a page that names no project
+      Given ada has just opened "ACME Platform"'s project
+      When ada opens an organization-scoped settings page
+      Then the ambient project is still "ACME Platform"'s project
+      And the ambient team is "ACME Platform"
+
+    @integration
+    Scenario: The admin's remembered team survives
+      Given ada's remembered selection names "ACME Platform"
+      When ada opens an organization-scoped settings page
+      Then the ambient team is "ACME Platform"
+      # A member still goes back to a team they were added to, which the
+      # rule above keeps covering.
+
+  # ============================================================================
   # The address bar still decides
   # ============================================================================
 

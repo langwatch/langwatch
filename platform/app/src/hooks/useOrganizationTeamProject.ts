@@ -64,6 +64,42 @@ export function userBelongsToTeam<T extends { members?: { userId: string }[] }>(
 ): boolean {
   return team.members?.some((member) => member.userId === userId) ?? false;
 }
+
+/** The caller's own role in an organization, or undefined outside one. */
+export function organizationRoleOf(
+  organization: { members?: { role: OrganizationUserRole }[] } | undefined,
+): OrganizationUserRole | undefined {
+  // `organization.getAll` narrows `members` to the caller's own row.
+  return organization?.members?.[0]?.role;
+}
+
+/**
+ * Whether the caller can be shown a team's context.
+ *
+ * A membership row answers it, and so does the organization ADMIN role on its
+ * own: `organization.getAll` hands an admin every team of the organization
+ * with no membership row in most of them, and the server grants team
+ * permissions on the admin role alone (`resolveTeamPermission`). The page body
+ * applies the same two-part test, so a context this accepts is one the chrome
+ * renders rather than refuses.
+ *
+ * A caller with no user id yet is not held to the test: the session is still
+ * resolving, and refusing there would drop a selection that is about to be
+ * valid.
+ */
+export function userCanOpenTeam<T extends { members?: { userId: string }[] }>({
+  team,
+  userId,
+  organizationRole,
+}: {
+  team: T;
+  userId: string | undefined;
+  organizationRole: OrganizationUserRole | undefined;
+}): boolean {
+  if (organizationRole === OrganizationUserRole.ADMIN) return true;
+  if (!userId) return true;
+  return userBelongsToTeam(team, userId);
+}
 /**
  * Ambient team for organization-level work.
  *
@@ -331,18 +367,27 @@ export const useOrganizationTeamProject = (
   // /[some-slug]/* into every organization-scoped page that carries no project
   // of its own. Two kinds have to be dropped there. A personal workspace is a
   // private context the caller never asked to work in, and a team the caller
-  // does not belong to is one the chrome refuses outright. Both let the
-  // ambient resolution below pick again, which also re-persists what it picks
-  // so the stale selection heals itself.
+  // cannot be shown is one the chrome refuses outright. Both let the ambient
+  // resolution below pick again, which also re-persists what it picks so the
+  // stale selection heals itself.
+  //
+  // An organization admin passes the second test on their role, so the project
+  // they picked in a team they hold no membership row in stays picked. Dropping
+  // it there sent them back to another team's project on every page that names
+  // no project, the app root included.
   //
   // A slug named in the address bar keeps resolving exactly as before,
-  // including into a team the caller is not on: the refusal that follows is
-  // the honest answer to typing someone else's project into the URL.
+  // including into a team the caller cannot open: the refusal that follows is
+  // the plain answer to typing someone else's project into the URL.
   const stickySlugIsUnusable =
     !!slugMatch &&
     !isAddressedBySlug &&
     (!!slugMatch.team.isPersonal ||
-      (!!userId && !userBelongsToTeam(slugMatch.team, userId)));
+      !userCanOpenTeam({
+        team: slugMatch.team,
+        userId,
+        organizationRole: organizationRoleOf(slugMatch.organization),
+      }));
   const resolvedSlugMatch = stickySlugIsUnusable ? undefined : slugMatch;
 
   // For demo mode, find the organization that contains the demo project
@@ -389,16 +434,21 @@ export const useOrganizationTeamProject = (
       )
     : undefined;
 
-  // The remembered selection carries the same membership requirement as the
-  // ambient pick below. Without it a persisted team id keeps resolving a team
-  // the caller is not on, long after the resolution itself stopped producing
-  // one: the selection is written from whatever last resolved, so a bad pick
-  // outlives the page that made it.
+  // The remembered selection carries the same test as the ambient pick below.
+  // Without it a persisted team id keeps resolving a team the caller cannot be
+  // shown, long after the resolution itself stopped producing one: the
+  // selection is written from whatever last resolved, so a bad pick outlives
+  // the page that made it. An organization admin passes the test on their
+  // role, so their remembered team stays remembered.
   const rememberedTeam = organization?.teams.find(
     (team) =>
       team.id == localStorageTeamId &&
       !team.isPersonal &&
-      (!userId || userBelongsToTeam(team, userId)),
+      userCanOpenTeam({
+        team,
+        userId,
+        organizationRole: organizationRoleOf(organization),
+      }),
   );
 
   const team = isDemo
@@ -616,7 +666,7 @@ export const useOrganizationTeamProject = (
     };
   }
 
-  const organizationRole = organization?.members?.[0]?.role;
+  const organizationRole = organizationRoleOf(organization);
 
   // ============================================================================
   // NEW RBAC SYSTEM - Preferred API going forward
