@@ -36,7 +36,7 @@ vi.mock("@langwatch/observability", () => ({
 // module; the tests always inject their own resolver, so stub the module out
 // of the import graph entirely.
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
+  getClickHouseClientForTenant: vi.fn(),
 }));
 
 function clientReturning(

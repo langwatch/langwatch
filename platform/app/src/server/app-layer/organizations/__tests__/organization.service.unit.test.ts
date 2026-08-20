@@ -267,9 +267,12 @@ describe("OrganizationService", () => {
           actingUserId: "admin-789",
         });
 
+        // The acting user travels with the removal: the grant revocation it
+        // emits is attributed to whoever made the decision.
         expect(mockRepo.deleteMember).toHaveBeenCalledWith({
           organizationId: "org-123",
           userId: "user-456",
+          actingUserId: "admin-789",
         });
       });
     });

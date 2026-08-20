@@ -71,6 +71,11 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // `src`, so without this root a scenario about the build could only ever be
   // @unimplemented.
   "platform/app/vite",
+  // The Langy dogfood scenario suite (e2e/langy) runs against a live stack, so
+  // it is not in any CI vitest lane — but its scenario tests are still the
+  // binding surface for @e2e-tagged specs about Langy's conversational
+  // behavior. Without this root those specs could only be @unimplemented.
+  "platform/app/e2e",
   "packages",
   "mcp/typescript/src",
   "sdks/typescript/src",
@@ -286,7 +291,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/governance-home-routing.feature",
   "specs/ai-gateway/governance/guardrails-project-scope.feature",
   "specs/ai-gateway/governance/ingestion-attribution.feature",
-  "specs/ai-gateway/governance/ingestion-sources.feature",
   "specs/ai-gateway/governance/me-usage-rest-api.feature",
   "specs/ai-gateway/governance/my-settings.feature",
   "specs/ai-gateway/governance/no-spy-mode.feature",
@@ -461,7 +465,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-context-awareness.feature",
   "specs/langy/langy-conversation-title.feature",
   "specs/langy/langy-derived-cards.feature",
-  "specs/langy/langy-dogfood-scenarios.feature",
   "specs/langy/langy-empty-state-suggestions.feature",
   "specs/langy/langy-event-sourced-conversations.feature",
   "specs/langy/langy-native-skills.feature",
@@ -469,7 +472,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-peek-dock.feature",
   "specs/langy/langy-selfhost-install.feature",
   "specs/langy/langy-session-key-lifecycle.feature",
-  "specs/langy/langy-session-key.feature",
   "specs/langy/langy-shutdown-handoff.feature",
   "specs/langy/langy-workbench-sidebar.feature",
   "specs/langy/langy-worker-isolation.feature",

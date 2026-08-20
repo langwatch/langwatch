@@ -1,7 +1,6 @@
 import { findHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
 import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import {
   createProjectApp,
   requires,

@@ -14,7 +14,8 @@ const logger = createLogger("langwatch:clickhouse:routing");
 
 /**
  * Resolver function that returns the appropriate ClickHouseClient for a given
- * tenant (projectId). Repositories use this instead of holding a fixed client,
+ * tenant — a project for most callers, an organization for the ones whose
+ * aggregate is one. Repositories use this instead of holding a fixed client,
  * enabling per-tenant routing to private ClickHouse instances.
  *
  * The type is exported; a resolver is not. One is built in the composition
@@ -79,32 +80,51 @@ function parsePrivateEnvVars(
 /** Cache of custom ClickHouse clients keyed by organizationId. */
 const customClientCache = new Map<string, ClickHouseClient>();
 
-/** Cache of projectId → organizationId to avoid repeated DB lookups. */
-const projectOrgCache = new Map<string, string>();
+/** Cache of tenantId → organizationId to avoid repeated DB lookups. */
+const tenantOrgCache = new Map<string, string>();
 
 /**
- * Returns the appropriate ClickHouse client for a given project.
+ * Returns the appropriate ClickHouse client for a given tenant.
  *
- * Resolves the project's organization (cached), then checks for a private
- * ClickHouse env var for that org. Falls back to the shared client.
+ * A tenant is usually a project, and was only ever a project until the grants
+ * ledger (ADR-092 §13) put an aggregate per ORGANIZATION into the same event
+ * store. Both kinds resolve here because routing is per-organization either
+ * way: a project contributes the organization that owns it, and an
+ * organization contributes itself.
+ *
+ * Resolves that organization (cached), then checks for a private ClickHouse
+ * env var for it. Falls back to the shared client.
+ *
+ * An id that names neither is still an error rather than the shared client:
+ * a tenant we cannot place is exactly the one whose data must not land on
+ * somebody else's instance.
  */
-export async function getClickHouseClientForProject(
-  projectId: string,
+export async function getClickHouseClientForTenant(
+  tenantId: string,
 ): Promise<ClickHouseClient | null> {
-  let orgId = projectOrgCache.get(projectId);
+  let orgId = tenantOrgCache.get(tenantId);
 
   if (!orgId) {
     const project = await prisma.project.findUnique({
-      where: { id: projectId },
+      where: { id: tenantId },
       select: { team: { select: { organizationId: true } } },
     });
-    if (!project) {
-      throw new Error(
-        `Cannot resolve ClickHouse client: project "${projectId}" not found. Refusing to fall back to shared client to prevent data leakage.`,
-      );
+    orgId = project?.team.organizationId;
+
+    if (!orgId) {
+      const organization = await prisma.organization.findUnique({
+        where: { id: tenantId },
+        select: { id: true },
+      });
+      if (!organization) {
+        throw new Error(
+          `Cannot resolve ClickHouse client: tenant "${tenantId}" is neither a project nor an organization. Refusing to fall back to shared client to prevent data leakage.`,
+        );
+      }
+      orgId = organization.id;
     }
-    orgId = project.team.organizationId;
-    projectOrgCache.set(projectId, orgId);
+
+    tenantOrgCache.set(tenantId, orgId);
   }
 
   return getClickHouseClientForOrganization(orgId);
@@ -240,10 +260,10 @@ export function getCustomClientCacheSize(): number {
 }
 
 /**
- * Clears the project → org cache. Useful for testing.
+ * Clears the tenant → org cache. Useful for testing.
  */
-export function clearProjectOrgCache(): void {
-  projectOrgCache.clear();
+export function clearTenantOrgCache(): void {
+  tenantOrgCache.clear();
 }
 
 /**

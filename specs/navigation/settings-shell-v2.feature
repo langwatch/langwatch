@@ -13,7 +13,9 @@ Feature: Settings shell in the new navigation modes
   BACKOFFICE groups with their current gates. Enterprise-plan entries
   carry a quiet grey pill, since it marks a plan rather than asking to
   be read first. Every settings page keeps its address, and every
-  visibility gate keeps its current condition.
+  visibility gate keeps its current condition. The back entry and its
+  rule sit above the scroll region, so a long settings menu never
+  scrolls the way out of the column.
 
   Devices on the legacy mode keep the current settings chrome
   unchanged.
@@ -49,6 +51,13 @@ Feature: Settings shell in the new navigation modes
   Scenario: A rule separates the way back from the pages below it
     Given I open Settings in a new navigation mode
     Then a rule runs under the way back entry
+
+  @integration
+  Scenario: The way back stays in place while the menu scrolls
+    Given I open Settings in a new navigation mode
+    When the settings menu scrolls
+    Then the way back entry stays where it is
+    And only the pages under the rule move
 
   @integration
   Scenario: A lite member sees no restricted settings entries

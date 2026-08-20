@@ -313,8 +313,14 @@ export class OrganizationService {
   }
 
   /**
-   * Creates an organization with a default team and assigns the given user as admin.
-   * The repository handles the transaction atomically (unit-of-work pattern).
+   * Creates an organization with a default team and assigns the given user as
+   * admin.
+   *
+   * The repository writes the organization, the membership row and the first
+   * team in one transaction. The founder's two ADMIN grants cannot join it —
+   * they are ledger facts (ADR-092 delivery-plan PR 2) — so they follow it,
+   * and a crash in between leaves an organization its founder has a seat in
+   * and no grants on, which the next sign-in is what surfaces.
    */
   async createAndAssign(params: {
     userId: string;
@@ -593,7 +599,12 @@ export class OrganizationService {
   }
 
   /**
-   * Removes a user from an organization and all its teams atomically.
+   * Removes a user from an organization and all its teams.
+   *
+   * Not one transaction, and deliberately ordered instead: the grants they
+   * hold are revoked first and the membership row goes after, so a crash
+   * leaves somebody holding a seat and no access rather than grants nobody
+   * can reach.
    *
    * Refuses to remove the acting user's own membership so an organization
    * cannot lose its last acting administrator by accident; a credential that
@@ -617,6 +628,7 @@ export class OrganizationService {
     return this.repo.deleteMember({
       organizationId: params.organizationId,
       userId: params.userId,
+      actingUserId: params.actingUserId ?? null,
     });
   }
 
@@ -847,7 +859,11 @@ export class OrganizationService {
   }
 
   /**
-   * Updates a team member's role with admin guard enforced atomically in the repo.
+   * Updates a team member's role. The repository decides the change under one
+   * transaction — the last-admin guard included — and emits the grant it
+   * resolves to once that has committed, since grants are ledger facts and
+   * cannot ride a database transaction.
+   *
    * License checks for EXTERNAL users must be performed by the caller (router).
    */
   async updateTeamMemberRole(params: {

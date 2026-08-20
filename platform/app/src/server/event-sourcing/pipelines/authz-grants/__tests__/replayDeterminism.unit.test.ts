@@ -2,11 +2,13 @@ import {
   type AuthzMigrationRepository,
   type ExistingTeamBinding,
   grantFactToCompatBinding,
+  grantFactToCompatShareLink,
   grantFactToRow,
   type LegacyTeamRow,
 } from "@langwatch/authz-server";
 import {
   type BackfillGrantEmission,
+  deriveGrantId,
   type GrantsLedgerEmitter,
   TeamUserBackfillMigration,
 } from "@langwatch/authz-server/migration";
@@ -62,6 +64,44 @@ const LEGACY_ROWS: LegacyTeamRow[] = [
   },
 ];
 
+/**
+ * One resource fact rides the same stream: the cutover import adopts a share
+ * link's id and business time, so the emission is a pure function of the
+ * legacy row exactly like the team bindings are — and the row it projects
+ * (Grant plus the compat ShareLink head) has to come out byte-identical on
+ * every replay for the same reason.
+ */
+const SHARE_LINK_ROW = {
+  resourceId: "trace_2Zk",
+  projectId: "proj_chatbot",
+  token: "tok_shared_1",
+  createdAtMs: 1_690_000_240_000,
+  createdByUserId: "user_sam",
+};
+
+const SHARE_EMISSION: BackfillGrantEmission = {
+  grantId: deriveGrantId({
+    organizationId: ORG,
+    principal: { type: "anyone", id: null },
+    scope: { type: "RESOURCE", id: SHARE_LINK_ROW.resourceId },
+    resourceToken: SHARE_LINK_ROW.token,
+    occurredAtMs: SHARE_LINK_ROW.createdAtMs,
+  }),
+  principal: { type: "anyone", id: null },
+  roleKey: null,
+  scope: { type: "RESOURCE", id: SHARE_LINK_ROW.resourceId },
+  resource: {
+    kind: "trace",
+    projectId: SHARE_LINK_ROW.projectId,
+    token: SHARE_LINK_ROW.token,
+    permission: "traces:view",
+    createdByUserId: SHARE_LINK_ROW.createdByUserId,
+  },
+  source: "cutover-import",
+  occurredAtMs: SHARE_LINK_ROW.createdAtMs,
+  actor: { type: "system", id: "system:cutover-import" },
+};
+
 /** Emissions captured through the migration's own public seam, with the
  *  fake ledger landing compat rows so the projection wait converges. */
 async function captureEmissions(): Promise<BackfillGrantEmission[]> {
@@ -90,7 +130,15 @@ async function captureEmissions(): Promise<BackfillGrantEmission[]> {
         });
       }
     },
+    // The backfill defines no roles — it only binds users to teams — but the
+    // emitter is one interface, so the stub implements all of it.
+    defineRoles: async () => undefined,
+    revokeGrants: async () => undefined,
+    deleteRole: async () => undefined,
     proveMigrationParity: async () => undefined,
+    // The backfill never completes a cutover; the emitter carries the verb
+    // because the cutover migration rides the same port.
+    completeCutover: async () => undefined,
   };
   const migration = new TeamUserBackfillMigration({
     repository,
@@ -112,7 +160,7 @@ async function captureEmissions(): Promise<BackfillGrantEmission[]> {
     poll: { intervalMs: 1, timeoutMs: 50 },
   });
   await migration.migrateTenant({ tenantId: ORG });
-  return emitted;
+  return [...emitted, SHARE_EMISSION];
 }
 
 /** The rest of the chain: command handler → wire events → fold → rows. */
@@ -150,6 +198,10 @@ async function replayToRows(emissions: BackfillGrantEmission[]) {
       const row = grantFactToCompatBinding({ grant, organizationId: ORG });
       return row ? [row] : [];
     }),
+    shareRows: grants.flatMap((grant) => {
+      const row = grantFactToCompatShareLink({ grant, organizationId: ORG });
+      return row ? [row] : [];
+    }),
   };
 }
 
@@ -165,6 +217,12 @@ describe("grants ledger replay determinism", () => {
       );
       expect(JSON.stringify(second.compatRows)).toBe(
         JSON.stringify(first.compatRows),
+      );
+      // The resource tier replays the same way: one share link in, one
+      // compat row out, identical down to the bytes.
+      expect(first.shareRows).toHaveLength(1);
+      expect(JSON.stringify(second.shareRows)).toBe(
+        JSON.stringify(first.shareRows),
       );
     });
 

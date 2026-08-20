@@ -25,7 +25,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
@@ -136,7 +136,7 @@ let ch: ClickHouseClient;
 let service: ClickHouseTraceService;
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
+  getClickHouseClientForTenant: vi.fn(),
 }));
 
 vi.mock("~/server/db", () => ({
@@ -171,7 +171,7 @@ async function readPage(options: Record<string, unknown>) {
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  vi.mocked(getClickHouseClientForProject).mockResolvedValue(ch);
+  vi.mocked(getClickHouseClientForTenant).mockResolvedValue(ch);
   service = new ClickHouseTraceService({
     prisma: prisma as ConstructorParameters<
       typeof ClickHouseTraceService

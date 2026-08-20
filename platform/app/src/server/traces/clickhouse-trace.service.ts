@@ -17,7 +17,7 @@ import {
 } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { DataRetentionPolicyRepository } from "~/server/data-retention/policy/dataRetentionPolicy.repository";
 import { RetentionPolicyCache } from "~/server/data-retention/retentionPolicyCache";
 import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
@@ -437,7 +437,7 @@ export class ClickHouseTraceService {
    * Resolve the ClickHouse client for a given project.
    *
    * The returned client is already wrapped with wrapWithDefaultSettings
-   * by getClickHouseClientForProject, so every query automatically receives
+   * by getClickHouseClientForTenant, so every query automatically receives
    * memory-safety limits (max_memory_usage, max_bytes_before_external_group_by).
    *
    * @throws ClickHouseClientUnavailableError when no client resolves —
@@ -445,7 +445,7 @@ export class ClickHouseTraceService {
    *   configuration error, never a signal to fall back.
    */
   private async resolveClient(projectId: string): Promise<ClickHouseClient> {
-    const client = await getClickHouseClientForProject(projectId);
+    const client = await getClickHouseClientForTenant(projectId);
     if (!client) {
       throw new ClickHouseClientUnavailableError(projectId);
     }

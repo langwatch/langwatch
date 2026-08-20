@@ -2,7 +2,7 @@ import { TupleParam } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
 import { ExperimentService } from "~/server/experiments/experiment.service";
 import {
@@ -39,7 +39,7 @@ interface ClickHouseCountRow {
 }
 
 type ProjectClickHouseClient = NonNullable<
-  Awaited<ReturnType<typeof getClickHouseClientForProject>>
+  Awaited<ReturnType<typeof getClickHouseClientForTenant>>
 >;
 
 /**
@@ -122,7 +122,7 @@ export class ExperimentRunService {
         },
       },
       async () => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        const clickHouseClient = await getClickHouseClientForTenant(projectId);
         if (!clickHouseClient) {
           throw new Error(
             `ClickHouse client unavailable for project ${projectId}`,
@@ -225,7 +225,7 @@ export class ExperimentRunService {
         },
       },
       async () => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        const clickHouseClient = await getClickHouseClientForTenant(projectId);
         if (!clickHouseClient) {
           throw new Error(
             `ClickHouse client unavailable for project ${projectId}`,
@@ -300,7 +300,7 @@ export class ExperimentRunService {
         },
       },
       async () => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        const clickHouseClient = await getClickHouseClientForTenant(projectId);
         if (!clickHouseClient) {
           throw new Error(
             `ClickHouse client unavailable for project ${projectId}`,
@@ -430,7 +430,7 @@ export class ExperimentRunService {
         attributes: { "tenant.id": projectId, "run.id": runId },
       },
       async () => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        const clickHouseClient = await getClickHouseClientForTenant(projectId);
         if (!clickHouseClient) {
           // Deliberately `null`, not `throw` — see method JSDoc above for
           // why this method diverges from the rest of the class.

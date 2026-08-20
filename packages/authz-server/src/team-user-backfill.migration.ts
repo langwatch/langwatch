@@ -15,13 +15,19 @@
  * the organization; the retry finds the events already appended and only
  * waits again.
  *
- * The sweep is unchanged: collect-once, decide-twice, one CollectedGrants
- * snapshot per member, the pure engine answering every (permission x scope)
- * pair with and without the legacy rows. A clean sweep is recorded as a
- * `migration_parity_proved` fact before the organization finalizes. Honest
- * disagreements (the legacy org-level union quirk) HOLD the organization
- * (`migrated`), behaviour unchanged, diffs in its report - no proof fact is
- * recorded for an unfinished argument.
+ * The sweep: collect-once, decide-twice, one CollectedGrants snapshot per
+ * member, the pure engine answering every (permission x scope) pair with and
+ * without the legacy rows — over the TEAM and PROJECT scopes the promoted
+ * bindings replace one for one. The ORGANIZATION scope is out of the sweep
+ * on purpose: there the rows act through the org-level union quirk, whose
+ * replacement (the genesis-minted org-member floor grant) stays dormant
+ * until contract while the engine keeps inferring the union from the rows on
+ * both heads — so an org-scope sweep leg demanded a replacement nothing
+ * pre-cutover could show, and parked every organization with an ordinary
+ * member. A clean sweep is recorded as a `migration_parity_proved` fact
+ * before the organization finalizes. Honest disagreements at the swept
+ * scopes HOLD the organization (`migrated`), behaviour unchanged, diffs in
+ * its report - no proof fact is recorded for an unfinished argument.
  *
  * The Redis epoch bump stays exactly as before (decision 19): the ledger
  * cursor is added alongside it, not instead of it.
@@ -46,8 +52,12 @@ import type {
   LegacyTeamRow,
 } from "./authz-migration.repository";
 import type { AuthzAuditWriter, AuthzEpochBumper } from "./grants.service";
-import { deriveGrantId } from "./ledger/grant-identity";
-import type { GrantFact, GrantsLedgerActor } from "./ledger/grants-ledger.reducer";
+import { bindingIdentityKey, deriveGrantId } from "./ledger/grant-identity";
+import type {
+  GrantFact,
+  GrantsLedgerActor,
+  RoleFact,
+} from "./ledger/grants-ledger.reducer";
 import { TEAM_USER_BACKFILL_MIGRATION_NAME } from "./team-user-backfill.name";
 
 /** The audit trail's actor for writes no human performed. */
@@ -73,6 +83,14 @@ export type ParityDiff = {
  *  system actor that authored it. */
 export type BackfillGrantEmission = GrantFact & { actor: GrantsLedgerActor };
 
+/** One compensating revocation the genesis import's deny-direction sweep
+ *  asks the ledger to apply. Named by id only - the import always knows the
+ *  exact head fact it is retracting, never a selector to resolve. */
+export type GenesisRevocationEmission = {
+  grantId: string;
+  reason?: string;
+};
+
 /**
  * The migration's door into the grants ledger. The app binds these to the
  * `authz_grants` pipeline's command senders; the package never sees the
@@ -85,10 +103,62 @@ export type GrantsLedgerEmitter = {
     commandId: string;
     grants: BackfillGrantEmission[];
   }) => Promise<void>;
+  /**
+   * Role definitions for one organization. A `RoleFact` IS the command's
+   * role entry (same six fields), so the app maps the batch straight onto
+   * the payload. The actor rides at the command level here rather than per
+   * entry, because that is where the `role_defined` command carries it.
+   */
+  defineRoles: (args: {
+    organizationId: string;
+    commandId: string;
+    roles: RoleFact[];
+    actor: GrantsLedgerActor;
+  }) => Promise<void>;
+  /**
+   * The deny-direction half of the genesis import: compensating
+   * `grant_revoked` facts for head grants whose legacy row is gone. Batched
+   * like `attachGrants`, on the same `revokeGrantsCommandDataSchema` the
+   * live revoke path already uses.
+   */
+  revokeGrants: (args: {
+    organizationId: string;
+    commandId: string;
+    revocations: GenesisRevocationEmission[];
+    actor: GrantsLedgerActor;
+    occurredAtMs: number;
+  }) => Promise<void>;
+  /**
+   * One stale custom role's compensating `role_deleted` fact. Singular
+   * because `deleteRoleCommandDataSchema` on the wire takes one roleId, not
+   * a batch - unlike every other genesis command, one call per role.
+   */
+  deleteRole: (args: {
+    organizationId: string;
+    commandId: string;
+    roleId: string;
+    actor: GrantsLedgerActor;
+    occurredAtMs: number;
+  }) => Promise<void>;
   proveMigrationParity: (args: {
     organizationId: string;
     commandId: string;
     diffs: string[];
+    occurredAtMs: number;
+  }) => Promise<void>;
+  /**
+   * The cutover's last emission: the organization is served by the engine
+   * from the moment the fold lands this fact on its projection. It is a
+   * plain queued send like the others — the migration observes the flip
+   * through the repository, never through this return. Its counterpart,
+   * `rollBackCutover`, is deliberately NOT here: rolling back is an
+   * operator action, wired to the ops rollback path, not something a
+   * migration may decide.
+   */
+  completeCutover: (args: {
+    organizationId: string;
+    commandId: string;
+    actor: GrantsLedgerActor;
     occurredAtMs: number;
   }) => Promise<void>;
 };
@@ -112,6 +182,17 @@ const DEFAULT_POLL = { intervalMs: 500, timeoutMs: 120_000 };
 
 export class TeamUserBackfillMigration implements SystemMigration {
   readonly name = TEAM_USER_BACKFILL_MIGRATION_NAME;
+  readonly title = "Team membership backfill";
+  readonly description =
+    "Writes every team member an explicit team-scoped role, so access no " +
+    "longer depends on the legacy organization-wide fallback. Changes " +
+    "nobody's effective permissions.";
+  // Dark: nothing an operator does to this migration changes how the fleet
+  // behaves, so no typed confirmation stands in the way.
+  readonly requiresOperatorConfirmation = false;
+  // Shipped and soaked: self-hosted installations have run this backfill
+  // automatically since it landed, and it changes nothing about who decides.
+  readonly runsAutomaticallyOnSelfHosted = true;
   private readonly engine = new AuthzEngine();
 
   constructor(private readonly deps: TeamUserBackfillDeps) {}
@@ -307,14 +388,20 @@ export class TeamUserBackfillMigration implements SystemMigration {
         legacyTeamMemberships: [],
       };
 
-      // Legacy rows can only influence scopes whose chain contains their
-      // team - the team itself, its projects, and the organization (through
-      // the org-level union step). Sweep exactly those.
+      // Sweep the scopes the backfilled bindings replace ONE FOR ONE: the
+      // row's team and that team's projects. The organization scope is
+      // deliberately NOT swept — there the legacy rows act through the
+      // org-level union quirk, whose replacement is not a team binding but
+      // the org-member floor grant the genesis mints, and that fact stays
+      // dormant until contract (the engine keeps inferring the union from
+      // the rows on BOTH heads until the rows die). Sweeping the org scope
+      // here demanded a replacement no pre-cutover reader could see, which
+      // parked every organization holding an ordinary member — the cutover
+      // then waited on this finalization forever.
       const legacyTeamIds = new Set(
         grants.legacyTeamMemberships.map((row) => row.teamId),
       );
       const scopes: AuthzScopeRef[] = [
-        { type: "organization", id: organizationId },
         ...inventory.teamIds
           .filter((teamId) => legacyTeamIds.has(teamId))
           .map(
@@ -409,15 +496,13 @@ function legacyRowToEmission({
 }
 
 /**
- * Identity as the DATABASE defines it - which is two keys, not one. The
- * partial unique indexes (migration
- * 20260410120000_fix_role_binding_unique_custom_role) key a built-in binding
- * on its role and a custom one on its custom role id, so a custom binding's
- * `role` column is not part of its identity at all.
- *
- * Keying on both would call an existing custom binding "missing" whenever its
- * role happened to differ, and the emission that followed would attach a
- * grant for a fact that already has one.
+ * Identity as the DATABASE defines it, via `bindingIdentityKey`
+ * (@langwatch/authz-server/ledger/grant-identity) - a built-in binding is
+ * keyed on its role, a custom one on its custom role id, so a custom
+ * binding's `role` column is not part of its identity at all. Keying on both
+ * would call an existing custom binding "missing" whenever its role happened
+ * to differ, and the emission that followed would attach a grant for a fact
+ * that already has one.
  *
  * Built-in rows key on the ROLE KEY, not on the raw enum value, because this
  * function is asked to compare two populations written in different
@@ -427,7 +512,8 @@ function legacyRowToEmission({
  * as `VIEWER`. Keyed on the raw enum those two never match: the row is
  * emitted, its projection is never recognized, and `awaitCompatRows` times
  * the organization out into `parked` on every pass, forever. Normalizing
- * both sides through the same mapping is what makes the comparison honest.
+ * both sides through the same mapping (here, before the shared key function
+ * ever sees the role) is what makes the comparison honest.
  */
 function bindingKey(row: {
   userId: string;
@@ -435,7 +521,12 @@ function bindingKey(row: {
   role: TeamUserRole;
   customRoleId: string | null;
 }): string {
-  return row.customRoleId === null
-    ? `${row.userId}::${row.teamId}::builtin::${roleKeyForTeamRole(row.role)}`
-    : `${row.userId}::${row.teamId}::custom::${row.customRoleId}`;
+  return bindingIdentityKey({
+    principal: { userId: row.userId },
+    scopeType: "TEAM",
+    scopeId: row.teamId,
+    role:
+      row.customRoleId === null ? roleKeyForTeamRole(row.role) : row.role,
+    customRoleId: row.customRoleId,
+  });
 }

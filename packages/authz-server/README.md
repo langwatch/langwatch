@@ -29,10 +29,10 @@ options, so the app's composition root is the single place `process.env` is
 touched.
 
 The app implements the two interfaces with Prisma
-(`platform/app/src/server/authz/repositories/*.prisma.repository.ts` -
+(`platform/app/src/server/app-layer/authz/repositories/*.prisma.repository.ts` -
 atomicity lives in the implementations, which own the transactions) and
 composes one of each service in
-`platform/app/src/server/authz/runtime.ts`. The pure core - the registry,
+`platform/app/src/server/app-layer/authz/runtime.ts`. The pure core - the registry,
 roles, and the `AuthzEngine` these services decide with - is
 [`@langwatch/authz`](../authz/README.md), whose README carries the **bible
 of terms**, the **usage guide**, and the **migration digest**.

@@ -1466,9 +1466,131 @@ export const opsRouter = createTRPCRouter({
     .query(() => systemMigrationsService.getOverview()),
 
   /**
+   * The cloud rollout's enrollment listing: which organizations are enrolled
+   * for which migrations, with the names the operator recognizes. Carries
+   * `isSaaS` so the page can say honestly that a self-hosted installation
+   * has nothing to enroll.
+   */
+  listMigrationEnrollments: protectedProcedure
+    .use(opsViewPermission)
+    .query(({ ctx }) =>
+      systemMigrationsService.getEnrollments({
+        requestedBy: ctx.session.user.id,
+      }),
+    ),
+
+  /**
+   * The organization lookup behind the page's pickers: enroll, targeted run
+   * and rollback all act on an organization found by name or exact id.
+   */
+  searchMigrationOrganizations: protectedProcedure
+    .use(opsViewPermission)
+    .input(z.object({ query: z.string().max(200) }))
+    .query(({ input }) =>
+      systemMigrationsService.searchOrganizations({ query: input.query }),
+    ),
+
+  /**
+   * Enroll one organization for one registered migration. Takes effect on
+   * the next pass - enrollment is read fresh each time. The service refuses
+   * duplicates, unknown migrations, unknown organizations, and any
+   * enrollment on a self-hosted installation, each with a handled error the
+   * page renders.
+   */
+  enrollMigrationTenant: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        organizationId: z.string().min(1).max(200),
+        migrationName: z.string().min(1).max(200),
+        // Typed confirmation for the cutover migration, same reasoning as
+        // the rollback's: enrolling an organization for cutover is what lets
+        // the next pass flip which tables answer every permission check for
+        // it.
+        confirm: z.literal("ENROLL").optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // The preparation migrations are behavior-neutral (backfill and
+      // genesis change nothing about who decides); the cutover has the
+      // rollback's blast radius, so it takes the rollback's guard. Which is
+      // which comes from the migration's own declaration, so this gate and
+      // the page that asks for the confirmation cannot drift apart.
+      if (
+        systemMigrationsService.requiresOperatorConfirmation({
+          migrationName: input.migrationName,
+        })
+      ) {
+        requireDestructiveOpsAuth(ctx, input.confirm);
+      }
+      await systemMigrationsService.enroll({
+        organizationId: input.organizationId,
+        migrationName: input.migrationName,
+        actorUserId: ctx.session.user.id,
+      });
+      return { enrolled: true };
+    }),
+
+  /**
+   * Withdraw an enrollment: later passes stop processing the organization
+   * for that migration. State already recorded stays exactly as it is -
+   * pausing the rollout is this action's whole job; undoing it is the
+   * rollback's.
+   */
+  withdrawMigrationTenant: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        organizationId: z.string().min(1).max(200),
+        migrationName: z.string().min(1).max(200),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await systemMigrationsService.withdraw({
+        organizationId: input.organizationId,
+        migrationName: input.migrationName,
+        actorUserId: ctx.session.user.id,
+      });
+      return { withdrawn: true };
+    }),
+
+  /**
+   * Run one migration for one organization now. Awaited: the operator asked
+   * about one organization and gets the status it ended the run in. The
+   * service refuses unknown migrations, unknown organizations, unenrolled
+   * organizations (cloud) and a pass already holding the fleet-wide lease,
+   * each with a handled error the page renders.
+   */
+  runSystemMigrationForOrganization: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        organizationId: z.string().min(1).max(200),
+        migrationName: z.string().min(1).max(200),
+        // Typed confirmation for the cutover migration - a targeted cutover
+        // run is exactly the flip the enrollment confirmation guards.
+        confirm: z.literal("RUN").optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (
+        systemMigrationsService.requiresOperatorConfirmation({
+          migrationName: input.migrationName,
+        })
+      ) {
+        requireDestructiveOpsAuth(ctx, input.confirm);
+      }
+      return systemMigrationsService.runForOrganization({
+        organizationId: input.organizationId,
+        migrationName: input.migrationName,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  /**
    * Kick a migration pass now instead of waiting for the next worker boot -
-   * the lever for widening a cloud cohort or re-verifying held tenants
-   * after remediation. Fire-and-forget: the fleet-wide lease already
+   * the lever for processing a fresh enrollment right away or re-verifying
+   * held tenants after remediation. Fire-and-forget: the fleet-wide lease already
    * guarantees a single driver, so the worst case for a double click is a
    * pass that stands down immediately.
    */
@@ -1480,9 +1602,12 @@ export const opsRouter = createTRPCRouter({
     }),
 
   /**
-   * The operator rollback: pin a finalized organization back onto its
-   * legacy path. Only `finalized` rolls back; the service refuses anything
-   * else with a handled error. Rolled-back tenants are terminal for the
+   * The operator rollback: pin a migrated or finalized organization back
+   * onto its legacy path. Both are already live on the ledger; the service
+   * refuses anything else with a handled error. An already `rolled_back`
+   * organization RETRIES — calling this again re-applies the rollback's
+   * effects against the standing pin, which is how a rollback whose effect
+   * died halfway is finished. Rolled-back tenants are terminal for the
    * runner — later passes leave them alone.
    */
   rollBackSystemMigrationTenant: protectedProcedure

@@ -2434,21 +2434,28 @@ model Grant {
   // lets a projection reloaded from these rows reconstruct the fact rather
   // than a lossy copy. Null on everything ledger-born; retired at cutover.
   legacyRole String? // ADMIN | MEMBER | VIEWER | CUSTOM
-  source  String // which writer emitted the fact: grants-service | scim | invite | backfill-b | genesis-import | read-through-mint
+  source     String // which writer emitted the fact: grants-service | scim | invite | backfill-b | genesis-import | read-through-mint | cutover-import
 
   scopeType GrantScopeType
   scopeId   String
 
   // Resource-tier FACT columns (ShareLink heritage, ADR-057 possession
-  // intact; null on every other tier). All four are set by the mint event
+  // intact; null on every other tier). All of them are set by the mint event
   // and owned by the fold like every other column here. View-consumption
   // accounting (viewCount) deliberately does NOT live on this table - it
-  // has a different writer (ShareService) and lands as its own accounting
-  // row when ShareService moves onto the ledger.
-  token      String?   @unique
-  permission String?
-  expiresAt  DateTime?
-  maxViews   Int?
+  // has a different writer (ShareService) and lives in GrantUsage below.
+  //
+  // scopeId is the shared resource's id alone, so the row carries the rest
+  // of that resource's identity itself: resourceKind says what the id names
+  // (TRACE | THREAD, ShareLink's own spelling) and projectId says where it
+  // lives. createdByUserId is whoever minted the link.
+  token           String?   @unique
+  permission      String?
+  resourceKind    String?
+  projectId       String?
+  createdByUserId String?
+  expiresAt       DateTime?
+  maxViews        Int?
 
   occurredAt DateTime // business time of the fact (backfills carry the legacy row's createdAt)
   createdAt  DateTime @default(now())
@@ -2463,9 +2470,40 @@ model Grant {
   // the partiality and rebuild it over every share-link row, which is the one
   // thing the WHERE clause exists to avoid.
   //
-  // The same migration adds "Grant_resource_terms_check", a both-or-neither
-  // CHECK over (token, permission) that Prisma also cannot express.
+  // "Grant_resource_terms_check" is an all-or-nothing CHECK over the tier's
+  // four identity columns (token, permission, resourceKind, projectId), tied
+  // to scopeType = 'RESOURCE'. Added over two columns in
+  // 20260817160000_grants_ledger_projections and widened to four in
+  // 20260818120001_grant_resource_facts, which is where the other two arrive.
+  // Prisma cannot express it either.
   @@index([organizationId, scopeType, scopeId])
+  // The resource tier's own access shape: the compat/share write paths and
+  // the token-possession reads both fence on (project, kind, resource).
+  @@index([projectId, resourceKind, scopeId])
+}
+
+// ShareService-owned view accounting for resource grants (delivery-plan
+// decision 22). Split from Grant because it has a different writer: the fold
+// owns the fact columns, ShareService increments this row once per view. The
+// fold NEVER writes here - a projection pass that touched viewCount would
+// reset every share link's view budget.
+model GrantUsage {
+  grantId        String @id // the Grant row's id; deterministic, so this row is addressable before the view happens
+  organizationId String
+  projectId      String
+
+  viewCount    Int       @default(0)
+  lastViewedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([organizationId])
+  // The share write path fences its conditional consume on (grant,
+  // organization, project) and the cutover seeds a whole project's budgets at
+  // once; without this the project-scoped reads fall back to the
+  // organization index and filter.
+  @@index([projectId])
 }
 
 // The grants ledger's role projection - CustomRole's successor, fed by the
@@ -2506,6 +2544,11 @@ model AuthzCutoverProjection {
   onEngine       Boolean   @default(false)
   provedAt       DateTime?
   parityDiffs    Json?
+  // Why the newest cutover_completed fact did NOT put this organization on
+  // the engine, or null when none was refused. The fold is a pure reducer
+  // and cannot log, so a refusal is state - and this column is what carries
+  // it to the operator surface. "parity_unproven" | "parity_diffs_outstanding".
+  completionRefusedReason String?
   // Business time of the newest cutover fact folded here - the reducer's
   // monotonic guard, persisted so a reload does not reset it.
   changedAt      DateTime?
@@ -4142,4 +4185,19 @@ model SystemMigrationTenantState {
 
   @@id([migrationName, tenantId])
   @@index([migrationName, status])
+}
+
+model SystemMigrationEnrollment {
+  organizationId   String
+  // The stable name of one registered migration (e.g.
+  // "authz-team-user-backfill"). A plain string column validated in code
+  // against the registered migrations, like the status column above - each
+  // migration is enrolled separately, so the rollout paces per
+  // (organization, migration).
+  migrationName    String
+  enrolledByUserId String
+  createdAt        DateTime @default(now())
+
+  @@id([organizationId, migrationName])
+  @@index([migrationName])
 }
