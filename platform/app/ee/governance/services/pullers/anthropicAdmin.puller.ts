@@ -172,9 +172,9 @@ function encodeCursor({
   startingAt,
   page,
   query,
-}: {
-  startingAt: string;
-  page: string | null;
+}: Omit<z.infer<typeof cursorSchema>, "query"> & {
+  // Refined non-null: every cursor minted after query-binding carries the
+  // query identity; only cursors READ from storage can lack it.
   query: string;
 }): string {
   return JSON.stringify({ startingAt, page, query });
@@ -287,23 +287,24 @@ const costResultSchema = z
  * USD meaning $1.23. The shift to dollars is index arithmetic on the string,
  * so no digit ever passes through a float on the way to the ledger.
  *
- * An amount that is not a plain decimal throws rather than guesses: same
- * class as a malformed page — a contract that moved, not a row to retry.
+ * An amount that is not a decimal returns null rather than guessing — and
+ * rather than throwing: a throw here escapes `runOnce`'s fetch-only error
+ * handling, discards every event already read, and holds the cursor on a row
+ * that would be malformed again on every retry, wedging the source
+ * permanently. Same blast-radius call as the non-USD skip in `costEvent`.
  */
-function centsToUsd(amount: string): string {
+function centsToUsd(amount: string): string | null {
   const match = /^([+-]?)(\d+)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(
     amount.trim(),
   );
   if (!match) {
-    throw new Error(
-      `anthropic cost amount is not a decimal string: ${JSON.stringify(amount)}`,
-    );
+    return null;
   }
   const [, sign = "", wholeRaw = "0", fraction = "", exponent] = match;
   if (exponent !== undefined) {
-    // Exponent form ("1e-7") can only reach here via the schema's number
-    // branch stringifying a float. Shift the exponent instead of the digits —
-    // the money parser downstream reads exponents exactly.
+    // Exponent form ("1e-7") — from the schema's number branch stringifying a
+    // float, or sent as a string outright. Shift the exponent instead of the
+    // digits — the money parser downstream reads exponents exactly.
     return `${sign}${wholeRaw}${fraction ? `.${fraction}` : ""}e${
       Number(exponent) - 2
     }`;
@@ -672,6 +673,16 @@ export class AnthropicAdminPuller
       return null;
     }
     const amountUsd = centsToUsd(result.amount);
+    if (amountUsd === null) {
+      // Same reasoning as the non-USD skip above: one permanently malformed
+      // row must cost one row, not the whole source. No raw amount in the
+      // log — dimensions identify the row without echoing unparseable input.
+      logger.error(
+        { adapter: this.id, startingAt, dimensions },
+        "anthropic cost report amount is not a decimal; skipping the row",
+      );
+      return null;
+    }
     return {
       source_event_id: `cost:${startingAt}:${dimensionPath(dimensions)}`,
       event_timestamp: startingAt,

@@ -183,6 +183,35 @@ describe("the Anthropic Admin puller", () => {
       );
     });
 
+    it("keys rows differing only by service tier apart", async () => {
+      const row = USAGE_PAGE.data[0]!.results[0]!;
+      fetchMock.mockResolvedValue(
+        jsonResponse({
+          ...USAGE_PAGE,
+          data: [
+            {
+              ...USAGE_PAGE.data[0]!,
+              results: [row, { ...row, service_tier: "batch" }],
+            },
+          ],
+        }),
+      );
+
+      const result = await new AnthropicAdminPuller().runOnce(RUN_OPTIONS, {
+        adapter: "anthropic_admin",
+        report: "usage",
+        bucketWidth: "1d",
+        schedule: "0 * * * *",
+      });
+
+      // Batch usage is priced differently from standard, so service tier must
+      // participate in identity the same way context window does.
+      expect(result.events).toHaveLength(2);
+      expect(result.events[0]!.source_event_id).not.toBe(
+        result.events[1]!.source_event_id,
+      );
+    });
+
     it("falls back to the legacy flat cache-creation field when the nested object is absent", async () => {
       const { cache_creation: _nested, ...row } =
         USAGE_PAGE.data[0]!.results[0]!;
@@ -331,6 +360,42 @@ describe("the Anthropic Admin puller", () => {
       // The unsupported row is gone and the USD row beside it survived. A
       // throw here would have unwound the whole run — and since the row is
       // non-USD on every retry, it would have wedged the source permanently.
+      expect(result.events).toHaveLength(1);
+      expect(result.errorCount).toBe(0);
+      const record = buildPulledUsageRecord({
+        event: result.events[0]!,
+        source: SOURCE,
+        observedAt: OBSERVED_AT,
+      });
+      expect(record?.costNanoUsd).toBe(412_800_000_000);
+    });
+
+    it("drops a malformed amount row rather than aborting the pull", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse({
+          ...COST_PAGE,
+          data: [
+            {
+              starting_at: "2026-08-01T00:00:00Z",
+              results: [
+                { ...COST_PAGE.data[0]!.results[0], amount: "not-a-number" },
+                COST_PAGE.data[0]!.results[0],
+              ],
+            },
+          ],
+        }),
+      );
+
+      const result = await new AnthropicAdminPuller().runOnce(RUN_OPTIONS, {
+        adapter: "anthropic_admin",
+        report: "cost",
+        bucketWidth: "1d",
+        schedule: "0 * * * *",
+      });
+
+      // Same blast-radius call as the non-USD row: the malformed row would be
+      // malformed again on every retry, so a throw would wedge the source
+      // permanently. One bad row costs one row.
       expect(result.events).toHaveLength(1);
       expect(result.errorCount).toBe(0);
       const record = buildPulledUsageRecord({
