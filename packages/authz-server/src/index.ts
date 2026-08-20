@@ -103,20 +103,11 @@ export type {
   BindingIdentityPrincipal,
 } from "./ledger/grant-identity";
 export {
-  CUTOVER_COMPLETION_REFUSALS,
-  emptyGrantsLedgerState,
-  reduceGrantsLedger,
-} from "./ledger/grants-ledger.reducer";
+} from "./ledger/facts";
 export type {
   GrantEventSource,
   GrantFact,
-  GrantRevocationSelector,
   GrantsLedgerActor,
-  GrantsLedgerCutover,
-  GrantsLedgerEvent,
-  GrantsLedgerState,
-  LedgerMigrationStatus,
-  LedgerMigrationTenantState,
   LedgerPrincipal,
   LedgerPrincipalType,
   LedgerScope,
@@ -124,4 +115,4 @@ export type {
   LegacyBindingRole,
   ResourceGrantTerms,
   RoleFact,
-} from "./ledger/grants-ledger.reducer";
+} from "./ledger/facts";

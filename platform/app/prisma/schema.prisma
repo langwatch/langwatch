@@ -2449,7 +2449,11 @@ model Grant {
   // of that resource's identity itself: resourceKind says what the id names
   // (TRACE | THREAD, ShareLink's own spelling) and projectId says where it
   // lives. createdByUserId is whoever minted the link.
-  token           String?   @unique
+  // Partial unique (`WHERE "revokedAt" IS NULL`), defined in migration
+  // 20260820180000_grants_revoke_marks_the_row and NOT declared as @unique
+  // here: Prisma would rebuild it non-partially on the next migrate dev, and
+  // a revoked link's token would then block re-minting it forever.
+  token           String?
   permission      String?
   resourceKind    String?
   projectId       String?
@@ -2460,6 +2464,13 @@ model Grant {
   occurredAt DateTime // business time of the fact (backfills carry the legacy row's createdAt)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
+
+  // A revoke MARKS the row rather than deleting it. Deleting made the
+  // projection order-dependent - a redelivered `attached` after a `revoked`
+  // had no row left to lose to - and it threw away the answer to when a
+  // grant ended and why. Every read of live access fences on this being null.
+  revokedAt     DateTime?
+  revokedReason String?
 
   // The collector's principal scan is served by
   // "Grant_organizationId_principalType_principalId_idx", a PARTIAL index
@@ -2515,12 +2526,16 @@ model Role {
   name           String
   description    String?
   permissions    Json // registry permission strings only; empty grants nothing
-  kind           String   @default("custom") // "custom" | "system_api_key"
+  kind           String    @default("custom") // "custom" | "system_api_key"
   occurredAt     DateTime
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @default(now()) @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
+  // Same rule as Grant.revokedAt: a delete marks, so the name stays taken by
+  // a row nothing can see unless the unique is partial. The
+  // (organizationId, name) unique is therefore SQL-side too - see migration
+  // 20260820180000_grants_revoke_marks_the_row.
+  deletedAt      DateTime?
 
-  @@unique([organizationId, name])
   @@index([organizationId])
 }
 

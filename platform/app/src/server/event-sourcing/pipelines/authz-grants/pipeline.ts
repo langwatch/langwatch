@@ -13,7 +13,6 @@ import {
   RollBackCutoverCommand,
 } from "./commands/grantsLedgerCommands";
 import {
-  type AuthzGrantsFoldState,
   AuthzGrantsStateFoldProjection,
 } from "./projections/authzGrantsState.foldProjection";
 import {

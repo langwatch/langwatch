@@ -15,7 +15,7 @@ import type {
   LegacyBindingRole,
   ResourceGrantTerms,
   RoleFact,
-} from "./grants-ledger.reducer";
+} from "./facts";
 
 /** The single permission a share link has ever conferred (ADR-057) - the one
  *  spelling every minter and every importer of a share-link grant uses

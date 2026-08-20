@@ -1,5 +1,4 @@
 import {
-  emptyGrantsLedgerState,
   type GrantEventSource,
   type GrantFact,
   grantFactToRow,

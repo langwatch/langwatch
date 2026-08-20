@@ -36,7 +36,6 @@ import {
   DefineRolesCommand,
 } from "~/server/event-sourcing/pipelines/authz-grants/commands/grantsLedgerCommands";
 import {
-  type AuthzGrantsFoldState,
   AuthzGrantsStateFoldProjection,
 } from "~/server/event-sourcing/pipelines/authz-grants/projections/authzGrantsState.foldProjection";
 import type {

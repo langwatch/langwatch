@@ -45,7 +45,6 @@ import {
   BindingMissingError,
   type BindingPrincipalWhere,
   DuplicateBindingError,
-  type GrantRevocationSelector,
   type LedgerActor,
   type LedgerScopeType,
   type RoleBindingWrite,
