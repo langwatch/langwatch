@@ -19,6 +19,13 @@ const service = vi.hoisted(() => ({
   rollBack: vi.fn(),
   runForOrganization: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   searchOrganizations: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  // Declared by the migration itself in production, so the stub answers
+  // the way the registered migrations do: only the cutover changes how
+  // the fleet behaves, and only it takes the typed confirmation.
+  requiresOperatorConfirmation: vi.fn(
+    ({ migrationName }: { migrationName: string }) =>
+      migrationName === "authz-grants-cutover",
+  ),
 }));
 
 vi.mock("~/server/app-layer/system-migrations/runtime", () => ({
@@ -144,7 +151,7 @@ describe("ops migration enrollment procedures", () => {
         migrationName: "authz-team-user-backfill",
       });
 
-      expect(result).toEqual({ status: "finalized" });
+      expect(result).toEqual({ status: "finalized", waiting: false });
       expect(service.runForOrganization).toHaveBeenCalledWith({
         organizationId: "org_acme",
         migrationName: "authz-team-user-backfill",
