@@ -204,10 +204,10 @@ Feature: In-place authorization data migration
   @unit
   Scenario: A cohort never includes an enterprise organization
     Given "bigcorp" holds an active or pending enterprise subscription
-    And "isolated-inc" routes to a private ClickHouse instance via the environment
+    And "isolated-inc" has a dedicated data plane
     When an operator enrolls a cohort for the grants import
     Then neither "bigcorp" nor "isolated-inc" is in the cohort
-    And no organization id was named in code to exclude them
+    And the operator maintained no list to exclude them
 
   @unit
   Scenario: A cohort samples only organizations not already enrolled

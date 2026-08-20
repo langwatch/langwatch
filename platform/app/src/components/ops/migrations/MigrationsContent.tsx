@@ -557,6 +557,7 @@ function EnrollCohortAction({
             type="number"
             min={1}
             max={1000}
+            step={1}
             value={sampleSizeText}
             onChange={(event) => setSampleSizeText(event.target.value)}
           />
