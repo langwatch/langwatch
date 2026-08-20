@@ -1335,6 +1335,7 @@ const reserveRealtimeSessionSchema = z.object({
   // The trace the mint's own span belongs to. Optional so a gateway that
   // predates this field, or a request with no trace context, still books.
   trace_id: z.string().max(128).optional(),
+  requested_model: z.string().max(512).optional(),
   vendor: z.enum(["openai", "elevenlabs"]),
   agent_id: z.string().max(256).optional(),
   model: z.string().min(1).max(512),
@@ -1403,6 +1404,7 @@ secured.access(gatewayPolicy()).post("/realtime-sessions", async (c) => {
     agentId: body.agent_id,
     model: body.model,
     traceId: body.trace_id,
+    requestedModel: body.requested_model,
   });
   if (!result.ok) {
     return c.json(

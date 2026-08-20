@@ -361,6 +361,33 @@ describe("gatewaySpend fold", () => {
   });
 
   /** @scenario An outcome states the attribution its admission has not delivered */
+  it("does not let a late admission erase what the outcome stated", () => {
+    // The trace id is only known once the customer span opens, which happens
+    // after admission, so an admission carries none. A brokered voice session
+    // is confirmed by the control plane and can fold first, and an admission
+    // that overwrote unconditionally would blank the trace the settlement had
+    // just named, breaking the join between the spend row and the trace.
+    const early = projection.handleGatewaySpendConfirmed(
+      makeEvent<GatewaySpendConfirmedEvent>(
+        GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+        { ...confirmed().data, ...ATTRIBUTED_OUTCOME },
+        T0 + 3800,
+      ),
+      initial(),
+    );
+
+    const admitWithoutTrace = makeEvent<GatewaySpendAdmittedEvent>(
+      GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
+      { ...admitted().data, trace_id: "" },
+      T0,
+    );
+
+    expect(
+      projection.handleGatewaySpendAdmitted(admitWithoutTrace, early).traceId,
+    ).toBe("trace-1");
+  });
+
+  /** @scenario An outcome states the attribution its admission has not delivered */
   it("lets the admission win over what the outcome stated", () => {
     const early = projection.handleGatewaySpendConfirmed(
       makeEvent<GatewaySpendConfirmedEvent>(

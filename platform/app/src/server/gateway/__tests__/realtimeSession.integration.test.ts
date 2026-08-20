@@ -116,6 +116,9 @@ function reservation(
     modelProviderId: PROVIDER_ID,
     vendor: "elevenlabs",
     model: "convai",
+    // The caller asked for the provider-prefixed alias, which is what the
+    // mint's span recorded; the billing id resolved to "convai".
+    requestedModel: "elevenlabs/convai",
     ...(traceId === undefined ? {} : { traceId }),
   };
 }
@@ -272,14 +275,16 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
     // separately is how they come to disagree about it.
     const confirmedNanoUsd = sentConfirmations[0]!.cost_nano_usd as number;
     expect(confirmedNanoUsd).toBeGreaterThan(0);
-    expect(spanAttr(written, "langwatch.cost.usd")).toBeCloseTo(
+    expect(spanAttr(written, "langwatch.span.cost")).toBeCloseTo(
       confirmedNanoUsd / 1_000_000_000,
       12,
     );
     expect(spanAttr(written, "langwatch.virtual_key_id")).toBe(vk);
-    expect(spanAttr(written, "langwatch.realtime.audio_ms")).toBe(6000);
-    expect(spanAttr(written, "gen_ai.system")).toBe("elevenlabs");
-    expect(spanAttr(written, "langwatch.model")).toBe("convai");
+    expect(spanAttr(written, "gen_ai.usage.audio_seconds")).toBe(6);
+    expect(spanAttr(written, "gen_ai.provider.name")).toBe("elevenlabs");
+    // The mint's model, not the billing id: two names for one call would put
+    // the cost under a model the trace never mentions.
+    expect(spanAttr(written, "gen_ai.request.model")).toBe("elevenlabs/convai");
   });
 
   /** @scenario A settlement delivered twice is written into the trace once */

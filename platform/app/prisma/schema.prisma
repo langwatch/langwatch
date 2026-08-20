@@ -4197,6 +4197,13 @@ model GatewayRealtimeSession {
   // The catalog id this session bills under.
   model String
 
+  // The model id the caller asked for, which is what the mint's own span
+  // records. It differs from `model` whenever the request named a
+  // provider-prefixed alias, so the settlement span has to use this one or
+  // one call shows up as two models: the mint at no cost, and the cost under
+  // a name the trace never mentions.
+  requestedModel String?
+
   // The vendor's own id for the conversation. Unique per vendor so a
   // redelivered post-call report resolves to exactly one session, and NULL
   // until the mint reports one, since Postgres treats NULLs as distinct.

@@ -3,9 +3,9 @@ package app
 import (
 	"context"
 
-	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/app/pipeline"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
@@ -59,6 +59,7 @@ func (a *App) dispatchRealtimeSession(ctx context.Context, call *pipeline.Call) 
 		Vendor:          session.Vendor,
 		AgentID:         session.AgentID,
 		Model:           resolvedModelID(call.Request),
+		RequestedModel:  call.Request.Model,
 		TraceID:         customerTraceID(ctx),
 	}
 	if err := a.reserveRealtimeSession(ctx, reservation); err != nil {
@@ -216,15 +217,15 @@ func (a *App) releaseRealtimeSession(ctx context.Context, reservation domain.Rea
 	}
 }
 
-// customerTraceID is the trace the mint's own span belongs to. A brokered
-// call emits no further spans of its own, so this is the only way the
-// settlement can find the trace to write its cost into.
+// customerTraceID is the trace the mint's own span belongs to.
+//
+// It reads the customer-facing span, not the ambient one: those are two
+// different traces, and the settlement has to write its cost into the trace
+// the customer actually sees. A brokered call emits no further spans of its
+// own, so this is the only way the settlement can find that trace minutes
+// later.
 func customerTraceID(ctx context.Context) string {
-	sc := trace.SpanContextFromContext(ctx)
-	if !sc.IsValid() {
-		return ""
-	}
-	return sc.TraceID().String()
+	return customertracebridge.CustomerTraceID(ctx)
 }
 
 // resolvedModelID names the model a session bills under: the resolved id

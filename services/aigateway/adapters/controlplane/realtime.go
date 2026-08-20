@@ -38,6 +38,7 @@ type reserveRequest struct {
 	VirtualKeyID    string `json:"virtual_key_id"`
 	ModelProviderID string `json:"model_provider_id"`
 	TraceID         string `json:"trace_id"`
+	RequestedModel  string `json:"requested_model"`
 	Vendor          string `json:"vendor"`
 	AgentID         string `json:"agent_id,omitempty"`
 	Model           string `json:"model"`
@@ -64,6 +65,7 @@ func (c *Client) Reserve(ctx context.Context, r domain.RealtimeReservation) erro
 		VirtualKeyID:    r.VirtualKeyID,
 		ModelProviderID: r.ModelProviderID,
 		TraceID:         r.TraceID,
+		RequestedModel:  r.RequestedModel,
 		Vendor:          string(r.Vendor),
 		AgentID:         r.AgentID,
 		Model:           r.Model,

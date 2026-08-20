@@ -63,6 +63,7 @@ export interface ReserveInput {
    * request with no trace context.
    */
   traceId?: string;
+  requestedModel?: string;
 }
 
 /**
@@ -130,6 +131,7 @@ export async function reserveRealtimeSession(
         agentId: input.agentId ?? null,
         model: input.model,
         traceId: input.traceId ?? null,
+        requestedModel: input.requestedModel ?? null,
         status: "OPEN",
       },
     });

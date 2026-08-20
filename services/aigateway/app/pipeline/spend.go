@@ -151,9 +151,19 @@ func deferredOutcome(t domain.RequestType) bool {
 	return t == domain.RequestTypeRealtimeSession
 }
 
-// traceIDFrom returns the active trace id, or empty when no span is
-// recording: an all-zeros id must never masquerade as a join key.
+// traceIDFrom returns the trace this spend record joins to, or empty when
+// there is none: an all-zeros id must never masquerade as a join key.
+//
+// The customer-facing trace comes first. That is the trace the request lands
+// in for the project, so it is the one that matches the trace surface; the
+// ambient span belongs to the gateway's internal instrumentation and names a
+// different trace whenever the caller sent no traceparent of its own. The
+// ambient span is still the fallback, so a request outside the bridge keeps
+// the join it had.
 func traceIDFrom(ctx context.Context) string {
+	if id := customertracebridge.CustomerTraceID(ctx); id != "" {
+		return id
+	}
 	sc := trace.SpanFromContext(ctx).SpanContext()
 	if !sc.HasTraceID() {
 		return ""

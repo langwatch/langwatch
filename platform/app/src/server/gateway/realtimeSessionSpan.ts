@@ -21,6 +21,7 @@ import { createLogger } from "@langwatch/observability";
 import { createHash } from "crypto";
 import type { GatewayRealtimeSession } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
+import { ATTR_KEYS as ATTR } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import type { SpendUsage } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 
@@ -73,16 +74,35 @@ export async function recordRealtimeSessionSpan(params: {
 
   const endMs = params.occurredAt.getTime();
   const startMs = Math.max(0, endMs - Math.max(0, params.durationMs));
+  // The canonical attribute names, the same ones the gateway's mint span
+  // writes. The trace fold reads cost from `langwatch.span.cost` and tokens
+  // from the `gen_ai.usage.*` keys; a name of our own would store fine and
+  // then be ignored, leaving the span visible at no cost, which is the
+  // failure this whole change exists to remove.
   const attributes = [
-    attr("langwatch.span.type", "llm"),
-    attr("langwatch.model", session.model),
-    attr("langwatch.cost.usd", params.costNanoUsd / 1_000_000_000),
+    attr(ATTR.SPAN_TYPE, "llm"),
+    // The model the mint's span recorded, so one call is one model on the
+    // trace surface. Falling back to the billing id keeps a session minted
+    // before this was carried from losing its model entirely.
+    attr(ATTR.GEN_AI_REQUEST_MODEL, session.requestedModel || session.model),
+    attr(ATTR.GEN_AI_PROVIDER_NAME, session.vendor),
+    // Priority 2 in the cost cascade: a cost the emitter worked out itself
+    // wins over the registry estimate. This is the figure the spend record
+    // carries, so the two surfaces state one number.
+    attr(ATTR.LANGWATCH_SPAN_COST, params.costNanoUsd / 1_000_000_000),
+    attr(ATTR.GEN_AI_USAGE_INPUT_TOKENS, params.usage.input_tokens ?? 0),
+    attr(ATTR.GEN_AI_USAGE_OUTPUT_TOKENS, params.usage.output_tokens ?? 0),
+    attr(
+      ATTR.GEN_AI_USAGE_INPUT_AUDIO_TOKENS,
+      params.usage.input_audio_tokens ?? 0,
+    ),
+    attr(
+      ATTR.GEN_AI_USAGE_OUTPUT_AUDIO_TOKENS,
+      params.usage.output_audio_tokens ?? 0,
+    ),
+    attr(ATTR.GEN_AI_USAGE_AUDIO_SECONDS, (params.usage.audio_ms ?? 0) / 1000),
     attr("langwatch.virtual_key_id", session.virtualKeyId),
-    attr("langwatch.input_tokens", params.usage.input_tokens ?? 0),
-    attr("langwatch.output_tokens", params.usage.output_tokens ?? 0),
-    attr("gen_ai.system", session.vendor),
-    attr("langwatch.realtime.session_id", session.id),
-    attr("langwatch.realtime.audio_ms", params.usage.audio_ms ?? 0),
+    attr("langwatch.gateway_request_id", session.id),
   ];
 
   try {

@@ -63,6 +63,11 @@ type RealtimeReservation struct {
 	AgentID         string
 	// Model is the catalog id this session bills under.
 	Model string
+	// RequestedModel is the model id the caller asked for, which is what the
+	// mint's own span records. It differs from Model whenever the request
+	// named a provider-prefixed alias, and the settlement has to use it or one
+	// call reads as two models on the trace surface.
+	RequestedModel string
 	// TraceID is the customer-facing trace this mint was recorded under, so
 	// the settlement can write the call's cost back into the same trace.
 	// Empty when the request carried no trace context.

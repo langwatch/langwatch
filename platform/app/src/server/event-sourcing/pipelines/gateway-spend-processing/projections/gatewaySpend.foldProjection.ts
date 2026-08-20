@@ -223,22 +223,28 @@ export class GatewaySpendFoldProjection
     // and an outcome may omit these fields, so each one sticks only when
     // the resolved state actually carries a value.
     const outcomeResolved = state.status !== "" && state.status !== "admitted";
+    // Admission is the authority, so its value wins wherever it states one.
+    // Where it states nothing, what the outcome already recorded stands. An
+    // admission that folds after its outcome would otherwise erase a field it
+    // never carried: the trace id is only known once the customer span opens,
+    // which is after admission, so a late admission on a brokered voice
+    // session used to blank the trace the settlement had just named.
     return {
       ...state,
       status: state.status === "" ? "admitted" : state.status,
-      organizationId: d.organization_id,
-      virtualKeyId: d.virtual_key_id,
-      principalUserId: d.principal_user_id,
-      endUserId: d.end_user_id,
+      organizationId: d.organization_id || state.organizationId,
+      virtualKeyId: d.virtual_key_id || state.virtualKeyId,
+      principalUserId: d.principal_user_id || state.principalUserId,
+      endUserId: d.end_user_id || state.endUserId,
       model: outcomeResolved && state.model !== "" ? state.model : d.model,
       providerKey:
         outcomeResolved && state.providerKey !== ""
           ? state.providerKey
           : d.model_provider_id,
-      traceId: d.trace_id,
-      requestType: d.request_type,
-      labels: d.labels,
-      metadataJson: d.metadata,
+      traceId: d.trace_id || state.traceId,
+      requestType: d.request_type || state.requestType,
+      labels: d.labels?.length ? d.labels : (state.labels ?? []),
+      metadataJson: d.metadata || state.metadataJson,
       podId: d.pod_id,
       podSeq: d.pod_seq,
       occurredAtMs: d.occurred_at,
