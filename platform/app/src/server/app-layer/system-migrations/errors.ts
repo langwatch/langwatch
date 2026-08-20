@@ -110,13 +110,13 @@ export class MigrationRollbackCutoverNotStartedError extends HandledError {
 export class MigrationEnrollmentAlreadyExistsError extends HandledError {
   declare readonly code: "migration_enrollment_already_exists";
 
-  constructor({ stage }: { stage: string }) {
+  constructor({ migrationName }: { migrationName: string }) {
     super(
       "migration_enrollment_already_exists",
-      "This organization is already enrolled for that stage",
-      // meta.stage lets the presentation say which stage the standing
-      // enrollment covers.
-      { httpStatus: 409, fault: "customer", meta: { stage } },
+      "This organization is already enrolled for that migration",
+      // meta.migrationName lets the presentation say which migration the
+      // standing enrollment covers.
+      { httpStatus: 409, fault: "customer", meta: { migrationName } },
     );
     this.name = "MigrationEnrollmentAlreadyExistsError";
   }
@@ -125,13 +125,83 @@ export class MigrationEnrollmentAlreadyExistsError extends HandledError {
 export class MigrationEnrollmentNotFoundError extends HandledError {
   declare readonly code: "migration_enrollment_not_found";
 
-  constructor({ stage }: { stage: string }) {
+  constructor({ migrationName }: { migrationName: string }) {
     super(
       "migration_enrollment_not_found",
-      "This organization is not enrolled for that stage",
-      { httpStatus: 404, fault: "customer", meta: { stage } },
+      "This organization is not enrolled for that migration",
+      { httpStatus: 404, fault: "customer", meta: { migrationName } },
     );
     this.name = "MigrationEnrollmentNotFoundError";
+  }
+}
+
+/** A migration name nothing registered answers to. */
+export class MigrationUnknownError extends HandledError {
+  declare readonly code: "migration_unknown";
+
+  constructor() {
+    super("migration_unknown", "No migration exists with that name", {
+      httpStatus: 404,
+      fault: "customer",
+    });
+    this.name = "MigrationUnknownError";
+  }
+}
+
+/**
+ * A targeted run refused because the organization is not enrolled for the
+ * migration (cloud only - self-hosted has no enrollment). Enrollment stays
+ * the single pacing source of truth: a run that bypassed it would be an
+ * unenrolled organization migrating anyway.
+ */
+export class MigrationRunRequiresEnrollmentError extends HandledError {
+  declare readonly code: "migration_run_requires_enrollment";
+
+  constructor({ migrationName }: { migrationName: string }) {
+    super(
+      "migration_run_requires_enrollment",
+      "Enroll this organization for the migration before running it",
+      { httpStatus: 409, fault: "customer", meta: { migrationName } },
+    );
+    this.name = "MigrationRunRequiresEnrollmentError";
+  }
+}
+
+/**
+ * A targeted run refused because another pass holds the fleet-wide lease.
+ * Not a failure of anything: the running pass may well be processing the
+ * very organization the operator asked about, and the operator's action is
+ * simply to retry once it concludes.
+ */
+export class MigrationPassAlreadyRunningError extends HandledError {
+  declare readonly code: "migration_pass_already_running";
+
+  constructor() {
+    super(
+      "migration_pass_already_running",
+      "A migration pass is already running; try again once it concludes",
+      { httpStatus: 409, fault: "customer" },
+    );
+    this.name = "MigrationPassAlreadyRunningError";
+  }
+}
+
+/**
+ * A targeted run refused on a self-hosted installation for a migration not
+ * yet released there. The runner never drives it for any tenant until a
+ * release flips its declaration, and a targeted run must not become the
+ * bypass.
+ */
+export class MigrationNotAvailableOnInstallationError extends HandledError {
+  declare readonly code: "migration_not_available_on_installation";
+
+  constructor() {
+    super(
+      "migration_not_available_on_installation",
+      "This migration is not yet available for this installation",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "MigrationNotAvailableOnInstallationError";
   }
 }
 

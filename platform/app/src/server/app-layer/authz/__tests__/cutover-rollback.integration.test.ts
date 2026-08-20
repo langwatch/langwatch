@@ -75,6 +75,8 @@ describe("given a cut-over organization rolled back with the queue stopped", () 
       migrations: () => [
         {
           name: GRANTS_CUTOVER_MIGRATION_NAME,
+          title: "Authorization engine cutover",
+          description: "Test double of the cutover's listing declaration.",
           runsAutomaticallyOnSelfHosted: false,
         },
       ],
@@ -82,13 +84,18 @@ describe("given a cut-over organization rolled back with the queue stopped", () 
       // about the enforcement ordering.
       isSaaS: () => false,
       enrollments: {
-        findAllByStage: async () => [],
+        findAll: async () => [],
         findOrganizationById: async () => null,
+        isEnrolled: async () => false,
+        countEnrolledByMigration: async () => new Map(),
+        countOrganizations: async () => 0,
+        searchOrganizations: async () => [],
         create: async () => undefined,
         delete: async () => undefined,
       },
       audit: async () => undefined,
       runPass: async () => null,
+      runTargetedPass: async () => null,
       rollbackEffects: {
         [GRANTS_CUTOVER_MIGRATION_NAME]: async ({
           tenantId,

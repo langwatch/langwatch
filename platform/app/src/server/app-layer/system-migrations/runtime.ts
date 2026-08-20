@@ -113,6 +113,8 @@ export const systemMigrationsService = new SystemMigrationsService({
   migrations: () =>
     registeredMigrations().map((migration) => ({
       name: migration.name,
+      title: migration.title,
+      description: migration.description,
       runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
     })),
   isSaaS: () => env.IS_SAAS === true,
@@ -125,6 +127,8 @@ export const systemMigrationsService = new SystemMigrationsService({
       args: entry.args,
     }),
   runPass: () => runSystemMigrationPass(),
+  runTargetedPass: ({ organizationId, migrationName }) =>
+    runSystemMigrationTargetedPass({ organizationId, migrationName }),
   rollbackEffects: {
     [GRANTS_CUTOVER_MIGRATION_NAME]: rollBackAuthzCutover,
   },
@@ -486,12 +490,13 @@ export function registeredMigrations(): SystemMigration[] {
       // the legacy head — resolver-resident quirks are exactly what the two
       // row-head collectors cannot see.
       legacyDecide: legacyOrganizationDecide(prisma),
-      // A stage of its own, deliberately not the "migrations" enrollment:
-      // the backfill and the genesis import are dark and can go wide, while
-      // the cutover is the one migration that changes who decides, so it
-      // advances organization by organization - on cloud, only when an
-      // operator enrolled the organization for "cutover", read from the
-      // database per call so a new enrollment needs no restart. Self-hosted
+      // The cutover's own belt-and-braces enrollment probe, on top of the
+      // runner's per-migration cohort: the backfill and the genesis import
+      // are dark and can go wide, while the cutover is the one migration
+      // that changes who decides, so it advances organization by
+      // organization - on cloud, only when an operator enrolled the
+      // organization for it, read from the database per call so a new
+      // enrollment needs no restart. Self-hosted
       // cuts over automatically once its prerequisites finalize - the
       // in-place doctrine (an operator never learns it happened), and what
       // makes that safe is the parity proof standing between the import and
@@ -524,29 +529,29 @@ export async function cutoverEnrollmentCohort(
   if (env.IS_SAAS !== true) return true;
   return enrollmentRepository.isEnrolled({
     organizationId: tenantId,
-    stage: "cutover",
+    migrationName: GRANTS_CUTOVER_MIGRATION_NAME,
   });
 }
 
 /**
- * The runner's cohort for one pass. On cloud the "migrations" enrollment is
- * read ONCE here, fresh at the start of every pass - one query instead of
- * one per tenant, and an enrollment or withdrawal takes effect on the very
- * next pass with no restart. Self-hosted includes every organization.
+ * The runner's cohort for one pass, per (tenant, migration). On cloud every
+ * enrollment is read ONCE here, fresh at the start of every pass - one
+ * query instead of one per tenant per migration, and an enrollment or
+ * withdrawal takes effect on the very next pass with no restart.
+ * Self-hosted includes every organization for every migration the
+ * installation runs at all.
  */
 export async function migrationPassCohort(): Promise<
-  (tenantId: string) => boolean
+  (args: { tenantId: string; migrationName: string }) => boolean
 > {
   const isSaaS = env.IS_SAAS === true;
-  const enrolledOrganizationIds = isSaaS
-    ? await enrollmentRepository.findEnrolledOrganizationIds({
-        stage: "migrations",
-      })
-    : new Set<string>();
-  return (tenantId) =>
+  const enrolledByMigration = isSaaS
+    ? await enrollmentRepository.findEnrolledOrganizationIdsByMigration()
+    : new Map<string, Set<string>>();
+  return ({ tenantId, migrationName }) =>
     organizationMigrates({
       isSaaS,
-      enrolled: enrolledOrganizationIds.has(tenantId),
+      enrolled: enrolledByMigration.get(migrationName)?.has(tenantId) ?? false,
     });
 }
 
@@ -577,6 +582,47 @@ function warnWhenRetiredCohortVariablesAreSet(): void {
  * are not driven for any tenant - never attempted, parked or reported -
  * until a later release flips the declaration.
  */
+/**
+ * One migration for one organization, now - the ops page's targeted run.
+ * The same lease as a full pass (one driver fleet-wide, so a targeted run
+ * can never double-drive an organization a pass is working through; null
+ * means the lease is held and the service turns that into a retry-shaped
+ * refusal), the same cohort read (enrollment stays the pacing source of
+ * truth even here - the service refuses unenrolled organizations before
+ * composing this, and the cohort would skip them anyway), a tenant source
+ * of exactly one id, and the migration list cut to the one asked for.
+ */
+export async function runSystemMigrationTargetedPass({
+  organizationId,
+  migrationName,
+  signal,
+}: {
+  organizationId: string;
+  migrationName: string;
+  signal?: AbortSignal;
+}): Promise<MigrationPassSummary | null> {
+  const redis = tryGetApp()?.redis ?? null;
+  const runner = new SystemMigrationRunnerService({
+    state: systemMigrationState,
+    lease: new RedisMigrationLeaseRepository(redis),
+    tenants: {
+      findTenantIdsAfter: async ({ cursor }) =>
+        cursor === null ? [organizationId] : [],
+    },
+    cohort: await migrationPassCohort(),
+    migrations: registeredMigrations().filter(
+      (migration) =>
+        migration.name === migrationName &&
+        migrationRunsOnThisInstallation({
+          isSaaS: env.IS_SAAS === true,
+          runsAutomaticallyOnSelfHosted:
+            migration.runsAutomaticallyOnSelfHosted,
+        }),
+    ),
+  });
+  return runner.runPass({ signal });
+}
+
 export async function runSystemMigrationPass(args?: {
   signal?: AbortSignal;
   /**

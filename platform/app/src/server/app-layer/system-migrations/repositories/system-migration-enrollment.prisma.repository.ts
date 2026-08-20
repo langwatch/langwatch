@@ -3,35 +3,27 @@ import {
   MigrationEnrollmentAlreadyExistsError,
   MigrationEnrollmentNotFoundError,
 } from "../errors";
-import type {
-  MigrationEnrollmentRecord,
-  MigrationEnrollmentStage,
-} from "../system-migrations.service";
+import type { MigrationEnrollmentRecord } from "../system-migrations.service";
 
 /**
  * The cloud rollout's enrollment rows (`SystemMigrationEnrollment`): which
- * organizations the runner processes ("migrations") and which the cutover
- * may flip ("cutover"). One row per (organization, stage); withdrawal
- * deletes the row. The uniqueness refusals live here because the unique key
- * is the only race-free duplicate check - the service adds the guards that
- * are business rules rather than storage facts.
+ * organizations each registered migration processes, one row per
+ * (organization, migration); withdrawal deletes the row. The uniqueness
+ * refusals live here because the unique key is the only race-free duplicate
+ * check - the service adds the guards that are business rules rather than
+ * storage facts.
  */
 export class PrismaSystemMigrationEnrollmentRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   /**
-   * One stage's enrollments with the names the ops page shows - the
-   * organization's, and something readable for who enrolled it. Both are
-   * best-effort lookups: an enrollment must still list (and be
-   * withdrawable) when its organization or enroller has since been deleted.
+   * Every enrollment with the names the ops page shows - the organization's,
+   * and something readable for who enrolled it. Both are best-effort
+   * lookups: an enrollment must still list (and be withdrawable) when its
+   * organization or enroller has since been deleted.
    */
-  async findAllByStage({
-    stage,
-  }: {
-    stage: MigrationEnrollmentStage;
-  }): Promise<MigrationEnrollmentRecord[]> {
+  async findAll(): Promise<MigrationEnrollmentRecord[]> {
     const rows = await this.prisma.systemMigrationEnrollment.findMany({
-      where: { stage },
       orderBy: { createdAt: "desc" },
     });
     if (rows.length === 0) return [];
@@ -57,7 +49,7 @@ export class PrismaSystemMigrationEnrollmentRepository {
     return rows.map((row) => ({
       organizationId: row.organizationId,
       organizationName: organizationNames.get(row.organizationId) ?? null,
-      stage,
+      migrationName: row.migrationName,
       enrolledByUserId: row.enrolledByUserId,
       enrolledByLabel: userLabels.get(row.enrolledByUserId) ?? null,
       createdAt: row.createdAt,
@@ -65,36 +57,57 @@ export class PrismaSystemMigrationEnrollmentRepository {
   }
 
   /**
-   * The pass's read: every organization enrolled for one stage, as a set the
-   * runner probes per tenant. Read once at the start of each pass - fresh
-   * per pass, like the env knob it replaced, and one query instead of one
-   * per tenant.
+   * The pass's read: every enrollment as migration-name → organization-id
+   * sets, so the runner probes per (tenant, migration) in memory. Read once
+   * at the start of each pass - fresh per pass, and one query instead of one
+   * per tenant per migration.
    */
-  async findEnrolledOrganizationIds({
-    stage,
-  }: {
-    stage: MigrationEnrollmentStage;
-  }): Promise<Set<string>> {
+  async findEnrolledOrganizationIdsByMigration(): Promise<
+    Map<string, Set<string>>
+  > {
     const rows = await this.prisma.systemMigrationEnrollment.findMany({
-      where: { stage },
-      select: { organizationId: true },
+      select: { organizationId: true, migrationName: true },
     });
-    return new Set(rows.map((row) => row.organizationId));
+    const byMigration = new Map<string, Set<string>>();
+    for (const row of rows) {
+      const ids = byMigration.get(row.migrationName) ?? new Set<string>();
+      ids.add(row.organizationId);
+      byMigration.set(row.migrationName, ids);
+    }
+    return byMigration;
   }
 
-  /** The cutover's per-tenant probe (only tenants past their prerequisites reach it). */
+  /** The cutover's per-tenant probe, and the targeted run's precondition. */
   async isEnrolled({
     organizationId,
-    stage,
+    migrationName,
   }: {
     organizationId: string;
-    stage: MigrationEnrollmentStage;
+    migrationName: string;
   }): Promise<boolean> {
     const row = await this.prisma.systemMigrationEnrollment.findUnique({
-      where: { organizationId_stage: { organizationId, stage } },
+      where: {
+        organizationId_migrationName: { organizationId, migrationName },
+      },
       select: { organizationId: true },
     });
     return row !== null;
+  }
+
+  /** How many organizations are enrolled, per migration name. */
+  async countEnrolledByMigration(): Promise<Map<string, number>> {
+    const groups = await this.prisma.systemMigrationEnrollment.groupBy({
+      by: ["migrationName"],
+      _count: { organizationId: true },
+    });
+    return new Map(
+      groups.map((group) => [group.migrationName, group._count.organizationId]),
+    );
+  }
+
+  /** Every organization on the installation - the enrollment ceiling. */
+  async countOrganizations(): Promise<number> {
+    return this.prisma.organization.count();
   }
 
   /** The service's existence check for the organization being enrolled. */
@@ -109,25 +122,45 @@ export class PrismaSystemMigrationEnrollmentRepository {
     });
   }
 
+  /**
+   * The operator's organization lookup: by name (contains, case-insensitive)
+   * or exact id, a short list for a picker. Name and id only - the ops page
+   * needs nothing else to act on an organization.
+   */
+  async searchOrganizations({
+    query,
+  }: {
+    query: string;
+  }): Promise<Array<{ id: string; name: string }>> {
+    return this.prisma.organization.findMany({
+      where: {
+        OR: [{ name: { contains: query, mode: "insensitive" } }, { id: query }],
+      },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+      take: 10,
+    });
+  }
+
   async create({
     organizationId,
-    stage,
+    migrationName,
     enrolledByUserId,
   }: {
     organizationId: string;
-    stage: MigrationEnrollmentStage;
+    migrationName: string;
     enrolledByUserId: string;
   }): Promise<void> {
     try {
       await this.prisma.systemMigrationEnrollment.create({
-        data: { organizationId, stage, enrolledByUserId },
+        data: { organizationId, migrationName, enrolledByUserId },
       });
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2002"
       ) {
-        throw new MigrationEnrollmentAlreadyExistsError({ stage });
+        throw new MigrationEnrollmentAlreadyExistsError({ migrationName });
       }
       throw error;
     }
@@ -135,21 +168,23 @@ export class PrismaSystemMigrationEnrollmentRepository {
 
   async delete({
     organizationId,
-    stage,
+    migrationName,
   }: {
     organizationId: string;
-    stage: MigrationEnrollmentStage;
+    migrationName: string;
   }): Promise<void> {
     try {
       await this.prisma.systemMigrationEnrollment.delete({
-        where: { organizationId_stage: { organizationId, stage } },
+        where: {
+          organizationId_migrationName: { organizationId, migrationName },
+        },
       });
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2025"
       ) {
-        throw new MigrationEnrollmentNotFoundError({ stage });
+        throw new MigrationEnrollmentNotFoundError({ migrationName });
       }
       throw error;
     }

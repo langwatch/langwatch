@@ -9,8 +9,8 @@ import {
   type DashboardData,
   OPS_BLOB_SORTS,
 } from "~/server/app-layer/ops/types";
+import { GRANTS_CUTOVER_MIGRATION_NAME } from "@langwatch/authz-server/migration";
 import { systemMigrationsService } from "~/server/app-layer/system-migrations/runtime";
-import { MIGRATION_ENROLLMENT_STAGES } from "~/server/app-layer/system-migrations/system-migrations.service";
 import {
   resolveHotDays,
   TABLE_TTL_CONFIG,
@@ -1468,8 +1468,7 @@ export const opsRouter = createTRPCRouter({
 
   /**
    * The cloud rollout's enrollment listing: which organizations are enrolled
-   * for the preparation work ("migrations") and which for the flip onto the
-   * engine ("cutover"), with the names the operator recognizes. Carries
+   * for which migrations, with the names the operator recognizes. Carries
    * `isSaaS` so the page can say honestly that a self-hosted installation
    * has nothing to enroll.
    */
@@ -1482,33 +1481,46 @@ export const opsRouter = createTRPCRouter({
     ),
 
   /**
-   * Enroll one organization for one stage of the in-place migration rollout.
-   * Takes effect on the next pass - enrollment is read fresh each time. The
-   * service refuses duplicates, unknown organizations, and any enrollment on
-   * a self-hosted installation, each with a handled error the page renders.
+   * The organization lookup behind the page's pickers: enroll, targeted run
+   * and rollback all act on an organization found by name or exact id.
+   */
+  searchMigrationOrganizations: protectedProcedure
+    .use(opsViewPermission)
+    .input(z.object({ query: z.string().max(200) }))
+    .query(({ input }) =>
+      systemMigrationsService.searchOrganizations({ query: input.query }),
+    ),
+
+  /**
+   * Enroll one organization for one registered migration. Takes effect on
+   * the next pass - enrollment is read fresh each time. The service refuses
+   * duplicates, unknown migrations, unknown organizations, and any
+   * enrollment on a self-hosted installation, each with a handled error the
+   * page renders.
    */
   enrollMigrationTenant: protectedProcedure
     .use(opsManagePermission)
     .input(
       z.object({
         organizationId: z.string().min(1).max(200),
-        stage: z.enum(MIGRATION_ENROLLMENT_STAGES),
-        // Typed confirmation for the cutover stage, same reasoning as the
-        // rollback's: enrolling an organization for cutover is what lets the
-        // next pass flip which tables answer every permission check for it.
+        migrationName: z.string().min(1).max(200),
+        // Typed confirmation for the cutover migration, same reasoning as
+        // the rollback's: enrolling an organization for cutover is what lets
+        // the next pass flip which tables answer every permission check for
+        // it.
         confirm: z.literal("ENROLL").optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // The `migrations` stage is behavior-neutral (backfill and genesis
-      // change nothing about who decides); the cutover stage has the
+      // The preparation migrations are behavior-neutral (backfill and
+      // genesis change nothing about who decides); the cutover has the
       // rollback's blast radius, so it takes the rollback's guard.
-      if (input.stage === "cutover") {
+      if (input.migrationName === GRANTS_CUTOVER_MIGRATION_NAME) {
         requireDestructiveOpsAuth(ctx, input.confirm);
       }
       await systemMigrationsService.enroll({
         organizationId: input.organizationId,
-        stage: input.stage,
+        migrationName: input.migrationName,
         actorUserId: ctx.session.user.id,
       });
       return { enrolled: true };
@@ -1516,24 +1528,54 @@ export const opsRouter = createTRPCRouter({
 
   /**
    * Withdraw an enrollment: later passes stop processing the organization
-   * for that stage. State already recorded stays exactly as it is - pausing
-   * the rollout is this action's whole job; undoing it is the rollback's.
+   * for that migration. State already recorded stays exactly as it is -
+   * pausing the rollout is this action's whole job; undoing it is the
+   * rollback's.
    */
   withdrawMigrationTenant: protectedProcedure
     .use(opsManagePermission)
     .input(
       z.object({
         organizationId: z.string().min(1).max(200),
-        stage: z.enum(MIGRATION_ENROLLMENT_STAGES),
+        migrationName: z.string().min(1).max(200),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       await systemMigrationsService.withdraw({
         organizationId: input.organizationId,
-        stage: input.stage,
+        migrationName: input.migrationName,
         actorUserId: ctx.session.user.id,
       });
       return { withdrawn: true };
+    }),
+
+  /**
+   * Run one migration for one organization now. Awaited: the operator asked
+   * about one organization and gets the status it ended the run in. The
+   * service refuses unknown migrations, unknown organizations, unenrolled
+   * organizations (cloud) and a pass already holding the fleet-wide lease,
+   * each with a handled error the page renders.
+   */
+  runSystemMigrationForOrganization: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        organizationId: z.string().min(1).max(200),
+        migrationName: z.string().min(1).max(200),
+        // Typed confirmation for the cutover migration - a targeted cutover
+        // run is exactly the flip the enrollment confirmation guards.
+        confirm: z.literal("RUN").optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.migrationName === GRANTS_CUTOVER_MIGRATION_NAME) {
+        requireDestructiveOpsAuth(ctx, input.confirm);
+      }
+      return systemMigrationsService.runForOrganization({
+        organizationId: input.organizationId,
+        migrationName: input.migrationName,
+        actorUserId: ctx.session.user.id,
+      });
     }),
 
   /**

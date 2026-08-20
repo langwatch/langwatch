@@ -111,9 +111,11 @@ Feature: In-place authorization data migration
   # Enrollment and self-hosted release pacing
   # ============================================================================
   # The rollout's pacing lives in the product, not the environment. Cloud is
-  # paced per organization by enrollment rows operators write on the ops
-  # migrations page - one for the preparation work ("migration"), one for the
-  # flip onto the engine ("cutover"), each read fresh on every pass.
+  # paced per organization AND per migration by enrollment rows operators
+  # write on the ops migrations page - one row per (organization, migration),
+  # each read fresh on every pass. An organization not enrolled for a
+  # migration is simply not processed by it: no state is recorded, so "not
+  # enrolled yet" and "not started" are the same pending state.
   # Self-hosted has no enrollment at all: every organization migrates
   # automatically, but only through the migrations each release declares
   # ready for self-hosting - a migration still soaking on cloud ships inert
@@ -129,11 +131,19 @@ Feature: In-place authorization data migration
     And withdrawing "acme" stops the pass after that the same way
 
   @unit
-  Scenario: Migration and cutover enrollment pace independently
-    Given "acme" is enrolled for migration but not for cutover
-    When a pass carries "acme" through the preparation work
+  Scenario: Each migration is enrolled separately and paces independently
+    Given "acme" is enrolled for the team-user backfill and the grants import
+      but not for the cutover
+    When a pass runs over "acme"
     Then the backfill and the genesis import proceed for "acme"
-    And the cutover holds "acme" as waiting instead of flipping it
+    And the cutover leaves "acme" untouched with no state recorded
+
+  @unit
+  Scenario: An organization enrolled only for a later migration waits on its prerequisites
+    Given "acme" is enrolled for the cutover but not for the preparation migrations
+    When a pass runs over "acme"
+    Then the cutover holds "acme" as waiting on its unfinished prerequisites
+    And nothing flips for "acme"
 
   @unit
   Scenario: Enrollment alone decides which organizations migrate
@@ -144,8 +154,8 @@ Feature: In-place authorization data migration
 
   @unit
   Scenario: Enrolling an organization twice is refused
-    Given "acme" is already enrolled for migration
-    When an operator enrolls "acme" for migration again
+    Given "acme" is already enrolled for the team-user backfill
+    When an operator enrolls "acme" for the team-user backfill again
     Then the enrollment is refused with error code "migration_enrollment_already_exists"
     And the standing enrollment is unchanged
 
@@ -159,6 +169,12 @@ Feature: In-place authorization data migration
   Scenario: Enrolling an organization that does not exist is refused
     When an operator enrolls an organization id nothing matches
     Then the enrollment is refused with error code "organization_not_found"
+    And no enrollment is written
+
+  @unit
+  Scenario: Enrolling for a migration that does not exist is refused
+    When an operator enrolls "acme" for a migration name nothing matches
+    Then the enrollment is refused with error code "migration_unknown"
     And no enrollment is written
 
   @unit
@@ -195,6 +211,56 @@ Feature: In-place authorization data migration
     When the workers boot and a pass runs
     Then the team-user backfill and the genesis import run automatically
     And the cutover waits for a later release, its organizations reading as a normal waiting state rather than needing attention
+
+  # ============================================================================
+  # The ops migrations page
+  # ============================================================================
+  # The page presents the migrations as the ordered pipeline they are, in the
+  # operator's language: each step carries a human title and a description of
+  # what it does for the organization, with the stable internal name demoted
+  # to a detail. The stored name never changes - renaming it would orphan
+  # every recorded state row - so the human title is presentation over it.
+
+  @unit
+  Scenario: Each migration presents a title and a description, in running order
+    When an operator opens the migrations page
+    Then each migration lists with its human title and a description of what it does
+    And the migrations appear in the order they run per organization
+    And the stable internal name is shown as a secondary detail
+
+  @unit
+  Scenario: The page shows how many organizations each migration could still enroll
+    Given three organizations exist and one is enrolled for the team-user backfill
+    When an operator opens the migrations page
+    Then the team-user backfill shows one organization enrolled and two eligible
+
+  @unit
+  Scenario: An operator finds an organization by name to act on it
+    Given an organization named "Acme Corporation" exists
+    When an operator searches for "acme"
+    Then the search lists "Acme Corporation" with its organization id
+    And enrollment, targeted runs and rollbacks accept the organization picked from the search
+
+  @unit
+  Scenario: An operator runs one migration for one organization now
+    Given "acme" is enrolled for the team-user backfill
+    When an operator runs the team-user backfill for "acme" now
+    Then only "acme" is processed, and only by the team-user backfill
+    And the operator is told the status the organization ended the run in
+
+  @unit
+  Scenario: A targeted run for an organization that is not enrolled is refused
+    Given the installation is cloud and "globex" is not enrolled for the grants import
+    When an operator runs the grants import for "globex" now
+    Then the run is refused with error code "migration_run_requires_enrollment"
+    And no state is recorded for "globex"
+
+  @unit
+  Scenario: A targeted run while a pass is already running is refused
+    Given a migration pass holds the fleet-wide lease
+    When an operator runs a migration for one organization now
+    Then the run is refused with error code "migration_pass_already_running"
+    And the operator can simply retry once the pass concludes
 
   # ============================================================================
   # The backfill (runbook M1)

@@ -8,10 +8,23 @@ import type { TenantMigrationOutcome, TenantMigrationRecord } from "./types";
  */
 export interface SystemMigration {
   /**
-   * Stable identifier - the state table's key and the name operators see.
-   * Renaming it orphans every stored record, so never do that.
+   * Stable identifier - the state table's key. Renaming it orphans every
+   * stored record, so never do that; what operators read is `title`.
    */
   readonly name: string;
+
+  /**
+   * The name operators read on the ops page. Presentation over the stable
+   * `name`, so it may change freely.
+   */
+  readonly title: string;
+
+  /**
+   * What this migration does for an organization, in the operator's
+   * language: the change it makes and whether it affects who answers
+   * permission checks. Shown verbatim on the ops page.
+   */
+  readonly description: string;
 
   /**
    * Whether a SELF-HOSTED installation runs this migration automatically.

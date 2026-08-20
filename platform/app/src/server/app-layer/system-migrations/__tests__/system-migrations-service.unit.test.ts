@@ -1,10 +1,16 @@
-import type { TenantMigrationRecord } from "@langwatch/system-migrations";
+import type {
+  MigrationPassSummary,
+  TenantMigrationRecord,
+} from "@langwatch/system-migrations";
 import { describe, expect, it, vi } from "vitest";
 import {
   MigrationEnrollmentCloudOnlyError,
   MigrationEnrollmentOrganizationNotFoundError,
+  MigrationPassAlreadyRunningError,
   MigrationRollbackRequiresMigratedOrFinalizedError,
+  MigrationRunRequiresEnrollmentError,
   MigrationStateNotFoundError,
+  MigrationUnknownError,
 } from "../errors";
 import {
   type SystemMigrationEnrollmentStore,
@@ -14,14 +20,35 @@ import {
 const MIGRATION = "team-user-backfill";
 const TENANT = "org_acme";
 
+function migrationOf(name: string, runsAutomaticallyOnSelfHosted = true) {
+  return {
+    name,
+    title: name,
+    description: name,
+    runsAutomaticallyOnSelfHosted,
+  };
+}
+
 function enrollmentStoreStub() {
   return {
-    findAllByStage: vi
-      .fn<SystemMigrationEnrollmentStore["findAllByStage"]>()
+    findAll: vi
+      .fn<SystemMigrationEnrollmentStore["findAll"]>()
       .mockResolvedValue([]),
     findOrganizationById: vi
       .fn<SystemMigrationEnrollmentStore["findOrganizationById"]>()
       .mockResolvedValue({ id: "org_acme", name: "Acme" }),
+    isEnrolled: vi
+      .fn<SystemMigrationEnrollmentStore["isEnrolled"]>()
+      .mockResolvedValue(true),
+    countEnrolledByMigration: vi
+      .fn<SystemMigrationEnrollmentStore["countEnrolledByMigration"]>()
+      .mockResolvedValue(new Map()),
+    countOrganizations: vi
+      .fn<SystemMigrationEnrollmentStore["countOrganizations"]>()
+      .mockResolvedValue(0),
+    searchOrganizations: vi
+      .fn<SystemMigrationEnrollmentStore["searchOrganizations"]>()
+      .mockResolvedValue([]),
     create: vi
       .fn<SystemMigrationEnrollmentStore["create"]>()
       .mockResolvedValue(undefined),
@@ -31,13 +58,31 @@ function enrollmentStoreStub() {
   };
 }
 
+function targetedPassStub() {
+  return vi
+    .fn<
+      (args: {
+        organizationId: string;
+        migrationName: string;
+      }) => Promise<MigrationPassSummary | null>
+    >()
+    .mockResolvedValue({
+      tenantsSeen: 1,
+      finalized: 1,
+      held: 0,
+      parked: 0,
+      skipped: 0,
+    });
+}
+
 function serviceWith({
   record,
   rollbackEffects,
   rollbackGuards,
   isSaaS = true,
   enrollments = enrollmentStoreStub(),
-  migrations = [{ name: MIGRATION, runsAutomaticallyOnSelfHosted: true }],
+  migrations = [migrationOf(MIGRATION)],
+  runTargetedPass = targetedPassStub(),
 }: {
   record: TenantMigrationRecord | null;
   rollbackEffects?: Record<
@@ -54,7 +99,8 @@ function serviceWith({
   >;
   isSaaS?: boolean;
   enrollments?: ReturnType<typeof enrollmentStoreStub>;
-  migrations?: Array<{ name: string; runsAutomaticallyOnSelfHosted: boolean }>;
+  migrations?: Array<ReturnType<typeof migrationOf>>;
+  runTargetedPass?: ReturnType<typeof targetedPassStub>;
 }) {
   const upserts: TenantMigrationRecord[] = [];
   const audit = vi.fn().mockResolvedValue(undefined);
@@ -83,10 +129,11 @@ function serviceWith({
     enrollments,
     audit,
     runPass: vi.fn(),
+    runTargetedPass,
     ...(rollbackEffects ? { rollbackEffects } : {}),
     ...(rollbackGuards ? { rollbackGuards } : {}),
   });
-  return { service, upserts, enrollments, audit };
+  return { service, upserts, enrollments, audit, runTargetedPass };
 }
 
 describe("SystemMigrationsService.rollBack", () => {
@@ -410,21 +457,37 @@ describe("SystemMigrationsService enrollment", () => {
 
         await service.enroll({
           organizationId: "org_acme",
-          stage: "cutover",
+          migrationName: MIGRATION,
           actorUserId: "user_alex",
         });
 
         expect(enrollments.create).toHaveBeenCalledWith({
           organizationId: "org_acme",
-          stage: "cutover",
+          migrationName: MIGRATION,
           enrolledByUserId: "user_alex",
         });
         expect(audit).toHaveBeenCalledWith({
           userId: "user_alex",
           organizationId: "org_acme",
           action: "systemMigrations.enroll",
-          args: { stage: "cutover" },
+          args: { migrationName: MIGRATION },
         });
+      });
+    });
+
+    describe("when the migration name matches nothing registered", () => {
+      /** @scenario "Enrolling for a migration that does not exist is refused" */
+      it("refuses with migration_unknown and writes nothing", async () => {
+        const { service, enrollments } = serviceWith({ record: null });
+
+        const attempt = service.enroll({
+          organizationId: "org_acme",
+          migrationName: "no-such-migration",
+          actorUserId: "user_alex",
+        });
+
+        await expect(attempt).rejects.toThrow(MigrationUnknownError);
+        expect(enrollments.create).not.toHaveBeenCalled();
       });
     });
 
@@ -437,7 +500,7 @@ describe("SystemMigrationsService enrollment", () => {
 
         const attempt = service.enroll({
           organizationId: "org_typo",
-          stage: "migrations",
+          migrationName: MIGRATION,
           actorUserId: "user_alex",
         });
 
@@ -459,19 +522,19 @@ describe("SystemMigrationsService enrollment", () => {
 
         await service.withdraw({
           organizationId: "org_acme",
-          stage: "migrations",
+          migrationName: MIGRATION,
           actorUserId: "user_alex",
         });
 
         expect(enrollments.delete).toHaveBeenCalledWith({
           organizationId: "org_acme",
-          stage: "migrations",
+          migrationName: MIGRATION,
         });
         expect(audit).toHaveBeenCalledWith({
           userId: "user_alex",
           organizationId: "org_acme",
           action: "systemMigrations.withdraw",
-          args: { stage: "migrations" },
+          args: { migrationName: MIGRATION },
         });
       });
     });
@@ -493,13 +556,13 @@ describe("SystemMigrationsService enrollment", () => {
           () =>
             service.enroll({
               organizationId: "org_acme",
-              stage: "migrations",
+              migrationName: MIGRATION,
               actorUserId: "user_alex",
             }),
           () =>
             service.withdraw({
               organizationId: "org_acme",
-              stage: "migrations",
+              migrationName: MIGRATION,
               actorUserId: "user_alex",
             }),
         ]) {
@@ -519,26 +582,19 @@ describe("SystemMigrationsService enrollment", () => {
   });
 
   describe("when the ops page lists enrollments", () => {
-    it("answers both stages flattened, with the installation shape alongside", async () => {
+    it("answers every migration's rows, with the installation shape alongside", async () => {
       const createdAt = new Date("2026-08-19T10:00:00Z");
       const enrollments = enrollmentStoreStub();
-      enrollments.findAllByStage.mockImplementation(
-        ({ stage }: { stage: string }) =>
-          Promise.resolve(
-            stage === "migrations"
-              ? [
-                  {
-                    organizationId: "org_acme",
-                    organizationName: "Acme",
-                    stage,
-                    enrolledByUserId: "user_alex",
-                    enrolledByLabel: "Alex",
-                    createdAt,
-                  },
-                ]
-              : [],
-          ),
-      );
+      enrollments.findAll.mockResolvedValue([
+        {
+          organizationId: "org_acme",
+          organizationName: "Acme",
+          migrationName: MIGRATION,
+          enrolledByUserId: "user_alex",
+          enrolledByLabel: "Alex",
+          createdAt,
+        },
+      ]);
       const { service } = serviceWith({ record: null, enrollments });
 
       const listing = await service.getEnrollments({
@@ -549,13 +605,7 @@ describe("SystemMigrationsService enrollment", () => {
       expect(listing.enrollments).toHaveLength(1);
       expect(listing.enrollments[0]).toMatchObject({
         organizationId: "org_acme",
-        stage: "migrations",
-      });
-      expect(enrollments.findAllByStage).toHaveBeenCalledWith({
-        stage: "migrations",
-      });
-      expect(enrollments.findAllByStage).toHaveBeenCalledWith({
-        stage: "cutover",
+        migrationName: MIGRATION,
       });
     });
 
@@ -578,8 +628,8 @@ describe("SystemMigrationsService enrollment", () => {
         record: null,
         isSaaS: false,
         migrations: [
-          { name: "released", runsAutomaticallyOnSelfHosted: true },
-          { name: "unreleased", runsAutomaticallyOnSelfHosted: false },
+          migrationOf("released", true),
+          migrationOf("unreleased", false),
         ],
       });
 
@@ -594,20 +644,187 @@ describe("SystemMigrationsService enrollment", () => {
         { name: "released", availableOnThisInstallation: true },
         { name: "unreleased", availableOnThisInstallation: false },
       ]);
+      // Enrollment does not exist off cloud, so the gauge is honestly null
+      // rather than a zero that reads as "nobody enrolled yet".
+      expect(overview[0]?.enrollment).toBeNull();
     });
 
     it("marks everything available on cloud, whatever the declarations say", async () => {
       const { service } = serviceWith({
         record: null,
         isSaaS: true,
-        migrations: [
-          { name: "unreleased", runsAutomaticallyOnSelfHosted: false },
-        ],
+        migrations: [migrationOf("unreleased", false)],
       });
 
       const overview = await service.getOverview();
 
       expect(overview[0]?.availableOnThisInstallation).toBe(true);
+    });
+  });
+
+  describe("when the overview is read on cloud", () => {
+    /** @scenario "Each migration presents a title and a description, in running order" */
+    it("carries each migration's title and description, in registration order", async () => {
+      const { service } = serviceWith({
+        record: null,
+        migrations: [
+          {
+            name: "first",
+            title: "First step",
+            description: "What the first step does.",
+            runsAutomaticallyOnSelfHosted: true,
+          },
+          {
+            name: "second",
+            title: "Second step",
+            description: "What the second step does.",
+            runsAutomaticallyOnSelfHosted: true,
+          },
+        ],
+      });
+
+      const overview = await service.getOverview();
+
+      expect(
+        overview.map(({ name, title, description }) => ({
+          name,
+          title,
+          description,
+        })),
+      ).toEqual([
+        {
+          name: "first",
+          title: "First step",
+          description: "What the first step does.",
+        },
+        {
+          name: "second",
+          title: "Second step",
+          description: "What the second step does.",
+        },
+      ]);
+    });
+
+    /** @scenario "The page shows how many organizations each migration could still enroll" */
+    it("gauges each migration's enrolled and eligible organizations", async () => {
+      const enrollments = enrollmentStoreStub();
+      enrollments.countEnrolledByMigration.mockResolvedValue(
+        new Map([[MIGRATION, 1]]),
+      );
+      enrollments.countOrganizations.mockResolvedValue(3);
+      const { service } = serviceWith({ record: null, enrollments });
+
+      const overview = await service.getOverview();
+
+      expect(overview[0]?.enrollment).toEqual({
+        enrolledCount: 1,
+        eligibleCount: 2,
+      });
+    });
+  });
+});
+
+describe("SystemMigrationsService.runForOrganization", () => {
+  describe("given an enrolled organization on cloud", () => {
+    /** @scenario "An operator runs one migration for one organization now" */
+    it("runs the targeted pass and answers the status the organization ended in", async () => {
+      const { service, runTargetedPass } = serviceWith({
+        record: {
+          migrationName: MIGRATION,
+          tenantId: TENANT,
+          status: "finalized",
+          report: null,
+        },
+      });
+
+      const outcome = await service.runForOrganization({
+        organizationId: TENANT,
+        migrationName: MIGRATION,
+        actorUserId: "user_alex",
+      });
+
+      expect(runTargetedPass).toHaveBeenCalledWith({
+        organizationId: TENANT,
+        migrationName: MIGRATION,
+      });
+      expect(outcome).toEqual({ status: "finalized" });
+    });
+  });
+
+  describe("given an organization that is not enrolled on cloud", () => {
+    /** @scenario "A targeted run for an organization that is not enrolled is refused" */
+    it("refuses with migration_run_requires_enrollment and runs nothing", async () => {
+      const enrollments = enrollmentStoreStub();
+      enrollments.isEnrolled.mockResolvedValue(false);
+      const { service, runTargetedPass } = serviceWith({
+        record: null,
+        enrollments,
+      });
+
+      const attempt = service.runForOrganization({
+        organizationId: TENANT,
+        migrationName: MIGRATION,
+        actorUserId: "user_alex",
+      });
+
+      await expect(attempt).rejects.toThrow(
+        MigrationRunRequiresEnrollmentError,
+      );
+      expect(runTargetedPass).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a migration name nothing registered answers to", () => {
+    it("refuses with migration_unknown and runs nothing", async () => {
+      const { service, runTargetedPass } = serviceWith({ record: null });
+
+      await expect(
+        service.runForOrganization({
+          organizationId: TENANT,
+          migrationName: "no-such-migration",
+          actorUserId: "user_alex",
+        }),
+      ).rejects.toThrow(MigrationUnknownError);
+      expect(runTargetedPass).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when another pass holds the fleet-wide lease", () => {
+    /** @scenario "A targeted run while a pass is already running is refused" */
+    it("refuses with migration_pass_already_running", async () => {
+      const { service } = serviceWith({
+        record: null,
+        runTargetedPass: targetedPassStub().mockResolvedValue(null),
+      });
+
+      await expect(
+        service.runForOrganization({
+          organizationId: TENANT,
+          migrationName: MIGRATION,
+          actorUserId: "user_alex",
+        }),
+      ).rejects.toThrow(MigrationPassAlreadyRunningError);
+    });
+  });
+
+  describe("given a self-hosted installation and an unreleased migration", () => {
+    it("refuses with migration_not_available_on_installation", async () => {
+      const { service, runTargetedPass } = serviceWith({
+        record: null,
+        isSaaS: false,
+        migrations: [migrationOf(MIGRATION, false)],
+      });
+
+      await expect(
+        service.runForOrganization({
+          organizationId: TENANT,
+          migrationName: MIGRATION,
+          actorUserId: "user_alex",
+        }),
+      ).rejects.toMatchObject({
+        code: "migration_not_available_on_installation",
+      });
+      expect(runTargetedPass).not.toHaveBeenCalled();
     });
   });
 });
