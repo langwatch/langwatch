@@ -132,7 +132,10 @@ sleep 3
 # themselves rather than about process names: a name pattern broad enough to
 # catch the Go services also matches the Go linker, whose -o argument contains
 # the binary path, and that is a compile step which exits on its own.
-APP_PORTS="5560 5561"
+# 5560 vite (what the boxd proxy serves), 5561 the nlpgo service, 6560 the API
+# the gateway probes at /api/internal/gateway/health. A stale holder of any of
+# them stops the new stack from serving.
+APP_PORTS="5560 5561 6560"
 port_holders() {
   local p held=""
   for p in $APP_PORTS; do
