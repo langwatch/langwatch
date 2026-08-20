@@ -547,7 +547,7 @@ describe("the Anthropic Admin puller", () => {
       expect(String(fetchMock.mock.calls[0]?.[0])).toContain("page=page_2");
     });
 
-    it("discards the cursor and re-reads from the configured start on a config edit", async () => {
+    it("keeps the usage watermark on a config edit, dropping only the page token", async () => {
       const puller = new AnthropicAdminPuller();
       const cursor = await midWindowCursor(puller);
 
@@ -558,23 +558,26 @@ describe("the Anthropic Admin puller", () => {
 
       const url = String(fetchMock.mock.calls[0]?.[0]);
       expect(url).not.toContain("page=");
-      // The whole window is re-read from the configured start: the watermark
-      // only certifies data pulled under the query it was minted with.
+      // Usage identity embeds the config bucket width, so a historical
+      // re-read under the new query would emit rows under NEW keys beside
+      // the old ones — duplicated spend, not restatement. The watermark
+      // survives; only the dead page token goes.
       expect(url).toContain(
         `starting_at=${encodeURIComponent("2026-08-01T00:00:00.000Z")}`,
       );
     });
 
-    it("treats a cursor from before query-binding as unsafe to replay", async () => {
+    it("keeps a pre-query-binding usage watermark rather than rewinding into duplicates", async () => {
       fetchMock.mockResolvedValue(jsonResponse(USAGE_PAGE));
 
       await new AnthropicAdminPuller().runOnce(
         {
           ...RUN_OPTIONS,
           // A cursor persisted by the previous version: no query identity.
-          // This fix itself changes the group_by set, so replaying its page
-          // token would 400 on the first post-deploy run — and everything
-          // behind its watermark was mapped by the old code.
+          // Its page token would 400 against the widened group_by, so it
+          // goes — but the watermark stays: this PR changed the usage
+          // identity (serviceTier, contextWindow), so re-reading history
+          // would double-count every bucket instead of restating it.
           cursor: '{"startingAt":"2026-08-01T00:00:00Z","page":"page_stale"}',
         },
         {
@@ -588,26 +591,26 @@ describe("the Anthropic Admin puller", () => {
 
       const url = String(fetchMock.mock.calls[0]?.[0]);
       expect(url).not.toContain("page=");
-      // Rewound to the configured start, not the legacy watermark.
+      // NOT rewound to the configured start — the watermark is kept.
       expect(url).toContain(
-        `starting_at=${encodeURIComponent("2026-07-01T00:00:00.000Z")}`,
+        `starting_at=${encodeURIComponent("2026-08-01T00:00:00Z")}`,
       );
     });
 
-    it("never rewinds FORWARD: a backlogged watermark older than the configured start survives", async () => {
-      fetchMock.mockResolvedValue(jsonResponse(USAGE_PAGE));
+    it("never rewinds a cost source FORWARD: a backlogged watermark older than the configured start survives", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(COST_PAGE));
 
       await new AnthropicAdminPuller().runOnce(
         {
           ...RUN_OPTIONS,
-          // A source that fell behind: legacy cursor, watermark months old.
-          // No configured startingAt, so the rewind target would default to
-          // ~24h ago — snapping forward would silently skip the backlog.
+          // A cost source that fell behind: legacy cursor, watermark months
+          // old. No configured startingAt, so the rewind target would default
+          // to ~3 days ago — snapping forward would silently skip the backlog.
           cursor: '{"startingAt":"2026-06-01T00:00:00Z","page":null}',
         },
         {
           adapter: "anthropic_admin",
-          report: "usage",
+          report: "cost",
           bucketWidth: "1d",
           schedule: "0 * * * *",
         },

@@ -117,15 +117,25 @@ export type AnthropicAdminPullConfig = z.infer<
  * binding, one config edit mid-window would wedge the source permanently:
  * every retry replays the same dead token.
  *
- * A mismatch discards the WHOLE cursor, watermark included, and re-reads from
- * the configured start. The watermark only certifies data pulled under the
- * query it was minted with: everything behind it was fetched, mapped, and
- * priced by the old code, and keeping it would strand those rows as written.
- * That is exactly how the 100x cost figures survived — mature sources resume
- * from their watermark, so the wrong rows behind it were never re-read.
- * Re-reading is idempotent: identities are stable, so restatement supersedes
- * the old rows, and after the first re-pull the cursor carries the current
+ * What a mismatch does depends on whether re-reading can SUPERSEDE:
+ *
+ * COST sources discard the whole cursor, watermark included, and re-read from
+ * the configured start. Cost identity (`costEvent`'s dimensions plus the
+ * pinned bucket width) is independent of config and unchanged by this fix, so
+ * a re-read emits the same `source_event_id`s and restatement replaces the
+ * old rows in place. That is what repairs the 100x figures — mature sources
+ * resume from their watermark, so the wrong rows behind it would otherwise
+ * never be re-read. After the first re-pull the cursor carries the current
  * identity and the rewind never fires again.
+ *
+ * USAGE sources drop only the unsafe page token and KEEP the watermark.
+ * Usage identity is NOT stable across a query change — it embeds the config
+ * bucket width, and this fix itself added `serviceTier` and `contextWindow`
+ * to it — so a historical re-read would emit rows under new keys BESIDE the
+ * old ones rather than superseding them: every re-read bucket would be
+ * double-counted spend. History stays as written (the flat-cache zeros and
+ * collapsed tiers are a documented, bounded wrong); correctness applies from
+ * the watermark forward.
  */
 const cursorSchema = z.object({
   startingAt: z.string(),
@@ -159,25 +169,8 @@ function parseCursor({
       // Also covers cursors minted before query-binding existed (`query`
       // null): this change itself widened the group_by set and fixed the
       // cents→USD conversion, so everything those cursors certify was
-      // written by the old code. Rewind — see the cursorSchema doc for why
-      // the watermark must not survive.
-      logger.warn(
-        { adapter: ANTHROPIC_ADMIN_ADAPTER_ID, report: config.report },
-        "anthropic admin cursor was minted under a different query; discarding it and re-reading from the start",
-      );
-      const configuredStart =
-        config.startingAt ?? defaultStartingAt(config.report);
-      // The EARLIER of the stored watermark and the configured start: the
-      // rewind must never move the watermark FORWARD. A source that fell
-      // behind (paused, erroring) holds a watermark older than the default
-      // window, and snapping it to `configuredStart` would silently skip
-      // everything in between.
-      const watermarkMs = Date.parse(parsed.startingAt);
-      const rewoundStart =
-        Number.isNaN(watermarkMs) || Date.parse(configuredStart) <= watermarkMs
-          ? configuredStart
-          : parsed.startingAt;
-      return { startingAt: rewoundStart, page: null };
+      // written by the old code.
+      return staleCursorRestart({ parsed, config });
     } catch {
       logger.warn(
         { cursor },
@@ -189,6 +182,47 @@ function parseCursor({
     startingAt: config.startingAt ?? defaultStartingAt(config.report),
     page: null,
   };
+}
+
+/**
+ * Where a run resumes after its cursor failed the query-identity check.
+ * The split between reports is the cursorSchema doc's supersede-vs-duplicate
+ * distinction: cost re-reads restate, usage re-reads double-count.
+ */
+function staleCursorRestart({
+  parsed,
+  config,
+}: {
+  parsed: z.infer<typeof cursorSchema>;
+  config: AnthropicAdminPullConfig;
+}): Pick<z.infer<typeof cursorSchema>, "startingAt" | "page"> {
+  if (config.report === "usage") {
+    // No rewind: usage identity is not stable across a query change, so
+    // re-reading history would duplicate spend rather than restate it.
+    // The page token still has to go — it would 400 against the new
+    // query params.
+    logger.warn(
+      { adapter: ANTHROPIC_ADMIN_ADAPTER_ID, report: config.report },
+      "anthropic admin usage cursor was minted under a different query; dropping the page token and keeping the watermark",
+    );
+    return { startingAt: parsed.startingAt, page: null };
+  }
+  logger.warn(
+    { adapter: ANTHROPIC_ADMIN_ADAPTER_ID, report: config.report },
+    "anthropic admin cost cursor was minted under a different query; discarding it and re-reading from the start",
+  );
+  const configuredStart = config.startingAt ?? defaultStartingAt(config.report);
+  // The EARLIER of the stored watermark and the configured start: the
+  // rewind must never move the watermark FORWARD. A source that fell
+  // behind (paused, erroring) holds a watermark older than the default
+  // window, and snapping it to `configuredStart` would silently skip
+  // everything in between.
+  const watermarkMs = Date.parse(parsed.startingAt);
+  const rewoundStart =
+    Number.isNaN(watermarkMs) || Date.parse(configuredStart) <= watermarkMs
+      ? configuredStart
+      : parsed.startingAt;
+  return { startingAt: rewoundStart, page: null };
 }
 
 function encodeCursor({
