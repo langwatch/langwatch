@@ -14,6 +14,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { PageRequest } from "../../logic/eventsPager";
@@ -295,6 +296,61 @@ describe("given the page stays mounted while the source it addresses changes", (
     );
     await screen.findByText("actor-source-b@acme.test");
     expect(screen.queryByText("actor-source-a@acme.test")).toBeNull();
+  });
+});
+
+describe("given React mounts the table twice, as StrictMode does in development", () => {
+  it("loads the first page exactly once, never a duplicate", async () => {
+    const server = fakeServer([
+      makeEvent({ id: "only", ts: BASE_TS, actor: "actor-once@acme.test" }),
+    ]);
+    render(
+      <StrictMode>
+        <ChakraProvider value={defaultSystem}>
+          <Harness fetchPage={server} pageSize={10} />
+        </ChakraProvider>
+      </StrictMode>,
+    );
+    await screen.findByText("actor-once@acme.test");
+    // A second landing of the same walk must be dropped, not appended
+    // as a phantom second page.
+    expect(screen.getAllByTestId("source-event-row")).toHaveLength(1);
+    expect(screen.queryByTestId("pagination-page-2")).toBeNull();
+  });
+});
+
+describe("given a page fetch fails mid-walk", () => {
+  /** @scenario "A failed load is an error, never an empty list" */
+  it("keeps the rows already loaded and lets the next click retry", async () => {
+    const user = userEvent.setup();
+    const twelve = Array.from({ length: 12 }, (_, i) =>
+      makeEvent({
+        id: `e${String(i).padStart(2, "0")}`,
+        ts: BASE_TS - i * 1000,
+        actor: `actor-e${String(i).padStart(2, "0")}@acme.test`,
+      }),
+    );
+    const realServer = fakeServer(twelve);
+    let failNext = false;
+    const flakyServer = vi.fn(async (req: PageRequest) => {
+      if (failNext) {
+        failNext = false;
+        throw new Error("transient");
+      }
+      return realServer(req);
+    });
+    renderTable({ fetchPage: flakyServer, pageSize: 10 });
+    await screen.findByText("actor-e00@acme.test");
+
+    failNext = true;
+    await user.click(screen.getByTestId("pagination-next"));
+    await screen.findByText("Couldn't load more events");
+    // The walked pages survive the failure.
+    expect(screen.getByText("actor-e00@acme.test")).toBeTruthy();
+
+    await user.click(screen.getByTestId("pagination-next"));
+    await screen.findByText("actor-e10@acme.test");
+    expect(screen.queryByText("Couldn't load more events")).toBeNull();
   });
 });
 

@@ -72,7 +72,7 @@ function RawPanel({ event }: { event: SourceEventRowData }) {
   try {
     parsed = JSON.parse(event.rawPayload);
   } catch {
-    // not JSON, render as text
+    // fall through with parsed = null
   }
   return (
     <Box>

@@ -250,6 +250,17 @@ export function SourceEventsTable({
         emptyState
       ) : (
         <Box>
+          {/* A failure while pages are already on screen must not hide
+              them — it names itself above the table and the next click
+              retries the walk. */}
+          {pager.error != null && (
+            <Box marginBottom={2}>
+              <HandledErrorAlert
+                error={pager.error}
+                fallbackTitle="Couldn't load more events"
+              />
+            </Box>
+          )}
           <ListTable size="sm" containerProps={{ overflowX: "auto" }}>
             <EventsTableHeader />
             <Table.Body>

@@ -21,8 +21,11 @@ import {
  * fake server.
  */
 export type SourceEventsPager<R extends PagerRow> = {
-  /** Loading covers only the very first page; later walks set isFetching. */
+  /** Loading covers only the very first page; later walks set
+   * isFetching. "error" means nothing ever loaded — a failure with
+   * pages on screen keeps status "ready" and travels in `error`. */
   status: "loading" | "error" | "ready";
+  /** The last walk's failure, if any; cleared when a new fetch starts. */
   error: unknown;
   page: number;
   pageSize: number;
@@ -70,23 +73,40 @@ const initPagerState = <R extends PagerRow>(
   generation: 0,
 });
 
-function landFetch<R extends PagerRow>(
-  state: PagerState<R>,
-  action: { rows: R[]; hasMore: boolean },
-): PagerState<R> {
+function landFetch<R extends PagerRow>({
+  state,
+  rows,
+  hasMore,
+}: {
+  state: PagerState<R>;
+  rows: R[];
+  hasMore: boolean;
+}): PagerState<R> {
   const pages = [...(state.pages ?? [])];
   // An empty page is only kept as the very first one — it is how "this
   // source has no events" is represented; later empty results just end
   // the walk on the page already shown.
-  if (action.rows.length > 0 || pages.length === 0) pages.push(action.rows);
+  if (rows.length > 0 || pages.length === 0) pages.push(rows);
   return {
     ...state,
     pages,
     page: pages.length,
-    hasMore: action.rows.length > 0 && action.hasMore,
+    hasMore: rows.length > 0 && hasMore,
     isFetching: false,
   };
 }
+
+/**
+ * A landing only counts while its walk is still the current one: same
+ * generation AND a fetch still marked in flight. The second guard makes
+ * a duplicated start (StrictMode's double effect run) harmless — the
+ * first landing clears `isFetching`, so the echo is dropped instead of
+ * appended as a phantom page.
+ */
+const isCurrentWalk = <R extends PagerRow>(
+  state: PagerState<R>,
+  generation: number,
+) => generation === state.generation && state.isFetching;
 
 function pagerReducer<R extends PagerRow>(
   state: PagerState<R>,
@@ -104,13 +124,15 @@ function pagerReducer<R extends PagerRow>(
         generation: state.generation + 1,
       };
     case "fetchStart":
-      return { ...state, isFetching: true };
+      // Starting a walk is also the retry: a failure from the previous
+      // attempt stops being true the moment a new fetch is in flight.
+      return { ...state, isFetching: true, error: null };
     case "fetchLanded":
-      return action.generation === state.generation
-        ? landFetch(state, action)
+      return isCurrentWalk(state, action.generation)
+        ? landFetch({ state, rows: action.rows, hasMore: action.hasMore })
         : state;
     case "fetchFailed":
-      return action.generation === state.generation
+      return isCurrentWalk(state, action.generation)
         ? { ...state, error: action.error, isFetching: false }
         : state;
     case "show":
@@ -149,10 +171,13 @@ async function walkOnePage<R extends PagerRow>({
 }
 
 /** The state, shaped for the table and the pagination bar. */
-function presentPager<R extends PagerRow>(
-  state: PagerState<R>,
-  controls: Pick<SourceEventsPager<R>, "goToPage" | "setPageSize">,
-): SourceEventsPager<R> {
+function presentPager<R extends PagerRow>({
+  state,
+  controls,
+}: {
+  state: PagerState<R>;
+  controls: Pick<SourceEventsPager<R>, "goToPage" | "setPageSize">;
+}): SourceEventsPager<R> {
   const loadedCount = state.pages?.reduce((sum, p) => sum + p.length, 0) ?? 0;
   const view = paginationView({
     pageSize: state.pageSize,
@@ -161,12 +186,15 @@ function presentPager<R extends PagerRow>(
     hasMore: state.hasMore,
   });
   return {
+    // A failure with pages on screen is not the table's whole story:
+    // "error" is reserved for a walk that never loaded anything. A
+    // mid-walk failure keeps status "ready" and travels in `error`.
     status:
-      state.error !== null
-        ? "error"
-        : state.pages === null
-          ? "loading"
-          : "ready",
+      state.pages === null
+        ? state.error !== null
+          ? "error"
+          : "loading"
+        : "ready",
     error: state.error,
     page: state.page,
     pageSize: state.pageSize,
@@ -257,5 +285,5 @@ export function useSourceEventsPager<R extends PagerRow>({
     [],
   );
 
-  return presentPager(state, { goToPage, setPageSize });
+  return presentPager({ state, controls: { goToPage, setPageSize } });
 }
