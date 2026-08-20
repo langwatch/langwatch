@@ -242,6 +242,27 @@ describe("selfHostedClickHouseProvisioningStatements", () => {
     }
   });
 
+  // The tenant boundary, pinned as an ordering property rather than a
+  // presence one. A table carrying a SELECT grant and no row policy returns
+  // every row, and provisioning is not atomic, so grants-first would leave a
+  // partial run readable across tenants — the one failure mode the design
+  // rules out. Policies-first makes the same partial run refuse instead.
+  it("creates every row policy before any grant, so a partial run refuses rather than leaks", () => {
+    const statements = selfHostedStatements();
+    const lastPolicyIndex = statements.reduce(
+      (last, statement, index) =>
+        statement.startsWith("CREATE ROW POLICY") ? index : last,
+      -1,
+    );
+    const firstGrantIndex = statements.findIndex((statement) =>
+      statement.startsWith("GRANT"),
+    );
+
+    expect(lastPolicyIndex).toBeGreaterThanOrEqual(0);
+    expect(firstGrantIndex).toBeGreaterThanOrEqual(0);
+    expect(lastPolicyIndex).toBeLessThan(firstGrantIndex);
+  });
+
   it("creates the named collection before the engine tables referencing it, dropping stale tables first", () => {
     const statements = selfHostedStatements();
     const collectionIndex = statements.findIndex((statement) =>

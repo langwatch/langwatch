@@ -471,10 +471,11 @@ export function dropLangWatchQLRowPolicyStatement({
  * NOT created here — they come from migrations and from the PG mapping. This
  * function provisions only the access model over them.
  *
- * Not called from any production path in this repo: the real access model is
- * owned by infra (langwatch-saas#1126). This is the reference implementation
- * that terraform must match — keep it and its tests in sync, do not delete as
- * dead code.
+ * Two callers, two ownership models. Self-hosted deployments run this for
+ * real via `selfProvisioning.ts` under `LWQL_SELF_PROVISION` (issue #6635),
+ * so it is a production path. On cloud the same access model is owned by
+ * infra (langwatch-saas#1126) and this stays the reference implementation
+ * terraform must match — keep it and its tests in sync with both.
  */
 export function lwqlClickHouseSetupStatements({
   names,

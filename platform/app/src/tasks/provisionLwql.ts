@@ -286,7 +286,22 @@ async function selfProvisionAll({
 }
 
 export default async function execute() {
+  // The mode is whichever one the operator asked for, never whichever one's
+  // inputs happen to have arrived. `LWQL_SELF_PROVISION=true` with an
+  // incomplete Secret (both passwords are `optional: true` in the chart) used
+  // to fall through to the explicit path below — which is fatal on error,
+  // rethrown by the task runner into `start.sh`'s `set -e`, i.e. a
+  // CrashLoopBackOff for a feature the chart promises will "degrade, not brick
+  // an upgrade". Self-provisioning declines loudly and lets the pod boot.
+  const selfProvisionRequested = process.env.LWQL_SELF_PROVISION === "true";
   const selfProvision = lwqlSelfProvisionFromEnv();
+  if (selfProvisionRequested && !selfProvision) {
+    logger.warn(
+      "LWQL_SELF_PROVISION is true but its inputs are incomplete — skipping provisioning this boot; LangWatchQL queries stay refused (fail-closed) until the configuration is complete",
+    );
+    return;
+  }
+
   const connection = selfProvision?.connection ?? lwqlConnectionFromEnv();
   if (!connection) {
     logger.info("LWQL not configured, skipping");
