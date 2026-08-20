@@ -273,10 +273,33 @@ describe("groupIntoTurns", () => {
     ]);
   });
 
-  it("leaves untraced parts unnumbered", () => {
+  it("folds an untraced part into the traced turn that answers it", () => {
     const turns = groupIntoTurns([part("a"), part("b", "trace-1")]);
 
-    expect(turns[0]?.turnNumber).toBeUndefined();
-    expect(turns[1]?.turnNumber).toBe(1);
+    // A message and the reply that answers it are one turn, so the untraced
+    // part leads the traced turn rather than standing alone ahead of it.
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.turnNumber).toBe(1);
+    expect(turns[0]?.parts.map((p) => p.id)).toEqual(["a", "b"]);
+  });
+
+  it("leaves a trailing untraced part unnumbered", () => {
+    const turns = groupIntoTurns([part("a", "trace-1"), part("b")]);
+
+    // Nothing traced follows it, so it is live content whose turn has not
+    // resolved yet. Numbering it would promise a turn that may never land.
+    expect(turns).toHaveLength(2);
+    expect(turns[0]?.turnNumber).toBe(1);
+    expect(turns[1]?.turnNumber).toBeUndefined();
+  });
+
+  it("numbers a trailing untraced part while the thread is live", () => {
+    const turns = groupIntoTurns([part("a", "trace-1"), part("b")], {
+      live: true,
+    });
+
+    // In the playground the user's own message is a turn the moment they send
+    // it, well before its trace lands.
+    expect(turns[1]?.turnNumber).toBe(2);
   });
 });
