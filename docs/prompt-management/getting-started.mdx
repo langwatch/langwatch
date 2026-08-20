@@ -146,11 +146,12 @@ At runtime, you can fetch the latest version of your prompt from LangWatch using
       input: "How do I reset my password?"
     });
 
-    // Use with AI SDK
+    // Use with AI SDK. A compiled prompt carries your system turn inside
+    // `messages`, so AI SDK 7 needs allowSystemInMessages to accept it.
     const result = await generateText({
       model: openai(prompt.model.replace("openai/", "")),
       messages: compiledPrompt.messages,
-      experimental_telemetry: { isEnabled: true },
+      allowSystemInMessages: true,
     });
 
     console.log(result.text);
@@ -211,12 +212,16 @@ You can link your prompt to LLM generation traces to track performance and see w
     ```typescript tracing.ts
     import { LangWatch, getLangWatchTracer } from "langwatch";
     import { openai } from "@ai-sdk/openai";
-    import { generateText } from "ai";
+    import { generateText, registerTelemetry } from "ai";
+    import { OpenTelemetry } from "@ai-sdk/otel";
 
     // Initialize LangWatch client
     const langwatch = new LangWatch({
       apiKey: process.env.LANGWATCH_API_KEY
     });
+
+    // AI SDK 7 emits no spans until an integration is registered
+    registerTelemetry(new OpenTelemetry());
 
     const tracer = getLangWatchTracer("customer-support");
 
@@ -232,10 +237,12 @@ You can link your prompt to LLM generation traces to track performance and see w
           input: "I need help with my account",
         });
 
-        // Use with AI SDK
+        // Use with AI SDK. A compiled prompt carries your system turn inside
+        // `messages`, so AI SDK 7 needs allowSystemInMessages to accept it.
         const { text } = await generateText({
           model: openai(prompt.model.replace("openai/", "")),
-          messages: compiledPrompt.messages
+          messages: compiledPrompt.messages,
+          allowSystemInMessages: true,
         });
 
         return text;

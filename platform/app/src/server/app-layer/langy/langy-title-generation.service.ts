@@ -130,7 +130,7 @@ export function createLangyConversationTitleGenerator(deps: {
 
       const { text } = await generateText({
         model,
-        system: TITLE_SYSTEM_PROMPT,
+        instructions: TITLE_SYSTEM_PROMPT,
         prompt: `Conversation so far:\n\n${transcript}\n\nTitle:`,
         temperature: 0.2,
         maxRetries: 1,

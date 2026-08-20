@@ -63,12 +63,16 @@ result = customer_support_generation()
 ```typescript
 import { LangWatch, getLangWatchTracer } from "langwatch";
 import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
+import { generateText, registerTelemetry } from "ai";
+import { OpenTelemetry } from "@ai-sdk/otel";
 
 // Initialize LangWatch client
 const langwatch = new LangWatch({
   apiKey: process.env.LANGWATCH_API_KEY,
 });
+
+// AI SDK 7 emits no spans until an integration is registered
+registerTelemetry(new OpenTelemetry());
 
 const tracer = getLangWatchTracer("customer-support");
 
@@ -84,11 +88,13 @@ async function customerSupportGeneration() {
       input: "I need help with my account",
     });
 
-    // Use with AI SDK (native instrumentation support)
+    // Use with AI SDK (native instrumentation support). A compiled prompt
+    // carries your system turn inside `messages`, so AI SDK 7 needs
+    // allowSystemInMessages to accept it.
     const result = await generateText({
       model: openai(prompt.model.replace("openai/", "")),
       messages: compiledPrompt.messages,
-      experimental_telemetry: { isEnabled: true },
+      allowSystemInMessages: true,
     });
 
     return result.text;

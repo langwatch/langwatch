@@ -23,7 +23,8 @@ If your instrumentation already emits any of the signals below, TTFT shows up wi
 
 | Source | Signal |
 |--------|--------|
-| Vercel AI SDK | `ai.response.msToFirstChunk` span attribute |
+| Vercel AI SDK 7+ | `gen_ai.client.operation.time_to_first_chunk` span attribute (seconds) |
+| Vercel AI SDK 6 and earlier | `ai.response.msToFirstChunk` span attribute (milliseconds) |
 | OpenLLMetry / OpenLIT instrumentors | `llm.content.completion.chunk` / `First Token Stream Event` span events |
 | OTel GenAI semconv emitters | `gen_ai.server.time_to_first_token` span attribute (milliseconds) |
 | LangWatch SDKs | `timestamps.first_token_at` on the span (see below) |
@@ -31,7 +32,7 @@ If your instrumentation already emits any of the signals below, TTFT shows up wi
 When more than one LLM span in a trace reports a TTFT, the trace-level value is the smallest one, the first token the user could have seen.
 
 <Note>
-  If you stream through the Vercel AI SDK with `experimental_telemetry` enabled, TTFT is captured automatically from `ai.response.msToFirstChunk`, nothing to do.
+  If you stream through the Vercel AI SDK, TTFT is captured automatically, nothing to do. On AI SDK 7 this requires `registerTelemetry(new OpenTelemetry())` from `@ai-sdk/otel` at startup — without it the SDK emits no spans at all.
 </Note>
 
 ## Setting TTFT manually

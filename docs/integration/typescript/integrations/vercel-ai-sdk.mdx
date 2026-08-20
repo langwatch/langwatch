@@ -17,19 +17,19 @@ import TypeScriptIntro from "/snippets/typescript-intro.mdx";
 
 <CodeGroup>
 ```bash npm
-npm i langwatch ai @ai-sdk/openai
+npm i langwatch ai @ai-sdk/otel @ai-sdk/openai
 ```
 
 ```bash pnpm
-pnpm add langwatch ai @ai-sdk/openai
+pnpm add langwatch ai @ai-sdk/otel @ai-sdk/openai
 ```
 
 ```bash yarn
-yarn add langwatch ai @ai-sdk/openai
+yarn add langwatch ai @ai-sdk/otel @ai-sdk/openai
 ```
 
 ```bash bun
-bun add langwatch ai @ai-sdk/openai
+bun add langwatch ai @ai-sdk/otel @ai-sdk/openai
 ```
 </CodeGroup>
 
@@ -43,16 +43,17 @@ Set up observability and enable telemetry on your Vercel AI SDK calls:
 
 ```typescript
 import { setupObservability } from "langwatch/observability/node";
-import { generateText } from "ai";
+import { generateText, registerTelemetry } from "ai";
+import { OpenTelemetry } from "@ai-sdk/otel";
 import { openai } from "@ai-sdk/openai";
 
 setupObservability({ serviceName: "<project_name>" });
+registerTelemetry(new OpenTelemetry());
 
 async function main(message: string): Promise<string> {
   const response = await generateText({
     model: openai("gpt-5-mini"),
     prompt: message,
-    experimental_telemetry: { isEnabled: true },
   });
   return response.text;
 }
@@ -60,7 +61,17 @@ async function main(message: string): Promise<string> {
 console.log(await main("Hey, tell me a joke"));
 ```
 
-The Vercel AI SDK automatically sends traces to LangWatch when `experimental_telemetry.isEnabled` is set to `true`. For Next.js applications, configure OpenTelemetry in your `instrumentation.ts` file using `LangWatchExporter`.
+Once `registerTelemetry` has run, every `generateText` and `streamText` call reports to LangWatch — you no longer set a flag per call. For Next.js applications, configure OpenTelemetry in your `instrumentation.ts` file using `LangWatchExporter`.
+
+<Note>
+  On AI SDK 6 and earlier there is no `registerTelemetry`. Drop `registerTelemetry`
+  from the `ai` import, drop the `@ai-sdk/otel` import and the
+  `registerTelemetry(new OpenTelemetry())` call, and set
+  `experimental_telemetry: { isEnabled: true }` on each `generateText` and
+  `streamText` call instead. AI SDK 7 emits no spans at all until an
+  integration is registered, so a v6
+  snippet left unchanged on v7 sends LangWatch nothing.
+</Note>
 
 ## Related
 

@@ -125,8 +125,11 @@ secured
     try {
       const result = streamText({
         model: vercelProvider(model),
-        system: systemPrompt?.trim() ? systemPrompt : undefined,
+        instructions: systemPrompt?.trim() ? systemPrompt : undefined,
         messages,
+        // The playground exists so an authenticated user can author and test
+        // their own system turns, so keep accepting them in the transcript.
+        allowSystemInMessages: true,
         maxRetries: modelProvider.customKeys ? 1 : 3,
       });
 

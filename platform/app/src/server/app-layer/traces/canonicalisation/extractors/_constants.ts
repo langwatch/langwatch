@@ -44,6 +44,10 @@ export const ATTR_KEYS = {
   // Time to first streamed chunk, a duration in SECONDS (OTel GenAI semconv
   // v1.41). Canonicalised onto gen_ai.server.time_to_first_token (in ms).
   GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK: "gen_ai.response.time_to_first_chunk",
+  // Same duration, same SECONDS unit, emitted under a different key by
+  // @ai-sdk/otel (Vercel AI SDK 7+), which replaced ai.response.msToFirstChunk.
+  GEN_AI_CLIENT_OPERATION_TIME_TO_FIRST_CHUNK:
+    "gen_ai.client.operation.time_to_first_chunk",
   // Time to first token in milliseconds, relative to the span start.
   GEN_AI_SERVER_TIME_TO_FIRST_TOKEN: "gen_ai.server.time_to_first_token",
   // Vercel AI SDK time to first token, a duration in milliseconds.

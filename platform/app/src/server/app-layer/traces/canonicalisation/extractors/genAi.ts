@@ -318,21 +318,39 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // summary TTFT and the span first_token timing both populate. An explicit
     // time_to_first_token already on the span wins.
     // ─────────────────────────────────────────────────────────────────────────
-    const timeToFirstChunkSeconds = asNumber(
+    const responseTimeToFirstChunkSeconds = asNumber(
       attrs.get(ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK),
     );
+    const clientTimeToFirstChunkSeconds = asNumber(
+      attrs.get(ATTR_KEYS.GEN_AI_CLIENT_OPERATION_TIME_TO_FIRST_CHUNK),
+    );
+    // Prefer the first *valid* value, not the first present key — a garbage
+    // or negative gen_ai.response.time_to_first_chunk must not shadow a good
+    // gen_ai.client.operation.time_to_first_chunk.
+    const isResponseTime =
+      responseTimeToFirstChunkSeconds !== null &&
+      responseTimeToFirstChunkSeconds >= 0;
+    const timeToFirstChunkKey = isResponseTime
+      ? ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK
+      : ATTR_KEYS.GEN_AI_CLIENT_OPERATION_TIME_TO_FIRST_CHUNK;
+    const timeToFirstChunkSeconds = isResponseTime
+      ? responseTimeToFirstChunkSeconds
+      : clientTimeToFirstChunkSeconds;
+    const timeToFirstChunkRuleSuffix = isResponseTime
+      ? "response.time_to_first_chunk"
+      : "client.operation.time_to_first_chunk";
     if (
       timeToFirstChunkSeconds !== null &&
       timeToFirstChunkSeconds >= 0 &&
       ctx.out[ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN] === undefined &&
       !attrs.has(ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN)
     ) {
-      attrs.delete(ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK);
+      attrs.delete(timeToFirstChunkKey);
       ctx.setAttr(
         ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN,
         timeToFirstChunkSeconds * 1000,
       );
-      ctx.recordRule(`${this.id}:response.time_to_first_chunk`);
+      ctx.recordRule(`${this.id}:${timeToFirstChunkRuleSuffix}`);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

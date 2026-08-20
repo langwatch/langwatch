@@ -214,7 +214,7 @@ export function valueMatches(value: string, rule: Match): boolean {
 
 /**
  * Checks if a span is from the Vercel AI SDK.
- * A span is considered a Vercel AI span if its instrumentation scope name is 'ai' (case-insensitive).
+ * A span matches if its instrumentation scope name is 'ai' or 'gen_ai' (case-insensitive).
  *
  * @param span - Span to check
  * @returns True if the span is from the Vercel AI SDK, false otherwise
@@ -228,7 +228,8 @@ export function valueMatches(value: string, rule: Match): boolean {
  */
 export function isVercelAiSpan(span: ReadableSpan): boolean {
   const scope = span.instrumentationScope?.name?.toLowerCase?.() ?? "";
-  return scope === "ai";
+  // AI SDK <=6 emitted scope 'ai'; @ai-sdk/otel (SDK 7+) emits 'gen_ai'.
+  return scope === "ai" || scope === "gen_ai";
 }
 
 /**
