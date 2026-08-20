@@ -41,14 +41,24 @@ const model = openai("gpt-5-mini");
  * The failing-traces flows need errored APPLICATION traces to exist: Langy
  * correctly excludes simulation/langy origins (its own runs and this suite's),
  * so on a clean project "no failed traces" is a true answer and the drill
- * scenario has nothing to drill into. Stable trace ids make re-posts upserts,
- * so repeated runs refresh the same two traces instead of accumulating.
+ * scenario has nothing to drill into.
+ *
+ * The ids carry a minute stamp so a re-run within the same minute is an upsert
+ * and a later one seeds fresh traces. They used to be fixed, which looked
+ * tidier and quietly corrupted the data: a trace summary keeps the EARLIEST
+ * start it was ever posted, so every re-post widened the same trace instead of
+ * replacing it. After a day of runs the fixtures reported `total_time_ms` of
+ * 71,170,357 (19.8 hours) against spans that say 60 seconds, and Langy spent a
+ * paragraph of every reply correctly flagging the instrumentation anomaly we
+ * had seeded.
  */
+const FIXTURE_RUN_STAMP = String(Math.floor(Date.now() / 60_000));
+
 async function seedFailingApplicationTraces(): Promise<void> {
   const now = Date.now();
   const fixtures = [
     {
-      traceId: "langy-dogfood-error-timeout",
+      traceId: `langy-dogfood-error-timeout-${FIXTURE_RUN_STAMP}`,
       user: "Summarize the quarterly report for the board.",
       error:
         "OpenAI request timed out after 60000ms (model gpt-5-mini, attempt 2 of 2)",
@@ -56,7 +66,7 @@ async function seedFailingApplicationTraces(): Promise<void> {
       durationMs: 60_000,
     },
     {
-      traceId: "langy-dogfood-error-schema",
+      traceId: `langy-dogfood-error-schema-${FIXTURE_RUN_STAMP}`,
       user: "Extract the invoice fields as JSON.",
       error:
         'Output validation failed: expected key "total_amount" missing from model response',
@@ -213,8 +223,12 @@ describe("Langy dogfood: named flows", () => {
       // Layer 2: the seeded fixture traces the reply reports on really exist,
       // through the same REST surface any integration uses. Grounding is a
       // hard fact, so it is asserted here, not delegated to the LLM judge.
-      expect(await traceExists("langy-dogfood-error-timeout")).toBe(true);
-      expect(await traceExists("langy-dogfood-error-schema")).toBe(true);
+      expect(
+        await traceExists(`langy-dogfood-error-timeout-${FIXTURE_RUN_STAMP}`),
+      ).toBe(true);
+      expect(
+        await traceExists(`langy-dogfood-error-schema-${FIXTURE_RUN_STAMP}`),
+      ).toBe(true);
     });
 
     /** @scenario A multi-turn scenario checks that Langy drills in using prior context */
