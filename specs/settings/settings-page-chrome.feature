@@ -1,25 +1,26 @@
 Feature: Every settings page keeps the settings chrome
   As someone who opens a page under Settings
-  I want the same header, navigation and page frame on all of them
+  I want the same header, menu and page frame on all of them
   So that I know where I am and can reach the other settings pages
 
-  The chrome comes from `SettingsLayout`, which each page renders around its
-  own content. `withPermissionGuard` takes a `layoutComponent` too, but that
-  one frames only the refusal that a reader without the permission sees. A
-  page that names the layout there and nowhere else is framed when it refuses
-  the reader and bare when it serves them: no top bar, no menu, no way back
-  out except the browser.
+  The settings chrome is the top bar, the settings menu beside the page, and
+  the frame the page sits in. A page that opens without it stands alone on
+  an empty background, with no menu and no way back except the browser.
 
-  Rule: a settings page puts its content inside the settings layout
+  What the reader is allowed to see does not change this. The frame around a
+  "you do not have permission" message and the frame around the page itself
+  are two different things, so a page can be framed when it refuses the
+  reader and bare when it serves them.
+
+  Rule: a settings page opens inside the settings chrome
 
     @integration
-    Scenario: The email suppressions page carries the settings chrome
+    Scenario: The email suppressions page keeps it
       Given I can view the triggers of this project
       When I open the email suppressions page
-      Then the page content is inside the settings layout
+      Then the page opens inside the settings chrome
 
     @unit
-    Scenario: Every settings page in the routes table renders the layout
-      Given the routes table registers pages under "/settings"
-      When each of those pages is read
-      Then every one of them renders the settings layout
+    Scenario: No page the Settings menu opens is left without it
+      Given every page that Settings can open
+      Then each of them keeps the settings chrome

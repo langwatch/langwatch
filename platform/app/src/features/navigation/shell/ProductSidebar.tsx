@@ -14,7 +14,7 @@ import { useCommandBar } from "~/features/command-bar";
 import { getCommandBarShortcut } from "~/features/command-bar/utils/platform";
 import { APP_HEADER_HEIGHT } from "~/features/langy/logic/langyPanelLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useRouter } from "~/utils/compat/next-router";
+import { usePathname } from "~/utils/compat/next-navigation";
 import { featureIcons } from "~/utils/featureIcons";
 import { readLastVisitedProduct } from "../logic/productMemory";
 import { resolveSettingsBackTarget } from "../logic/resolveSettingsBackTarget";
@@ -26,7 +26,7 @@ import {
 } from "../sectionNavItems";
 import { useLlmOpsProjectSlug } from "../useLlmOpsProjectSlug";
 import { useReachableProducts } from "../useReachableProducts";
-import { useSettingsMenu } from "../useSettingsMenu";
+import { isSettingsMenuItemActive, useSettingsMenu } from "../useSettingsMenu";
 import { QUIET_SIDEBAR_CHIP } from "./quietChipStyle";
 import {
   SHELL_SIDEBAR_WIDTH_COMPACT,
@@ -85,7 +85,7 @@ function SidebarBottomBlock({
   showExpanded: boolean;
   shouldIncludeSettingsLink: boolean;
 }) {
-  const router = useRouter();
+  const pathname = usePathname();
   const { hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
@@ -112,10 +112,7 @@ function SidebarBottomBlock({
           icon={featureIcons.settings.icon}
           label="Settings"
           href="/settings"
-          isActive={isPathUnder({
-            pathname: router.pathname,
-            base: "/settings",
-          })}
+          isActive={isPathUnder({ pathname, base: "/settings" })}
           showLabel={showExpanded}
         />
       )}
@@ -172,7 +169,7 @@ function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
  * entries carry the quiet grey pill.
  */
 function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
-  const router = useRouter();
+  const pathname = usePathname();
   const groups = useSettingsMenu();
 
   return (
@@ -190,12 +187,7 @@ function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
               icon={item.icon}
               label={item.label}
               href={item.href}
-              isActive={
-                (item.alsoActiveAt?.includes(router.pathname) ?? false) ||
-                (item.isExactMatch
-                  ? router.pathname === item.href
-                  : router.pathname.startsWith(item.includePath ?? item.href))
-              }
+              isActive={isSettingsMenuItemActive({ item, pathname })}
               showLabel={showExpanded}
               rightElement={
                 item.isEnterprise ? (
@@ -231,7 +223,7 @@ function SectionItemsNav({
   items: readonly SectionNavItemData[];
   showExpanded: boolean;
 }) {
-  const router = useRouter();
+  const pathname = usePathname();
   return (
     <>
       {items.map((item) => (
@@ -242,8 +234,8 @@ function SectionItemsNav({
           href={item.href}
           isActive={
             item.includePath
-              ? router.pathname.startsWith(item.includePath)
-              : router.pathname === item.href
+              ? isPathUnder({ pathname, base: item.includePath })
+              : pathname === item.href
           }
           showLabel={showExpanded}
           isExternal={item.isExternal}

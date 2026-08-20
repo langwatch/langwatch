@@ -17,13 +17,33 @@ import { describe, expect, it } from "vitest";
  */
 const SOURCE_ROOT = join(__dirname, "..", "..", "..");
 
-/** Every `/settings` route in the table, as the module path it loads. */
+const routesSource = readFileSync(join(SOURCE_ROOT, "routes.tsx"), "utf-8");
+
+/**
+ * Every `/settings` route in the table, as the module path it loads.
+ *
+ * The table is cut into one chunk per route first, so a route can only be
+ * paired with the module named inside its own entry, and one that names none
+ * throws rather than borrowing the next route's.
+ */
 function registeredSettingsPageModules(): string[] {
-  const routes = readFileSync(join(SOURCE_ROOT, "routes.tsx"), "utf-8");
-  const entries = routes.matchAll(
-    /path:\s*"(\/settings[^"]*)"[\s\S]{0,120}?import\("\.\/(pages\/settings[^"]*)"\)/g,
-  );
-  return [...entries].map((entry) => entry[2]!);
+  return routesSource
+    .split(/path:\s*"/)
+    .slice(1)
+    .filter((entry) => entry.startsWith("/settings"))
+    .map((entry) => {
+      const address = entry.slice(0, entry.indexOf('"'));
+      const module = /import\("\.\/(pages\/settings[^"]*)"\)/.exec(entry);
+      if (!module) {
+        throw new Error(`The route ${address} names no page module`);
+      }
+      return module[1]!;
+    });
+}
+
+/** The same routes counted a second way, to hold the reading above to it. */
+function declaredSettingsRouteCount(): number {
+  return (routesSource.match(/path:\s*"\/settings/g) ?? []).length;
 }
 
 /** Where a route's module specifier lives on disk. */
@@ -42,15 +62,18 @@ describe("the pages under /settings", () => {
 
   describe("when the routes table is read", () => {
     it("finds every settings page, so the check below covers them all", () => {
-      // Guards the regex itself: a routes-table edit that stops matching
-      // would otherwise leave this suite passing over an empty list.
-      expect(modules.length).toBeGreaterThanOrEqual(23);
+      // Both counts come from the table but are read differently, so a page
+      // the reading above drops is a page these two disagree about. The floor
+      // catches the case where both readings break at once and the check
+      // below would pass over an empty list.
+      expect(declaredSettingsRouteCount()).toBeGreaterThan(20);
+      expect(modules).toHaveLength(declaredSettingsRouteCount());
       expect(modules).toContain("pages/settings/email-suppressions");
     });
   });
 
   describe("when a settings page renders", () => {
-    /** @scenario Every settings page in the routes table renders the layout */
+    /** @scenario No page the Settings menu opens is left without it */
     it.each(modules)("%s renders SettingsLayout", (moduleSpecifier) => {
       const source = readFileSync(sourceFileOf(moduleSpecifier), "utf-8");
 

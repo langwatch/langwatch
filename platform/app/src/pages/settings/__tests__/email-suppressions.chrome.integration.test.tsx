@@ -77,7 +77,7 @@ describe("the email suppressions page", () => {
   });
 
   describe("when a reader who can view triggers opens it", () => {
-    /** @scenario The email suppressions page carries the settings chrome */
+    /** @scenario The email suppressions page keeps it */
     it("puts its content inside the settings layout", () => {
       renderPage();
 

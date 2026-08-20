@@ -77,6 +77,16 @@ Feature: Settings shell in the new navigation modes
     And the ACCESS group does not hold it
 
   @integration
+  Scenario: The menu marks the page that is open
+    Given I open the Email Suppressions settings page
+    Then the Email Suppressions entry is marked as the open one
+    And no other entry is marked
+    # The entry is matched against the address in the address bar. Matching
+    # it against the route pattern instead left every settings page except
+    # General and Audit Log with nothing marked, because the pattern for all
+    # the others is the one wildcard they share.
+
+  @integration
   Scenario: A lite member sees no restricted settings entries
     Given I am a lite member
     When the settings sidebar renders in a new navigation mode
