@@ -33,7 +33,7 @@ import {
   clearCustomClientCache,
   getAllClickHouseInstances,
   getClickHouseClientForOrganization,
-  getClickHouseClientForProject,
+  getClickHouseClientForTenant,
   getSharedClickHouseClient,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
@@ -385,7 +385,7 @@ export function initializeDefaultApp(options?: {
   const resolveClickHouseClient: ClickHouseClientResolver = async (
     tenantId: string,
   ): Promise<ClickHouseClient> => {
-    const client = await getClickHouseClientForProject(tenantId);
+    const client = await getClickHouseClientForTenant(tenantId);
     if (!client)
       throw new Error(`ClickHouse not available for tenant ${tenantId}`);
     return client;

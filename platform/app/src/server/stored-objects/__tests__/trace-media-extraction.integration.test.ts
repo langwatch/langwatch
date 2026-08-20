@@ -61,7 +61,7 @@ import { mintFileUri } from "../uri";
 // ---------------------------------------------------------------------------
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
+  getClickHouseClientForTenant: vi.fn(),
   getSharedClickHouseClient: vi.fn(),
 }));
 
@@ -279,7 +279,7 @@ beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
   vi.mocked(
-    clickhouseClientModule.getClickHouseClientForProject,
+    clickhouseClientModule.getClickHouseClientForTenant,
   ).mockResolvedValue(ch);
   vi.mocked(clickhouseClientModule.getSharedClickHouseClient).mockReturnValue(
     ch,

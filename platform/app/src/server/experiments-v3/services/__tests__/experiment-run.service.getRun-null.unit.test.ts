@@ -23,10 +23,10 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const getClickHouseClientForProjectMock = vi.fn();
+const getClickHouseClientForTenantMock = vi.fn();
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: (...args: unknown[]) =>
-    getClickHouseClientForProjectMock(...args),
+  getClickHouseClientForTenant: (...args: unknown[]) =>
+    getClickHouseClientForTenantMock(...args),
 }));
 
 import { ExperimentRunService } from "../experiment-run.service";
@@ -37,12 +37,12 @@ function makeService() {
 
 describe("ExperimentRunService.getRun", () => {
   beforeEach(() => {
-    getClickHouseClientForProjectMock.mockReset();
+    getClickHouseClientForTenantMock.mockReset();
   });
 
   describe("when the ClickHouse client is unavailable", () => {
     it("returns null instead of throwing so the UI can poll without 500-cascade", async () => {
-      getClickHouseClientForProjectMock.mockResolvedValue(null);
+      getClickHouseClientForTenantMock.mockResolvedValue(null);
 
       const result = await makeService().getRun({
         projectId: "project_x",
@@ -56,7 +56,7 @@ describe("ExperimentRunService.getRun", () => {
 
   describe("when the run row has not been folded into ClickHouse yet", () => {
     it("returns null so the UI can poll until the projection lands", async () => {
-      getClickHouseClientForProjectMock.mockResolvedValue({
+      getClickHouseClientForTenantMock.mockResolvedValue({
         query: vi.fn().mockResolvedValue({
           json: vi.fn().mockResolvedValue([]),
         }),

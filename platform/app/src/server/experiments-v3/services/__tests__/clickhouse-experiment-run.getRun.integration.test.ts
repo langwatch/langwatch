@@ -6,7 +6,7 @@ import {
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
 
-// getRun resolves its ClickHouse client through getClickHouseClientForProject;
+// getRun resolves its ClickHouse client through getClickHouseClientForTenant;
 // point that at the testcontainer client so the real query path runs.
 let testClient: ClickHouseClient;
 vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
@@ -16,7 +16,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
     >();
   return {
     ...actual,
-    getClickHouseClientForProject: async () => testClient,
+    getClickHouseClientForTenant: async () => testClient,
   };
 });
 

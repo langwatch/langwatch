@@ -146,9 +146,9 @@ function makeQueryInput(
 let ch: ClickHouseClient;
 let service: ClickHouseTraceService;
 
-// Mock getClickHouseClientForProject to return the test container client
+// Mock getClickHouseClientForTenant to return the test container client
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
+  getClickHouseClientForTenant: vi.fn(),
 }));
 
 // Mock prisma
@@ -161,7 +161,7 @@ vi.mock("~/server/db", () => ({
 }));
 
 // Lazy import so the mock is in place before the module loads
-let getClickHouseClientForProject: ReturnType<typeof vi.fn>;
+let getClickHouseClientForTenant: ReturnType<typeof vi.fn>;
 
 beforeAll(async () => {
   const containers = await startTestContainers();
@@ -169,10 +169,10 @@ beforeAll(async () => {
 
   // Wire up the mock to return the test container's client
   const chModule = await import("~/server/clickhouse/clickhouseClient");
-  getClickHouseClientForProject = vi.mocked(
-    chModule.getClickHouseClientForProject,
+  getClickHouseClientForTenant = vi.mocked(
+    chModule.getClickHouseClientForTenant,
   );
-  getClickHouseClientForProject.mockResolvedValue(ch);
+  getClickHouseClientForTenant.mockResolvedValue(ch);
 
   // Import the mocked prisma and build the shared service instance
   const { prisma } = await import("~/server/db");
@@ -524,7 +524,7 @@ describe("ClickHouse trace dedup (integration)", () => {
 
         it("resolves the OccurredAt span and bounds the heavy summary read", async () => {
           const { client, queries } = recordingClient();
-          getClickHouseClientForProject.mockResolvedValue(client);
+          getClickHouseClientForTenant.mockResolvedValue(client);
           try {
             const traces = await service.getTracesWithSpans(
               tenantId,
@@ -536,7 +536,7 @@ describe("ClickHouse trace dedup (integration)", () => {
             expect(traces![0]!.trace_id).toBe(traceId);
             expect(traces![0]!.metrics?.total_time_ms).toBe(300);
           } finally {
-            getClickHouseClientForProject.mockResolvedValue(ch);
+            getClickHouseClientForTenant.mockResolvedValue(ch);
           }
 
           // A cheap resolve (min/max OccurredAt) runs, then the heavy summary
@@ -555,7 +555,7 @@ describe("ClickHouse trace dedup (integration)", () => {
 
         it("stays unbounded when the trace ids resolve to no rows", async () => {
           const { client, queries } = recordingClient();
-          getClickHouseClientForProject.mockResolvedValue(client);
+          getClickHouseClientForTenant.mockResolvedValue(client);
           try {
             const traces = await service.getTracesWithSpans(
               tenantId,
@@ -564,7 +564,7 @@ describe("ClickHouse trace dedup (integration)", () => {
             );
             expect(traces ?? []).toHaveLength(0);
           } finally {
-            getClickHouseClientForProject.mockResolvedValue(ch);
+            getClickHouseClientForTenant.mockResolvedValue(ch);
           }
 
           // Resolve found nothing (epoch default), so the heavy summary read

@@ -6,7 +6,7 @@
  * StoredObjectsService.getStorageUsageByProject sums size_bytes of a project's
  * live objects, deduped across ReplacingMergeTree versions and optionally
  * scoped to one purpose. Real ClickHouse + LocalFilesystemDriver; only
- * getClickHouseClientForProject is wired to the test client.
+ * getClickHouseClientForTenant is wired to the test client.
  */
 
 import fs from "node:fs/promises";
@@ -30,7 +30,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", async () => {
   );
   return {
     ...actual,
-    getClickHouseClientForProject: vi.fn(),
+    getClickHouseClientForTenant: vi.fn(),
   };
 });
 
@@ -67,7 +67,7 @@ beforeAll(async () => {
   if (!client) throw new Error("ClickHouse test container not available");
   ch = client;
   vi.mocked(
-    clickhouseClientModule.getClickHouseClientForProject,
+    clickhouseClientModule.getClickHouseClientForTenant,
   ).mockResolvedValue(ch);
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "so-usage-int-"));
 }, 120_000);

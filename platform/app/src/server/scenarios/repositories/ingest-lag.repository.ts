@@ -9,7 +9,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 
 /** Resolves the ClickHouse client for a project. Injectable for tests. */
 export type IngestLagClientResolver = (
@@ -32,7 +32,7 @@ interface IngestLagRow {
  */
 export async function findIngestLagP95({
   projectId,
-  clientResolver = getClickHouseClientForProject,
+  clientResolver = getClickHouseClientForTenant,
 }: {
   projectId: string;
   clientResolver?: IngestLagClientResolver;
