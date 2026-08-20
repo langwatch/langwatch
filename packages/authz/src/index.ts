@@ -52,14 +52,13 @@ export {
   declaredScopeId,
   isPlatformTierPermission,
   permissionGrantTiers,
+  SCOPE_TIER_BY_FIELD,
   SCOPE_TIER_FIELDS,
-  SCOPE_TIER_ORDER,
 } from "./declaration";
 export type {
   DeclaredScopeId,
-  InputScopeTier,
   NoPermissionOptions,
-  PermissionDeclarationError,
+  DeclarationError,
   PermissionGrantTiers,
   PermissionScopeArg,
   PlatformTierPermission,

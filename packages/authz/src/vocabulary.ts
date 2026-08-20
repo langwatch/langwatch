@@ -22,9 +22,9 @@
  */
 export const SCOPE_TIERS = {
   resource: { stored: "RESOURCE" },
-  project: { stored: "PROJECT" },
-  team: { stored: "TEAM" },
-  organization: { stored: "ORGANIZATION" },
+  project: { stored: "PROJECT", field: "projectId" },
+  team: { stored: "TEAM", field: "teamId" },
+  organization: { stored: "ORGANIZATION", field: "organizationId" },
   platform: { stored: "PLATFORM" },
 } as const;
 
@@ -45,6 +45,27 @@ export const BINDING_SCOPE_TIERS = [
 ] as const satisfies readonly ScopeTier[];
 
 export type BindingScopeTier = (typeof BINDING_SCOPE_TIERS)[number];
+
+/**
+ * The input field naming each binding tier — the same three tiers, spelled
+ * the way a procedure input spells them. Declared on the tiers above rather
+ * than in a table of its own, so a tier cannot have a field here and no
+ * stored spelling there.
+ */
+export const SCOPE_TIER_FIELDS = {
+  project: SCOPE_TIERS.project.field,
+  team: SCOPE_TIERS.team.field,
+  organization: SCOPE_TIERS.organization.field,
+} as const;
+
+export type ScopeTierField = (typeof SCOPE_TIER_FIELDS)[BindingScopeTier];
+
+/** The tier a scope field names — the reverse of SCOPE_TIER_FIELDS. */
+export const SCOPE_TIER_BY_FIELD = {
+  projectId: "project",
+  teamId: "team",
+  organizationId: "organization",
+} as const satisfies Record<ScopeTierField, BindingScopeTier>;
 export type StoredBindingScopeTier =
   (typeof SCOPE_TIERS)[BindingScopeTier]["stored"];
 

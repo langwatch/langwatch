@@ -182,3 +182,26 @@ Feature: Typed permission declarations
     Given a management endpoint whose declared policy names a permission the config does not enforce
     When the service builds
     Then the build fails naming both halves of the declaration
+
+  # ============================================================================
+  # The CI sweep: what the types cannot reach
+  # ============================================================================
+
+  @unit
+  Scenario: Every scope id a procedure accepts is checked or explicitly allowed
+    Given a procedure whose input requires a project, team or organization id
+    When the declaration sweep walks the router
+    Then the sweep refuses any id no declared check resolves a scope from
+    And an id a custom middleware enforces must be named by that declaration
+
+  @unit
+  Scenario: A declaration that cannot resolve a scope from its input fails the sweep
+    Given a procedure declaring a permission
+    When its input carries no id at a tier the permission is grantable at
+    Then the sweep refuses the procedure
+
+  @unit
+  Scenario: A procedure whose input cannot be inspected fails the sweep
+    Given a procedure whose input schema the sweep cannot read
+    When the sweep walks the router
+    Then the procedure is reported rather than skipped

@@ -27,7 +27,7 @@ import { bumpAuthzEpoch, getAuthzEpoch } from "./epoch";
 import { grantsLedgerWriter } from "./ledger";
 import { LedgerAuthzGrantsRepository } from "./repositories/authz-grants.ledger.repository";
 import { CutoverAwareAuthzReadRepository } from "./repositories/authz-read.cutover.repository";
-import { demoProjectId } from "./shadow";
+import { demoProjectId } from "./demo-project";
 
 /**
  * COLLECT policies over the read repository, which since delivery-plan PR 3

@@ -16,15 +16,6 @@ const { userPermissionCheck, apiKeyPermissionCheck } = vi.hoisted(() => ({
   apiKeyPermissionCheck: vi.fn(),
 }));
 
-vi.mock("~/server/app-layer/authz/shadow", () => ({
-  authzShadowFor: () => ({
-    userPermissionCheck,
-    apiKeyPermissionCheck,
-    userBatchPermissionCheck: vi.fn(),
-  }),
-  demoProjectId: () => undefined,
-  parseShadowRate: () => 0,
-}));
 
 import {
   checkRoleBindingPermission,

@@ -32,15 +32,6 @@ const { userPermissionCheck, userBatchPermissionCheck, apiKeyPermissionCheck } =
 // The stage-A4 shadow is stubbed rather than silenced: "the legacy path still
 // shadows" is half of what these tests assert, and a sample rate of zero
 // cannot be told apart from a missing call.
-vi.mock("~/server/app-layer/authz/shadow", () => ({
-  authzShadowFor: () => ({
-    userPermissionCheck,
-    userBatchPermissionCheck,
-    apiKeyPermissionCheck,
-  }),
-  demoProjectId: () => undefined,
-  parseShadowRate: () => 0,
-}));
 
 import {
   batchScopePermissions,

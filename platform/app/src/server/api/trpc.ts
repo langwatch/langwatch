@@ -40,7 +40,7 @@ import { auditLog } from "@ee/audit-log/auditLog";
 import type {
   AuthzPermission,
   NoPermissionOptions,
-  PermissionDeclarationError,
+  DeclarationError,
   ScopeTierField,
   ValidatePermissionForInput,
   ViaFieldFor,
@@ -1338,7 +1338,7 @@ type ValidateDeclaredPermission<
   P extends AuthzPermission,
   I,
 > = UnsetMarker extends I
-  ? PermissionDeclarationError<"declare .input() before .permission() — the check reads its scope id from the validated input">
+  ? DeclarationError<"declare .input() before .permission() — the check reads its scope id from the validated input">
   : ValidatePermissionForInput<P, I>;
 
 type PermissionAnyArgs<
@@ -1347,7 +1347,7 @@ type PermissionAnyArgs<
 > = UnsetMarker extends I
   ? [
       AuthzPermission &
-        PermissionDeclarationError<"declare .input() before .permissionAny() — the check reads its projectId from the validated input">,
+        DeclarationError<"declare .input() before .permissionAny() — the check reads its projectId from the validated input">,
     ]
   : I extends { projectId: string }
     ? {
@@ -1356,7 +1356,7 @@ type PermissionAnyArgs<
       }
     : [
         AuthzPermission &
-          PermissionDeclarationError<".permissionAny() checks at the project scope and needs a required 'projectId' in the input">,
+          DeclarationError<".permissionAny() checks at the project scope and needs a required 'projectId' in the input">,
       ];
 
 type DeclaredNoPermissionOptions<I> = UnsetMarker extends I
