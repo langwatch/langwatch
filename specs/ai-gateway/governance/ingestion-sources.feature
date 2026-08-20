@@ -192,8 +192,79 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       | upstream connection status                            |
       | "Send test event" button (push/webhook sources)       |
       | "Run poll now" button (pull sources)                  |
-      | last 50 events ingested with raw + normalised side-by-side |
+      | a paginated table of ingested events, newest first    |
     And from this page the admin can rotate the ingestSecret atomically
+
+  Rule: The events table pages through everything the source ever ingested
+
+    Every event the source ever ingested is reachable, not just the
+    newest batch. The admin walks pages newest-first; nothing is known
+    about how many events exist in total, so the pager promises only
+    what it can honour: pages already visited plus the next one, and no
+    grand-total line. Order is fixed at newest-first, and there are no
+    sort headers and no search box — either would only act on the page
+    in hand and quietly lie about the rest.
+
+    Two honesty boundaries the scenarios below pin down: events stamped
+    on the same millisecond are never lost to a page cut, up to one
+    fetch's worth per millisecond, past which the walk moves on rather
+    than looping; and pages once seen do not change — walking back
+    shows exactly the rows the admin came from, even while new events
+    keep arriving.
+
+    @integration
+    Scenario: Events render as a table, newest first
+      Given a source has ingested events
+      When the admin opens the source's detail page
+      Then the events appear as table rows, newest first
+      And each row shows when it happened, its type, who acted,
+        the action, its target, its cost and its token usage
+      And the time reads relatively, with the exact timestamp on hover
+
+    @integration
+    Scenario: The table pages through more events than fit at once
+      Given a source has ingested more events than one page holds
+      When the admin moves to the next page
+      Then the following, older events are listed
+      And moving back returns to the exact rows they came from,
+        re-read from what was already loaded, not from the server
+
+    @integration
+    Scenario: Changing rows-per-page starts over from the first page
+      Given the admin is a few pages into the events table
+      When they pick a different rows-per-page size
+      Then the table returns to the first page at the new size
+
+    @integration
+    Scenario: A row opens into raw + normalised detail
+      When the admin clicks an event row
+      Then the row expands to show the normalised event
+      And for a pulled event, the raw payload as ingested sits beside it
+      And for a pushed event, whose raw body is never stored, the raw
+        panel says so instead of sitting silently empty
+      And clicking again folds the detail away
+
+    @integration
+    Scenario: Events sharing a timestamp are not lost at a page boundary
+      Given several events were stamped with the same millisecond
+      And fewer of them than the server's single-fetch maximum
+      And they straddle a page boundary
+      When the admin walks from one page to the next
+      Then every one of the tied events appears on exactly one page
+
+    @integration
+    Scenario: A failed load is an error, never an empty list
+      Given the events request fails
+      When the admin views the events section
+      Then they see an error message
+      And they do NOT see the "no events yet" setup walkthrough
+
+    @integration
+    Scenario: The pager offers no control it cannot honour
+      When the admin looks at the events table
+      Then there are no sortable column headers and no search box
+      And the pager shows no grand total of events
+      And only visited pages and the immediate next page can be opened
 
   Scenario: ingestSecret rotation
     When the admin clicks "Rotate secret"
