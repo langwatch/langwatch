@@ -313,7 +313,17 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 	// error frame the client renders as the install card / access hint — instead
 	// of the model floundering through an opaque auth failure in prose.
 	githubGate := newGithubGate(req.Credentials.GithubToken != "", cancelStream)
-	sink.onFrame = githubGate.Observe
+	// The step-limit gate (steplimitgate.go): a runaway backstop. A turn stuck
+	// re-running a refused command (the loop AGENTS.md rules 16 and 29 tell the
+	// agent to avoid, caught here for the turn where it doesn't) settles hundreds
+	// of sub-second tool calls inside the 120s wall-clock; this stops it before it
+	// fills the transcript with identical failing cards. The tripped check below
+	// turns it into the vetted `langy_turn_step_limit` terminal frame.
+	stepGate := newStepLimitGate(maxToolCallsPerTurn, cancelStream)
+	sink.onFrame = func(f frames.Frame) {
+		githubGate.Observe(f)
+		stepGate.Observe(f)
+	}
 
 	// Kick the consumer first so we don't lose the first delta. Panic-guarded: a
 	// crash is recovered + a sentinel pushed so the flow below never hangs on errCh.
@@ -362,6 +372,19 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		clog.Get(ctx).Info("github gate stopped the turn", zap.String("code", code))
 		failTurn(message, code)
 		a.turnObserved(ctx, start, "github-gate", req.Intent)
+		return
+	}
+	// The step-limit gate preempts the switch for the same reason the GitHub gate
+	// does: WE cancelled the stream, so streamErr is a benign cancellation that
+	// would otherwise fall through to a SUCCESS final for a turn we stopped.
+	if stepGate.Tripped() {
+		clog.Get(ctx).Info("step-limit gate stopped the turn",
+			zap.Int("limit", maxToolCallsPerTurn))
+		failTurn(
+			"the agent kept running commands without finishing and was stopped to prevent a loop",
+			codeTurnStepLimit,
+		)
+		a.turnObserved(ctx, start, "step-limit", req.Intent)
 		return
 	}
 	switch {

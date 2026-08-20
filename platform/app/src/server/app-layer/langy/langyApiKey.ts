@@ -458,3 +458,49 @@ export async function mintLangySessionApiKey({
   getLangySessionKeysCounter("minted").inc();
   return { token, apiKeyId: apiKey.id };
 }
+
+/**
+ * The Langy candidate permissions the caller does NOT hold in this project —
+ * `LANGY_CANDIDATE_PERMISSIONS` minus the held subset, resolved exactly the way
+ * {@link mintLangySessionApiKey} resolves the held subset (one batched
+ * resolution, team-scoped bindings folded in via the project's team).
+ *
+ * This is the PRE-FLIGHT companion to the session key. The key already REFUSES
+ * an action the caller can't take, but the refusal arrives as a failed command
+ * the assistant then retries variations of — the "busy, messy, loopy" chat a
+ * real session produced. Handing the turn this list lets it decline up front,
+ * naming the access in plain words, instead of running a command that was
+ * always going to be refused. See `renderLangyMissingPermissionsNote`.
+ *
+ * Recomputed per turn — including warm-worker reuse, where no mint runs — so a
+ * mid-conversation access change shows up on the very next turn. It costs the
+ * same ~4 batched queries the mint pays and is meant to be OVERLAPPED with the
+ * turn's other reads, never awaited on its own.
+ */
+export async function resolveLangyMissingPermissions({
+  prisma,
+  session,
+  projectId,
+  organizationId,
+}: {
+  prisma: PrismaClient;
+  session: Session;
+  projectId: string;
+  organizationId: string;
+}): Promise<Permission[]> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { teamId: true },
+  });
+  const held = await batchProjectPermissions(
+    { prisma, session },
+    {
+      organizationId,
+      projectId,
+      ...(project?.teamId ? { teamId: project.teamId } : {}),
+      permissions: [...LANGY_CANDIDATE_PERMISSIONS],
+    },
+  );
+  const heldSet = new Set(held);
+  return LANGY_CANDIDATE_PERMISSIONS.filter((p) => !heldSet.has(p));
+}

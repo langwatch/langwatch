@@ -177,6 +177,11 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
   // behind a spinner. The user gets the card and decides.
   langy_agent_errored: terminal("langy_agent_errored"),
 
+  // The step-limit gate stopped a looping turn. TERMINAL: an auto-retry would
+  // re-drive the same loop into the same wall. The card offers a manual retry —
+  // a fresh turn carries the pre-flight access note and usually behaves.
+  langy_turn_step_limit: terminal("langy_turn_step_limit"),
+
   // A spawn that failed is usually transient (a slow skill install, a readiness
   // timeout under load) and the next one succeeds. Retry it here, bounded — the
   // SERVER cannot, because the spawn it would retry is the one that just died.

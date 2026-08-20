@@ -1734,6 +1734,11 @@ const presentations = {
     describe: () =>
       "Langy didn't finish in time. Try again, or ask for a narrower slice: a shorter time range, or a single trace.",
   },
+  langy_turn_step_limit: {
+    title: "Langy stopped to avoid a loop",
+    describe: () =>
+      "Langy kept running commands without finishing, so it stopped. Try again — and if it keeps happening, narrow or rephrase what you're after.",
+  },
   langy_agent_at_capacity: {
     title: "Langy is busy right now",
     describe: () =>

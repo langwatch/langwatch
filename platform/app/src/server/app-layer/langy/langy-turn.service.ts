@@ -225,13 +225,79 @@ export function langyTurnIdentity(input: {
 export const LANGY_USER_MESSAGE_LABEL = "THE USER'S MESSAGE:";
 
 /**
+ * `scenarios:create` → "create scenarios": the action verb in the words a
+ * customer already uses, then the resource. This is the AGENT-PROMPT twin of the
+ * card-side `humanPermission` (langyToolFailure.ts) — deliberately independent,
+ * because one addresses the model composing a reply and the other a user reading
+ * a card, and coupling them across the server/client boundary would be worse
+ * than a few lines of parallel formatting.
+ */
+const LANGY_PERMISSION_ACTION_WORDS: Record<string, string> = {
+  view: "view",
+  create: "create",
+  update: "edit",
+  delete: "delete",
+  manage: "manage",
+  share: "share",
+};
+
+// Resources whose slug is not the word the customer uses. `evaluations` is the
+// online-evaluation (monitor) family — "evaluations" alone reads as the broader
+// concept, so name it the way the product does. Everything else humanizes fine
+// from its slug (scenarios, datasets, prompts, …).
+const LANGY_PERMISSION_RESOURCE_LABELS: Record<string, string> = {
+  evaluations: "online evaluations",
+};
+
+function humanizeLangyPermission(permission: string): string {
+  const [resource, action] = permission.split(":");
+  const verb = (action ? LANGY_PERMISSION_ACTION_WORDS[action] : "") ?? action;
+  const noun =
+    (resource ? LANGY_PERMISSION_RESOURCE_LABELS[resource] : "") ??
+    (resource ?? "")
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .replace(/[_-]/g, " ")
+      .toLowerCase();
+  return verb ? `${verb} ${noun}`.trim() : noun;
+}
+
+/**
+ * The per-turn "access you lack" note, or "" when the caller holds everything
+ * Langy uses (so it is dropped from the prompt, exactly like the cap note).
+ *
+ * It rides the USER message, not the system lane, because it is per-caller and
+ * per-project and so would break the cached prefix (see `composeLangyTurnPrompt`
+ * and `startConversationTurn`). It names each missing access in plain words AND
+ * carries the raw permission slug, so the model can both phrase the refusal
+ * nicely and quote the exact access if the user asks which one. See
+ * {@link resolveLangyMissingPermissions} for how the list is derived.
+ */
+export function renderLangyMissingPermissionsNote(
+  missing: readonly string[],
+): string {
+  if (missing.length === 0) return "";
+  const phrases = missing.map(
+    (p) => `${humanizeLangyPermission(p)} (\`${p}\`)`,
+  );
+  return [
+    "ACCESS THE PERSON YOU ACT FOR DOES NOT HOLD IN THIS PROJECT —",
+    "they cannot:",
+    `${phrases.join("; ")}.`,
+    "Do NOT run any command that needs one of these; it will be refused.",
+    "If they ask for one, tell them plainly — in their own words, not the slug",
+    "— that they don't have access to do it in this project, and stop. Never",
+    'run the command "to check", and never retry it with fewer arguments.',
+  ].join(" ");
+}
+
+/**
  * Compose the turn's user-message prompt.
  *
  * A bare ask stays a bare ask: when nothing is (or could be) prepended, the
  * prompt is exactly the user's text, as it always was. The moment anything
- * rides ahead of it (the screen-context block, the cap note, or a history
- * seed the manager may fold in), the ask is set apart under
- * {@link LANGY_USER_MESSAGE_LABEL} so no prepended DATA can blur into the
+ * rides ahead of it (the screen-context block, the cap note, the access-you-
+ * lack note, or a history seed the manager may fold in), the ask is set apart
+ * under {@link LANGY_USER_MESSAGE_LABEL} so no prepended DATA can blur into the
  * user's own words. `hasHistorySeed` exists because the SEED is prepended by
  * the worker manager, not here: the label must already be in place on the
  * wire for the composition the manager may produce.
@@ -244,15 +310,17 @@ export const LANGY_USER_MESSAGE_LABEL = "THE USER'S MESSAGE:";
 export function composeLangyTurnPrompt({
   contextBlock,
   capNote,
+  permissionsNote,
   hasHistorySeed,
   userText,
 }: {
   contextBlock: string | null;
   capNote: string;
+  permissionsNote: string;
   hasHistorySeed: boolean;
   userText: string;
 }): string {
-  const preamble = [contextBlock, capNote]
+  const preamble = [contextBlock, capNote, permissionsNote]
     .map((block) => (block ?? "").trim())
     .filter((block) => block.length > 0);
   if (preamble.length === 0 && !hasHistorySeed) return userText;
@@ -317,6 +385,17 @@ export interface LangyTurnServiceDeps {
     projectId: string;
     organizationId: string;
   }) => Promise<{ token: string; apiKeyId: string }>;
+  /**
+   * The Langy access the caller does NOT hold in this project, resolved fresh
+   * each turn so the assistant can be told up front what to decline rather than
+   * attempting-then-looping (prisma pre-bound at composition). A failed resolve
+   * is never fatal — the turn runs without the note, degraded, not broken.
+   */
+  resolveMissingPermissions: (args: {
+    session: Session;
+    projectId: string;
+    organizationId: string;
+  }) => Promise<string[]>;
   revokeSessionKey: (args: {
     apiKeyId: string;
     projectId: string;
@@ -633,6 +712,7 @@ export class LangyTurnService {
         runTokenResult,
         modelsAllowedResult,
         memoryResult,
+        missingPermissionsResult,
         overrideResult,
       ] = await Promise.allSettled([
         conversationService.findByIdVisible({
@@ -665,6 +745,15 @@ export class LangyTurnService {
               conversationId: conversation.id,
               projectId,
             }),
+        // The access the caller does NOT hold, so the turn can tell the
+        // assistant up front what to decline instead of attempting-then-looping.
+        // Overlapped with the reads above (no extra latency window); a failed
+        // resolve just omits the note (see below), never fails the turn.
+        this.deps.resolveMissingPermissions({
+          session,
+          projectId,
+          organizationId: credentials.organizationId,
+        }),
         // The system-block override (ADR-050). It depends on nothing computed
         // after `resolveLangyTurnBaseDependencies`, so it belongs in this
         // batch: awaiting it on its own at the composition site put two serial
@@ -866,12 +955,31 @@ export class LangyTurnService {
         .filter((block): block is string => !!block && block.trim().length > 0)
         .join("\n\n");
 
+      // The access the caller does not hold — named for the assistant so it
+      // declines up front instead of running a refused command and retrying.
+      // A failed resolve is not fatal: the turn runs without the note (the key
+      // still refuses the action reactively), degraded, not broken.
+      if (missingPermissionsResult.status === "rejected") {
+        logger.warn(
+          {
+            error: missingPermissionsResult.reason,
+            conversationId: conversation.id,
+          },
+          "failed to resolve caller's missing Langy permissions — the turn runs without the pre-flight note",
+        );
+      }
+      const missingPermissionsNote =
+        missingPermissionsResult.status === "fulfilled"
+          ? renderLangyMissingPermissionsNote(missingPermissionsResult.value)
+          : "";
+
       // The per-turn user-message lane: what the user is looking at and the
-      // turn-scoped cap note precede a clearly labelled ask, so the model
-      // reads the DATA before the message that may refer to it.
+      // turn-scoped cap / access notes precede a clearly labelled ask, so the
+      // model reads the DATA before the message that may refer to it.
       const prompt = composeLangyTurnPrompt({
         contextBlock: renderLangyTurnContext(turnContext),
         capNote: capReachedNote,
+        permissionsNote: missingPermissionsNote,
         hasHistorySeed: historySeed.length > 0,
         userText,
       });

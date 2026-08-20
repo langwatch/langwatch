@@ -146,6 +146,7 @@ export const APP_ERROR_CODES = [
   "langy_rate_limited",
   "langy_turn_in_progress",
   "langy_turn_not_stoppable",
+  "langy_turn_step_limit",
   "langy_turn_timeout",
   "langy_worker_restarting",
   "langy_worker_spawn_failed",

@@ -40,6 +40,9 @@ describe("KNOWN_LANGY_ERROR_KINDS", () => {
       // The agent itself reported the turn failed (its LLM call was rejected)
       // — the worker is fine, the reply failed. Terminal with a manual retry.
       "langy_agent_errored",
+      // The manager's step-limit gate stopped a turn stuck in a tool-call loop
+      // (services/langyagent/app/steplimitgate.go). Terminal with manual retry.
+      "langy_turn_step_limit",
       // Raised from the TOOL STREAM (the agent reached for `gh` with no token),
       // never from the model's prose. Produced by the manager's GitHub gate
       // (services/langyagent/app/githubgate.go); the command grammar lives in

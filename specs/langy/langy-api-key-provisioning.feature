@@ -129,3 +129,49 @@ Feature: Dedicated Langy API key provisioning
       When my access is reduced to viewing scenarios
       Then that key can no longer create a scenario
       And it can still read the scenarios I can still read
+
+  # ---------------------------------------------------------------------------
+  # Telling Langy what it cannot do, BEFORE it tries
+  # ---------------------------------------------------------------------------
+
+  # The key already refuses an action the caller can't take — but the refusal
+  # arrives as a failed command the assistant then retries variations of, which
+  # is the "busy, messy, loopy" chat a real session produced. Handing the turn
+  # the list of access it does NOT hold lets it decline up front, naming the
+  # access in plain words, instead of running a command that was always going
+  # to be refused.
+  Rule: A turn is told the access it lacks so it can decline before attempting
+
+    @unit
+    Scenario: The turn names the access the caller does not hold
+      Given the caller cannot create scenarios or online evaluations
+      When the turn is prepared for the assistant
+      Then the turn tells the assistant it lacks access to create scenarios
+      And the turn tells the assistant it lacks access to create online evaluations
+
+    @unit
+    Scenario: A caller who holds everything gets no such note
+      Given the caller holds every access the assistant uses
+      When the turn is prepared for the assistant
+      Then the turn carries no "access you lack" note at all
+
+    # Resolved per turn, not per conversation. Access changes mid-conversation —
+    # someone is granted a role, a team binding lands — and the very next turn
+    # must reflect it. A cached answer would keep declining something the person
+    # can now do, in a chat they are still sitting in.
+    @unit
+    Scenario: Access granted mid-conversation is honoured on the next turn
+      Given the caller lacked one access on their previous turn
+      When they lose a different access before the next turn
+      Then the next turn names only the access they lack now
+      And it no longer names the one from the previous turn
+
+    # Degraded, not broken. The key still refuses the action when the assistant
+    # reaches for it, so the worst case is the old attempt-then-retry chat —
+    # losing the whole turn to a read blip would be strictly worse.
+    @unit
+    Scenario: The access cannot be looked up and the turn runs anyway
+      Given the caller's access cannot be looked up right now
+      When the turn is prepared for the assistant
+      Then the turn still starts
+      And it carries no "access you lack" note

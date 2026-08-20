@@ -20,6 +20,7 @@ import { LangyCredentialService } from "~/server/app-layer/langy/LangyCredential
 import { LangyFeedbackPromptService } from "~/server/app-layer/langy/langy-feedback-prompt.service";
 import {
   mintLangySessionApiKey,
+  resolveLangyMissingPermissions,
   revokeLangySessionApiKey,
 } from "~/server/app-layer/langy/langyApiKey";
 import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
@@ -1346,6 +1347,13 @@ export function initializeDefaultApp(options?: {
     perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
     mintSessionKey: ({ session, projectId, organizationId }) =>
       mintLangySessionApiKey({ prisma, session, projectId, organizationId }),
+    resolveMissingPermissions: ({ session, projectId, organizationId }) =>
+      resolveLangyMissingPermissions({
+        prisma,
+        session,
+        projectId,
+        organizationId,
+      }),
     revokeSessionKey: ({ apiKeyId, projectId }) =>
       revokeLangySessionApiKey({ prisma, apiKeyId, projectId }).then(
         () => undefined,
@@ -2142,6 +2150,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         mintSessionKey: async () => {
           throw new Error("no session-key mint in test app");
         },
+        resolveMissingPermissions: async () => [],
         revokeSessionKey: noop,
         admission: new NullLangyTurnAdmissionRepository(),
         accessStore: null,

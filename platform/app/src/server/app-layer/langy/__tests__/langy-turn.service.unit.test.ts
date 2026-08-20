@@ -41,6 +41,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
   const probe = vi.fn(async (_args: { hasGithubAuth: boolean }) => false);
   const dispatch = vi.fn(async () => "accepted" as const);
   const mintSessionKey = vi.fn(async () => ({ token: "t", apiKeyId: "k" }));
+  const resolveMissingPermissions = vi.fn(async () => [] as string[]);
   const revokeSessionKey = vi.fn(async () => {});
   const reservePermit = vi.fn(async () => ({
     reserved: true,
@@ -100,6 +101,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
     releasePermit,
     perDayPrCap: 5,
     mintSessionKey,
+    resolveMissingPermissions,
     revokeSessionKey,
     admission: {
       claim,
@@ -123,6 +125,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
       probe,
       dispatch,
       mintSessionKey,
+      resolveMissingPermissions,
       revokeSessionKey,
       reservePermit,
       releasePermit,
@@ -711,6 +714,128 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
 });
 
 /**
+ * The pre-flight access note is what stops the "busy, messy, loopy" chat: the
+ * session key already REFUSES an action the caller cannot take, but a reactive
+ * refusal arrives as a failed command the agent then retries variations of.
+ * These pin the service flow end to end — the resolver is asked the right
+ * question, its answer reaches the prompt, and a resolver that throws degrades
+ * the turn instead of failing it.
+ */
+describe("when the caller does not hold every access Langy uses", () => {
+  const NOTE_MARKER = "ACCESS THE PERSON YOU ACT FOR DOES NOT HOLD";
+
+  const promptOf = (dispatch: ReturnType<typeof vi.fn>): string =>
+    (dispatch.mock.calls[0]![0] as { prompt: string }).prompt;
+
+  /** @scenario The turn names the access the caller does not hold */
+  it("hands the turn the access the caller lacks, in words and by slug", async () => {
+    const { deps, mocks } = makeDeps();
+    mocks.resolveMissingPermissions.mockResolvedValue([
+      "scenarios:create",
+      "evaluations:create",
+    ]);
+
+    await LangyTurnService.create(deps).startConversationTurn(input());
+
+    // Asked about THIS caller in THIS project — a note resolved for the wrong
+    // scope would confidently decline something the user can actually do.
+    expect(mocks.resolveMissingPermissions).toHaveBeenCalledWith({
+      session: SESSION,
+      projectId: "p1",
+      organizationId: "org-1",
+    });
+
+    const prompt = promptOf(mocks.dispatch);
+    expect(prompt).toContain(NOTE_MARKER);
+    // Both halves matter: the words are what the model says back to the user,
+    // the slug is what it quotes when they ask which access exactly.
+    expect(prompt).toContain("create scenarios");
+    expect(prompt).toContain("`scenarios:create`");
+    expect(prompt).toContain("`evaluations:create`");
+    // The note is DATA, so it rides ahead of the labelled ask like the rest.
+    expect(prompt.indexOf(NOTE_MARKER)).toBeLessThan(
+      prompt.indexOf("THE USER'S MESSAGE:"),
+    );
+  });
+
+  /** @scenario The turn names the access the caller does not hold */
+  it("stashes the same prompt, so an outbox re-dispatch still declines up front", async () => {
+    const { deps, mocks } = makeDeps();
+    mocks.resolveMissingPermissions.mockResolvedValue(["scenarios:create"]);
+
+    await LangyTurnService.create(deps).startConversationTurn(input());
+
+    const stashed = (
+      mocks.stash.mock.calls[0] as unknown as [{ prompt: string }]
+    )[0];
+    expect(stashed.prompt).toBe(promptOf(mocks.dispatch));
+    expect(stashed.prompt).toContain(NOTE_MARKER);
+  });
+
+  /** @scenario Access granted mid-conversation is honoured on the next turn */
+  it("asks again on the next turn, so a change in access lands immediately", async () => {
+    const { deps, mocks } = makeDeps();
+    mocks.resolveMissingPermissions
+      .mockResolvedValueOnce(["scenarios:create"])
+      .mockResolvedValueOnce(["evaluations:create"]);
+
+    // ONE service, ONE conversation, two turns — the shape a conversation-level
+    // cache would survive. Distinct idempotency keys so the second is a real
+    // turn and not the replay of the first.
+    const service = LangyTurnService.create(deps);
+    await service.startConversationTurn(input({ idempotencyKey: "req-1" }));
+    await service.startConversationTurn(input({ idempotencyKey: "req-2" }));
+
+    expect(mocks.resolveMissingPermissions).toHaveBeenCalledTimes(2);
+
+    const promptAt = (i: number) =>
+      (mocks.dispatch.mock.calls[i] as unknown as [{ prompt: string }])[0]
+        .prompt;
+    const first = promptAt(0);
+    const second = promptAt(1);
+
+    // Each turn carries only its OWN answer. Caching the first would keep
+    // declining something the caller may since have been granted — in a chat
+    // they are still sitting in.
+    expect(first).toContain("`scenarios:create`");
+    expect(first).not.toContain("`evaluations:create`");
+    expect(second).toContain("`evaluations:create`");
+    expect(second).not.toContain("`scenarios:create`");
+  });
+
+  /** @scenario A caller who holds everything gets no such note */
+  it("says nothing at all when the caller holds everything", async () => {
+    const { deps, mocks } = makeDeps();
+    mocks.resolveMissingPermissions.mockResolvedValue([]);
+
+    await LangyTurnService.create(deps).startConversationTurn(input());
+
+    expect(promptOf(mocks.dispatch)).not.toContain(NOTE_MARKER);
+  });
+
+  describe("when the access cannot be resolved at all", () => {
+    /** @scenario The access cannot be looked up and the turn runs anyway */
+    it("runs the turn without the note rather than failing it", async () => {
+      const { deps, mocks } = makeDeps();
+      mocks.resolveMissingPermissions.mockRejectedValue(
+        new Error("postgres unavailable"),
+      );
+
+      // Degraded, not broken: the key still refuses the action reactively, so
+      // the worst case is the loopy chat we had before — losing the whole turn
+      // to a read blip would be strictly worse.
+      const result = await LangyTurnService.create(deps).startConversationTurn(
+        input(),
+      );
+
+      expect(result.turnId).toBe(TURN_ID);
+      expect(mocks.dispatch).toHaveBeenCalled();
+      expect(promptOf(mocks.dispatch)).not.toContain(NOTE_MARKER);
+    });
+  });
+});
+
+/**
  * The runToken is the HMAC key the worker signs every frame with, and the relay
  * verifies against. It must never degrade to a sentinel: an empty key is
  * publicly computable, and the relay maps "no token" to a rejection, so a turn
@@ -874,6 +999,7 @@ describe("LangyTurnService.stopTurn", () => {
       releasePermit: vi.fn(),
       perDayPrCap: 0,
       mintSessionKey: vi.fn(),
+      resolveMissingPermissions: vi.fn(),
       revokeSessionKey: vi.fn(),
       admission: {} as unknown as LangyTurnServiceDeps["admission"],
       accessStore: {

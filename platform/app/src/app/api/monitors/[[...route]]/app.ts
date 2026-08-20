@@ -193,12 +193,19 @@ secured.access(requires("evaluations:view")).get(
 );
 
 // ── Create Monitor ──────────────────────────────────────────
-// `:manage`, not `:create`. A monitor is not a definition sitting inert until
-// someone runs it: `executionMode` defaults to ON_MESSAGE, so the moment it
-// exists it evaluates every trace the project ingests, on its own, indefinitely.
-// Creating one is standing up a process, which is administration. The evaluator
-// routes keep `:create`, because an evaluator IS the inert definition.
-secured.access(requires("evaluations:manage")).post(
+// `:create`. This aligns the REST create with the tRPC create, which has
+// always required only `evaluations:create` (routers/monitors.ts) — the REST
+// route's `:manage` was the outlier, not a considered platform stance. Yes, a
+// monitor defaults to ON_MESSAGE and starts evaluating on its own, but authoring
+// one is a create, held by everyone who can create evaluations, the same grain
+// the evaluator routes use; pinning REST to `:manage` locked out every non-admin
+// who can legitimately create evaluations — including Langy, whose session key
+// mirrors the caller's own `:create` rights and could never reach `:manage`.
+// `resourceLimitMiddleware` still caps how many a plan may run. The genuinely
+// administrative moves keep `:manage`: DELETE (destroying a running process) and
+// the cross-project `copy` (tRPC); `:manage` implies `:create`, so no admin
+// loses access here.
+secured.access(requires("evaluations:create")).post(
   "/",
   describeRoute({
     description: "Create a new online evaluation monitor",
