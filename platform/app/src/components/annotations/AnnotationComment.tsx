@@ -78,13 +78,14 @@ export function AnnotationComment({ key = "" }: { key: string }) {
     scoreOptions: {},
   };
 
-  const { control, handleSubmit, watch, setValue, reset } =
-    useForm<Annotation>({
+  const { control, handleSubmit, watch, setValue, reset } = useForm<Annotation>(
+    {
       defaultValues: {
         comment: "",
         scoreOptions: {},
       },
-    });
+    },
+  );
 
   // Set form values when data is available
   useEffect(() => {

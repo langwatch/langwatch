@@ -14,10 +14,31 @@
  *
  * Spec: specs/setup/react-compiler.feature
  */
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import type { Plugin } from "vite";
 import { describe, expect, it } from "vitest";
 
 import viteConfig from "../vite.config";
+
+/**
+ * The components that call `reset()`, so a memoized registration in any of them
+ * silently drops what the user types. The e2e covers the scenario editor; these
+ * are the rest, which nothing else would catch.
+ *
+ * Kept as paths rather than a glob: a glob that stopped matching would leave
+ * this asserting nothing at all.
+ */
+const FORMS_THAT_RESET = [
+  "src/components/scenarios/ScenarioForm.tsx",
+  "src/components/settings/ChangePasswordDialog.tsx",
+  "src/components/projects/ProjectForm.tsx",
+  "src/components/annotations/AnnotationComment.tsx",
+  "src/components/evaluators/EvaluatorEditorShared.tsx",
+  "src/optimization_studio/components/properties/AgentPropertiesPanel.tsx",
+  "src/prompts/forms/ChangeHandleDialog.tsx",
+  "src/prompts/forms/SaveVersionDialog.tsx",
+];
 
 const COMPILER_PLUGIN_NAME = "vite:react-compiler";
 
@@ -59,7 +80,13 @@ interface RecordingContext {
  * context, and we are deliberately calling them with a stub that records
  * instead of one vite built.
  */
-const handlerOf = <T>(hook: unknown, hookName: string): T => {
+const handlerOf = <T>({
+  hook,
+  hookName,
+}: {
+  hook: unknown;
+  hookName: string;
+}): T => {
   if (hook === undefined) {
     throw new Error(`${COMPILER_PLUGIN_NAME} has no ${hookName} hook`);
   }
@@ -114,16 +141,16 @@ const compileThroughTheBuild = async (
   };
 
   // Loads the native compiler the transform then uses.
-  await handlerOf<ConfigHook>(plugin.config, "config").call(
+  await handlerOf<ConfigHook>({ hook: plugin.config, hookName: "config" }).call(
     context,
     {},
     { command: "build", mode: "production" },
   );
 
-  const result = await handlerOf<TransformHook>(
-    plugin.transform,
-    "transform",
-  ).call(context, source, "/src/TotalCost.tsx");
+  const result = await handlerOf<TransformHook>({
+    hook: plugin.transform,
+    hookName: "transform",
+  }).call(context, source, "/src/TotalCost.tsx");
 
   return {
     code: typeof result === "string" ? result : (result?.code ?? ""),
@@ -175,6 +202,28 @@ describe("the React Compiler pass", () => {
       expect(code).toMatch(/_c\(\d+\)/);
       expect(code).toContain("react/compiler-runtime");
       expect(warnings).toEqual([]);
+    });
+  });
+
+  describe("given the form components that re-seed themselves", () => {
+    /** @scenario "A form that re-seeds itself still records what the user types" */
+    it("compiles none of them with a memoized field registration", async () => {
+      const offenders: string[] = [];
+
+      for (const relativePath of FORMS_THAT_RESET) {
+        const source = await readFile(
+          resolve(import.meta.dirname, "..", relativePath),
+          "utf8",
+        );
+        const { code } = await compileThroughTheBuild(source);
+        // The shape that breaks: the compiler caching a `register()` call,
+        // keyed on `register` — which never changes, so it never re-runs.
+        if (/\$\[\d+\]\s*!==\s*(\w+\.)?register\b/.test(code)) {
+          offenders.push(relativePath);
+        }
+      }
+
+      expect(offenders).toEqual([]);
     });
   });
 

@@ -43,6 +43,18 @@ Feature: The React Compiler memoizes the app at build time
     Then the derived value is reused while its inputs are unchanged
     And the component needed no useMemo, useCallback or memo of its own
 
+  @unit
+  Scenario: A form that re-seeds itself still records what the user types
+    Given a form component that calls reset
+    When the React Compiler transforms it
+    Then no field registration is memoized away
+    # The regression this fixes. `register()` spread into props is memoized —
+    # `register` is a stable reference — so it runs once, and a later `reset()`
+    # empties react-hook-form's field registry with nothing to re-register.
+    # Typing then stops reaching form state while the input still shows it, and
+    # validation goes with it. The e2e covers one such form; this covers every
+    # component that resets, which is where the silence is dangerous.
+
   # ===========================================================================
   # The compiler is not a new way for the build to fail
   # ===========================================================================
