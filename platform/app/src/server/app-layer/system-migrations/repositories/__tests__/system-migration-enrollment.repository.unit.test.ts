@@ -123,9 +123,7 @@ describe("PrismaSystemMigrationEnrollmentRepository", () => {
         user: {
           findMany: vi
             .fn()
-            .mockResolvedValue([
-              { id: "user_alex", name: null, email: "alex@acme.dev" },
-            ]),
+            .mockResolvedValue([{ id: "user_alex", name: "Alex" }]),
         },
       });
 
@@ -137,7 +135,7 @@ describe("PrismaSystemMigrationEnrollmentRepository", () => {
           organizationName: "Acme",
           stage: "migrations",
           enrolledByUserId: "user_alex",
-          enrolledByLabel: "alex@acme.dev",
+          enrolledByLabel: "Alex",
           createdAt,
         },
         {

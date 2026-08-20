@@ -61,8 +61,9 @@ export type MigrationEnrollmentRecord = {
   stage: MigrationEnrollmentStage;
   enrolledByUserId: string;
   /** The enroller's display name; null when it no longer resolves (the user
-   *  id above still identifies them). Never the email - the listing is a
-   *  plain read with no audit trail, so it carries no PII. */
+   *  id above still identifies them). Never the email - the name is the one
+   *  piece of personal data the listing carries, and the read is audited
+   *  for exactly that reason. */
   enrolledByLabel: string | null;
   createdAt: Date;
 };
@@ -146,11 +147,13 @@ export class SystemMigrationsService {
       /**
        * The ops audit trail. Enrollment decides which organizations the
        * platform migrates, so both actions are recorded the way the
-       * backfill's own writes are.
+       * backfill's own writes are - and the enrollment LISTING is recorded
+       * too, because it returns the enrollers' display names (personal
+       * data). A platform-scope entry carries no organizationId.
        */
       audit: (entry: {
         userId: string;
-        organizationId: string;
+        organizationId?: string;
         action: string;
         args?: Record<string, unknown>;
       }) => Promise<void>;
@@ -228,9 +231,11 @@ export class SystemMigrationsService {
   /**
    * The enrollment listing for the ops page: both stages, newest first, with
    * whatever names still resolve. `isSaaS` rides along so the page can say
-   * honestly that a self-hosted installation has nothing to enroll.
+   * honestly that a self-hosted installation has nothing to enroll. The
+   * read is audited because the records carry the enrollers' display names -
+   * personal data leaves through here, so the trail says who read it.
    */
-  async getEnrollments(): Promise<{
+  async getEnrollments({ requestedBy }: { requestedBy: string }): Promise<{
     isSaaS: boolean;
     enrollments: MigrationEnrollmentRecord[];
   }> {
@@ -239,6 +244,10 @@ export class SystemMigrationsService {
         this.deps.enrollments.findAllByStage({ stage }),
       ),
     );
+    await this.deps.audit({
+      userId: requestedBy,
+      action: "systemMigrations.listEnrollments",
+    });
     return { isSaaS: this.deps.isSaaS(), enrollments: perStage.flat() };
   }
 

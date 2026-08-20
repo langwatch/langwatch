@@ -31,6 +31,8 @@ function purgingPrisma() {
     "role",
     "authzProjectionCursor",
     "authzCutoverProjection",
+    "systemMigrationTenantState",
+    "systemMigrationEnrollment",
     "apiKey",
     "promptTag",
     "team",
@@ -68,6 +70,10 @@ describe("PrismaOrganizationRepository.deleteProvisionedOrganization", () => {
         "role",
         "authzProjectionCursor",
         "authzCutoverProjection",
+        // The migration machinery's own per-tenant rows: nothing cascades
+        // them either, and leaving them would keep a deleted tenant enrolled.
+        "systemMigrationTenantState",
+        "systemMigrationEnrollment",
         "apiKey",
         "promptTag",
         "team",
@@ -85,12 +91,15 @@ describe("PrismaOrganizationRepository.deleteProvisionedOrganization", () => {
       await repository.deleteProvisionedOrganization(ORGANIZATION_ID);
 
       for (const deletion of deletions) {
-        // The organization row itself is keyed by id; everything else by the
-        // organization it belongs to.
+        // The organization row itself is keyed by id, the migration state row
+        // by the tenant id it tracks; everything else by the organization it
+        // belongs to.
         expect(deletion.where).toEqual(
           deletion.model === "organization"
             ? { id: ORGANIZATION_ID }
-            : { organizationId: ORGANIZATION_ID },
+            : deletion.model === "systemMigrationTenantState"
+              ? { tenantId: ORGANIZATION_ID }
+              : { organizationId: ORGANIZATION_ID },
         );
       }
     });

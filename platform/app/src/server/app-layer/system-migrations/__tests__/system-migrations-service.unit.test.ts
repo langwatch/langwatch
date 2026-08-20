@@ -541,7 +541,9 @@ describe("SystemMigrationsService enrollment", () => {
       );
       const { service } = serviceWith({ record: null, enrollments });
 
-      const listing = await service.getEnrollments();
+      const listing = await service.getEnrollments({
+        requestedBy: "user_ops",
+      });
 
       expect(listing.isSaaS).toBe(true);
       expect(listing.enrollments).toHaveLength(1);
@@ -554,6 +556,17 @@ describe("SystemMigrationsService enrollment", () => {
       });
       expect(enrollments.findAllByStage).toHaveBeenCalledWith({
         stage: "cutover",
+      });
+    });
+
+    it("audits the read, because the listing carries the enrollers' names", async () => {
+      const { service, audit } = serviceWith({ record: null });
+
+      await service.getEnrollments({ requestedBy: "user_ops" });
+
+      expect(audit).toHaveBeenCalledWith({
+        userId: "user_ops",
+        action: "systemMigrations.listEnrollments",
       });
     });
   });

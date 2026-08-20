@@ -173,6 +173,11 @@ describe("ops migration enrollment procedures", () => {
       expect(demandedPermissions.get("listMigrationEnrollments")).toBe(
         "ops:view",
       );
+      // The listing carries the enrollers' names, so the service audits the
+      // read - the route has to say who is reading.
+      expect(service.getEnrollments).toHaveBeenCalledWith({
+        requestedBy: "user_alex",
+      });
     });
   });
 });

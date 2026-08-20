@@ -65,9 +65,11 @@ const logger = createLogger("langwatch:authz:fork");
 /**
  * Every detached comparison still running, across every service instance -
  * module scope on purpose, because the composition builds a service per
- * call and a test cannot reach the instance that ran. Exists for one
- * consumer: an integration teardown that must not delete the rows a
- * comparison is still reading.
+ * call and a test cannot reach the instance that ran. Two consumers: the
+ * in-flight bound (`admitsComparison` reads its size, which is why an
+ * instance-local counter would not bound anything - each request's fresh
+ * service would start back at zero), and an integration teardown that must
+ * not delete the rows a comparison is still reading.
  */
 const detachedComparisons = new Set<Promise<void>>();
 
@@ -132,8 +134,6 @@ type LegacyThunk<T> = () => Promise<T>;
 
 export class AuthzForkService {
   private readonly engine = new AuthzEngine();
-  /** Comparisons started and not yet settled, for the in-flight bound. */
-  private inFlightComparisons = 0;
   /**
    * The rate announcement latch is static for the reason shadow's is: the app
    * composes a fresh service per request, so a per-instance latch would
@@ -654,11 +654,11 @@ export class AuthzForkService {
     if (!this.sampled()) return false;
     const ceiling =
       this.options.maxInFlightComparisons ?? DEFAULT_MAX_IN_FLIGHT_COMPARISONS;
-    if (this.inFlightComparisons >= ceiling) {
+    if (detachedComparisons.size >= ceiling) {
       // Debug, not warn: shedding a detached comparison is the bound doing
       // its job, and the caller's answer is unaffected either way.
       logger.debug(
-        { inFlight: this.inFlightComparisons, ceiling },
+        { inFlight: detachedComparisons.size, ceiling },
         "authz fork comparison shed",
       );
       return false;
@@ -685,17 +685,15 @@ export class AuthzForkService {
     }
   }
 
-  /** Run the comparison detached, counted in and out so the in-flight bound
-   *  means something. The body already swallows its own failures; the
-   *  `finally` is what guarantees the counter comes back down anyway. */
+  /** Run the comparison detached, registered in the module-scope set so the
+   *  in-flight bound counts it. The body already swallows its own failures;
+   *  the `finally` is what guarantees the registration comes back out. */
   private runDetached(caller: string, body: () => Promise<void>): void {
-    this.inFlightComparisons += 1;
     const settled = body()
       .catch((error: unknown) => {
         logger.warn({ error, caller }, "authz fork comparison failed");
       })
       .finally(() => {
-        this.inFlightComparisons -= 1;
         detachedComparisons.delete(settled);
       });
     detachedComparisons.add(settled);

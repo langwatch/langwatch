@@ -1475,7 +1475,11 @@ export const opsRouter = createTRPCRouter({
    */
   listMigrationEnrollments: protectedProcedure
     .use(opsViewPermission)
-    .query(() => systemMigrationsService.getEnrollments()),
+    .query(({ ctx }) =>
+      systemMigrationsService.getEnrollments({
+        requestedBy: ctx.session.user.id,
+      }),
+    ),
 
   /**
    * Enroll one organization for one stage of the in-place migration rollout.
