@@ -208,11 +208,15 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		//
 		// webfetch STAYS. Langy answers questions about the user's agents, and the
 		// answers are not all inside LangWatch's docs: a provider's error code, a
-		// framework's changelog, a model's release notes. Egress already runs
-		// through the per-worker adapter with its TLS, throttle and allow-list
-		// rungs, so reading the web is governed by the proxy rather than by
-		// removing the tool. What stays out of scope is sending the user's data
-		// out, which is a Scope rule in AGENTS.md, not a missing tool.
+		// framework's changelog, a model's release notes. Removing the tool would
+		// not remove the capability either, since bash reaches the network too.
+		//
+		// Be exact about what the per-worker egress adapter enforces on a stock
+		// install: rung 1 only, which is TLS required, SNI cross-checked, and
+		// throttled. DESTINATION policy is monitor-only until a project sets an
+		// allow-list or an operator turns on LANGY_EGRESS_ENFORCE_FLOOR (ADR-076),
+		// so out of the box the proxy decides HOW a request may leave and not
+		// WHERE it may go. Where it may go is the Scope rule in AGENTS.md.
 		//
 		// bash, read, grep, glob, edit/write, skill and todowrite stay: the CLI,
 		// the GitHub skill's repo work, dataset file preparation, and the plan
