@@ -390,10 +390,13 @@ function IngestionSourceList({
  * either unnamed, or carrying a pull config the adapter cannot honour (which
  * `resolvePullConfig` has already toasted about).
  */
-export function buildCreateInput(
-  composer: ComposerState,
-  organizationId: string,
-) {
+export function buildCreateInput({
+  composer,
+  organizationId,
+}: {
+  composer: ComposerState;
+  organizationId: string;
+}) {
   if (!composer.name.trim()) return null;
   const resolved = resolvePullConfig(composer);
   if (!resolved) return null;
@@ -535,7 +538,7 @@ function useIngestionSourcesPage() {
   });
 
   const onSubmit = () => {
-    const input = buildCreateInput(composer, orgId);
+    const input = buildCreateInput({ composer, organizationId: orgId });
     // A null input means a required field is missing or malformed;
     // resolvePullConfig has already said which, and the drawer stays open so
     // the user can fix it.
@@ -895,10 +898,10 @@ function SourceComposerDrawer({
               loading={isPending}
               disabled={
                 !composer.name.trim() ||
-                composerCadenceError(
-                  composer.sourceType,
-                  composer.pullSchedule,
-                ) !== null
+                composerCadenceError({
+                  sourceType: composer.sourceType,
+                  pullSchedule: composer.pullSchedule,
+                }) !== null
               }
             >
               Create source

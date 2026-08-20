@@ -90,7 +90,15 @@ export function recommendedPullSchedule(sourceType: SourceType): string | null {
 
 /** Parse one plain integer cron field, or null for anything with an
  *  operator ("*", steps, lists, ranges) or out of range. */
-function parsePlainInt(field: string, min: number, max: number): number | null {
+function parsePlainInt({
+  field,
+  min,
+  max,
+}: {
+  field: string;
+  min: number;
+  max: number;
+}): number | null {
   if (!/^\d+$/.test(field)) return null;
   const n = Number(field);
   return n >= min && n <= max ? n : null;
@@ -142,7 +150,7 @@ function fixedMinuteShape({
   hourField,
   dowField,
 }: CronShapeFields): PullCadenceParts | null {
-  const minute = parsePlainInt(minField, 0, 59);
+  const minute = parsePlainInt({ field: minField, min: 0, max: 59 });
   if (minute === null) return null;
 
   if (hourField === "*") {
@@ -150,14 +158,14 @@ function fixedMinuteShape({
     return { ...BASE_PARTS, frequency: "hourly", minute };
   }
 
-  const hour = parsePlainInt(hourField, 0, 23);
+  const hour = parsePlainInt({ field: hourField, min: 0, max: 23 });
   if (hour === null) return null;
 
   if (dowField === "*") {
     return { ...BASE_PARTS, frequency: "daily", minute, hour };
   }
 
-  const dayOfWeek = parsePlainInt(dowField, 0, 6);
+  const dayOfWeek = parsePlainInt({ field: dowField, min: 0, max: 6 });
   if (dayOfWeek === null) return null;
   return { ...BASE_PARTS, frequency: "weekly", minute, hour, dayOfWeek };
 }
@@ -226,10 +234,13 @@ export function pullCadenceCronError(cron: string): string | null {
  * recommended schedule" and is always fine; anything typed must be runnable.
  * Sources without a pull adapter carry no cadence at all.
  */
-export function composerCadenceError(
-  sourceType: SourceType,
-  pullSchedule: string,
-): string | null {
+export function composerCadenceError({
+  sourceType,
+  pullSchedule,
+}: {
+  sourceType: SourceType;
+  pullSchedule: string;
+}): string | null {
   if (!PULL_ADAPTER_FOR_SOURCE[sourceType]) return null;
   if (pullSchedule.trim() === "") return null;
   return pullCadenceCronError(pullSchedule);
