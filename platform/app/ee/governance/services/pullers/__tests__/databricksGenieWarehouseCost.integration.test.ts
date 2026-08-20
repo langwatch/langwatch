@@ -363,7 +363,7 @@ describe("a source that names a warehouse", () => {
     expect(result.events[0]?.actor).toBe("dana@acme.test");
   });
 
-  /** @scenario "A statement that runs across a chunk boundary keeps both halves" */
+  /** @scenario "A query that outlives one billing read is charged in full" */
   it("adds up a statement the window was read in two pieces of", async () => {
     // The window is read oldest-first in chunks that tile it, and each chunk
     // answers only for the hours it owns. A statement still running when a
@@ -1501,6 +1501,60 @@ describe("a period with more statements than one answer can carry", () => {
     expect(spanOf(statementBodies[0]!)).toBeGreaterThan(24 * 60 * 60 * 1000);
     expect(spanOf(statementBodies[1]!)).toBeLessThanOrEqual(
       24 * 60 * 60 * 1000,
+    );
+  });
+
+  /** @scenario "A statement is held when an hour it ran through has no bill yet" */
+  it("keeps the billed share of a piece that still owes an hour", async () => {
+    // A piece can price one of a statement's hours and still owe another. The
+    // hold is right — the owed hour is re-read once its bill lands — but the
+    // billed share belongs to this run's record, exactly as it would had the
+    // chunk priced whole. Dropping it would emit the question at nothing and
+    // only correct it when billing settles, which the whole-chunk path never
+    // does.
+    //
+    // Deep enough into the window to land in the refused first chunk, and half
+    // a day off the piece boundaries so both hours sit in the same piece.
+    const billedHour = usageHourOf(
+      Date.now() - 29 * 24 * 60 * 60 * 1000 + 12 * 60 * 60 * 1000,
+    );
+    const owedHour = usageHourOf(Date.parse(billedHour) + 60 * 60 * 1000);
+    costPlanQueue = [{ rows: [], nextChunkIndex: 1 }];
+    costPlan = {
+      rows: [
+        // Half of a $6 hour, billed.
+        [
+          STATEMENT_ID,
+          billedHour,
+          "1800000",
+          "3600000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+        // And an hour whose bill has not landed: the LEFT JOIN's null SKU.
+        [STATEMENT_ID, owedHour, "600000", "3600000", null, null, null],
+      ],
+    };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+    const cursor = JSON.parse(result.cursor!) as { sinceMs: number };
+
+    // The premise: both hours were answered by one piece-sized call, so the
+    // share below was kept by the owed piece itself, not by a later chunk.
+    const carrying = servedRows.filter((rows) => rows.length > 0);
+    expect(carrying).toHaveLength(1);
+    expect(carrying[0]).toHaveLength(2);
+
+    // The billed hour's share survives the hold.
+    expect(hintOf(result).costUsd).toBe("3");
+    expect(result.events[0]?.cost_usd).toBe("3");
+
+    // And the hold still holds: the watermark stays at the owed piece rather
+    // than moving past the unbilled hour.
+    expect(cursor.sinceMs).toBeLessThan(Date.now() - 28 * 24 * 60 * 60 * 1000);
+    expect(cursor.sinceMs).toBeGreaterThan(
+      Date.now() - 30 * 24 * 60 * 60 * 1000,
     );
   });
 });

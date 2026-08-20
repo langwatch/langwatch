@@ -377,7 +377,7 @@ Feature: Databricks AI/BI Genie puller
       # The priced line wins. Holding an already-priced statement would stall
       # the watermark on every hour where two SKUs bill at different speeds.
 
-    @unit
+    @unit @integration
     Scenario: A statement is held when an hour it ran through has no bill yet
       Given a query that ran through two hours
       And only the first of those hours has been billed
@@ -392,11 +392,11 @@ Feature: Databricks AI/BI Genie puller
       # hour.
 
     @unit @integration
-    Scenario: A statement that runs across a chunk boundary keeps both halves
-      Given a query still running when one read chunk ends
-      And the next chunk prices the hours it ran into
+    Scenario: A query that outlives one billing read is charged in full
+      Given a Genie question whose query was still running when one billing read ended
+      And a later read priced the hours it ran into
       When the puller allocates warehouse cost
-      Then the query is charged for both chunks together
+      Then the recorded cost covers the query's whole runtime
       # The window is read oldest-first in chunks that tile it, and each chunk
       # answers only for the hours it owns, so a straddler comes back once per
       # chunk with a different part of itself. The sweep emits its question

@@ -655,10 +655,13 @@ export function costReadFloorMs({
  * hour is ever read twice inside one sweep. Adding therefore cannot double a
  * cost that was already counted.
  */
-export function mergeWarehouseCost(
-  into: Map<string, WarehousePricedStatement>,
-  from: Map<string, WarehousePricedStatement>,
-): void {
+export function mergeWarehouseCost({
+  into,
+  from,
+}: {
+  into: Map<string, WarehousePricedStatement>;
+  from: Map<string, WarehousePricedStatement>;
+}): void {
   for (const [statementId, priced] of from) {
     const already = into.get(statementId);
     if (already === undefined) {

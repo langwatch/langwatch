@@ -594,7 +594,7 @@ describe("splitting the window into readable pieces", () => {
 });
 
 describe("mergeWarehouseCost", () => {
-  /** @scenario "A statement that runs across a chunk boundary keeps both halves" */
+  /** @scenario "A query that outlives one billing read is charged in full" */
   it("adds a straddler's two chunks together instead of replacing one with the other", () => {
     // The window is read oldest-first in chunks, and a statement that begins
     // near the end of one burns compute in the next. Each chunk prices the
@@ -604,9 +604,9 @@ describe("mergeWarehouseCost", () => {
     // if it were the whole cost.
     const total = new Map<string, WarehousePricedStatement>();
 
-    mergeWarehouseCost(
-      total,
-      new Map([
+    mergeWarehouseCost({
+      into: total,
+      from: new Map([
         [
           "straddler",
           {
@@ -616,10 +616,10 @@ describe("mergeWarehouseCost", () => {
           },
         ],
       ]),
-    );
-    mergeWarehouseCost(
-      total,
-      new Map([
+    });
+    mergeWarehouseCost({
+      into: total,
+      from: new Map([
         [
           "straddler",
           {
@@ -629,7 +629,7 @@ describe("mergeWarehouseCost", () => {
           },
         ],
       ]),
-    );
+    });
 
     // Exact strings, both halves. The ingredients are sums over the hours the
     // statement ran through, so they add across chunks for the same reason the
@@ -641,7 +641,7 @@ describe("mergeWarehouseCost", () => {
     });
   });
 
-  /** @scenario "A statement that runs across a chunk boundary keeps both halves" */
+  /** @scenario "A query that outlives one billing read is charged in full" */
   it("leaves a statement only one chunk answered for exactly as it arrived", () => {
     const total = new Map<string, WarehousePricedStatement>();
     const priced: WarehousePricedStatement = {
@@ -650,7 +650,7 @@ describe("mergeWarehouseCost", () => {
       hourBillableUsd: "12",
     };
 
-    mergeWarehouseCost(total, new Map([["question", priced]]));
+    mergeWarehouseCost({ into: total, from: new Map([["question", priced]]) });
 
     expect(total.get("question")).toEqual(priced);
   });

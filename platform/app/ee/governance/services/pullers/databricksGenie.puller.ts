@@ -2758,7 +2758,10 @@ export class DatabricksGeniePuller
       // arrives here twice with a different part of itself. `mergeWarehouseCost`
       // adds rather than replaces for exactly that reason — see the ownership
       // note on the hour clip in `WAREHOUSE_COST_STATEMENT`.
-      mergeWarehouseCost(costByStatementId, read.costByStatementId);
+      mergeWarehouseCost({
+        into: costByStatementId,
+        from: read.costByStatementId,
+      });
       // Priced, but not wholly: a statement here was seen and has no bill yet.
       // Hold the watermark at the chunk's start so the whole chunk is re-read
       // once billing lands, rather than moving past the unbilled statement and
@@ -2915,15 +2918,22 @@ export class DatabricksGeniePuller
       if (pieceRead.outcome !== "priced") {
         return piece;
       }
-      // Priced, but a statement in this piece has no bill yet. Hold at the
-      // piece, exactly as a refusal to it would: the pieces before it kept
-      // their cost and are never re-asked, and this one is re-read once its
-      // billing settles. Merging the piece first would be overwritten by that
-      // re-read, so it is left for the re-read to price whole.
+      // Merged BEFORE the owed check, the same order the full-chunk path
+      // uses: a piece can be owed for one hour and priced for others, and the
+      // priced shares belong to this run's records rather than to nothing. The
+      // hold below re-reads the piece once billing settles, and that re-read
+      // replaces the ledger rows with the same figure — so keeping the cost
+      // now costs nothing later.
+      mergeWarehouseCost({
+        into: costByStatementId,
+        from: pieceRead.costByStatementId,
+      });
+      // A statement in this piece has no bill yet. Hold at the piece, exactly
+      // as a refusal to it would: the pieces before it kept their cost and are
+      // never re-asked, and this one is re-read once its billing settles.
       if (pieceRead.owed) {
         return piece;
       }
-      mergeWarehouseCost(costByStatementId, pieceRead.costByStatementId);
     }
     return null;
   }
