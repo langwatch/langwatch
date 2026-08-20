@@ -3,8 +3,11 @@ import type { Cluster } from "ioredis";
 import { register } from "prom-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  gqGroupStagingDepthMax,
+  gqGroupsOverStagingDepth,
   gqOldestBacklogAgeMilliseconds,
   gqOldestPendingAgeMilliseconds,
+  STAGING_DEPTH_REPORT_THRESHOLD,
 } from "../metrics";
 import { GroupQueueMetricsCollector } from "../metricsCollector";
 import { MIN_PLAUSIBLE_EPOCH_MS } from "../readyScore";
@@ -74,6 +77,12 @@ function makeRedis(
   opts: {
     readyZset?: ReadyEntry[];
     headJobScores?: Record<string, string[]>;
+    /** groupId -> HLEN of its `:data` hash. Absent means the key is gone (0). */
+    stagingDepths?: Record<string, number>;
+    /** groupIds whose pipelined HLEN comes back as an error reply. */
+    stagingDepthErrors?: string[];
+    /** Members per ZSCAN page, so a rotation can be driven deterministically. */
+    zscanPageSize?: number;
   } = {},
 ) {
   return {
@@ -88,24 +97,59 @@ function makeRedis(
         rest: args.slice(3),
       }),
     ),
+    /**
+     * Paged ZSCAN over the ready zset. Cursors are opaque in real Redis; an
+     * index models the one guarantee the sweep relies on, that a member
+     * present for a whole rotation is returned at least once, and lets a test
+     * choose where the page boundary falls. The integration test alongside
+     * this file runs the same sweep against real Redis so the model is not
+     * the only evidence.
+     */
+    zscan: vi.fn(async (...args: unknown[]) => {
+      const entries = opts.readyZset ?? [];
+      const cursor = Number(args[1]);
+      const countIdx = args.indexOf("COUNT");
+      const pageSize =
+        opts.zscanPageSize ?? (countIdx >= 0 ? Number(args[countIdx + 1]) : 10);
+      const page = entries.slice(cursor, cursor + pageSize);
+      const nextCursor =
+        cursor + pageSize >= entries.length ? "0" : String(cursor + pageSize);
+      return [nextCursor, page.flatMap((e) => [e.member, String(e.score)])];
+    }),
     pipeline: vi.fn(() => {
-      const cmds: string[] = [];
+      const cmds: Array<{ op: "zrange" | "hlen"; key: string }> = [];
       const chain = {
         zrange: (key: string) => {
-          cmds.push(key);
+          cmds.push({ op: "zrange", key });
+          return chain;
+        },
+        hlen: (key: string) => {
+          cmds.push({ op: "hlen", key });
           return chain;
         },
         exec: async () =>
-          cmds.map((key) => [null, opts.headJobScores?.[key] ?? []]),
+          cmds.map(({ op, key }) => {
+            if (op === "zrange") {
+              return [null, opts.headJobScores?.[key] ?? []];
+            }
+            const groupId = key
+              .slice(`${PREFIX}group:`.length)
+              .replace(/:data$/, "");
+            if (opts.stagingDepthErrors?.includes(groupId)) {
+              return [new Error("READONLY"), undefined];
+            }
+            return [null, opts.stagingDepths?.[groupId] ?? 0];
+          }),
       };
       return chain;
     }),
   } as unknown as (IORedis | Cluster) & {
     zrangebyscore: ReturnType<typeof vi.fn>;
+    zscan: ReturnType<typeof vi.fn>;
   };
 }
 
-function runCollect(redis: IORedis | Cluster) {
+function makeCollector(redis: IORedis | Cluster) {
   const collector = new GroupQueueMetricsCollector({
     scripts: { getKeyPrefix: () => PREFIX } as unknown as GroupStagingScripts,
     processingQueue: { length: () => 0 } as never,
@@ -120,8 +164,13 @@ function runCollect(redis: IORedis | Cluster) {
       info: vi.fn(),
     } as never,
   });
-  // collect() is private; drive one cycle directly.
-  return (collector as unknown as { collect: () => Promise<void> }).collect();
+  // collect() is private; drive cycles directly.
+  return collector as unknown as { collect: () => Promise<void> };
+}
+
+/** One cycle on a fresh collector, which is what most cases here want. */
+function runCollect(redis: IORedis | Cluster) {
+  return makeCollector(redis).collect();
 }
 
 async function readGauge(): Promise<number | undefined> {
@@ -384,6 +433,142 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
         await runCollect(redis);
 
         expect(await readBacklogGauge()).toBe(86_400_000);
+      });
+    });
+  });
+});
+
+/**
+ * The aggregate gauges above are blind to one group holding an enormous
+ * staging hash: the group count is unremarkable and the head job's age says
+ * nothing about how many jobs sit behind it. These cover the sweep that closes
+ * that gap, and in particular that it is a rotation and not a sample, because
+ * a sample of the head of ready is exactly where the outlier is not.
+ */
+describe("GroupQueueMetricsCollector, per-group staging depth", () => {
+  beforeEach(() => {
+    register.resetMetrics();
+    vi.useFakeTimers({ now: Date.now() });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const readMax = async () =>
+    (await gqGroupStagingDepthMax.get()).values.find(
+      (v) => v.labels.queue_name === QUEUE,
+    )?.value;
+
+  const readOverThreshold = async () =>
+    (await gqGroupsOverStagingDepth.get()).values.find(
+      (v) => v.labels.queue_name === QUEUE,
+    )?.value;
+
+  const ready = (...members: string[]): ReadyEntry[] =>
+    members.map((member, i) => ({ member, score: Date.now() + i }));
+
+  describe("given groups of differing depth", () => {
+    describe("when a cycle reads them", () => {
+      it("reports the deepest group, not the total or the average", async () => {
+        const redis = makeRedis({
+          readyZset: ready("shallow", "deep", "middling"),
+          stagingDepths: { shallow: 5, deep: 900, middling: 12 },
+        });
+
+        await runCollect(redis);
+
+        expect(await readMax()).toBe(900);
+      });
+
+      it("counts how many are over the reporting threshold", async () => {
+        const redis = makeRedis({
+          readyZset: ready("a", "b", "c"),
+          stagingDepths: {
+            a: STAGING_DEPTH_REPORT_THRESHOLD,
+            b: STAGING_DEPTH_REPORT_THRESHOLD - 1,
+            c: STAGING_DEPTH_REPORT_THRESHOLD * 3,
+          },
+        });
+
+        await runCollect(redis);
+
+        // One hot key and a stalled drainer both raise the max; only this
+        // separates them.
+        expect(await readOverThreshold()).toBe(2);
+      });
+    });
+  });
+
+  describe("given the deep group is past the first page", () => {
+    describe("when the rotation continues across cycles", () => {
+      it("reports it, which a fixed sample of the head never would", async () => {
+        const redis = makeRedis({
+          readyZset: ready("g1", "g2", "g3", "deep"),
+          stagingDepths: { g1: 1, g2: 2, g3: 3, deep: 250_000 },
+          zscanPageSize: 2,
+        });
+        const collector = makeCollector(redis);
+
+        await collector.collect();
+        expect(await readMax()).toBe(2);
+
+        await collector.collect();
+        expect(await readMax()).toBe(250_000);
+      });
+    });
+  });
+
+  describe("given a group that was deep and has drained", () => {
+    describe("when the next rotation reads it", () => {
+      it("stops reporting the old depth instead of pinning the high-water mark", async () => {
+        const depths: Record<string, number> = { quiet: 3, deep: 250_000 };
+        const redis = makeRedis({
+          readyZset: ready("quiet", "deep"),
+          stagingDepths: depths,
+        });
+        const collector = makeCollector(redis);
+
+        // One cycle covers both groups, so this cycle completes a rotation.
+        await collector.collect();
+        expect(await readMax()).toBe(250_000);
+
+        depths.deep = 0;
+        await collector.collect();
+
+        expect(await readMax()).toBe(3);
+      });
+    });
+  });
+
+  describe("given a group that disappeared mid-sweep", () => {
+    describe("when its depth read fails or finds nothing", () => {
+      it("reports no depth for it, because neither reply is evidence of one", async () => {
+        const redis = makeRedis({
+          readyZset: ready("gone", "errored", "real"),
+          // "gone" drained between the scan and the read: HLEN on a missing
+          // key is 0, which the stub returns for any group with no entry.
+          stagingDepths: { real: 7 },
+          stagingDepthErrors: ["errored"],
+        });
+
+        await runCollect(redis);
+
+        expect(await readMax()).toBe(7);
+        expect(await readOverThreshold()).toBe(0);
+      });
+    });
+  });
+
+  describe("given an empty ready set", () => {
+    describe("when a cycle runs", () => {
+      it("reports zero rather than leaving the last value standing", async () => {
+        const redis = makeRedis({ readyZset: [] });
+
+        await runCollect(redis);
+
+        expect(await readMax()).toBe(0);
+        expect(await readOverThreshold()).toBe(0);
       });
     });
   });

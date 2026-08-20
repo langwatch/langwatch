@@ -7,10 +7,13 @@ import {
   gqBlockedGroups,
   gqFastqActive,
   gqFastqPending,
+  gqGroupStagingDepthMax,
+  gqGroupsOverStagingDepth,
   gqOldestBacklogAgeMilliseconds,
   gqOldestPendingAgeMilliseconds,
   gqParkedGroups,
   gqPendingGroups,
+  STAGING_DEPTH_REPORT_THRESHOLD,
 } from "./metrics";
 import { isPlausibleReadyScore, MIN_PLAUSIBLE_EPOCH_MS } from "./readyScore";
 import type { DispatchResult, GroupStagingScripts } from "./scripts";
@@ -28,10 +31,27 @@ import type { DispatchResult, GroupStagingScripts } from "./scripts";
 const OLDEST_BACKLOG_SAMPLE_GROUPS = 50;
 
 /**
+ * Groups whose staging depth one collect cycle reads.
+ *
+ * A cap, not a sample. The cursor below survives across cycles, so successive
+ * cycles read the next page instead of the same head, and every group is
+ * reached within one rotation whatever the group count. Paged at the same
+ * width the ops repository already pages the ready set at.
+ */
+const STAGING_DEPTH_GROUPS_PER_CYCLE = 1000;
+
+/**
  * Periodically collects metrics from the group queue processing and staging layers.
  */
 export class GroupQueueMetricsCollector {
   private interval: ReturnType<typeof setInterval> | null = null;
+
+  /** ZSCAN cursor for the staging-depth rotation; "0" starts a new rotation. */
+  private stagingCursor = "0";
+  /** Deepest group seen so far in the rotation in progress. */
+  private stagingDepthMax = 0;
+  /** Groups over the threshold seen so far in the rotation in progress. */
+  private stagingOverThreshold = 0;
 
   constructor(
     private readonly params: {
@@ -110,6 +130,7 @@ export class GroupQueueMetricsCollector {
       );
 
       await this.collectOldestAges({ readyKey, keyPrefix });
+      await this.sweepStagingDepth({ readyKey, keyPrefix });
     } catch (error) {
       this.params.logger.debug(
         {
@@ -254,6 +275,111 @@ export class GroupQueueMetricsCollector {
     }
     const headResults = (await headPipeline.exec()) ?? [];
     return minDueMs(seed, headResults, nowMs);
+  }
+
+  /**
+   * Reads one page of groups' staging depth, continuing where the last cycle
+   * stopped.
+   *
+   * A rotation rather than a sample, because a sample cannot find this. The
+   * failure being watched for is ONE group out of many holding an enormous
+   * staging hash, and the previous version of the age gauge above records what
+   * happens when you look for a per-group outlier in the first N members of
+   * ready: the N most dispatch-eligible groups are not where the outlier is,
+   * and the gauge under-reported for as long as that code existed. Reading a
+   * fixed page per cycle and keeping the cursor covers every group instead of
+   * the same head repeatedly, at the same cost per cycle.
+   *
+   * What that costs is timeliness, and it is worth being exact about it. The
+   * gauges report the deepest group seen since the current rotation began, so
+   * a group that starts accumulating right after the cursor passes it is not
+   * reported until the next rotation reaches it: `ceil(groups / 1000)` cycles,
+   * one rotation, in the worst case. Against an accumulation that took hours
+   * to become an incident, and a capacity alarm that only fired at 50% of the
+   * cluster, a rotation's lag is not what makes this late.
+   *
+   * The running values reset when the cursor wraps, so a group that drained
+   * stops being reported within one rotation rather than pinning the gauge at
+   * its high-water mark for ever.
+   *
+   * ZSCAN's guarantee is the one this relies on: every member present for the
+   * whole rotation is returned at least once. Members added or removed part
+   * way through may or may not be, which is why a fresh accumulation is
+   * bounded by a rotation and not by a cycle.
+   */
+  private async sweepStagingDepth({
+    readyKey,
+    keyPrefix,
+  }: {
+    readyKey: string;
+    keyPrefix: string;
+  }): Promise<void> {
+    const [nextCursor, flat] = await this.params.redisConnection.zscan(
+      readyKey,
+      this.stagingCursor,
+      "COUNT",
+      STAGING_DEPTH_GROUPS_PER_CYCLE,
+    );
+
+    // ZSCAN returns a flat [member, score, member, score, ...] reply.
+    const groupIds = flat.filter((_, index) => index % 2 === 0);
+
+    for (const depth of await this.readStagingDepths({ groupIds, keyPrefix })) {
+      if (depth > this.stagingDepthMax) {
+        this.stagingDepthMax = depth;
+      }
+      if (depth >= STAGING_DEPTH_REPORT_THRESHOLD) {
+        this.stagingOverThreshold += 1;
+      }
+    }
+
+    gqGroupStagingDepthMax.set(
+      { queue_name: this.params.queueName },
+      this.stagingDepthMax,
+    );
+    gqGroupsOverStagingDepth.set(
+      { queue_name: this.params.queueName },
+      this.stagingOverThreshold,
+    );
+
+    this.stagingCursor = nextCursor;
+    if (nextCursor === "0") {
+      this.stagingDepthMax = 0;
+      this.stagingOverThreshold = 0;
+    }
+  }
+
+  /**
+   * Reads one page of groups' staging-hash sizes.
+   *
+   * A group that drained between the scan and the read is gone, not deep:
+   * HLEN on a missing key is 0. An errored reply carries no value at all, so
+   * it reads as NaN. Neither is evidence of accumulation, and both are dropped
+   * by the same filter, because ioredis signals an error by omitting the
+   * value rather than alongside one, so the two shapes are not separable here.
+   *
+   * That filter is not observable through the gauges on its own: every
+   * comparison the caller makes is false for NaN already, so a NaN depth is
+   * inert whether it is dropped or not. It is here for the reader.
+   */
+  private async readStagingDepths({
+    groupIds,
+    keyPrefix,
+  }: {
+    groupIds: string[];
+    keyPrefix: string;
+  }): Promise<number[]> {
+    if (groupIds.length === 0) return [];
+
+    const pipeline = this.params.redisConnection.pipeline();
+    for (const groupId of groupIds) {
+      pipeline.hlen(`${keyPrefix}group:${groupId}:data`);
+    }
+    const results = (await pipeline.exec()) ?? [];
+
+    return results
+      .map(([, value]) => Number(value))
+      .filter((depth) => Number.isFinite(depth));
   }
 }
 
