@@ -1,4 +1,4 @@
-import { getSharedClickHouseClient } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import type { LwqlKeyMapRow } from "./productionProvisioning";
 
 /**
@@ -12,6 +12,11 @@ import type { LwqlKeyMapRow } from "./productionProvisioning";
  * in `src/tasks/provisionLwql.ts` does NOT come through here — it runs before
  * the app (and its shared client) exists, on a per-run admin client of its
  * own, which the boundary test names as a construction site.
+ *
+ * Resolved per tenant rather than from the shared client: a project whose
+ * organization has a private ClickHouse instance keeps its LangWatchQL views
+ * and its key map on that instance, so a row written to the shared one would
+ * leave that project's access unreachable while looking like it succeeded.
  */
 export async function insertLwqlKeyMapRow({
   table,
@@ -21,7 +26,7 @@ export async function insertLwqlKeyMapRow({
   table: string;
   row: LwqlKeyMapRow;
 }): Promise<void> {
-  const client = getSharedClickHouseClient();
+  const client = await getClickHouseClientForTenant(row.TenantId);
   if (!client) {
     throw new Error(
       "ClickHouse is not configured (CLICKHOUSE_URL) — cannot write the LangWatchQL key-map row",
