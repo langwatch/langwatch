@@ -83,10 +83,23 @@ function makeRedis(
     stagingDepthErrors?: string[];
     /** Members per ZSCAN page, so a rotation can be driven deterministically. */
     zscanPageSize?: number;
+    /**
+     * Held by the FIRST `zcard` only, which is the first read `collect` makes.
+     * Later calls resolve at once, so a test can hold one cycle open and see
+     * whether a second gets past the in-flight guard.
+     */
+    gateFirstCall?: Promise<void>;
   } = {},
 ) {
+  let gateUsed = false;
   return {
-    zcard: vi.fn(async () => 0),
+    zcard: vi.fn(async () => {
+      if (opts.gateFirstCall && !gateUsed) {
+        gateUsed = true;
+        await opts.gateFirstCall;
+      }
+      return 0;
+    }),
     scard: vi.fn(async () => 0),
     smembers: vi.fn(async () => [] as string[]),
     zrangebyscore: vi.fn(async (...args: unknown[]) =>
@@ -149,7 +162,20 @@ function makeRedis(
   };
 }
 
-function makeCollector(redis: IORedis | Cluster) {
+/** A logger stub whose calls a test can read. */
+function makeLogger() {
+  return {
+    debug: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+  };
+}
+
+function makeCollector(
+  redis: IORedis | Cluster,
+  logger: ReturnType<typeof makeLogger> = makeLogger(),
+) {
   const collector = new GroupQueueMetricsCollector({
     scripts: { getKeyPrefix: () => PREFIX } as unknown as GroupStagingScripts,
     processingQueue: { length: () => 0 } as never,
@@ -157,12 +183,7 @@ function makeCollector(redis: IORedis | Cluster) {
     queueName: QUEUE,
     activeJobCountFn: () => 0,
     metricsIntervalMs: 60_000,
-    logger: {
-      debug: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      info: vi.fn(),
-    } as never,
+    logger: logger as never,
   });
   // collect() is private; drive cycles directly.
   return collector as unknown as { collect: () => Promise<void> };
@@ -556,6 +577,85 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
 
         expect(await readMax()).toBe(7);
         expect(await readOverThreshold()).toBe(0);
+      });
+    });
+  });
+
+  describe("given a cycle that is still running when the next tick fires", () => {
+    describe("when the second cycle starts", () => {
+      it("skips it, rather than two cycles sharing one rotation", async () => {
+        let release: () => void = () => undefined;
+        const gate = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        const redis = makeRedis({
+          readyZset: ready("g1", "g2"),
+          stagingDepths: { g1: 1, g2: 2 },
+          gateFirstCall: gate,
+        });
+        const collector = makeCollector(redis);
+
+        const inFlight = collector.collect();
+        await collector.collect();
+
+        // The first cycle is held before it reaches the sweep. If the second
+        // got past the guard it would reach the sweep on its own, read the
+        // same cursor, and advance it a second time.
+        expect(redis.zscan).not.toHaveBeenCalled();
+
+        release();
+        await inFlight;
+
+        expect(redis.zscan).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe("given a group ZSCAN returns on two pages", () => {
+    describe("when the rotation counts groups over the threshold", () => {
+      it("counts it once, because the scan promises at least once", async () => {
+        const deep = STAGING_DEPTH_REPORT_THRESHOLD * 2;
+        const redis = makeRedis({
+          // "seen-twice" spans a page boundary, which is what a rehash part
+          // way through a rotation looks like from here.
+          readyZset: ready("seen-twice", "other", "seen-twice", "another"),
+          stagingDepths: {
+            "seen-twice": deep,
+            other: 1,
+            another: 2,
+          },
+          zscanPageSize: 2,
+        });
+        const collector = makeCollector(redis);
+
+        await collector.collect();
+        await collector.collect();
+
+        expect(await readOverThreshold()).toBe(1);
+        expect(await readMax()).toBe(deep);
+      });
+    });
+  });
+
+  describe("given every depth reply in a page fails", () => {
+    describe("when the sweep publishes", () => {
+      it("says how many it dropped, so a healthy zero is not fabricated", async () => {
+        const logger = makeLogger();
+        const redis = makeRedis({
+          readyZset: ready("a", "b"),
+          stagingDepthErrors: ["a", "b"],
+        });
+
+        await makeCollector(redis, logger).collect();
+
+        // Both gauges read 0 here, which is indistinguishable from a quiet
+        // queue. The log line is the only thing that says the sweep saw
+        // nothing rather than nothing being there.
+        expect(await readMax()).toBe(0);
+        expect(logger.debug).toHaveBeenCalledWith(
+          expect.objectContaining({ dropped: 2, ofGroups: 2 }),
+          expect.stringContaining("dropped replies"),
+        );
       });
     });
   });

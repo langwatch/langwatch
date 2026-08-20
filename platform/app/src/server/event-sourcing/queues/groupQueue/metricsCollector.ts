@@ -46,12 +46,35 @@ const STAGING_DEPTH_GROUPS_PER_CYCLE = 1000;
 export class GroupQueueMetricsCollector {
   private interval: ReturnType<typeof setInterval> | null = null;
 
+  /**
+   * Whether a cycle is still running.
+   *
+   * The timer does not await `collect`, which was harmless while a cycle
+   * carried no state between calls. The rotation below does: two overlapping
+   * cycles would read the same cursor, both advance it, and skip the page
+   * between them. A cycle that pipelines a page of HLENs is also the cycle
+   * most likely to outlast the interval. Skipping a tick loses nothing a
+   * rotation does not pick up on the next one.
+   */
+  private isCollecting = false;
+
   /** ZSCAN cursor for the staging-depth rotation; "0" starts a new rotation. */
   private stagingCursor = "0";
   /** Deepest group seen so far in the rotation in progress. */
   private stagingDepthMax = 0;
-  /** Groups over the threshold seen so far in the rotation in progress. */
-  private stagingOverThreshold = 0;
+  /**
+   * Groups over the threshold in the rotation in progress, by id.
+   *
+   * Ids rather than a counter because ZSCAN promises each member at least
+   * once, not exactly once: a group present across a rehash can be returned on
+   * two pages, and counting sightings would report one hot group as several.
+   * The max is immune to that, a count is not, and telling one deep group from
+   * a stalled drainer is the whole reason the count exists.
+   *
+   * Only over-threshold ids are held, so this is empty in the steady state and
+   * never larger than the number it reports.
+   */
+  private stagingOverThreshold = new Set<string>();
 
   constructor(
     private readonly params: {
@@ -80,6 +103,8 @@ export class GroupQueueMetricsCollector {
   }
 
   private async collect(): Promise<void> {
+    if (this.isCollecting) return;
+    this.isCollecting = true;
     try {
       gqFastqPending.set(
         { queue_name: this.params.queueName },
@@ -139,6 +164,8 @@ export class GroupQueueMetricsCollector {
         },
         "Failed to collect group queue metrics",
       );
+    } finally {
+      this.isCollecting = false;
     }
   }
 
@@ -324,12 +351,15 @@ export class GroupQueueMetricsCollector {
     // ZSCAN returns a flat [member, score, member, score, ...] reply.
     const groupIds = flat.filter((_, index) => index % 2 === 0);
 
-    for (const depth of await this.readStagingDepths({ groupIds, keyPrefix })) {
+    for (const { groupId, depth } of await this.readStagingDepths({
+      groupIds,
+      keyPrefix,
+    })) {
       if (depth > this.stagingDepthMax) {
         this.stagingDepthMax = depth;
       }
       if (depth >= STAGING_DEPTH_REPORT_THRESHOLD) {
-        this.stagingOverThreshold += 1;
+        this.stagingOverThreshold.add(groupId);
       }
     }
 
@@ -339,13 +369,13 @@ export class GroupQueueMetricsCollector {
     );
     gqGroupsOverStagingDepth.set(
       { queue_name: this.params.queueName },
-      this.stagingOverThreshold,
+      this.stagingOverThreshold.size,
     );
 
     this.stagingCursor = nextCursor;
     if (nextCursor === "0") {
       this.stagingDepthMax = 0;
-      this.stagingOverThreshold = 0;
+      this.stagingOverThreshold.clear();
     }
   }
 
@@ -368,7 +398,7 @@ export class GroupQueueMetricsCollector {
   }: {
     groupIds: string[];
     keyPrefix: string;
-  }): Promise<number[]> {
+  }): Promise<Array<{ groupId: string; depth: number }>> {
     if (groupIds.length === 0) return [];
 
     const pipeline = this.params.redisConnection.pipeline();
@@ -377,9 +407,29 @@ export class GroupQueueMetricsCollector {
     }
     const results = (await pipeline.exec()) ?? [];
 
-    return results
-      .map(([, value]) => Number(value))
-      .filter((depth) => Number.isFinite(depth));
+    const depths = results
+      .map((result, index) => ({
+        groupId: groupIds[index] ?? "",
+        depth: Number(result?.[1]),
+      }))
+      .filter(({ depth }) => Number.isFinite(depth));
+
+    // Say so when replies were dropped. Silence here reads as a healthy zero:
+    // if every reply in a page failed, both gauges would publish 0 and look
+    // exactly like a queue with nothing accumulating in it.
+    const dropped = groupIds.length - depths.length;
+    if (dropped > 0) {
+      this.params.logger.debug(
+        {
+          queueName: this.params.queueName,
+          dropped,
+          ofGroups: groupIds.length,
+        },
+        "Staging-depth sweep dropped replies that carried no depth",
+      );
+    }
+
+    return depths;
   }
 }
 
