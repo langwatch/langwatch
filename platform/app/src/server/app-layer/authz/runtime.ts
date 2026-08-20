@@ -34,6 +34,13 @@ import { demoProjectId } from "./shadow";
  * is per-organization: a cut-over organization collects from the grants
  * ledger's own projection, everyone else from the compat heads, decided per
  * call by the cutover gate.
+ *
+ * This instance lives for the whole process, and the routed repository pins
+ * its head decision per instance — which is only safe because EVERY gated
+ * read the collector performs goes through `beginPass()`, a fresh instance
+ * per snapshot (binding tier and resource tier alike). A gated read taken on
+ * this instance directly would pin its organization's head until the pod
+ * restarted, and the rollback lever would stop working for it.
  */
 export const authzCollector = new AuthzCollectorService(
   new CutoverAwareAuthzReadRepository(prisma),

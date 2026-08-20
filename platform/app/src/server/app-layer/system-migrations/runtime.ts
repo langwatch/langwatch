@@ -8,9 +8,14 @@
  */
 import { adminEmailList } from "@ee/admin/isAdmin";
 import { auditLog } from "@ee/audit-log/auditLog";
-import { AuthzCollectorService } from "@langwatch/authz-server";
 import {
+  AuthzCollectorService,
+  TEAM_USER_BACKFILL_MIGRATION_NAME,
+} from "@langwatch/authz-server";
+import {
+  CUTOVER_WAITING_REPORT_KINDS,
   GRANTS_CUTOVER_MIGRATION_NAME,
+  GRANTS_GENESIS_IMPORT_MIGRATION_NAME,
   GrantsCutoverMigration,
   GrantsGenesisImportMigration,
   type GrantsLedgerEmitter,
@@ -21,6 +26,7 @@ import {
   type MigrationPassSummary,
   type SystemMigration,
   SystemMigrationRunnerService,
+  type TenantMigrationRecord,
 } from "@langwatch/system-migrations";
 import type { Cluster, Redis } from "ioredis";
 import { env } from "~/env.mjs";
@@ -37,9 +43,17 @@ import { GrantsAuthzReadRepository } from "../authz/repositories/authz-read.gran
 import { PrismaAuthzReadRepository } from "../authz/repositories/authz-read.prisma.repository";
 import { legacyOrganizationDecide } from "../authz/repositories/cutover-parity.legacy-decide";
 import { authzCollector } from "../authz/runtime";
-import { cohortIncludes } from "./cohort";
+import {
+  migrationRunsOnThisInstallation,
+  organizationMigrates,
+} from "./cohort";
+import {
+  MigrationRollbackBlockedByDependentError,
+  MigrationRollbackCutoverNotStartedError,
+} from "./errors";
 import { RedisMigrationLeaseRepository } from "./repositories/migration-lease.redis.repository";
 import { PrismaOrganizationTenantSource } from "./repositories/organization-tenant-source.prisma.repository";
+import { PrismaSystemMigrationEnrollmentRepository } from "./repositories/system-migration-enrollment.prisma.repository";
 import { PrismaSystemMigrationStateRepository } from "./repositories/system-migration-state.prisma.repository";
 import { WitnessingSystemMigrationStateRepository } from "./repositories/witnessing-migration-state.repository";
 import { SystemMigrationsService } from "./system-migrations.service";
@@ -79,18 +93,126 @@ const systemMigrationState = new WitnessingSystemMigrationStateRepository({
 });
 
 /**
+ * The cloud rollout's enrollment rows: what the ops enrollment actions write
+ * and what every pass reads fresh (see `runSystemMigrationPass` and the
+ * cutover's `cutoverCohort` below).
+ */
+const enrollmentRepository = new PrismaSystemMigrationEnrollmentRepository(
+  prisma,
+);
+
+/**
  * What the ops dashboard talks to. The route calls this and never the state
  * repository, so the read model stays inside the app layer.
  */
 export const systemMigrationsService = new SystemMigrationsService({
   state: systemMigrationState,
-  migrationNames: () =>
-    registeredMigrations().map((migration) => migration.name),
+  migrations: () =>
+    registeredMigrations().map((migration) => ({
+      name: migration.name,
+      runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
+    })),
+  isSaaS: () => env.IS_SAAS === true,
+  enrollments: enrollmentRepository,
+  audit: (entry) =>
+    auditLog({
+      userId: entry.userId,
+      organizationId: entry.organizationId,
+      action: entry.action,
+      args: entry.args,
+    }),
   runPass: () => runSystemMigrationPass(),
   rollbackEffects: {
     [GRANTS_CUTOVER_MIGRATION_NAME]: rollBackAuthzCutover,
   },
+  // The authz knowledge the generic service must not carry: which
+  // migrations the cutover stands on, and when a cutover rollback has
+  // nothing behind it to undo. Guards run before the pin is written and on
+  // retries, so a refusal holds however the operator arrived.
+  rollbackGuards: {
+    [TEAM_USER_BACKFILL_MIGRATION_NAME]: refuseWhileCutoverStandsOnIt,
+    [GRANTS_GENESIS_IMPORT_MIGRATION_NAME]: refuseWhileCutoverStandsOnIt,
+    [GRANTS_CUTOVER_MIGRATION_NAME]: refuseCutoverRollbackBeforeItStarted,
+  },
 });
+
+/**
+ * Whether a cutover record's report says the migration is merely WAITING -
+ * on unfinished prerequisites, or outside the cohort. Waiting tenants sit in
+ * `migrated` (the runner has no waiting status), but nothing was imported
+ * and nothing flipped, so there is nothing on the ledger for a rollback to
+ * concern itself with.
+ */
+function cutoverReportSaysWaiting(report: unknown): boolean {
+  if (report == null || typeof report !== "object") return false;
+  const kind = (report as Record<string, unknown>).kind;
+  return (CUTOVER_WAITING_REPORT_KINDS as readonly unknown[]).includes(kind);
+}
+
+/**
+ * The dependency guard (delivery-plan review L1): the genesis import and the
+ * team-user backfill are the floor the authz cutover stands on, so neither
+ * may be rolled back from under a cutover that is `migrated` or `finalized`.
+ *
+ * The failure mode this refuses is asymmetric access: the ledger-write gate
+ * keys on the GENESIS status, so rolling the genesis back flips this
+ * organization's grant WRITES onto the legacy path while its reads stay
+ * wherever the cutover left them. A revocation then deletes the RoleBinding
+ * row and never the Grant head - and the engine keeps honouring the head, so
+ * the revoked member keeps access until somebody notices. The operator's
+ * path is stated by the refusal: roll the cutover back first (which flips
+ * reads AND is guarded below), then the floor.
+ *
+ * A cutover that is `migrated` but merely WAITING is exempt: it has stated
+ * nothing on the ledger and flipped nothing, so nothing stands on the floor
+ * yet - and refusing would deadlock, since the waiting cutover itself
+ * refuses to roll back (see the guard below).
+ */
+async function refuseWhileCutoverStandsOnIt({
+  tenantId,
+}: {
+  tenantId: string;
+  record: TenantMigrationRecord;
+}): Promise<void> {
+  const cutover = await systemMigrationState.findRecord({
+    migrationName: GRANTS_CUTOVER_MIGRATION_NAME,
+    tenantId,
+  });
+  if (!cutover) return;
+  if (cutover.status !== "migrated" && cutover.status !== "finalized") return;
+  if (cutoverReportSaysWaiting(cutover.report)) return;
+  throw new MigrationRollbackBlockedByDependentError({
+    blockingMigration: GRANTS_CUTOVER_MIGRATION_NAME,
+    blockingStatus: cutover.status,
+  });
+}
+
+/**
+ * The never-started guard (delivery-plan review L5): a cutover record that
+ * is `migrated` only because the organization is WAITING has no flip to
+ * undo. Rolling it back would append a spurious `cutover_rolled_back` fact
+ * and - worse - pin the row terminally `rolled_back`, stranding an
+ * organization the runner would otherwise have cut over once its wait
+ * ended. The projection is consulted too, in the fail-open direction: an
+ * organization that IS on the engine is always the operator's to pull back,
+ * whatever its report says - the lever exists for incidents, and a stale
+ * report must never block it.
+ */
+async function refuseCutoverRollbackBeforeItStarted({
+  tenantId,
+  record,
+}: {
+  tenantId: string;
+  record: TenantMigrationRecord;
+}): Promise<void> {
+  if (!cutoverReportSaysWaiting(record.report)) return;
+  const projection = await prisma.authzCutoverProjection.findUnique({
+    where: { organizationId: tenantId },
+    select: { onEngine: true },
+  });
+  if (projection?.onEngine === true) return;
+  throw new MigrationRollbackCutoverNotStartedError();
+}
 
 /**
  * Rolling one organization off the engine, applied before the operator's
@@ -147,13 +269,33 @@ async function rollBackAuthzCutover({
 
   const decidedAtMs = Date.parse(decidedAt);
   try {
+    // The fact must land AFTER the completion it undoes, on the ledger's own
+    // clock. `decidedAt` is this web pod's clock; the reducer's monotonic
+    // guard compares against the completion's `occurredAtMs`, stamped by a
+    // WORKER - and with cross-pod skew a rollback stamped behind the
+    // completion is silently dropped at fold, permanently (the retry reuses
+    // the same command id, so a corrected stamp never lands). So the stamp
+    // is max(decidedAt, the projection's changedAt + 1): `changedAt` is the
+    // newest cutover fact's business time, persisted by the fold, and the
+    // enforcement write above deliberately leaves it untouched. The command
+    // id stays keyed on `decidedAt` alone, so retries of one decision still
+    // dedupe.
+    const projection = await prisma.authzCutoverProjection.findUnique({
+      where: { organizationId },
+      select: { changedAt: true },
+    });
+    const changedAtMs = projection?.changedAt?.getTime() ?? null;
+    const flooredAtMs = Number.isFinite(decidedAtMs) ? decidedAtMs : Date.now();
     await (await authzGrantsCommands()).commands.rollBackCutover.send({
       tenantId: organizationId,
       organizationId,
       commandId: `cutover:rollback:${organizationId}:${decidedAt}`,
       actor: { type: "user", id: actorUserId },
       reason: "operator rollback",
-      occurredAtMs: Number.isFinite(decidedAtMs) ? decidedAtMs : Date.now(),
+      occurredAtMs:
+        changedAtMs === null
+          ? flooredAtMs
+          : Math.max(flooredAtMs, changedAtMs + 1),
     });
   } catch (error) {
     logger.error(
@@ -310,21 +452,21 @@ export function registeredMigrations(): SystemMigration[] {
       // the legacy head — resolver-resident quirks are exactly what the two
       // row-head collectors cannot see.
       legacyDecide: legacyOrganizationDecide(prisma),
-      // A knob of its own, deliberately not SYSTEM_MIGRATIONS_COHORT: the
-      // backfill and the genesis import are dark and can go wide, while the
-      // cutover is the one migration that changes who decides, so it
-      // advances organization by organization. Left unset, self-hosted cuts
-      // over automatically once its prerequisites finalize - the in-place
-      // doctrine (an operator never learns it happened), and what makes
-      // that safe is the parity proof standing between the import and the
-      // flip. Set, it is an explicit cohort on every deployment shape, so a
-      // self-hosted operator can opt out with `none`.
-      cutoverCohort: (tenantId) =>
-        cohortIncludes({
-          isSaaS: env.IS_SAAS === true,
-          cohort: process.env.AUTHZ_CUTOVER_COHORT,
-          tenantId,
-        }),
+      // A stage of its own, deliberately not the "migrations" enrollment:
+      // the backfill and the genesis import are dark and can go wide, while
+      // the cutover is the one migration that changes who decides, so it
+      // advances organization by organization - on cloud, only when an
+      // operator enrolled the organization for "cutover", read from the
+      // database per call so a new enrollment needs no restart. Self-hosted
+      // cuts over automatically once its prerequisites finalize - the
+      // in-place doctrine (an operator never learns it happened), and what
+      // makes that safe is the parity proof standing between the import and
+      // the flip. That arm engages only once the cutover's own
+      // `runsAutomaticallyOnSelfHosted` declaration is released: until then
+      // the self-hosted runner never drives this migration at all (see
+      // `runSystemMigrationPass`), so answering true here is the released
+      // behavior, not a bypass.
+      cutoverCohort: (tenantId) => cutoverEnrollmentCohort(tenantId),
       // The live platform-admin check's own parse (`adminEmailList`), read
       // per pass rather than captured, so widening ADMIN_EMAILS needs no
       // restart and the cutover import can never see a different admitted
@@ -336,10 +478,70 @@ export function registeredMigrations(): SystemMigration[] {
 }
 
 /**
+ * Whether one organization may cut over on THIS pass of THIS installation:
+ * its "cutover" enrollment on cloud (a per-call database read, so enrolling
+ * needs no restart), automatic self-hosted - where reaching this question at
+ * all means the cutover's release declaration admitted the migration (see
+ * the cutoverCohort comment in `registeredMigrations`).
+ */
+export async function cutoverEnrollmentCohort(
+  tenantId: string,
+): Promise<boolean> {
+  if (env.IS_SAAS !== true) return true;
+  return enrollmentRepository.isEnrolled({
+    organizationId: tenantId,
+    stage: "cutover",
+  });
+}
+
+/**
+ * The runner's cohort for one pass. On cloud the "migrations" enrollment is
+ * read ONCE here, fresh at the start of every pass - one query instead of
+ * one per tenant, and an enrollment or withdrawal takes effect on the very
+ * next pass with no restart. Self-hosted includes every organization.
+ */
+export async function migrationPassCohort(): Promise<
+  (tenantId: string) => boolean
+> {
+  const isSaaS = env.IS_SAAS === true;
+  const enrolledOrganizationIds = isSaaS
+    ? await enrollmentRepository.findEnrolledOrganizationIds({
+        stage: "migrations",
+      })
+    : new Set<string>();
+  return (tenantId) =>
+    organizationMigrates({
+      isSaaS,
+      enrolled: enrolledOrganizationIds.has(tenantId),
+    });
+}
+
+/**
+ * The retired pacing knobs. Both were replaced by in-app enrollment (cloud)
+ * and the per-migration release declaration (self-hosted); neither is
+ * honored any more, and a deployment still setting one deserves to hear
+ * that loudly rather than wonder why nothing paces. Once per pass, so the
+ * warning recurs without flooding.
+ */
+function warnWhenRetiredCohortVariablesAreSet(): void {
+  for (const variable of ["SYSTEM_MIGRATIONS_COHORT", "AUTHZ_CUTOVER_COHORT"]) {
+    if (process.env[variable]?.trim()) {
+      logger.warn(
+        { variable },
+        "this environment variable is retired and ignored - migration pacing is per-organization enrollment on the ops migrations page now",
+      );
+    }
+  }
+}
+
+/**
  * One full pass over every cohort organization. Composed per call so the
- * lease token, the Redis handle and the cohort env read are all fresh -
- * the ops "run a pass now" action and the worker boot share this exact
- * entry point.
+ * lease token, the Redis handle and the enrollment read are all fresh - the
+ * ops "run a pass now" action and the worker boot share this exact entry
+ * point. Self-hosted runs only the migrations whose
+ * `runsAutomaticallyOnSelfHosted` declaration has been released: the others
+ * are not driven for any tenant - never attempted, parked or reported -
+ * until a later release flips the declaration.
  */
 export async function runSystemMigrationPass(args?: {
   signal?: AbortSignal;
@@ -351,18 +553,19 @@ export async function runSystemMigrationPass(args?: {
    */
   redis?: Redis | Cluster | null;
 }): Promise<MigrationPassSummary | null> {
+  warnWhenRetiredCohortVariablesAreSet();
   const redis = args?.redis ?? tryGetApp()?.redis ?? null;
   const runner = new SystemMigrationRunnerService({
     state: systemMigrationState,
     lease: new RedisMigrationLeaseRepository(redis),
     tenants: new PrismaOrganizationTenantSource(prisma),
-    cohort: (tenantId) =>
-      cohortIncludes({
+    cohort: await migrationPassCohort(),
+    migrations: registeredMigrations().filter((migration) =>
+      migrationRunsOnThisInstallation({
         isSaaS: env.IS_SAAS === true,
-        cohort: process.env.SYSTEM_MIGRATIONS_COHORT,
-        tenantId,
+        runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
       }),
-    migrations: registeredMigrations(),
+    ),
   });
   return runner.runPass({ signal: args?.signal });
 }

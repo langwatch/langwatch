@@ -1,41 +1,61 @@
 /**
  * Who migrates when (specs/rbac/in-place-authz-migration.feature).
  *
- * One knob, read from the process environment per pass (not the env schema -
- * an internal, temporary rollout knob, same posture as AUTHZ_V2_SHADOW), and
- * it is honoured on EVERY deployment shape. What differs between cloud and
- * self-hosted is only what an UNSET knob means:
+ * The environment knobs are gone. `SYSTEM_MIGRATIONS_COHORT` and
+ * `AUTHZ_CUTOVER_COHORT` used to pace the rollout as process-env strings
+ * (`none` / `all` / a CSV of organization ids); both are now ignored - the
+ * pass logs a warning when either is still set - and pacing lives in two
+ * places instead:
  *
- *   unset / ""      the deployment's default - nothing on cloud (we pace it
- *                   ourselves), everything self-hosted (the whole point of
- *                   in-place migration is that a self-hosted operator never
- *                   learns it happened)
- *   "none"          nothing migrates. This is the self-hosted OPT-OUT: an
- *                   operator who wants to stay on the legacy path has a way
- *                   to say so, which is what an unconditional `true` denied
- *                   them.
- *   "all"           everything migrates
- *   "org1,org2"     exactly these organizations
+ * CLOUD is paced per organization, at runtime, by ENROLLMENT: rows an
+ * operator writes from the ops migrations page (`SystemMigrationEnrollment`,
+ * one row per organization and stage). An organization that nobody enrolled
+ * is simply not processed - no state is recorded for it, so "not enrolled
+ * yet" and "not started" are the same pending state, which is what lets the
+ * rollout widen later. The two stages pace independently: "migrations"
+ * enrolls the preparation work (backfill + genesis import), "cutover"
+ * enrolls the flip onto the engine.
  *
- * Setting the knob therefore means the same thing everywhere: an explicit
- * cohort, taken literally. Leaving it unset changes nothing about how either
- * deployment behaved before.
+ * SELF-HOSTED is paced per migration, at release time, by the migration's
+ * own `runsAutomaticallyOnSelfHosted` declaration. There is no enrollment
+ * and no configuration - the in-place doctrine is that an operator never
+ * learns a migration happened - so every organization migrates automatically,
+ * but only through the migrations already released for self-hosting.
+ * A migration still soaking on cloud declares `false` and the self-hosted
+ * runner never drives it for any tenant; a later release flips the
+ * declaration, and the next pass runs it. The old `none` opt-out died with
+ * the env var - the self-hosted lever is the operator rollback, plus the
+ * release declaration itself.
  */
-export function cohortIncludes({
+
+/**
+ * Whether one organization is in this pass's cohort. On cloud that is its
+ * enrollment for the pass's stage, read fresh at the start of every pass;
+ * self-hosted includes everything (which migrations run there is
+ * `migrationRunsOnThisInstallation`'s question, not this one's).
+ */
+export function organizationMigrates({
   isSaaS,
-  cohort,
-  tenantId,
+  enrolled,
 }: {
   isSaaS: boolean;
-  cohort: string | undefined;
-  tenantId: string;
+  enrolled: boolean;
 }): boolean {
-  const trimmed = cohort?.trim() ?? "";
-  if (trimmed === "") return !isSaaS;
-  if (trimmed === "none") return false;
-  if (trimmed === "all") return true;
-  return trimmed
-    .split(",")
-    .map((id) => id.trim())
-    .includes(tenantId);
+  return isSaaS ? enrolled : true;
+}
+
+/**
+ * Whether this installation's runner drives a migration at all. Cloud runs
+ * every registered migration (for its enrolled organizations - the
+ * declaration is self-hosted pacing and changes nothing on cloud);
+ * self-hosted runs only the migrations already released for self-hosting.
+ */
+export function migrationRunsOnThisInstallation({
+  isSaaS,
+  runsAutomaticallyOnSelfHosted,
+}: {
+  isSaaS: boolean;
+  runsAutomaticallyOnSelfHosted: boolean;
+}): boolean {
+  return isSaaS || runsAutomaticallyOnSelfHosted;
 }

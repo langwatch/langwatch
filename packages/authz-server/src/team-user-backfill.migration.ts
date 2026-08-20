@@ -176,6 +176,9 @@ const DEFAULT_POLL = { intervalMs: 500, timeoutMs: 120_000 };
 
 export class TeamUserBackfillMigration implements SystemMigration {
   readonly name = TEAM_USER_BACKFILL_MIGRATION_NAME;
+  // Shipped and soaked: self-hosted installations have run this backfill
+  // automatically since it landed, and it changes nothing about who decides.
+  readonly runsAutomaticallyOnSelfHosted = true;
   private readonly engine = new AuthzEngine();
 
   constructor(private readonly deps: TeamUserBackfillDeps) {}

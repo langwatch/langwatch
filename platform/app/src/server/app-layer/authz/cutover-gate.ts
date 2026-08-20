@@ -85,8 +85,11 @@ export async function cutoverOnEngine({
 /**
  * Drop ONE organization's cached answer, so the very next check re-reads the
  * projection. The rollback effect calls this straight after flipping
- * `onEngine` off, which is what closes the window where the pod that served
- * the operator's own rollback keeps answering "on engine" from its own cache.
+ * `onEngine` off, and the gate also marks any read still in flight stale, so
+ * a read that started before the flip cannot re-cache "on engine" when it
+ * settles. What remains is only the unavoidable sliver: callers already
+ * coalesced onto that in-flight read get its pre-flip answer once - it is
+ * never cached, and the next check re-reads the projection.
  *
  * Deliberately POD-LOCAL: this is a module map, so it invalidates the process
  * that calls it and nothing else. Every other pod converges on the TTL above,

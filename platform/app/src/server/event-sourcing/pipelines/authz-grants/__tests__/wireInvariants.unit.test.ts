@@ -134,6 +134,46 @@ describe("the grants ledger's wire boundary", () => {
     });
   });
 
+  describe("when resource terms cannot say what they open", () => {
+    function resourceGrant(resource: Record<string, unknown>) {
+      return parse(
+        {},
+        {
+          principal: { type: "anyone", id: null },
+          roleKey: null,
+          scope: { type: "RESOURCE", id: "trace_t1" },
+          resource,
+        },
+      );
+    }
+
+    it("refuses terms that name no kind", () => {
+      const { kind: _kind, ...withoutKind } = SHARE_TERMS;
+      expect(resourceGrant(withoutKind).success).toBe(false);
+    });
+
+    it("refuses a kind outside the stored vocabulary", () => {
+      expect(resourceGrant({ ...SHARE_TERMS, kind: "dataset" }).success).toBe(
+        false,
+      );
+    });
+
+    it("refuses terms that name no project", () => {
+      const { projectId: _projectId, ...withoutProject } = SHARE_TERMS;
+      expect(resourceGrant(withoutProject).success).toBe(false);
+    });
+
+    it("refuses an empty token, project or permission", () => {
+      for (const empty of [
+        { token: "" },
+        { projectId: "" },
+        { permission: "" },
+      ]) {
+        expect(resourceGrant({ ...SHARE_TERMS, ...empty }).success).toBe(false);
+      }
+    });
+  });
+
   describe("when a resource-tier principal appears at a wider scope", () => {
     it("refuses a standing public grant over a whole organization", () => {
       // `anyone` names no subject, so this grant is held by nobody and can be

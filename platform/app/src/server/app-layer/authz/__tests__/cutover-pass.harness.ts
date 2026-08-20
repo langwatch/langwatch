@@ -102,27 +102,50 @@ export function inlineGrantsLedger(prisma: PrismaClient): InlineLedger {
   const appended: AppendedCommand[] = [];
 
   /**
-   * One command: handled by the real handler, then folded into the real
-   * store under the aggregate the command addressed. `data` is kept
-   * verbatim so a suite can assert what was SAID, the way the instant-revoke
-   * suite asserts its appends.
+   * One command: validated against the same wire schema the production
+   * transport enforces (`commandDispatcher` runs `schema.validate` before
+   * any handler sees a payload), handled by the real handler, then folded
+   * into the real store under the aggregate the command addressed. The
+   * validation is what keeps the header's "real wire schemas" claim honest:
+   * a payload the queue would refuse fails here too, instead of slipping
+   * straight into `handle`. `data` is kept verbatim so a suite can assert
+   * what was SAID, the way the instant-revoke suite asserts its appends.
    */
   const send = async <Data extends { commandId: string }>({
     handler,
+    schema,
     type,
     aggregateId,
     data,
   }: {
     handler: { handle: (command: never) => Promise<Event[]> };
+    schema: {
+      validate: (
+        payload: unknown,
+      ) =>
+        | { success: true; data: unknown }
+        | { success: false; error: { message: string } };
+    };
     type: string;
     aggregateId: string;
     data: Data;
   }): Promise<void> => {
+    const payload = {
+      ...data,
+      tenantId: aggregateId,
+      organizationId: aggregateId,
+    };
+    const validation = schema.validate(payload);
+    if (!validation.success) {
+      throw new Error(
+        `wire-invalid payload for command type "${type}": ${validation.error.message}`,
+      );
+    }
     const events = await handler.handle({
       tenantId: createTenantId(aggregateId),
       aggregateId,
       type,
-      data: { ...data, tenantId: aggregateId, organizationId: aggregateId },
+      data: payload,
     } as never);
     appended.push({
       type,
@@ -160,6 +183,7 @@ export function inlineGrantsLedger(prisma: PrismaClient): InlineLedger {
       attachGrants: ({ organizationId, commandId, grants }) =>
         send({
           handler: new AttachGrantsCommand(),
+          schema: AttachGrantsCommand.schema,
           type: ATTACH_GRANTS_COMMAND_TYPE,
           aggregateId: organizationId,
           data: { commandId, grants },
@@ -167,6 +191,7 @@ export function inlineGrantsLedger(prisma: PrismaClient): InlineLedger {
       defineRoles: ({ organizationId, commandId, roles, actor }) =>
         send({
           handler: new DefineRolesCommand(),
+          schema: DefineRolesCommand.schema,
           type: DEFINE_ROLES_COMMAND_TYPE,
           aggregateId: organizationId,
           data: { commandId, roles, actor },
@@ -180,6 +205,7 @@ export function inlineGrantsLedger(prisma: PrismaClient): InlineLedger {
       }) =>
         send({
           handler: new RevokeGrantsCommand(),
+          schema: RevokeGrantsCommand.schema,
           type: REVOKE_GRANTS_COMMAND_TYPE,
           aggregateId: organizationId,
           data: { commandId, revocations, actor, occurredAtMs },
@@ -193,6 +219,7 @@ export function inlineGrantsLedger(prisma: PrismaClient): InlineLedger {
       }) =>
         send({
           handler: new DeleteRoleCommand(),
+          schema: DeleteRoleCommand.schema,
           type: DELETE_ROLE_COMMAND_TYPE,
           aggregateId: organizationId,
           data: { commandId, roleId, actor, occurredAtMs },
@@ -205,6 +232,7 @@ export function inlineGrantsLedger(prisma: PrismaClient): InlineLedger {
       }) =>
         send({
           handler: new ProveMigrationParityCommand(),
+          schema: ProveMigrationParityCommand.schema,
           type: PROVE_MIGRATION_PARITY_COMMAND_TYPE,
           aggregateId: organizationId,
           data: { commandId, diffs, occurredAtMs },
@@ -212,6 +240,7 @@ export function inlineGrantsLedger(prisma: PrismaClient): InlineLedger {
       completeCutover: ({ organizationId, commandId, actor, occurredAtMs }) =>
         send({
           handler: new CompleteCutoverCommand(),
+          schema: CompleteCutoverCommand.schema,
           type: COMPLETE_CUTOVER_COMMAND_TYPE,
           aggregateId: organizationId,
           data: { commandId, actor, occurredAtMs },
@@ -225,6 +254,7 @@ export function inlineGrantsLedger(prisma: PrismaClient): InlineLedger {
     }) =>
       send({
         handler: new RollBackCutoverCommand(),
+        schema: RollBackCutoverCommand.schema,
         type: ROLL_BACK_CUTOVER_COMMAND_TYPE,
         aggregateId: organizationId,
         data: {
@@ -240,8 +270,9 @@ export function inlineGrantsLedger(prisma: PrismaClient): InlineLedger {
 /**
  * The three registered migrations, composed exactly as
  * `system-migrations/runtime.ts` composes them, with two deps injected rather
- * than read from the environment: the cutover cohort (a `process.env` read in
- * production, `AUTHZ_CUTOVER_COHORT`) and the platform-admin email list.
+ * than composed from the App: the cutover cohort (a per-organization
+ * enrollment read in production - the ops page's `SystemMigrationEnrollment`
+ * rows) and the platform-admin email list.
  *
  * The epoch bump is a no-op here. It is Redis work stage B already proves, and
  * this pass is about which facts land and who decides afterwards.

@@ -107,6 +107,44 @@ describe("grants ledger reducer, migration lifecycle", () => {
       });
     });
 
+    describe("when the rollback's clock ran behind the completion's", () => {
+      /**
+       * The cross-pod skew timeline. The completion's business time comes
+       * from a WORKER's clock; the operator's rollback is decided on a WEB
+       * pod whose clock may trail it. The monotonic guard is strict-older-
+       * loses, so the writer's contract (runtime.ts, `rollBackAuthzCutover`)
+       * is to stamp the fact `max(decidedAt, completion changedAt + 1)` -
+       * never behind, never tying. Both halves are pinned here: a tie still
+       * applies (the guard drops only STRICTLY older facts, so replay
+       * converges), and the +1 keeps the rollback the newest cutover fact so
+       * nothing later mistakes the completion for current.
+       */
+      /** @scenario "A rollback fact lands however the pods' clocks disagree" */
+      it("applies a rollback stamped just past the completion, skew or not", () => {
+        const state = apply([
+          { kind: "migration_parity_proved", diffs: [], occurredAtMs: 5 },
+          // The worker's clock, five minutes ahead of the web pod that will
+          // decide the rollback.
+          { kind: "cutover_completed", actor: ACTOR, occurredAtMs: 300_006 },
+          // decidedAt was 6 on the web pod; the writer stamps 300_007.
+          { kind: "cutover_rolled_back", actor: ACTOR, occurredAtMs: 300_007 },
+        ]);
+
+        expect(state.cutover.onEngine).toBe(false);
+        expect(state.cutover.changedAtMs).toBe(300_007);
+      });
+
+      it("still applies a rollback that TIES the completion - only strictly older facts drop", () => {
+        const state = apply([
+          { kind: "migration_parity_proved", diffs: [], occurredAtMs: 5 },
+          { kind: "cutover_completed", actor: ACTOR, occurredAtMs: 6 },
+          { kind: "cutover_rolled_back", actor: ACTOR, occurredAtMs: 6 },
+        ]);
+
+        expect(state.cutover.onEngine).toBe(false);
+      });
+    });
+
     describe("when a rolled-back organization completes again", () => {
       /** The re-cutover path: an operator rolls back, the cause is fixed, and
        *  the organization cuts over a second time. The proof it already has

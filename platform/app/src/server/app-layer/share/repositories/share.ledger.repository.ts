@@ -25,8 +25,15 @@ import {
   shareVisibilityAudience,
 } from "@langwatch/authz-server";
 import { nanoid } from "nanoid";
-import type { PrismaClient, ShareLink } from "~/generated/prisma/client";
-import { cutoverOnEngine } from "../../authz/cutover-gate";
+import type {
+  Prisma,
+  PrismaClient,
+  ShareLink,
+} from "~/generated/prisma/client";
+import {
+  cutoverOnEngine,
+  queryCutoverOnEngine,
+} from "../../authz/cutover-gate";
 import type { GrantsLedgerWriter } from "../../authz/ledger";
 import type {
   CreateShareLinkParams,
@@ -159,6 +166,19 @@ export class LedgerShareRepository implements ShareRepository {
    * Revoke one link. Revocation enforcement deletes the `Grant` row and the
    * compat `ShareLink` row together (decision 7), so the token stops
    * resolving before this returns.
+   *
+   * The revoke is keyed by the link's OWN id, never by a Grant-table read:
+   * compat rows share their id with the grant id by construction (the fold
+   * authors compat rows with id = grantId; the cutover import adopts
+   * ShareLink ids as grant ids), and the fold writes compat-before-head —
+   * the Grant row is the commit marker. A ledger-minted link whose fold is
+   * parked between the two writes therefore has a compat row and no Grant
+   * row yet; discovering grant ids from the Grant table would find nothing,
+   * and a legacy-only delete taken on that answer removes the row with no
+   * fact appended — for the fold's re-run to put the "revoked" token back,
+   * permanently. Keying on the id itself means the `grant_revoked` fact is
+   * appended either way, and it sits after the mint in stream order, so the
+   * fold can never redo the mint without also folding the revoke.
    */
   async deleteById({
     id,
@@ -167,26 +187,56 @@ export class LedgerShareRepository implements ShareRepository {
     id: string;
     projectId: string;
   }): Promise<void> {
-    const organizationId = await this.ledgerOrganizationFor(projectId);
+    const organizationId = await this.revocationOrganizationFor(projectId);
     if (!organizationId) return this.legacy.deleteById({ id, projectId });
 
+    if (!(await this.linkNamedAt({ organizationId, projectId, id }))) {
+      // Neither head anchors this id to the caller's project: the legacy
+      // delete would be the same no-op, and an unanchored id must not
+      // become an organization-wide revocation fact — the (id, projectId)
+      // pair is the tenancy fence every other query here carries.
+      return;
+    }
+    await this.writer().revokeResourceGrants({
+      organizationId,
+      grantIds: [id],
+      actor: SYSTEM_ACTOR,
+    });
+    // Enforcement locates the compat head THROUGH the Grant row, so when
+    // that head has not landed it cannot delete the row the token resolves
+    // by. Revocation is instant-enforcement class (decision 7): the compat
+    // row goes here, before the call returns, queue running or not. For a
+    // link minted during a rollback window this is also the delete that
+    // removes it (its revoke fact folds as a no-op).
+    await this.legacy.deleteById({ id, projectId });
+  }
+
+  /**
+   * Whether either head — the compat row or the grant row — names this id
+   * in this project: the fence a single-link revoke crosses before it
+   * appends. The compat row is checked first because it is the head the
+   * fold writes first, so it is the one a parked fold has already landed.
+   */
+  private async linkNamedAt({
+    organizationId,
+    projectId,
+    id,
+  }: {
+    organizationId: string;
+    projectId: string;
+    id: string;
+  }): Promise<boolean> {
+    const row = await this.prisma.shareLink.findFirst({
+      where: { id, projectId },
+      select: { id: true },
+    });
+    if (row) return true;
     const grantIds = await this.resourceGrantIds({
       organizationId,
       projectId,
       id,
     });
-    if (grantIds.length === 0) {
-      // The cutover import adopted every share link the organization had, so
-      // a live link with no grant behind it can only be one minted while the
-      // organization was rolled back onto legacy. It is a plain row; delete
-      // it the plain way.
-      return this.legacy.deleteById({ id, projectId });
-    }
-    await this.writer().revokeResourceGrants({
-      organizationId,
-      grantIds,
-      actor: SYSTEM_ACTOR,
-    });
+    return grantIds.length > 0;
   }
 
   async deleteByResource({
@@ -198,7 +248,7 @@ export class LedgerShareRepository implements ShareRepository {
     resourceType: ShareResourceType;
     resourceId: string;
   }): Promise<void> {
-    const organizationId = await this.ledgerOrganizationFor(projectId);
+    const organizationId = await this.revocationOrganizationFor(projectId);
     if (!organizationId) {
       return this.legacy.deleteByResource({
         projectId,
@@ -217,7 +267,7 @@ export class LedgerShareRepository implements ShareRepository {
   }
 
   async deleteAllTraceShares(projectId: string): Promise<void> {
-    const organizationId = await this.ledgerOrganizationFor(projectId);
+    const organizationId = await this.revocationOrganizationFor(projectId);
     if (!organizationId) return this.legacy.deleteAllTraceShares(projectId);
 
     await this.revokeThenSweep({
@@ -258,21 +308,12 @@ export class LedgerShareRepository implements ShareRepository {
       return this.legacy.consumeView({ id, projectId, maxViews });
     }
 
-    const consumed = await this.consumeUsage({
+    return this.consumeUsage({
       grantId: id,
       organizationId,
       projectId,
       maxViews,
     });
-    if (consumed) {
-      // The mirror IS the legacy repository's own conditional consume, run
-      // for its write rather than its answer: same statement, same cap
-      // condition, one place where the shape lives. `ShareLink.viewCount`
-      // stays ShareService-owned accounting on the compat row — the fold
-      // writes every other column of it and never this one (decision 22).
-      await this.legacy.consumeView({ id, projectId, maxViews });
-    }
-    return consumed;
   }
 
   /**
@@ -281,6 +322,16 @@ export class LedgerShareRepository implements ShareRepository {
    * and a concurrent first view — so the create is attempted and the unique
    * violation is what tells them apart, with one retry of the condition for
    * the racer that lost.
+   *
+   * Each consuming branch runs inside ONE transaction together with the
+   * compat mirror, so the authoritative count and the mirrored one commit
+   * or fail as a unit — as two separate writes, a crash between them left
+   * the compat column one view behind, which after a rollback onto legacy
+   * is a free extra view. The guarded create's EXPECTED unique violation
+   * aborts a Postgres transaction, so the single conditioned retry cannot
+   * run inside the transaction it just aborted: it opens its own. The
+   * branch semantics are exactly the three above; only the commit
+   * boundaries moved.
    */
   private async consumeUsage({
     grantId,
@@ -294,8 +345,10 @@ export class LedgerShareRepository implements ShareRepository {
     maxViews: number | null;
   }): Promise<boolean> {
     const capped = maxViews != null;
-    const increment = async (): Promise<boolean> => {
-      const result = await this.prisma.grantUsage.updateMany({
+    const increment = async (
+      db: Prisma.TransactionClient,
+    ): Promise<boolean> => {
+      const result = await db.grantUsage.updateMany({
         where: {
           grantId,
           organizationId,
@@ -311,29 +364,56 @@ export class LedgerShareRepository implements ShareRepository {
       });
       return result.count > 0;
     };
-
-    if (await increment()) return true;
-    // A cap of zero (or less) admits nobody, so the first view must not be
-    // able to sneak in through the create below.
-    if (capped && maxViews <= 0) return false;
+    // The mirror is the legacy repository's own conditional consume — same
+    // statement, same cap condition — issued on THIS transaction's client,
+    // because the port cannot lend its statement a foreign transaction and
+    // the mirror must commit with the usage write or not at all.
+    // `ShareLink.viewCount` stays ShareService-owned accounting on the
+    // compat row — the fold writes every other column of it and never this
+    // one (decision 22).
+    const mirror = async (db: Prisma.TransactionClient): Promise<void> => {
+      await db.shareLink.updateMany({
+        where: {
+          id: grantId,
+          projectId,
+          ...(capped ? { viewCount: { lt: maxViews } } : {}),
+        },
+        data: { viewCount: { increment: 1 } },
+      });
+    };
 
     try {
-      await this.prisma.grantUsage.create({
-        data: {
-          grantId,
-          organizationId,
-          projectId,
-          viewCount: 1,
-          lastViewedAt: new Date(),
-        },
+      return await this.prisma.$transaction(async (tx) => {
+        if (await increment(tx)) {
+          await mirror(tx);
+          return true;
+        }
+        // A cap of zero (or less) admits nobody, so the first view must not
+        // be able to sneak in through the create below.
+        if (capped && maxViews <= 0) return false;
+        await tx.grantUsage.create({
+          data: {
+            grantId,
+            organizationId,
+            projectId,
+            viewCount: 1,
+            lastViewedAt: new Date(),
+          },
+        });
+        await mirror(tx);
+        return true;
       });
-      return true;
     } catch (error) {
       if (!isUniqueConstraintViolation(error)) throw error;
       // Another viewer created the row between the update and the create.
       // The row exists now, so the cap is the only thing left that can
-      // refuse: re-run the condition exactly once.
-      return increment();
+      // refuse: re-run the condition exactly once, in a fresh transaction —
+      // the violation aborted the one above before anything committed.
+      return this.prisma.$transaction(async (tx) => {
+        if (!(await increment(tx))) return false;
+        await mirror(tx);
+        return true;
+      });
     }
   }
 
@@ -359,16 +439,36 @@ export class LedgerShareRepository implements ShareRepository {
     resourceId?: string;
     sweep: () => Promise<void>;
   }): Promise<void> {
-    const grantIds = await this.resourceGrantIds({
-      organizationId,
-      projectId,
-      resourceKind,
-      ...(resourceId !== undefined ? { resourceId } : {}),
-    });
-    if (grantIds.length > 0) {
+    // Ids come from BOTH heads. The fold writes compat-before-head, so a
+    // ledger-minted link whose Grant row has not landed is visible only
+    // through its compat row — skipping it would let the sweep delete the
+    // row with no fact behind it, for the fold's re-run to resurrect. A
+    // compat-only id that truly has no fact (a rollback-window mint) folds
+    // its revoke as a no-op, which is the harmless direction. The one mint
+    // neither head can show — appended, with the fold parked before even
+    // the compat write — is also one whose id no caller ever received (the
+    // mint's read-back throws first), so nothing resolvable escapes it.
+    const [compatRows, grantIds] = await Promise.all([
+      this.prisma.shareLink.findMany({
+        where: {
+          projectId,
+          resourceType: resourceKind,
+          ...(resourceId !== undefined ? { resourceId } : {}),
+        },
+        select: { id: true },
+      }),
+      this.resourceGrantIds({
+        organizationId,
+        projectId,
+        resourceKind,
+        ...(resourceId !== undefined ? { resourceId } : {}),
+      }),
+    ]);
+    const ids = [...new Set([...compatRows.map((row) => row.id), ...grantIds])];
+    if (ids.length > 0) {
       await this.writer().revokeResourceGrants({
         organizationId,
-        grantIds,
+        grantIds: ids,
         actor: SYSTEM_ACTOR,
       });
     }
@@ -426,5 +526,45 @@ export class LedgerShareRepository implements ShareRepository {
       organizationId,
     });
     return onEngine ? organizationId : null;
+  }
+
+  /**
+   * The organization a REVOCATION is about, or null when the delete belongs
+   * to legacy. Deliberately NOT `ledgerOrganizationFor`: revocation is
+   * instant-enforcement class (decision 7) and must never come undone, so
+   * its routing cannot ride `cutoverOnEngine` — a 60-second-TTL cache that
+   * also answers false (and caches it) when the projection read throws. Any
+   * false window routes a cut-over organization's revoke to the legacy-only
+   * branch: the compat row is deleted with no fact appended, the Grant head
+   * keeps the grant, and the fold's next run re-projects the "revoked"
+   * link. Mints and reads keep the cached gate — a stale answer there costs
+   * a legacy-authored row the next genesis pass adopts, never access that
+   * was explicitly taken away.
+   *
+   * So: one UNCACHED projection read per revocation, and a FAILED read
+   * fails toward the ledger branch — the path that deletes both heads and
+   * appends the fact. That direction is harmless when the organization
+   * turns out to be on legacy (the sweep still deletes the plain rows, and
+   * a fact no mint stands behind folds as a no-op) and is the only correct
+   * one when it is not.
+   */
+  private async revocationOrganizationFor(
+    projectId: string,
+  ): Promise<string | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { team: { select: { organizationId: true } } },
+    });
+    const organizationId = project?.team?.organizationId;
+    if (!organizationId) return null;
+    try {
+      const onEngine = await queryCutoverOnEngine({
+        prisma: this.prisma,
+        organizationId,
+      });
+      return onEngine ? organizationId : null;
+    } catch {
+      return organizationId;
+    }
   }
 }

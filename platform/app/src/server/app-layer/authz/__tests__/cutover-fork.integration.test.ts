@@ -108,9 +108,9 @@ describe("given an organization whose cutover pass runs to a clean proof", () =>
     const migrations = cutoverMigrations({
       prisma,
       ledger: ledger.emitter,
-      // Injected rather than AUTHZ_CUTOVER_COHORT: the knob is a process.env
-      // read in production, and this suite is about what the pass does once
-      // the organization is in the cohort.
+      // Injected rather than read from enrollment rows: in production the
+      // cutover cohort is a per-organization enrollment read, and this suite
+      // is about what the pass does once the organization is in the cohort.
       cutoverCohort: (tenantId) => tenantId === organization.id,
     });
     // Exiting this loop unfinished would leave the assertions below failing

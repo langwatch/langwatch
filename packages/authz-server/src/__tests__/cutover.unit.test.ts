@@ -15,6 +15,7 @@ import type {
 import {
   type CutoverResourceDiff,
   GrantsCutoverMigration,
+  parityCommandId,
   PLATFORM_AUTHZ_TENANT_ID,
 } from "../cutover.migration";
 import { GRANTS_GENESIS_IMPORT_MIGRATION_NAME } from "../genesis-import.name";
@@ -62,8 +63,10 @@ class FakeCutoverRepository implements AuthzCutoverRepository {
   onEngine = false;
   /** Flip on to have the projection never report the flip. */
   cutoverNeverLands = false;
-  /** The usage rows the seed created, keyed by grant id - create-if-absent,
-   *  exactly as the Prisma implementation's `skipDuplicates` behaves. */
+  /** The usage rows the seed wrote, keyed by grant id - created when
+   *  absent, RAISED when the seeded count is higher, never lowered,
+   *  exactly as the Prisma implementation behaves (the port's monotonic
+   *  contract). */
   usageRows = new Map<string, number>();
   seedCalls: ResourceGrantUsageSeed[][] = [];
 
@@ -114,7 +117,8 @@ class FakeCutoverRepository implements AuthzCutoverRepository {
   }): Promise<void> {
     this.seedCalls.push([...seeds]);
     for (const seed of seeds) {
-      if (this.usageRows.has(seed.grantId)) continue;
+      const stored = this.usageRows.get(seed.grantId);
+      if (stored !== undefined && stored >= seed.viewCount) continue;
       this.usageRows.set(seed.grantId, seed.viewCount);
     }
   }
@@ -536,16 +540,59 @@ describe("GrantsCutoverMigration", () => {
       it("names every chunk deterministically so a retry appends the same events", async () => {
         await migration().migrateTenant({ tenantId: ORG });
 
+        // Every family carries a content hash: the source tables are live,
+        // and an id keyed on the chunk index alone deduped a SHIFTED chunk
+        // against the previous pass's event - the changed fact never landed
+        // and convergence waited on it forever.
         expect(
           ledger.calls
             .filter((call) => call.verb === "attachGrants")
             .map((call) => call.commandId),
         ).toEqual([
-          `cutover:share-links:${ORG}:0`,
-          `cutover:lite-members:${ORG}:0`,
-          `cutover:project-keys:${ORG}:0`,
+          expect.stringMatching(
+            new RegExp(`^cutover:share-links:${ORG}:[^:]+:0$`),
+          ),
+          expect.stringMatching(
+            new RegExp(`^cutover:lite-members:${ORG}:[^:]+:0$`),
+          ),
+          expect.stringMatching(
+            new RegExp(`^cutover:project-keys:${ORG}:[^:]+:0$`),
+          ),
           expect.stringMatching(/^cutover:platform:[^:]+:0$/),
         ]);
+      });
+
+      /** @scenario "A shifted chunk never reuses a previous pass's idempotency key" */
+      it("names a changed member set differently, so a held organization's new fact still lands", async () => {
+        await migration().migrateTenant({ tenantId: ORG });
+        const before = ledger.calls
+          .filter((call) => call.verb === "attachGrants")
+          .map((call) => call.commandId);
+        ledger.calls = [];
+        // A member joins while the organization is held: the lite-member
+        // chunk's contents shift, and its command must not dedupe against
+        // the old event.
+        repository.externalMembers = [
+          ...repository.externalMembers,
+          { userId: "user_new", createdAtMs: MEMBER_CREATED_AT_MS + 1 },
+        ];
+
+        await migration().migrateTenant({ tenantId: ORG });
+
+        const after = ledger.calls
+          .filter((call) => call.verb === "attachGrants")
+          .map((call) => call.commandId);
+        const liteBefore = before.find((id) =>
+          id.startsWith(`cutover:lite-members:${ORG}:`),
+        );
+        const liteAfter = after.find((id) =>
+          id.startsWith(`cutover:lite-members:${ORG}:`),
+        );
+        expect(liteAfter).not.toBe(liteBefore);
+        // The unchanged families still dedupe against their own events.
+        expect(
+          after.find((id) => id.startsWith(`cutover:share-links:${ORG}:`)),
+        ).toBe(before.find((id) => id.startsWith(`cutover:share-links:${ORG}:`)));
       });
 
       it("emits identical ids and commands on a second pass", async () => {
@@ -749,6 +796,33 @@ describe("GrantsCutoverMigration", () => {
 
     beforeEach(() => {
       repository.memberIds = ["user_sam"];
+    });
+
+    describe("when a retry visits the principals in a different order", () => {
+      it("names the same verdict with the same command id and the same fact", async () => {
+        const proofs = () =>
+          ledger.calls.filter(
+            (call) => call.verb === "proveMigrationParity",
+          ) as Array<{ commandId: string; diffs: string[] }>;
+        repository.memberIds = ["user_sam", "user_kim"];
+        await disagreeing().migrateTenant({ tenantId: ORG });
+        const first = proofs()[0]!;
+        ledger.calls = [];
+        // The proof's identity must be a function of WHAT was found, never
+        // of the order the sweep happened to visit principals in - Postgres
+        // guarantees no row order, and a retry that named the same verdict
+        // differently would append a second fact for one claim.
+        repository.memberIds = ["user_kim", "user_sam"];
+
+        await disagreeing().migrateTenant({ tenantId: ORG });
+
+        const second = proofs()[0]!;
+        expect(second.commandId).toBe(first.commandId);
+        expect(second.diffs).toEqual(first.diffs);
+        // The fact's evidence is the sorted list, so the two payloads are
+        // byte-identical however the sweep iterated.
+        expect(second.diffs).toEqual([...second.diffs].sort());
+      });
     });
 
     describe("when the parity proof sweeps", () => {
@@ -1021,6 +1095,27 @@ describe("GrantsCutoverMigration", () => {
 
         expect(repository.usageRows.get("share_1")).toBe(3);
       });
+
+      /** @scenario "A view spent while an organization is held is handed over on the next pass" */
+      it("hands over a view spent on the legacy path between two passes", async () => {
+        await migration().migrateTenant({ tenantId: ORG });
+        expect(repository.usageRows.get("share_1")).toBe(2);
+        // The legacy path is still the org's live path while it is not cut
+        // over, so a view lands on ShareLink.viewCount after the seed. A
+        // create-only seed left the usage row at 2 forever, the exact-match
+        // proof reported viewCount drift on every later pass, and the
+        // organization wedged with no operator action that could fix it.
+        repository.shareLinkRows = [
+          shareLinkRow({ id: "share_1", maxViews: 3, viewCount: 3 }),
+        ];
+
+        const outcome = await migration().migrateTenant({ tenantId: ORG });
+
+        // The re-run raised the budget to the legacy count and the proof
+        // came back clean - handed over, never refunded.
+        expect(repository.usageRows.get("share_1")).toBe(3);
+        expect(outcome.status).toBe("finalized");
+      });
     });
 
     describe("when the import reproduced the link with a fresh budget", () => {
@@ -1154,3 +1249,30 @@ function foldParityProofs(
     emptyGrantsLedgerState({ organizationId: ORG }),
   );
 }
+
+describe("parityCommandId", () => {
+  const line = (index: number) =>
+    `user:user_${String(index).padStart(4, "0")} traces:view organization:${ORG} legacy=true engine=false`;
+
+  describe("when two verdicts share their first 200 lines and differ beyond", () => {
+    it("names them differently - the id hashes the FULL set, not the truncation", async () => {
+      // MAX_PROVEN_DIFFS is 200: the appended fact keeps only that prefix as
+      // evidence, so the prefix alone cannot be the claim's identity.
+      const shared = Array.from({ length: 200 }, (_, index) => line(index));
+      const verdictA = [...shared, line(900)];
+      const verdictB = [...shared, line(901)];
+
+      expect(
+        parityCommandId({ organizationId: ORG, diffs: verdictA }),
+      ).not.toBe(parityCommandId({ organizationId: ORG, diffs: verdictB }));
+    });
+
+    it("also separates a verdict from its own truncation - the count travels with the digest", async () => {
+      const shared = Array.from({ length: 200 }, (_, index) => line(index));
+
+      expect(
+        parityCommandId({ organizationId: ORG, diffs: [...shared, line(900)] }),
+      ).not.toBe(parityCommandId({ organizationId: ORG, diffs: shared }));
+    });
+  });
+});

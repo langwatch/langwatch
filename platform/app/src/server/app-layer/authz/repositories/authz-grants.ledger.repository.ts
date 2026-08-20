@@ -27,6 +27,7 @@ import type {
 import {
   BindingMissingError,
   DuplicateBindingError,
+  OffboardIncompleteError,
 } from "@langwatch/authz-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
@@ -348,6 +349,31 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
           })
         : { count: 0 };
 
+      // The DIRECT postcondition, before the collector-shaped proof: no
+      // grant source keyed to this user's principal may remain on either
+      // head. The proof below re-collects through the reader the request
+      // path uses, and both heads' user reads GATE ON MEMBERSHIP - which
+      // this very transaction has just deleted - so on its own it passes
+      // vacuously whether or not the revocations actually landed. This
+      // count does not gate: surviving Grant or RoleBinding rows would
+      // resolve again the moment the user is re-invited, so they fail the
+      // offboarding here, rolling the membership deletes back while the
+      // revocation facts stand (fail-safe: the retry converges).
+      const [remainingGrantHeads, remainingCompatRows] = await Promise.all([
+        tx.grant.count({
+          where: { organizationId, principalType: "USER", principalId: userId },
+        }),
+        tx.roleBinding.count({ where: { organizationId, userId } }),
+      ]);
+      if (remainingGrantHeads > 0 || remainingCompatRows > 0) {
+        throw new OffboardIncompleteError({
+          userId,
+          organizationId,
+          remainingGrantHeads,
+          remainingCompatRows,
+        });
+      }
+
       // The proof sees the enforced binding deletes (already committed)
       // and this transaction's own membership deletes; a throw rolls the
       // memberships back while the revocations stand — fail-safe.
@@ -355,7 +381,10 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
       // It reads through the CUTOVER-AWARE repository, not the legacy one:
       // "nothing resolves any more" has to be proven against the head this
       // organization is actually served from, or a cut-over organization's
-      // offboarding would prove the wrong thing about the wrong table.
+      // offboarding would prove the wrong thing about the wrong table. The
+      // direct count above is what keeps it honest about the rows; this
+      // keeps it honest about RESOLUTION - group- and org-floor paths the
+      // row count cannot see.
       await prove(new CutoverAwareAuthzReadRepository(tx));
 
       return {

@@ -54,8 +54,8 @@ Feature: In-place authorization data migration
     Then every organization is processed with no configuration required
 
   @unit
-  Scenario: Cloud rollout processes only the configured cohort
-    Given the installation is cloud and the cohort names "acme"
+  Scenario: Cloud rollout processes only enrolled organizations
+    Given the installation is cloud and an operator enrolled "acme" for migration
     When the migration pass runs over "acme" and "globex"
     Then "acme" is processed
     And "globex" is left untouched with no state recorded
@@ -90,12 +90,109 @@ Feature: In-place authorization data migration
     And later passes leave "acme" alone instead of re-migrating it
 
   @unit
+  Scenario: A pass already in flight cannot overwrite an operator's rollback
+    Given a pass read "acme" as migrated and is still working through it
+    When an operator records "acme" as rolled back before the pass concludes
+    Then the pass's conclusion is discarded rather than written over the rollback
+    And "acme" stays rolled back on its legacy path
+    And a pass that errors on "acme" cannot park over the rollback either
+
+  @unit
   Scenario: The pass keeps its lease while one large organization migrates
     Given migrating "acme" takes longer than a single lease term
     When the pass is working through "acme"
     Then the lease is renewed for as long as the pass runs
     And a lease lost to another process stops this pass at the next
       organization
+
+  # ============================================================================
+  # Enrollment and self-hosted release pacing
+  # ============================================================================
+  # The rollout's pacing lives in the product, not the environment. Cloud is
+  # paced per organization by enrollment rows operators write on the ops
+  # migrations page - one for the preparation work ("migration"), one for the
+  # flip onto the engine ("cutover"), each read fresh on every pass.
+  # Self-hosted has no enrollment at all: every organization migrates
+  # automatically, but only through the migrations each release declares
+  # ready for self-hosting - a migration still soaking on cloud ships inert
+  # and engages when a later release declares it. The old environment
+  # variables (including the self-hosted "none" opt-out) are retired; the
+  # self-hosted levers are the release itself and the operator rollback.
+
+  @unit
+  Scenario: Enrolling an organization takes effect on the next pass
+    Given the installation is cloud and "acme" was enrolled after the last pass ended
+    When the next pass runs
+    Then "acme" is processed without any restart or deploy
+    And withdrawing "acme" stops the pass after that the same way
+
+  @unit
+  Scenario: Migration and cutover enrollment pace independently
+    Given "acme" is enrolled for migration but not for cutover
+    When a pass carries "acme" through the preparation work
+    Then the backfill and the genesis import proceed for "acme"
+    And the cutover holds "acme" as waiting instead of flipping it
+
+  @unit
+  Scenario: The retired cohort environment variables are ignored
+    Given a deployment still sets one of the old cohort environment variables
+    When a migration pass runs
+    Then the variable changes nothing about which organizations migrate
+    And the pass logs a warning pointing at enrollment on the ops page
+
+  @unit
+  Scenario: Enrolling an organization twice is refused
+    Given "acme" is already enrolled for migration
+    When an operator enrolls "acme" for migration again
+    Then the enrollment is refused with error code "migration_enrollment_already_exists"
+    And the standing enrollment is unchanged
+
+  @unit
+  Scenario: Withdrawing an organization that is not enrolled is refused
+    Given "globex" is not enrolled for the cutover
+    When an operator withdraws "globex" from the cutover
+    Then the withdrawal is refused with error code "migration_enrollment_not_found"
+
+  @unit
+  Scenario: Enrolling an organization that does not exist is refused
+    When an operator enrolls an organization id nothing matches
+    Then the enrollment is refused with error code "organization_not_found"
+    And no enrollment is written
+
+  @unit
+  Scenario: Enrollment does not apply to self-hosted installations
+    Given the installation is self-hosted
+    When an operator tries to enroll or withdraw an organization
+    Then the action is refused with error code "migration_enrollment_cloud_only"
+    And the ops page explains that released migrations run automatically instead
+
+  @unit
+  Scenario: A migration not yet released for self-hosting never runs there
+    Given the installation is self-hosted
+    And a migration is not yet released for self-hosted installations
+    When a migration pass runs
+    Then the released migrations process every organization
+    And the unreleased migration is never attempted, so no state is recorded for it
+
+  @unit
+  Scenario: A release that turns a migration on for self-hosting makes it run on the next pass
+    Given the installation is self-hosted
+    And a new release declares the migration released for self-hosted installations
+    When the next migration pass runs
+    Then the migration processes every organization automatically
+
+  @unit
+  Scenario: Cloud rollout is unaffected by the self-hosted release declaration
+    Given the installation is cloud
+    When a migration pass runs for an enrolled organization
+    Then every registered migration runs for it, whatever its self-hosted declaration says
+
+  @unit
+  Scenario: Self-hosted installations run the preparation work but not the cutover yet
+    Given a self-hosted installation on this release
+    When the workers boot and a pass runs
+    Then the team-user backfill and the genesis import run automatically
+    And the cutover waits for a later release, its organizations reading as a normal waiting state rather than needing attention
 
   # ============================================================================
   # The backfill (runbook M1)
@@ -278,6 +375,29 @@ Feature: In-place authorization data migration
     When the operator rolls it back again
     Then the enforcement flip is re-applied and the ledger records one rollback
 
+  @unit
+  Scenario: A rollback fact lands however the pods' clocks disagree
+    Given "acme" was cut over with the completion stamped by a worker whose
+      clock runs ahead of the pod serving the operator
+    When an operator rolls "acme" back
+    Then the rollback fact is stamped after the completion it undoes
+    And a replay of the stream still ends with "acme" off the engine
+
+  @unit
+  Scenario: A migration the cutover stands on cannot be rolled back from under it
+    Given "acme" was cut over and is served by the engine
+    When an operator tries to roll back its genesis import or its team backfill
+    Then the rollback is refused, naming the cutover as what stands on it
+    And nothing about "acme"'s state changes
+    And rolling the cutover back first re-opens the path
+
+  @unit
+  Scenario: Rolling back a cutover that never started is refused
+    Given "acme" is only waiting to cut over and is not served by the engine
+    When an operator tries to roll its cutover back
+    Then the rollback is refused because there is nothing to roll back
+    And "acme" is not pinned, so it still cuts over once its wait ends
+
   @integration
   Scenario: Cutover imports the legacy facts that only exist outside bindings
     Given "acme" has a member whose only admin fact is a legacy organization ADMIN row
@@ -294,6 +414,15 @@ Feature: In-place authorization data migration
     When the cutover proves the resource import
     Then "acme" is held with that grant reported as extra
     And "acme" is not cut over
+
+  @unit
+  Scenario: A view spent while an organization is held is handed over on the next pass
+    Given "acme"'s share budgets were seeded on an earlier pass
+    And a visitor spent another view on the legacy path since
+    When a later pass re-runs the cutover for "acme"
+    Then the usage row is raised to carry the newly spent view
+    And a view already handed over is never walked back
+    And the import proof comes back clean
 
   # ============================================================================
   # The genesis import (ADR-092 §13 - the grants state becomes event-derived)
@@ -470,6 +599,74 @@ Feature: In-place authorization data migration
     Then an audit row is recorded naming the actor, the organization, and the
       fact
     And it has the same shape the ledger's subscriber writes
+
+  # ============================================================================
+  # Share-link revocation survives every crash window (decisions 7 and 22)
+  # ============================================================================
+  # Revocation is the one write whose failure mode is MORE access: a revoke
+  # that deletes a compat row without recording the fact is undone by the
+  # fold's next run, and the link the customer revoked resolves again. These
+  # scenarios pin what keeps every crash window at less-or-equal access:
+  # a revoke never depends on a projection that may lag or a cached answer
+  # that may be stale or failed, and a consumed view commits together with
+  # its compat mirror or not at all.
+
+  @unit
+  Scenario: Revoking a link whose grant row has not landed still records the fact
+    Given a cut-over organization's share link minted through the ledger
+    And the fold has written the link's compat row but not its grant row
+    When the link is revoked
+    Then the revocation fact is recorded keyed by the link's own id
+    And the link stops resolving before the call returns
+    And the fold's re-run cannot bring the revoked link back
+
+  @unit
+  Scenario: A resource-wide revoke also names the links only the compat head can see
+    Given a cut-over organization with a link whose grant row has not landed
+    When every link for that resource is revoked
+    Then the revocation facts include that link's own id
+    And the remaining compat rows are swept
+
+  @unit
+  Scenario: A revocation never appends a fact for a link outside the caller's project
+    Given a revoke names an id that no head anchors to the caller's project
+    When the revoke runs
+    Then no revocation fact is recorded and no row is deleted
+
+  @unit
+  Scenario: Revocation routing never trusts a cached gate answer
+    Given an organization was cut over after this process cached it as legacy
+    When one of its share links is revoked
+    Then the routing reads the cutover projection directly
+    And the revoke is written through the ledger, not the legacy-only branch
+
+  @unit
+  Scenario: A failed cutover read routes a revocation toward deleting both heads
+    Given the cutover projection read fails
+    When a share link is revoked
+    Then the revoke is written through the ledger and the compat row is swept
+    And no failure window leaves the customer with more access than before
+
+  @unit
+  Scenario: A consumed view and its compat mirror commit together
+    Given a cut-over organization's share link with views remaining
+    When a visitor's view is consumed
+    Then the usage count and its compat mirror are written in one transaction
+    And a crash between the two writes can no longer refund a view
+
+  @unit
+  Scenario: A view that loses the first-view race retries in a fresh transaction
+    Given two visitors race to consume a link's first view
+    When the loser's guarded create collides
+    Then the loser re-runs the cap condition exactly once, in its own transaction
+    And the view budget is never overcounted
+
+  @unit
+  Scenario: The resource-tier collect never pins an organization's head beyond one read
+    Given the process-lifetime collector serves share-link reads
+    When a share-link read is collected
+    Then the read runs on a pass-scoped reader that is then dropped
+    And a rollback is honoured by the organization's next read without a restart
 
   # ============================================================================
   # The audit trail as an event subscriber (ADR-092 decision 17)

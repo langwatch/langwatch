@@ -71,7 +71,22 @@ describe("given a cut-over organization rolled back with the queue stopped", () 
   const service = () =>
     new SystemMigrationsService({
       state: new PrismaSystemMigrationStateRepository(prisma),
-      migrationNames: () => [GRANTS_CUTOVER_MIGRATION_NAME],
+      migrations: () => [
+        {
+          name: GRANTS_CUTOVER_MIGRATION_NAME,
+          runsAutomaticallyOnSelfHosted: false,
+        },
+      ],
+      // Enrollment plays no part in a rollback; inert stubs keep this suite
+      // about the enforcement ordering.
+      isSaaS: () => false,
+      enrollments: {
+        findAllByStage: async () => [],
+        findOrganizationById: async () => null,
+        create: async () => undefined,
+        delete: async () => undefined,
+      },
+      audit: async () => undefined,
       runPass: async () => null,
       rollbackEffects: {
         [GRANTS_CUTOVER_MIGRATION_NAME]: async ({ tenantId, actorUserId }) => {

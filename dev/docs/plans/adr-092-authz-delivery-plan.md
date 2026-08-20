@@ -490,15 +490,17 @@ PR 2) — reads move, one organization at a time:
    `GrantUsage` row (decision 22) incremented conditionally against the cap
    and mirrored back onto the compat row, so a rollback finds the count
    where it left it. The fold never writes accounting.
-6. **The cohort knob** `AUTHZ_CUTOVER_COHORT`, deliberately separate from
-   `SYSTEM_MIGRATIONS_COHORT`: the backfill and the import are dark and can
-   go wide, while the cutover is the one migration that changes who decides.
-   Both are plain `process.env` reads with no env-schema entry, and the trap
-   PR 2 carries forward applies to both — they must be set on the **web and
-   the worker deployments alike**. The worker runs the boot pass; the ops
-   page's "run a pass now" runs the same entry point inside web, so a
-   cohort set on one deployment gives the two processes different answers
-   about which organizations are in it.
+6. **Enrollment in the app, not the environment.** The two cohort env vars
+   (`SYSTEM_MIGRATIONS_COHORT`, `AUTHZ_CUTOVER_COHORT`) are gone; the ops
+   migrations page enrolls a cloud organization per stage — `migrations`
+   (backfill + genesis) and `cutover` pace independently — stored as
+   `SystemMigrationEnrollment` rows and read fresh every pass, so web and
+   worker can never disagree the way a per-deployment env var could. A set
+   env var is ignored with a loud warn. Self-hosted never enrolls: released
+   migrations run automatically (the in-place doctrine), and each migration
+   declares `runsAutomaticallyOnSelfHosted` in code — flipping it in a later
+   release, after the cloud soak, IS the self-hosted release act (the
+   cutover ships `false`).
 7. **Instant rollback**: the generic ops rollback gained per-migration
    `rollbackEffects`, invoked after the `rolled_back` pin is written. For
    the cutover: the `cutover_rolled_back` fact, then the projection flipped
@@ -516,9 +518,10 @@ PR 2) — reads move, one organization at a time:
    block.
 
 **Next is our own organization first, in production** — cut over, watched, and
-used end to end before `AUTHZ_CUTOVER_COHORT` names anyone else. Then the
-cohort widens organization by organization, each one behind its own parity
-proof, with the rollback lever as the only thing anyone has to remember.
+used end to end before anyone else is enrolled for cutover. Then enrollment
+widens organization by organization from the ops page, each one behind its
+own parity proof, with the rollback lever as the only thing anyone has to
+remember.
 
 ## The identity platform (the next programme) — doors left open
 

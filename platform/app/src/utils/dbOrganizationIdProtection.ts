@@ -279,6 +279,19 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
       isNonEmptyStringList(clauseField(clause, "grantId")),
   },
   Role: {},
+  // Which organizations the in-place migration runner processes on cloud
+  // (specs/rbac/in-place-authz-migration.feature, the enrollment scenarios).
+  // The runner's per-pass read and the ops listing are platform-scope by
+  // design - they list one STAGE across organizations, the same posture as
+  // the ops rollup over SystemMigrationTenantState - so a stage-string
+  // predicate is admitted for reads only. Writes stay bounded to one
+  // organization: enroll carries organizationId in its data, withdraw names
+  // the compound (organizationId, stage) key, and a stage-wide bulk write
+  // (which would withdraw every organization at once) has no admitted shape.
+  SystemMigrationEnrollment: {
+    extraBound: ({ clause, action }) =>
+      action === "findMany" && typeof clauseField(clause, "stage") === "string",
+  },
   AuthzProjectionCursor: {},
   AuthzCutoverProjection: {},
   AiToolEntry: {},

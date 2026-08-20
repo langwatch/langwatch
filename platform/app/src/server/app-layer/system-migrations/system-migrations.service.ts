@@ -5,16 +5,24 @@ import type {
   TenantMigrationStatus,
 } from "@langwatch/system-migrations";
 import {
+  MigrationEnrollmentCloudOnlyError,
+  MigrationEnrollmentOrganizationNotFoundError,
   MigrationRollbackRequiresMigratedOrFinalizedError,
   MigrationStateNotFoundError,
 } from "./errors";
 
 /**
- * The statuses a tenant may be rolled back from. Mirrors
- * `LEDGER_WRITE_STATUSES` in ../authz/ledger-write-gate.ts: both are already
- * on the ledger (writes, and possibly reads too), so both are the
- * operator's to pull back onto the legacy path. `parked` never reached the
- * ledger, and `rolled_back` already left it.
+ * The statuses a tenant may be rolled back from. The same pair as
+ * `LEDGER_WRITE_STATUSES` in ../authz/ledger-write-gate.ts, but the premise
+ * is weaker than "already on the ledger": what `migrated` MEANS is each
+ * migration's own business (the cutover parks tenants in `migrated` while
+ * they merely WAIT on prerequisites or a cohort, and those never touched
+ * the ledger at all). The status check here is therefore only the generic
+ * floor - per-migration preconditions live in `rollbackGuards`, which is
+ * where "this migrated tenant has nothing to roll back" and "another
+ * migration still depends on this one" are refused. `parked` never did any
+ * work worth undoing, and `rolled_back` is accepted only as a RETRY of a
+ * standing pin.
  */
 const ROLLBACK_ELIGIBLE_STATUSES: readonly TenantMigrationStatus[] = [
   "migrated",
@@ -29,10 +37,57 @@ const logger = createLogger("langwatch:ops:system-migrations");
 /**
  * The ops model over stored migration state. Deliberately narrower than the
  * runner's own port: the runner reads and writes one tenant at a time; the
- * dashboard reads across them, and its ONE write is the operator rollback —
- * migrated or finalized → rolled_back, the state machine's only
- * human-driven edge.
+ * dashboard reads across them, and its writes are the operator's levers -
+ * the rollback (migrated or finalized → rolled_back, the state machine's
+ * only human-driven edge) and, on cloud, the enrollment rows that pace who
+ * migrates at all.
  */
+/**
+ * The two independently paced enrollment stages of the cloud rollout:
+ * "migrations" is the preparation work (the team-user backfill and the
+ * genesis import), "cutover" is the flip onto the engine. A plain string
+ * vocabulary validated at the boundary, like the status column.
+ */
+export const MIGRATION_ENROLLMENT_STAGES = ["migrations", "cutover"] as const;
+
+export type MigrationEnrollmentStage =
+  (typeof MIGRATION_ENROLLMENT_STAGES)[number];
+
+/** One enrollment row as the ops page lists it. */
+export type MigrationEnrollmentRecord = {
+  organizationId: string;
+  /** Null when the organization has since been deleted. */
+  organizationName: string | null;
+  stage: MigrationEnrollmentStage;
+  enrolledByUserId: string;
+  /** The enroller's name or email; null when neither resolves any more. */
+  enrolledByLabel: string | null;
+  createdAt: Date;
+};
+
+/**
+ * The enrollment store the ops actions write through. Uniqueness refusals
+ * (duplicate enroll, withdraw of nothing) are the store's - the unique key
+ * is the only race-free check - and both surface as handled errors.
+ */
+export interface SystemMigrationEnrollmentStore {
+  findAllByStage(args: {
+    stage: MigrationEnrollmentStage;
+  }): Promise<MigrationEnrollmentRecord[]>;
+  findOrganizationById(args: {
+    organizationId: string;
+  }): Promise<{ id: string; name: string } | null>;
+  create(args: {
+    organizationId: string;
+    stage: MigrationEnrollmentStage;
+    enrolledByUserId: string;
+  }): Promise<void>;
+  delete(args: {
+    organizationId: string;
+    stage: MigrationEnrollmentStage;
+  }): Promise<void>;
+}
+
 export interface SystemMigrationStateReader {
   findStatusCounts(args: {
     migrationName: string;
@@ -57,6 +112,14 @@ const ATTENTION_LIMIT = 50;
 
 export type MigrationOverview = {
   name: string;
+  /**
+   * False only on self-hosted, for a migration whose
+   * `runsAutomaticallyOnSelfHosted` declaration has not been released yet:
+   * the runner never drives it here, so its empty counts are a normal
+   * waiting state rather than something needing attention. Cloud runs every
+   * registered migration, so this is always true there.
+   */
+  availableOnThisInstallation: boolean;
   counts: Record<TenantMigrationStatus, number>;
   attention: Array<TenantMigrationRecord & { updatedAt: Date }>;
 };
@@ -70,7 +133,25 @@ export class SystemMigrationsService {
   constructor(
     private readonly deps: {
       state: SystemMigrationStateReader;
-      migrationNames: () => string[];
+      /** Every registered migration's listing-facing declaration, cutover last. */
+      migrations: () => Array<{
+        name: string;
+        runsAutomaticallyOnSelfHosted: boolean;
+      }>;
+      /** Read per call, so the answer is never a boot-time capture. */
+      isSaaS: () => boolean;
+      enrollments: SystemMigrationEnrollmentStore;
+      /**
+       * The ops audit trail. Enrollment decides which organizations the
+       * platform migrates, so both actions are recorded the way the
+       * backfill's own writes are.
+       */
+      audit: (entry: {
+        userId: string;
+        organizationId: string;
+        action: string;
+        args?: Record<string, unknown>;
+      }) => Promise<void>;
       runPass: () => Promise<MigrationPassSummary | null>;
       /**
        * What else a rollback has to DO, per migration name. The generic
@@ -96,6 +177,24 @@ export class SystemMigrationsService {
           decidedAt: string;
         }) => Promise<void>
       >;
+      /**
+       * What must HOLD before a rollback may even be pinned, per migration
+       * name. The generic service knows the state machine; it does not know
+       * that one migration's state depends on another's, or that a status
+       * can be technically eligible while there is nothing behind it to
+       * undo - that is domain knowledge, and it lives in the composition
+       * (runtime.ts) exactly like `rollbackEffects` does. A guard refuses
+       * by throwing (a `HandledError` the operator can act on); it runs
+       * BEFORE the pin is written, and on retries too - a refusal must hold
+       * however the operator arrived here.
+       */
+      rollbackGuards?: Record<
+        string,
+        (args: {
+          tenantId: string;
+          record: TenantMigrationRecord;
+        }) => Promise<void>
+      >;
     },
   ) {}
 
@@ -106,12 +205,17 @@ export class SystemMigrationsService {
    * listing, and neither are rolled-back ones.
    */
   async getOverview(): Promise<MigrationOverview[]> {
+    const isSaaS = this.deps.isSaaS();
     return Promise.all(
-      this.deps.migrationNames().map(async (name) => ({
-        name,
-        counts: await this.deps.state.findStatusCounts({ migrationName: name }),
+      this.deps.migrations().map(async (migration) => ({
+        name: migration.name,
+        availableOnThisInstallation:
+          isSaaS || migration.runsAutomaticallyOnSelfHosted,
+        counts: await this.deps.state.findStatusCounts({
+          migrationName: migration.name,
+        }),
         attention: await this.deps.state.findRecordsByStatus({
-          migrationName: name,
+          migrationName: migration.name,
           statuses: ["migrated", "parked"],
           limit: ATTENTION_LIMIT,
         }),
@@ -120,9 +224,97 @@ export class SystemMigrationsService {
   }
 
   /**
+   * The enrollment listing for the ops page: both stages, newest first, with
+   * whatever names still resolve. `isSaaS` rides along so the page can say
+   * honestly that a self-hosted installation has nothing to enroll.
+   */
+  async getEnrollments(): Promise<{
+    isSaaS: boolean;
+    enrollments: MigrationEnrollmentRecord[];
+  }> {
+    const perStage = await Promise.all(
+      MIGRATION_ENROLLMENT_STAGES.map((stage) =>
+        this.deps.enrollments.findAllByStage({ stage }),
+      ),
+    );
+    return { isSaaS: this.deps.isSaaS(), enrollments: perStage.flat() };
+  }
+
+  /**
+   * Enroll one organization for one stage of the cloud rollout
+   * (specs/rbac/in-place-authz-migration.feature, the enrollment scenarios).
+   * Takes effect on the next pass - the runner reads enrollment fresh each
+   * time - and refuses rather than lies: off cloud (where a row would change
+   * nothing, see MigrationEnrollmentCloudOnlyError), for an organization
+   * that does not exist, and for one already enrolled (the store's unique
+   * key raises that refusal).
+   */
+  async enroll({
+    organizationId,
+    stage,
+    actorUserId,
+  }: {
+    organizationId: string;
+    stage: MigrationEnrollmentStage;
+    actorUserId: string;
+  }): Promise<void> {
+    if (!this.deps.isSaaS()) throw new MigrationEnrollmentCloudOnlyError();
+    const organization = await this.deps.enrollments.findOrganizationById({
+      organizationId,
+    });
+    if (!organization) {
+      throw new MigrationEnrollmentOrganizationNotFoundError();
+    }
+    await this.deps.enrollments.create({
+      organizationId,
+      stage,
+      enrolledByUserId: actorUserId,
+    });
+    logger.info(
+      { organizationId, stage, actorUserId },
+      "operator enrolled an organization for the in-place migration rollout",
+    );
+    await this.deps.audit({
+      userId: actorUserId,
+      organizationId,
+      action: "systemMigrations.enroll",
+      args: { stage },
+    });
+  }
+
+  /**
+   * Withdraw an enrollment: the row is deleted, and the next pass simply no
+   * longer processes the organization for that stage. State already recorded
+   * stays exactly as it is - withdrawal pauses the rollout, it does not roll
+   * anything back (that is the operator rollback's job).
+   */
+  async withdraw({
+    organizationId,
+    stage,
+    actorUserId,
+  }: {
+    organizationId: string;
+    stage: MigrationEnrollmentStage;
+    actorUserId: string;
+  }): Promise<void> {
+    if (!this.deps.isSaaS()) throw new MigrationEnrollmentCloudOnlyError();
+    await this.deps.enrollments.delete({ organizationId, stage });
+    logger.info(
+      { organizationId, stage, actorUserId },
+      "operator withdrew an organization from the in-place migration rollout",
+    );
+    await this.deps.audit({
+      userId: actorUserId,
+      organizationId,
+      action: "systemMigrations.withdraw",
+      args: { stage },
+    });
+  }
+
+  /**
    * Kick a pass now instead of waiting for the next worker boot - the lever
-   * for widening a cloud cohort or re-verifying held tenants after
-   * remediation. Fire-and-forget: the fleet-wide lease already guarantees a
+   * for processing a fresh enrollment right away or re-verifying held
+   * tenants after remediation. Fire-and-forget: the fleet-wide lease already guarantees a
    * single driver, so the worst case for a double click is a pass that
    * stands down immediately.
    */
@@ -194,6 +386,10 @@ export class SystemMigrationsService {
         status: record.status,
       });
     }
+    // The migration's own preconditions, before anything is written: a
+    // refusal here leaves no pin behind, so the tenant's state is exactly
+    // what it was when the operator asked.
+    await this.deps.rollbackGuards?.[migrationName]?.({ tenantId, record });
     const priorReport =
       record.report != null && typeof record.report === "object"
         ? (record.report as Record<string, unknown>)

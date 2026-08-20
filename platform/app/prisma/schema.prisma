@@ -4186,3 +4186,16 @@ model SystemMigrationTenantState {
   @@id([migrationName, tenantId])
   @@index([migrationName, status])
 }
+
+model SystemMigrationEnrollment {
+  organizationId   String
+  // "migrations" (the backfill + genesis preparation work) or "cutover" (the
+  // flip onto the engine). A plain string column validated in code, like the
+  // status column above - the vocabulary is internal and small.
+  stage            String
+  enrolledByUserId String
+  createdAt        DateTime @default(now())
+
+  @@id([organizationId, stage])
+  @@index([stage])
+}

@@ -6,13 +6,14 @@ import {
   Heading,
   HStack,
   Input,
+  NativeSelect,
   Spacer,
   Spinner,
   Stack,
   Table,
   Text,
 } from "@chakra-ui/react";
-import { Play, Undo2 } from "lucide-react";
+import { Play, Undo2, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
@@ -108,7 +109,237 @@ export function MigrationsContent() {
           canManage={canManage}
         />
       ))}
+
+      <EnrollmentSection canManage={canManage} />
     </Stack>
+  );
+}
+
+const ENROLLMENT_STAGE_LABEL: Record<string, string> = {
+  migrations: "Enrolled for migration",
+  cutover: "Enrolled for cutover",
+};
+
+type EnrollmentListing = RouterOutputs["ops"]["listMigrationEnrollments"];
+
+/**
+ * The cloud rollout's pacing lever: which organizations the runner processes
+ * ("Enrolled for migration") and which the cutover may flip ("Enrolled for
+ * cutover"). Self-hosted installations have nothing to enroll - released
+ * migrations run automatically for every organization - and the section says
+ * so instead of offering a form that would only be refused.
+ */
+function EnrollmentSection({ canManage }: { canManage: boolean }) {
+  const query = api.ops.listMigrationEnrollments.useQuery(undefined, {
+    refetchInterval: 30_000,
+  });
+
+  return (
+    <Box>
+      <HStack marginBottom={3}>
+        <Heading size="md">Enrollment</Heading>
+      </HStack>
+      <Text fontSize="sm" color="fg.muted" maxWidth="720px" marginBottom={4}>
+        Enrollment decides which organizations these migrations process.
+        Enrolling for migration lets the next pass run the preparation work for
+        an organization; enrolling for cutover lets it flip onto the new
+        authorization engine once that work has finalized. Withdrawing stops
+        later passes without undoing anything already done.
+      </Text>
+      {query.isLoading ? (
+        <Center paddingY={6}>
+          <Spinner />
+        </Center>
+      ) : query.error && !query.data ? (
+        <HandledErrorAlert
+          error={query.error}
+          fallbackTitle="Couldn't load enrollments"
+        />
+      ) : query.data && !query.data.isSaaS ? (
+        <Text fontSize="sm" color="fg.muted">
+          This installation runs released migrations automatically for every
+          organization, so there is nothing to enroll.
+        </Text>
+      ) : (
+        <Stack gap={4}>
+          {canManage && <EnrollForm />}
+          <EnrollmentTable
+            enrollments={query.data?.enrollments ?? []}
+            canManage={canManage}
+          />
+        </Stack>
+      )}
+    </Box>
+  );
+}
+
+function EnrollForm() {
+  const [organizationId, setOrganizationId] = useState("");
+  const [stage, setStage] = useState<"migrations" | "cutover">("migrations");
+  const utils = api.useUtils();
+  const enroll = api.ops.enrollMigrationTenant.useMutation({
+    onSuccess: async () => {
+      toaster.create({
+        title: "Organization enrolled",
+        description:
+          "The next migration pass picks the enrollment up automatically.",
+        type: "success",
+      });
+      setOrganizationId("");
+      await Promise.all([
+        utils.ops.listMigrationEnrollments.invalidate(),
+        utils.ops.listSystemMigrations.invalidate(),
+      ]);
+    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't enroll" }),
+  });
+
+  return (
+    <HStack>
+      <Input
+        size="sm"
+        width="320px"
+        fontFamily="mono"
+        placeholder="organization id"
+        value={organizationId}
+        onChange={(event) => setOrganizationId(event.target.value)}
+      />
+      <NativeSelect.Root size="sm" width="160px">
+        <NativeSelect.Field
+          aria-label="Stage"
+          value={stage}
+          onChange={(event) =>
+            setStage(event.currentTarget.value as "migrations" | "cutover")
+          }
+        >
+          <option value="migrations">Migration</option>
+          <option value="cutover">Cutover</option>
+        </NativeSelect.Field>
+        <NativeSelect.Indicator />
+      </NativeSelect.Root>
+      <Button
+        size="sm"
+        loading={enroll.isPending}
+        disabled={organizationId.trim().length === 0}
+        onClick={() =>
+          enroll.mutate({ organizationId: organizationId.trim(), stage })
+        }
+      >
+        <UserPlus size={14} /> Enroll
+      </Button>
+    </HStack>
+  );
+}
+
+function EnrollmentTable({
+  enrollments,
+  canManage,
+}: {
+  enrollments: EnrollmentListing["enrollments"];
+  canManage: boolean;
+}) {
+  if (enrollments.length === 0) {
+    return (
+      <Text fontSize="sm" color="fg.muted">
+        No organizations are enrolled yet.
+      </Text>
+    );
+  }
+  return (
+    <Table.Root size="sm">
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Organization</Table.ColumnHeader>
+          <Table.ColumnHeader>Stage</Table.ColumnHeader>
+          <Table.ColumnHeader>Enrolled by</Table.ColumnHeader>
+          <Table.ColumnHeader>Enrolled at</Table.ColumnHeader>
+          {canManage && <Table.ColumnHeader />}
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {enrollments.map((enrollment) => (
+          <EnrollmentRow
+            key={`${enrollment.organizationId}:${enrollment.stage}`}
+            enrollment={enrollment}
+            canManage={canManage}
+          />
+        ))}
+      </Table.Body>
+    </Table.Root>
+  );
+}
+
+function EnrollmentRow({
+  enrollment,
+  canManage,
+}: {
+  enrollment: EnrollmentListing["enrollments"][number];
+  canManage: boolean;
+}) {
+  const utils = api.useUtils();
+  const withdraw = api.ops.withdrawMigrationTenant.useMutation({
+    onSuccess: async () => {
+      toaster.create({
+        title: "Enrollment withdrawn",
+        description:
+          "Later passes leave this organization alone for that stage. Nothing already done is undone.",
+        type: "success",
+      });
+      await Promise.all([
+        utils.ops.listMigrationEnrollments.invalidate(),
+        utils.ops.listSystemMigrations.invalidate(),
+      ]);
+    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't withdraw" }),
+  });
+
+  return (
+    <Table.Row>
+      <Table.Cell>
+        {enrollment.organizationName ? (
+          <Text>{enrollment.organizationName}</Text>
+        ) : (
+          <Text color="fg.muted">Deleted organization</Text>
+        )}
+        <Text fontFamily="mono" fontSize="xs" color="fg.muted">
+          {enrollment.organizationId}
+        </Text>
+      </Table.Cell>
+      <Table.Cell>
+        <Badge
+          colorPalette={enrollment.stage === "cutover" ? "purple" : "blue"}
+        >
+          {ENROLLMENT_STAGE_LABEL[enrollment.stage] ?? enrollment.stage}
+        </Badge>
+      </Table.Cell>
+      <Table.Cell>
+        {enrollment.enrolledByLabel ?? (
+          <Text as="span" fontFamily="mono" fontSize="xs">
+            {enrollment.enrolledByUserId}
+          </Text>
+        )}
+      </Table.Cell>
+      <Table.Cell>{new Date(enrollment.createdAt).toLocaleString()}</Table.Cell>
+      {canManage && (
+        <Table.Cell textAlign="right">
+          <Button
+            size="xs"
+            variant="outline"
+            loading={withdraw.isPending}
+            onClick={() =>
+              withdraw.mutate({
+                organizationId: enrollment.organizationId,
+                stage: enrollment.stage,
+              })
+            }
+          >
+            Withdraw
+          </Button>
+        </Table.Cell>
+      )}
+    </Table.Row>
   );
 }
 
@@ -138,9 +369,17 @@ function MigrationSection({
           </Badge>
         )}
         <Spacer />
-        {canManage && <RollBackAction migrationName={migration.name} />}
+        {canManage && migration.availableOnThisInstallation && (
+          <RollBackAction migrationName={migration.name} />
+        )}
       </HStack>
-      {migration.attention.length === 0 ? (
+      {!migration.availableOnThisInstallation ? (
+        <Text fontSize="sm" color="fg.muted">
+          Not yet available for self-hosted installations. It will run
+          automatically, for every organization, in a later release - nothing to
+          do until then.
+        </Text>
+      ) : migration.attention.length === 0 ? (
         <Text fontSize="sm" color="fg.muted">
           No organizations need attention.
         </Text>

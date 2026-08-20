@@ -322,10 +322,18 @@ export class PrismaAuthzMigrationRepository
   }
 
   /**
-   * The view budgets, handed over rather than restarted. `skipDuplicates` is
-   * the whole safety argument: a row that already exists is a budget the
-   * ledger has been counting since the first seed, and overwriting it would
-   * refund views a customer already spent.
+   * The view budgets, handed over rather than restarted - and RAISED on a
+   * re-run, never lowered (the port's own contract; decision 22).
+   *
+   * Two writes, each safe on its own terms. The `createMany` with
+   * `skipDuplicates` lands missing rows without touching existing ones. The
+   * per-row guarded update then raises a row the legacy path has outgrown:
+   * while an organization is held, views keep landing on
+   * `ShareLink.viewCount`, and a usage row seeded on an earlier pass would
+   * otherwise sit permanently below it - wedging the import proof, which
+   * compares the two counts exactly. The `viewCount: { lt: ... }` predicate
+   * is the refund guard: a row already at or above the seeded count (a view
+   * consumed since the seed) is left exactly as it is.
    */
   async seedResourceGrantUsage({
     organizationId,
@@ -344,6 +352,17 @@ export class PrismaAuthzMigrationRepository
       })),
       skipDuplicates: true,
     });
+    for (const seed of seeds) {
+      await this.prisma.grantUsage.updateMany({
+        where: {
+          grantId: seed.grantId,
+          organizationId,
+          projectId: seed.projectId,
+          viewCount: { lt: seed.viewCount },
+        },
+        data: { viewCount: seed.viewCount },
+      });
+    }
   }
 
   async findExternalMemberFacts({
@@ -458,9 +477,12 @@ export class PrismaAuthzMigrationRepository
   }: {
     organizationId: string;
   }): Promise<string[]> {
+    // Ordered because the parity proof derives diff order - and, from it,
+    // its command id - from this iteration order (the port's own doc).
     const rows = await this.prisma.organizationUser.findMany({
       where: { organizationId },
       select: { userId: true },
+      orderBy: { userId: "asc" },
     });
     return rows.map((row) => row.userId);
   }
@@ -475,6 +497,9 @@ export class PrismaAuthzMigrationRepository
     const rows = await this.prisma.apiKey.findMany({
       where: { organizationId, revokedAt: null },
       select: { id: true },
+      // Ordered for the same reason the member read is: the proof's identity
+      // depends on iteration order.
+      orderBy: { id: "asc" },
     });
     return rows.map((row) => row.id);
   }

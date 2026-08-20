@@ -62,6 +62,7 @@ function buildRepository({
   onEngine,
   grantIds = [],
   usage,
+  compat,
 }: {
   onEngine: boolean;
   grantIds?: string[];
@@ -69,15 +70,37 @@ function buildRepository({
     updateMany?: ReturnType<typeof vi.fn>;
     create?: ReturnType<typeof vi.fn>;
   };
+  compat?: {
+    findFirst?: ReturnType<typeof vi.fn>;
+    findMany?: ReturnType<typeof vi.fn>;
+  };
 }) {
   const legacy = spyLegacy();
   const grantFindMany = vi
     .fn()
     .mockResolvedValue(grantIds.map((id) => ({ id })));
+  // The consume and its compat mirror run on the TRANSACTION client; the
+  // root client's own write surfaces stay separate mocks so a test can
+  // prove the writes never bypass the transaction.
   const grantUsage = {
     updateMany: usage?.updateMany ?? vi.fn().mockResolvedValue({ count: 1 }),
     create: usage?.create ?? vi.fn().mockResolvedValue(undefined),
   };
+  const compatMirror = vi.fn().mockResolvedValue({ count: 1 });
+  const rootGrantUsage = {
+    updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    create: vi.fn().mockResolvedValue(undefined),
+  };
+  const shareLink = {
+    findFirst:
+      compat?.findFirst ?? vi.fn().mockResolvedValue({ id: "share_1" }),
+    findMany: compat?.findMany ?? vi.fn().mockResolvedValue([]),
+    updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+  };
+  const transaction = vi.fn(async (run: (tx: unknown) => Promise<unknown>) =>
+    run({ grantUsage, shareLink: { updateMany: compatMirror } }),
+  );
+  const cutoverFindUnique = vi.fn().mockResolvedValue({ onEngine });
   const prisma = {
     project: {
       findUnique: vi
@@ -85,10 +108,12 @@ function buildRepository({
         .mockResolvedValue({ team: { organizationId: ORGANIZATION_ID } }),
     },
     authzCutoverProjection: {
-      findUnique: vi.fn().mockResolvedValue({ onEngine }),
+      findUnique: cutoverFindUnique,
     },
     grant: { findMany: grantFindMany },
-    grantUsage,
+    grantUsage: rootGrantUsage,
+    shareLink,
+    $transaction: transaction,
   } as unknown as PrismaClient;
   const writer = {
     attachResourceGrant: vi.fn().mockResolvedValue(undefined),
@@ -100,6 +125,11 @@ function buildRepository({
     writer,
     grantFindMany,
     grantUsage,
+    rootGrantUsage,
+    compatMirror,
+    shareLink,
+    transaction,
+    cutoverFindUnique,
     repository: new LedgerShareRepository({
       legacy,
       prisma,
@@ -260,44 +290,114 @@ describe("LedgerShareRepository", () => {
     });
 
     describe("when a link is revoked", () => {
-      it("revokes the grant, whose enforcement removes both heads", async () => {
-        const { repository, legacy, writer, grantFindMany } = buildRepository({
+      it("revokes by the link's own id and deletes the compat row before returning", async () => {
+        const { repository, legacy, writer } = buildRepository({
           onEngine: true,
           grantIds: ["share_1"],
         });
 
         await repository.deleteById({ id: "share_1", projectId: PROJECT_ID });
 
-        expect(grantFindMany).toHaveBeenCalledWith({
-          where: {
-            organizationId: ORGANIZATION_ID,
-            projectId: PROJECT_ID,
-            scopeType: "RESOURCE",
-            id: "share_1",
-          },
-          select: { id: true },
-        });
         expect(writer.revokeResourceGrants).toHaveBeenCalledWith({
           organizationId: ORGANIZATION_ID,
           grantIds: ["share_1"],
           actor: { type: "system", id: null },
         });
-        expect(legacy.deleteById).not.toHaveBeenCalled();
+        expect(legacy.deleteById).toHaveBeenCalledWith({
+          id: "share_1",
+          projectId: PROJECT_ID,
+        });
       });
 
-      it("deletes a link the ledger never knew about the plain way", async () => {
-        const { repository, legacy, writer } = buildRepository({
+      /** @scenario "Revoking a link whose grant row has not landed still records the fact" */
+      it("keys the revoke on the compat row's id when the grant head has not landed", async () => {
+        // The fold writes compat-before-head: the ShareLink row exists, the
+        // Grant row does not. Discovering ids from the Grant table would
+        // find nothing and fall back to a plain delete the fold's re-run
+        // undoes — the revoked token would resolve again, permanently.
+        const { repository, legacy, writer, grantFindMany } = buildRepository({
           onEngine: true,
           grantIds: [],
         });
 
         await repository.deleteById({ id: "share_1", projectId: PROJECT_ID });
 
+        expect(writer.revokeResourceGrants).toHaveBeenCalledWith({
+          organizationId: ORGANIZATION_ID,
+          grantIds: ["share_1"],
+          actor: { type: "system", id: null },
+        });
         expect(legacy.deleteById).toHaveBeenCalledWith({
           id: "share_1",
           projectId: PROJECT_ID,
         });
+        // The compat head answered, so the Grant table was never needed.
+        expect(grantFindMany).not.toHaveBeenCalled();
+      });
+
+      /** @scenario "A revocation never appends a fact for a link outside the caller's project" */
+      it("appends nothing for an id neither head anchors to the project", async () => {
+        const { repository, legacy, writer } = buildRepository({
+          onEngine: true,
+          grantIds: [],
+          compat: { findFirst: vi.fn().mockResolvedValue(null) },
+        });
+
+        await repository.deleteById({
+          id: "share_foreign",
+          projectId: PROJECT_ID,
+        });
+
         expect(writer.revokeResourceGrants).not.toHaveBeenCalled();
+        expect(legacy.deleteById).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the routing gate is stale or failing", () => {
+      /** @scenario "Revocation routing never trusts a cached gate answer" */
+      it("routes a revoke on the uncached projection read, past a stale cached answer", async () => {
+        const { repository, legacy, writer, cutoverFindUnique } =
+          buildRepository({ onEngine: false });
+
+        // Warm the cached gate with "legacy" through a read/mint-class
+        // write, then cut the organization over: the projection answers
+        // true while the cached gate still holds false for its TTL.
+        await repository.consumeView({
+          id: "share_1",
+          projectId: PROJECT_ID,
+          maxViews: null,
+        });
+        expect(legacy.consumeView).toHaveBeenCalledTimes(1);
+        cutoverFindUnique.mockResolvedValue({ onEngine: true });
+
+        await repository.deleteById({ id: "share_1", projectId: PROJECT_ID });
+
+        expect(writer.revokeResourceGrants).toHaveBeenCalledWith(
+          expect.objectContaining({ grantIds: ["share_1"] }),
+        );
+        expect(legacy.deleteById).toHaveBeenCalledWith({
+          id: "share_1",
+          projectId: PROJECT_ID,
+        });
+      });
+
+      /** @scenario "A failed cutover read routes a revocation toward deleting both heads" */
+      it("fails a broken projection read toward the branch that deletes both heads", async () => {
+        const { repository, legacy, writer, cutoverFindUnique } =
+          buildRepository({ onEngine: true, grantIds: ["share_1"] });
+        cutoverFindUnique.mockRejectedValue(
+          new Error("projection unavailable"),
+        );
+
+        await repository.deleteById({ id: "share_1", projectId: PROJECT_ID });
+
+        expect(writer.revokeResourceGrants).toHaveBeenCalledWith(
+          expect.objectContaining({ grantIds: ["share_1"] }),
+        );
+        expect(legacy.deleteById).toHaveBeenCalledWith({
+          id: "share_1",
+          projectId: PROJECT_ID,
+        });
       });
     });
 
@@ -336,6 +436,44 @@ describe("LedgerShareRepository", () => {
         });
       });
 
+      /** @scenario "A resource-wide revoke also names the links only the compat head can see" */
+      it("includes the compat-only ids the grant head cannot see yet", async () => {
+        // A ledger-minted link whose fold parked between the compat write
+        // and the Grant write is visible only through its compat row; its
+        // id must still reach the revoke, or the sweep deletes the row for
+        // the fold's re-run to resurrect.
+        const { repository, legacy, writer, shareLink } = buildRepository({
+          onEngine: true,
+          grantIds: ["share_1"],
+          compat: {
+            findMany: vi
+              .fn()
+              .mockResolvedValue([{ id: "share_1" }, { id: "share_parked" }]),
+          },
+        });
+
+        await repository.deleteByResource({
+          projectId: PROJECT_ID,
+          resourceType: "TRACE",
+          resourceId: TRACE_ID,
+        });
+
+        expect(shareLink.findMany).toHaveBeenCalledWith({
+          where: {
+            projectId: PROJECT_ID,
+            resourceType: "TRACE",
+            resourceId: TRACE_ID,
+          },
+          select: { id: true },
+        });
+        expect(writer.revokeResourceGrants).toHaveBeenCalledWith(
+          expect.objectContaining({
+            grantIds: ["share_1", "share_parked"],
+          }),
+        );
+        expect(legacy.deleteByResource).toHaveBeenCalledTimes(1);
+      });
+
       it("revokes every trace fact in the project on a bulk revoke, then sweeps", async () => {
         const { repository, legacy, writer, grantFindMany } = buildRepository({
           onEngine: true,
@@ -361,9 +499,17 @@ describe("LedgerShareRepository", () => {
     });
 
     describe("when a view is consumed", () => {
-      it("creates the usage row on the first view and mirrors the count onto the compat row", async () => {
+      /** @scenario "A consumed view and its compat mirror commit together" */
+      it("creates the usage row on the first view and mirrors the count in the same transaction", async () => {
         const create = vi.fn().mockResolvedValue(undefined);
-        const { repository, legacy } = buildRepository({
+        const {
+          repository,
+          legacy,
+          compatMirror,
+          transaction,
+          rootGrantUsage,
+          shareLink,
+        } = buildRepository({
           onEngine: true,
           grantIds: ["share_1"],
           usage: {
@@ -379,6 +525,7 @@ describe("LedgerShareRepository", () => {
         });
 
         expect(consumed).toBe(true);
+        expect(transaction).toHaveBeenCalledTimes(1);
         expect(create).toHaveBeenCalledWith({
           data: expect.objectContaining({
             grantId: "share_1",
@@ -387,17 +534,26 @@ describe("LedgerShareRepository", () => {
             viewCount: 1,
           }),
         });
-        expect(legacy.consumeView).toHaveBeenCalledWith({
-          id: "share_1",
-          projectId: PROJECT_ID,
-          maxViews: 2,
+        expect(compatMirror).toHaveBeenCalledWith({
+          where: {
+            id: "share_1",
+            projectId: PROJECT_ID,
+            viewCount: { lt: 2 },
+          },
+          data: { viewCount: { increment: 1 } },
         });
+        // Neither write may bypass the transaction: a crash between the
+        // consume and the mirror is exactly the drift this pins out.
+        expect(rootGrantUsage.updateMany).not.toHaveBeenCalled();
+        expect(rootGrantUsage.create).not.toHaveBeenCalled();
+        expect(shareLink.updateMany).not.toHaveBeenCalled();
+        expect(legacy.consumeView).not.toHaveBeenCalled();
       });
 
       it("increments the usage row while the link is uncapped", async () => {
         const updateMany = vi.fn().mockResolvedValue({ count: 1 });
         const create = vi.fn();
-        const { repository, legacy } = buildRepository({
+        const { repository, legacy, compatMirror } = buildRepository({
           onEngine: true,
           grantIds: ["share_1"],
           usage: { updateMany, create },
@@ -419,7 +575,65 @@ describe("LedgerShareRepository", () => {
           data: expect.objectContaining({ viewCount: { increment: 1 } }),
         });
         expect(create).not.toHaveBeenCalled();
-        expect(legacy.consumeView).toHaveBeenCalledTimes(1);
+        expect(compatMirror).toHaveBeenCalledWith({
+          where: { id: "share_1", projectId: PROJECT_ID },
+          data: { viewCount: { increment: 1 } },
+        });
+        expect(legacy.consumeView).not.toHaveBeenCalled();
+      });
+
+      /** @scenario "A view that loses the first-view race retries in a fresh transaction" */
+      it("retries the conditioned increment in its own transaction after losing the create race", async () => {
+        // The guarded create's unique violation aborts the transaction it
+        // ran in, so the single conditioned retry must open a fresh one.
+        const updateMany = vi
+          .fn()
+          .mockResolvedValueOnce({ count: 0 })
+          .mockResolvedValueOnce({ count: 1 });
+        const create = vi
+          .fn()
+          .mockRejectedValue(
+            Object.assign(new Error("unique violation"), { code: "P2002" }),
+          );
+        const { repository, transaction, compatMirror } = buildRepository({
+          onEngine: true,
+          grantIds: ["share_1"],
+          usage: { updateMany, create },
+        });
+
+        const consumed = await repository.consumeView({
+          id: "share_1",
+          projectId: PROJECT_ID,
+          maxViews: 2,
+        });
+
+        expect(consumed).toBe(true);
+        expect(transaction).toHaveBeenCalledTimes(2);
+        expect(updateMany).toHaveBeenCalledTimes(2);
+        expect(compatMirror).toHaveBeenCalledTimes(1);
+      });
+
+      it("mirrors nothing when the retry finds the cap already spent", async () => {
+        const updateMany = vi.fn().mockResolvedValue({ count: 0 });
+        const create = vi
+          .fn()
+          .mockRejectedValue(
+            Object.assign(new Error("unique violation"), { code: "P2002" }),
+          );
+        const { repository, compatMirror } = buildRepository({
+          onEngine: true,
+          grantIds: ["share_1"],
+          usage: { updateMany, create },
+        });
+
+        const consumed = await repository.consumeView({
+          id: "share_1",
+          projectId: PROJECT_ID,
+          maxViews: 1,
+        });
+
+        expect(consumed).toBe(false);
+        expect(compatMirror).not.toHaveBeenCalled();
       });
 
       it("fences the increment on the cap when the link is capped", async () => {

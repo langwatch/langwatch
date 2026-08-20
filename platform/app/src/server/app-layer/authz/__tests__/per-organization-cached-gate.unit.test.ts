@@ -2,9 +2,10 @@
  * The shape ./cutover-gate.ts and ./legacy-fallback-gate.ts both delegate to.
  * ./cutover-gate.unit.test.ts and rbac.legacy-fallback-gate.unit.test.ts
  * already cover the per-gate TTL/fail-safe contract through the two public
- * gates; this suite covers the two behaviours that live in the shared helper
+ * gates; this suite covers the behaviours that live in the shared helper
  * itself and previously had no test anywhere: a read that throws is LOGGED,
- * and concurrent asks for the same cold key share one read.
+ * concurrent asks for the same cold key share one read, and an invalidation
+ * racing an in-flight read stops that read from caching what it resolves.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { perOrganizationCachedFlag } from "../per-organization-cached-gate";
@@ -115,6 +116,98 @@ describe("perOrganizationCachedFlag", () => {
       await flag.get({ organizationId: "org-1", read });
 
       expect(calls).toBe(1);
+    });
+  });
+
+  describe("when invalidate runs while a read is in flight", () => {
+    it("hands the in-flight callers the old answer but does not cache it, so the next read hits the source", async () => {
+      const flag = gate();
+      let resolveFirst: (value: boolean) => void = () => undefined;
+      const first = flag.get({
+        organizationId: "org-1",
+        read: () =>
+          new Promise<boolean>((resolve) => {
+            resolveFirst = resolve;
+          }),
+      });
+
+      flag.invalidate({ organizationId: "org-1" });
+      resolveFirst(true);
+
+      // The read had already begun when the invalidation landed, so its own
+      // callers still get what it resolved - that is the coalescing contract.
+      expect(await first).toBe(true);
+
+      // But the stale answer was NOT cached: the next ask re-reads the
+      // source and gets the post-invalidation value.
+      let calls = 0;
+      const second = await flag.get({
+        organizationId: "org-1",
+        read: () => {
+          calls += 1;
+          return Promise.resolve(false);
+        },
+      });
+      expect(calls).toBe(1);
+      expect(second).toBe(false);
+    });
+
+    it("drops the in-flight entry, so a reader arriving after the invalidation starts a fresh read rather than coalescing onto the stale one", async () => {
+      const flag = gate();
+      let resolveFirst: (value: boolean) => void = () => undefined;
+      const first = flag.get({
+        organizationId: "org-1",
+        read: () =>
+          new Promise<boolean>((resolve) => {
+            resolveFirst = resolve;
+          }),
+      });
+
+      flag.invalidate({ organizationId: "org-1" });
+
+      // Still unresolved - yet the new reader must not share its promise.
+      const second = await flag.get({
+        organizationId: "org-1",
+        read: () => Promise.resolve(false),
+      });
+      expect(second).toBe(false);
+
+      resolveFirst(true);
+      expect(await first).toBe(true);
+
+      // And the fresh read's answer is what stayed cached: no re-read, and
+      // the late settle of the stale flight did not overwrite it.
+      let calls = 0;
+      const third = await flag.get({
+        organizationId: "org-1",
+        read: () => {
+          calls += 1;
+          return Promise.resolve(true);
+        },
+      });
+      expect(calls).toBe(0);
+      expect(third).toBe(false);
+    });
+
+    it("drops an already-cached answer, so the very next read hits the source", async () => {
+      const flag = gate();
+      await flag.get({
+        organizationId: "org-1",
+        read: () => Promise.resolve(true),
+      });
+
+      flag.invalidate({ organizationId: "org-1" });
+
+      let calls = 0;
+      const result = await flag.get({
+        organizationId: "org-1",
+        read: () => {
+          calls += 1;
+          return Promise.resolve(false);
+        },
+      });
+      expect(calls).toBe(1);
+      expect(result).toBe(false);
     });
   });
 

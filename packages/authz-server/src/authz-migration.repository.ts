@@ -237,10 +237,17 @@ export interface AuthzCutoverRepository
    * Hand each imported link's spent views over to the usage row that becomes
    * their authority.
    *
-   * CREATE-IF-ABSENT, and the implementation must not weaken that: a re-run
-   * that updated would walk back a view consumed since the seed, and the
-   * cutover would give a customer's spent budget back to whoever holds the
-   * token.
+   * MONOTONIC, never lowering (decision 22: views are never refunded): a
+   * missing row is created with the seeded count, and an existing row is
+   * RAISED to the seeded count when - and only when - it is lower. The raise
+   * exists because the legacy path keeps counting while an organization is
+   * held: a view spent on `ShareLink.viewCount` between one pass's seed and
+   * the next left the usage row permanently behind, the import proof
+   * compares the two counts exactly, and the organization wedged on a drift
+   * that only ever grew. Re-seeding upward converges the usage row onto the
+   * legacy count each pass, so the proof heals on the next run - while the
+   * guard on "lower" keeps a view consumed since the seed from ever being
+   * walked back.
    */
   seedResourceGrantUsage(args: {
     organizationId: string;
@@ -254,7 +261,11 @@ export interface AuthzCutoverRepository
   findOrganizationScopeInventory(args: {
     organizationId: string;
   }): Promise<OrganizationScopeInventory>;
-  /** Every principal the decision-parity proof decides for. */
+  /** Every principal the decision-parity proof decides for. Both lists must
+   *  come back in a DETERMINISTIC order (sorted by id): the proof's diff
+   *  list, its truncation and its command id are derived from iteration
+   *  order, and a retry that visited principals differently would name the
+   *  same verdict differently. */
   findOrganizationMemberIds(args: { organizationId: string }): Promise<string[]>;
   findOrganizationApiKeyIds(args: { organizationId: string }): Promise<string[]>;
 

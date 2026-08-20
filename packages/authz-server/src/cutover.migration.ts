@@ -128,6 +128,20 @@ const MAX_PROVEN_DIFFS = 200;
 
 const DEFAULT_POLL = { intervalMs: 500, timeoutMs: 120_000 };
 
+/**
+ * The report kinds that mean the cutover has DONE nothing for this tenant
+ * yet: it is `migrated` only because the runner has no "waiting" status, so
+ * waiting tenants park in `migrated` with one of these reports. Exported for
+ * the operator-rollback guard in the app's runtime: a waiting tenant has no
+ * flip to undo, so rolling it back is refused rather than pinned
+ * (specs/rbac/in-place-authz-migration.feature, "Rolling back a cutover that
+ * never started is refused").
+ */
+export const CUTOVER_WAITING_REPORT_KINDS = [
+  "cutover_waiting",
+  "cutover_waiting_cohort",
+] as const;
+
 /** The prerequisite migrations, in the order they must have finalized. */
 const PREREQUISITE_MIGRATIONS: readonly string[] = [
   TEAM_USER_BACKFILL_MIGRATION_NAME,
@@ -193,11 +207,11 @@ export type CutoverDeps = {
     permission: string;
   }) => Promise<boolean>;
   /**
-   * Whether this organization may cut over yet. Composed in the app from
-   * the cohort helper and its own environment knob — the package reads no
-   * environment of its own.
+   * Whether this organization may cut over yet. Composed in the app - on
+   * cloud it reads the organization's cutover enrollment per call, so it may
+   * be asynchronous; the package reads no configuration of its own.
    */
-  cutoverCohort: (tenantId: string) => boolean;
+  cutoverCohort: (tenantId: string) => boolean | Promise<boolean>;
   /** The platform-admin email list, as the live admin check parses it. */
   adminEmails: () => string[];
   now: () => number;
@@ -215,6 +229,15 @@ type CutoverCounts = {
 
 export class GrantsCutoverMigration implements SystemMigration {
   readonly name = GRANTS_CUTOVER_MIGRATION_NAME;
+  // NOT yet released for self-hosting: the cutover is the one migration that
+  // changes who decides permissions, and OSS releases can ship this code
+  // while cloud is still migrating and soaking. Until a later release flips
+  // this to `true`, a self-hosted runner never drives the cutover for any
+  // tenant - its organizations sit at genesis-finalized, which is a normal
+  // waiting state, not one needing attention. Flipping it is the self-hosted
+  // release act (the in-place doctrine's automatic cutover engages then),
+  // made only after the cloud soak.
+  readonly runsAutomaticallyOnSelfHosted = false;
   private readonly engine = new AuthzEngine();
 
   constructor(private readonly deps: CutoverDeps) {}
@@ -232,11 +255,14 @@ export class GrantsCutoverMigration implements SystemMigration {
     if (awaiting.length > 0) {
       return {
         status: "migrated",
-        report: { kind: "cutover_waiting", awaiting },
+        report: { kind: CUTOVER_WAITING_REPORT_KINDS[0], awaiting },
       };
     }
-    if (!this.deps.cutoverCohort(tenantId)) {
-      return { status: "migrated", report: { kind: "cutover_waiting_cohort" } };
+    if (!(await this.deps.cutoverCohort(tenantId))) {
+      return {
+        status: "migrated",
+        report: { kind: CUTOVER_WAITING_REPORT_KINDS[1] },
+      };
     }
 
     const { emissions, unmatchedAdminEmails } = await this.planImport({
@@ -268,8 +294,12 @@ export class GrantsCutoverMigration implements SystemMigration {
     }
 
     const parity = await this.proveDecisionParity({ organizationId, signal });
-    const provenDiffs = parity.diffs.slice(0, MAX_PROVEN_DIFFS);
-    if (parity.diffs.length > 0) {
+    // Sorted BEFORE anything reads it: the sweep's own order is the reads'
+    // iteration order, which nothing guarantees across retries, and both the
+    // fact's truncation and the command id below must not depend on it.
+    const sortedDiffs = [...parity.diffs].sort();
+    const provenDiffs = sortedDiffs.slice(0, MAX_PROVEN_DIFFS);
+    if (sortedDiffs.length > 0) {
       // The disagreement is recorded as a fact before the tenant is held:
       // the ledger is where the argument lives, the report is where an
       // operator reads it. The commandId carries the proof's OWN identity —
@@ -277,7 +307,7 @@ export class GrantsCutoverMigration implements SystemMigration {
       // hold-fix-reprove path unable to record the fix.
       await this.deps.ledger.proveMigrationParity({
         organizationId,
-        commandId: parityCommandId({ organizationId, diffs: provenDiffs }),
+        commandId: parityCommandId({ organizationId, diffs: sortedDiffs }),
         diffs: provenDiffs,
         occurredAtMs: this.deps.now(),
       });
@@ -288,8 +318,8 @@ export class GrantsCutoverMigration implements SystemMigration {
           ...counts,
           ...parity.verified,
           unmatchedAdminEmails,
-          totalDiffs: parity.diffs.length,
-          diffs: parity.diffs.slice(0, MAX_REPORTED_DIFFS),
+          totalDiffs: sortedDiffs.length,
+          diffs: sortedDiffs.slice(0, MAX_REPORTED_DIFFS),
         },
       };
     }
@@ -429,12 +459,22 @@ export class GrantsCutoverMigration implements SystemMigration {
       ["lite-members", emissions.liteMembers],
       ["project-keys", emissions.projectCredentials],
     ];
+    // Each command id carries a hash of its chunk's contents, for the same
+    // reason the platform family's does (below): these are LIVE tables. A
+    // held organization is re-imported on every pass, and a member added or
+    // a link minted meanwhile SHIFTS the chunks - keyed on the index alone,
+    // the shifted chunk deduped against the old event, the new fact never
+    // landed, and `awaitConvergence` waited forever on a grant id nobody
+    // would ever append. The plan is sorted by source-row id, so a retry
+    // over unchanged rows still hashes - and dedupes - identically.
     for (const [label, grants] of perOrganization) {
       for (const [index, chunk] of chunked(grants).entries()) {
         this.assertNotAborted(signal);
         await this.deps.ledger.attachGrants({
           organizationId,
-          commandId: `cutover:${label}:${organizationId}:${index}`,
+          commandId: `cutover:${label}:${organizationId}:${contentHash(
+            chunk.map((grant) => grant.grantId),
+          )}:${index}`,
           grants: chunk,
         });
       }
@@ -882,8 +922,19 @@ function contentHash(parts: readonly string[]): string {
  * re-run that finds the same disagreement is still the same claim and still
  * dedupes, while the clean proof that follows a fix is a different claim and
  * gets its own fact.
+ *
+ * The caller hands over the FULL diff list, sorted, and this must never
+ * change to the truncated one: the appended fact keeps only the first
+ * `MAX_PROVEN_DIFFS` lines as evidence, and two verdicts that share those
+ * lines but differ beyond them are still different claims. Hashing the whole
+ * set (the digest carries the total count too, see `contentHash`) is what
+ * keeps them from colliding into one fact. Sorted, because the id must be a
+ * function of WHAT was found, not of the order the sweep happened to visit
+ * principals in.
+ *
+ * Exported only for its pinning test.
  */
-function parityCommandId({
+export function parityCommandId({
   organizationId,
   diffs,
 }: {

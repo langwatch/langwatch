@@ -137,6 +137,10 @@ export type GenesisImportDeps = {
 
 export class GrantsGenesisImportMigration implements SystemMigration {
   readonly name = GRANTS_GENESIS_IMPORT_MIGRATION_NAME;
+  // Dark by construction - the import states facts and proves them against
+  // the rows it started from without changing who decides - so self-hosted
+  // runs it automatically, as it has since it shipped.
+  readonly runsAutomaticallyOnSelfHosted = true;
 
   constructor(private readonly deps: GenesisImportDeps) {}
 

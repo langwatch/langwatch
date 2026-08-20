@@ -9,9 +9,11 @@
  * legacy path it wraps).
  *
  * Finalization is a one-way latch, which is what makes caching safe: a
- * positive answer is cached forever, a negative one briefly, and the stale
- * direction of the negative cache is "fallback still consulted" - correct,
- * just not yet switched.
+ * positive answer is cached long but bounded (the documented stage B
+ * rollback must land fleet-wide without a deploy - see
+ * POSITIVE_CACHE_TTL_MS), a negative one briefly, and the stale direction
+ * of the negative cache is "fallback still consulted" - correct, just not
+ * yet switched.
  *
  * Caching, coalescing and the fail-safe/warn behaviour live in
  * ./per-organization-cached-gate.ts, shared with ./cutover-gate.ts; this

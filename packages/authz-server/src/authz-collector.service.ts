@@ -202,7 +202,13 @@ export class AuthzCollectorService {
       { kind: scope.kind, id: scope.id },
       ...(scope.parents ?? []),
     ];
-    const rows = await this.reader.findShareLinks({
+    // Same one-pass discipline as collectGrants above: the composition
+    // root holds ONE reader for the process's lifetime, and a routed
+    // reader's head decision is memoized per instance. A gated read taken
+    // on that instance directly would pin the organization's head until
+    // the pod restarted — defeating the rollback lever. The pass-scoped
+    // reader pins for exactly this read and is then dropped.
+    const rows = await this.beginPass().findShareLinks({
       projectId: scope.projectId,
       tokens: scope.shareTokens,
       links,

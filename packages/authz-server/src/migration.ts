@@ -10,6 +10,7 @@
  */
 export { GRANTS_CUTOVER_MIGRATION_NAME } from "./cutover.name";
 export {
+  CUTOVER_WAITING_REPORT_KINDS,
   GrantsCutoverMigration,
   normalizedAdminEmails,
   PLATFORM_AUTHZ_TENANT_ID,

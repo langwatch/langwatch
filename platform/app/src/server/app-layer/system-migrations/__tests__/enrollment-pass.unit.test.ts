@@ -1,0 +1,210 @@
+/**
+ * Pass-level proof of the pacing rules, composed the way
+ * `runSystemMigrationPass` composes them: the real runner from
+ * @langwatch/system-migrations, the real cohort helpers from ../cohort, and
+ * the migration list filtered by each migration's own
+ * `runsAutomaticallyOnSelfHosted` declaration. What is faked is storage -
+ * this is about who gets processed, not how state is stored.
+ */
+import {
+  type SystemMigration,
+  SystemMigrationRunnerService,
+  type SystemMigrationStateRepository,
+  type TenantMigrationRecord,
+} from "@langwatch/system-migrations";
+import { describe, expect, it, vi } from "vitest";
+import {
+  migrationRunsOnThisInstallation,
+  organizationMigrates,
+} from "../cohort";
+
+class InMemoryStateRepository implements SystemMigrationStateRepository {
+  private readonly rows = new Map<string, TenantMigrationRecord>();
+
+  async findRecord({
+    migrationName,
+    tenantId,
+  }: {
+    migrationName: string;
+    tenantId: string;
+  }): Promise<TenantMigrationRecord | null> {
+    return this.rows.get(`${migrationName}:${tenantId}`) ?? null;
+  }
+
+  async upsertRecord(record: TenantMigrationRecord): Promise<void> {
+    this.rows.set(`${record.migrationName}:${record.tenantId}`, record);
+  }
+
+  async upsertRecordUnlessRolledBack(
+    record: TenantMigrationRecord,
+  ): Promise<boolean> {
+    await this.upsertRecord(record);
+    return true;
+  }
+
+  recordCount(): number {
+    return this.rows.size;
+  }
+}
+
+const grantedLease = {
+  acquire: async () => true,
+  renew: async () => true,
+  release: async () => undefined,
+};
+
+function tenantSourceOf(ids: string[]) {
+  return {
+    async findTenantIdsAfter({
+      cursor,
+      limit,
+    }: {
+      cursor: string | null;
+      limit: number;
+    }) {
+      const start = cursor === null ? 0 : ids.indexOf(cursor) + 1;
+      return ids.slice(start, start + limit);
+    },
+  };
+}
+
+function migrationOf({
+  name,
+  runsAutomaticallyOnSelfHosted,
+}: {
+  name: string;
+  runsAutomaticallyOnSelfHosted: boolean;
+}): SystemMigration & { migrateTenant: ReturnType<typeof vi.fn> } {
+  return {
+    name,
+    runsAutomaticallyOnSelfHosted,
+    migrateTenant: vi.fn(async () => ({ status: "finalized" as const })),
+  };
+}
+
+/** The pass, composed exactly as runtime.ts composes it. */
+function passOn({
+  isSaaS,
+  tenants,
+  enrolled,
+  migrations,
+  state,
+}: {
+  isSaaS: boolean;
+  tenants: string[];
+  enrolled: Set<string>;
+  migrations: SystemMigration[];
+  state: SystemMigrationStateRepository;
+}) {
+  return new SystemMigrationRunnerService({
+    state,
+    lease: grantedLease,
+    tenants: tenantSourceOf(tenants),
+    cohort: (tenantId) =>
+      organizationMigrates({ isSaaS, enrolled: enrolled.has(tenantId) }),
+    migrations: migrations.filter((migration) =>
+      migrationRunsOnThisInstallation({
+        isSaaS,
+        runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
+      }),
+    ),
+  }).runPass();
+}
+
+describe("the migration pass under enrollment pacing", () => {
+  describe("given a self-hosted installation with a migration not yet released for it", () => {
+    /** @scenario "A migration not yet released for self-hosting never runs there" */
+    it("drives the released migrations for every organization and never attempts the unreleased one", async () => {
+      const released = migrationOf({
+        name: "released",
+        runsAutomaticallyOnSelfHosted: true,
+      });
+      const unreleased = migrationOf({
+        name: "unreleased",
+        runsAutomaticallyOnSelfHosted: false,
+      });
+      const state = new InMemoryStateRepository();
+
+      const summary = await passOn({
+        isSaaS: false,
+        tenants: ["acme", "globex"],
+        enrolled: new Set(),
+        migrations: [released, unreleased],
+        state,
+      });
+
+      expect(released.migrateTenant).toHaveBeenCalledTimes(2);
+      expect(unreleased.migrateTenant).not.toHaveBeenCalled();
+      // Never attempted means never reported either: no state row exists for
+      // the unreleased migration, so nothing reads as parked or held.
+      expect(
+        await state.findRecord({
+          migrationName: "unreleased",
+          tenantId: "acme",
+        }),
+      ).toBeNull();
+      expect(summary?.finalized).toBe(2);
+    });
+  });
+
+  describe("given a release that declares the migration ready for self-hosting", () => {
+    /** @scenario "A release that turns a migration on for self-hosting makes it run on the next pass" */
+    it("drives it for every organization on the next pass", async () => {
+      const nowReleased = migrationOf({
+        name: "cutover-like",
+        runsAutomaticallyOnSelfHosted: true,
+      });
+
+      await passOn({
+        isSaaS: false,
+        tenants: ["acme", "globex"],
+        enrolled: new Set(),
+        migrations: [nowReleased],
+        state: new InMemoryStateRepository(),
+      });
+
+      expect(nowReleased.migrateTenant).toHaveBeenCalledTimes(2);
+      expect(nowReleased.migrateTenant).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: "acme" }),
+      );
+      expect(nowReleased.migrateTenant).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: "globex" }),
+      );
+    });
+  });
+
+  describe("given a cloud installation", () => {
+    /** @scenario "Cloud rollout is unaffected by the self-hosted release declaration" */
+    it("drives every registered migration for an enrolled organization, whatever it declares", async () => {
+      const releasedForSelfHosting = migrationOf({
+        name: "released",
+        runsAutomaticallyOnSelfHosted: true,
+      });
+      const notReleasedForSelfHosting = migrationOf({
+        name: "unreleased",
+        runsAutomaticallyOnSelfHosted: false,
+      });
+      const state = new InMemoryStateRepository();
+
+      await passOn({
+        isSaaS: true,
+        tenants: ["acme", "globex"],
+        enrolled: new Set(["acme"]),
+        migrations: [releasedForSelfHosting, notReleasedForSelfHosting],
+        state,
+      });
+
+      for (const migration of [
+        releasedForSelfHosting,
+        notReleasedForSelfHosting,
+      ]) {
+        expect(migration.migrateTenant).toHaveBeenCalledTimes(1);
+        expect(migration.migrateTenant).toHaveBeenCalledWith(
+          expect.objectContaining({ tenantId: "acme" }),
+        );
+      }
+      // The un-enrolled organization was left untouched with no state.
+      expect(state.recordCount()).toBe(2);
+    });
+  });
+});
