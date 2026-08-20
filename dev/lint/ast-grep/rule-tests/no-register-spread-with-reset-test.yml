@@ -1,0 +1,51 @@
+id: no-register-spread-with-reset
+valid:
+  # The fix: the field binds through Controller, so registration happens in
+  # useController's effect and survives the reset.
+  - |
+    function Editor({ control }: Props) {
+      const { reset } = useForm<Values>();
+      useEffect(() => reset({}), [reset]);
+      return (
+        <Controller
+          name="name"
+          control={control}
+          render={({ field }) => <Input {...field} />}
+        />
+      );
+    }
+  # register() with no reset() anywhere: the registry is never emptied, so the
+  # memoized registration is never invalidated. Not this bug — and staying
+  # quiet here is what keeps the rule readable, since ~29 files look like this.
+  - |
+    function Simple() {
+      const { register } = useForm<Values>();
+      return <Input {...register("name")} placeholder="x" />;
+    }
+  # reset() with no register() spread: nothing to un-register.
+  - |
+    function ResetOnly() {
+      const { reset, control } = useForm<Values>();
+      useEffect(() => reset({}), [reset]);
+      return <Controller name="a" control={control} render={() => <Input />} />;
+    }
+invalid:
+  # The failing shape: a destructured register() spread into props, in a
+  # component that resets. This is the ScenarioForm bug.
+  - |
+    function Hazard({ defaults }: Props) {
+      const { register, reset } = useForm<Values>();
+      useEffect(() => {
+        reset({ ...defaults });
+      }, [defaults, reset]);
+      return <Input {...register("name")} placeholder="x" />;
+    }
+  # Same hazard reached through the form object rather than a destructure.
+  - |
+    function HazardOnForm({ defaults }: Props) {
+      const form = useForm<Values>();
+      useEffect(() => {
+        form.reset({ ...defaults });
+      }, [defaults, form]);
+      return <Input {...form.register("name")} />;
+    }

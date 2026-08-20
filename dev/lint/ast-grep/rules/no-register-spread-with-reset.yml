@@ -1,0 +1,42 @@
+id: no-register-spread-with-reset
+message: >
+  A spread `{...register(name)}` in a component that also calls `reset()` is
+  broken under the React Compiler. `register` is a stable reference, so the
+  call is memoized and runs once; `reset()` then empties react-hook-form's
+  field registry and nothing re-registers. Typing stops reaching form state —
+  silently, and validation goes with it. Bind the field through
+  `<Controller>` / `useController`, which re-registers from an effect the
+  compiler cannot elide. See specs/setup/react-compiler.feature.
+severity: warning
+language: Tsx
+rule:
+  all:
+    # The registration call itself, however it is reached: a destructured
+    # `register(...)` or a `form.register(...)` on the form object.
+    - any:
+        - pattern: register($$$ARGS)
+        - pattern: $FORM.register($$$ARGS)
+    # ...spread into JSX props. A bare `register("x")` assigned to a variable
+    # is the same hazard, but the spread is where it is always wrong.
+    - inside:
+        kind: spread_element
+        stopBy: end
+    # ...in a component that also resets. `reset()` is what empties the
+    # registry, so register-without-reset is not this bug and stays quiet —
+    # the repo has ~29 such files and flagging them would bury this.
+    - inside:
+        stopBy: end
+        any:
+          - kind: arrow_function
+          - kind: function_declaration
+          - kind: function_expression
+        has:
+          stopBy: end
+          any:
+            - pattern: reset($$$RESET_ARGS)
+            - pattern: $RFORM.reset($$$RESET_ARGS)
+files:
+  - "platform/app/src/**/*.tsx"
+ignores:
+  - "**/*.test.tsx"
+  - "**/*.spec.tsx"
