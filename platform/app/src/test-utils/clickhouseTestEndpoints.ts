@@ -110,6 +110,10 @@ export interface TestClickHouseEndpoint {
  * registers under a fragment of the id, and the organization silently falls
  * back to the shared client. The alphabet here has no `_`, so the name a suite
  * writes is the name the parser reads back.
+ *
+ * `name` is held to the same rule, and refused rather than repaired: a suite
+ * that asks for a namespace the variable cannot carry has a mistake to fix in
+ * the line it wrote, and a quietly rewritten namespace would hide it.
  */
 const routableIdSuffix = customAlphabet(
   "0123456789abcdefghijklmnopqrstuvwxyz",
@@ -117,6 +121,11 @@ const routableIdSuffix = customAlphabet(
 );
 
 export function privateRouteOrgId(name: string): string {
+  if (name.includes("__")) {
+    throw new Error(
+      `A private-route org id cannot be named "${name}": "__" separates the label from the organization in the env var name, so the parser would read back only what follows it.`,
+    );
+  }
   return `${name}-${routableIdSuffix()}`;
 }
 

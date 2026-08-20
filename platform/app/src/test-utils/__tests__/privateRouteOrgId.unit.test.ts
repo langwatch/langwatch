@@ -34,4 +34,10 @@ describe("privateRouteOrgId", () => {
       expect(privateRouteOrgId("test-org")).toMatch(/^test-org-[0-9a-z]{6}$/);
     });
   });
+
+  describe("when the namespace carries the separator itself", () => {
+    it("refuses it, rather than minting an id that reads back short", () => {
+      expect(() => privateRouteOrgId("test__org")).toThrow("test__org");
+    });
+  });
 });
