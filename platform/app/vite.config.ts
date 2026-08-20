@@ -152,11 +152,12 @@ export default defineConfig(async (): Promise<UserConfig> => {
     // is on the render paths nobody got around to memoizing by hand, and this
     // codebase has plenty (large tables, the trace drawer, the studio canvas).
     //
-    // `compiler: true` runs the Rust port (`oxc-transform-react`, an optional
-    // peer) rather than Babel. It replaces a separate Babel pass over every
-    // file, and it folds the compiler, TypeScript/JSX and Fast Refresh into
-    // the one transform the plugin already performs — so the compiler stops
-    // being a second parse of the whole frontend.
+    // `compiler: true` adds a `vite:react-compiler` pass that runs the Rust
+    // port (`oxc-transform-react`, an optional peer). The alternative was the
+    // Babel plugin, which would put a Babel parse of every file on top of the
+    // oxc transform vite already performs; this keeps the whole pipeline on
+    // oxc. It is still a pass of its own — the plugin has no existing
+    // transform to fold it into — which is what the ~2.4s costs.
     //
     // The compiler bails out per-component when it cannot prove a component
     // follows the rules of React, so an offending file loses the optimization

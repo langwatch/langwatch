@@ -12,9 +12,16 @@ Feature: The React Compiler memoizes the app at build time
   # a build config, and a build config has no user who notices when it goes.
   #
   # The @unit scenarios bind to platform/app/vite/reactCompiler.unit.test.ts,
-  # which resolves the real vite config and runs the real Babel preset. They do
-  # not build the app; what a full production build produces is asserted by the
-  # build itself.
+  # which resolves the real vite config, finds the compiler pass in it, and
+  # drives that pass. Every scenario goes through the resolved config, so
+  # unwiring the compiler fails all three. Calling the transformer directly
+  # would be easier and would prove nothing: its compiler is on by default, so
+  # such a test stays green with the build wired to skip it.
+  #
+  # They do not build the app. Nothing asserts the compiler ran in a full
+  # production build — a build whose compiler silently no-ops is still green —
+  # so the wiring assertion here is the only thing standing between us and a
+  # repeat of #3170.
 
   # ===========================================================================
   # The compiler runs
@@ -25,9 +32,9 @@ Feature: The React Compiler memoizes the app at build time
     Given someone builds the application
     When the frontend passes through the build
     Then the React Compiler transforms it
-    # Vite's React plugin transforms with oxc and cannot host the compiler
-    # itself, so the compiler runs as its own pass. A build that quietly stops
-    # running that pass is indistinguishable from a build that never had it.
+    # The compiler runs as a pass of its own, added to the build alongside the
+    # oxc transform vite already performs. A build that quietly stops running
+    # that pass is indistinguishable from a build that never had it.
 
   @unit
   Scenario: A component is memoized without anyone writing a hook

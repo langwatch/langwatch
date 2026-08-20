@@ -23,6 +23,10 @@
 		"./scripts/**/*.test.ts",
 		"./scripts/**/*.spec.ts",
 		"./scripts/__tests__/**/*",
+		// Build-config tests. `tsconfig.tsgo.json` picks up `vite/*.ts` but
+		// excludes every `*.test.ts`, so without this the tests beside the vite
+		// config are checked by neither project.
+		"./vite/**/*.test.ts",
 		"./e2e/**/*",
 		"next-env.d.ts"
 	],

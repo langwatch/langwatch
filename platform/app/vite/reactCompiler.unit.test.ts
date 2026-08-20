@@ -3,13 +3,17 @@
  *
  * The compiler was enabled under Next.js and lost in the migration to Vite
  * (#3170) with nothing failing. So this reads the real vite config rather than
- * a fixture, and runs the real transformer rather than asserting the config's
- * source text — a string check would have passed for the entire period the
- * compiler was not running.
+ * a fixture, and drives the pass that config produces rather than asserting the
+ * config's source text — a string check would have passed for the entire period
+ * the compiler was not running.
+ *
+ * Every scenario here goes through `compileThroughTheBuild`, which looks the
+ * pass up in the resolved config first. Calling `oxc-transform-react` directly
+ * would be easier and would prove nothing: its compiler is on by default, so
+ * those assertions would stay green with the build wired to skip it entirely.
  *
  * Spec: specs/setup/react-compiler.feature
  */
-import { transform } from "oxc-transform-react";
 import type { Plugin } from "vite";
 import { describe, expect, it } from "vitest";
 
@@ -18,22 +22,114 @@ import viteConfig from "../vite.config";
 const COMPILER_PLUGIN_NAME = "vite:react-compiler";
 
 /**
+ * Hand-rolled rather than `Array.prototype.flat(Infinity)`, whose return type
+ * recurses until the compiler gives up with TS2589.
+ */
+const flatten = (value: unknown): unknown[] =>
+  Array.isArray(value) ? value.flatMap(flatten) : [value];
+
+const isPlugin = (value: unknown): value is Plugin =>
+  typeof value === "object" && value !== null && "name" in value;
+
+/**
  * The config's plugin list, flattened and settled. Vite accepts nested arrays
  * and promises in `plugins`.
  */
-const resolvedPluginNames = async (): Promise<string[]> => {
+const resolvedPlugins = async (): Promise<Plugin[]> => {
   const config = await viteConfig({ command: "build", mode: "production" });
-  const plugins = await Promise.all((config.plugins ?? []).flat(Infinity));
-  return plugins
-    .filter((plugin): plugin is Plugin => !!plugin && "name" in plugin)
-    .map((plugin) => plugin.name);
+  const plugins = await Promise.all(flatten(config.plugins ?? []));
+  return plugins.filter(isPlugin);
 };
 
-/** Runs the transformer the vite config ships, over one component's source. */
-const compile = (source: string) =>
-  transform("Component.tsx", source, {
-    jsx: { runtime: "automatic", development: false, importSource: "react" },
-  });
+/**
+ * What the plugin calls on itself while transforming. `error` throws so that a
+ * diagnostic the compiler escalates fails the test rather than passing quietly
+ * — that escalation is the failure mode the bail-out scenario rules out.
+ */
+interface RecordingContext {
+  environment: undefined;
+  error(reason: unknown): never;
+  warn(reason: unknown): void;
+}
+
+/**
+ * Vite lets a hook be a bare function or `{ handler }`. Accept both.
+ *
+ * Takes `unknown` because vite types each hook's `this` as its own plugin
+ * context, and we are deliberately calling them with a stub that records
+ * instead of one vite built.
+ */
+const handlerOf = <T>(hook: unknown, hookName: string): T => {
+  if (hook === undefined) {
+    throw new Error(`${COMPILER_PLUGIN_NAME} has no ${hookName} hook`);
+  }
+  return (
+    typeof hook === "object" && hook !== null && "handler" in hook
+      ? hook.handler
+      : hook
+  ) as T;
+};
+
+type ConfigHook = (
+  this: RecordingContext,
+  config: Record<string, unknown>,
+  env: { command: string; mode: string },
+) => unknown;
+
+type TransformHook = (
+  this: RecordingContext,
+  code: string,
+  id: string,
+) => Promise<{ code?: string } | string | null | undefined>;
+
+/**
+ * Runs one component's source through the compiler pass the build runs, and
+ * reports what the pass said about it.
+ */
+const compileThroughTheBuild = async (
+  source: string,
+): Promise<{ code: string; warnings: string[] }> => {
+  const plugin = (await resolvedPlugins()).find(
+    (candidate) => candidate.name === COMPILER_PLUGIN_NAME,
+  );
+  if (!plugin) {
+    throw new Error(`the build runs no ${COMPILER_PLUGIN_NAME} pass`);
+  }
+
+  const warnings: string[] = [];
+  const context: RecordingContext = {
+    environment: undefined,
+    error(reason) {
+      throw new Error(String(reason));
+    },
+    warn(reason) {
+      warnings.push(
+        String(
+          reason && typeof reason === "object" && "message" in reason
+            ? reason.message
+            : reason,
+        ),
+      );
+    },
+  };
+
+  // Loads the native compiler the transform then uses.
+  await handlerOf<ConfigHook>(plugin.config, "config").call(
+    context,
+    {},
+    { command: "build", mode: "production" },
+  );
+
+  const result = await handlerOf<TransformHook>(
+    plugin.transform,
+    "transform",
+  ).call(context, source, "/src/TotalCost.tsx");
+
+  return {
+    code: typeof result === "string" ? result : (result?.code ?? ""),
+    warnings,
+  };
+};
 
 const A_COMPILABLE_COMPONENT = `
   export function TotalCost({ spans }) {
@@ -61,32 +157,42 @@ describe("the React Compiler pass", () => {
   describe("given the vite config the application builds with", () => {
     /** @scenario "The build compiles the frontend" */
     it("includes the compiler pass in the plugins the build runs", async () => {
-      expect(await resolvedPluginNames()).toContain(COMPILER_PLUGIN_NAME);
+      const names = (await resolvedPlugins()).map((plugin) => plugin.name);
+
+      expect(names).toContain(COMPILER_PLUGIN_NAME);
     });
   });
 
   describe("given a component that derives a value on every render", () => {
     /** @scenario "A component is memoized without anyone writing a hook" */
-    it("caches the derived value across renders", async () => {
-      const result = await compile(A_COMPILABLE_COMPONENT);
+    it("compiles it with memoization slots it never asked for", async () => {
+      const { code, warnings } = await compileThroughTheBuild(
+        A_COMPILABLE_COMPONENT,
+      );
 
-      expect(result.code).toContain("react/compiler-runtime");
-      expect(result.errors).toEqual([]);
-      expect(A_COMPILABLE_COMPONENT).not.toContain("useMemo");
+      // The cache slots are the memoization: `_c(n)` reserves them, and the
+      // runtime import is what reads them back on the next render.
+      expect(code).toMatch(/_c\(\d+\)/);
+      expect(code).toContain("react/compiler-runtime");
+      expect(warnings).toEqual([]);
     });
   });
 
   describe("when a component breaks the rules of React", () => {
     /** @scenario "Code the compiler cannot prove is left as it was written" */
-    it("leaves it uncompiled instead of failing the build", async () => {
-      const result = await compile(A_COMPONENT_THAT_BREAKS_THE_RULES);
+    it("leaves it uncompiled and reports it instead of failing the build", async () => {
+      const { code, warnings } = await compileThroughTheBuild(
+        A_COMPONENT_THAT_BREAKS_THE_RULES,
+      );
 
-      expect(result.code).not.toContain("react/compiler-runtime");
-      expect(result.code).toContain("useState(spans.length)");
+      expect(code).not.toContain("react/compiler-runtime");
+      expect(code).toContain("useState(spans.length)");
       // Reported, not thrown: the build keeps going without this component's
-      // optimization. A `fatal` here would be the failure mode we are ruling out.
-      expect(result.fatal).toBeFalsy();
-      expect(result.errors.map((error) => error.severity)).toEqual(["Warning"]);
+      // optimization. `context.error` throws, so an escalated diagnostic would
+      // have failed this test before reaching the assertions.
+      expect(warnings.join("\n")).toContain(
+        "Hooks must always be called in a consistent order",
+      );
     });
   });
 });
