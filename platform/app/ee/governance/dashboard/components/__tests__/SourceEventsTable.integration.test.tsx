@@ -317,6 +317,33 @@ describe("given React mounts the table twice, as StrictMode does in development"
     expect(screen.getAllByTestId("source-event-row")).toHaveLength(1);
     expect(screen.queryByTestId("pagination-page-2")).toBeNull();
   });
+
+  it("shows the page the second walk fetched when the first one failed", async () => {
+    // Both starts share a generation and one in-flight flag, so only a
+    // per-walk id can tell the outdated failure from the landing that
+    // actually carries rows.
+    const realServer = fakeServer([
+      makeEvent({ id: "only", ts: BASE_TS, actor: "actor-second@acme.test" }),
+    ]);
+    let shouldFailNext = true;
+    const flakyServer = vi.fn(async (req: PageRequest) => {
+      if (shouldFailNext) {
+        shouldFailNext = false;
+        throw new Error("transient");
+      }
+      return realServer(req);
+    });
+    render(
+      <StrictMode>
+        <ChakraProvider value={defaultSystem}>
+          <Harness fetchPage={flakyServer} pageSize={10} />
+        </ChakraProvider>
+      </StrictMode>,
+    );
+
+    await screen.findByText("actor-second@acme.test");
+    expect(screen.queryByText("Couldn't load this source's events")).toBeNull();
+  });
 });
 
 describe("given a page fetch fails mid-walk", () => {
@@ -331,10 +358,10 @@ describe("given a page fetch fails mid-walk", () => {
       }),
     );
     const realServer = fakeServer(twelve);
-    let failNext = false;
+    let shouldFailNext = false;
     const flakyServer = vi.fn(async (req: PageRequest) => {
-      if (failNext) {
-        failNext = false;
+      if (shouldFailNext) {
+        shouldFailNext = false;
         throw new Error("transient");
       }
       return realServer(req);
@@ -342,7 +369,7 @@ describe("given a page fetch fails mid-walk", () => {
     renderTable({ fetchPage: flakyServer, pageSize: 10 });
     await screen.findByText("actor-e00@acme.test");
 
-    failNext = true;
+    shouldFailNext = true;
     await user.click(screen.getByTestId("pagination-next"));
     await screen.findByText("Couldn't load more events");
     // The walked pages survive the failure.
