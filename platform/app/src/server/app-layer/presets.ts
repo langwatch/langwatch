@@ -135,6 +135,8 @@ import { App, getApp, globalForApp, initializeApp } from "./app";
 import { GrantsLedgerWriter, grantsLedgerWriter } from "./authz/ledger";
 import { PrismaAuthzAuditTrailRepository } from "./authz/repositories/authz-audit-trail.prisma.repository";
 import { PrismaAuthzGrantsProjectionRepository } from "./authz/repositories/authz-grants-projection.prisma.repository";
+import { PrismaIdentityGuardReads } from "./identity/repositories/identity-guard-reads.prisma.repository";
+import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
 import { EmailSuppressionService } from "./automations/emailSuppression.service";
 import { REPORT_SCHEDULER_TARGET_TYPE } from "./automations/report.builder";
 import {
@@ -872,6 +874,8 @@ export function initializeDefaultApp(options?: {
     processStore: new PrismaProcessStore(prisma),
     authzGrantsProjection: new PrismaAuthzGrantsProjectionRepository(prisma),
     authzAuditTrail: new PrismaAuthzAuditTrailRepository(prisma),
+    identityProjection: new PrismaIdentityProjectionRepository(prisma),
+    identityGuardReads: new PrismaIdentityGuardReads(prisma),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),

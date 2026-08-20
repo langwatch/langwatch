@@ -41,6 +41,12 @@ const GLOBAL_MODELS = [
   "Session",
   "User",
   "VerificationToken",
+  // Identity pipeline projection tables (ADR-101, D01): per-user, not
+  // per-project/org, and the D03 router's lookup is by identifier VALUE
+  // before any user is known - inherently cross-user, the same posture as
+  // `User` by email above.
+  "Identifier",
+  "IdentityProjectionCursor",
   // Top-level tenancy entities, addressed by their own id / slug.
   "Organization",
   "Project",

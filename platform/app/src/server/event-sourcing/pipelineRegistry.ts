@@ -100,6 +100,9 @@ import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
 import { createAuthzGrantsPipeline } from "./pipelines/authz-grants/pipeline";
 import type { AuthzGrantsFoldState } from "./pipelines/authz-grants/projections/authzGrantsState.foldProjection";
 import type { AuthzAuditTrailStore } from "./pipelines/authz-grants/subscribers/authzAuditTrail.subscriber";
+import type { IdentityGuardReads } from "./pipelines/identity/commands/identityCommands";
+import { createIdentityPipeline } from "./pipelines/identity/pipeline";
+import type { IdentityFoldState } from "./pipelines/identity/projections/identityState.foldProjection";
 import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
 import { ReportUsageForMonthCommand } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
 import {
@@ -352,6 +355,10 @@ export interface PipelineRepositories {
   authzGrantsProjection: StateProjectionStore<AuthzGrantsFoldState>;
   /** Insert-only audit sink for the grants ledger (ADR-092 decision 17). */
   authzAuditTrail: AuthzAuditTrailStore;
+  /** The identity pipeline's `Identifier` head + cursor (ADR-101 §3). */
+  identityProjection: StateProjectionStore<IdentityFoldState>;
+  /** Postgres reads the identity command guards run against (ADR-101 §2). */
+  identityGuardReads: IdentityGuardReads;
 }
 
 export interface PipelineRegistryDeps {
@@ -646,6 +653,16 @@ export class PipelineRegistry {
         authzGrantsProjectionStore:
           this.deps.repositories.authzGrantsProjection,
         authzAuditTrailStore: this.deps.repositories.authzAuditTrail,
+      }),
+    );
+    // The identity pipeline (ADR-101, D01 PR 1). Ships dark: no production
+    // writer dispatches these commands until the identity adapter lands, and
+    // the adapter's per-user write gate itself ships closed until a user's
+    // backfill (PR 2) latches — a deploy changes nothing on its own.
+    this.deps.eventSourcing.register(
+      createIdentityPipeline({
+        identityProjectionStore: this.deps.repositories.identityProjection,
+        identityGuardReads: this.deps.repositories.identityGuardReads,
       }),
     );
 

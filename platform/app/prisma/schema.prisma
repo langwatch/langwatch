@@ -66,6 +66,11 @@ model User {
   emailVerified                 Boolean                  @default(false)
   image                         String?                  @db.Text
   pendingSsoSetup               Boolean                  @default(false)
+  // Per-user HMAC key for identity event payload hashes (ADR-101 §4): minted
+  // at user creation, shredded on erasure - after which every identifierHash
+  // in the user's event history is unlinkable noise. Row-truth; never in an
+  // event.
+  userHashKey                   String?
   accounts                      Account[]
   sessions                      Session[]
   teamMemberships               TeamUser[]
@@ -126,6 +131,50 @@ model VerificationToken {
   updatedAt  DateTime @default(now()) @updatedAt
 
   @@unique([identifier, token])
+}
+
+// Pure event-truth projection of the identity pipeline (ADR-101, D01): one row
+// per sign-in method a user holds, fold-written from `lw.identity.*` events,
+// rebuilt whole-row by replay (ADR-022/015 apply unamended - no column here is
+// handler-written). Deliberately no foreign keys and no unique constraint on
+// the natural key: DETACHED rows are tombstones that persist forever, so
+// uniqueness of verified values is a command-time guard, not a database
+// constraint. `value` and `identifierHash` are wiped by erasure (R11); the row
+// itself remains as the tombstone replay reproduces.
+// Spec: specs/identity/identifier-model.feature.
+model Identifier {
+  id             String    @id
+  userId         String
+  provider       String
+  value          String?
+  domain         String?
+  identifierHash String?
+  accountId      String?
+  state          String
+  connectionId   String?
+  verifiedAt     DateTime?
+  attachedAt     DateTime
+  detachedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
+
+  @@index([userId])
+  @@index([identifierHash])
+  @@index([value])
+  @@index([domain])
+}
+
+// One row per user: the identity fold's event cursor (the AuthzProjectionCursor
+// pattern, re-tenanted to users). Advanced by the projection writer itself;
+// its (acceptedAt, lastEventId) compare is what makes re-applies no-ops.
+model IdentityProjectionCursor {
+  userId            String   @id
+  lastEventId       String
+  acceptedAt        DateTime
+  occurredAt        DateTime
+  projectionVersion String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
 }
 
 enum TeamUserRole {

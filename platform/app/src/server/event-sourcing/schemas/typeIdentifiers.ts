@@ -18,6 +18,10 @@ import {
   AUTHZ_GRANTS_EVENT_TYPES,
 } from "../pipelines/authz-grants/schemas/constants";
 import {
+  IDENTITY_COMMAND_TYPES,
+  IDENTITY_EVENT_TYPES,
+} from "../pipelines/identity/schemas/constants";
+import {
   AUTOMATIONS_COMMAND_TYPES,
   AUTOMATIONS_EVENT_TYPES,
 } from "../pipelines/automations/schemas/constants";
@@ -81,6 +85,7 @@ const TEST_EVENT_TYPES = ["test.integration.event"] as const;
  */
 export const EVENT_TYPE_IDENTIFIERS = [
   ...AUTHZ_GRANTS_EVENT_TYPES,
+  ...IDENTITY_EVENT_TYPES,
   ...AUTOMATIONS_EVENT_TYPES,
   ...TRACE_PROCESSING_EVENT_TYPES,
   ...METRIC_PROCESSING_EVENT_TYPES,
@@ -103,6 +108,7 @@ export const EVENT_TYPE_IDENTIFIERS = [
  */
 export const COMMAND_TYPE_IDENTIFIERS = [
   ...AUTHZ_GRANTS_COMMAND_TYPES,
+  ...IDENTITY_COMMAND_TYPES,
   ...AUTOMATIONS_COMMAND_TYPES,
   ...TRACE_PROCESSING_COMMAND_TYPES,
   ...METRIC_PROCESSING_COMMAND_TYPES,
@@ -133,6 +139,7 @@ const TEST_AGGREGATE_TYPE = "test_aggregate" as const;
  */
 export const AGGREGATE_TYPE_IDENTIFIERS = [
   "authz_grants",
+  "user_identity",
   "trigger",
   "trace",
   "metric",
