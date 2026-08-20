@@ -36,6 +36,13 @@ if ! flock -n 9; then
 fi
 echo "$EXPECTED_SHA $$" >&9
 
+# Record our own process group so the workflow can kill the whole tree — pnpm,
+# prisma and their children — if the run fails or is cancelled. Read from the
+# kernel rather than assumed from the launcher's $!, which is only the process
+# group id when setsid happens not to fork.
+PGID_FILE="${STATUS%.status}.pgid"
+ps -o pgid= -p $$ | tr -d '[:space:]' > "$PGID_FILE"
+
 trap 'code=$?; if [ "$code" -ne 0 ]; then echo failed > "$STATUS"; fi' EXIT
 
 # no TTY here: pnpm refuses destructive steps without CI=true
@@ -74,8 +81,12 @@ pkill -9 -f "bin/pnpm de[v]" 2>/dev/null || true
 pkill -9 -f "concurrentl[y]" 2>/dev/null || true
 pkill -9 -f "start:ap[p]" 2>/dev/null || true
 sleep 3
-# 9>&- matters: the dev stack outlives this script, and an inherited lock fd
-# would keep the flock held for the life of the machine.
-nohup pnpm dev > "$DEV_LOG" 2>&1 9>&- &
+# Two deliberate details here:
+#   9>&-  the dev stack outlives this script, and an inherited lock fd would
+#         keep the flock held for the life of the machine.
+#   setsid  puts the dev stack in its own session, so that cleaning up a failed
+#         refresh by killing the refresh's process group does not take staging
+#         down with it.
+setsid nohup pnpm dev > "$DEV_LOG" 2>&1 9>&- &
 
 echo done > "$STATUS"

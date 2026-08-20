@@ -94,8 +94,12 @@ jobs:
           B64=$(base64 -w0 .github/scripts/boxd-golden-refresh.sh)
           boxd machine exec --timeout 60 "$GOLDEN" -- bash -c \
             "mkdir -p $REMOTE_DIR && chmod 700 $REMOTE_DIR && echo $B64 | base64 -d > $REMOTE_SCRIPT && chmod +x $REMOTE_SCRIPT && rm -f $REMOTE_STATUS"
+          # setsid gives the refresh its own process group, so cleanup can kill
+          # the whole tree — pnpm, prisma and their children — rather than just
+          # the script. Those children inherit the lock fd, so leaving them
+          # alive would also leave the golden locked against the next run.
           boxd machine exec --timeout 30 "$GOLDEN" -- bash -c \
-            "nohup $REMOTE_SCRIPT '$GITHUB_SHA' '$REMOTE_STATUS' > $REMOTE_LOG 2>&1 & echo launched"
+            "setsid nohup $REMOTE_SCRIPT '$GITHUB_SHA' '$REMOTE_STATUS' > $REMOTE_LOG 2>&1 & echo launched"
 
       - name: Wait for refresh to finish
         env:
@@ -173,15 +177,19 @@ jobs:
           boxd snapshots list
           exit 1
 
-      # Best effort: on cancellation the runner kills the steps above, but the
-      # detached refresh keeps running on the golden. Kill only this run's own
-      # process — never the lock file. The lock is kernel-held, so killing the
-      # owner releases it; deleting it by hand would free it while another
-      # run's refresh was still live.
-      - name: Stop this run's remote refresh if cancelled
-        if: cancelled()
+      # A failed or cancelled run leaves the detached refresh — and everything
+      # pnpm and prisma started under it — running on the golden, holding the
+      # lock through the inherited fd. Kill this run's whole process group.
+      #
+      # Never delete the lock file: it is kernel-held, so killing the owner
+      # releases it, while removing it by hand would free it out from under a
+      # different run that was still working. The dev stack is in its own
+      # session (setsid in the script), so staging survives this cleanup.
+      - name: Stop this run's remote refresh on failure or cancellation
+        if: failure() || cancelled()
         env:
           BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
         run: |
-          boxd machine exec --timeout 30 "$GOLDEN" -- \
-            pkill -9 -f "refresh.${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.s[h]" || true
+          PGID_FILE="${REMOTE_STATUS%.status}.pgid"
+          boxd machine exec --timeout 30 "$GOLDEN" -- bash -c \
+            "PGID=\$(cat $PGID_FILE 2>/dev/null); if [ -n \"\$PGID\" ]; then kill -9 -\"\$PGID\" 2>/dev/null && echo killed group \$PGID || echo 'group \$PGID already gone'; else echo 'no pgid recorded — refresh never started'; fi" || true
