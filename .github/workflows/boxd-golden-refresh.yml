@@ -16,40 +16,62 @@ concurrency:
   group: boxd-golden-refresh
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 env:
-  BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
   GOLDEN: langwatch-golden-v3
   SNAPSHOT: langwatch-main
   GOLDEN_URL: https://langwatch-golden-v3.boxd.sh
+  # Re-pin when boxd ships a new installer:
+  #   curl -fsSL https://boxd.sh/downloads/cli/install.sh | sha256sum
+  BOXD_INSTALLER_SHA256: 935d59706c090a6ed8276c6a8635b1e24b5d9748cf14625365bccd445ee16343
 
 jobs:
   refresh-golden:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      # persist-credentials: false — nothing here talks to git after checkout,
+      # and the default would leave the workflow token in .git/config.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           sparse-checkout: .github
+          persist-credentials: false
 
+      # No BOXD_TOKEN in this step's environment: the installer is third-party
+      # code and must never run with the control-plane credential in scope.
+      # The downloaded script is checksum-verified before it executes.
       - name: Install boxd CLI
         run: |
-          curl -fsSL https://boxd.sh/downloads/install.sh | sh
+          set -euo pipefail
+          curl -fsSL --max-time 60 https://boxd.sh/downloads/cli/install.sh -o /tmp/boxd-install.sh
+          echo "$BOXD_INSTALLER_SHA256  /tmp/boxd-install.sh" | sha256sum -c -
+          sh /tmp/boxd-install.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Golden is running and exec channel works
+        env:
+          BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
         run: |
           boxd machine get "$GOLDEN" --json
           boxd machine exec --timeout 30 "$GOLDEN" -- echo exec-ok | grep -q exec-ok
 
       - name: Launch refresh on golden (detached)
+        env:
+          BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
         run: |
           B64=$(base64 -w0 .github/scripts/boxd-golden-refresh.sh)
           boxd machine exec --timeout 60 "$GOLDEN" -- bash -c \
             "echo $B64 | base64 -d > /tmp/golden-refresh.sh && chmod +x /tmp/golden-refresh.sh && rm -f /tmp/golden-refresh.status"
           boxd machine exec --timeout 30 "$GOLDEN" -- bash -c \
-            "nohup /tmp/golden-refresh.sh > /tmp/golden-refresh.log 2>&1 & echo launched"
+            "nohup /tmp/golden-refresh.sh '$GITHUB_SHA' > /tmp/golden-refresh.log 2>&1 & echo launched"
 
       - name: Wait for refresh to finish
+        env:
+          BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
         run: |
           for i in $(seq 1 120); do
             S=$(boxd machine exec --timeout 30 "$GOLDEN" -- cat /tmp/golden-refresh.status 2>/dev/null || true)
@@ -69,7 +91,7 @@ jobs:
       - name: Wait for /api/health 204
         run: |
           for i in $(seq 1 120); do
-            CODE=$(curl -sk -o /dev/null -w '%{http_code}' "$GOLDEN_URL/api/health" || true)
+            CODE=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' "$GOLDEN_URL/api/health" || true)
             echo "health: $CODE"
             [ "$CODE" = "204" ] && exit 0
             sleep 15
@@ -78,6 +100,8 @@ jobs:
           exit 1
 
       - name: Verify golden serves this exact commit
+        env:
+          BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
         run: |
           DEPLOYED=$(boxd machine exec --timeout 30 "$GOLDEN" -- git -C /home/boxd/langwatch rev-parse HEAD | tr -d '[:space:]')
           echo "deployed=$DEPLOYED expected=$GITHUB_SHA"
@@ -85,11 +109,13 @@ jobs:
 
       - name: Verify API auth layer is up (collector rejects unauthenticated)
         run: |
-          CODE=$(curl -sk -o /dev/null -w '%{http_code}' -X POST "$GOLDEN_URL/api/collector" -H 'Content-Type: application/json' -d '{}')
+          CODE=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' -X POST "$GOLDEN_URL/api/collector" -H 'Content-Type: application/json' -d '{}')
           echo "collector unauthenticated: $CODE"
           [ "$CODE" = "401" ]
 
       - name: Save verified snapshot
+        env:
+          BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
         run: |
           boxd snapshots save "$GOLDEN" "$SNAPSHOT" --json
           boxd snapshots list

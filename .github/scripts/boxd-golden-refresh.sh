@@ -15,10 +15,16 @@ export CI=true
 NODE_BIN="$(ls -d "$HOME"/.nvm/versions/node/*/bin 2>/dev/null | sort -V | tail -1)"
 export PATH="$NODE_BIN:$HOME/bin:$HOME/go/bin:/usr/local/bin:$PATH"
 
+# Deploy the exact commit that triggered the workflow run, not whatever
+# origin/main points at by the time this detached script starts — the job is
+# serialized, so main can move while a run waits its turn.
+EXPECTED_SHA="${1:?expected commit SHA is required}"
+
 cd "$HOME/langwatch"
 git fetch -q origin main
 git checkout -qf main
-git reset -q --hard origin/main
+git rev-parse -q --verify "${EXPECTED_SHA}^{commit}" > /dev/null
+git reset -q --hard "$EXPECTED_SHA"
 
 # app package location: platform/app since the repo restructure, langwatch/ before
 if [ -d platform/app ]; then APP_DIR=platform/app; else APP_DIR=langwatch; fi
