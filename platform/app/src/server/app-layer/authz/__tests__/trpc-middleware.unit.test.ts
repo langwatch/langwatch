@@ -98,7 +98,10 @@ describe("checkDeclaredPermission", () => {
         params as any,
       );
       expect(resolveProjectPermission).toHaveBeenCalledWith(
-        params.ctx,
+        {
+          prisma: params.ctx.prisma,
+          session: { user: { id: "alice" }, expires: "" },
+        },
         "proj-1",
         "traces:view",
       );
@@ -117,7 +120,10 @@ describe("checkDeclaredPermission", () => {
         params as any,
       );
       expect(hasOrganizationPermission).toHaveBeenCalledWith(
-        params.ctx,
+        {
+          prisma: params.ctx.prisma,
+          session: { user: { id: "alice" }, expires: "" },
+        },
         "org-1",
         "organization:manage",
       );
@@ -134,7 +140,10 @@ describe("checkDeclaredPermission", () => {
         via: "teamId",
       })(params as any);
       expect(resolveTeamPermission).toHaveBeenCalledWith(
-        params.ctx,
+        {
+          prisma: params.ctx.prisma,
+          session: { user: { id: "alice" }, expires: "" },
+        },
         "team-1",
         "organization:manage",
       );
@@ -239,7 +248,10 @@ describe("checkDeclaredPermissionAny", () => {
       params as any,
     );
     expect(resolveProjectPermissionAny).toHaveBeenCalledWith(
-      params.ctx,
+      {
+        prisma: params.ctx.prisma,
+        session: { user: { id: "alice" }, expires: "" },
+      },
       "proj-1",
       ["traces:view", "scenarios:view"],
     );

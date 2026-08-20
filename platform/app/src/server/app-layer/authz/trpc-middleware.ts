@@ -3,13 +3,16 @@
  * declaration surface. `protectedProcedure.input(…).permission("…")` compiles
  * down to the middleware built here.
  *
- * ONE seam, decision-neutral: the runtime delegates to the same fork-aware
- * resolvers the legacy `checkXxxPermission` middlewares ran (`rbac.ts`), so a
- * not-yet-cut-over organization is still decided by the legacy walk with the
- * engine shadowing it, and a cut-over organization by the engine with legacy
- * as reverse-shadow. Deploying the codemod changes no decision anywhere; the
- * contract PR later deletes the legacy branch inside the resolvers — one
- * file, not four hundred call sites.
+ * ONE seam, decision-neutral, properly layered: this middleware is the tRPC
+ * boundary, it composes the `PermissionsService`, which takes the
+ * `ForkAwarePermissionDecisionRepository`, which owns the client and
+ * delegates to the same fork-aware resolvers the legacy
+ * `checkXxxPermission` middlewares ran (`rbac.ts`) — so a not-yet-cut-over
+ * organization is still decided by the legacy walk with the engine shadowing
+ * it, and a cut-over organization by the engine with legacy as
+ * reverse-shadow. Deploying the codemod changes no decision anywhere; the
+ * contract PR later rewires only the repository — one file, not four hundred
+ * call sites.
  *
  * What IS deliberately new here is the denial shape: every tier's refusal now
  * carries the engine's one handled code (`permission_denied`, with the
@@ -36,14 +39,9 @@ import type {
   OrganizationUserRole,
   PrismaClient,
 } from "~/generated/prisma/client";
-import {
-  hasOrganizationPermission,
-  resolveProjectPermission,
-  resolveProjectPermissionAny,
-  resolveTeamPermission,
-} from "../../api/rbac";
 import type { Session } from "../../auth";
 import { LiteMemberRestrictedError } from "../permissions/errors";
+import { permissionsServiceFor } from "../permissions/runtime";
 import {
   type DeclaredAuthzMiddleware,
   declareAuthzMiddleware,
@@ -92,12 +90,9 @@ export const checkDeclaredPermission = ({
       }
 
       const scope = requireDeclaredScope({ permission, input, via });
-      const sessionCtx = ctx as MiddlewareParams["ctx"] & { session: Session };
-      const { permitted, organizationRole } = await decideAtTier({
-        ctx: sessionCtx,
-        scope,
-        permission,
-      });
+      const { permitted, organizationRole } = await permissionsServiceFor(
+        ctx.prisma,
+      ).getDecision({ userId: ctx.session.user.id, permission, scope });
       if (!permitted) {
         throw deniedError({ permission, scope, organizationRole });
       }
@@ -111,35 +106,6 @@ export const checkDeclaredPermission = ({
       return next();
     },
   );
-
-/**
- * The one runtime behind every declared check: each tier delegates to the
- * same fork-aware resolver the legacy middleware for that tier ran.
- */
-async function decideAtTier({
-  ctx,
-  scope,
-  permission,
-}: {
-  ctx: MiddlewareParams["ctx"] & { session: Session };
-  scope: DeclaredScopeId;
-  permission: AuthzPermission;
-}): Promise<{
-  permitted: boolean;
-  organizationRole: OrganizationUserRole | null;
-}> {
-  switch (scope.tier) {
-    case "project":
-      return await resolveProjectPermission(ctx, scope.id, permission);
-    case "team":
-      return await resolveTeamPermission(ctx, scope.id, permission);
-    case "organization":
-      return {
-        permitted: await hasOrganizationPermission(ctx, scope.id, permission),
-        organizationRole: null,
-      };
-  }
-}
 
 /**
  * `.permissionAny(…)` — any one of the permissions is enough, checked at the
@@ -161,12 +127,13 @@ export const checkDeclaredPermissionAny = (
       if (typeof projectId !== "string" || projectId.length === 0) {
         throw wiringBug({ permission: permissions[0] });
       }
-      const sessionCtx = ctx as MiddlewareParams["ctx"] & { session: Session };
-      const { permitted, organizationRole } = await resolveProjectPermissionAny(
-        sessionCtx,
+      const { permitted, organizationRole } = await permissionsServiceFor(
+        ctx.prisma,
+      ).getProjectAnyDecision({
+        userId: ctx.session.user.id,
         projectId,
-        [...permissions],
-      );
+        permissions,
+      });
       if (!permitted) {
         throw deniedError({
           permission: permissions[0],

@@ -1,6 +1,6 @@
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
-import { PermissionsService } from "~/server/app-layer/permissions/permissions.service";
+import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
 
 /**
  * Asserts that a user holds the given permission on a project.
@@ -32,6 +32,6 @@ export async function requireProjectPermission({
   permission: Permission;
   prisma: PrismaClient;
 }): Promise<void> {
-  const service = new PermissionsService(prisma);
+  const service = permissionsServiceFor(prisma);
   return service.requireProjectPermission({ userId, projectId, permission });
 }
