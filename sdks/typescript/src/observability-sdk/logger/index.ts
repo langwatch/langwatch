@@ -1,8 +1,8 @@
 import {
+  createNoopLogger,
   type Logger,
   type LoggerOptions,
   type LoggerProvider,
-  createNoopLogger,
 } from "@opentelemetry/api-logs";
 import { LangWatchLoggerInternal } from "./implementation";
 import type { LangWatchLogger } from "./types";
