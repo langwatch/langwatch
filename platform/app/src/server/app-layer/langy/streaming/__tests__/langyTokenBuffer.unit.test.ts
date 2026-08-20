@@ -24,15 +24,27 @@ interface RecordedEntry {
   text?: string;
 }
 
+/**
+ * A stream that reads back what was written, keyed the way redis keys it.
+ * `xrange` used to return `[]` unconditionally, which quietly made any
+ * assertion about reading the stream a test of the fake instead of the code.
+ */
 function makeRedis(): { redis: LangyStreamRedis; entries: RecordedEntry[] } {
   const entries: RecordedEntry[] = [];
+  const streams = new Map<string, Array<[string, string[]]>>();
+  let seq = 0;
   const redis: LangyStreamRedis = {
-    xadd: async (_key, ...args) => {
+    xadd: async (key, ...args) => {
       // Payload is the last arg (single `p` field).
-      entries.push(JSON.parse(String(args[args.length - 1])) as RecordedEntry);
-      return "1-1";
+      const payload = String(args[args.length - 1]);
+      entries.push(JSON.parse(payload) as RecordedEntry);
+      const id = `1-${++seq}`;
+      const rows = streams.get(key) ?? [];
+      rows.push([id, ["p", payload]]);
+      streams.set(key, rows);
+      return id;
     },
-    xrange: async () => [],
+    xrange: async (key) => streams.get(key) ?? [],
     expire: async () => 1,
     set: async () => "OK",
     get: async () => null,
@@ -186,7 +198,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
           name: "bash",
           phase: "end",
         });
-        await buffer.markEnd(ids);
+        await buffer.markEnd({ ...ids, backstopSilentTurn: true });
 
         expect(deltas(entries)).toEqual([
           { type: "delta", text: LANGY_EMPTY_TURN_FALLBACK },
@@ -202,13 +214,56 @@ describe("LangyTokenBuffer hybrid flush", () => {
         // Whitespace is truthy, so this used to satisfy the has-written check
         // while the panel still rendered nothing the user could read.
         await buffer.appendChunk({ ...ids, text: "\n\n  " });
-        await buffer.markEnd(ids);
+        await buffer.markEnd({ ...ids, backstopSilentTurn: true });
 
         expect(
           deltas(entries)
             .map((entry) => entry.text)
             .join(""),
         ).toContain(LANGY_EMPTY_TURN_FALLBACK);
+      });
+    });
+
+    describe("when the stream ends for a reason other than the turn finishing", () => {
+      /** @scenario A stream that ends without the turn finishing says nothing */
+      it("stays silent on a user stop, which lands on a partial answer", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = new LangyTokenBuffer({ redis });
+
+        // stopTurn ends the stream on its own buffer instance, one that never
+        // saw a chunk. Reading that as "the turn wrote no reply" put the
+        // fallback after every single stop, including the ones with a real
+        // half-answer above them.
+        const { backstopped } = await buffer.markEnd(ids);
+
+        expect(backstopped).toBe(false);
+        expect(deltas(entries)).toEqual([]);
+        expect(entries.at(-1)?.type).toBe("end");
+      });
+    });
+  });
+
+  describe("given the worker reconnects part way through a turn", () => {
+    describe("when the turn finishes on a buffer that never saw the deltas", () => {
+      /** @scenario A turn never ends silently */
+      it("reads the stream rather than its own memory, and stays quiet", async () => {
+        // One redis, two buffers: a buffer is built per relay request, so the
+        // instance that ends the stream is not always the one that filled it.
+        const { redis, entries } = makeRedis();
+        const streamed = new LangyTokenBuffer({ redis });
+        const ending = new LangyTokenBuffer({ redis });
+
+        await streamed.appendChunk({ ...ids, text: "Found 3 failing traces." });
+        await streamed.flush(ids);
+        const { backstopped } = await ending.markEnd({
+          ...ids,
+          backstopSilentTurn: true,
+        });
+
+        expect(backstopped).toBe(false);
+        expect(deltas(entries)).toEqual([
+          { type: "delta", text: "Found 3 failing traces." },
+        ]);
       });
     });
   });
@@ -252,10 +307,10 @@ describe("LangyTokenBuffer hybrid flush", () => {
         const buffer = new LangyTokenBuffer({ redis });
 
         await buffer.appendChunk({ ...ids, text: "First answer." });
-        await buffer.markEnd(ids);
+        await buffer.markEnd({ ...ids, backstopSilentTurn: true });
 
         const second = { conversationId: "conv_1", turnId: "turn_2" };
-        await buffer.markEnd(second);
+        await buffer.markEnd({ ...second, backstopSilentTurn: true });
 
         expect(deltas(entries).at(-1)).toEqual({
           type: "delta",

@@ -490,14 +490,25 @@ export class LangyTokenBuffer {
     });
   }
 
-  /** Terminal marker: the turn completed. Flushes buffered tokens first. */
+  /**
+   * Terminal marker: the live stream is over. Flushes buffered tokens first.
+   *
+   * `backstopSilentTurn` asks for the empty-turn fallback line, and only a
+   * genuinely completed turn may ask. A user Stop and an ADR-048 handoff both
+   * end the stream too, and neither is a turn that finished without writing a
+   * reply: Stop usually lands on a real partial answer, and a handoff is
+   * re-driven on a fresh worker. Telling either one "I finished this turn
+   * without writing a reply" is wrong on both halves of the sentence.
+   */
   async markEnd({
     conversationId,
     turnId,
+    backstopSilentTurn = false,
   }: {
     conversationId: string;
     turnId: string;
-  }): Promise<void> {
+    backstopSilentTurn?: boolean;
+  }): Promise<{ backstopped: boolean }> {
     await this.flush({ conversationId, turnId });
     await this.flushReasoning({ conversationId, turnId });
     // A turn that completes without a text delta leaves a finished spinner and
@@ -505,7 +516,11 @@ export class LangyTokenBuffer {
     // the turn succeeded. The agent is told to always end with visible text;
     // this is the backstop. Pure whitespace reads the same as nothing, so it
     // takes the fallback too.
-    if (!this.sawVisibleText.has(this.pendingKey(conversationId, turnId))) {
+    const backstopped =
+      backstopSilentTurn &&
+      !this.sawVisibleText.has(this.pendingKey(conversationId, turnId)) &&
+      !(await this.streamCarriesVisibleText({ conversationId, turnId }));
+    if (backstopped) {
       await this.append(conversationId, turnId, {
         type: "delta",
         text: LANGY_EMPTY_TURN_FALLBACK,
@@ -514,6 +529,29 @@ export class LangyTokenBuffer {
     this.firstFlushDone.delete(this.pendingKey(conversationId, turnId));
     this.sawVisibleText.delete(this.pendingKey(conversationId, turnId));
     await this.append(conversationId, turnId, { type: "end" });
+    return { backstopped };
+  }
+
+  /**
+   * Did this turn already write something the user can read?
+   *
+   * `sawVisibleText` is in-memory and a buffer is built per relay request, so a
+   * worker that reconnects mid-turn ends the stream on an instance that never
+   * saw the earlier deltas. The stream is the durable record of what the user
+   * got, so it decides. Only reached when instance memory says nothing was
+   * written, which is the rare case, so the normal path pays no read.
+   */
+  private async streamCarriesVisibleText({
+    conversationId,
+    turnId,
+  }: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<boolean> {
+    const { reads } = await this.readTail({ conversationId, turnId });
+    return reads.some(
+      ({ entry }) => entry.type === "delta" && entry.text.trim() !== "",
+    );
   }
 
   /** Terminal marker: the turn errored. Flushes buffered tokens first. */

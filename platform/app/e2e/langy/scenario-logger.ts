@@ -8,6 +8,7 @@ import {
   type BrowserQAResult,
   browserQA,
 } from "./browser-qa";
+import { isTransientInfrastructureError } from "./langy-agent";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,13 +61,13 @@ export async function runScenarioAndLog(
   // rather than counting how many appeared. A scenario whose write cannot be
   // repeated must not run through here until the library can resume a single
   // turn instead of the whole script.
-  const transient = ["langy_worker_stopped", "never settled"];
+  // The adapter marks both on the error it throws, so this reads a flag rather
+  // than looking for a code inside prose that is free to be reworded.
   let result: Result;
   try {
     result = await scenario.run(config);
   } catch (error) {
-    const message = String(error);
-    if (!transient.some((marker) => message.includes(marker))) throw error;
+    if (!isTransientInfrastructureError(error)) throw error;
     console.log(`[scenario] transient infrastructure failure, retrying once`);
     result = await scenario.run(config);
   }

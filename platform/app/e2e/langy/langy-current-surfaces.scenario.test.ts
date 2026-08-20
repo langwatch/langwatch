@@ -349,7 +349,6 @@ describe("Langy current-surfaces coverage", () => {
         `Layer 2 trigger guard: ${created ? `LEAKED ${created.name}` : "nothing created"}`,
       );
       expect(created).toBeFalsy();
-      expect(created?.active).toBe(false);
     });
   });
 

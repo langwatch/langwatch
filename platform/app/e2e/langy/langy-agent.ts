@@ -172,24 +172,59 @@ async function trpcMutateWithTurnLockRetry<T>({
 }
 
 /**
+ * The turn failed for a reason that says nothing about how Langy behaves: the
+ * worker died mid-reply, or the stream closed without the turn ever settling.
+ * The scenario logger retries one of these once instead of grading it.
+ *
+ * A property rather than a message match. The two markers used to be found by
+ * substring on `String(error)`, which reads a code out of prose and breaks the
+ * moment the wording moves.
+ */
+export function isTransientInfrastructureError(error: unknown): boolean {
+  return (
+    (error as { transientInfrastructure?: boolean } | null)
+      ?.transientInfrastructure === true
+  );
+}
+
+function transientInfrastructureError(message: string): Error {
+  const error = new Error(message) as Error & {
+    transientInfrastructure?: boolean;
+  };
+  error.transientInfrastructure = true;
+  return error;
+}
+
+/**
  * The stream's error entry carries the handled-error JSON as a string in
  * `error` (and human text in `errorText`). Returns its code and tips when it
  * parses as one, null for anything else.
+ *
+ * The app parses the same shape in `readLangyStreamError`, and this stays a
+ * separate reader on purpose: the suite drives a live stack over HTTP and
+ * imports nothing from `src/`, so it cannot drift with a refactor it never
+ * compiled against. What it must not do is trust the shape, since `tips[0]`
+ * goes into the text a judge grades — every field is checked here.
  */
 function parseHandledStreamError(entry: {
   error?: unknown;
 }): { code: string; tips: string[] } | null {
   if (typeof entry.error !== "string") return null;
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(entry.error) as {
-      code?: string;
-      tips?: string[];
-    };
-    if (typeof parsed.code !== "string") return null;
-    return { code: parsed.code, tips: parsed.tips ?? [] };
+    parsed = JSON.parse(entry.error);
   } catch {
     return null;
   }
+  if (!parsed || typeof parsed !== "object") return null;
+  const { code, tips } = parsed as { code?: unknown; tips?: unknown };
+  if (typeof code !== "string") return null;
+  return {
+    code,
+    tips: Array.isArray(tips)
+      ? tips.filter((tip): tip is string => typeof tip === "string")
+      : [],
+  };
 }
 
 /** Reads the onTurnStream SSE frames until the server closes the response. */
@@ -217,6 +252,7 @@ async function streamTurnText({
   let buf = "";
   let assistantText = "";
   let streamError: string | null = null;
+  let streamErrorCode: string | null = null;
   let sawTerminal = false;
 
   const handleFrame = (rawFrame: string) => {
@@ -254,6 +290,7 @@ async function streamTurnText({
             typeof entry.errorText === "string"
               ? entry.errorText
               : `Langy stream error (raw: ${JSON.stringify(entry)})`;
+          streamErrorCode = parsed?.code ?? null;
         }
       }
       if (entry.type === "end") sawTerminal = true;
@@ -276,7 +313,14 @@ async function streamTurnText({
   buf += decoder.decode();
   if (buf.trim()) handleFrame(buf);
 
-  if (streamError) throw new Error(`Langy turn error: ${streamError}`);
+  if (streamError) {
+    const message = `Langy turn error: ${streamError}`;
+    // A worker that died mid-reply says nothing about how Langy answers, so it
+    // is retried rather than graded. Any other handled code is a real outcome.
+    throw streamErrorCode === "langy_worker_stopped"
+      ? transientInfrastructureError(message)
+      : new Error(message);
+  }
   // Whitespace is truthy, so a turn whose only deltas were blank lines would
   // otherwise be handed to the judge as a reply the user cannot see.
   if (assistantText.trim()) return assistantText;
@@ -294,10 +338,13 @@ async function streamTurnText({
   // still held (the adapter's own retry budget is ~120s) or the machine was
   // loaded. That is infrastructure, not agent behaviour, so it fails loudly
   // here rather than being scored as a bad answer.
-  throw new Error(
-    sawTerminal
-      ? "Langy turn ended with a terminal marker but no visible text — the empty-turn fallback did not fire"
-      : "Langy turn produced no text and never settled — the stream closed with no terminal marker (conversation lock still held, or the stack is too loaded to answer); this is an environment failure, not a reply to grade",
+  if (sawTerminal) {
+    throw new Error(
+      "Langy turn ended with a terminal marker but no visible text — the empty-turn fallback did not fire",
+    );
+  }
+  throw transientInfrastructureError(
+    "Langy turn produced no text and never settled — the stream closed with no terminal marker (conversation lock still held, or the stack is too loaded to answer); this is an environment failure, not a reply to grade",
   );
 }
 
