@@ -19,6 +19,10 @@ import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
 import { ActivityMonitorService } from "../activity-monitor/activityMonitor.service";
 
 const USER_KEY = "langwatch.user_id";
@@ -93,6 +97,9 @@ describe("ActivityMonitorService.spendByDepartment", () => {
     const maybeCh = getTestClickHouseClient();
     if (!maybeCh) throw new Error("ClickHouse test container not available");
     ch = maybeCh;
+    // The service resolves its org client through getApp().clickhouse now
+    // (two-door access), so the fixture installs the App the seam expects.
+    installClickHouseTestApp({ resolveClient: async () => ch });
 
     org = await prisma.organization.create({
       data: { name: ns, slug: `org-${ns}` },
@@ -216,6 +223,7 @@ describe("ActivityMonitorService.spendByDepartment", () => {
   });
 
   afterAll(async () => {
+    await clearClickHouseTestApp();
     await prisma.project
       .deleteMany({
         where: { team: { organizationId: { in: [org.id, crossOrg.id] } } },

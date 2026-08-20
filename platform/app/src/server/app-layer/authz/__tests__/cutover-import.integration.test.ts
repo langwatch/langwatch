@@ -224,17 +224,16 @@ describe("given an organization whose legacy facts live outside its bindings", (
     expect(resourceGrant?.expiresAt).toEqual(SHARE_EXPIRES_AT);
     expect(resourceGrant?.occurredAt).toEqual(SHARE_LINK_AT);
 
-    // Operator access is the live admin list, never a ledger fact. The org
-    // filter would be the wider net, but sibling suites legitimately import
-    // grants for their own organizations into this shared database - what no
-    // suite may ever write is a platform-scoped cutover grant, for anyone.
-    const strayGrants = await prisma.grant.findMany({
-      where: {
-        source: "cutover-import",
-        scopeType: GrantScopeType.PLATFORM,
-      },
-    });
-    expect(strayGrants).toEqual([]);
+    // Operator access is the live admin list, never a ledger fact: no
+    // platform-scoped cutover grant may exist for anyone, anywhere. The
+    // tenancy guard (rightly) refuses an org-unkeyed Grant query from app
+    // code, so this fleet-wide invariant reads the table raw - the one
+    // reader with a legitimate claim to every organization's rows at once.
+    const strayPlatformGrants = await prisma.$queryRaw<
+      Array<{ count: bigint }>
+    >`SELECT COUNT(*)::bigint AS count FROM "Grant"
+      WHERE source = 'cutover-import' AND "scopeType" = 'PLATFORM'`;
+    expect(Number(strayPlatformGrants[0]?.count ?? -1)).toBe(0);
 
     // Nothing the import stated carries the time it was stated. The
     // organization's two imported facts - the share link and the project's
