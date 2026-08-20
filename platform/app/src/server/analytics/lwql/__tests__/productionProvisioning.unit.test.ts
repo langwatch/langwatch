@@ -25,6 +25,7 @@ import type { LangWatchQLConnection } from "../executor";
 import {
   LWQL_KEY_MAP_TABLE,
   lwqlKeyMapTableQualifiedName,
+  lwqlPostgresSchemaFromDatabaseUrl,
   planLwqlKeyMapBackfill,
   productionClickHouseObjectStatements,
   productionLangWatchQLNames,
@@ -159,6 +160,44 @@ describe("given productionPostgresApprovedViewStatements", () => {
     expect(
       productionPostgresApprovedViewStatements({ views: [GATED_DATASET] }),
     ).toEqual([]);
+  });
+
+  it("creates the view in the given schema, not a hardcoded public", () => {
+    const statements = productionPostgresApprovedViewStatements({
+      schema: "langwatch_db",
+      views: [POSTGRES_RESIDENT_VIEW],
+    });
+
+    expect(statements[0]).toContain('"langwatch_db".');
+    expect(statements[0]).not.toContain('"public".');
+  });
+});
+
+describe("given lwqlPostgresSchemaFromDatabaseUrl", () => {
+  it("reads Prisma's schema query parameter", () => {
+    expect(
+      lwqlPostgresSchemaFromDatabaseUrl(
+        "postgresql://user:pass@db.internal:5432/langwatch_db?sslmode=no-verify&schema=langwatch_db",
+      ),
+    ).toBe("langwatch_db");
+  });
+
+  it("defaults to public when the URL names no schema", () => {
+    expect(
+      lwqlPostgresSchemaFromDatabaseUrl(
+        "postgresql://user:pass@db.internal:5432/mydb",
+      ),
+    ).toBe("public");
+  });
+
+  it("defaults to public when no URL is set at all", () => {
+    expect(lwqlPostgresSchemaFromDatabaseUrl(undefined)).toBe("public");
+  });
+
+  it("throws on a present-but-unparseable URL instead of silently provisioning into public", () => {
+    expect(() => lwqlPostgresSchemaFromDatabaseUrl("not a url")).toThrow(
+      /not a parseable URL/,
+    );
   });
 });
 

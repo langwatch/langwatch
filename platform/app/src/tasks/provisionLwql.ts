@@ -25,6 +25,7 @@ import { lwqlConnectionFromEnv } from "../server/analytics/lwql/executor";
 import {
   type LwqlKeyMapBackfillPlan,
   lwqlKeyMapTableQualifiedName,
+  lwqlPostgresSchemaFromDatabaseUrl,
   planLwqlKeyMapBackfill,
   productionClickHouseObjectStatements,
   productionLangWatchQLNames,
@@ -172,7 +173,14 @@ export default async function execute() {
   );
 
   try {
-    await runPostgresStatements(productionPostgresApprovedViewStatements());
+    await runPostgresStatements(
+      productionPostgresApprovedViewStatements({
+        // The schema the tables actually live in (Prisma's `?schema=` URL
+        // parameter), not a hardcoded `public` — the SaaS cloud deploys with
+        // `schema=langwatch_db`, where `public."Annotation"` does not exist.
+        schema: lwqlPostgresSchemaFromDatabaseUrl(process.env.DATABASE_URL),
+      }),
+    );
   } catch (error) {
     logger.error(
       { error },

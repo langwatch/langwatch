@@ -46,8 +46,39 @@ import {
  */
 export const LWQL_KEY_MAP_TABLE = "lwql_api_key_tenant_map";
 
-/** PostgreSQL schema the approved views live in. */
+/** PostgreSQL schema the approved views live in when the URL names none. */
 export const LWQL_POSTGRES_SCHEMA = "public";
+
+/**
+ * The schema the application's tables actually live in, read from the
+ * connection URL's `schema` query parameter (the same one Prisma honours).
+ *
+ * Hardcoding `public` here broke on any deployment whose `DATABASE_URL`
+ * carries `?schema=...` — the SaaS cloud runs with `schema=langwatch_db` —
+ * because the approved views name their base relations schema-qualified, and
+ * `public."Annotation"` does not exist there. The views must be created in,
+ * and read from, the schema the tables are in: it is also the schema the
+ * infra-owned reader-role bootstrap grants `lwql_%` views in and puts first
+ * on the role's `search_path`.
+ *
+ * Throws on a present-but-unparseable URL rather than defaulting: silently
+ * provisioning into `public` on a deployment that meant another schema is
+ * the exact failure this function exists to close.
+ */
+export function lwqlPostgresSchemaFromDatabaseUrl(
+  databaseUrl: string | undefined,
+): string {
+  if (!databaseUrl) return LWQL_POSTGRES_SCHEMA;
+  let url: URL;
+  try {
+    url = new URL(databaseUrl);
+  } catch {
+    throw new Error(
+      "lwql provisioning: DATABASE_URL is set but not a parseable URL, cannot determine the PostgreSQL schema for the approved views",
+    );
+  }
+  return url.searchParams.get("schema") ?? LWQL_POSTGRES_SCHEMA;
+}
 
 /**
  * Builds the object names a production deploy provisions under, from the
@@ -123,12 +154,15 @@ export function productionClickHouseObjectStatements({
  * always runs.
  */
 export function productionPostgresApprovedViewStatements({
+  schema = LWQL_POSTGRES_SCHEMA,
   views = LWQL_VIEW_CATALOG,
 }: {
+  /** From {@link lwqlPostgresSchemaFromDatabaseUrl} in a real deploy. */
+  schema?: string;
   views?: readonly LangWatchQLViewDefinition[];
 } = {}): string[] {
   return lwqlPostgresApprovedViewStatements({
-    schema: LWQL_POSTGRES_SCHEMA,
+    schema,
     views,
   });
 }
