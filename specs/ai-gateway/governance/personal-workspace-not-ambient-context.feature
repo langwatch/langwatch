@@ -123,6 +123,41 @@ Feature: A personal workspace is never the ambient context for organization work
       # held to the membership test.
 
   # ============================================================================
+  # An organization admin reaches every team, so the test must not drop theirs
+  # ============================================================================
+
+  Rule: the membership test reads as "can the caller be shown this team"
+
+    An organization admin reaches every team of the organization, with or
+    without a membership row in it: the page body renders for them on the
+    admin role alone, and the picker offers them every project. A membership
+    test written as the team rows alone therefore throws away an admin's own
+    selection, and the project they picked reverts to another team's project
+    on every page that carries no project in its address, the app root
+    included. The test is the same one the page body applies: a membership
+    row, or the admin role.
+
+    Background:
+      Given ada is an admin of "ACME"
+      And ada belongs to the shared team holding "acme-app", and not to
+        "ACME Platform"
+
+    @integration
+    Scenario: The admin's picked project survives a page that names no project
+      Given ada has just opened "ACME Platform"'s project
+      When ada opens an organization-scoped settings page
+      Then the ambient project is still "ACME Platform"'s project
+      And the ambient team is "ACME Platform"
+
+    @integration
+    Scenario: The admin's remembered team survives
+      Given ada's remembered selection names "ACME Platform"
+      When ada opens an organization-scoped settings page
+      Then the ambient team is "ACME Platform"
+      # A member keeps healing to the team they are on, which the rule
+      # above still covers: only the admin role opens the other team.
+
+  # ============================================================================
   # The address bar still decides
   # ============================================================================
 

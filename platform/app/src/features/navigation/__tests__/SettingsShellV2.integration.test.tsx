@@ -364,6 +364,20 @@ describe("the settings shell in a new navigation mode", () => {
       });
     });
 
+    /** @scenario "The way back stays in place while the menu scrolls" */
+    it("keeps the way back out of the region the menu scrolls in", () => {
+      renderSettings();
+
+      const scrollRegion = screen.getByTestId("sidebar-scroll-region");
+      expect(scrollRegion).not.toContainElement(
+        screen.getByRole("link", { name: /^Back/ }),
+      );
+      // The pages themselves are what scrolls, so they stay inside it.
+      expect(scrollRegion).toContainElement(
+        screen.getByRole("link", { name: "Members" }),
+      );
+    });
+
     it("hides the enterprise entries outside an enterprise plan", () => {
       mockIsEnterprise = false;
       renderSettings();

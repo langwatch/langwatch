@@ -150,6 +150,62 @@ import { MENU_WIDTH_EXPANDED } from "~/components/MainMenu";
 import { ProductSidebar } from "../shell/ProductSidebar";
 import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../shell/shellLayout";
 
+/**
+ * jsdom has no scrollIntoView at all, so the menu's own call is what the
+ * scroll assertions read: which entry it aimed at, and where in the
+ * column it asked to put it. Removed again in afterEach.
+ */
+function recordScrollIntoView(): {
+  element: HTMLElement;
+  options?: ScrollIntoViewOptions;
+}[] {
+  const scrolls: { element: HTMLElement; options?: ScrollIntoViewOptions }[] =
+    [];
+  (
+    window.HTMLElement.prototype as unknown as {
+      scrollIntoView: (options?: ScrollIntoViewOptions) => void;
+    }
+  ).scrollIntoView = function (
+    this: HTMLElement,
+    options?: ScrollIntoViewOptions,
+  ) {
+    scrolls.push({ element: this, options });
+  };
+  return scrolls;
+}
+
+/**
+ * jsdom reports every box at the origin, so the one measurement the reveal
+ * reads is stubbed: how far the active entry sits below the top of the
+ * menu it scrolls in.
+ */
+function stubEntryOffset({
+  entryLabel,
+  offset,
+}: {
+  entryLabel: string;
+  offset: number;
+}) {
+  const rectAt = (top: number) => ({ ...EMPTY_RECT, top, y: top });
+  window.HTMLElement.prototype.getBoundingClientRect = function (
+    this: HTMLElement,
+  ) {
+    if (this.dataset.testid === "sidebar-scroll-region") return rectAt(0);
+    if (this.getAttribute("aria-label") === entryLabel) return rectAt(offset);
+    return rectAt(0);
+  } as HTMLElement["getBoundingClientRect"];
+}
+
+const EMPTY_RECT = {
+  bottom: 0,
+  height: 0,
+  left: 0,
+  right: 0,
+  toJSON: () => ({}),
+  width: 0,
+  x: 0,
+} as const;
+
 function renderSidebar(surface: "me" | "llm-ops" | "gateway" | "governance") {
   return render(
     <ChakraProvider value={defaultSystem}>
@@ -166,11 +222,16 @@ beforeEach(() => {
   localStorage.clear();
 });
 
+const realGetBoundingClientRect =
+  window.HTMLElement.prototype.getBoundingClientRect;
+
 afterEach(() => {
   cleanup();
   // jsdom has no scrollIntoView; the deep-link test installs one.
   delete (window.HTMLElement.prototype as { scrollIntoView?: unknown })
     .scrollIntoView;
+  window.HTMLElement.prototype.getBoundingClientRect =
+    realGetBoundingClientRect;
 });
 
 describe("the product sidebar", () => {
@@ -259,23 +320,59 @@ describe("the product sidebar", () => {
   describe("when a page is opened by its address", () => {
     /** @scenario "Opening a page by its address reveals its sidebar entry" */
     it("brings that page's entry into view", async () => {
-      const scrolledInto: HTMLElement[] = [];
-      (
-        window.HTMLElement.prototype as unknown as {
-          scrollIntoView: (options?: ScrollIntoViewOptions) => void;
-        }
-      ).scrollIntoView = function (this: HTMLElement) {
-        scrolledInto.push(this);
-      };
+      const scrolls = recordScrollIntoView();
 
       mockPathname = "/gateway/virtual-keys";
       renderSidebar("gateway");
 
       await waitFor(() => {
         expect(
-          scrolledInto.some((el) => el.textContent?.includes("Virtual Keys")),
+          scrolls.some((scroll) =>
+            scroll.element.textContent?.includes("Virtual Keys"),
+          ),
         ).toBe(true);
       });
+      expect(
+        scrolls.every((scroll) => scroll.options?.block === "nearest"),
+      ).toBe(true);
+    });
+
+    /** @scenario "Opening a page by its address reveals its sidebar entry" */
+    it("scrolls the menu so that entry sits at the top of the column", async () => {
+      // jsdom lays nothing out, so the entry is placed by hand: 300px
+      // down a menu whose own box starts at the top of the viewport.
+      stubEntryOffset({ entryLabel: "Virtual Keys", offset: 300 });
+
+      mockPathname = "/gateway/virtual-keys";
+      renderSidebar("gateway");
+
+      await waitFor(() => {
+        expect(screen.getByTestId("sidebar-scroll-region").scrollTop).toBe(300);
+      });
+    });
+
+    /** @scenario "Moving inside the menu leaves the scroll where it is" */
+    it("leaves the scroll alone once the reader takes over", async () => {
+      stubEntryOffset({ entryLabel: "Virtual Keys", offset: 300 });
+
+      mockPathname = "/gateway/virtual-keys";
+      renderSidebar("gateway");
+
+      const region = screen.getByTestId("sidebar-scroll-region");
+      await waitFor(() => {
+        expect(region.scrollTop).toBe(300);
+      });
+
+      // The reader scrolls the menu themselves, and it keeps changing
+      // under them: the gated groups are still arriving.
+      region.dispatchEvent(new Event("wheel"));
+      region.scrollTop = 40;
+      region.appendChild(document.createElement("div"));
+
+      await waitFor(() => {
+        expect(region.childElementCount).toBeGreaterThan(0);
+      });
+      expect(region.scrollTop).toBe(40);
     });
   });
 

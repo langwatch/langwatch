@@ -99,7 +99,7 @@ const OWNING_TEAM = {
   projects: [{ id: "proj-data", name: "Data App", slug: "data-app" }],
 };
 
-function organizationWith(teams: unknown[]) {
+function organizationWith(teams: unknown[], organizationRole = "MEMBER") {
   return {
     data: [
       {
@@ -107,7 +107,8 @@ function organizationWith(teams: unknown[]) {
         name: "ACME",
         slug: "acme",
         primaryIntent: null,
-        members: [{ role: "MEMBER" }],
+        // `organization.getAll` narrows the members to the caller's own row.
+        members: [{ role: organizationRole }],
         teams,
       },
     ],
@@ -136,7 +137,11 @@ function renderResolution() {
  */
 function chromeWouldRefuse(
   team: { members?: { userId: string }[] } | undefined,
+  organizationRole = "MEMBER",
 ) {
+  // The page body renders for an organization admin on the role alone,
+  // whatever team rows they hold.
+  if (organizationRole === "ADMIN") return false;
   return !(
     team?.members?.some((member) => member.userId === MEMBER_ID) ?? false
   );
@@ -201,6 +206,37 @@ describe("useOrganizationTeamProject team-membership resolution", () => {
 
         expect(mockLocalStorage.selectedTeamId).toBe("team-data");
         expect(mockLocalStorage.selectedProjectSlug).toBe("data-app");
+      });
+    });
+  });
+
+  describe("given an admin of the organization, on one of its teams", () => {
+    beforeEach(() => {
+      mockOrganizationsQuery.mockReturnValue(
+        organizationWith([OTHER_TEAM, OWNING_TEAM], "ADMIN"),
+      );
+    });
+
+    describe("when they open a settings page after working in another team's project", () => {
+      /** @scenario "The admin's picked project survives a page that names no project" */
+      it("keeps the project they picked, and its team", () => {
+        mockLocalStorage.selectedTeamId = "team-platform";
+        mockLocalStorage.selectedProjectSlug = "platform-app";
+
+        const { result } = renderResolution();
+
+        expect(result.current.project?.slug).toBe("platform-app");
+        expect(result.current.team?.id).toBe("team-platform");
+        expect(chromeWouldRefuse(result.current.team, "ADMIN")).toBe(false);
+      });
+
+      /** @scenario "The admin's remembered team survives" */
+      it("keeps the remembered team when only the team is remembered", () => {
+        mockLocalStorage.selectedTeamId = "team-platform";
+
+        const { result } = renderResolution();
+
+        expect(result.current.team?.id).toBe("team-platform");
       });
     });
   });

@@ -91,6 +91,13 @@ Feature: Product sidebars in the new navigation modes
   Scenario: Opening a page by its address reveals its sidebar entry
     Given I open a product page by its address
     Then the sidebar brings that page's entry into view
+    And the entry sits as near the top of the menu as the menu allows
+
+  @integration
+  Scenario: Moving inside the menu leaves the scroll where it is
+    Given a page is open and its entry is already in view
+    When I open another page from the same menu
+    Then the menu does not scroll
 
   @integration
   Scenario: Closing the Support menu with the pointer leaves no focus ring
