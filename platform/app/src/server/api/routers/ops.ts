@@ -9,7 +9,6 @@ import {
   type DashboardData,
   OPS_BLOB_SORTS,
 } from "~/server/app-layer/ops/types";
-import { GRANTS_CUTOVER_MIGRATION_NAME } from "@langwatch/authz-server/migration";
 import { systemMigrationsService } from "~/server/app-layer/system-migrations/runtime";
 import {
   resolveHotDays,
@@ -1514,8 +1513,14 @@ export const opsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // The preparation migrations are behavior-neutral (backfill and
       // genesis change nothing about who decides); the cutover has the
-      // rollback's blast radius, so it takes the rollback's guard.
-      if (input.migrationName === GRANTS_CUTOVER_MIGRATION_NAME) {
+      // rollback's blast radius, so it takes the rollback's guard. Which is
+      // which comes from the migration's own declaration, so this gate and
+      // the page that asks for the confirmation cannot drift apart.
+      if (
+        systemMigrationsService.requiresOperatorConfirmation({
+          migrationName: input.migrationName,
+        })
+      ) {
         requireDestructiveOpsAuth(ctx, input.confirm);
       }
       await systemMigrationsService.enroll({
@@ -1568,7 +1573,11 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      if (input.migrationName === GRANTS_CUTOVER_MIGRATION_NAME) {
+      if (
+        systemMigrationsService.requiresOperatorConfirmation({
+          migrationName: input.migrationName,
+        })
+      ) {
         requireDestructiveOpsAuth(ctx, input.confirm);
       }
       return systemMigrationsService.runForOrganization({

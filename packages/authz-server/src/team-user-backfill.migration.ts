@@ -187,6 +187,9 @@ export class TeamUserBackfillMigration implements SystemMigration {
     "Writes every team member an explicit team-scoped role, so access no " +
     "longer depends on the legacy organization-wide fallback. Changes " +
     "nobody's effective permissions.";
+  // Dark: nothing an operator does to this migration changes how the fleet
+  // behaves, so no typed confirmation stands in the way.
+  readonly requiresOperatorConfirmation = false;
   // Shipped and soaked: self-hosted installations have run this backfill
   // automatically since it landed, and it changes nothing about who decides.
   readonly runsAutomaticallyOnSelfHosted = true;

@@ -142,6 +142,9 @@ export class GrantsGenesisImportMigration implements SystemMigration {
     "Copies every existing grant into the authorization ledger, which " +
     "becomes the system of record for grant changes. Permission checks " +
     "still answer from the legacy path.";
+  // Dark: the import states facts without changing who decides, so no typed
+  // confirmation stands in the way.
+  readonly requiresOperatorConfirmation = false;
   // Dark by construction - the import states facts and proves them against
   // the rows it started from without changing who decides - so self-hosted
   // runs it automatically, as it has since it shipped.

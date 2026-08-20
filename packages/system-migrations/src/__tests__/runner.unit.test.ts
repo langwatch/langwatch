@@ -96,6 +96,7 @@ function migrationOf(
     name,
     title: name,
     description: name,
+    requiresOperatorConfirmation: false,
     runsAutomaticallyOnSelfHosted: true,
     migrateTenant,
   };

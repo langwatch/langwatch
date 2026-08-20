@@ -115,6 +115,7 @@ export const systemMigrationsService = new SystemMigrationsService({
       name: migration.name,
       title: migration.title,
       description: migration.description,
+      requiresOperatorConfirmation: migration.requiresOperatorConfirmation,
       runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
     })),
   isSaaS: () => env.IS_SAAS === true,
@@ -129,6 +130,12 @@ export const systemMigrationsService = new SystemMigrationsService({
   runPass: () => runSystemMigrationPass(),
   runTargetedPass: ({ organizationId, migrationName }) =>
     runSystemMigrationTargetedPass({ organizationId, migrationName }),
+  // The cutover is the only migration that waits (on its prerequisites, or
+  // on the cohort), and its report is the only place that says so - the
+  // same fact the rollback guard below reads.
+  waitingReports: {
+    [GRANTS_CUTOVER_MIGRATION_NAME]: cutoverReportSaysWaiting,
+  },
   rollbackEffects: {
     [GRANTS_CUTOVER_MIGRATION_NAME]: rollBackAuthzCutover,
   },

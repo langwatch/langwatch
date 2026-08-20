@@ -35,7 +35,14 @@ const STATUS_LABEL: Record<string, string> = {
   rolled_back: "Rolled back",
 };
 
-/** How a targeted run's outcome reads in the toast, per resulting status. */
+/**
+ * How a targeted run's outcome reads in the toast, per resulting status.
+ * `migrated` here always means HELD - a step that merely waited reports
+ * `migrated` too, and the server flags that separately (see the waiting
+ * copy below), because telling an operator a parity proof found
+ * disagreements when nothing ran sends them looking for a problem that does
+ * not exist.
+ */
 const RUN_OUTCOME_LABEL: Record<string, string> = {
   finalized: "The organization finalized: it is fully on the new behavior.",
   migrated:
@@ -45,6 +52,36 @@ const RUN_OUTCOME_LABEL: Record<string, string> = {
   rolled_back:
     "The organization is pinned rolled back, so the run left it alone.",
 };
+
+/**
+ * What a targeted run's toast says. `waiting` comes first because it
+ * overrides the status: a waiting step records `migrated` exactly as a held
+ * one does, and reading it as held would tell the operator a parity proof
+ * found disagreements when nothing ran at all.
+ */
+function runOutcomeToast({
+  status,
+  waiting,
+}: {
+  status: string | null;
+  waiting: boolean;
+}): { title: string; description: string; type: "success" | "info" } {
+  if (waiting) {
+    return {
+      title: "Run finished: waiting",
+      description:
+        "This step is waiting on the earlier steps to finalize for this organization. Nothing ran and nothing changed - run the earlier steps first.",
+      type: "info",
+    };
+  }
+  return {
+    title: `Run finished: ${STATUS_LABEL[status ?? ""] ?? "no state recorded"}`,
+    description:
+      (status ? RUN_OUTCOME_LABEL[status] : undefined) ??
+      "The run recorded no state for this organization.",
+    type: status === "finalized" ? "success" : "info",
+  };
+}
 
 type MigrationListing = RouterOutputs["ops"]["listSystemMigrations"][number];
 type EnrollmentListing = RouterOutputs["ops"]["listMigrationEnrollments"];
@@ -163,7 +200,10 @@ function MigrationSection({
   isSaaS: boolean;
   canManage: boolean;
 }) {
-  const isCutover = migration.name === "authz-grants-cutover";
+  // Which steps take a typed confirmation is the server's call, declared by
+  // the migration itself - the page asks for it exactly where the server
+  // requires it rather than recognising a step by its name.
+  const requiresConfirmation = migration.requiresOperatorConfirmation;
   return (
     <Box>
       <HStack marginBottom={1} flexWrap="wrap">
@@ -189,7 +229,7 @@ function MigrationSection({
               Enrolled {migration.enrollment.enrolledCount}
             </Badge>
             <Badge colorPalette="purple">
-              Eligible {migration.enrollment.eligibleCount}
+              Not enrolled {migration.enrollment.notEnrolledCount}
             </Badge>
           </>
         )}
@@ -200,13 +240,13 @@ function MigrationSection({
               <EnrollAction
                 migrationName={migration.name}
                 migrationTitle={migration.title}
-                isCutover={isCutover}
+                requiresConfirmation={requiresConfirmation}
               />
             )}
             <RunForOrganizationAction
               migrationName={migration.name}
               migrationTitle={migration.title}
-              isCutover={isCutover}
+              requiresConfirmation={requiresConfirmation}
             />
             <RollBackAction
               migrationName={migration.name}
@@ -348,11 +388,11 @@ function OrganizationPicker({
 function EnrollAction({
   migrationName,
   migrationTitle,
-  isCutover,
+  requiresConfirmation,
 }: {
   migrationName: string;
   migrationTitle: string;
-  isCutover: boolean;
+  requiresConfirmation: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [organization, setOrganization] = useState<PickedOrganization | null>(
@@ -394,12 +434,12 @@ function EnrollAction({
           enroll.mutate({
             organizationId: organization.id,
             migrationName,
-            ...(isCutover ? { confirm: "ENROLL" as const } : {}),
+            ...(requiresConfirmation ? { confirm: "ENROLL" as const } : {}),
           });
         }}
         title={`Enroll an organization for the ${migrationTitle.toLowerCase()}`}
         description={
-          isCutover
+          requiresConfirmation
             ? "Once its earlier steps finish, the next pass proves parity and moves this organization's permission checks onto the new engine. Rolling that back afterwards is an operator action of its own."
             : "The next pass runs this step for the organization. It changes nothing about who answers permission checks, and withdrawing later stops future passes without undoing anything."
         }
@@ -421,11 +461,11 @@ function EnrollAction({
 function RunForOrganizationAction({
   migrationName,
   migrationTitle,
-  isCutover,
+  requiresConfirmation,
 }: {
   migrationName: string;
   migrationTitle: string;
-  isCutover: boolean;
+  requiresConfirmation: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [organization, setOrganization] = useState<PickedOrganization | null>(
@@ -433,14 +473,8 @@ function RunForOrganizationAction({
   );
   const utils = api.useUtils();
   const run = api.ops.runSystemMigrationForOrganization.useMutation({
-    onSuccess: async ({ status }) => {
-      toaster.create({
-        title: `Run finished: ${STATUS_LABEL[status ?? ""] ?? "no state recorded"}`,
-        description:
-          (status && RUN_OUTCOME_LABEL[status]) ??
-          "The run recorded no state for this organization.",
-        type: status === "finalized" ? "success" : "info",
-      });
+    onSuccess: async ({ status, waiting }) => {
+      toaster.create(runOutcomeToast({ status, waiting }));
       setOpen(false);
       setOrganization(null);
       await utils.ops.listSystemMigrations.invalidate();
@@ -465,12 +499,12 @@ function RunForOrganizationAction({
           run.mutate({
             organizationId: organization.id,
             migrationName,
-            ...(isCutover ? { confirm: "RUN" as const } : {}),
+            ...(requiresConfirmation ? { confirm: "RUN" as const } : {}),
           });
         }}
         title={`Run the ${migrationTitle.toLowerCase()} for one organization`}
         description={
-          isCutover
+          requiresConfirmation
             ? "If parity proves clean, this moves the organization's permission checks onto the new engine right now. The organization must already be enrolled for this step."
             : "Runs this step for the organization right now and reports how it ended. The organization must already be enrolled for this step."
         }

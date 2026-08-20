@@ -121,6 +121,12 @@ export type MigrationOverview = {
   /** What the migration does for an organization, in the operator's language. */
   description: string;
   /**
+   * Whether acting on this migration takes the typed destructive
+   * confirmation, so the page asks for it exactly where the server requires
+   * it rather than deciding for itself which migration is dangerous.
+   */
+  requiresOperatorConfirmation: boolean;
+  /**
    * False only on self-hosted, for a migration whose
    * `runsAutomaticallyOnSelfHosted` declaration has not been released yet:
    * the runner never drives it here, so its empty counts are a normal
@@ -132,9 +138,12 @@ export type MigrationOverview = {
   /**
    * The rollout gauge, cloud only (null off cloud, where enrollment does
    * not exist): how many organizations are enrolled for this migration, and
-   * how many more could be.
+   * how many are not. Enrollment only - an organization counts as not
+   * enrolled whether or not its prerequisites have finalized, because
+   * enrolling early is legitimate (the migration waits), so this must never
+   * be read as "ready to run".
    */
-  enrollment: { enrolledCount: number; eligibleCount: number } | null;
+  enrollment: { enrolledCount: number; notEnrolledCount: number } | null;
   attention: Array<TenantMigrationRecord & { updatedAt: Date }>;
 };
 
@@ -152,6 +161,7 @@ export class SystemMigrationsService {
         name: string;
         title: string;
         description: string;
+        requiresOperatorConfirmation: boolean;
         runsAutomaticallyOnSelfHosted: boolean;
       }>;
       /** Read per call, so the answer is never a boot-time capture. */
@@ -181,6 +191,16 @@ export class SystemMigrationsService {
         organizationId: string;
         migrationName: string;
       }) => Promise<MigrationPassSummary | null>;
+      /**
+       * Whether a migration's stored report means it merely WAITED, per
+       * migration name. The state machine has no waiting status, so a
+       * migration that is waiting on something records `migrated` exactly
+       * as a held one does, and only the migration's own composition can
+       * tell the two apart by reading its report - so the predicate lives
+       * there, like `rollbackGuards`. A migration that never waits has no
+       * entry, and its `migrated` always means held.
+       */
+      waitingReports?: Record<string, (report: unknown) => boolean>;
       /**
        * What else a rollback has to DO, per migration name. The generic
        * rollback is a state write; a migration whose finalization changed
@@ -249,6 +269,7 @@ export class SystemMigrationsService {
           name: migration.name,
           title: migration.title,
           description: migration.description,
+          requiresOperatorConfirmation: migration.requiresOperatorConfirmation,
           availableOnThisInstallation:
             isSaaS || migration.runsAutomaticallyOnSelfHosted,
           counts: await this.deps.state.findStatusCounts({
@@ -257,7 +278,10 @@ export class SystemMigrationsService {
           enrollment: enrolledByMigration
             ? {
                 enrolledCount,
-                eligibleCount: Math.max(0, totalOrganizations - enrolledCount),
+                notEnrolledCount: Math.max(
+                  0,
+                  totalOrganizations - enrolledCount,
+                ),
               }
             : null,
           attention: await this.deps.state.findRecordsByStatus({
@@ -395,7 +419,7 @@ export class SystemMigrationsService {
     organizationId: string;
     migrationName: string;
     actorUserId: string;
-  }): Promise<{ status: TenantMigrationStatus | null }> {
+  }): Promise<{ status: TenantMigrationStatus | null; waiting: boolean }> {
     const migration = this.requireRegisteredMigration(migrationName);
     if (!this.deps.isSaaS() && !migration.runsAutomaticallyOnSelfHosted) {
       throw new MigrationNotAvailableOnInstallationError();
@@ -430,7 +454,32 @@ export class SystemMigrationsService {
       migrationName,
       tenantId: organizationId,
     });
-    return { status: record?.status ?? null };
+    // `migrated` covers two outcomes an operator must not confuse: the
+    // migration ran and is held for review, or it did nothing because it is
+    // still waiting. Only the migration's own report tells them apart, so
+    // the status alone would report a waiting cutover as a held one.
+    return {
+      status: record?.status ?? null,
+      waiting:
+        record != null &&
+        (this.deps.waitingReports?.[migrationName]?.(record.report) ?? false),
+    };
+  }
+
+  /**
+   * Whether acting on this migration takes the typed destructive
+   * confirmation. Read from the migration's own declaration so the gate and
+   * the page that renders it can never disagree about which migration is
+   * dangerous; an unknown name is refused before any confirmation question
+   * arises.
+   */
+  requiresOperatorConfirmation({
+    migrationName,
+  }: {
+    migrationName: string;
+  }): boolean {
+    return this.requireRegisteredMigration(migrationName)
+      .requiresOperatorConfirmation;
   }
 
   /** The migration a name refers to, or the refusal the operator can act on. */
@@ -438,6 +487,7 @@ export class SystemMigrationsService {
     name: string;
     title: string;
     description: string;
+    requiresOperatorConfirmation: boolean;
     runsAutomaticallyOnSelfHosted: boolean;
   } {
     const migration = this.deps

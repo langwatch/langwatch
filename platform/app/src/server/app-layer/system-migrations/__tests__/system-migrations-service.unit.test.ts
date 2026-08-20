@@ -20,11 +20,16 @@ import {
 const MIGRATION = "team-user-backfill";
 const TENANT = "org_acme";
 
-function migrationOf(name: string, runsAutomaticallyOnSelfHosted = true) {
+function migrationOf(
+  name: string,
+  runsAutomaticallyOnSelfHosted = true,
+  requiresOperatorConfirmation = false,
+) {
   return {
     name,
     title: name,
     description: name,
+    requiresOperatorConfirmation,
     runsAutomaticallyOnSelfHosted,
   };
 }
@@ -77,6 +82,7 @@ function targetedPassStub() {
 
 function serviceWith({
   record,
+  waitingReports,
   rollbackEffects,
   rollbackGuards,
   isSaaS = true,
@@ -85,6 +91,7 @@ function serviceWith({
   runTargetedPass = targetedPassStub(),
 }: {
   record: TenantMigrationRecord | null;
+  waitingReports?: Record<string, (report: unknown) => boolean>;
   rollbackEffects?: Record<
     string,
     (args: {
@@ -130,6 +137,7 @@ function serviceWith({
     audit,
     runPass: vi.fn(),
     runTargetedPass,
+    ...(waitingReports ? { waitingReports } : {}),
     ...(rollbackEffects ? { rollbackEffects } : {}),
     ...(rollbackGuards ? { rollbackGuards } : {}),
   });
@@ -672,12 +680,14 @@ describe("SystemMigrationsService enrollment", () => {
             name: "first",
             title: "First step",
             description: "What the first step does.",
+            requiresOperatorConfirmation: false,
             runsAutomaticallyOnSelfHosted: true,
           },
           {
             name: "second",
             title: "Second step",
             description: "What the second step does.",
+            requiresOperatorConfirmation: false,
             runsAutomaticallyOnSelfHosted: true,
           },
         ],
@@ -706,7 +716,7 @@ describe("SystemMigrationsService enrollment", () => {
     });
 
     /** @scenario "The page shows how many organizations each migration could still enroll" */
-    it("gauges each migration's enrolled and eligible organizations", async () => {
+    it("gauges each migration's enrolled and not-enrolled organizations", async () => {
       const enrollments = enrollmentStoreStub();
       enrollments.countEnrolledByMigration.mockResolvedValue(
         new Map([[MIGRATION, 1]]),
@@ -718,7 +728,7 @@ describe("SystemMigrationsService enrollment", () => {
 
       expect(overview[0]?.enrollment).toEqual({
         enrolledCount: 1,
-        eligibleCount: 2,
+        notEnrolledCount: 2,
       });
     });
   });
@@ -747,7 +757,36 @@ describe("SystemMigrationsService.runForOrganization", () => {
         organizationId: TENANT,
         migrationName: MIGRATION,
       });
-      expect(outcome).toEqual({ status: "finalized" });
+      expect(outcome).toEqual({ status: "finalized", waiting: false });
+    });
+  });
+
+  describe("given a step that only waited on its prerequisites", () => {
+    /** @scenario "A targeted run that only waited says so, rather than reporting a held organization" */
+    it("answers that it is waiting, not that it is held for review", async () => {
+      const { service } = serviceWith({
+        // The state machine has no waiting status: a waiting step records
+        // `migrated` exactly as a held one does, and only its report
+        // separates them.
+        record: {
+          migrationName: MIGRATION,
+          tenantId: TENANT,
+          status: "migrated",
+          report: { kind: "cutover_waiting", awaiting: ["earlier-step"] },
+        },
+        waitingReports: {
+          [MIGRATION]: (report) =>
+            (report as { kind?: string } | null)?.kind === "cutover_waiting",
+        },
+      });
+
+      const outcome = await service.runForOrganization({
+        organizationId: TENANT,
+        migrationName: MIGRATION,
+        actorUserId: "user_alex",
+      });
+
+      expect(outcome).toEqual({ status: "migrated", waiting: true });
     });
   });
 

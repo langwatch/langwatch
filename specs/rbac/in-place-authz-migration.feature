@@ -232,7 +232,8 @@ Feature: In-place authorization data migration
   Scenario: The page shows how many organizations each migration could still enroll
     Given three organizations exist and one is enrolled for the team-user backfill
     When an operator opens the migrations page
-    Then the team-user backfill shows one organization enrolled and two eligible
+    Then the team-user backfill shows one organization enrolled and two not enrolled
+    And the gauge counts enrollment only, never readiness to run
 
   @unit
   Scenario: An operator finds an organization by name to act on it
@@ -247,6 +248,13 @@ Feature: In-place authorization data migration
     When an operator runs the team-user backfill for "acme" now
     Then only "acme" is processed, and only by the team-user backfill
     And the operator is told the status the organization ended the run in
+
+  @unit
+  Scenario: A targeted run that only waited says so, rather than reporting a held organization
+    Given "acme" is enrolled for the cutover but its prerequisites have not finalized
+    When an operator runs the cutover for "acme" now
+    Then the operator is told the cutover is waiting on the earlier steps
+    And the operator is not told a parity proof found disagreements
 
   @unit
   Scenario: A targeted run for an organization that is not enrolled is refused

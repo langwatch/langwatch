@@ -27,6 +27,16 @@ export interface SystemMigration {
   readonly description: string;
 
   /**
+   * Whether an operator action on this migration takes a typed destructive
+   * confirmation. True for a migration whose finalization changes how the
+   * running fleet behaves; false for dark preparation work. Declared here
+   * so the gate that enforces it and the interface that renders it read the
+   * same fact - a new behaviour-changing migration that forgets to set it
+   * gets no confirmation at all, so set it deliberately.
+   */
+  readonly requiresOperatorConfirmation: boolean;
+
+  /**
    * Whether a SELF-HOSTED installation runs this migration automatically.
    *
    * Cloud never reads this - there the pacing is per-organization enrollment,

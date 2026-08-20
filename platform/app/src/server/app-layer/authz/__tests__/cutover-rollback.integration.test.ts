@@ -77,6 +77,7 @@ describe("given a cut-over organization rolled back with the queue stopped", () 
           name: GRANTS_CUTOVER_MIGRATION_NAME,
           title: "Authorization engine cutover",
           description: "Test double of the cutover's listing declaration.",
+          requiresOperatorConfirmation: true,
           runsAutomaticallyOnSelfHosted: false,
         },
       ],
