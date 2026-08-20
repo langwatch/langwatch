@@ -21,6 +21,18 @@ import type { LwqlKeyMapRow } from "./productionProvisioning";
  * per-run admin client of its own, which the access boundary names as a
  * construction site.
  */
+/**
+ * The key-map insert contract, in one place because two paths write this table:
+ * this repository at project-create and the deploy backfill in
+ * `src/tasks/provisionLwql.ts`. Waited-on async insert — the row must be
+ * readable by the row-filter subquery before the project's first LangWatchQL
+ * query, but many project-creates may land at once.
+ */
+export const LWQL_KEY_MAP_INSERT_SETTINGS = {
+  async_insert: 1,
+  wait_for_async_insert: 1,
+} as const;
+
 export interface LwqlKeyMapRepository {
   insertRow(input: { table: string; row: LwqlKeyMapRow }): Promise<void>;
 }
@@ -41,10 +53,7 @@ export class LwqlKeyMapClickHouseRepository implements LwqlKeyMapRepository {
       table,
       values: [row],
       format: "JSONEachRow",
-      // Waited-on async insert: the row must be readable by the row-filter
-      // subquery before the project's first LangWatchQL query, but many
-      // project-creates may land at once.
-      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      clickhouse_settings: LWQL_KEY_MAP_INSERT_SETTINGS,
     });
   }
 }

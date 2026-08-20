@@ -22,6 +22,7 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { lwqlConnectionFromEnv } from "../server/analytics/lwql/executor";
+import { LWQL_KEY_MAP_INSERT_SETTINGS } from "../server/analytics/lwql/lwqlKeyMap.repository";
 import {
   type LwqlKeyMapBackfillPlan,
   lwqlKeyMapTableQualifiedName,
@@ -146,7 +147,7 @@ async function backfillKeyMap({
     table,
     values: plan.rowsToInsert,
     format: "JSONEachRow",
-    clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+    clickhouse_settings: LWQL_KEY_MAP_INSERT_SETTINGS,
   });
   logger.info(
     { inserted: plan.rowsToInsert.length },

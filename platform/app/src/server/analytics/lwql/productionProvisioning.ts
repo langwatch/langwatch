@@ -281,7 +281,7 @@ export function planLwqlKeyMapBackfill({
     rowsToInsert.push({
       [KEY_MAP_COLUMNS.keyHash]: hash,
       [KEY_MAP_COLUMNS.tenantId]: project.id,
-    } as LwqlKeyMapRow);
+    });
   }
 
   return { rowsToInsert, blankKeyProjectIds };
