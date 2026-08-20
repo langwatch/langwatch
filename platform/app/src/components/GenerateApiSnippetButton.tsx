@@ -34,7 +34,7 @@ export function GenerateApiSnippetButton({
         variant="outline"
         onClick={onClick}
       >
-        <UnplugIcon size={14} />
+        <UnplugIcon size={12} />
         API
       </Button>
     </Tooltip>
