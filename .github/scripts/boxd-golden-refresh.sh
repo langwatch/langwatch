@@ -140,10 +140,27 @@ port_holders() {
   done
   echo "$held"
 }
+# Ask the kernel who holds the port and kill that tree, rather than guessing at
+# process names. Name patterns cannot cover a stack this script did not start —
+# a vite server from an older stack held 5560 and matched nothing.
+free_ports() {
+  local p pid pids
+  for p in $APP_PORTS; do
+    pids="$(ss -lntpH "sport = :$p" 2>/dev/null | grep -oE 'pid=[0-9]+' | cut -d= -f2 | sort -u || true)"
+    for pid in $pids; do
+      [ "$pid" = "1" ] && continue # never the init process
+      echo "port $p held by pid $pid ($(ps -o cmd= -p "$pid" 2>/dev/null | cut -c1-60)) — stopping it"
+      kill_tree "$pid"
+    done
+  done
+}
+free_ports
+
 for _ in $(seq 1 15); do
   BUSY="$(port_holders)"
   [ -z "${BUSY// /}" ] && break
   echo "waiting for ports to free up:$BUSY"
+  free_ports
   sleep 2
 done
 BUSY="$(port_holders)"
