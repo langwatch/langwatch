@@ -14,6 +14,8 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
+import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import type {
   RoleBindingRepository,
@@ -58,19 +60,6 @@ const MEMBER_USER_SELECT = {
   email: true,
   image: true,
 } as const satisfies Prisma.UserSelect;
-
-const principalInOrganizationWhere = (
-  organizationId: string,
-): Prisma.RoleBindingWhereInput => ({
-  OR: [
-    {
-      userId: { not: null },
-      user: { orgMemberships: { some: { organizationId } } },
-    },
-    { groupId: { not: null }, group: { organizationId } },
-    { apiKeyId: { not: null }, apiKey: { organizationId } },
-  ],
-});
 
 // Ascending, nulls last — matches Postgres `ORDER BY col ASC` (the ordering the
 // previous Prisma `orderBy` produced before members were resolved in memory).
@@ -245,6 +234,12 @@ export class TeamService {
       prisma,
     ),
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
+    // Listing reads go through the per-organization fork (ADR-092,
+    // delivery-plan PR 3 follow-up): a cut-over organization's team pages are
+    // served from the ledger's own head.
+    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
+      prisma,
+    ),
   ) {}
 
   /**
@@ -438,36 +433,16 @@ export class TeamService {
 
         // ── Fetch all RoleBindings touching this team (team-level + project-level) ──
         const [teamBindings, projectBindings] = await Promise.all([
-          this.prisma.roleBinding.findMany({
-            where: {
-              organizationId,
-              scopeType: RoleBindingScopeType.TEAM,
-              scopeId: team.id,
-              ...principalInOrganizationWhere(organizationId),
-            },
-            include: {
-              user: { select: MEMBER_USER_SELECT },
-              group: { select: { id: true, name: true, scimSource: true } },
-              apiKey: { select: { id: true, name: true } },
-              customRole: { select: { id: true, name: true } },
-            },
+          this.accessListing.findScopeBindings({
+            organizationId,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeIds: [team.id],
           }),
-          projectIds.length > 0
-            ? this.prisma.roleBinding.findMany({
-                where: {
-                  organizationId,
-                  scopeType: RoleBindingScopeType.PROJECT,
-                  scopeId: { in: projectIds },
-                  ...principalInOrganizationWhere(organizationId),
-                },
-                include: {
-                  user: { select: MEMBER_USER_SELECT },
-                  group: { select: { id: true, name: true, scimSource: true } },
-                  apiKey: { select: { id: true, name: true } },
-                  customRole: { select: { id: true, name: true } },
-                },
-              })
-            : [],
+          this.accessListing.findScopeBindings({
+            organizationId,
+            scopeType: RoleBindingScopeType.PROJECT,
+            scopeIds: projectIds,
+          }),
         ]);
 
         // ── Expand group memberships for every group referenced by any

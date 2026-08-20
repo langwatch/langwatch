@@ -12,6 +12,8 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
+import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
 import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { RoleDuplicateNameError, RoleNotFoundError } from "../errors";
@@ -39,6 +41,11 @@ export type UpdateRoleParams = Partial<
  * Single Responsibility: Handle all database operations for CustomRole
  */
 export class RoleRepository {
+  // Listing reads go through the per-organization fork (ADR-092,
+  // delivery-plan PR 3 follow-up): a cut-over organization's role editor
+  // lists from the ledger's own Role head.
+  private readonly accessListing: AccessListingRepository;
+
   constructor(
     private readonly prisma: RolePrismaDelegate,
     /**
@@ -49,7 +56,9 @@ export class RoleRepository {
      * transaction client.
      */
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-  ) {}
+  ) {
+    this.accessListing = new CutoverAwareAccessListingRepository(prisma);
+  }
 
   async findAllByOrganization(organizationId: string) {
     return this.prisma.customRole.findMany({
@@ -59,13 +68,10 @@ export class RoleRepository {
   }
 
   async findUserCreatedByOrganization(organizationId: string) {
-    return this.prisma.customRole.findMany({
-      where: {
-        organizationId,
-        kind: CUSTOM_ROLE_KIND.CUSTOM,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    // Through the per-organization fork (ADR-092, delivery-plan PR 3
+    // follow-up): a cut-over organization's role editor is served from the
+    // ledger's own Role head.
+    return this.accessListing.findUserCreatedRoles({ organizationId });
   }
 
   async findById(roleId: string) {
