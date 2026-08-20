@@ -200,12 +200,17 @@ function staleCursorRestart({
     // No rewind: usage identity is not stable across a query change, so
     // re-reading history would duplicate spend rather than restate it.
     // The page token still has to go — it would 400 against the new
-    // query params.
+    // query params. A watermark that doesn't parse as a date certifies no
+    // history at all, so falling back to the configured start duplicates
+    // nothing — and passing it through would 400 on every retry forever.
     logger.warn(
       { adapter: ANTHROPIC_ADMIN_ADAPTER_ID, report: config.report },
       "anthropic admin usage cursor was minted under a different query; dropping the page token and keeping the watermark",
     );
-    return { startingAt: parsed.startingAt, page: null };
+    const keptWatermark = Number.isNaN(Date.parse(parsed.startingAt))
+      ? (config.startingAt ?? defaultStartingAt(config.report))
+      : parsed.startingAt;
+    return { startingAt: keptWatermark, page: null };
   }
   logger.warn(
     { adapter: ANTHROPIC_ADMIN_ADAPTER_ID, report: config.report },

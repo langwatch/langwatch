@@ -597,6 +597,34 @@ describe("the Anthropic Admin puller", () => {
       );
     });
 
+    it("falls back to the configured start when a kept usage watermark is not a date", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(USAGE_PAGE));
+
+      await new AnthropicAdminPuller().runOnce(
+        {
+          ...RUN_OPTIONS,
+          // A corrupt watermark certifies no history, so falling back
+          // duplicates nothing — while passing it through as `starting_at`
+          // would 400 on every retry forever (the cursor holds still on
+          // failure).
+          cursor: '{"startingAt":"not-a-date","page":"page_stale"}',
+        },
+        {
+          adapter: "anthropic_admin",
+          report: "usage",
+          bucketWidth: "1d",
+          schedule: "0 * * * *",
+          startingAt: "2026-07-01T00:00:00.000Z",
+        },
+      );
+
+      const url = String(fetchMock.mock.calls[0]?.[0]);
+      expect(url).not.toContain("page=");
+      expect(url).toContain(
+        `starting_at=${encodeURIComponent("2026-07-01T00:00:00.000Z")}`,
+      );
+    });
+
     it("never rewinds a cost source FORWARD: a backlogged watermark older than the configured start survives", async () => {
       fetchMock.mockResolvedValue(jsonResponse(COST_PAGE));
 
