@@ -121,6 +121,51 @@ describe("Langy permission coverage", () => {
     });
   });
 
+  // The sweeps above cannot see THIS class of bug, and it is worth saying why.
+  // Both of them filter to grains `classifyForLangy` says Langy should hold, so
+  // a route demanding a COARSER grain than its action needs — `evaluations:manage`
+  // to create a monitor — is discarded before it can fail anything. Widening a
+  // route from `:create` to `:manage` therefore makes the guard quieter, not
+  // louder. Until that blindness is fixed generally, the surfaces it already bit
+  // get pinned by name.
+  //
+  // Monitors is the one it bit: `POST /api/monitors` demanded `evaluations:manage`
+  // while the tRPC twin the UI's own create button calls asks only for
+  // `evaluations:create` — and writes `enabled: true` either way. The same action
+  // cost more over REST than in the product, which refused every least-privilege
+  // key without holding any line the UI held.
+  describe("given the monitor write routes", () => {
+    describe("when the grains they demand are read out of the registry", () => {
+      it("gates creating a monitor on the grain the product's own create uses", () => {
+        const demanded = permissionsDemandedByRoutes();
+        const monitorRoutes = (permission: string) =>
+          (demanded.get(permission) ?? []).filter((route) =>
+            route.includes("/api/monitors"),
+          );
+
+        expect(
+          monitorRoutes("evaluations:create").some((route) =>
+            route.startsWith("POST "),
+          ),
+          "Creating a monitor must demand evaluations:create, matching " +
+            "server/api/routers/monitors.ts. Any coarser grain refuses every " +
+            "least-privilege key while the UI creates the same enabled monitor",
+        ).toBe(true);
+
+        // Deletion is where the destructive line sits, and it keeps `:manage`.
+        // Every other verb must stay reachable by a key that holds no `:manage`.
+        expect(
+          monitorRoutes("evaluations:manage").filter(
+            (route) => !route.startsWith("DELETE "),
+          ),
+          "A non-delete monitor route demands evaluations:manage. Langy — and " +
+            "any least-privilege key — can never hold that grain, so this is a " +
+            "403 at the door for an action the product allows on :create",
+        ).toEqual([]);
+      });
+    });
+  });
+
   // The regression that started this: the reported 403 was `experiments:view`
   // on `GET /api/experiments`, and the run route asked `evaluations:manage` —
   // a grain no least-privilege key can hold. Both are covered by the sweeps

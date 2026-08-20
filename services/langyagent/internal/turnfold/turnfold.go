@@ -111,8 +111,13 @@ func (a *Accumulator) Result() (text string, tools []frames.ToolCall) {
 	text = a.text.String()
 	if a.sawTool {
 		if trailing := a.afterTools.String(); strings.TrimSpace(trailing) != "" {
-			text = strings.TrimLeft(trailing, " \t\r\n")
+			text = trailing
 		}
 	}
-	return text, tools
+	// Trimmed on both ends, on both paths. The post-tool segment almost always
+	// opens with the newline that separated it from the tool call, and a model
+	// that goes quiet after its last tool can still emit a stray trailing one —
+	// neither is part of the answer, and both render as blank lines in the
+	// user's panel.
+	return strings.TrimSpace(text), tools
 }

@@ -1734,6 +1734,17 @@ const presentations = {
   // and "a network policy an admin must fix" there, and only one of them was
   // true. One code, one set of words.
   // ==========================================================================
+  langy_conversation_id_unadoptable: {
+    title: "That conversation id can't be used",
+    // The two reasons need different words because they need different fixes:
+    // one is the caller's id to correct, the other is a conversation that is
+    // over. Collapsing them into one sentence would tell half the readers to
+    // change something that is already fine.
+    describe: (error) =>
+      str(error, "reason", "") === "archived"
+        ? "That conversation is archived, and archived conversations can't be reopened. Start a new one."
+        : "Conversation ids are 6-120 characters, using letters, numbers, dashes and underscores.",
+  },
   langy_conversation_not_found: {
     title: "Conversation not found",
     describe: () =>

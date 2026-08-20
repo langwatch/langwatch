@@ -131,6 +131,7 @@ export const APP_ERROR_CODES = [
   "langy_api_key_unowned",
   "langy_api_request_invalid",
   "langy_codex_plan_limit",
+  "langy_conversation_id_unadoptable",
   "langy_conversation_not_found",
   "langy_conversation_not_owned",
   "langy_credential_resolution",

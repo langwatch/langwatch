@@ -8,6 +8,9 @@ import { LANGWATCH_API_KEY, LW_BASE_URL } from "./config";
 const LW_BASE = LW_BASE_URL;
 const LW_KEY = LANGWATCH_API_KEY;
 
+/** How long seeded traces get to become queryable before the suite gives up. */
+const INGESTION_VISIBILITY_TIMEOUT_MS = 60_000;
+
 async function lwGet(path: string): Promise<any> {
   const res = await fetch(`${LW_BASE}${path}`, {
     headers: { "X-Auth-Token": LW_KEY },
@@ -93,6 +96,26 @@ export async function listMonitors(): Promise<
   return toArray(await lwGet("/api/monitors"));
 }
 
+/**
+ * Cleanup for the monitor scenario. Langy's own session key cannot delete —
+ * that grain is withheld from it on purpose — but the suite runs with a full
+ * project key, so the test can tidy up after itself.
+ *
+ * Best-effort: a monitor that is already gone (404) is the desired end state,
+ * not a failure, and a cleanup error must never fail a scenario that passed.
+ */
+export async function deleteMonitor(id: string): Promise<void> {
+  try {
+    await fetch(`${LW_BASE}/api/monitors/${id}`, {
+      method: "DELETE",
+      headers: { "X-Auth-Token": LW_KEY },
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    // Ignored on purpose — see the doc comment.
+  }
+}
+
 export async function listDashboards(): Promise<
   Array<{ id: string; name?: string }>
 > {
@@ -168,9 +191,20 @@ export async function listTriggers(): Promise<
  * in the last 24h" is CORRECT, and any judge that expects a non-zero count
  * is grading against data that does not exist. Spans carry no
  * langwatch.origin, which the platform coalesces to "application".
+ *
+ * Returns only once the seeded traces are QUERYABLE, not merely accepted. The
+ * collector acks before indexing completes, so returning on the ack raced the
+ * first data scenario against ingestion: the ground truth was still zero, Langy
+ * correctly answered "no traffic", and the suite recorded a Langy defect that
+ * was really a timing artifact. A false red here is the one failure this suite
+ * must never produce, because it is read as evidence about the agent.
  */
 export async function seedApplicationTraces(count = 8): Promise<void> {
   const now = Date.now();
+  const traceIds = Array.from(
+    { length: count },
+    (_, i) => `trace_e2e_seed_${now}_${i}`,
+  );
   const posts = Array.from({ length: count }, (_, i) => {
     const startedAt = now - (i + 1) * 60_000;
     // Varied latencies (0.8s–9.6s) so p95 is a real figure, one error span.
@@ -180,7 +214,7 @@ export async function seedApplicationTraces(count = 8): Promise<void> {
       body: {
         spans: [
           {
-            trace_id: `trace_e2e_seed_${now}_${i}`,
+            trace_id: traceIds[i],
             span_id: `span_e2e_seed_${now}_${i}`,
             type: "llm",
             model: "gpt-5-mini",
@@ -214,4 +248,22 @@ export async function seedApplicationTraces(count = 8): Promise<void> {
     });
   });
   await Promise.all(posts);
+
+  // Poll the newest and oldest seeded ids rather than all of them: they bracket
+  // the batch, so both being queryable means indexing has caught up with the
+  // whole write.
+  const bracket = [traceIds[0]!, traceIds[traceIds.length - 1]!];
+  const deadline = Date.now() + INGESTION_VISIBILITY_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const visible = await Promise.all(bracket.map(traceExists));
+    if (visible.every(Boolean)) return;
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+
+  throw new Error(
+    `Seeded traces were still not queryable after ${
+      INGESTION_VISIBILITY_TIMEOUT_MS / 1_000
+    }s. This is ingestion lag in the environment, NOT a Langy defect — the ` +
+      "data scenarios would have graded an empty index as a wrong answer.",
+  );
 }
