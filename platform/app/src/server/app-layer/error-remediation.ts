@@ -194,6 +194,12 @@ const registry = {
     ],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
+  api_key_permission_not_delegable: {
+    tips: [
+      "A wider key or a higher role does not change this — make the change in LangWatch instead",
+    ],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
   api_key_scope_violation: {
     tips: [
       "A key cannot be granted a scope you do not hold yourself — lower the requested scope or ask an admin to create the key",

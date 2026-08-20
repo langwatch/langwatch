@@ -39,7 +39,7 @@ function fakeBuffer() {
     appendMilestone: vi.fn(async () => {}),
     appendPlan: vi.fn(async () => {}),
     appendTool: vi.fn(async () => {}),
-    markEnd: vi.fn(async () => {}),
+    markEnd: vi.fn(async () => ({ backstopped: false })),
     markError: vi.fn(async () => {}),
     heartbeat: vi.fn(async () => {}),
     appendNavigate: vi.fn(async () => {}),
@@ -895,9 +895,11 @@ describe("LangyTurnRelay", () => {
         }),
       );
       expect(out).toEqual({ status: "terminal" });
+      // The frame carries text, so there is nothing to backstop.
       expect(buffer.markEnd).toHaveBeenCalledWith({
         conversationId: "conv-1",
         turnId: "turn-1",
+        backstopSilentTurn: false,
       });
       expect(conversations.ingestAgentTurnResult).toHaveBeenCalledWith(
         expect.objectContaining({ status: "completed", text: "the answer" }),
@@ -955,6 +957,9 @@ describe("LangyTurnRelay", () => {
         frame({ type: "handoff", resumeToken: "opaque-resume" }),
       );
       expect(out).toEqual({ status: "terminal" });
+      // A handoff ends the stream without the turn having finished, so it never
+      // asks for the fallback: the turn is re-driven on a fresh worker, and
+      // "I finished this turn without writing a reply" would be wrong twice.
       expect(buffer.markEnd).toHaveBeenCalledWith({
         conversationId: "conv-1",
         turnId: "turn-1",

@@ -30,6 +30,7 @@ export const APP_ERROR_CODES = [
   "api_key_not_in_organization",
   "api_key_not_owned",
   "api_key_permission_denied",
+  "api_key_permission_not_delegable",
   "api_key_reserved_name",
   "api_key_scope_violation",
   "authz_ledger_unavailable",
