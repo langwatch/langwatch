@@ -45915,6 +45915,19 @@
                         "type": "number"
                       },
                       "rawEvent": {},
+                      "batchRunId": {
+                        "type": "string"
+                      },
+                      "scenarioId": {
+                        "type": "string"
+                      },
+                      "scenarioRunId": {
+                        "type": "string"
+                      },
+                      "scenarioSetId": {
+                        "type": "string",
+                        "default": "default"
+                      },
                       "messages": {
                         "type": "array",
                         "items": {
@@ -47195,28 +47208,15 @@
                             }
                           ]
                         }
-                      },
-                      "batchRunId": {
-                        "type": "string"
-                      },
-                      "scenarioId": {
-                        "type": "string"
-                      },
-                      "scenarioRunId": {
-                        "type": "string"
-                      },
-                      "scenarioSetId": {
-                        "type": "string",
-                        "default": "default"
                       }
                     },
                     "required": [
                       "type",
                       "timestamp",
-                      "messages",
                       "batchRunId",
                       "scenarioId",
-                      "scenarioRunId"
+                      "scenarioRunId",
+                      "messages"
                     ]
                   },
                   {

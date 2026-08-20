@@ -21571,6 +21571,11 @@ export interface operations {
                     type: "SCENARIO_MESSAGE_SNAPSHOT";
                     timestamp: number;
                     rawEvent?: unknown;
+                    batchRunId: string;
+                    scenarioId: string;
+                    scenarioRunId: string;
+                    /** @default default */
+                    scenarioSetId?: string;
                     messages: ((({
                         id: string;
                         /** @constant */
@@ -21887,11 +21892,6 @@ export interface operations {
                         id?: string;
                         trace_id?: string;
                     })[];
-                    batchRunId: string;
-                    scenarioId: string;
-                    scenarioRunId: string;
-                    /** @default default */
-                    scenarioSetId?: string;
                 } | {
                     /** @constant */
                     type: "SCENARIO_TEXT_MESSAGE_START";
