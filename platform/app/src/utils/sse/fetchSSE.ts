@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
+import { explainSerializedError } from "~/features/errors/logic/presentation";
 import { toError } from "~/utils/posthogErrorCapture";
 import { FetchSSETimeoutError } from "./errors";
 
@@ -41,16 +42,26 @@ export interface FetchSSEOptions<T> {
 /**
  * Reads the sentence a refused request came back with.
  *
- * Our routes answer with `{ error }` — a dataset still normalising (425), a
- * node with no model (422) — and that sentence is the one telling the user
- * what to fix. Falling back to `statusText` reduced every one of them to
- * "Unprocessable Entity".
+ * Two body shapes reach here. Routes on `@langwatch/api` answer with a coded
+ * envelope whose wire `message` is deliberately the code slug, so the words
+ * come from the client error registry, keyed by `code`. Legacy SecuredApp
+ * routes answer `{ error }` — a dataset still normalising (425), a node with
+ * no model (422) — and that sentence is the one telling the user what to fix.
+ * Falling back to `statusText` reduced every one of them to "Unprocessable
+ * Entity".
  */
 async function describeRefusal(response: Response): Promise<string> {
   const body = (await response
     .clone()
     .json()
-    .catch(() => null)) as { error?: unknown } | null;
+    .catch(() => null)) as { code?: unknown; error?: unknown } | null;
+
+  if (typeof body?.code === "string") {
+    const explained = explainSerializedError(
+      body as Parameters<typeof explainSerializedError>[0],
+    );
+    return explained.description || explained.title;
+  }
 
   if (typeof body?.error === "string") return body.error;
 
