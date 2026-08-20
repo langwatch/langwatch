@@ -382,11 +382,14 @@ Feature: Databricks AI/BI Genie puller
       Given a query that ran through two hours
       And only the first of those hours has been billed
       When the puller allocates warehouse cost
-      Then the query is held rather than recorded at the first hour's cost
+      Then the query keeps what the billed hour is worth
+      And the query is held until the unbilled hour arrives
       # A query spanning two hours is only fully priced once both hours have
-      # billed. Recording it on the first hour alone understates it, and the
-      # record cannot be revised later, so the unbilled hour has to hold it —
-      # the same rule as an entirely unbilled question, applied per hour.
+      # billed. What did price is worth keeping, but settling there would
+      # leave the second hour recorded at nothing for good — so the unbilled
+      # hour holds the query and the re-read that lands it restates the
+      # total. The same rule as an entirely unbilled question, applied per
+      # hour.
 
     @unit
     Scenario: The billing query only ever runs on the configured workspace

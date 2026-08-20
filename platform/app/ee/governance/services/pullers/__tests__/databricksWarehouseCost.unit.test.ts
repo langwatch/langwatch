@@ -283,16 +283,10 @@ describe("allocateWarehouseCost", () => {
     });
 
     // 6 USD * 1000 / 2_281_000 — a quarter of a cent, not six dollars.
-    expect(Number(costByStatementId.get("question")?.costUsd)).toBeCloseTo(
-      0.00263,
-      5,
-    );
+    expect(costByStatementId.get("question")?.costUsd).toBe("0.002630425");
     // And the compute it did not do stays with the statement that did it:
     // 6 * 120000/120000 + 6 * 2280000/2281000.
-    expect(Number(costByStatementId.get("straddler")?.costUsd)).toBeCloseTo(
-      11.99737,
-      5,
-    );
+    expect(costByStatementId.get("straddler")?.costUsd).toBe("11.997369574");
 
     // The ingredients have to name every hour the share was drawn from. Costing
     // a statement out of two hours and then reporting the first hour's total

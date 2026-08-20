@@ -499,18 +499,22 @@ SELECT
 FROM sliced w
 JOIN hour_total t
   ON t.usage_hour = w.usage_hour AND t.warehouse_id = w.warehouse_id
--- LEFT, not inner, and that is the whole fix for the zero-cost stall. An hour
--- the workspace has not billed yet has no \`priced\` row, and an inner join would
--- drop its statements entirely — indistinguishable from an hour with no Genie
--- traffic, so the watermark would sail past work that was about to be billed and
--- never come back for it. Kept with null price columns, the caller can tell "not
--- billed yet" from "nothing to bill" and hold.
+-- LEFT, not inner, and that is the whole fix for the zero-cost stall. An inner
+-- join drops any Genie statement whose hour is not in \`system.billing.usage\`
+-- yet, and that table lands minutes to days behind the question. Dropped, a
+-- not-yet-billed statement is indistinguishable from a genuinely free one: both
+-- are simply absent, the chunk reads as fully priced, the watermark moves past
+-- them, and the fixed settling re-read never reaches back far enough to correct
+-- them — a permanent zero. Kept, a not-yet-billed statement returns with a null
+-- \`sku_name\`, which the allocator reads as "seen but unbilled" and holds the
+-- watermark for until its bill lands (or the max hold expires).
 LEFT JOIN priced pr
   ON pr.usage_hour = w.usage_hour AND pr.warehouse_id = w.warehouse_id
--- A union, because each half alone is a cliff. Older workspaces answer with a
--- null \`genie_space_id\` and only the client application to go on; workspaces
--- that renamed the client application answer with the space id and nothing that
--- matches the name.
+-- A union, because each half alone is a cliff. The label is a display string
+-- the provider can rename or localize at will; the space id is structural but
+-- observed on 103/103 Genie statements over 60 days, not documented as
+-- guaranteed. Either change alone silently shrinks the priced set to zero —
+-- together, both have to break at once.
 WHERE (w.genie_space_id IS NOT NULL OR w.client_application = :genie_app)
   -- The look-back exists to feed the denominators, not to re-emit statements a
   -- previous chunk already priced. A statement is EMITTED for the chunk its
@@ -571,6 +575,16 @@ const warehouseCostResponseSchema = z.object({
  * exactly one that nothing else would catch. Checking the manifest turns that
  * into a refusal.
  */
+const WAREHOUSE_COST_COLUMNS = [
+  "statement_id",
+  "usage_hour",
+  "execution_ms_in_hour",
+  "hour_total_ms",
+  "hour_billable_usd",
+  "currency_code",
+  "sku_name",
+] as const;
+
 /**
  * The window this question is asked about, as bound parameters.
  *
@@ -622,16 +636,6 @@ function warehouseCostParameters(chunk: {
     },
   ];
 }
-
-const WAREHOUSE_COST_COLUMNS = [
-  "statement_id",
-  "usage_hour",
-  "execution_ms_in_hour",
-  "hour_total_ms",
-  "hour_billable_usd",
-  "currency_code",
-  "sku_name",
-] as const;
 
 /**
  * What one cost reply turned out to be worth.
