@@ -41,6 +41,7 @@ import { toError } from "~/utils/posthogErrorCapture";
 
 import { LangWatchQLUnavailableError } from "./errors";
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "./provisioning";
+import { lwqlDerivedConnectionFromEnv } from "./selfProvisioning";
 
 const logger = createLogger("langwatch:analytics:lwql:executor");
 
@@ -314,6 +315,15 @@ export function lwqlConnectionFromEnv(): LangWatchQLConnection | null {
   const absent = required.filter(([, value]) => !value).map(([name]) => name);
 
   if (absent.length > 0) {
+    // Self-provisioning deployments (issue #6635) set `LWQL_SELF_PROVISION`
+    // and at most a subset of the five — the rest derive from the admin
+    // `CLICKHOUSE_URL` with the SaaS-convention defaults, in
+    // `./selfProvisioning.ts`. In that mode a partial set is per-field
+    // overrides, not a misconfiguration, so the partial-config warning below
+    // does not apply.
+    if (process.env.LWQL_SELF_PROVISION === "true") {
+      return lwqlDerivedConnectionFromEnv();
+    }
     // A deployment that set *some* of these meant to enable the API and got a
     // silent refusal on every query instead, so name what is missing. One that
     // set none is simply not running the API and says nothing. Variable names

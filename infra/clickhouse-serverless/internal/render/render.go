@@ -52,6 +52,8 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 		{"password", func() error { return renderDefaultPassword(input, usersD) }},
 		{"logging", func() error { return renderLogging(input, configD) }},
 		{"network", func() error { return renderNetwork(computed, configD) }},
+		{"custom-settings-prefixes", func() error { return renderCustomSettingsPrefixes(configD) }},
+		{"access-management", func() error { return renderAccessManagement(usersD) }},
 	} {
 		if err := s.fn(); err != nil {
 			return fmt.Errorf("%s: %w", s.name, err)

@@ -850,6 +850,35 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: CLICKHOUSE_BACKUP_METRICS_ENABLED
   value: {{ if or ($chBackup).enabled ($chBackup).metricsEnabled }}"true"{{ else }}"false"{{ end }}
 
+{{/* LangWatchQL self-provisioning (issue #6635). The app derives the
+     restricted connection from CLICKHOUSE_URL/DATABASE_URL and converges the
+     whole access model at boot; the chart contributes only the mode switch and
+     the two stable passwords. `optional: true` is deliberate: an operator
+     Secret without these keys means LangWatchQL simply stays unprovisioned
+     (fail-closed refusals) instead of the pod dying in
+     CreateContainerConfigError — a default-on feature must degrade, not brick
+     an upgrade. Skipped for chart-managed ClickHouse at replicas > 1:
+     SQL-created access entities and named collections live per node and do
+     not replicate, so the provisioned identity would exist on one replica
+     only — see NOTES.txt. */}}
+{{- if (include "langwatch.lwql.selfProvisionActive" .) }}
+{{- $lwqlSecretName := .Values.secrets.existingSecret | default (include "langwatch.appSecretName" .) }}
+- name: LWQL_SELF_PROVISION
+  value: "true"
+- name: LWQL_CLICKHOUSE_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ $lwqlSecretName }}
+      key: LWQL_CLICKHOUSE_PASSWORD
+      optional: true
+- name: LWQL_POSTGRES_READER_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ $lwqlSecretName }}
+      key: LWQL_POSTGRES_READER_PASSWORD
+      optional: true
+{{- end }}
+
 # Credentials encryption key
 {{- if .Values.app.credentialsEncryptionKey.secretKeyRef.name }}
 - name: CREDENTIALS_SECRET
@@ -1213,6 +1242,26 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "langwatch.storedObjects.localFilesystemIsActive" -}}
 {{- if and .Values.app.storedObjects.localFilesystem.enabled (not .Values.app.dataplane.enabled) -}}
 true
+{{- end -}}
+{{- end -}}
+
+{{/*
+  Whether LangWatchQL self-provisioning is wired into the pods (issue #6635).
+  Enabled by default; skipped — not failed — for chart-managed ClickHouse at
+  replicas > 1, because SQL-created access entities and named collections are
+  per-node state that does not replicate: the restricted identity would exist
+  on whichever replica the boot-time DDL landed on and nowhere else. Skipping
+  keeps a multi-replica upgrade converging instead of aborting on a feature
+  the operator never asked to configure; NOTES.txt says so out loud.
+  External ClickHouse is wired regardless — the chart cannot see its topology,
+  and the app degrades to a logged, fail-closed refusal if the server rejects
+  access-management DDL.
+*/}}
+{{- define "langwatch.lwql.selfProvisionActive" -}}
+{{- if .Values.lwql.enabled -}}
+{{- if not (and .Values.clickhouse.chartManaged (gt (int (.Values.clickhouse).replicas) 1)) -}}
+true
+{{- end -}}
 {{- end -}}
 {{- end -}}
 

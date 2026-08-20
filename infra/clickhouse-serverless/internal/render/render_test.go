@@ -77,8 +77,10 @@ func TestRenderAll_CreatesExpectedFiles(t *testing.T) {
 		"config.d/limits.yaml",
 		"config.d/logging.yaml",
 		"config.d/network.yaml",
+		"config.d/custom-settings-prefixes.yaml",
 		"users.d/profiles.yaml",
 		"users.d/default-password.yaml",
+		"users.d/zz-access-management.yaml",
 	}
 
 	for _, f := range expectedFiles {
@@ -386,5 +388,41 @@ func TestRenderAll_NetworkSettings(t *testing.T) {
 	}
 	if !strings.Contains(profContent, "tcp_keep_alive_timeout: 20") {
 		t.Error("profiles.yaml should contain tcp_keep_alive_timeout: 20")
+	}
+}
+
+func TestRenderAll_LangWatchQLAccessPrerequisites(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	prefixData, err := os.ReadFile(filepath.Join(dir, "config.d/custom-settings-prefixes.yaml"))
+	if err != nil {
+		t.Fatalf("read custom-settings-prefixes.yaml: %v", err)
+	}
+	if !strings.Contains(string(prefixData), "custom_settings_prefixes: custom_") {
+		t.Error("custom-settings-prefixes.yaml should declare the custom_ prefix")
+	}
+
+	// The zz- name is load-bearing: users.d merges lexicographically and the
+	// later file wins, so this must sort after any access_management: 0.
+	accessData, err := os.ReadFile(filepath.Join(dir, "users.d/zz-access-management.yaml"))
+	if err != nil {
+		t.Fatalf("read zz-access-management.yaml: %v", err)
+	}
+	accessContent := string(accessData)
+	for _, want := range []string{
+		"access_management: 1",
+		"named_collection_control: 1",
+		"show_named_collections: 1",
+		"show_named_collections_secrets: 1",
+	} {
+		if !strings.Contains(accessContent, want) {
+			t.Errorf("zz-access-management.yaml should contain %q", want)
+		}
 	}
 }
