@@ -10,10 +10,19 @@ const { mockClickHouseQuery, mockPrismaFindUnique } = vi.hoisted(() => ({
   mockPrismaFindUnique: vi.fn(),
 }));
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForTenant: () =>
-    Promise.resolve({ query: mockClickHouseQuery }),
-}));
+vi.mock("~/server/app-layer/app", () => {
+  const app = () => ({
+    clickhouse: {
+      enabled: true,
+      resolveClient: () => Promise.resolve({ query: mockClickHouseQuery }),
+      resolveOrganizationClient: async () => {
+        throw new Error("no organization client in this suite");
+      },
+      allInstances: async () => [],
+    },
+  });
+  return { getApp: app, tryGetApp: app };
+});
 
 vi.mock("~/server/db", () => ({
   prisma: {},

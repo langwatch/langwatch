@@ -6,7 +6,7 @@
  */
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
+import { getApp } from "~/server/app-layer/app";
 import type { StoredObject } from "./stored-object";
 import { storedObjectSchema } from "./stored-object";
 
@@ -17,7 +17,7 @@ const tracer = getLangWatchTracer("langwatch.stored-objects.repository");
 /**
  * ClickHouse repository for stored_objects rows.
  *
- * Clients are resolved at call time via `getClickHouseClientForTenant` so
+ * Clients are resolved at call time through the App's resolver so
  * per-tenant private ClickHouse routing is always respected.
  */
 export class StoredObjectsRepository {
@@ -46,12 +46,7 @@ export class StoredObjectsRepository {
         },
       },
       async () => {
-        const client = await getClickHouseClientForTenant(projectId);
-        if (!client) {
-          throw new Error(
-            "ClickHouse is not configured — cannot insert stored object",
-          );
-        }
+        const client = await getApp().clickhouse.resolveClient(projectId);
 
         await client.insert({
           table: TABLE_NAME,
@@ -110,12 +105,7 @@ export class StoredObjectsRepository {
         },
       },
       async (span) => {
-        const client = await getClickHouseClientForTenant(projectId);
-        if (!client) {
-          throw new Error(
-            "ClickHouse is not configured — cannot find stored object by id",
-          );
-        }
+        const client = await getApp().clickhouse.resolveClient(projectId);
 
         // Scalar-subquery dedup: inner reads only (project_id, id, inserted_at)
         // to find max(inserted_at), outer reads the full row for that version.
@@ -199,12 +189,7 @@ export class StoredObjectsRepository {
         },
       },
       async (span) => {
-        const client = await getClickHouseClientForTenant(projectId);
-        if (!client) {
-          throw new Error(
-            "ClickHouse is not configured — cannot enumerate stored objects",
-          );
-        }
+        const client = await getApp().clickhouse.resolveClient(projectId);
 
         // Project-scoped enumeration. Two notes on cost:
         //
@@ -263,12 +248,7 @@ export class StoredObjectsRepository {
     afterId?: string;
     limit: number;
   }): Promise<StoredObject[]> {
-    const client = await getClickHouseClientForTenant(projectId);
-    if (!client) {
-      throw new Error(
-        "ClickHouse is not configured — cannot enumerate stored objects",
-      );
-    }
+    const client = await getApp().clickhouse.resolveClient(projectId);
 
     const result = await client.query({
       query: `
@@ -340,12 +320,7 @@ export class StoredObjectsRepository {
         },
       },
       async (span) => {
-        const client = await getClickHouseClientForTenant(projectId);
-        if (!client) {
-          throw new Error(
-            "ClickHouse is not configured - cannot sum stored object sizes",
-          );
-        }
+        const client = await getApp().clickhouse.resolveClient(projectId);
 
         const purposePredicate = purpose
           ? "AND t.purpose = {purpose:String}"
@@ -417,12 +392,7 @@ export class StoredObjectsRepository {
         },
       },
       async () => {
-        const client = await getClickHouseClientForTenant(projectId);
-        if (!client) {
-          throw new Error(
-            "ClickHouse is not configured — cannot delete stored objects",
-          );
-        }
+        const client = await getApp().clickhouse.resolveClient(projectId);
 
         await client.exec({
           query: `
@@ -477,12 +447,7 @@ export class StoredObjectsRepository {
         },
       },
       async () => {
-        const client = await getClickHouseClientForTenant(projectId);
-        if (!client) {
-          throw new Error(
-            "ClickHouse is not configured — cannot delete stored objects",
-          );
-        }
+        const client = await getApp().clickhouse.resolveClient(projectId);
         await client.exec({
           query: `
             ALTER TABLE ${TABLE_NAME}

@@ -68,7 +68,6 @@ const CLIENT_MODULE_VALUE_EXPORTS = new Set([
   "getClickHouseClientForTenant",
   "getClickHouseClientForOrganization",
   "getAllClickHouseInstances",
-  "getSharedClickHouseClient",
   "isClickHouseEnabled",
   "clearCustomClientCache",
   "getCustomClientCacheSize",
@@ -202,11 +201,7 @@ function mayResolveByLocation(path: string): boolean {
  * the caller takes that repository from `getApp()`. Delete a line when its file
  * is done. Do not add one.
  */
-const RESOLVES_DIRECTLY_BACKLOG = new Set([
-  "ee/governance/services/activity-monitor/activityMonitor.service.ts",
-  "src/server/experiments-v3/services/experiment-run.service.ts",
-  "src/server/traces/clickhouse-trace.service.ts",
-]);
+const RESOLVES_DIRECTLY_BACKLOG = new Set<string>([]);
 
 const SKIPPED_DIRECTORIES = new Set([
   "node_modules",

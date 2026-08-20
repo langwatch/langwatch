@@ -156,14 +156,6 @@ export type ProjectCredentialFact = {
   createdAtMs: number;
 };
 
-/** A user matched from the platform-admin email list. */
-export type PlatformAdminUserFact = {
-  userId: string;
-  /** Normalized (lowercased) — the migration reports the emails it could
-   *  not match, and matching is what decides that. */
-  email: string;
-  createdAtMs: number;
-};
 
 /** One RESOURCE-scope `Grant` head row, re-read for the import proof.
  *  Columns as stored: `principalType` and `resourceKind` keep the database's
@@ -222,11 +214,6 @@ export interface AuthzCutoverRepository
   findProjectCredentialFacts(args: {
     organizationId: string;
   }): Promise<ProjectCredentialFact[]>;
-  /** Users behind the platform-admin email list, matched case-insensitively
-   *  the way the live admin check matches them. */
-  findUsersByEmail(args: {
-    emails: readonly string[];
-  }): Promise<PlatformAdminUserFact[]>;
 
   /** The RESOURCE heads, for the import proof. */
   findResourceGrantRows(args: {

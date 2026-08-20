@@ -184,6 +184,57 @@ Feature: In-place authorization data migration
     Then the action is refused with error code "migration_enrollment_cloud_only"
     And the ops page explains that released migrations run automatically instead
 
+  # ----------------------------------------------------------------------------
+  # Cohort enrollment - sampling the long tail without touching the big fish
+  # ----------------------------------------------------------------------------
+  # One organization at a time paces a rollout of ten; it does not pace a
+  # rollout of seven thousand. A cohort enrolls a sample in one action - and
+  # the organizations it must never sweep up are the ones the platform
+  # already knows by data, not by a list an operator maintains: an enterprise
+  # plan on the subscription, or a private ClickHouse route in the
+  # environment. Neither signal names an id in code.
+
+  @unit
+  Scenario: An operator enrolls a sampled cohort in one action
+    Given the installation is cloud with organizations not yet enrolled for the grants import
+    When an operator enrolls a cohort of 50 for the grants import
+    Then 50 eligible organizations are enrolled in one action
+    And the result names every organization it picked, so the action is auditable
+
+  @unit
+  Scenario: A cohort never includes an enterprise organization
+    Given "bigcorp" holds an active or pending enterprise subscription
+    And "isolated-inc" has a dedicated data plane
+    When an operator enrolls a cohort for the grants import
+    Then neither "bigcorp" nor "isolated-inc" is in the cohort
+    And the operator maintained no list to exclude them
+
+  @unit
+  Scenario: A cohort samples only organizations not already enrolled
+    Given "acme" is already enrolled for the grants import
+    When an operator enrolls a cohort for the grants import
+    Then "acme" is not picked again
+    And the cohort is drawn entirely from organizations with no enrollment row
+
+  @unit
+  Scenario: A cohort larger than the eligible pool enrolls the whole pool
+    Given fewer eligible organizations remain than the requested cohort size
+    When an operator enrolls the cohort
+    Then every remaining eligible organization is enrolled
+    And the result says how many were enrolled rather than erroring
+
+  @unit
+  Scenario: A cutover cohort takes the typed confirmation
+    Given the cutover migration requires operator confirmation
+    When an operator enrolls a cohort for the cutover without typing the confirmation
+    Then the cohort is refused the same way a single cutover enrollment is
+
+  @unit
+  Scenario: Cohort enrollment does not apply to self-hosted installations
+    Given the installation is self-hosted
+    When an operator enrolls a cohort
+    Then the action is refused with error code "migration_enrollment_cloud_only"
+
   @unit
   Scenario: A migration not yet released for self-hosting never runs there
     Given the installation is self-hosted
@@ -478,12 +529,18 @@ Feature: In-place authorization data migration
   @integration
   Scenario: Cutover imports the legacy facts that only exist outside bindings
     Given "acme" has a member whose only admin fact is a legacy organization ADMIN row
-    And "acme" has a share link and an operator listed in the platform admin list
+    And "acme" has a share link
     When "acme" is cut over
     Then the legacy admin holds an organization-scoped admin grant
     And the share link is a resource-scope grant with its token and expiry intact
-    And the operator holds a platform-scope grant
     And every imported grant carries the business time of the fact it came from
+
+  @unit
+  Scenario: Platform operator access is never a ledger fact
+    Given a platform operator who administers every organization
+    When an organization is cut over
+    Then who can operate the platform is unchanged
+    And the cutover records access for that organization alone
 
   @unit
   Scenario: A share grant no legacy link accounts for holds the cutover
@@ -546,6 +603,20 @@ Feature: In-place authorization data migration
     When the genesis import runs for "acme"
     Then that user holds an organization-scoped admin grant
     And a member with no bindings gains nothing beyond the floor
+
+  @unit
+  Scenario: The convergence wait grows with the size of the import
+    Given "acme"'s genesis import states more facts than the base wait could fold
+    When the import waits for the projection to land its facts
+    Then the wait's deadline scales with the number of facts it is waiting on
+    And an organization within the ceiling's budget is never parked for being large
+
+  @unit
+  Scenario: The convergence wait's budget has a ceiling
+    Given an organization whose import is larger than the ceiling's budget
+    When the import waits for the projection
+    Then the wait stops growing at the ceiling, so one organization cannot hold the pass indefinitely
+    And past it the organization parks and finishes on a later pass, as every organization did before
 
   @unit
   Scenario: Running the genesis import twice states the same facts

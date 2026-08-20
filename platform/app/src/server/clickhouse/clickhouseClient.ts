@@ -205,9 +205,6 @@ export function isClickHouseEnabled(): boolean {
   );
 }
 
-/** Re-export for infrastructure-only use (metrics collection, not tenant data). */
-export { _getSharedClickHouseClient as getSharedClickHouseClient } from "./client";
-
 /**
  * Returns a cached ClickHouse client for the given org and URL,
  * creating one if it doesn't exist yet.
@@ -267,7 +264,10 @@ export function clearTenantOrgCache(): void {
 }
 
 /**
- * Returns the parsed private ClickHouse URLs map. Exposed for testing.
+ * Returns the parsed private ClickHouse URLs map. Two production consumers on
+ * top of the tests: `tasks/clickhouseMigrate.ts` runs each private instance's
+ * migrations off the values, and the system-migrations composition reads the
+ * KEYS as the private-dataplane organizations a cohort enrollment must skip.
  */
 export function getPrivateClickHouseUrls(): ReadonlyMap<string, string> {
   // Projected, not returned directly. The backing map now holds a route object

@@ -58,7 +58,6 @@ export type {
   LegacyTeamRow,
   OrganizationMemberFact,
   OrganizationScopeInventory,
-  PlatformAdminUserFact,
   ProjectCredentialFact,
   ResourceGrantRow,
   ResourceGrantUsageSeed,

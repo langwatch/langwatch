@@ -1,5 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { getAllClickHouseInstances } from "~/server/clickhouse/clickhouseClient";
+import { getApp } from "~/server/app-layer/app";
 
 const TABLE_NAME = "simulation_runs" as const;
 
@@ -133,7 +133,7 @@ export class ClickHouseStalledRunFinder implements StalledRunFinder {
 export async function getStalledRunFindersByInstance(): Promise<
   Array<{ target: "shared" | string; finder: StalledRunFinder }>
 > {
-  const instances = await getAllClickHouseInstances();
+  const instances = await getApp().clickhouse.allInstances();
   return instances.map(({ target, client }) => ({
     target,
     finder: new ClickHouseStalledRunFinder(client),

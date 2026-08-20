@@ -73,6 +73,11 @@ import type {
   OrganizationMemberFact,
   RoleHeadRow,
 } from "./authz-migration.repository";
+import {
+  type ConvergencePoll,
+  convergenceTimeoutMs,
+  DEFAULT_CONVERGENCE_POLL,
+} from "./convergence-poll";
 import { GRANTS_GENESIS_IMPORT_MIGRATION_NAME } from "./genesis-import.name";
 import { deriveGrantId } from "./ledger/grant-identity";
 import type {
@@ -104,8 +109,6 @@ const GENESIS_CHUNK = 500;
 /** Reports stay bounded however far the projection has drifted. */
 const MAX_REPORTED_DIFFS = 50;
 
-const DEFAULT_POLL = { intervalMs: 500, timeoutMs: 120_000 };
-
 /** One way the projection failed to reproduce a legacy row - the ALLOW
  *  direction (`binding_missing`, `binding_changed`, `role_missing`,
  *  `role_changed`) - or a way it holds a fact the legacy side no longer
@@ -132,7 +135,7 @@ export type GenesisImportDeps = {
   ledger: GrantsLedgerEmitter;
   now: () => number;
   /** How long to wait for the projection to land the import before parking. */
-  poll?: { intervalMs: number; timeoutMs: number };
+  poll?: ConvergencePoll;
 };
 
 export class GrantsGenesisImportMigration implements SystemMigration {
@@ -384,8 +387,12 @@ export class GrantsGenesisImportMigration implements SystemMigration {
     signal?: AbortSignal;
   }): Promise<void> {
     if (staleGrantIds.length === 0 && staleRoleIds.length === 0) return;
-    const poll = this.deps.poll ?? DEFAULT_POLL;
-    const deadline = this.deps.now() + poll.timeoutMs;
+    const poll = this.deps.poll ?? DEFAULT_CONVERGENCE_POLL;
+    const timeoutMs = convergenceTimeoutMs({
+      poll,
+      factCount: staleGrantIds.length + staleRoleIds.length,
+    });
+    const deadline = this.deps.now() + timeoutMs;
     for (;;) {
       this.assertNotAborted(signal);
       const [genesisGrantIds, roleHeads] = await Promise.all([
@@ -402,7 +409,7 @@ export class GrantsGenesisImportMigration implements SystemMigration {
       }
       if (this.deps.now() >= deadline) {
         throw new Error(
-          `grants projection did not clear ${staleGrantIds.length + staleRoleIds.length} stale genesis fact(s) for ${organizationId} within ${poll.timeoutMs}ms; tenant parked for retry`,
+          `grants projection did not clear ${staleGrantIds.length + staleRoleIds.length} stale genesis fact(s) for ${organizationId} within ${timeoutMs}ms; tenant parked for retry`,
         );
       }
       await new Promise((resolve) => setTimeout(resolve, poll.intervalMs));
@@ -427,8 +434,12 @@ export class GrantsGenesisImportMigration implements SystemMigration {
     signal?: AbortSignal;
   }): Promise<void> {
     if (grantIds.length === 0 && roleIds.length === 0) return;
-    const poll = this.deps.poll ?? DEFAULT_POLL;
-    const deadline = this.deps.now() + poll.timeoutMs;
+    const poll = this.deps.poll ?? DEFAULT_CONVERGENCE_POLL;
+    const timeoutMs = convergenceTimeoutMs({
+      poll,
+      factCount: grantIds.length + roleIds.length,
+    });
+    const deadline = this.deps.now() + timeoutMs;
     for (;;) {
       this.assertNotAborted(signal);
       const [presentGrantIds, roleHeads] = await Promise.all([
@@ -445,7 +456,7 @@ export class GrantsGenesisImportMigration implements SystemMigration {
       }
       if (this.deps.now() >= deadline) {
         throw new Error(
-          `grants projection did not land the genesis import for ${organizationId} within ${poll.timeoutMs}ms; tenant parked for retry`,
+          `grants projection did not land the genesis import for ${organizationId} within ${timeoutMs}ms; tenant parked for retry`,
         );
       }
       await new Promise((resolve) => setTimeout(resolve, poll.intervalMs));

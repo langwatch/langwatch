@@ -34,10 +34,12 @@ import {
   getAllClickHouseInstances,
   getClickHouseClientForOrganization,
   getClickHouseClientForTenant,
-  getSharedClickHouseClient,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
-import { closeClickHouseClient } from "~/server/clickhouse/client";
+import {
+  _getSharedClickHouseClient,
+  closeClickHouseClient,
+} from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { bindProcessFleetMetricsSource } from "~/server/event-sourcing/process-manager/metrics";
@@ -1644,7 +1646,7 @@ export function initializeDefaultApp(options?: {
   // One snapshot store shared by this pod's writer and its reader: the writer
   // publishes only while it holds the lease, the reader always reads.
   const snapshotRepo = redis ? new SnapshotRedisRepository(redis) : null;
-  const sharedCh = getSharedClickHouseClient();
+  const sharedCh = _getSharedClickHouseClient();
   const eventExplorerRepo = sharedCh
     ? new EventExplorerClickHouseRepository(sharedCh)
     : new NullEventExplorerRepository();
@@ -1736,6 +1738,8 @@ export function initializeDefaultApp(options?: {
     clickhouse: {
       enabled: clickhouseEnabled,
       resolveClient: resolveClickHouseClient,
+      resolveOrganizationClient: getClickHouseClientForOrganization,
+      allInstances: getAllClickHouseInstances,
     },
     redis,
     billing: {
@@ -1780,7 +1784,11 @@ export function initializeDefaultApp(options?: {
       ),
     },
     opsExplain: {
-      service: new OpsExplainService(new OpsExplainClickHouseRepository()),
+      service: new OpsExplainService(
+        new OpsExplainClickHouseRepository({
+          fallbackClient: _getSharedClickHouseClient,
+        }),
+      ),
     },
     // traced() gives every service call a `ClassName.method` span, same as
     // the rest of the app bag. Per-method, not per-frame: the streaming hot
@@ -2057,6 +2065,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       resolveClient: async () => {
         throw new Error("ClickHouse is not available in the test app");
       },
+      resolveOrganizationClient: async () => {
+        throw new Error("ClickHouse is not available in the test app");
+      },
+      allInstances: async () => [],
     },
     // No Redis in the test preset; a test that needs one passes it as an
     // override, or injects a double into the unit directly.
@@ -2100,7 +2112,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       ),
     },
     opsExplain: {
-      service: new OpsExplainService(new OpsExplainClickHouseRepository()),
+      service: new OpsExplainService(
+        new OpsExplainClickHouseRepository({ fallbackClient: () => null }),
+      ),
     },
     langy: {
       conversations: LangyConversationService.create(

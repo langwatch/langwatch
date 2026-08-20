@@ -12,7 +12,6 @@ import type {
   AuthzCutoverRepository,
   ExternalMemberFact,
   OrganizationScopeInventory,
-  PlatformAdminUserFact,
   ProjectCredentialFact,
   ResourceGrantRow,
   ShareLinkFactRow,
@@ -47,9 +46,6 @@ class SweepRepository implements AuthzCutoverRepository {
     return [];
   }
   async findProjectCredentialFacts(): Promise<ProjectCredentialFact[]> {
-    return [];
-  }
-  async findUsersByEmail(): Promise<PlatformAdminUserFact[]> {
     return [];
   }
   async findResourceGrantRows(): Promise<ResourceGrantRow[]> {
@@ -146,7 +142,6 @@ function sweepWith({
       grants: collectorReturning(grants),
     },
     cutoverCohort: () => true,
-    adminEmails: () => [],
     now: () => Date.now(),
     poll: { intervalMs: 1, timeoutMs: 50 },
   });

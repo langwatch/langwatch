@@ -86,6 +86,15 @@ export interface SystemMigrationEnrollmentStore {
     migrationName: string;
     enrolledByUserId: string;
   }): Promise<void>;
+  findCohortEligibleOrganizations(args: {
+    migrationName: string;
+    excludeOrganizationIds: string[];
+  }): Promise<Array<{ id: string; name: string }>>;
+  createMany(args: {
+    organizationIds: string[];
+    migrationName: string;
+    enrolledByUserId: string;
+  }): Promise<{ insertedCount: number }>;
   delete(args: {
     organizationId: string;
     migrationName: string;
@@ -148,6 +157,21 @@ export type MigrationOverview = {
 };
 
 /**
+ * A uniform sample without replacement: Fisher-Yates over a copy, first
+ * `count` entries. A pool smaller than the ask returns the whole pool -
+ * the caller reports how many it got rather than erroring.
+ */
+function sample<T>({ pool, count }: { pool: T[]; count: number }): T[] {
+  const copy = [...pool];
+  const size = Math.min(count, copy.length);
+  for (let index = 0; index < size; index++) {
+    const swap = index + Math.floor(Math.random() * (copy.length - index));
+    [copy[index], copy[swap]] = [copy[swap] as T, copy[index] as T];
+  }
+  return copy.slice(0, size);
+}
+
+/**
  * The ops dashboard's view of the in-place migrations, and the operator's one
  * lever over them. Routes call this and nothing else - the state repository
  * stays behind the app layer.
@@ -167,6 +191,13 @@ export class SystemMigrationsService {
       /** Read per call, so the answer is never a boot-time capture. */
       isSaaS: () => boolean;
       enrollments: SystemMigrationEnrollmentStore;
+      /**
+       * The organizations whose data plane is a private ClickHouse instance,
+       * read from the environment's routing table. A cohort must never sweep
+       * one up, and the environment - not a list in code - is what names
+       * them.
+       */
+      privateDataplaneOrganizationIds: () => string[];
       /**
        * The ops audit trail. Enrollment decides which organizations the
        * platform migrates, so both actions are recorded the way the
@@ -374,6 +405,72 @@ export class SystemMigrationsService {
       action: "systemMigrations.enroll",
       args: { migrationName },
     });
+  }
+
+  /**
+   * Enroll a sampled cohort for one migration in a single action
+   * (specs/rbac/in-place-authz-migration.feature, the cohort scenarios).
+   * The pool is every organization not yet enrolled for the migration,
+   * minus the ones the platform already knows to leave alone by data
+   * rather than by a hand-kept list: an active enterprise subscription, or
+   * a private ClickHouse route in the environment. The sample is drawn at
+   * random so a cohort is a spread of the long tail, not the same head of
+   * some fixed order every time - and the result names every organization
+   * it picked, because an action over N organizations is only auditable if
+   * it says which N.
+   */
+  async enrollCohort({
+    migrationName,
+    sampleSize,
+    actorUserId,
+  }: {
+    migrationName: string;
+    sampleSize: number;
+    actorUserId: string;
+  }): Promise<{
+    enrolled: Array<{ id: string; name: string }>;
+    eligibleCount: number;
+  }> {
+    if (!this.deps.isSaaS()) throw new MigrationEnrollmentCloudOnlyError();
+    this.requireRegisteredMigration(migrationName);
+    const eligible =
+      await this.deps.enrollments.findCohortEligibleOrganizations({
+        migrationName,
+        excludeOrganizationIds: this.deps.privateDataplaneOrganizationIds(),
+      });
+    const picked = sample({ pool: eligible, count: sampleSize });
+    const { insertedCount } = await this.deps.enrollments.createMany({
+      organizationIds: picked.map((organization) => organization.id),
+      migrationName,
+      enrolledByUserId: actorUserId,
+    });
+    logger.info(
+      {
+        migrationName,
+        actorUserId,
+        sampleSize,
+        // Both counts on purpose: `skipDuplicates` drops a row a concurrent
+        // single enrollment already wrote, and the trail must not overclaim.
+        pickedCount: picked.length,
+        insertedCount,
+        eligibleCount: eligible.length,
+        organizationIds: picked.map((organization) => organization.id),
+      },
+      "operator enrolled a cohort for the in-place migration rollout",
+    );
+    // One audit row PER organization, mirroring `enroll`'s shape: the row's
+    // indexed organizationId column is how "what touched org X" is answered,
+    // and a single row holding a thousand-id array loses every id to the
+    // audit writer's size cap.
+    for (const organization of picked) {
+      await this.deps.audit({
+        userId: actorUserId,
+        organizationId: organization.id,
+        action: "systemMigrations.enrollCohort",
+        args: { migrationName, sampleSize, cohortSize: picked.length },
+      });
+    }
+    return { enrolled: picked, eligibleCount: eligible.length };
   }
 
   /**

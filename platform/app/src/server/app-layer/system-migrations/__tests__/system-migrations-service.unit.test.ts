@@ -61,6 +61,12 @@ function enrollmentStoreStub() {
     create: vi
       .fn<SystemMigrationEnrollmentStore["create"]>()
       .mockResolvedValue(undefined),
+    findCohortEligibleOrganizations: vi
+      .fn<SystemMigrationEnrollmentStore["findCohortEligibleOrganizations"]>()
+      .mockResolvedValue([]),
+    createMany: vi
+      .fn<SystemMigrationEnrollmentStore["createMany"]>()
+      .mockResolvedValue({ insertedCount: 0 }),
     delete: vi
       .fn<SystemMigrationEnrollmentStore["delete"]>()
       .mockResolvedValue(undefined),
@@ -93,6 +99,7 @@ function serviceWith({
   enrollments = enrollmentStoreStub(),
   migrations = [migrationOf({ name: MIGRATION })],
   runTargetedPass = targetedPassStub(),
+  privateDataplaneOrganizationIds = [],
 }: {
   record: TenantMigrationRecord | null;
   waitingReports?: Record<string, (report: unknown) => boolean>;
@@ -112,6 +119,7 @@ function serviceWith({
   enrollments?: ReturnType<typeof enrollmentStoreStub>;
   migrations?: Array<ReturnType<typeof migrationOf>>;
   runTargetedPass?: ReturnType<typeof targetedPassStub>;
+  privateDataplaneOrganizationIds?: string[];
 }) {
   const upserts: TenantMigrationRecord[] = [];
   const audit = vi.fn().mockResolvedValue(undefined);
@@ -138,6 +146,7 @@ function serviceWith({
     migrations: () => migrations,
     isSaaS: () => isSaaS,
     enrollments,
+    privateDataplaneOrganizationIds: () => privateDataplaneOrganizationIds,
     audit,
     runPass: vi.fn(),
     runTargetedPass,
