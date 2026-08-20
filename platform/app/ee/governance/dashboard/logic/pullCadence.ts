@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { SourceType } from "@ee/governance/dashboard/components/ingestionSourceCatalog";
 import { Cron } from "croner";
 import {
   timeOfDay,
   WEEKDAYS,
 } from "~/features/automations/logic/reportSchedule";
+import type { SourceType } from "../components/ingestionSourceCatalog";
 
 /**
  * Pure cadence <-> cron helpers for the pull-source Cadence picker. Kept out
