@@ -32,6 +32,13 @@ Feature: Langy minimal harness
     Then its size is under the enforced byte ceiling
 
   @unit
+  Scenario: Every skill the prompt routes to is one the worker has
+    Given the skills named in the prompt's routing table
+    When each is looked for in the tree the worker is given
+    Then all of them are there, so no reply can be spent calling a skill that
+      was never shipped
+
+  @unit
   Scenario: The prompt names every trace origin the platform stamps
     Given the trace origins listed in Langy's prompt
     When they are compared with the origins the platform stamps

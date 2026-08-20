@@ -15,6 +15,15 @@ import { parseOriginOption } from "./origin-filter";
 /** Traces are walked in chunks so the progress bar moves rather than jumping 0 → 1. */
 const PROGRESS_CHUNK = 5;
 
+/**
+ * The text query is matched as a phrase, so a Lucene-style query returns zero
+ * rows rather than an error, and zero rows reads like "you have none of those".
+ * Measured against a project with 638 traces: "validation failed" matched 40,
+ * "validation AND failed" matched 0. Named here so an empty result says which
+ * of the two it is.
+ */
+const BOOLEAN_OPERATORS = /(^|\s)(AND|OR|NOT)(\s|$)/;
+
 export const searchTracesCommand = async (options: {
   query?: string;
   startDate?: string;
@@ -103,6 +112,13 @@ export const searchTracesCommand = async (options: {
       if (traces.length === 0) {
         console.log();
         console.log(chalk.gray("No traces found matching your criteria."));
+        if (options.query && BOOLEAN_OPERATORS.test(options.query)) {
+          console.log(
+            chalk.gray(
+              "The query is matched as plain text, so AND, OR and NOT are searched for as words. Try one phrase.",
+            ),
+          );
+        }
         console.log(chalk.gray("Try widening your date range or search query."));
       } else {
         printTable({ events, traces, matched });

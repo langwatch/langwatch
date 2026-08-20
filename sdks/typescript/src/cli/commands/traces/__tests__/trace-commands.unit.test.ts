@@ -116,6 +116,43 @@ describe("searchTracesCommand()", () => {
 		});
 	});
 
+	// The query is matched as a phrase, so a Lucene-style query returns zero
+	// rows rather than an error, and zero rows reads like "you have none of
+	// those". An agent asked to find failing traces reports that as the answer.
+	describe("when a query with boolean operators finds nothing", () => {
+		/** @scenario A boolean query that finds nothing says why */
+		it("says the operators were searched for as words", async () => {
+			const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+			mockSearch.mockResolvedValue({
+				traces: [],
+				pagination: { totalHits: 0 },
+			});
+
+			await searchTracesCommand({ query: "error OR exception" });
+
+			expect(log.mock.calls.flat().join("\n")).toContain(
+				"searched for as words",
+			);
+			log.mockRestore();
+		});
+
+		/** @scenario A plain query that finds nothing does not blame the operators */
+		it("stays quiet about them when the query is one phrase", async () => {
+			const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+			mockSearch.mockResolvedValue({
+				traces: [],
+				pagination: { totalHits: 0 },
+			});
+
+			await searchTracesCommand({ query: "validation failed" });
+
+			expect(log.mock.calls.flat().join("\n")).not.toContain(
+				"searched for as words",
+			);
+			log.mockRestore();
+		});
+	});
+
 	describe("when format is json", () => {
 		it("outputs raw JSON", async () => {
 			const result = {
