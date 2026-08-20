@@ -10,20 +10,21 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
+import type { SourceType } from "../../components/ingestionSourceCatalog";
 import { ParserConfigFields } from "../ingestion-sources";
 
-function Harness({ sourceType }: { sourceType: string }) {
+function Harness({ sourceType }: { sourceType: SourceType }) {
   const [values, setValues] = useState<Record<string, string>>({});
   return (
     <ParserConfigFields
-      sourceType={sourceType as never}
+      sourceType={sourceType}
       values={values}
       onChange={setValues}
     />
   );
 }
 
-const renderFields = (sourceType: string) =>
+const renderFields = (sourceType: SourceType) =>
   render(
     <ChakraProvider value={defaultSystem}>
       <Harness sourceType={sourceType} />

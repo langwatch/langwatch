@@ -14,6 +14,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
+import type { SourceType } from "../ingestionSourceCatalog";
 import { PullCadenceField } from "../PullCadenceField";
 
 function Harness({
@@ -21,14 +22,14 @@ function Harness({
   initialValue,
   onChangeSpy,
 }: {
-  sourceType: string;
+  sourceType: SourceType;
   initialValue: string;
   onChangeSpy?: (next: string) => void;
 }) {
   const [value, setValue] = useState(initialValue);
   return (
     <PullCadenceField
-      sourceType={sourceType as never}
+      sourceType={sourceType}
       value={value}
       onChange={(next) => {
         onChangeSpy?.(next);
