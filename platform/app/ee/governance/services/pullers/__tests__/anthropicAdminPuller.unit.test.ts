@@ -379,6 +379,12 @@ describe("the Anthropic Admin puller", () => {
               starting_at: "2026-08-01T00:00:00Z",
               results: [
                 { ...COST_PAGE.data[0]!.results[0], amount: "not-a-number" },
+                // An exponent past Number's safe-integer range would collapse
+                // to Infinity and emit "eInfinity" — malformed, not money.
+                {
+                  ...COST_PAGE.data[0]!.results[0],
+                  amount: `1e${"9".repeat(309)}`,
+                },
                 COST_PAGE.data[0]!.results[0],
               ],
             },

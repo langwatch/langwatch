@@ -305,8 +305,15 @@ function centsToUsd(amount: string): string | null {
     // Exponent form ("1e-7") — from the schema's number branch stringifying a
     // float, or sent as a string outright. Shift the exponent instead of the
     // digits — the money parser downstream reads exponents exactly.
+    const exponentValue = Number(exponent);
+    if (!Number.isSafeInteger(exponentValue)) {
+      // An exponent too large for exact arithmetic would collapse to
+      // Infinity and emit "eInfinity". No real money amount lives out
+      // there — treat it as malformed.
+      return null;
+    }
     return `${sign}${wholeRaw}${fraction ? `.${fraction}` : ""}e${
-      Number(exponent) - 2
+      exponentValue - 2
     }`;
   }
   // Three digits guarantee a whole part survives the two-digit shift.
