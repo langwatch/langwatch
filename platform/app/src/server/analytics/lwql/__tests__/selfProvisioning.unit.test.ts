@@ -27,6 +27,7 @@ import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import { lwqlPostgresViews } from "../catalog/types";
 import { productionLangWatchQLNames } from "../productionProvisioning";
 import { qualified } from "../provisioning";
+import { lwqlSourceTables } from "../views";
 import {
   LWQL_SELF_PROVISION_DEFAULTS,
   lwqlDerivedConnectionFromEnv,
@@ -205,11 +206,15 @@ const NAMES = productionLangWatchQLNames({
   },
 });
 
+// The self-hosted composition requires the LangWatchQL database to be the
+// application's own, so one constant serves as both.
+const SOURCE_DATABASE = "langwatch";
+
 function selfHostedStatements(): string[] {
   return selfHostedClickHouseProvisioningStatements({
     names: NAMES,
     restrictedPassword: "restricted-secret",
-    sourceDatabase: "langwatch",
+    sourceDatabase: SOURCE_DATABASE,
     postgres: {
       endpoint: { host: "pg.internal", port: 5432, database: "mydb" },
       readerPassword: "reader-secret",
@@ -278,17 +283,36 @@ describe("selfHostedClickHouseProvisioningStatements", () => {
       }
     });
 
-    // Only tables carrying BOTH. A view is granted but never policed — the
-    // policies sit on the *source* tables it reads, which is what filters it —
-    // so "every granted object is policed" would be false by design. The
-    // property that matters is that wherever both exist, the policy lands
-    // first.
-    const policedAndGranted = [...firstGrant.keys()].filter((table) =>
-      firstPolicy.has(table),
-    );
-    expect(policedAndGranted.length).toBeGreaterThan(0);
+    // The expected set comes from the catalog, not from the statements, so
+    // that deleting a policy fails here instead of quietly shrinking what the
+    // test checks. Every physical table the restricted identity can read is
+    // listed: the key map, plus one entry per distinct catalog source table.
+    // Views are deliberately absent — a view is granted but never policed, the
+    // policies sitting on the source tables it reads, so requiring a policy on
+    // one would be false by design.
+    const expectedProtected = [
+      qualified(NAMES, NAMES.keyMapTable, SOURCE_DATABASE),
+      ...lwqlSourceTables({
+        names: NAMES,
+        sourceDatabase: SOURCE_DATABASE,
+      }).map((lwqlTable) =>
+        qualified(NAMES, lwqlTable.table, lwqlTable.database),
+      ),
+    ];
+
+    // Both statements must exist for every protected table...
     expect(
-      policedAndGranted.filter(
+      expectedProtected.filter(
+        (table) => !firstPolicy.has(table) || !firstGrant.has(table),
+      ),
+    ).toEqual([]);
+
+    // ...and on each one the policy must land first. A table granted before it
+    // is policed returns every row to the restricted identity for the width of
+    // the gap, and this list executes statement by statement, so a partial run
+    // would leave exactly that window open.
+    expect(
+      expectedProtected.filter(
         (table) => (firstPolicy.get(table) ?? 0) > (firstGrant.get(table) ?? 0),
       ),
     ).toEqual([]);
