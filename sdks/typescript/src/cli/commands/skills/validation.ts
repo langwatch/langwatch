@@ -9,7 +9,7 @@ import { commandValidationError } from "../../utils/errorOutput";
 
 /**
  * Throw a validation failure as a real Error that still carries the domain
- * brand — eslint's only-throw-error demands an Error instance, while
+ * brand — only an Error instance carries a usable stack, while
  * `handledErrorFromThrown` recognises the failure by the brand on the thrown
  * value itself (it reads those fields before unwrapping anything).
  *

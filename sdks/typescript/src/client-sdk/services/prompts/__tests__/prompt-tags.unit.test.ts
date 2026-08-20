@@ -140,7 +140,6 @@ describe("Prompt Tags", () => {
           versionId: "prompt_version_abc123",
         });
 
-        // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(promptsApiService.assignTag).toHaveBeenCalledWith({
           id: "pizza-prompt",
           tag: "production",

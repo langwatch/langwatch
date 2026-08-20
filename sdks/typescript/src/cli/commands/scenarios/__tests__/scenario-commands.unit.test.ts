@@ -3,7 +3,6 @@ import type { ScenarioResponse } from "@/client-sdk/services/scenarios";
 import { ScenariosApiError } from "@/client-sdk/services/scenarios";
 
 vi.mock("@/client-sdk/services/scenarios", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   const actual =
     await importOriginal<typeof import("@/client-sdk/services/scenarios")>();
   return {
@@ -103,7 +102,6 @@ describe("listScenariosCommand()", () => {
 
       await listScenariosCommand();
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(process.exit).not.toHaveBeenCalled();
     });
   });

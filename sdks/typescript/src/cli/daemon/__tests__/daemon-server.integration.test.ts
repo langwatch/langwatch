@@ -374,7 +374,6 @@ describe("daemon over a unix socket", () => {
 
         const nameAtClose: boolean[] = [];
         // Captured only to delegate back to; the .call below supplies `this`.
-        // eslint-disable-next-line @typescript-eslint/unbound-method
         const realClose = net.Server.prototype.close;
         vi.spyOn(net.Server.prototype, "close").mockImplementation(function (
           this: net.Server,

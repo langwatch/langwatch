@@ -4,7 +4,6 @@ import { ExperimentsApiServiceError } from "@/client-sdk/services/experiments/ex
 vi.mock(
   "@/client-sdk/services/experiments/experiments-api.service",
   async (importOriginal) => {
-    // eslint-disable-next-line @typescript-eslint/consistent-type-imports
     const actual =
       await importOriginal<
         typeof import("@/client-sdk/services/experiments/experiments-api.service")

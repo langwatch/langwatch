@@ -4,7 +4,6 @@ import { AgentsApiError } from "@/client-sdk/services/agents/agents-api.service"
 vi.mock(
   "@/client-sdk/services/agents/agents-api.service",
   async (importOriginal) => {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     const actual = (await importOriginal()) as Record<string, unknown>;
     return {
       ...actual,
@@ -103,7 +102,6 @@ describe("listAgentsCommand()", () => {
 
       await listAgentsCommand();
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(process.exit).not.toHaveBeenCalled();
     });
   });

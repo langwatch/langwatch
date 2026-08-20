@@ -4,7 +4,6 @@ import { AnnotationsApiError } from "@/client-sdk/services/annotations/annotatio
 vi.mock(
   "@/client-sdk/services/annotations/annotations-api.service",
   async (importOriginal) => {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     const actual = (await importOriginal()) as Record<string, unknown>;
     return {
       ...actual,

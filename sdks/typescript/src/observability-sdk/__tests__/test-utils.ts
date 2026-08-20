@@ -68,8 +68,7 @@ export class MockSpan implements Span {
       exception !== null &&
       "message" in exception
         ? (exception as any).message
-        : // eslint-disable-next-line @typescript-eslint/no-base-to-string
-          String(exception);
+        : String(exception);
 
     this._events.push({
       name: "exception",

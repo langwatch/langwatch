@@ -98,7 +98,6 @@ describe("listSimulationRunsCommand()", () => {
 
       await listSimulationRunsCommand({});
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(process.exit).not.toHaveBeenCalled();
     });
   });
@@ -229,7 +228,6 @@ describe("getSimulationRunCommand()", () => {
 
       await getSimulationRunCommand("run_abc123");
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(process.exit).not.toHaveBeenCalled();
     });
   });

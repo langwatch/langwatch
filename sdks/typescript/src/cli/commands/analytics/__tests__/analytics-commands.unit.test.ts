@@ -4,7 +4,6 @@ import { AnalyticsApiError } from "@/client-sdk/services/analytics/analytics-api
 vi.mock(
   "@/client-sdk/services/analytics/analytics-api.service",
   async (importOriginal) => {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     const actual = (await importOriginal()) as Record<string, unknown>;
     return {
       ...actual,

@@ -4,7 +4,6 @@ import { WorkflowsApiError } from "@/client-sdk/services/workflows/workflows-api
 vi.mock(
   "@/client-sdk/services/workflows/workflows-api.service",
   async (importOriginal) => {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     const actual = (await importOriginal()) as Record<string, unknown>;
     return {
       ...actual,
@@ -97,7 +96,6 @@ describe("listWorkflowsCommand()", () => {
 
       await listWorkflowsCommand();
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(process.exit).not.toHaveBeenCalled();
     });
   });

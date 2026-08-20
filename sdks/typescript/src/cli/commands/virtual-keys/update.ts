@@ -49,7 +49,6 @@ function parseConfig(
   if (options.configFile) {
     // Lazy-require so the import stays local to the --config-file path
     // (the CLI is an entrypoint shared with scripts that may not need fs).
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { readFileSync } = require("node:fs") as typeof NodeFs;
     const raw = readFileSync(options.configFile, "utf8");
     try {

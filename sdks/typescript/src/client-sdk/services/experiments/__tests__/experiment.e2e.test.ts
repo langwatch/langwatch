@@ -180,7 +180,6 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
       console.log = (...args: unknown[]) => {
         captured.push(args.map(String).join(" "));
       };
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       const origExit = process.exit;
       let exitedWith: number | string | null | undefined = null;
       (process as unknown as { exit: (c?: number) => void }).exit = ((

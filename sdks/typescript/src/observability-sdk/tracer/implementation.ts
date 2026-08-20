@@ -235,7 +235,6 @@ export function getLangWatchTracerFromProvider(
   };
 
   // See comment above about why.
-  // eslint-disable-next-line prefer-const
   proxyInstance = new Proxy(tracer, handler) as LangWatchTracer;
   return proxyInstance;
 }

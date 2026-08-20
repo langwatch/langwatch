@@ -4,7 +4,6 @@ import { ModelProvidersApiError } from "@/client-sdk/services/model-providers/mo
 vi.mock(
   "@/client-sdk/services/model-providers/model-providers-api.service",
   async (importOriginal) => {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     const actual = (await importOriginal()) as Record<string, unknown>;
     return {
       ...actual,
@@ -84,7 +83,6 @@ describe("listModelProvidersCommand()", () => {
 
       await listModelProvidersCommand();
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(process.exit).not.toHaveBeenCalled();
     });
   });

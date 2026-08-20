@@ -207,7 +207,6 @@ describe("Tag CRUD", () => {
 
         const result = await facade.tags.list();
 
-        // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(promptsApiService.listTags).toHaveBeenCalled();
         expect(result).toEqual(expectedTags);
       });
@@ -224,7 +223,6 @@ describe("Tag CRUD", () => {
 
         const result = await facade.tags.create({ name: "canary" });
 
-        // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(promptsApiService.createTag).toHaveBeenCalledWith({
           name: "canary",
         });
@@ -238,7 +236,6 @@ describe("Tag CRUD", () => {
 
         await facade.tags.delete("my-tag");
 
-        // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(promptsApiService.deleteTag).toHaveBeenCalledWith("my-tag");
       });
     });

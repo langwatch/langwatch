@@ -4,7 +4,6 @@ import { DashboardsApiError } from "@/client-sdk/services/dashboards/dashboards-
 vi.mock(
   "@/client-sdk/services/dashboards/dashboards-api.service",
   async (importOriginal) => {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     const actual = (await importOriginal()) as Record<string, unknown>;
     return {
       ...actual,
@@ -97,7 +96,6 @@ describe("listDashboardsCommand()", () => {
 
       await listDashboardsCommand();
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(process.exit).not.toHaveBeenCalled();
     });
   });

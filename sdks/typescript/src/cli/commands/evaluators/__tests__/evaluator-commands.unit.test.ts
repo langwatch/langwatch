@@ -5,7 +5,6 @@ import { EvaluatorsApiError } from "@/client-sdk/services/evaluators";
 
 // Mock dependencies before imports
 vi.mock("@/client-sdk/services/evaluators", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   const actual =
     await importOriginal<typeof import("@/client-sdk/services/evaluators")>();
   return {
@@ -111,7 +110,6 @@ describe("listEvaluatorsCommand()", () => {
 
       await listEvaluatorsCommand();
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(process.exit).not.toHaveBeenCalled();
     });
   });
