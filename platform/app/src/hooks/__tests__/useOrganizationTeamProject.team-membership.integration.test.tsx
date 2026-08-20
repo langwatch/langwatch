@@ -99,7 +99,13 @@ const OWNING_TEAM = {
   projects: [{ id: "proj-data", name: "Data App", slug: "data-app" }],
 };
 
-function organizationWith(teams: unknown[], organizationRole = "MEMBER") {
+function organizationWith({
+  teams,
+  organizationRole = "MEMBER",
+}: {
+  teams: unknown[];
+  organizationRole?: string;
+}) {
   return {
     data: [
       {
@@ -134,11 +140,18 @@ function renderResolution() {
  * statement of that is what makes the assertion mean anything: calling the
  * hook's own exported predicate would let the two drift together and still
  * agree, which is exactly the failure this covers.
+ *
+ * Both inputs come from the hook under test, never from a literal in the
+ * test body. A literal role would make the admin assertions pass on their
+ * own, whatever role the hook resolved.
  */
-function chromeWouldRefuse(
-  team: { members?: { userId: string }[] } | undefined,
-  organizationRole = "MEMBER",
-) {
+function chromeWouldRefuse({
+  team,
+  organizationRole,
+}: {
+  team: { members?: { userId: string }[] } | undefined;
+  organizationRole: string | undefined;
+}) {
   // The page body renders for an organization admin on the role alone,
   // whatever team rows they hold.
   if (organizationRole === "ADMIN") return false;
@@ -158,7 +171,7 @@ describe("useOrganizationTeamProject team-membership resolution", () => {
       mockLocalStorage[key] = "";
     }
     mockOrganizationsQuery.mockReturnValue(
-      organizationWith([OTHER_TEAM, OWNING_TEAM]),
+      organizationWith({ teams: [OTHER_TEAM, OWNING_TEAM] }),
     );
   });
 
@@ -173,7 +186,12 @@ describe("useOrganizationTeamProject team-membership resolution", () => {
         const { result } = renderResolution();
 
         expect(result.current.team?.id).toBe("team-data");
-        expect(chromeWouldRefuse(result.current.team)).toBe(false);
+        expect(
+          chromeWouldRefuse({
+            team: result.current.team,
+            organizationRole: result.current.organizationRole,
+          }),
+        ).toBe(false);
       });
 
       /** @scenario The ambient project belongs to the team the member is on */
@@ -194,7 +212,12 @@ describe("useOrganizationTeamProject team-membership resolution", () => {
 
         expect(result.current.team?.id).toBe("team-data");
         expect(result.current.project?.slug).toBe("data-app");
-        expect(chromeWouldRefuse(result.current.team)).toBe(false);
+        expect(
+          chromeWouldRefuse({
+            team: result.current.team,
+            organizationRole: result.current.organizationRole,
+          }),
+        ).toBe(false);
       });
 
       /** @scenario The remembered selection heals to the team the member is on */
@@ -213,7 +236,10 @@ describe("useOrganizationTeamProject team-membership resolution", () => {
   describe("given an admin of the organization, on one of its teams", () => {
     beforeEach(() => {
       mockOrganizationsQuery.mockReturnValue(
-        organizationWith([OTHER_TEAM, OWNING_TEAM], "ADMIN"),
+        organizationWith({
+          teams: [OTHER_TEAM, OWNING_TEAM],
+          organizationRole: "ADMIN",
+        }),
       );
     });
 
@@ -227,7 +253,13 @@ describe("useOrganizationTeamProject team-membership resolution", () => {
 
         expect(result.current.project?.slug).toBe("platform-app");
         expect(result.current.team?.id).toBe("team-platform");
-        expect(chromeWouldRefuse(result.current.team, "ADMIN")).toBe(false);
+        expect(result.current.organizationRole).toBe("ADMIN");
+        expect(
+          chromeWouldRefuse({
+            team: result.current.team,
+            organizationRole: result.current.organizationRole,
+          }),
+        ).toBe(false);
       });
 
       /** @scenario "The admin's remembered team survives" */
@@ -244,7 +276,9 @@ describe("useOrganizationTeamProject team-membership resolution", () => {
   describe("given someone who belongs to no team in the organization", () => {
     beforeEach(() => {
       mockOrganizationsQuery.mockReturnValue(
-        organizationWith([OTHER_TEAM, { ...OWNING_TEAM, members: [] }]),
+        organizationWith({
+          teams: [OTHER_TEAM, { ...OWNING_TEAM, members: [] }],
+        }),
       );
     });
 
@@ -256,7 +290,12 @@ describe("useOrganizationTeamProject team-membership resolution", () => {
         // A resolved context is what lets the chrome render the refusal at
         // all; leaving it undefined would hang the page on a loading screen.
         expect(result.current.team).toBeDefined();
-        expect(chromeWouldRefuse(result.current.team)).toBe(true);
+        expect(
+          chromeWouldRefuse({
+            team: result.current.team,
+            organizationRole: result.current.organizationRole,
+          }),
+        ).toBe(true);
       });
     });
   });
@@ -273,7 +312,12 @@ describe("useOrganizationTeamProject team-membership resolution", () => {
         const { result } = renderResolution();
 
         expect(result.current.team?.id).toBe("team-platform");
-        expect(chromeWouldRefuse(result.current.team)).toBe(true);
+        expect(
+          chromeWouldRefuse({
+            team: result.current.team,
+            organizationRole: result.current.organizationRole,
+          }),
+        ).toBe(true);
       });
     });
   });

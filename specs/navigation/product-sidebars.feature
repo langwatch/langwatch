@@ -100,6 +100,13 @@ Feature: Product sidebars in the new navigation modes
     Then the menu does not scroll
 
   @integration
+  Scenario: A reader who scrolls the menu keeps the position they chose
+    Given I open a product page by its address
+    When I scroll the menu myself
+    And the menu keeps growing while its remaining groups arrive
+    Then the menu stays where I put it
+
+  @integration
   Scenario: Closing the Support menu with the pointer leaves no focus ring
     Given the Support menu opened because the pointer moved over it
     When the pointer moves away and the menu closes

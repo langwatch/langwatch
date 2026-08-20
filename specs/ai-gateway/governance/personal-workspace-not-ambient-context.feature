@@ -123,19 +123,17 @@ Feature: A personal workspace is never the ambient context for organization work
       # held to the membership test.
 
   # ============================================================================
-  # An organization admin reaches every team, so the test must not drop theirs
+  # An organization admin reaches every team of the organization
   # ============================================================================
 
-  Rule: the membership test reads as "can the caller be shown this team"
+  Rule: an admin keeps a selection in any team they are allowed to open
 
-    An organization admin reaches every team of the organization, with or
-    without a membership row in it: the page body renders for them on the
-    admin role alone, and the picker offers them every project. A membership
-    test written as the team rows alone therefore throws away an admin's own
-    selection, and the project they picked reverts to another team's project
-    on every page that carries no project in its address, the app root
-    included. The test is the same one the page body applies: a membership
-    row, or the admin role.
+    An organization admin can open every team of the organization and every
+    project in it, whether or not they were added to that team. So a project
+    an admin picks stays picked on the pages that follow, including the pages
+    that name no project in their address and the app root.
+
+    A member is unchanged: they keep only the teams they were added to.
 
     Background:
       Given ada is an admin of "ACME"
@@ -154,8 +152,8 @@ Feature: A personal workspace is never the ambient context for organization work
       Given ada's remembered selection names "ACME Platform"
       When ada opens an organization-scoped settings page
       Then the ambient team is "ACME Platform"
-      # A member keeps healing to the team they are on, which the rule
-      # above still covers: only the admin role opens the other team.
+      # A member still goes back to a team they were added to, which the
+      # rule above keeps covering.
 
   # ============================================================================
   # The address bar still decides

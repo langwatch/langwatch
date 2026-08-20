@@ -176,24 +176,39 @@ function recordScrollIntoView(): {
 
 /**
  * jsdom reports every box at the origin, so the one measurement the reveal
- * reads is stubbed: how far the active entry sits below the top of the
- * menu it scrolls in.
+ * reads is stubbed: how far each named entry sits below the top of the menu
+ * it scrolls in.
  */
-function stubEntryOffset({
-  entryLabel,
-  offset,
-}: {
-  entryLabel: string;
-  offset: number;
-}) {
+function stubEntryOffsets(offsets: Record<string, number>) {
   const rectAt = (top: number) => ({ ...EMPTY_RECT, top, y: top });
   window.HTMLElement.prototype.getBoundingClientRect = function (
     this: HTMLElement,
   ) {
     if (this.dataset.testid === "sidebar-scroll-region") return rectAt(0);
-    if (this.getAttribute("aria-label") === entryLabel) return rectAt(offset);
-    return rectAt(0);
+    const label = this.getAttribute("aria-label");
+    return rectAt((label ? offsets[label] : undefined) ?? 0);
   } as HTMLElement["getBoundingClientRect"];
+}
+
+/**
+ * Appends a child to the menu and resolves once a MutationObserver has been
+ * handed that change.
+ *
+ * Waiting for the child to be in the DOM proves nothing: it is there the
+ * moment `appendChild` returns, while the observers run later in their own
+ * microtask. Observers are called in the order they were created, and the
+ * menu's own observer is created first, when the column mounts. So by the
+ * time this one runs, the menu has already had its chance to move.
+ */
+async function appendChildAndAwaitMutation(region: HTMLElement) {
+  await new Promise<void>((resolve) => {
+    const observer = new MutationObserver(() => {
+      observer.disconnect();
+      resolve();
+    });
+    observer.observe(region, { childList: true, subtree: true });
+    region.appendChild(document.createElement("div"));
+  });
 }
 
 const EMPTY_RECT = {
@@ -341,7 +356,7 @@ describe("the product sidebar", () => {
     it("scrolls the menu so that entry sits at the top of the column", async () => {
       // jsdom lays nothing out, so the entry is placed by hand: 300px
       // down a menu whose own box starts at the top of the viewport.
-      stubEntryOffset({ entryLabel: "Virtual Keys", offset: 300 });
+      stubEntryOffsets({ "Virtual Keys": 300 });
 
       mockPathname = "/gateway/virtual-keys";
       renderSidebar("gateway");
@@ -352,8 +367,41 @@ describe("the product sidebar", () => {
     });
 
     /** @scenario "Moving inside the menu leaves the scroll where it is" */
+    it("does not move the menu when another page in it is opened", async () => {
+      // Budgets sits further down than Virtual Keys, so a menu that
+      // revealed the newly opened page would land on a different number.
+      stubEntryOffsets({ "Virtual Keys": 300, Budgets: 520 });
+
+      mockPathname = "/gateway/virtual-keys";
+      const { rerender } = renderSidebar("gateway");
+
+      const region = screen.getByTestId("sidebar-scroll-region");
+      await waitFor(() => {
+        expect(region.scrollTop).toBe(300);
+      });
+
+      // Opening another page from the same menu. The column stays mounted
+      // and keeps its scroll; only the entry marked as the page being
+      // shown moves.
+      mockPathname = "/gateway/budgets";
+      rerender(
+        <ChakraProvider value={defaultSystem}>
+          <ProductSidebar surface="gateway" isCompact={false} />
+        </ChakraProvider>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole("link", { name: "Budgets" })).toHaveAttribute(
+          "aria-current",
+          "page",
+        );
+      });
+      expect(region.scrollTop).toBe(300);
+    });
+
+    /** @scenario "A reader who scrolls the menu keeps the position they chose" */
     it("leaves the scroll alone once the reader takes over", async () => {
-      stubEntryOffset({ entryLabel: "Virtual Keys", offset: 300 });
+      stubEntryOffsets({ "Virtual Keys": 300 });
 
       mockPathname = "/gateway/virtual-keys";
       renderSidebar("gateway");
@@ -367,11 +415,8 @@ describe("the product sidebar", () => {
       // under them: the gated groups are still arriving.
       region.dispatchEvent(new Event("wheel"));
       region.scrollTop = 40;
-      region.appendChild(document.createElement("div"));
+      await appendChildAndAwaitMutation(region);
 
-      await waitFor(() => {
-        expect(region.childElementCount).toBeGreaterThan(0);
-      });
       expect(region.scrollTop).toBe(40);
     });
   });
