@@ -461,7 +461,8 @@ export class ActivityMonitorService {
     const thisWindowStart = now - windowMs;
     const previousWindowStart = now - 2 * windowMs;
 
-    const row = await this.repo.findSummarySpend(ch, {
+    const row = await this.repo.findSummarySpend({
+      ch,
       tenantId: govProjectId,
       thisStart: thisWindowStart,
       prevStart: previousWindowStart,
@@ -519,7 +520,8 @@ export class ActivityMonitorService {
     const now = Date.now();
     const windowMs = input.windowDays * 24 * 60 * 60 * 1000;
 
-    const rows = await this.repo.findSpendByUser(ch, {
+    const rows = await this.repo.findSpendByUser({
+      ch,
       tenantId: govProjectId,
       windowStart: now - windowMs,
       sortBy: input.sortBy ?? "spend",
@@ -595,7 +597,8 @@ export class ActivityMonitorService {
     const now = Date.now();
     const windowStart = now - input.windowDays * 24 * 60 * 60 * 1000;
 
-    const rows = await this.repo.findSpendByDepartment(ch, {
+    const rows = await this.repo.findSpendByDepartment({
+      ch,
       tenantIds,
       windowStart,
     });
@@ -759,7 +762,8 @@ export class ActivityMonitorService {
 
     const previousWindowStart = now - 2 * windowMs;
 
-    const sourceRows = await this.repo.findSpendByTeamSource(ch, {
+    const sourceRows = await this.repo.findSpendByTeamSource({
+      ch,
       tenantId: govProjectId,
       thisStart: now - windowMs,
       prevStart: previousWindowStart,
@@ -896,7 +900,8 @@ export class ActivityMonitorService {
       return { buckets: emptyDenseBuckets(windowStart, windowDays) };
     }
 
-    const rows = await this.repo.findSpendOverTime(ch, {
+    const rows = await this.repo.findSpendOverTime({
+      ch,
       tenantId: govProjectId,
       windowStart,
       groupBy: input.groupBy,
@@ -1069,17 +1074,20 @@ export class ActivityMonitorService {
       const sourceIds = sources.map((s) => s.id);
       const since = Date.now() - 24 * 60 * 60 * 1000;
       const counts = await Promise.all([
-        this.repo.countTracedEventsBySource(ch, {
+        this.repo.countTracedEventsBySource({
+          ch,
           tenantId: govProjectId,
           sourceIds,
           since,
         }),
-        this.repo.countLoggedEventsBySource(ch, {
+        this.repo.countLoggedEventsBySource({
+          ch,
           tenantId: govProjectId,
           sourceIds,
           since,
         }),
-        this.repo.countPulledEventsBySource(ch, {
+        this.repo.countPulledEventsBySource({
+          ch,
           tenantId: govProjectId,
           sourceIds,
           since,
@@ -1120,13 +1128,17 @@ export class ActivityMonitorService {
     if (!ch) return [];
 
     const limit = input.limit ?? 50;
-    const beforeMs = input.beforeIso
+    const parsedBeforeMs = input.beforeIso
       ? new Date(input.beforeIso).getTime()
+      : Number.NaN;
+    const beforeMs = Number.isFinite(parsedBeforeMs)
+      ? parsedBeforeMs
       : Date.now();
 
     const [pushedEvents, pulledEvents] = await Promise.all([
       this.repo
-        .findPushedEventsForSource(ch, {
+        .findPushedEventsForSource({
+          ch,
           tenantId: govProjectId,
           sourceId: input.sourceId,
           beforeMs,
@@ -1134,7 +1146,8 @@ export class ActivityMonitorService {
         })
         .then((rows) => rows.map(toPushedEvent)),
       this.repo
-        .findPulledEventsForSource(ch, {
+        .findPulledEventsForSource({
+          ch,
           tenantId: govProjectId,
           sourceId: input.sourceId,
           beforeMs,
@@ -1176,6 +1189,7 @@ export class ActivityMonitorService {
     const now = Date.now();
     const day = 24 * 60 * 60 * 1000;
     const windowParams = {
+      ch,
       tenantId: govProjectId,
       sourceId: input.sourceId,
       since24h: now - day,
@@ -1184,9 +1198,9 @@ export class ActivityMonitorService {
     };
 
     const windows = await Promise.all([
-      this.repo.findTracedEventWindowCounts(ch, windowParams),
-      this.repo.findLoggedEventWindowCounts(ch, windowParams),
-      this.repo.findPulledEventWindowCounts(ch, windowParams),
+      this.repo.findTracedEventWindowCounts(windowParams),
+      this.repo.findLoggedEventWindowCounts(windowParams),
+      this.repo.findPulledEventWindowCounts(windowParams),
     ]);
 
     const total = (pick: (row: WindowCountChRow) => number) =>

@@ -37,7 +37,8 @@ describe("ActivityMonitorClickHouseRepository", () => {
         { thisSpend: "1.5", prevSpend: "0.75", thisUsers: "3" },
       ]);
 
-      const row = await repo.findSummarySpend(ch, {
+      const row = await repo.findSummarySpend({
+        ch,
         tenantId: "t",
         thisStart: 0,
         prevStart: 0,
@@ -54,7 +55,8 @@ describe("ActivityMonitorClickHouseRepository", () => {
         { c24: "42", c7: "200", c30: "800", lastMs: "1700000000000" },
       ]);
 
-      const row = await repo.findTracedEventWindowCounts(ch, {
+      const row = await repo.findTracedEventWindowCounts({
+        ch,
         tenantId: "t",
         sourceId: "s",
         since24h: 0,
@@ -86,7 +88,8 @@ describe("ActivityMonitorClickHouseRepository", () => {
         },
       ]);
 
-      const rows = await repo.findPushedEventsForSource(ch, {
+      const rows = await repo.findPushedEventsForSource({
+        ch,
         tenantId: "t",
         sourceId: "s",
         beforeMs: Date.now(),
@@ -106,7 +109,8 @@ describe("ActivityMonitorClickHouseRepository", () => {
         { thisSpend: null, prevSpend: null, thisUsers: null },
       ]);
 
-      const row = await repo.findSummarySpend(ch, {
+      const row = await repo.findSummarySpend({
+        ch,
         tenantId: "t",
         thisStart: 0,
         prevStart: 0,
@@ -126,7 +130,8 @@ describe("ActivityMonitorClickHouseRepository", () => {
         },
       ]);
 
-      const rows = await repo.findSpendByUser(ch, {
+      const rows = await repo.findSpendByUser({
+        ch,
         tenantId: "t",
         windowStart: 0,
         sortBy: "spend",
@@ -141,7 +146,8 @@ describe("ActivityMonitorClickHouseRepository", () => {
     it("defaults null window count lastMs to null (preserved nullable)", async () => {
       const ch = mockCh([{ c24: 0, c7: 0, c30: 0, lastMs: null }]);
 
-      const row = await repo.findLoggedEventWindowCounts(ch, {
+      const row = await repo.findLoggedEventWindowCounts({
+        ch,
         tenantId: "t",
         sourceId: "s",
         since24h: 0,
@@ -156,7 +162,8 @@ describe("ActivityMonitorClickHouseRepository", () => {
     it("returns empty summary when CH returns no rows", async () => {
       const ch = mockCh([]);
 
-      const row = await repo.findSummarySpend(ch, {
+      const row = await repo.findSummarySpend({
+        ch,
         tenantId: "t",
         thisStart: 0,
         prevStart: 0,
@@ -168,7 +175,8 @@ describe("ActivityMonitorClickHouseRepository", () => {
     it("returns undefined when window count has no rows", async () => {
       const ch = mockCh([]);
 
-      const row = await repo.findPulledEventWindowCounts(ch, {
+      const row = await repo.findPulledEventWindowCounts({
+        ch,
         tenantId: "t",
         sourceId: "s",
         since24h: 0,
@@ -181,13 +189,14 @@ describe("ActivityMonitorClickHouseRepository", () => {
   });
 
   describe("when CH returns unexpected shapes (risk #3: schema drift)", () => {
-    it("rejects completely invalid summary row with ZodError", async () => {
+    it("falls back to zero when summary columns are renamed", async () => {
       const ch = mockCh([{ wrong_column: "value" }]);
 
       // thisSpend/prevSpend/thisUsers are all chNumeric with .catch(0),
       // so a missing field falls back to 0 rather than throwing.
       // This is intentional: individual field defaults are the first defense.
-      const row = await repo.findSummarySpend(ch, {
+      const row = await repo.findSummarySpend({
+        ch,
         tenantId: "t",
         thisStart: 0,
         prevStart: 0,
@@ -195,12 +204,35 @@ describe("ActivityMonitorClickHouseRepository", () => {
       expect(row).toEqual({ thisSpend: 0, prevSpend: 0, thisUsers: 0 });
     });
 
+    it("rejects spend-by-user rows missing a required column", async () => {
+      // actor has no .catch() — a missing/renamed column here must fail
+      // fast via .parse() rather than silently default, proving risk #3
+      // (schema drift) is actually caught, not just the per-field
+      // defaulting exercised above.
+      const ch = mockCh([
+        { spendUsdStr: "1.00", requests: "5", lastActivityMs: "0" },
+      ]);
+
+      await expect(
+        repo.findSpendByUser({
+          ch,
+          tenantId: "t",
+          windowStart: 0,
+          sortBy: "spend",
+          sortDir: "desc",
+          limit: 50,
+          offset: 0,
+        }),
+      ).rejects.toThrow();
+    });
+
     it("catches NaN from garbage numeric input", async () => {
       const ch = mockCh([
         { thisSpend: "not-a-number", prevSpend: {}, thisUsers: undefined },
       ]);
 
-      const row = await repo.findSummarySpend(ch, {
+      const row = await repo.findSummarySpend({
+        ch,
         tenantId: "t",
         thisStart: 0,
         prevStart: 0,
@@ -222,7 +254,8 @@ describe("ActivityMonitorClickHouseRepository", () => {
         },
       ]);
 
-      const rows = await repo.findPushedEventsForSource(ch, {
+      const rows = await repo.findPushedEventsForSource({
+        ch,
         tenantId: "t",
         sourceId: "s",
         beforeMs: Date.now(),
@@ -246,7 +279,8 @@ describe("ActivityMonitorClickHouseRepository", () => {
         },
       ]);
 
-      const rows = await repo.findPulledEventsForSource(ch, {
+      const rows = await repo.findPulledEventsForSource({
+        ch,
         tenantId: "t",
         sourceId: "s",
         beforeMs: Date.now(),
@@ -271,7 +305,8 @@ describe("ActivityMonitorClickHouseRepository", () => {
         },
       ]);
 
-      const rows = await repo.findSpendByUser(ch, {
+      const rows = await repo.findSpendByUser({
+        ch,
         tenantId: "t",
         windowStart: 0,
         sortBy: "spend",
@@ -297,7 +332,8 @@ describe("ActivityMonitorClickHouseRepository", () => {
         { sourceId: "src-2", c: "7" },
       ]);
 
-      const rows = await repo.countTracedEventsBySource(ch, {
+      const rows = await repo.countTracedEventsBySource({
+        ch,
         tenantId: "t",
         sourceIds: ["src-1", "src-2"],
         since: 0,
@@ -316,7 +352,8 @@ describe("ActivityMonitorClickHouseRepository", () => {
         },
       ]);
 
-      const rows = await repo.findSpendOverTime(ch, {
+      const rows = await repo.findSpendOverTime({
+        ch,
         tenantId: "t",
         windowStart: 0,
         groupBy: "team",
