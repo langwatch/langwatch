@@ -27,7 +27,6 @@ import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import { lwqlPostgresViews } from "../catalog/types";
 import { productionLangWatchQLNames } from "../productionProvisioning";
 import { qualified } from "../provisioning";
-import { lwqlSourceTables } from "../views";
 import {
   LWQL_SELF_PROVISION_DEFAULTS,
   lwqlDerivedConnectionFromEnv,
@@ -36,6 +35,7 @@ import {
   selfHostedClickHouseProvisioningStatements,
   selfHostedPostgresReaderStatements,
 } from "../selfProvisioning";
+import { lwqlSourceTables } from "../views";
 
 // Single character class, reused rather than interpolated into a pattern:
 // building a RegExp out of an identifier means escaping it, and a hand-rolled
