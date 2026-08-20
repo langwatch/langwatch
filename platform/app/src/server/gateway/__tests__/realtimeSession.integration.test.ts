@@ -56,6 +56,7 @@ import {
   matchRealtimeSession,
   REALTIME_OPEN_SESSION_WINDOW_MS,
   releaseRealtimeSession,
+  reportRealtimeSessionUsage,
   reserveRealtimeSession,
 } from "../realtimeSession.service";
 
@@ -417,5 +418,45 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
       (await prisma.gatewayRealtimeSession.findUnique({ where: { id: fresh } }))
         ?.status,
     ).toBe("OPEN");
+  });
+
+  describe("when a usage report arrives from a different key in the same project", () => {
+    /** @scenario A usage report names the key that opened the session */
+    it("refuses the report and leaves the session open", async () => {
+      const opener = await keyWithCap(`vk-opener-${nanoid(6)}`, null);
+      const other = await keyWithCap(`vk-other-${nanoid(6)}`, null);
+      const sessionId = `sess-xkey-${nanoid(6)}`;
+      await reserveRealtimeSession(reservation(opener, sessionId));
+
+      // Both keys are scoped to the same trace project, which is the normal
+      // shape: a project's keys share its destination. The session id is a
+      // gateway request id, which the opener's own response header carries,
+      // so it is not a secret.
+      const stolen = await reportRealtimeSessionUsage({
+        sessionId,
+        projectId: PROJECT_ID,
+        virtualKeyId: other,
+        usage: { input_tokens: 999_999 },
+      });
+      expect(stolen).toBe("not_found");
+      expect(sentConfirmations).toHaveLength(0);
+      expect(
+        (
+          await prisma.gatewayRealtimeSession.findUnique({
+            where: { id: sessionId },
+          })
+        )?.status,
+      ).toBe("OPEN");
+
+      // The key that opened it still closes it.
+      const own = await reportRealtimeSessionUsage({
+        sessionId,
+        projectId: PROJECT_ID,
+        virtualKeyId: opener,
+        usage: { input_tokens: 10, output_tokens: 5 },
+      });
+      expect(own).toBe("closed");
+      expect(sentConfirmations).toHaveLength(1);
+    });
   });
 });

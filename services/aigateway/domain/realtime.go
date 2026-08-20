@@ -95,7 +95,12 @@ type RealtimeRelease struct {
 type RealtimeUsageReport struct {
 	SessionID string
 	ProjectID string
-	Usage     Usage
+	// VirtualKeyID is the key the report arrived on. The registry matches on
+	// it as well as the project, so one key cannot close a session another
+	// key opened: several keys can share a project, and the spend record
+	// belongs to the key that was admitted.
+	VirtualKeyID string
+	Usage        Usage
 }
 
 // RealtimeMint is what a vendor mint call produced. The gateway returns

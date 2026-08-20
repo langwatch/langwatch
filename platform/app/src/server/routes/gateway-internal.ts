@@ -1277,6 +1277,10 @@ const patchRealtimeSessionSchema = z
 
 const reportRealtimeUsageSchema = z.object({
   project_id: z.string().min(1).max(256),
+  // Required, not optional. Several virtual keys can point at one project, so
+  // the project alone does not say whose session this is; the spend record
+  // belongs to the key that was admitted.
+  virtual_key_id: z.string().min(1).max(256),
   usage: spendUsageSchema,
 });
 
@@ -1413,7 +1417,7 @@ secured
             type: "bad_request",
             code: "invalid_usage_report",
             message:
-              "project_id and a usage object of integer quantities are required",
+              "project_id, virtual_key_id and a usage object of integer quantities are required",
           },
         },
         400,
@@ -1423,6 +1427,7 @@ secured
     const outcome = await reportRealtimeSessionUsage({
       sessionId,
       projectId: parsed.data.project_id,
+      virtualKeyId: parsed.data.virtual_key_id,
       usage: parsed.data.usage,
     });
     if (outcome === "not_found") {

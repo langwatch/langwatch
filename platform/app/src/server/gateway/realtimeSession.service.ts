@@ -313,11 +313,21 @@ export async function closeAndConfirmRealtimeSession(params: {
 export async function reportRealtimeSessionUsage(params: {
   sessionId: string;
   projectId: string;
+  virtualKeyId: string;
   usage: Partial<SpendUsage>;
   now?: Date;
 }): Promise<"closed" | "already_closed" | "not_found"> {
+  // Matched on the key as well as the project. A trace project is shared by
+  // every key scoped to it, so filtering on the project alone would let the
+  // holder of one key close a session another key opened and write arbitrary
+  // usage onto that key's admitted spend record. A session id is a
+  // gateway request id, which the other key's own response header carries.
   const session = await prisma.gatewayRealtimeSession.findFirst({
-    where: { id: params.sessionId, projectId: params.projectId },
+    where: {
+      id: params.sessionId,
+      projectId: params.projectId,
+      virtualKeyId: params.virtualKeyId,
+    },
   });
   if (!session) return "not_found";
   if (session.status === "CLOSED" || session.status === "FAILED") {

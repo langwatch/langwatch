@@ -189,6 +189,17 @@ Feature: Brokered realtime voice sessions on the AI Gateway
       # against.
 
     @unit
+    Scenario: A mint whose conversation id cannot be recorded is refused
+      Given the vendor minted a credential and reported its conversation id
+      When the control plane cannot record that id against the booking
+      Then the credential is not returned and the booking is released
+      # The id is the only exact join key between a call and its spend
+      # record, and the reconciler reads back only sessions that have one, so
+      # handing the credential out anyway would bill a real conversation as
+      # cost-unknown with no way to correct it. A retry costs the caller a
+      # moment; the alternative costs the customer a call nobody can price.
+
+    @unit
     Scenario: A failed mint releases its booking
       Given the session was booked and the vendor rejected the mint
       Then the booking is closed as FAILED
@@ -272,6 +283,21 @@ Feature: Brokered realtime voice sessions on the AI Gateway
       Given the mint asked for the conversation id and recorded it
       When the post-call report arrives
       Then it matches that session directly
+
+    @unit
+    Scenario: A usage report names the key that opened the session
+      When a client posts a usage report
+      Then the report carries the virtual key it arrived on, not only the project
+
+    @integration
+    Scenario: A usage report from another key in the same project is refused
+      Given two virtual keys point at one trace project
+      And one of them opened a voice session
+      When the other posts a usage report against that session id
+      Then the report is refused and the session stays OPEN
+      # Keys in a project share its destination, and a session id is a
+      # gateway request id the opener's own response header carries, so the
+      # project alone cannot say whose spend record this is.
 
     @integration
     Scenario: A transcription report confirms the session it names

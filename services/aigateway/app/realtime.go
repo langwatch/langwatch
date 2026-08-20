@@ -90,9 +90,26 @@ func (a *App) dispatchRealtimeSession(ctx context.Context, call *pipeline.Call) 
 		return nil, stampUpstreamProvider(err, cred)
 	}
 
-	a.correlateRealtimeSession(ctx, reservation, resp.RealtimeConversationID)
+	if err := a.correlateRealtimeSession(ctx, reservation, resp.RealtimeConversationID); err != nil {
+		return nil, a.refuseUncorrelatedMint(ctx, reservation)
+	}
 	a.metrics.RecordRealtimeMint(string(session.Vendor), "minted")
 	return resp, nil
+}
+
+// refuseUncorrelatedMint discards a credential the vendor issued but nothing
+// can bill against.
+//
+// The booking is released so the refusal does not also cost the key a cap
+// slot, and the vendor is charged nothing: a signed URL that opens no socket
+// is not a conversation.
+func (a *App) refuseUncorrelatedMint(ctx context.Context, reservation domain.RealtimeReservation) error {
+	a.releaseRealtimeSession(ctx, reservation, "correlation_failed")
+	a.metrics.RecordRealtimeMint(string(reservation.Vendor), "correlation_failed")
+	return herr.New(ctx, domain.ErrRealtimeRegistryUnavailable, herr.M{
+		"message": "the voice session was minted but could not be recorded against its conversation, so it was not issued: retry the request",
+		"fault":   "gateway",
+	})
 }
 
 // reserveRealtimeSession books the session and fails the mint when it cannot.
@@ -129,12 +146,22 @@ func (a *App) reserveRealtimeSession(ctx context.Context, reservation domain.Rea
 }
 
 // correlateRealtimeSession records the vendor's own conversation id on the
-// booking. A mint that could not report one still stands: the post-call
-// report is matched by the session id echoed back in the conversation's
-// variables, and failing that by the one open session in the time window.
-func (a *App) correlateRealtimeSession(ctx context.Context, reservation domain.RealtimeReservation, conversationID string) {
+// booking, and reports whether that record was written.
+//
+// A mint that reported no conversation id still stands: the post-call report
+// is matched by the session id echoed back in the conversation's variables,
+// and failing that by the one open session in the time window.
+//
+// A mint that reported one and could not store it does NOT stand, and the
+// caller refuses it. That id is the only exact join key between the call and
+// its spend record. The reconciler reads back only sessions that have one, so
+// a booking that lost it can never be closed by either path, and a real
+// conversation would bill as cost-unknown forever. Losing the credential
+// costs the caller a retry; keeping it costs the customer a call nobody can
+// price.
+func (a *App) correlateRealtimeSession(ctx context.Context, reservation domain.RealtimeReservation, conversationID string) error {
 	if a.realtime == nil || conversationID == "" {
-		return
+		return nil
 	}
 	if err := a.realtime.Correlate(ctx, domain.RealtimeCorrelation{
 		SessionID:            reservation.SessionID,
@@ -142,14 +169,16 @@ func (a *App) correlateRealtimeSession(ctx context.Context, reservation domain.R
 		VendorConversationID: conversationID,
 	}); err != nil {
 		a.metrics.RecordRealtimeRegistryError("correlate")
-		a.logger.Warn("realtime session minted but its vendor conversation id was not recorded",
+		a.logger.Warn("realtime session minted but its vendor conversation id was not recorded; the mint is being refused",
 			zap.String("session_id", reservation.SessionID),
 			zap.String("project_id", reservation.ProjectID),
 			zap.String("vendor", string(reservation.Vendor)),
 			zap.String("vendor_conversation_id", conversationID),
 			zap.Error(err),
 		)
+		return err
 	}
+	return nil
 }
 
 // releaseRealtimeSession closes a booking whose mint never produced a
@@ -219,9 +248,10 @@ func (a *App) ReportRealtimeUsage(ctx context.Context, bundle *domain.Bundle, re
 		})
 	}
 	if err := a.realtime.ReportUsage(ctx, domain.RealtimeUsageReport{
-		SessionID: report.SessionID,
-		ProjectID: bundle.ProjectID,
-		Usage:     usage,
+		SessionID:    report.SessionID,
+		ProjectID:    bundle.ProjectID,
+		VirtualKeyID: bundle.VirtualKeyID,
+		Usage:        usage,
 	}); err != nil {
 		a.metrics.RecordRealtimeRegistryError("usage")
 		return err

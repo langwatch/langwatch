@@ -16,11 +16,12 @@ import (
 // mockRealtimeRegistry stands in for the control plane's record of open
 // voice sessions.
 type mockRealtimeRegistry struct {
-	reserveErr  error
-	reserved    []domain.RealtimeReservation
-	correlated  []domain.RealtimeCorrelation
-	released    []domain.RealtimeRelease
-	reportedUse []domain.RealtimeUsageReport
+	reserveErr   error
+	correlateErr error
+	reserved     []domain.RealtimeReservation
+	correlated   []domain.RealtimeCorrelation
+	released     []domain.RealtimeRelease
+	reportedUse  []domain.RealtimeUsageReport
 }
 
 func (m *mockRealtimeRegistry) Reserve(_ context.Context, r domain.RealtimeReservation) error {
@@ -32,6 +33,9 @@ func (m *mockRealtimeRegistry) Reserve(_ context.Context, r domain.RealtimeReser
 }
 
 func (m *mockRealtimeRegistry) Correlate(_ context.Context, c domain.RealtimeCorrelation) error {
+	if m.correlateErr != nil {
+		return m.correlateErr
+	}
 	m.correlated = append(m.correlated, c)
 	return nil
 }
@@ -282,4 +286,68 @@ func TestASessionWithNoReportIsLeftForTheSettlementSweeper(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, registry.reportedUse,
 		"the mint reports no usage of its own; only the vendor's report can")
+}
+
+// @scenario "A mint whose conversation id cannot be recorded is refused"
+func TestAMintWhoseCorrelationFailsIsRefusedAndReleased(t *testing.T) {
+	t.Parallel()
+
+	registry := &mockRealtimeRegistry{
+		correlateErr: errors.New("the control plane could not record the id"),
+	}
+	provider := &mockProvider{
+		dispatchFn: func(context.Context, *domain.Request, domain.Credential) (*domain.Response, error) {
+			return &domain.Response{
+				StatusCode:             200,
+				Body:                   []byte(`{"signed_url":"wss://x"}`),
+				RealtimeConversationID: "conv_9",
+			}, nil
+		},
+	}
+	application := New(
+		WithProviders(provider),
+		WithRealtimeSessions(registry),
+		WithLogger(zap.NewNop()),
+	)
+
+	// The vendor minted a working credential. Handing it out anyway would
+	// leave a booking with no conversation id, and the reconciler reads back
+	// only sessions that have one, so a real call would bill as cost-unknown
+	// with no way to correct it.
+	_, err := application.HandleRealtimeSession(
+		context.Background(), elevenLabsBundle(), signedURLMint())
+	require.Error(t, err)
+	assert.True(t, herr.IsCode(err, domain.ErrRealtimeRegistryUnavailable),
+		"an unrecordable session is a registry failure, not a vendor one")
+
+	require.Len(t, registry.released, 1,
+		"the refusal must not also cost the key a cap slot")
+	assert.Equal(t, "FAILED", registry.released[0].Status)
+	assert.Equal(t, "correlation_failed", registry.released[0].Reason)
+}
+
+// @scenario "A usage report names the key that opened the session"
+func TestAUsageReportCarriesItsVirtualKey(t *testing.T) {
+	t.Parallel()
+
+	registry := &mockRealtimeRegistry{}
+	application := New(WithRealtimeSessions(registry), WithLogger(zap.NewNop()))
+
+	err := application.ReportRealtimeUsage(
+		context.Background(),
+		elevenLabsBundle(),
+		RealtimeUsagePost{
+			SessionID: "req_1",
+			Body:      []byte(`{"input_tokens":10,"output_tokens":5}`),
+		},
+	)
+	require.NoError(t, err)
+
+	// Several keys can share a trace project, so the project alone does not
+	// say whose session this is. Without the key on the wire, the registry
+	// cannot tell one key closing its own session from another key closing
+	// it for them.
+	require.Len(t, registry.reportedUse, 1)
+	assert.Equal(t, "vk-test", registry.reportedUse[0].VirtualKeyID)
+	assert.Equal(t, "proj-test", registry.reportedUse[0].ProjectID)
 }

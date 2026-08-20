@@ -125,10 +125,12 @@ func (c *Client) Release(ctx context.Context, release domain.RealtimeRelease) er
 // ReportUsage closes a session with the quantities its socket reported.
 func (c *Client) ReportUsage(ctx context.Context, report domain.RealtimeUsageReport) error {
 	payload, err := json.Marshal(struct {
-		ProjectID string            `json:"project_id"`
-		Usage     realtimeUsageWire `json:"usage"`
+		ProjectID    string            `json:"project_id"`
+		VirtualKeyID string            `json:"virtual_key_id"`
+		Usage        realtimeUsageWire `json:"usage"`
 	}{
-		ProjectID: report.ProjectID,
+		ProjectID:    report.ProjectID,
+		VirtualKeyID: report.VirtualKeyID,
 		Usage: realtimeUsageWire{
 			InputTokens:       report.Usage.BillableInputTokens(),
 			OutputTokens:      report.Usage.CompletionTokens,
