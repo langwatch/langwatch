@@ -465,7 +465,7 @@ func TestProvision_WritesCLIOnlyConfig(t *testing.T) {
 // match wins), so this block is the whole minimal-harness mechanism.
 //
 // @scenario "The system prompt is Langy's own, not a coding agent's"
-// @scenario "The worker does not expose tools outside Langy's role"
+// @scenario "The worker does not expose tools the panel cannot show"
 func TestProvision_ConfiguresLangyBuildAgent(t *testing.T) {
 	home := t.TempDir()
 	workspace := t.TempDir()
@@ -514,24 +514,28 @@ func TestProvision_ConfiguresLangyBuildAgent(t *testing.T) {
 		t.Errorf("agent.build.prompt must carry the Langy persona and point at the AGENTS.md contract; got\n%s", prompt)
 	}
 
-	for _, tool := range []string{"webfetch", "task", "question"} {
+	// Denied because the panel has no surface for them yet, not because the
+	// capability is unwanted.
+	for _, tool := range []string{"task", "question"} {
 		if got := cfg.Agent.Build.Permission[tool]; got != "deny" {
-			t.Errorf("agent.build.permission[%q] = %q, want %q — the tool is outside Langy's role", tool, got, "deny")
+			t.Errorf("agent.build.permission[%q] = %q, want %q — the panel cannot show this tool's work", tool, got, "deny")
 		}
 	}
-	// bash, edit, skill and todowrite stay OFF the deny list: the CLI, the
-	// GitHub skill's repo work, dataset file preparation and the plan panel run
-	// on them (an edit deny would also remove write and apply_patch).
-	for _, tool := range []string{"bash", "edit", "skill", "todowrite"} {
+	// bash, edit, skill, todowrite and webfetch stay OFF the deny list: the CLI,
+	// the GitHub skill's repo work, dataset file preparation and the plan panel
+	// run on them (an edit deny would also remove write and apply_patch), and
+	// webfetch is how Langy reads anything that is not in LangWatch's own docs.
+	// Egress is governed by the per-worker proxy, not by removing the tool.
+	for _, tool := range []string{"bash", "edit", "skill", "todowrite", "webfetch"} {
 		if got, present := cfg.Agent.Build.Permission[tool]; present && got == "deny" {
 			t.Errorf("agent.build.permission[%q] = deny — this tool is part of Langy's role", tool)
 		}
 	}
-	// Those three are the whole deny list. Without this, a later deny added for
+	// Those two are the whole deny list. Without this, a later deny added for
 	// a tool the role needs passes every check above, since a name absent from
 	// the loop is never looked at.
-	if len(cfg.Agent.Build.Permission) != 3 {
-		t.Errorf("agent.build.permission has %d entries, want exactly 3 (webfetch, task, question); got %v",
+	if len(cfg.Agent.Build.Permission) != 2 {
+		t.Errorf("agent.build.permission has %d entries, want exactly 2 (task, question); got %v",
 			len(cfg.Agent.Build.Permission), cfg.Agent.Build.Permission)
 	}
 }

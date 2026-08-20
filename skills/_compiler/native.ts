@@ -40,13 +40,27 @@ const __dirname = path.dirname(__filename);
 const skillsRoot = path.resolve(__dirname, "..");
 const DEFAULT_OUT = path.join(skillsRoot, "_compiled", "native");
 
+/**
+ * Setup partials the in-product agent must not be given.
+ *
+ * Both tell a reader how to reach a LangWatch project from the outside. The
+ * worker is already inside one: it boots with its credentials, its endpoint and
+ * the CLI on PATH, and AGENTS.md tells it to skip a skill's setup steps. So the
+ * sections are instructions to ignore something, priced at every token spent
+ * reading them, across every skill that imports them.
+ *
+ * They stay in the published and docs builds, where the reader really does have
+ * to install a CLI and find an API key.
+ */
+const LANGY_EXCLUDED_PARTIALS = ["cli-setup", "projects-and-api-keys"];
+
 // Render one canonical skill into opencode SKILL.md text — frontmatter + body,
-// using the same renderer as the public publisher.
+// using the same renderer as the public publisher, minus the setup partials.
 export function renderSkill(skill: PublishedSkill): string {
   if (!fs.existsSync(skill.src)) {
     throw new Error(`Skill source not found: ${skill.src}`);
   }
-  return inlineMdx(skill.src);
+  return inlineMdx(skill.src, { excludeShared: LANGY_EXCLUDED_PARTIALS });
 }
 
 function main() {

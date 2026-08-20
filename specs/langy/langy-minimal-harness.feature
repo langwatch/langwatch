@@ -11,10 +11,12 @@ Feature: Langy minimal harness
     And the harness's built-in coding-agent prompt is not used
 
   @unit
-  Scenario: The worker does not expose tools outside Langy's role
+  Scenario: The worker does not expose tools the panel cannot show
     When a worker is provisioned
-    Then web fetching, subagent spawning, and interactive questions are denied
-    And the shell, file, skill, and todo tools stay available for the role
+    Then subagent spawning and interactive questions are denied, because the
+      panel has no way to show either one yet
+    And the shell, file, skill, todo, and web fetching tools stay available,
+      since Langy answers questions whose answers are not in LangWatch's docs
 
   @unit
   Scenario: The prompt fits its size budget

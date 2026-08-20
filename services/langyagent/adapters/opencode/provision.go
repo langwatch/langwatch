@@ -190,25 +190,37 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		// about on the very first file touch.
 		"permission": "allow",
 		// The build agent (opencode's default; PostMessage never selects another)
-		// gets Langy's own prompt — which REPLACES the stock coding-agent prompt —
+		// gets Langy's own prompt, which REPLACES the stock coding-agent prompt,
 		// and a tool surface scoped to the role. A "deny" here removes the tool
 		// from the advertised schema, not just from execution: per-agent rules
 		// merge after the root "allow" and the last match wins.
-		//   webfetch — Langy reads docs via `langwatch docs`, and fetching
-		//              user-supplied URLs is out of scope by contract;
-		//   task     — no subagents: a subagent would run opencode's stock
-		//              coding-agent prompt, the exact thing this block retires;
-		//   question — an interactive prompt no headless worker can answer
-		//              (Langy asks its one legitimate question kind through the
-		//              choices card instead). bash, read, grep, glob, edit/write,
-		//              skill and todowrite stay: the CLI, the GitHub skill's
-		//              repo work, dataset file preparation, and the plan panel
-		//              all run on them.
+		//
+		// Both denials are "the product has no way to show this yet", not a
+		// judgement about the capability:
+		//   task     — a subagent runs opencode's stock coding-agent prompt, the
+		//              exact thing this block retires, and the panel has no way to
+		//              show a subagent's work. Re-enable once a subagent can
+		//              inherit this prompt and report into the turn;
+		//   question — opencode's interactive prompt has no surface in the panel,
+		//              so a headless worker blocks on an answer that can never
+		//              arrive. Langy asks through the choices card instead.
+		//              Re-enable if the panel ever renders opencode's own prompt.
+		//
+		// webfetch STAYS. Langy answers questions about the user's agents, and the
+		// answers are not all inside LangWatch's docs: a provider's error code, a
+		// framework's changelog, a model's release notes. Egress already runs
+		// through the per-worker adapter with its TLS, throttle and allow-list
+		// rungs, so reading the web is governed by the proxy rather than by
+		// removing the tool. What stays out of scope is sending the user's data
+		// out, which is a Scope rule in AGENTS.md, not a missing tool.
+		//
+		// bash, read, grep, glob, edit/write, skill and todowrite stay: the CLI,
+		// the GitHub skill's repo work, dataset file preparation, and the plan
+		// panel all run on them.
 		"agent": map[string]any{
 			"build": map[string]any{
 				"prompt": langyAgentPrompt,
 				"permission": map[string]any{
-					"webfetch": "deny",
 					"task":     "deny",
 					"question": "deny",
 				},

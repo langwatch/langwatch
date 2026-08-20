@@ -16,6 +16,13 @@ export interface InlineOptions {
   // Strip top-level frontmatter from output. Defaults to false (preserve).
   // Partials are always frontmatter-stripped when spliced in.
   stripFrontmatter?: boolean;
+  // `_shared/` partials to drop entirely, by basename without the extension
+  // (e.g. "cli-setup"). For readers that already have what the partial sets
+  // up: the in-product agent is provisioned with its credentials and its CLI
+  // before a skill loads, so the setup sections are instructions it is told to
+  // skip, priced at every token it reads. An unknown name is an error rather
+  // than a silent no-op, so a renamed partial cannot quietly re-inline.
+  excludeShared?: string[];
 }
 
 const parser = unified()
@@ -68,6 +75,9 @@ function parseFile(filePath: string): Root {
   return parser.parse(raw) as Root;
 }
 
+/** Partial name as `excludeShared` spells it: basename without extension. */
+const basename = (p: string) => path.basename(p, path.extname(p));
+
 function inlineTree(filePath: string, opts: InlineOptions, stack: string[]): Root {
   if (stack.includes(filePath)) {
     throw new Error(
@@ -108,6 +118,9 @@ function inlineTree(filePath: string, opts: InlineOptions, stack: string[]): Roo
       // (skill-local helpers, future per-skill components) must always inline
       // in full so we don't drop real content from a composed skill.
       const isSharedPartial = target.includes(`${path.sep}_shared${path.sep}`);
+      if (isSharedPartial && opts.excludeShared?.includes(basename(target))) {
+        continue;
+      }
       if (isSharedPartial && opts.seenShared?.has(target)) {
         out.push({
           type: "paragraph",
@@ -137,6 +150,31 @@ function inlineTree(filePath: string, opts: InlineOptions, stack: string[]): Roo
 }
 
 export function inlineMdx(sourceFile: string, opts: InlineOptions = {}): string {
+  if (opts.excludeShared?.length) {
+    // Recipes sit one level deeper than skills, so walk up for the `_shared/`
+    // directory rather than assuming a fixed depth.
+    let dir = path.dirname(path.resolve(sourceFile));
+    let sharedDir = "";
+    while (dir !== path.dirname(dir)) {
+      const candidate = path.join(dir, "_shared");
+      if (fs.existsSync(candidate)) {
+        sharedDir = candidate;
+        break;
+      }
+      dir = path.dirname(dir);
+    }
+    const known = sharedDir
+      ? new Set(fs.readdirSync(sharedDir).map(basename))
+      : new Set<string>();
+    for (const name of opts.excludeShared) {
+      if (!known.has(name)) {
+        throw new Error(
+          `excludeShared names "${name}", which is not a partial in ${sharedDir}. ` +
+            `A renamed partial must not silently start inlining again.`,
+        );
+      }
+    }
+  }
   const tree = inlineTree(path.resolve(sourceFile), opts, []);
   const out = stringifier.stringify(tree) as string;
   // remark-stringify escapes intra-word underscores (e.g. `LANGWATCH_API_KEY`
