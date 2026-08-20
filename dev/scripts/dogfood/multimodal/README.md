@@ -55,7 +55,8 @@ own credentials:
 
 `uv` runs every Python cell with no virtual environment to manage. Node
 runs the TypeScript cell directly, since Node's built-in type stripping
-handles the plain type annotations this file uses.
+handles the plain type annotations this file uses. That needs Node 22.18.0
+or later, where type stripping is on by default.
 
 ## Running one cell
 

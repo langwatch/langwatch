@@ -5,6 +5,9 @@
   "type": "module",
   "description": "Vercel AI SDK multimodal dogfood cell for LangWatch.",
   "license": "MIT",
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "scripts": {
     "start:image": "node vercel-ai.ts image",
     "start:pdf": "node vercel-ai.ts pdf"
