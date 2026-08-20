@@ -34,7 +34,6 @@ import {
   getAllClickHouseInstances,
   getClickHouseClientForOrganization,
   getClickHouseClientForTenant,
-  getSharedClickHouseClient,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
 import {
@@ -1647,7 +1646,7 @@ export function initializeDefaultApp(options?: {
   // One snapshot store shared by this pod's writer and its reader: the writer
   // publishes only while it holds the lease, the reader always reads.
   const snapshotRepo = redis ? new SnapshotRedisRepository(redis) : null;
-  const sharedCh = getSharedClickHouseClient();
+  const sharedCh = _getSharedClickHouseClient();
   const eventExplorerRepo = sharedCh
     ? new EventExplorerClickHouseRepository(sharedCh)
     : new NullEventExplorerRepository();
