@@ -74,13 +74,38 @@ else
   pnpm prisma migrate deploy
 fi
 
-# restart the dev stack (patterns exclude this script itself; SIGKILL because
-# concurrently's --restart-tries -1 stack survives plain TERM)
+# Stop the previous dev stack by process group. Name patterns are not enough:
+# the API server runs as `tsx src/server.mts`, which matches none of the
+# patterns below, so pattern-only kills left an old server alive holding the
+# app port. A stale server answering the health and collector gates would make
+# a refresh look verified while serving the previous commit — the gates check
+# git HEAD, which the reset already moved.
+DEV_PGID_FILE="$WORKDIR/dev-stack.pgid"
+if [ -s "$DEV_PGID_FILE" ]; then
+  OLD_PGID="$(cat "$DEV_PGID_FILE")"
+  kill -9 -"$OLD_PGID" 2>/dev/null || true
+fi
+
+# Patterns still run, for stacks started before the pgid file existed and for
+# anything started outside a refresh. SIGKILL because concurrently's
+# --restart-tries -1 stack survives plain TERM; bracket escapes so the patterns
+# cannot match this script itself.
 pkill -9 -f "dev-superviso[r]" 2>/dev/null || true
 pkill -9 -f "bin/pnpm de[v]" 2>/dev/null || true
 pkill -9 -f "concurrentl[y]" 2>/dev/null || true
 pkill -9 -f "start:ap[p]" 2>/dev/null || true
+pkill -9 -f "tsx/dist/cli.mjs src/server.mt[s]" 2>/dev/null || true
+pkill -9 -f "loader.mjs src/server.mt[s]" 2>/dev/null || true
 sleep 3
+
+# Nothing may still hold the app port, or the new stack's check-ports step
+# blocks and the refresh reports done while the app never boots.
+for _ in $(seq 1 10); do
+  HOLDERS="$(pgrep -f "src/server.mt[s]" | tr '\n' ' ')"
+  [ -z "$HOLDERS" ] && break
+  echo "waiting for old API server(s) to exit: $HOLDERS"
+  sleep 2
+done
 # Two deliberate details here:
 #   9>&-  the dev stack outlives this script, and an inherited lock fd would
 #         keep the flock held for the life of the machine.
@@ -88,5 +113,13 @@ sleep 3
 #         refresh by killing the refresh's process group does not take staging
 #         down with it.
 setsid nohup pnpm dev > "$DEV_LOG" 2>&1 9>&- &
+DEV_PID=$!
+
+# Record the new stack's process group so the next refresh can stop all of it,
+# including the API server that no name pattern matches. Read from the kernel:
+# $! is only the group id when setsid does not fork.
+sleep 1
+ps -o pgid= -p "$DEV_PID" 2>/dev/null | tr -d '[:space:]' > "$DEV_PGID_FILE" || true
+echo "dev stack pgid: $(cat "$DEV_PGID_FILE" 2>/dev/null || echo unknown)"
 
 echo done > "$STATUS"
