@@ -89,6 +89,19 @@ function renderResolution() {
   );
 }
 
+/**
+ * The next organization-scoped page, resolved after the one on screen is
+ * gone. What the first page left behind is all this one has to go on, which
+ * is what makes the return trip observable rather than a read of storage.
+ */
+function renderAfterReturningToOrganizationWork() {
+  cleanup();
+  mockRouter.route = "/settings/model-providers";
+  mockRouter.pathname = "/settings/model-providers";
+  mockRouter.asPath = "/settings/model-providers";
+  return renderResolution();
+}
+
 describe("useOrganizationTeamProject personal-workspace resolution", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -382,6 +395,21 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
       mockRouter.route = "/me";
       mockRouter.pathname = "/me";
       mockRouter.asPath = "/me";
+      // Two projects, and the one jane left is the second: with a single
+      // project, coming back to the first and coming back to the one she left
+      // are the same page, and the test would hold whatever the code did.
+      mockOrganizationsQuery.mockReturnValue(
+        loadedOrganizationsQuery([
+          PERSONAL_TEAM,
+          {
+            ...SHARED_TEAM,
+            projects: [
+              { id: "proj-other", name: "ACME Other", slug: "acme-other" },
+              ...SHARED_TEAM.projects,
+            ],
+          },
+        ]),
+      );
       mockLocalStorage.selectedTeamId = "team-shared";
       mockLocalStorage.selectedProjectSlug = "acme-app";
     });
@@ -397,12 +425,14 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
       expect(result.current.project?.id).toBe("proj-personal");
     });
 
-    /** @scenario The personal-workspace page leaves the remembered selection alone */
-    it("leaves the remembered team and project where they were", () => {
+    /** @scenario Organization-scoped work goes on in the project jane left, after a visit to the personal-workspace page */
+    it("opens the project she left when she goes back to organization-scoped work", () => {
       renderResolution();
 
-      expect(mockLocalStorage.selectedTeamId).toBe("team-shared");
-      expect(mockLocalStorage.selectedProjectSlug).toBe("acme-app");
+      const { result } = renderAfterReturningToOrganizationWork();
+
+      expect(result.current.team?.id).toBe("team-shared");
+      expect(result.current.project?.slug).toBe("acme-app");
     });
   });
 
@@ -413,12 +443,14 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
       mockRouter.asPath = "/me";
     });
 
-    /** @scenario The personal-workspace page leaves the remembered selection alone */
-    it("writes no personal selection for the pages that follow to read", () => {
+    /** @scenario The personal workspace is not what the next organization-scoped page is about */
+    it("opens the shared team on the next organization-scoped page", () => {
       renderResolution();
 
-      expect(mockLocalStorage.selectedTeamId).toBe("");
-      expect(mockLocalStorage.selectedProjectSlug).toBe("");
+      const { result } = renderAfterReturningToOrganizationWork();
+
+      expect(result.current.team?.id).toBe("team-shared");
+      expect(result.current.project?.id).toBe("proj-app");
     });
   });
 

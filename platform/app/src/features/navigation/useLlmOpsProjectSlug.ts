@@ -55,7 +55,7 @@ export function resolveLlmOpsProjectSlug({
 
   // The same preference the ambient context resolves with, so the product
   // opens where an organization-scoped page would have put the reader.
-  const preferredTeam = selectAmbientTeam(openableTeams, userId);
+  const preferredTeam = selectAmbientTeam({ teams: openableTeams, userId });
   return preferredTeam?.projects[0]?.slug ?? null;
 }
 

@@ -138,7 +138,7 @@ export function selectAmbientTeam<
     projects: unknown[];
     members?: { userId: string }[];
   },
->(teams: T[], userId?: string): T | undefined {
+>({ teams, userId }: { teams: T[]; userId?: string }): T | undefined {
   const byPreference = (candidates: T[]) =>
     candidates.find((team) => !team.isPersonal && team.projects.length > 0) ??
     candidates.find((team) => !team.isPersonal) ??
@@ -461,13 +461,14 @@ export const useOrganizationTeamProject = (
         t.projects.some(
           (project) => project.slug === publicEnv.data?.DEMO_PROJECT_SLUG,
         ),
-      ) ?? selectAmbientTeam(organization?.teams ?? [], userId)) // The team holding the demo project, else the ambient one
+      ) ?? selectAmbientTeam({ teams: organization?.teams ?? [], userId })) // The team holding the demo project, else the ambient one
     : resolvedSlugMatch
       ? resolvedSlugMatch.team
       : ownPersonalTeam
         ? ownPersonalTeam
         : organization
-          ? (rememberedTeam ?? selectAmbientTeam(organization.teams, userId))
+          ? (rememberedTeam ??
+            selectAmbientTeam({ teams: organization.teams, userId }))
           : undefined;
 
   // For demo mode, find the project with the demo slug

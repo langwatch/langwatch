@@ -405,6 +405,9 @@ describe("the settings shell in a new navigation mode", () => {
         .getAllByRole("link")
         .map((link) => link.textContent?.trim());
 
+      // It moved out of ACCESS rather than gaining a second home there, which
+      // an index lookup on its own would read as the move having worked.
+      expect(entries.filter((entry) => entry === "API Keys")).toHaveLength(1);
       expect(entries.indexOf("API Keys")).toBe(entries.indexOf("General") + 1);
       // Members opens ACCESS, so an entry before it is in ORGANIZATION.
       expect(entries.indexOf("API Keys")).toBeLessThan(
