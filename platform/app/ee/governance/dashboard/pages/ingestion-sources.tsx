@@ -112,22 +112,15 @@ export interface ComposerState {
    */
   ottlStatements: string[];
   /**
-   * Phase 10: optional cron override for puller-mode sources. When the
-   * source-type maps to a registered PullerAdapter, the composer
-   * auto-fills this with the adapter's locked default schedule (15min
-   * for copilot_studio); admins can edit before save. Ignored for
-   * push/webhook source types.
+   * Cron override for puller-mode sources. Stays "" while the admin
+   * leaves the Cadence picker untouched — meaning "the recommended
+   * schedule", which `buildCreateInput` resolves to an explicit cron at
+   * create (a stored null would mean the source never runs). Ignored
+   * for push/webhook source types.
    */
   pullSchedule: string;
 }
 
-/**
- * Maps user-facing pull-mode source-types onto the PullerAdapter id
- * registered server-side (`pullerAdapterRegistry.ids()`). Hardcoded
- * curated list per @ai_gateway_sergey_2's directive - keeps the UI
- * free of a round-trip enumeration call. Entries land in lockstep
- * with the reference adapters Sergey ships in `services/pullers/`.
- */
 const blankComposer = (): ComposerState => ({
   sourceType: "otel_generic",
   name: "",

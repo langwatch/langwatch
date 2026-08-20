@@ -48,9 +48,13 @@ export interface PullCadenceParts {
 export const MINUTE_INTERVALS = [5, 10, 15, 30] as const;
 
 /**
- * Which puller adapter serves each pull-mode source type. Lives here (not in
- * the page) so the Cadence field can resolve a source's recommended schedule
- * without importing the page it is rendered by.
+ * Maps user-facing pull-mode source-types onto the PullerAdapter id
+ * registered server-side (`pullerAdapterRegistry.ids()`). A hardcoded
+ * curated list - keeps the UI free of a round-trip enumeration call;
+ * entries land in lockstep with the reference adapters in
+ * `services/pullers/`. Lives here (not in the page) so the Cadence field
+ * can resolve a source's recommended schedule without importing the page
+ * it is rendered by.
  */
 export const PULL_ADAPTER_FOR_SOURCE: Partial<Record<SourceType, string>> = {
   copilot_studio: "copilot_studio",
