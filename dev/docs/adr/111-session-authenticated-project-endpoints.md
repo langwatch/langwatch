@@ -224,19 +224,33 @@ demands is one field, not the endpoint's schema.
 
 ### 4. The guard becomes tamper-evident
 
-Closing the §"second, quieter hole". Two changes, and the second is the one that
-actually holds:
+Closing the §"second, quieter hole". The mount-time check asserts the
+**enforcement**, not the declaration — `MountedRoute.config` is the same object
+the pipeline reads, so everything that decides the chain is visible there:
 
-- `guard()` returns its middleware under a key the endpoint author does not
-  spell (`_guard`), which the mount step concatenates with any `middleware` the
-  endpoint declares, rather than a key a later property silently replaces.
-- `registerMountedRoute` refuses to mount when a route declares `meta.policy`
-  whose enforcement is absent from the composed stack, and when `auth: "none"`
-  appears on a route whose policy is not `public` or `internal`.
+- `guard(permission, extra?)` takes additional middleware **as a parameter**.
+  There is no API shape in which `{ ...guard(p), middleware: [...] }`
+  type-checks, so the overwrite that silently disarms enforcement cannot be
+  spelled. (`createManagementService` gets the same signature in the same
+  change.)
+- The factory keeps a `WeakMap<MiddlewareHandler, Permission>` of the guard
+  instances it minted. `registerMountedRoute` refuses to mount unless:
+  `config.auth` is `undefined` or `"default"` (never `"none"`, never a custom
+  handler); `meta.policy` is present; `config.middleware` contains the exact
+  minted instance **for that policy's permission** — identity, not shape.
+  Namespace guards (`config: null`) and withdrawn 410 mounts (inherited
+  config) are handled explicitly, as `registerMountedRoute` already does.
+- `docs: { hide: true }` is injected by the factory in its registration path,
+  never a spreadable literal an endpoint could overwrite — an RPC declaring
+  `output` would otherwise become a documented mount by default.
 
-A test pins both: an endpoint that declares a policy and overrides its
-enforcement must fail the build, the same way an endpoint that declares no
-policy already does.
+Fail-closed is **asserted, not assumed**: tests execute the composed router
+and observe the refusal — `auth: "none"` alongside a guard still 403s (the
+guard reads the session off the context and never resolves its own, so a
+skipped authenticator is fatal rather than invisible); a hand-written
+`meta.policy` with no minted guard fails at boot; an endpoint declaring a
+policy and displacing its enforcement fails the build the same way one
+declaring no policy already does.
 
 ### 5. The prompt playground is the first consumer
 
@@ -248,17 +262,107 @@ const { service, guard } = createProjectService({
 
 service.version(PLAYGROUND_API_VERSION, (v) => {
   v.rpc("prompt.execute",
-    { ...guard("prompts:view", { project: { from: "body", field: "projectId" } }),
-      input: executeRequestSchema },
+    guard("prompts:view", {
+      project: { from: "body", field: "projectId" },
+      input: executeRequestSchema,
+    }),
     (c, { input }) => streamSSE(c, (stream) => streamPromptExecution({ … })));
 });
 ```
+
+The app calls the dated path — `PLAYGROUND_API_VERSION` is a shared constant,
+client and server ship from the same tree — because version-less aliases no
+longer exist ([ADR-112](112-no-versionless-api-paths.md)).
 
 Every `c.json({ error })` in that handler becomes a thrown `HandledError` with a
 stable `code`, a customer-safe message and an entry in the client presentation
 registry — so the conversation can render our copy rather than a prose blob.
 The failure modes it already has (`DatasetNotReadyError` → 425,
 `LlmModelNotSetError` → 422) get codes instead of ad-hoc bodies.
+
+## Security requirements
+
+An adversarial review of this design against the live code produced binding
+requirements. The enforcement chain, in the order the service composes it:
+
+```
+request ──► origin gate ──► body cap ──► session resolve ──► guard ──► validation ──► handler
+            (service mw)    (service mw)  (service auth)      (minted,   (zod input)
+                                                               per-endpoint)
+```
+
+**Origin gate before the session resolve.** The session cookie ships with
+`SameSite=Lax` and nothing else — the app sets no CORS or CSRF middleware, and
+the existing Origin/Referer check (`originGate.ts`) guards only `/api/auth/*`.
+Lax is a *site* boundary, not an origin boundary: content on any sibling
+subdomain of the registrable domain can POST with the cookie attached. And
+content-type is not a gate — Hono's json validator treats a non-JSON body as
+`{}` rather than rejecting, and an RPC with no `input` schema has no validator
+at all, so a CORS-simple `text/plain` POST reaches the handler. The service
+therefore mounts an origin check as service-level middleware, reusing
+`isAllowedAuthOrigin` (already unit-tested) rather than a new implementation.
+Every hand-rolled session route today, the playground included, lacks this.
+
+**No demo-project short-circuit on execution.** `hasProjectPermission` grants
+`DEMO_VIEW_PERMISSIONS` — which include `prompts:view` — to **any**
+authenticated user for the demo project, before any membership lookup. Prompt
+execution injects the project's API key and decrypted project secrets, falls
+back to the *instance's* provider keys when the project sets none, and the
+model is caller-chosen from the request body. Composed, that is a self-service
+route from a fresh signup to executing arbitrary prompts on LangWatch's own
+provider credentials. The guard takes `allowDemo` and defaults it to `false`;
+an endpoint that wants demo access says so in writing.
+
+**The body cap lives at service level.** The guard reads the project reference
+from the unvalidated body, and `c.req.json()` buffers the whole body — before
+any limit, since nothing on this path sets one (ingress caps at 50 MB).
+Endpoint `middleware` runs *after* the guard, so a cap declared there is
+useless; `ServiceConfig.middleware` applies via `app.use("*")` ahead of the
+endpoint stack, so it is the one place a cap actually precedes the read.
+
+**The project reference is parsed, bounded, and single.** The raw body field
+goes through a micro-schema (`z.string().min(1).max(64)`) before it touches
+Prisma — an object or array `projectId` must be a 400, not a Prisma validation
+throw logged as an unhandled 500 on an auth path. The guard puts the resolved
+project on the context; the handler operates on that project only, and never
+reads a second project-shaped field from the body.
+
+**Rate limits are declared, not remembered.** The playground executes models
+and spends money; nothing on the path rate-limits today (`rateLimit.ts` exists
+and is used by registration, files, avatars — not execution). An endpoint on
+this factory declares a rate limit or an explicit `limits: "none"` with a
+written reason; the factory refuses to mount silence.
+
+**SSE goes through the framework, and errors carry codes.** A raw `Response`
+from the RPC handler bypasses `createSSEResponse`, so the request finalizes at
+connect time — the span closes and the log says 200 before a token is
+generated, and a 100%-failing endpoint looks green. The framework helper is
+extended to register SSE completion for RPC handlers. Two leak paths close
+with it: hono's own SSE `onError` writes `e.message` to the client verbatim
+(so a `HandledError`'s server-side message — which may name internals — would
+reach the browser), and the playground's current handler streams provider
+prose via `parseLLMError`'s unknown-fallback. Mid-stream errors emit
+`{ code, traceId }`, never message prose; the client renders copy from the
+presentation registry. Streams are duration-bounded — connect-time-only
+authorization is acceptable for a bounded prompt execution and for nothing
+longer-lived.
+
+**Registry and gates.** Every mount registers with `credentialClass:
+"session"`, which arms an existing fail-closed backstop: OpenAPI generation
+*throws* on a documented session-credential operation, so un-hiding one breaks
+the build rather than publishing it. The service's base path gets an
+`UNPUBLISHED` entry (category `internal`) in the route-coverage exclusions in
+the same change.
+
+**No enterprise gate, on purpose.** `requireEnterprisePlanRest` reads
+`c.get("organization")`, which a session service never sets — spreading it
+into a project guard is a guaranteed 500, and the playground is not an
+Enterprise feature. The factory docstring states the omission so nobody
+"fixes" it later.
+
+**Logging.** The service sets `c.set("user", { id })` so request logs carry a
+`userId` and nothing more; the session id and cookie never enter context,
+`meta`, or a log line.
 
 ## Consequences
 
