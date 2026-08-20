@@ -24,7 +24,7 @@ import {
   Trash2,
 } from "lucide-react";
 import numeral from "numeral";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useCallback, useState } from "react";
 
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
@@ -51,14 +51,23 @@ import {
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
+
+import { SourceEventsTable } from "../components/SourceEventsTable";
+import {
+  type SourceEventsPager,
+  useSourceEventsPager,
+} from "../components/useSourceEventsPager";
+import type { PageRequest } from "../logic/eventsPager";
 
 /**
- * Per-source detail page - health metrics + recent events with raw vs
- * normalised side-by-side. Wired to api.activityMonitor.eventsForSource +
- * sourceHealthMetrics (Sergey f2cb9de7a).
+ * Per-source detail page - health metrics + a cursor-walked table of every
+ * event the source ever ingested, raw vs normalised on expand. Wired to
+ * api.activityMonitor.eventsForSource + sourceHealthMetrics.
  *
  * Spec: specs/ai-gateway/governance/ingestion-sources.feature
- *       (scenario "Per-source detail page shows health")
+ *       (scenario "Per-source detail page shows health" and rule "The
+ *       events table pages through everything the source ever ingested")
  */
 
 type Source = RouterOutputs["ingestionSources"]["get"];
@@ -94,23 +103,8 @@ function isNotFoundError(error: unknown): boolean {
   return readHandledError(error)?.httpStatus === 404;
 }
 
-const fmtUsd = (n: number | string) => {
-  const v = typeof n === "string" ? Number(n) : n;
-  return v === 0 ? "$0.00" : numeral(v).format("$0,0.0000");
-};
-
-const fmtRelative = (iso: string | null): string => {
-  if (!iso) return "-";
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const sec = Math.floor(diffMs / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const days = Math.floor(hr / 24);
-  return `${days}d ago`;
-};
+const fmtRelative = (iso: string | null): string =>
+  iso ? (formatTimeAgo(new Date(iso).getTime()) ?? "-") : "-";
 
 /** Back link, name, status, and the two manage-only controls. */
 function SourceDetailHeader({
@@ -252,62 +246,6 @@ function SourceHealthCards({
   );
 }
 
-/** The newest 50 OCSF-normalised events, raw next to normalised. */
-function RecentEventsPanel({
-  source,
-  events,
-  error,
-  isLoading,
-}: {
-  source: Source;
-  events: EventRow[];
-  error: unknown;
-  isLoading: boolean;
-}) {
-  return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={5}
-    >
-      <VStack align="start" gap={1} marginBottom={3}>
-        <Heading as="h3" size="sm">
-          Recent events
-        </Heading>
-        {!error && (
-          <Text fontSize="sm" color="fg.muted">
-            Last {events.length} OCSF-normalised events from this source. Raw
-            payload + normalised fields shown side-by-side. Newest first.
-          </Text>
-        )}
-      </VStack>
-
-      {isLoading && <Spinner size="sm" />}
-
-      {/* `EmptyEventsHint` walks an admin through setting up an integration.
-          Showing it because the events query failed sends someone debugging a
-          live source off to re-install something that is already working. */}
-      <HandledErrorAlert
-        error={error}
-        fallbackTitle="Couldn't load recent events"
-      />
-
-      {!isLoading && !error && events.length === 0 && (
-        <EmptyEventsHint source={source} />
-      )}
-
-      {events.length > 0 && (
-        <VStack align="stretch" gap={2}>
-          {events.map((ev) => (
-            <EventRow key={ev.eventId} event={ev} />
-          ))}
-        </VStack>
-      )}
-    </Box>
-  );
-}
-
 /**
  * Health counts, the stale-timestamp callout and the event feed. All three
  * come from the activity monitor, which has a grant of its own, so naming
@@ -318,7 +256,7 @@ function SourceActivityPanels({
   source,
   canReadActivity,
   healthQuery,
-  eventsQuery,
+  eventsPager,
 }: {
   source: Source;
   canReadActivity: boolean;
@@ -327,11 +265,7 @@ function SourceActivityPanels({
     error: unknown;
     isLoading: boolean;
   };
-  eventsQuery: {
-    data: EventRow[] | undefined;
-    error: unknown;
-    isLoading: boolean;
-  };
+  eventsPager: SourceEventsPager<EventRow>;
 }) {
   if (!canReadActivity) {
     return (
@@ -342,7 +276,6 @@ function SourceActivityPanels({
     );
   }
   const health = healthQuery.data;
-  const events = eventsQuery.data ?? [];
   return (
     <>
       <SourceHealthCards
@@ -352,13 +285,15 @@ function SourceActivityPanels({
       />
       <StaleTimestampCallout
         health={health ?? null}
-        eventsCount={events.length}
+        eventsCount={eventsPager.loadedCount}
       />
-      <RecentEventsPanel
-        source={source}
-        events={events}
-        error={eventsQuery.error}
-        isLoading={eventsQuery.isLoading}
+      {/* `EmptyEventsHint` walks an admin through setting up an integration.
+          The table only shows it once a load SUCCEEDED and came back empty —
+          showing it on a failed load sends someone debugging a live source
+          off to re-install something that is already working. */}
+      <SourceEventsTable
+        pager={eventsPager}
+        emptyState={<EmptyEventsHint source={source} />}
       />
     </>
   );
@@ -469,13 +404,25 @@ function useIngestionSourceDetailPage() {
       refetchOnWindowFocus: false,
     },
   );
-  const eventsQuery = api.activityMonitor.eventsForSource.useQuery(
-    { organizationId: orgId, sourceId: sourceId ?? "", limit: 20 },
-    {
-      enabled: !!orgId && !!sourceId && canReadActivity,
-      refetchOnWindowFocus: false,
-    },
+  // The events table walks the timestamp cursor itself (see
+  // logic/eventsPager.ts), so it fetches imperatively through the utils
+  // client instead of useQuery: pages once loaded are kept and never
+  // refetched, which pins the first page's time anchor.
+  const utils = api.useUtils();
+  const fetchEventsPage = useCallback(
+    (request: PageRequest) =>
+      utils.activityMonitor.eventsForSource.fetch({
+        organizationId: orgId,
+        sourceId: sourceId ?? "",
+        limit: request.limit,
+        ...(request.beforeIso ? { beforeIso: request.beforeIso } : {}),
+      }),
+    [utils, orgId, sourceId],
   );
+  const eventsPager = useSourceEventsPager<EventRow>({
+    enabled: !!orgId && !!sourceId && canReadActivity,
+    fetchPage: fetchEventsPage,
+  });
   const [secretReveal, setSecretReveal] = useState<{
     secret: string;
     sourceName: string;
@@ -496,7 +443,7 @@ function useIngestionSourceDetailPage() {
     canReadActivity,
     sourceQuery,
     healthQuery,
-    eventsQuery,
+    eventsPager,
     secretReveal,
     setSecretReveal,
     rotateMutation,
@@ -513,7 +460,7 @@ function IngestionSourceDetailPage() {
     canReadActivity,
     sourceQuery,
     healthQuery,
-    eventsQuery,
+    eventsPager,
     secretReveal,
     setSecretReveal,
     rotateMutation,
@@ -576,7 +523,7 @@ function IngestionSourceDetailPage() {
           source={source}
           canReadActivity={canReadActivity}
           healthQuery={healthQuery}
-          eventsQuery={eventsQuery}
+          eventsPager={eventsPager}
         />
       </VStack>
 
@@ -754,128 +701,6 @@ function MetricCard({
           {value}
         </Heading>
       )}
-    </Box>
-  );
-}
-
-function EventRow({ event }: { event: EventRow }) {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="sm"
-      padding={3}
-    >
-      <HStack gap={3} cursor="pointer" onClick={() => setExpanded((e) => !e)}>
-        <VStack align="start" gap={0} flex={1} minWidth={0}>
-          <HStack gap={2} wrap="wrap">
-            <Badge size="sm" variant="surface">
-              {event.eventType}
-            </Badge>
-            <Text fontSize="sm" fontWeight="medium">
-              {event.actor}
-            </Text>
-            <Text fontSize="sm" color="fg.muted">
-              · {event.action}
-            </Text>
-            <Text fontSize="sm" color="fg.muted">
-              {event.target ? `→ ${event.target}` : ""}
-            </Text>
-          </HStack>
-          <Text fontSize="xs" color="fg.muted">
-            {fmtRelative(event.eventTimestampIso)} · cost{" "}
-            {fmtUsd(event.costUsd)}
-            {(event.tokensInput > 0 || event.tokensOutput > 0) && (
-              <>
-                {" · "}
-                {numeral(event.tokensInput).format("0,0")} →{" "}
-                {numeral(event.tokensOutput).format("0,0")} tokens
-              </>
-            )}
-          </Text>
-        </VStack>
-        <Text fontSize="xs" color="fg.muted">
-          {expanded ? "▲" : "▼"}
-        </Text>
-      </HStack>
-      {expanded && (
-        <SimpleGrid columns={{ base: 1, lg: 2 }} gap={3} marginTop={3}>
-          <NormalisedPanel event={event} />
-          <RawPanel event={event} />
-        </SimpleGrid>
-      )}
-    </Box>
-  );
-}
-
-function NormalisedPanel({ event }: { event: EventRow }) {
-  return (
-    <Box>
-      <Text
-        fontSize="xs"
-        fontWeight="semibold"
-        color="fg.muted"
-        marginBottom={1}
-      >
-        Normalised (OCSF)
-      </Text>
-      <Code
-        display="block"
-        padding={3}
-        fontSize="xs"
-        whiteSpace="pre-wrap"
-        wordBreak="break-all"
-        backgroundColor="bg.subtle"
-      >
-        {JSON.stringify(
-          {
-            eventId: event.eventId,
-            eventType: event.eventType,
-            actor: event.actor,
-            action: event.action,
-            target: event.target,
-            costUsd: event.costUsd,
-            tokensInput: event.tokensInput,
-            tokensOutput: event.tokensOutput,
-            eventTimestamp: event.eventTimestampIso,
-            ingestedAt: event.ingestedAtIso,
-          },
-          null,
-          2,
-        )}
-      </Code>
-    </Box>
-  );
-}
-
-function RawPanel({ event }: { event: EventRow }) {
-  let parsed: unknown = null;
-  try {
-    parsed = JSON.parse(event.rawPayload);
-  } catch {
-    // not JSON, render as text
-  }
-  return (
-    <Box>
-      <Text
-        fontSize="xs"
-        fontWeight="semibold"
-        color="fg.muted"
-        marginBottom={1}
-      >
-        Raw payload (as ingested)
-      </Text>
-      <Code
-        display="block"
-        padding={3}
-        fontSize="xs"
-        whiteSpace="pre-wrap"
-        wordBreak="break-all"
-        backgroundColor="bg.subtle"
-      >
-        {parsed != null ? JSON.stringify(parsed, null, 2) : event.rawPayload}
-      </Code>
     </Box>
   );
 }
