@@ -495,6 +495,7 @@ func TestProvision_WritesCLIOnlyConfig(t *testing.T) {
 //
 // @scenario "The system prompt is Langy's own, not a coding agent's"
 // @scenario "The worker does not expose tools the panel cannot show"
+// @scenario "The harness's own built-in skill is denied by name"
 func TestProvision_ConfiguresLangyBuildAgent(t *testing.T) {
 	home := t.TempDir()
 	workspace := t.TempDir()
@@ -526,8 +527,10 @@ func TestProvision_ConfiguresLangyBuildAgent(t *testing.T) {
 	var cfg struct {
 		Agent struct {
 			Build struct {
-				Prompt     string            `json:"prompt"`
-				Permission map[string]string `json:"permission"`
+				Prompt string `json:"prompt"`
+				// any, not string: a tool's rule is an action, but "skill" carries
+				// a per-name map so one built-in skill can be denied by name.
+				Permission map[string]any `json:"permission"`
 			} `json:"build"`
 		} `json:"agent"`
 	}
@@ -547,24 +550,46 @@ func TestProvision_ConfiguresLangyBuildAgent(t *testing.T) {
 	// capability is unwanted.
 	for _, tool := range []string{"task", "question"} {
 		if got := cfg.Agent.Build.Permission[tool]; got != "deny" {
-			t.Errorf("agent.build.permission[%q] = %q, want %q — the panel cannot show this tool's work", tool, got, "deny")
+			t.Errorf("agent.build.permission[%q] = %v, want %q — the panel cannot show this tool's work", tool, got, "deny")
 		}
 	}
-	// bash, edit, skill, todowrite and webfetch stay OFF the deny list: the CLI,
-	// the GitHub skill's repo work, dataset file preparation and the plan panel
-	// run on them (an edit deny would also remove write and apply_patch), and
+	// bash, edit, todowrite and webfetch stay OFF the deny list: the CLI, the
+	// GitHub skill's repo work, dataset file preparation and the plan panel run
+	// on them (an edit deny would also remove write and apply_patch), and
 	// webfetch is how Langy reads anything that is not in LangWatch's own docs.
 	// Egress is governed by the per-worker proxy, not by removing the tool.
-	for _, tool := range []string{"bash", "edit", "skill", "todowrite", "webfetch"} {
+	for _, tool := range []string{"bash", "edit", "todowrite", "webfetch"} {
 		if got, present := cfg.Agent.Build.Permission[tool]; present && got == "deny" {
 			t.Errorf("agent.build.permission[%q] = deny — this tool is part of Langy's role", tool)
 		}
 	}
-	// Those two are the whole deny list. Without this, a later deny added for
+	// "skill" is denied per NAME, never wholesale. opencode reads a bare "deny"
+	// here as pattern "*", which switches the skill tool off and takes every
+	// skill we ship out of the prompt with it.
+	skillRule, ok := cfg.Agent.Build.Permission["skill"].(map[string]any)
+	if !ok {
+		t.Fatalf("agent.build.permission[\"skill\"] = %v, want a per-name map — a bare action would disable every shipped skill",
+			cfg.Agent.Build.Permission["skill"])
+	}
+	// opencode's one built-in skill. The env switches in buildWorkerEnv turn off
+	// the directory scans; this one is embedded in the binary and only a
+	// permission rule reaches it. Denying it by name drops it from
+	// <available_skills>, which is assembled from the skills the ruleset allows.
+	if got := skillRule["customize-opencode"]; got != "deny" {
+		t.Errorf("agent.build.permission[\"skill\"][\"customize-opencode\"] = %v, want %q — its description is prompt weight for a task outside Langy's scope",
+			got, "deny")
+	}
+	if _, present := skillRule["*"]; present {
+		t.Errorf("agent.build.permission[\"skill\"] carries a %q pattern: %v — that gates every shipped skill, not the built-in", "*", skillRule)
+	}
+	if len(skillRule) != 1 {
+		t.Errorf("agent.build.permission[\"skill\"] has %d patterns, want exactly 1 (customize-opencode); got %v", len(skillRule), skillRule)
+	}
+	// Those three are the whole rule set. Without this, a later deny added for
 	// a tool the role needs passes every check above, since a name absent from
 	// the loop is never looked at.
-	if len(cfg.Agent.Build.Permission) != 2 {
-		t.Errorf("agent.build.permission has %d entries, want exactly 2 (task, question); got %v",
+	if len(cfg.Agent.Build.Permission) != 3 {
+		t.Errorf("agent.build.permission has %d entries, want exactly 3 (task, question, skill); got %v",
 			len(cfg.Agent.Build.Permission), cfg.Agent.Build.Permission)
 	}
 }

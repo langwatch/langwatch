@@ -27,6 +27,15 @@ Feature: Langy minimal harness
       capabilities it offers the user
 
   @unit
+  Scenario: The harness's own built-in skill is denied by name
+    Given the harness ships a built-in skill for editing its own configuration,
+      which is work Langy does not do for a customer
+    When a worker is provisioned
+    Then that skill is denied by name
+    And every skill we ship stays available, because a rule that denied all of
+      them would also switch the skill tool off
+
+  @unit
   Scenario: The prompt fits its size budget
     When the prompt asset is checked
     Then its size is under the enforced byte ceiling

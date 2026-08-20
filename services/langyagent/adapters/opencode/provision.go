@@ -217,12 +217,27 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		// bash, read, grep, glob, edit/write, skill and todowrite stay: the CLI,
 		// the GitHub skill's repo work, dataset file preparation, and the plan
 		// panel all run on them.
+		//
+		// The skill rule is a different shape and does a different job. opencode
+		// ships one built-in skill, customize-opencode, which the two disable
+		// switches in buildWorkerEnv do not touch: they turn off the directory
+		// scans, and this one is embedded in the binary. Its own description
+		// scopes it to editing opencode's config, agents, plugins and permission
+		// rules, which is not something Langy does for a customer, so the 516
+		// characters it renders are prompt weight for nothing. A rule under "skill"
+		// removes it from <available_skills> as well as from execution, because
+		// opencode builds that block from the skills the agent's permission
+		// ruleset allows. The pattern is a name and not "*", so the skill tool
+		// itself stays enabled and every skill we ship still reaches the prompt.
 		"agent": map[string]any{
 			"build": map[string]any{
 				"prompt": langyAgentPrompt,
 				"permission": map[string]any{
 					"task":     "deny",
 					"question": "deny",
+					"skill": map[string]any{
+						"customize-opencode": "deny",
+					},
 				},
 			},
 		},
