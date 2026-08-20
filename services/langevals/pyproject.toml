@@ -82,9 +82,8 @@ override-dependencies = [
     # server-side file read; patched in 0.8.18.
     "langsmith>=0.8.18",
     # Force a patched strawberry-graphql (GHSA-fr49-mhgj-crfc, GHSA-qfwv-87qj-98xq,
-    # GHSA-x97m-qp5c-w9xj). arize-phoenix 14.6.0 pins it to 0.314.3; the patched
-    # 0.316.0 is API-compatible with Phoenix and is the version Phoenix itself moved
-    # to in 16.4.0.
+    # GHSA-x97m-qp5c-w9xj, all of which top out at 0.315.6). arize-phoenix pins
+    # strawberry exactly, so without this the pin decides the version.
     "strawberry-graphql>=0.316.0",
     "pydantic-settings>=2.14.2",  # security: pydantic-settings advisory (#1517)
     # security: GHSA circular JSON Schema $ref unbounded-CPU DoS; patched in 0.60.1.

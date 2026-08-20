@@ -10,6 +10,39 @@ from langchain_core.language_models.chat_models import (
 import litellm
 
 
+class RawCompletion:
+    """The `.parse()` / `.headers` shape ChatOpenAI expects back from a raw call.
+
+    langchain-openai 0.3 routes the non-streaming path through
+    `client.with_raw_response.create(...)` and then calls `.parse()` on what
+    comes back. litellm returns the parsed response directly, so the two are
+    bridged here rather than by pinning langchain-openai below 0.3.
+    """
+
+    def __init__(self, response):
+        self._response = response
+        self.headers: dict = {}
+
+    def parse(self):
+        return self._response
+
+
+class RawCompletionProxy:
+    def __init__(self, client: "LitellmCompletion"):
+        self._client = client
+
+    def create(self, *args, **kwargs):
+        return RawCompletion(self._client.create(*args, **kwargs))
+
+
+class AsyncRawCompletionProxy:
+    def __init__(self, client: "AsyncLitellmCompletion"):
+        self._client = client
+
+    async def create(self, *args, **kwargs):
+        return RawCompletion(await self._client.create(*args, **kwargs))
+
+
 class LitellmCompletion:
     exception: Optional[Exception] = None
     temperature: float = 0
@@ -36,10 +69,18 @@ class LitellmCompletion:
             self.exception = e
             raise e
 
+    @property
+    def with_raw_response(self):
+        return RawCompletionProxy(self)
+
 
 class AsyncLitellmCompletion(LitellmCompletion):
     async def create(self, *args, **kwargs):
         return super().create(*args, **kwargs)
+
+    @property
+    def with_raw_response(self):
+        return AsyncRawCompletionProxy(self)
 
 
 def model_to_langchain(
