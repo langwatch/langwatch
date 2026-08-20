@@ -1,3 +1,4 @@
+import type { ButtonProps } from "@chakra-ui/react";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { VersionHistoryListPopover } from "../../../VersionHistoryListPopover";
@@ -9,6 +10,7 @@ export function VersionHistoryButton({
   hasUnsavedChanges,
   label,
   initialOpen,
+  triggerSize,
 }: {
   configId: string;
   /** The versionId of the version currently being edited. If not provided, defaults to latest. */
@@ -18,6 +20,8 @@ export function VersionHistoryButton({
   label?: string;
   /** When true the history panel opens automatically on mount. */
   initialOpen?: boolean;
+  /** Matches the button row the trigger sits in. */
+  triggerSize?: ButtonProps["size"];
 }) {
   return (
     <Tooltip
@@ -33,6 +37,7 @@ export function VersionHistoryButton({
         hasUnsavedChanges={hasUnsavedChanges}
         label={label}
         initialOpen={initialOpen}
+        triggerSize={triggerSize}
       />
     </Tooltip>
   );

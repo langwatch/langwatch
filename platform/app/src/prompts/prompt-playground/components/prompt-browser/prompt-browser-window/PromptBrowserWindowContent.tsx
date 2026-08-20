@@ -20,10 +20,19 @@ import { useTabId } from "../ui/TabContext";
 import { PromptBrowserHeader } from "./PromptBrowserHeader";
 import { PromptMessagesEditor } from "./PromptMessagesEditor";
 import { PromptTabbedSection } from "./PromptTabbedSection";
+import { PANE_BAR_MIN_HEIGHT } from "./paneBar";
 
-/** Height of tabs header (32px) + divider (16px) + minimum chat area (200px) */
-const TABS_AND_DIVIDER_HEIGHT = 48;
+/** Height of the sub-tab bar (PANE_BAR_MIN_HEIGHT) + the drag divider (16px) */
+const TABS_AND_DIVIDER_HEIGHT = 56;
 const MIN_CHAT_AREA = 200;
+
+/**
+ * Softens the cut where the collapsible messages area meets the tabs below it.
+ * A mask carries no colour of its own, so unlike the gradient it replaced it
+ * cannot disagree with the surface behind it in either theme.
+ */
+const MESSAGES_FADE_MASK =
+  "linear-gradient(to bottom, #000 0, #000 calc(100% - 14px), rgba(0, 0, 0, 0.4) calc(100% - 5px), transparent 100%)";
 
 export { useTabId } from "../ui/TabContext";
 
@@ -284,8 +293,11 @@ function PromptBrowserWindowInner(props: {
               <Box
                 ref={headerRef}
                 flexShrink={0}
+                display="flex"
+                alignItems="center"
+                minHeight={PANE_BAR_MIN_HEIGHT}
                 paddingX={3}
-                paddingY={2}
+                paddingY={1}
                 borderBottom="1px solid"
                 borderColor="border.muted"
               >
@@ -305,13 +317,16 @@ function PromptBrowserWindowInner(props: {
               </Box>
             </Box>
 
-            {/* Right panel: Tabbed section (conversation/variables) */}
+            {/* Right panel: Tabbed section (conversation/variables). It starts
+                flush with the left panel's toolbar — the padding that used to
+                sit here pushed its tab strip down so the two panes disagreed
+                about where the pane began. */}
             <Box
               flex={1}
               display="flex"
               flexDirection="column"
               overflow="hidden"
-              paddingTop={2}
+              minWidth={0}
             >
               <PromptTabbedSection
                 layoutMode="horizontal"
@@ -348,7 +363,10 @@ function PromptBrowserWindowInner(props: {
           <Box
             ref={headerRef}
             flexShrink={0}
-            paddingY={2}
+            display="flex"
+            alignItems="center"
+            minHeight={PANE_BAR_MIN_HEIGHT}
+            paddingY={1}
             borderBottom="1px solid"
             borderColor="border.muted"
           >
@@ -371,6 +389,13 @@ function PromptBrowserWindowInner(props: {
             position="relative"
             flexShrink={0}
             transition={isCollapsed ? "max-height 0.15s ease-out" : undefined}
+            // The bottom edge softens by fading the messages themselves rather
+            // than painting a gradient of the surface colour over them, so it
+            // stays right whatever the surface behind it is.
+            css={{
+              maskImage: MESSAGES_FADE_MASK,
+              WebkitMaskImage: MESSAGES_FADE_MASK,
+            }}
           >
             <Box
               paddingTop={2}
@@ -382,19 +407,6 @@ function PromptBrowserWindowInner(props: {
             >
               <PromptMessagesEditor />
             </Box>
-
-            {/* Fade overlay at bottom */}
-            {!isCollapsed && (
-              <Box
-                position="absolute"
-                bottom={0}
-                left={0}
-                right={0}
-                height="12px"
-                background="linear-gradient(to bottom, transparent, var(--chakra-colors-bg-panel))"
-                pointerEvents="none"
-              />
-            )}
           </Box>
 
           {/* Tabbed section with divider */}

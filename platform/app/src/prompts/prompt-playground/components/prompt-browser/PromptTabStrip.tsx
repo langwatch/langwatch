@@ -7,6 +7,18 @@ import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
 import { TabIdProvider } from "./ui/TabContext";
 import { useIsOverflowing } from "./useIsOverflowing";
 
+/**
+ * Fades the trailing edge of the strip while tabs are scrolled out of view.
+ *
+ * A mask, not a painted gradient: it only varies the strip's own opacity, so it
+ * cannot fall out of step with the colour behind it the way the previous
+ * `bg.panel` gradient did on every surface that was not `bg.panel`. Three stops
+ * rather than two, so the ramp reads as a fade instead of a band with an edge.
+ * The colours here are alpha carriers — a mask ignores their hue.
+ */
+const STRIP_FADE_MASK =
+  "linear-gradient(to right, #000 0, #000 calc(100% - 36px), rgba(0, 0, 0, 0.45) calc(100% - 14px), transparent 100%)";
+
 interface PromptTabStripProps {
   tabs: Tab[];
   activeTabId?: string;
@@ -40,12 +52,17 @@ export function PromptTabStrip({
         gap={0}
         overflow="auto"
         height="full"
-        paddingY={2}
-        paddingX={2}
+        paddingY={1.5}
+        paddingX={1.5}
         // Tabs shrink to share this row before it ever scrolls, so `flex` lets
         // the strip claim the width the toolbar is not using.
         flex="1 1 0"
         minWidth={0}
+        css={
+          isStripOverflowing
+            ? { maskImage: STRIP_FADE_MASK, WebkitMaskImage: STRIP_FADE_MASK }
+            : undefined
+        }
       >
         {tabs.map((tab) => (
           <TabIdProvider key={tab.id} tabId={tab.id}>

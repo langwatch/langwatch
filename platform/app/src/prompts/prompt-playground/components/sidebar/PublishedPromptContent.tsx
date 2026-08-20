@@ -26,13 +26,18 @@ export function PublishedPromptContent({
           <OrganizationBadge />
         </Box>
       )}
+      {/* The rail is narrow and a handle can be long, so a truncated row keeps
+          its full handle — folder included — on hover. Same affordance the
+          prompt tabs use for the same reason. */}
       <Text
         overflow="hidden"
         textOverflow="ellipsis"
         whiteSpace="nowrap"
         fontSize="sm"
-        fontWeight="normal"
+        fontWeight="inherit"
         flex={1}
+        minWidth={0}
+        title={promptHandle ?? undefined}
       >
         {getDisplayHandle(promptHandle)}
       </Text>
