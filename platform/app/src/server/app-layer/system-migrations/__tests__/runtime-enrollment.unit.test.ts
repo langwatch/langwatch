@@ -20,6 +20,11 @@ const stubs = vi.hoisted(() => {
         findMany: enrollmentFindMany,
         findUnique: enrollmentFindUnique,
       },
+      // The pass pages tenants before claiming any (per-organization
+      // claims); an empty page ends it without touching Redis.
+      organization: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
     },
   };
 });
@@ -155,8 +160,8 @@ describe("migrationPassCohort on cloud", () => {
       process.env.AUTHZ_CUTOVER_COHORT = "none";
       stubs.enrollmentFindMany.mockResolvedValue([]);
       try {
-        // The pass stands down at the lease (no Redis here), but the warning
-        // and the enrollment read both happen before that.
+        // The pass sees no tenants (empty organization page), but the
+        // warning and the enrollment read both happen before that.
         await runSystemMigrationPass();
       } finally {
         delete process.env.SYSTEM_MIGRATIONS_COHORT;

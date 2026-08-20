@@ -189,6 +189,41 @@ describe("PrismaSystemMigrationEnrollmentRepository", () => {
         select: { id: true, name: true },
       });
     });
+
+    /** @scenario "A later step's cohort samples only organizations enrolled for the step before it" */
+    it("pools from the predecessor's enrollment when one is named", async () => {
+      const findMany = vi
+        .fn()
+        .mockImplementation(
+          async ({ where }: { where: { migrationName: string } }) =>
+            where.migrationName === "authz-grants-genesis-import"
+              ? [{ organizationId: "org_enrolled" }]
+              : [{ organizationId: "org_first_step" }],
+        );
+      const { prisma, repository } = repositoryWith({
+        enrollment: { findMany },
+        organization: { findMany: vi.fn().mockResolvedValue([]) },
+      });
+
+      await repository.findCohortEligibleOrganizations({
+        migrationName: "authz-grants-genesis-import",
+        enrolledForMigrationName: "authz-team-user-backfill",
+        excludeOrganizationIds: [],
+      });
+
+      expect(prisma.organization.findMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ["org_first_step"], notIn: ["org_enrolled"] },
+          subscriptions: {
+            none: {
+              status: { in: ["ACTIVE", "PENDING"] },
+              plan: "ENTERPRISE",
+            },
+          },
+        },
+        select: { id: true, name: true },
+      });
+    });
   });
 
   describe("when a cohort is written", () => {

@@ -45,6 +45,17 @@ import { rollBackAuthzCutover } from "../../system-migrations/runtime";
 import { SystemMigrationsService } from "../../system-migrations/system-migrations.service";
 import { resetCutoverGateForTesting } from "../cutover-gate";
 
+function emptyPassSummary() {
+  return {
+    tenantsSeen: 0,
+    finalized: 0,
+    held: 0,
+    parked: 0,
+    skipped: 0,
+    claimed: 0,
+  };
+}
+
 const ns = `authz-cutover-rollback-${nanoid(8)}`;
 
 const OPERATOR_ID = `user_operator_${nanoid(6)}`;
@@ -98,8 +109,8 @@ describe("given a cut-over organization rolled back with the queue stopped", () 
       },
       privateDataplaneOrganizationIds: () => [],
       audit: async () => undefined,
-      runPass: async () => null,
-      runTargetedPass: async () => null,
+      runPass: async () => emptyPassSummary(),
+      runTargetedPass: async () => emptyPassSummary(),
       rollbackEffects: {
         [GRANTS_CUTOVER_MIGRATION_NAME]: async ({
           tenantId,

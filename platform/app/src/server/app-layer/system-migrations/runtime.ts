@@ -591,10 +591,11 @@ function warnWhenRetiredCohortVariablesAreSet(): void {
  */
 /**
  * One migration for one organization, now - the ops page's targeted run.
- * The same lease as a full pass (one driver fleet-wide, so a targeted run
- * can never double-drive an organization a pass is working through; null
- * means the lease is held and the service turns that into a retry-shaped
- * refusal), the same cohort read (enrollment stays the pacing source of
+ * The same per-organization claim as a full pass (so a targeted run can
+ * never double-drive an organization a pass is working through; a summary
+ * counting the organization as claimed is what the service turns into a
+ * retry-shaped refusal), the same cohort read (enrollment stays the pacing
+ * source of
  * truth even here - the service refuses unenrolled organizations before
  * composing this, and the cohort would skip them anyway), a tenant source
  * of exactly one id, and the migration list cut to the one asked for.
@@ -607,7 +608,7 @@ export async function runSystemMigrationTargetedPass({
   organizationId: string;
   migrationName: string;
   signal?: AbortSignal;
-}): Promise<MigrationPassSummary | null> {
+}): Promise<MigrationPassSummary> {
   const redis = tryGetApp()?.redis ?? null;
   const runner = new SystemMigrationRunnerService({
     state: systemMigrationState,
@@ -639,7 +640,7 @@ export async function runSystemMigrationPass(args?: {
    * no-op. Callers that run after startup (the ops action) can omit it.
    */
   redis?: Redis | Cluster | null;
-}): Promise<MigrationPassSummary | null> {
+}): Promise<MigrationPassSummary> {
   warnWhenRetiredCohortVariablesAreSet();
   const redis = args?.redis ?? tryGetApp()?.redis ?? null;
   const runner = new SystemMigrationRunnerService({

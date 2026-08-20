@@ -106,7 +106,7 @@ export function MigrationsContent() {
       toaster.create({
         title: "Migration pass started",
         description:
-          "The pass runs in the background under the fleet-wide lease. This page refreshes as organizations move.",
+          "The pass runs in the background, several organizations at a time. This page refreshes as organizations move.",
         type: "success",
       });
       await utils.ops.listSystemMigrations.invalidate();
@@ -187,6 +187,7 @@ export function MigrationsContent() {
           key={migration.name}
           step={index + 1}
           migration={migration}
+          previousMigrationTitle={query.data?.[index - 1]?.title}
           enrollments={enrollments.filter(
             (enrollment) => enrollment.migrationName === migration.name,
           )}
@@ -267,12 +268,14 @@ function MigrationStatusBadges({ migration }: { migration: MigrationListing }) {
 function MigrationSection({
   step,
   migration,
+  previousMigrationTitle,
   enrollments,
   isSaaS,
   canManage,
 }: {
   step: number;
   migration: MigrationListing;
+  previousMigrationTitle?: string;
   enrollments: EnrollmentRecord[];
   isSaaS: boolean;
   canManage: boolean;
@@ -308,6 +311,7 @@ function MigrationSection({
                 <EnrollCohortAction
                   migrationName={migration.name}
                   migrationTitle={migration.title}
+                  previousMigrationTitle={previousMigrationTitle}
                   requiresConfirmation={requiresConfirmation}
                 />
               </>
@@ -523,19 +527,39 @@ function EnrollAction({
 }
 
 /**
- * Enroll a sampled cohort for THIS migration in one action. The sample is
- * drawn from organizations not yet enrolled, and the platform excludes the
- * ones it already knows to leave alone by data: an active enterprise
+ * Enroll a sampled cohort for THIS migration in one action. The first
+ * step's sample is drawn from organizations not yet enrolled; a later
+ * step's from the step before it. The platform excludes the ones it
+ * already knows to leave alone by data: an active enterprise
  * subscription, or a dedicated data plane configured in the environment.
  * No organization is ever named in code to exclude it.
  */
+function cohortDialogDescription({
+  previousMigrationTitle,
+  requiresConfirmation,
+}: {
+  previousMigrationTitle?: string;
+  requiresConfirmation: boolean;
+}): string {
+  const pool = previousMigrationTitle
+    ? `Enrolls a random sample of organizations enrolled for the ${previousMigrationTitle.toLowerCase()} but not yet for this step. `
+    : "Enrolls a random sample of organizations not yet enrolled for this step. ";
+  const consequence = requiresConfirmation
+    ? "Once their earlier steps finish, the next pass proves parity and moves every enrolled organization's permission checks onto the new engine. Organizations on an enterprise plan or with a dedicated data plane are always left out."
+    : "It changes nothing about who answers permission checks. Organizations on an enterprise plan or with a dedicated data plane are always left out.";
+  return pool + consequence;
+}
+
 function EnrollCohortAction({
   migrationName,
   migrationTitle,
+  previousMigrationTitle,
   requiresConfirmation,
 }: {
   migrationName: string;
   migrationTitle: string;
+  /** The step before this one; a later step's cohort samples from it. */
+  previousMigrationTitle?: string;
   requiresConfirmation: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -595,11 +619,10 @@ function EnrollCohortAction({
           });
         }}
         title={`Enroll a cohort for the ${migrationTitle.toLowerCase()}`}
-        description={
-          requiresConfirmation
-            ? "Enrolls a random sample of organizations not yet enrolled for this step. Once their earlier steps finish, the next pass proves parity and moves every enrolled organization's permission checks onto the new engine. Organizations on an enterprise plan or with a dedicated data plane are always left out."
-            : "Enrolls a random sample of organizations not yet enrolled for this step. It changes nothing about who answers permission checks. Organizations on an enterprise plan or with a dedicated data plane are always left out."
-        }
+        description={cohortDialogDescription({
+          previousMigrationTitle,
+          requiresConfirmation,
+        })}
         isLoading={enrollCohort.isPending}
         confirmDisabled={!sampleSizeValid}
       >

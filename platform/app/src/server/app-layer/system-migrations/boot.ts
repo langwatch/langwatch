@@ -23,9 +23,7 @@ export function startSystemMigrations(args?: {
     redis: args?.redis,
   })
     .then((summary) => {
-      if (summary) {
-        logger.info({ summary }, "system migration pass finished");
-      }
+      logger.info({ summary }, "system migration pass finished");
     })
     .catch((error) => {
       logger.error(

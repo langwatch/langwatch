@@ -1074,9 +1074,9 @@ const presentations = {
     },
   },
   migration_pass_already_running: {
-    title: "A migration pass is already running",
+    title: "This organization appears to be mid-migration",
     describe: () =>
-      "Only one pass runs at a time, and it may already be processing this organization. Wait for it to conclude, then retry.",
+      "The migration cannot start for this organization right now — another pass appears to be working it. Wait a moment, then retry.",
   },
   migration_not_available_on_installation: {
     title: "This migration is not available here yet",

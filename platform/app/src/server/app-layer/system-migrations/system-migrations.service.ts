@@ -88,6 +88,9 @@ export interface SystemMigrationEnrollmentStore {
   }): Promise<void>;
   findCohortEligibleOrganizations(args: {
     migrationName: string;
+    /** When set, the pool is restricted to organizations already enrolled
+     *  for this migration - a later step samples the step before it. */
+    enrolledForMigrationName?: string;
     excludeOrganizationIds: string[];
   }): Promise<Array<{ id: string; name: string }>>;
   createMany(args: {
@@ -211,17 +214,18 @@ export class SystemMigrationsService {
         action: string;
         args?: Record<string, unknown>;
       }) => Promise<void>;
-      runPass: () => Promise<MigrationPassSummary | null>;
+      runPass: () => Promise<MigrationPassSummary>;
       /**
-       * One migration for one organization, now, under the same fleet-wide
-       * lease as a full pass (null when another pass holds it). The
+       * One migration for one organization, now, under the same
+       * per-organization claim as a full pass (the summary's `claimed`
+       * says another pass is already working the organization). The
        * composition supplies it because only the composition can build a
        * runner scoped to a single (tenant, migration) pair.
        */
       runTargetedPass: (args: {
         organizationId: string;
         migrationName: string;
-      }) => Promise<MigrationPassSummary | null>;
+      }) => Promise<MigrationPassSummary>;
       /**
        * Whether a migration's stored report means it merely WAITED, per
        * migration name. The state machine has no waiting status, so a
@@ -433,9 +437,19 @@ export class SystemMigrationsService {
   }> {
     if (!this.deps.isSaaS()) throw new MigrationEnrollmentCloudOnlyError();
     this.requireRegisteredMigration(migrationName);
+    // The steps run as an ordered pipeline per organization, so a later
+    // step's pool is the step before it: an organization enrolled for a
+    // step whose predecessor nothing will ever run would sit pending
+    // forever. The first step keeps sampling the whole installation.
+    const ordered = this.deps.migrations();
+    const index = ordered.findIndex(
+      (migration) => migration.name === migrationName,
+    );
+    const previous = index > 0 ? ordered[index - 1] : undefined;
     const eligible =
       await this.deps.enrollments.findCohortEligibleOrganizations({
         migrationName,
+        enrolledForMigrationName: previous?.name,
         excludeOrganizationIds: this.deps.privateDataplaneOrganizationIds(),
       });
     const picked = sample({ pool: eligible, count: sampleSize });
@@ -509,8 +523,9 @@ export class SystemMigrationsService {
    * fire-and-forget - the operator asked about one organization and wants
    * its outcome. Enrollment stays the pacing source of truth on cloud: an
    * unenrolled organization is refused, never quietly migrated. The
-   * fleet-wide lease still applies, so a run during a full pass is refused
-   * with a retry-shaped error instead of double-driving the organization.
+   * organization's own claim still applies, so a run while another pass is
+   * working that organization is refused with a retry-shaped error instead
+   * of double-driving it.
    */
   async runForOrganization({
     organizationId,
@@ -550,7 +565,7 @@ export class SystemMigrationsService {
       organizationId,
       migrationName,
     });
-    if (summary === null) throw new MigrationPassAlreadyRunningError();
+    if (summary.claimed > 0) throw new MigrationPassAlreadyRunningError();
     const record = await this.deps.state.findRecord({
       migrationName,
       tenantId: organizationId,
@@ -601,9 +616,9 @@ export class SystemMigrationsService {
   /**
    * Kick a pass now instead of waiting for the next worker boot - the lever
    * for processing a fresh enrollment right away or re-verifying held
-   * tenants after remediation. Fire-and-forget: the fleet-wide lease already guarantees a
-   * single driver, so the worst case for a double click is a pass that
-   * stands down immediately.
+   * tenants after remediation. Fire-and-forget: per-organization claims keep
+   * two passes off the same organization, so the worst case for a double
+   * click is a pass that finds everything claimed and does nothing.
    */
   startPass(): void {
     void this.deps.runPass().catch((error) => {

@@ -1589,8 +1589,8 @@ export const opsRouter = createTRPCRouter({
    * Run one migration for one organization now. Awaited: the operator asked
    * about one organization and gets the status it ended the run in. The
    * service refuses unknown migrations, unknown organizations, unenrolled
-   * organizations (cloud) and a pass already holding the fleet-wide lease,
-   * each with a handled error the page renders.
+   * organizations (cloud) and an organization whose claim another pass
+   * already holds, each with a handled error the page renders.
    */
   runSystemMigrationForOrganization: protectedProcedure
     .use(opsManagePermission)
@@ -1621,9 +1621,9 @@ export const opsRouter = createTRPCRouter({
   /**
    * Kick a migration pass now instead of waiting for the next worker boot -
    * the lever for processing a fresh enrollment right away or re-verifying
-   * held tenants after remediation. Fire-and-forget: the fleet-wide lease already
-   * guarantees a single driver, so the worst case for a double click is a
-   * pass that stands down immediately.
+   * held tenants after remediation. Fire-and-forget: per-organization claims
+   * already keep two passes off the same organization, so the worst case for
+   * a double click is a pass that finds everything claimed and does nothing.
    */
   runSystemMigrationPass: protectedProcedure
     .use(opsManagePermission)
