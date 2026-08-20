@@ -25,20 +25,6 @@ import {
 } from "../logic/pullCadence";
 import type { SourceType } from "./ingestionSourceCatalog";
 
-/**
- * The Cadence section of the source composer: how often a pull-mode source
- * checks for new activity, said in plain words. Controlled like the raw
- * input it replaces: `value` is the composer's pullSchedule where "" means
- * "the recommended schedule" (resolved to an explicit cron at create — a
- * saved schedule of null would mean the source never runs), and every edit
- * comes back through `onChange` as a cron string.
- *
- * Cron editing stays behind an explicit toggle; a stored cron the picker
- * cannot express opens with the toggle already on so the value is editable
- * rather than clobbered by picker defaults. Renders nothing for source
- * types without a pull adapter.
- */
-
 /** One flat select collapses frequency + minute interval: "every 15
  *  minutes" is one thought to an admin, not two controls. */
 const FREQUENCY_CHOICES: Array<{ value: string; label: string }> = [
@@ -71,6 +57,19 @@ function partsFromChoice(
   return { ...current, frequency: choice as PullFrequency };
 }
 
+/**
+ * The Cadence section of the source composer: how often a pull-mode source
+ * checks for new activity, said in plain words. Controlled like the raw
+ * input it replaces: `value` is the composer's pullSchedule where "" means
+ * "the recommended schedule" (resolved to an explicit cron at create — a
+ * saved schedule of null would mean the source never runs), and every edit
+ * comes back through `onChange` as a cron string.
+ *
+ * Cron editing stays behind an explicit toggle; a stored cron the picker
+ * cannot express opens with the toggle already on so the value is editable
+ * rather than clobbered by picker defaults. Renders nothing for source
+ * types without a pull adapter.
+ */
 export function PullCadenceField({
   sourceType,
   value,
