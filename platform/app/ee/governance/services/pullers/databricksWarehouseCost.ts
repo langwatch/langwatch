@@ -331,10 +331,17 @@ export type WarehousePricedStatement = {
   hourTotalExecutionMs: string;
   /**
    * The bill across the lines this statement priced on, as an exact decimal USD
-   * string — the share's other ingredient, so
-   * `costUsd ≈ hourBillableUsd × executionMs / hourTotalExecutionMs` holds on
-   * the record itself. Both this and the denominator span the same hours, so
-   * the identity survives a statement that straddled.
+   * string — the share's other ingredient. Both this and the denominator span
+   * the same hours, so the pair says which bill the cost was drawn from.
+   *
+   * `costUsd` is NOT recoverable from them. Each hour's share is taken at that
+   * hour's own price and the three fields are then summed independently, so a
+   * one-line reconstruction only holds when every hour cost the same per
+   * millisecond. It does not for a straddler: the forty-minute statement in the
+   * unit suite costs 11.997369574, while bill x runtime / total reads
+   * 11.995001..., because its two minutes in an otherwise idle hour 09 were
+   * billed at nineteen times the per-millisecond price of hour 10. Reconciling
+   * a straddler needs the per-hour lines, which this record does not carry.
    */
   hourBillableUsd: string;
 };
