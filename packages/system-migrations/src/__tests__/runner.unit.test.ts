@@ -26,6 +26,15 @@ class FakeStateRepository implements SystemMigrationStateRepository {
   async upsertRecord(record: TenantMigrationRecord): Promise<void> {
     this.records.set(this.key(record.migrationName, record.tenantId), record);
   }
+
+  async upsertRecordUnlessRolledBack(
+    record: TenantMigrationRecord,
+  ): Promise<boolean> {
+    const key = this.key(record.migrationName, record.tenantId);
+    if (this.records.get(key)?.status === "rolled_back") return false;
+    this.records.set(key, record);
+    return true;
+  }
 }
 
 class FakeLeaseRepository implements MigrationLeaseRepository {
@@ -83,7 +92,14 @@ function migrationOf(
   name: string,
   migrateTenant: SystemMigration["migrateTenant"],
 ): SystemMigration {
-  return { name, migrateTenant };
+  return {
+    name,
+    title: name,
+    description: name,
+    requiresOperatorConfirmation: false,
+    runsAutomaticallyOnSelfHosted: true,
+    migrateTenant,
+  };
 }
 
 const finalized: TenantMigrationOutcome = { status: "finalized" };
@@ -136,14 +152,14 @@ describe("SystemMigrationRunnerService", () => {
   });
 
   describe("when the cohort excludes a tenant", () => {
-    /** @scenario "Cloud rollout processes only the configured cohort" */
+    /** @scenario "Cloud rollout processes only enrolled organizations" */
     it("processes cohort tenants and records nothing for the rest", async () => {
       const migrate = vi.fn(async () => finalized);
       const runner = new SystemMigrationRunnerService({
         state,
         lease: new FakeLeaseRepository(),
         tenants: tenantSourceOf(["acme", "globex"]),
-        cohort: (tenantId) => tenantId === "acme",
+        cohort: ({ tenantId }) => tenantId === "acme",
         migrations: [migrationOf("m1", migrate)],
       });
 
@@ -252,6 +268,121 @@ describe("SystemMigrationRunnerService", () => {
       // migration whose proof still passes and undo the rollback.
       expect(migrate).not.toHaveBeenCalled();
       expect(summary?.skipped).toBe(1);
+      expect(
+        (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))
+          ?.status,
+      ).toBe("rolled_back");
+    });
+  });
+
+  describe("when an operator rolled back a tenant that was only migrated, never finalized", () => {
+    /** @scenario "An operator rolls a migrated organization back to its legacy path" */
+    it("skips it exactly as it would a rolled-back finalized tenant", async () => {
+      await state.upsertRecord({
+        migrationName: "m1",
+        tenantId: "acme",
+        status: "migrated",
+        report: { diffs: ["budgets:view at org"] },
+      });
+      await state.upsertRecord({
+        migrationName: "m1",
+        tenantId: "acme",
+        status: "rolled_back",
+        report: { diffs: ["budgets:view at org"] },
+      });
+      const migrate = vi.fn(async () => finalized);
+      const runner = new SystemMigrationRunnerService({
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(["acme"]),
+        cohort: () => true,
+        migrations: [migrationOf("m1", migrate)],
+      });
+
+      const summary = await runner.runPass();
+
+      // A held (migrated) tenant is normally re-run every pass; rolled_back
+      // pins it exactly like a rolled-back finalized tenant, whatever state
+      // it came from.
+      expect(migrate).not.toHaveBeenCalled();
+      expect(summary?.skipped).toBe(1);
+      expect(
+        (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))
+          ?.status,
+      ).toBe("rolled_back");
+    });
+  });
+
+  describe("when an operator pins a tenant rolled_back while its migration is still running", () => {
+    /** @scenario "A pass already in flight cannot overwrite an operator's rollback" */
+    it("discards the pass's outcome instead of overwriting the pin", async () => {
+      // The interleaving: the pass reads "migrated", starts the (slow)
+      // migration, and the operator pins the row before the outcome write.
+      await state.upsertRecord({
+        migrationName: "m1",
+        tenantId: "acme",
+        status: "migrated",
+        report: { diffs: ["budgets:view at org"] },
+      });
+      const migration = migrationOf("m1", async () => {
+        await state.upsertRecord({
+          migrationName: "m1",
+          tenantId: "acme",
+          status: "rolled_back",
+          report: { rolledBack: { by: "user_alex" } },
+        });
+        return finalized;
+      });
+      const runner = new SystemMigrationRunnerService({
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(["acme"]),
+        cohort: () => true,
+        migrations: [migration],
+      });
+
+      const summary = await runner.runPass();
+
+      const record = await state.findRecord({
+        migrationName: "m1",
+        tenantId: "acme",
+      });
+      expect(record?.status).toBe("rolled_back");
+      expect(record?.report).toEqual({ rolledBack: { by: "user_alex" } });
+      // The pin won: nothing finalized, the tenant reads as skipped.
+      expect(summary?.finalized).toBe(0);
+      expect(summary?.skipped).toBe(1);
+    });
+
+    /** @scenario "A pass already in flight cannot overwrite an operator's rollback" */
+    it("never parks over the pin when the migration then throws", async () => {
+      await state.upsertRecord({
+        migrationName: "m1",
+        tenantId: "acme",
+        status: "migrated",
+        report: null,
+      });
+      const migration = migrationOf("m1", async () => {
+        await state.upsertRecord({
+          migrationName: "m1",
+          tenantId: "acme",
+          status: "rolled_back",
+          report: { rolledBack: { by: "user_alex" } },
+        });
+        throw new Error("storage gave out mid-pass");
+      });
+      const runner = new SystemMigrationRunnerService({
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(["acme"]),
+        cohort: () => true,
+        migrations: [migration],
+      });
+
+      await runner.runPass();
+
+      // A `parked` row would be retried on the next pass and re-finalized -
+      // the exact undo the pin exists to prevent.
       expect(
         (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))
           ?.status,

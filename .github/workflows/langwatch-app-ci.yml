@@ -286,18 +286,14 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: platform/app/node_modules/.cache/tsbuildinfo
-          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json') }}-${{ github.sha }}
+          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json', 'platform/app/tsconfig.tsgo.all.json') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json') }}-
+            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json', 'platform/app/tsconfig.tsgo.all.json') }}-
             ${{ runner.os }}-tsbuildinfo-
 
-      - name: Run typecheck
+      - name: Run typecheck (app and tests in one program)
         working-directory: platform/app
-        run: pnpm typecheck
-
-      - name: Run typecheck (tests)
-        working-directory: platform/app
-        run: pnpm run typecheck:tests
+        run: pnpm run typecheck:all
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -1365,6 +1361,19 @@ jobs:
 
       - name: Test start-boxd-ssh-agent.sh
         run: bash .github/scripts/__tests__/start-boxd-ssh-agent.test.sh
+
+      - name: Test biome-new-violations.sh
+        run: bash .github/scripts/__tests__/biome-new-violations.test.sh
+
+      - name: Test notify-slack-release.sh
+        run: bash .github/scripts/__tests__/notify-slack-release.test.sh
+
+      # Lives here rather than in deployment-impact-check.yml because that
+      # workflow filters `on.paths` down to deployment surface, which
+      # .github/** is not — so it would never start for a change to its own
+      # guard. This job's gate already lists `.github/scripts/**`.
+      - name: Test guard-deployment-impact.ts
+        run: node --test --experimental-strip-types .github/scripts/guard-deployment-impact.test.ts
 
   ci-self-test:
     needs: changes

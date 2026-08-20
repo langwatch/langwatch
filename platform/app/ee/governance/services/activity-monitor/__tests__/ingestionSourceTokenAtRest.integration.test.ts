@@ -143,3 +143,50 @@ describe("given an admin saves a Genie source carrying a workspace token", () =>
     }, 60_000);
   });
 });
+
+describe("given an admin saves a Genie source carrying a client id and secret", () => {
+  describe("when the source is saved through the service", () => {
+    /** @scenario "The client secret is never stored in plain text" */
+    it("stores the secret encrypted and unreadable from the source's configuration", async () => {
+      const clientId = `sp-${nanoid(12)}`;
+      const clientSecret = `dose${nanoid(28)}`;
+      const service = IngestionSourceService.create(prisma);
+
+      // Same save path as the token above, with the service-principal shape
+      // the governance form produces: both halves inside `credentials`, the
+      // secret in plaintext — the service is the one that must encrypt it.
+      const { source } = await service.createSource({
+        organizationId,
+        sourceType: "databricks_genie",
+        name: `genie-secret-at-rest-${ns}`,
+        pullConfig: {
+          adapter: "databricks_genie",
+          workspaceUrl: "https://adb-1234567890123456.7.azuredatabricks.net",
+          spaceIds: [],
+          schedule: "*/15 * * * *",
+          credentials: { clientId, clientSecret },
+        },
+        pullSchedule: "*/15 * * * *",
+        actorUserId,
+      });
+
+      const row = await prisma.ingestionSource.findUniqueOrThrow({
+        where: { id: source.id },
+      });
+      const stored = row.parserConfig as Record<string, unknown>;
+
+      // The whole serialised row, so a secret leaking into any other key is
+      // caught, not just one that stayed under `credentials`.
+      expect(JSON.stringify(stored)).not.toContain(clientSecret);
+
+      expect(typeof stored.credentials).toBe("string");
+      expect(stored.credentials as string).toMatch(/^enc:v1:/);
+
+      // Encrypted is not the same as lost — the puller still signs in with it.
+      expect(decryptCredentials(stored.credentials)).toEqual({
+        clientId,
+        clientSecret,
+      });
+    }, 60_000);
+  });
+});

@@ -99,6 +99,7 @@ import { mapCommands } from "./mapCommands";
 import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
 import { createAuthzGrantsPipeline } from "./pipelines/authz-grants/pipeline";
 import type { AuthzGrantsFoldState } from "./pipelines/authz-grants/projections/authzGrantsState.foldProjection";
+import type { AuthzAuditTrailStore } from "./pipelines/authz-grants/subscribers/authzAuditTrail.subscriber";
 import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
 import { ReportUsageForMonthCommand } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
 import {
@@ -349,6 +350,8 @@ export interface PipelineRepositories {
   langyTurnAdmission: LangyTurnAdmissionRepository;
   /** The grants ledger's two-headed Postgres projection (ADR-092 §13). */
   authzGrantsProjection: StateProjectionStore<AuthzGrantsFoldState>;
+  /** Insert-only audit sink for the grants ledger (ADR-092 decision 17). */
+  authzAuditTrail: AuthzAuditTrailStore;
 }
 
 export interface PipelineRegistryDeps {
@@ -631,13 +634,18 @@ export class PipelineRegistry {
       eventSourcing: this.deps.eventSourcing,
     });
     const billingPipeline = this.registerBillingReportingPipeline();
-    // The grants ledger (ADR-092 §13). Ships dark: registered so the
-    // machinery is live, but no production writer calls its commands until
-    // the backfill refactor and PR 2 move the write paths.
+    // The grants ledger (ADR-092 §13). The write paths emit through the
+    // app-layer ledger module, gated PER ORGANIZATION (decision 4): only an
+    // organization whose genesis import has landed (its
+    // SystemMigrationTenantState row, read by the ledger-write-gate) sends
+    // these commands; every other organization still takes the imperative
+    // Prisma path, and an operator's `rolled_back` flip returns one there
+    // with no deploy.
     this.deps.eventSourcing.register(
       createAuthzGrantsPipeline({
         authzGrantsProjectionStore:
           this.deps.repositories.authzGrantsProjection,
+        authzAuditTrailStore: this.deps.repositories.authzAuditTrail,
       }),
     );
 
@@ -1648,7 +1656,7 @@ export interface ProjectionMetadata {
   aggregateType: string;
   source: "pipeline" | "global";
   pauseKey: string;
-  kind: "fold" | "map";
+  kind: "fold" | "map" | "state";
 }
 
 export interface SubscriberMetadata {
@@ -1704,7 +1712,19 @@ export function getProjectionMetadata(): ProjectionMetadata[] {
         kind: "map" as const,
       }),
     );
-    return [...folds, ...maps];
+    const states = Array.from(def.stateProjections?.entries() ?? []).map(
+      ([name]) => ({
+        projectionName: name,
+        pipelineName,
+        aggregateType,
+        source: "pipeline" as const,
+        // State projections enqueue with `__jobType=stateProjection`; the
+        // dispatcher matches the pause key against that raw segment.
+        pauseKey: `${pipelineName}/stateProjection/${name}`,
+        kind: "state" as const,
+      }),
+    );
+    return [...folds, ...maps, ...states];
   });
 }
 
@@ -1805,63 +1825,82 @@ export interface KillSwitchDescriptor {
 }
 
 export function getKillSwitchDescriptors(): KillSwitchDescriptor[] {
+  return getDefinitions().flatMap(killSwitchDescriptorsOf);
+}
+
+function killSwitchDescriptorsOf(
+  def: StaticPipelineDefinition<any, any, any>,
+): KillSwitchDescriptor[] {
   const out: KillSwitchDescriptor[] = [];
-  for (const def of getDefinitions()) {
-    const { name: pipelineName, aggregateType } = def.metadata;
-    for (const { definition } of def.foldProjections.values()) {
-      out.push({
-        key: `es-${aggregateType}-projection-${definition.name}-killswitch`,
-        aggregateType,
-        componentType: "projection",
-        componentName: definition.name,
-        pipelineName,
-      });
-    }
-    for (const { definition } of def.mapProjections.values()) {
-      out.push({
-        key: `es-${aggregateType}-mapProjection-${definition.name}-killswitch`,
-        aggregateType,
-        componentType: "mapProjection",
-        componentName: definition.name,
-        pipelineName,
-      });
-    }
-    for (const cmd of def.commands) {
-      out.push({
-        key: `es-${aggregateType}-command-${cmd.name}-killswitch`,
-        aggregateType,
-        componentType: "command",
-        componentName: cmd.name,
-        pipelineName,
-      });
-    }
-    // Subscribers belong here MORE than the others do, not less: the enqueue
-    // seam decides relevance and DISCARDS what it judges irrelevant, and
-    // subscriber fan-out is never replayed (ADR-069), so a bad filter loses
-    // those events for good. `ops.setFeatureFlag` rejects any key that is
-    // neither a registry entry nor a live descriptor, so a switch missing from
-    // this list is not merely unlisted — it is unsettable, leaving a revert as
-    // the only way to stop the seam it guards.
-    //
-    // A subscriber may override its key via `options.killSwitch.customKey`;
-    // emit the key the router will actually read, or the page would offer one
-    // nothing consults.
-    for (const definition of def.eventSubscribers.values()) {
-      out.push({
-        // Generated, never re-spelled: the comment above is the reason. A
-        // hand-built key that drifts from `generateKillSwitchKey` is not a
-        // cosmetic mismatch — `ops.setFeatureFlag` refuses a key that is
-        // neither a registry entry nor a live descriptor, so the switch
-        // becomes unsettable.
-        key:
-          definition.options?.killSwitch?.customKey ??
-          generateKillSwitchKey(aggregateType, "subscriber", definition.name),
-        aggregateType,
-        componentType: "subscriber",
-        componentName: definition.name,
-        pipelineName,
-      });
-    }
+  const { name: pipelineName, aggregateType } = def.metadata;
+  for (const { definition } of def.foldProjections.values()) {
+    out.push({
+      key: `es-${aggregateType}-projection-${definition.name}-killswitch`,
+      aggregateType,
+      componentType: "projection",
+      componentName: definition.name,
+      pipelineName,
+    });
+  }
+  for (const { definition } of def.mapProjections.values()) {
+    out.push({
+      key: `es-${aggregateType}-mapProjection-${definition.name}-killswitch`,
+      aggregateType,
+      componentType: "mapProjection",
+      componentName: definition.name,
+      pipelineName,
+    });
+  }
+  // State projections check `componentType: "projection"` at runtime (the
+  // router reuses the fold-shaped key), so the descriptor must match it —
+  // a "stateProjection" segment here would list a switch nothing reads.
+  // Same for a custom key: emit the one the router consults.
+  for (const [name, definition] of def.stateProjections?.entries() ?? []) {
+    out.push({
+      key:
+        definition.options?.killSwitch?.customKey ??
+        generateKillSwitchKey(aggregateType, "projection", name),
+      aggregateType,
+      componentType: "projection",
+      componentName: name,
+      pipelineName,
+    });
+  }
+  for (const cmd of def.commands) {
+    out.push({
+      key: `es-${aggregateType}-command-${cmd.name}-killswitch`,
+      aggregateType,
+      componentType: "command",
+      componentName: cmd.name,
+      pipelineName,
+    });
+  }
+  // Subscribers belong here MORE than the others do, not less: the enqueue
+  // seam decides relevance and DISCARDS what it judges irrelevant, and
+  // subscriber fan-out is never replayed (ADR-069), so a bad filter loses
+  // those events for good. `ops.setFeatureFlag` rejects any key that is
+  // neither a registry entry nor a live descriptor, so a switch missing from
+  // this list is not merely unlisted — it is unsettable, leaving a revert as
+  // the only way to stop the seam it guards.
+  //
+  // A subscriber may override its key via `options.killSwitch.customKey`;
+  // emit the key the router will actually read, or the page would offer one
+  // nothing consults.
+  for (const definition of def.eventSubscribers.values()) {
+    out.push({
+      // Generated, never re-spelled: the comment above is the reason. A
+      // hand-built key that drifts from `generateKillSwitchKey` is not a
+      // cosmetic mismatch — `ops.setFeatureFlag` refuses a key that is
+      // neither a registry entry nor a live descriptor, so the switch
+      // becomes unsettable.
+      key:
+        definition.options?.killSwitch?.customKey ??
+        generateKillSwitchKey(aggregateType, "subscriber", definition.name),
+      aggregateType,
+      componentType: "subscriber",
+      componentName: definition.name,
+      pipelineName,
+    });
   }
   return out;
 }

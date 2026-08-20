@@ -78,8 +78,27 @@ let ch: ClickHouseClient;
 let service: ClickHouseTraceService;
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
+  getClickHouseClientForTenant: vi.fn(),
 }));
+
+// The service resolves its client through getApp().clickhouse now (two-door
+// access); this App stub delegates to the clickhouseClient mock above, so
+// the suite's existing per-tenant wiring keeps working unchanged.
+vi.mock("~/server/app-layer/app", async () => {
+  const clients = await import("~/server/clickhouse/clickhouseClient");
+  const app = () => ({
+    clickhouse: {
+      enabled: true,
+      resolveClient: (tenantId: string) =>
+        clients.getClickHouseClientForTenant(tenantId),
+      resolveOrganizationClient: async () => {
+        throw new Error("no organization client in this suite");
+      },
+      allInstances: async () => [],
+    },
+  });
+  return { getApp: app, tryGetApp: app };
+});
 
 vi.mock("~/server/db", () => ({
   prisma: {
@@ -94,10 +113,10 @@ beforeAll(async () => {
   ch = containers.clickHouseClient;
 
   const chModule = await import("~/server/clickhouse/clickhouseClient");
-  const getClickHouseClientForProject = vi.mocked(
-    chModule.getClickHouseClientForProject,
+  const getClickHouseClientForTenant = vi.mocked(
+    chModule.getClickHouseClientForTenant,
   );
-  getClickHouseClientForProject.mockResolvedValue(ch);
+  getClickHouseClientForTenant.mockResolvedValue(ch);
 
   const { prisma } = await import("~/server/db");
   service = new ClickHouseTraceService({

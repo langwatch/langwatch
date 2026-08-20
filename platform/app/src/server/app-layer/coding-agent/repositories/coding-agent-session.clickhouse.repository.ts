@@ -73,6 +73,7 @@ interface ClickHouseWriteRecord {
   GitBranches: string[];
   GitWorktree: string;
   Title: string;
+  TitleSource: string;
 
   ModelCalls: number;
   ToolCalls: number;
@@ -233,6 +234,7 @@ function toRecord({
     GitBranches: row.gitBranches,
     GitWorktree: row.gitWorktree,
     Title: row.title,
+    TitleSource: row.titleSource,
 
     ModelCalls: row.modelCalls,
     ToolCalls: row.toolCalls,
@@ -1074,6 +1076,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     gitBranches: asStringArray(record.GitBranches),
     gitWorktree: String(record.GitWorktree ?? ""),
     title: String(record.Title ?? ""),
+    titleSource: String(record.TitleSource ?? ""),
 
     modelCalls: asNumber(record.ModelCalls),
     toolCalls: asNumber(record.ToolCalls),

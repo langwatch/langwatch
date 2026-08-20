@@ -161,9 +161,6 @@ function DatasetsPage() {
                             title: "Dataset restored",
                             description: "The dataset has been restored.",
                             type: "success",
-                            meta: {
-                              closable: true,
-                            },
                           });
                           addEditDatasetDrawer.onClose();
                         },
@@ -178,9 +175,6 @@ function DatasetsPage() {
             id: `delete-dataset-${id}`,
             type: "success",
             duration: 10_000,
-            meta: {
-              closable: true,
-            },
           });
         },
         onError: (error) => {
@@ -191,9 +185,6 @@ function DatasetsPage() {
               "There was an error deleting the dataset. Please try again.",
             type: "error",
             duration: 5000,
-            meta: {
-              closable: true,
-            },
           });
         },
       },

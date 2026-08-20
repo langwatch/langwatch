@@ -22,16 +22,15 @@ existing routes:
 
 | Surface | Purpose | Audience | Where it lives |
 |---------|---------|----------|----------------|
-| `/governance` (forthcoming top-level home) | Daily-use **org governance home**: spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing--the-setup-state-signal) below) | Top-level route, org-scoped. Replaces the read-mostly content currently temporarily under `/settings/governance`. |
+| `/governance` | Daily-use **org governance home**: spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing--the-setup-state-signal) below) | Top-level route, org-scoped. |
 | `/me`, `/me/settings` | Daily-use **personal home**: your usage, your budget, your personal VK, your IDE setup snippet. | Any user with a personal VK | Top-level route, principal-scoped. |
 | `/[project]/...` | LLMOps daily-use, traces, evals, datasets, scenarios, workflows. | Project members | Per-project routes. **Unchanged** from current LangWatch. |
-| `/settings/governance/ingestion-sources`, `/settings/governance/anomaly-rules`, `/settings/routing-policies` | Admin-authoring (CRUD), create, rotate, archive sources, write rules, publish routing policies. | Org admins with `organization:manage` | Settings sub-routes, deliberately separate from daily-use surfaces. |
+| `/governance/ingestion-sources`, `/governance/anomaly-rules`, `/gateway/routing-policies` | Admin-authoring (CRUD), create, rotate, archive sources, write rules, publish routing policies. | The governance pages open on `governance:view` and `/gateway/routing-policies` on `routingPolicies:view`. Each write control needs the matching `:manage` grant (`ingestionSources:manage`, `anomalyRules:manage`, `routingPolicies:manage`) and is hidden without it. | Governance sub-routes, deliberately separate from daily-use surfaces. |
 
-This split is the answer to "why is governance overview hidden under
-Settings?", it shouldn't be. The read-mostly daily home is moving
-out to `/governance` (top-level); only the create, rotate, archive
-admin tools stay in Settings, where every other admin authoring
-tool lives.
+The whole governance product sits at the top level, not under Settings.
+The daily home is `/governance`, and the create, rotate and archive tools
+are its own sub-routes. Settings keeps the account and workspace
+administration that every product shares.
 
 ### Persona-based home routing: the setup-state signal
 
@@ -278,7 +277,7 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   validation).
 - ✅ **`/me` + `/me/settings`** dashboards (web app, gated behind the
   `release_ui_ai_governance_enabled` flag).
-- ✅ **`/settings/governance`** admin oversight dashboard
+- ✅ **`/governance`** admin oversight dashboard
   (org-admin-only via `organization:manage` permission, plus the
   governance flag). Wired to real `api.activityMonitor.{summary,
   spendByUser, ingestionSourcesHealth, recentAnomalies}` tRPC
@@ -286,7 +285,7 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   checklist (publish a RoutingPolicy, connect an IngestionSource),
   data renders live cards + per-user table + source-health strip.
   Read-mostly daily-use surface; admin authoring lives at the
-  `/settings/governance/*` sub-routes.
+  `/governance/*` sub-routes.
 - ✅ **Budget enforcement** (cross-surface, gateway 402 ↔ CLI
   Screen-8 box ↔ web `BudgetExceededBanner` all derive from
   `GatewayBudgetService.check()`).
@@ -316,7 +315,7 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   `organization:manage` permission AND
   `api.governance.setupState.governanceActive === true`. Renders
   a "GOVERN · Preview" section between LIBRARY and AI GATEWAY ·
-  Beta with an Eye-icon link to `/settings/governance`. Current
+  Beta with an Eye-icon link to `/governance`. Current
   LLMOps admins with no governance state see no nav change at all.
 
   ![MainMenu showing GOVERN Preview section with Governance entry, only visible when governanceActive=true](https://i.img402.dev/mck1l1ar3g.png)
@@ -331,7 +330,7 @@ In flight on the same branch:
 ## Admin oversight on real data
 
 Once a source is `active` and events are flowing, the admin
-oversight dashboard at `/settings/governance` queries
+oversight dashboard at `/governance` queries
 `gateway_activity_events` via the `api.activityMonitor.*` tRPC
 procedures. Empty data renders a setup checklist; data present
 renders live cards + per-user table + source-health strip.

@@ -160,10 +160,31 @@ Feature: Codex Path B recovers the full request body from the rollout transcript
       # losing it must never cost the conversation.
 
     @unit
-    Scenario: A session outside any repository posts its conversation and no context
+    Scenario: A session outside any repository still posts a context that names it
       Given a rollout whose session_meta names no remote
+      And its first user_message is a typed prompt
+      When the completed turn is harvested
+      Then one session-context record posts carrying the session title
+      And it carries no repository attributes
+      # Without this the session never gets a row: codex sessions appear in
+      # the sessions screen only through this record, so a codex agent
+      # running from a plain directory was invisible while its claude
+      # neighbours were listed.
+
+    @unit
+    Scenario: A session with no remote, no prompt and no name posts no context
+      Given a rollout whose session_meta names no remote
+      And it carries no typed prompt
+      And codex's session index does not name the thread
       When the completed turn is harvested
       Then the conversation posts and no session-context record does
+
+    @unit
+    Scenario: Codex's own thread name rides the context record
+      Given codex's session index names the thread, then renames it
+      When the completed turn is harvested
+      Then the session-context record carries the newest indexed name
+      And the transcript's first prompt still rides as the derived title
 
   Rule: a slow logs endpoint does not hold the conversation back
 

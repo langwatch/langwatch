@@ -22,12 +22,17 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Agent Simulations
 
 - [Introduction to Agent Testing](https://langwatch.ai/docs/agent-simulations/introduction.md)
+
+### Connect your agent
+
 - [Connect Your Agent](https://langwatch.ai/docs/agent-simulations/connect-your-agent.md): Register your agent's HTTP endpoint as a simulation target, so your team runs scenario suites from the platform and the judge verifies behavior against the agent's own traces.
 - [Remote Traces](https://langwatch.ai/docs/agent-simulations/remote-traces.md): Judge scenario criteria against what your agent did, tool calls, writes and retrievals, read from its own traces rather than from its reply text.
 - [Local Development](https://langwatch.ai/docs/agent-simulations/local-development.md): Run platform scenario suites against the agent on your machine, edit the code, and run them again, with no deployment in between.
-- [Write Scenarios in Code](https://langwatch.ai/docs/agent-simulations/getting-started.md)
 - [Scenario Run Parameters](https://langwatch.ai/docs/agent-simulations/scenario-parameters.md): Run the same scenario with different parameters, to set different setup conditions or fixtures for your agent.
 - [Testing Agents Behind Authentication](https://langwatch.ai/docs/agent-simulations/authenticated-agents.md): Reference project secrets from an HTTP target, and connect an API protected by OAuth2 client-credentials (Auth0 machine-to-machine) to LangWatch simulations using a custom code agent.
+
+- [Testing Your Agent](https://langwatch.ai/docs/agent-simulations/testing-your-agent.md): Create scenarios, run them against your agent, and read the results, all from the LangWatch interface. Written for product managers and domain experts, no code involved.
+- [Write Scenarios in Code](https://langwatch.ai/docs/agent-simulations/getting-started.md)
 - [Voice Agent Testing](https://langwatch.ai/docs/agent-simulations/voice-agents.md)
 - [Red Teaming](https://langwatch.ai/docs/agent-simulations/red-teaming.md)
 
@@ -496,7 +501,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Dashboards
 
-- [/governance dashboard](https://langwatch.ai/docs/ai-governance/governance-dashboard.md): The daily-use org governance home, spend, anomalies, ingestion-source health, per-user activity. Read-mostly; the admin-authoring CRUD pages still live under /settings/governance/*. Available only after the org's setup-state OR-of-flags trips.
+- [/governance dashboard](https://langwatch.ai/docs/ai-governance/governance-dashboard.md): The daily-use org governance home, spend, anomalies, ingestion-source health, per-user activity. Read-mostly; the admin-authoring CRUD pages still live under /governance/*. Available only after the org's setup-state OR-of-flags trips.
 - [Departments](https://langwatch.ai/docs/ai-governance/departments.md): A single-valued accounting dimension for attributing AI spend across people, teams, and projects, including personal AI use. Separate from RBAC; pure accounting.
 
 ## Privacy

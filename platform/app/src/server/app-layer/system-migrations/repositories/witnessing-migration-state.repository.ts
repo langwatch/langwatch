@@ -1,9 +1,17 @@
 import { createLogger } from "@langwatch/observability";
 import type {
+  SystemMigrationStateRepository,
   TenantMigrationRecord,
   TenantMigrationStatus,
 } from "@langwatch/system-migrations";
 import type { SystemMigrationStateReader } from "../system-migrations.service";
+
+/**
+ * What the decorator wraps and re-exposes: the ops reads the service needs
+ * plus the runner's guarded write. One composed instance serves both.
+ */
+export type WitnessedStateRepository = SystemMigrationStateReader &
+  Pick<SystemMigrationStateRepository, "upsertRecordUnlessRolledBack">;
 
 const logger = createLogger("langwatch:system-migrations:witness");
 
@@ -44,9 +52,9 @@ export type MigrationStateWitness = (args: {
 const WITNESS_TIMEOUT_MS = 5_000;
 
 export class WitnessingSystemMigrationStateRepository
-  implements SystemMigrationStateReader
+  implements WitnessedStateRepository
 {
-  private readonly inner: SystemMigrationStateReader;
+  private readonly inner: WitnessedStateRepository;
   private readonly witness: MigrationStateWitness;
   private readonly now: () => number;
 
@@ -55,7 +63,7 @@ export class WitnessingSystemMigrationStateRepository
     witness,
     now,
   }: {
-    inner: SystemMigrationStateReader;
+    inner: WitnessedStateRepository;
     witness: MigrationStateWitness;
     now: () => number;
   }) {
@@ -87,6 +95,25 @@ export class WitnessingSystemMigrationStateRepository
 
   async upsertRecord(record: TenantMigrationRecord): Promise<void> {
     await this.inner.upsertRecord(record);
+    await this.witnessTransition(record);
+  }
+
+  /**
+   * The runner's compare-and-set, witnessed only when the write actually
+   * landed: a refused write is not a transition, and witnessing it would
+   * record a status change the table never made.
+   */
+  async upsertRecordUnlessRolledBack(
+    record: TenantMigrationRecord,
+  ): Promise<boolean> {
+    const written = await this.inner.upsertRecordUnlessRolledBack(record);
+    if (written) await this.witnessTransition(record);
+    return written;
+  }
+
+  private async witnessTransition(
+    record: TenantMigrationRecord,
+  ): Promise<void> {
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       await Promise.race([

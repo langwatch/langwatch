@@ -13,7 +13,7 @@
  *
  * The route takes its budget repository from `getApp()`; standing in for
  * the store means standing in for `getApp()`, wired to the same
- * `getClickHouseClientForProject` resolver the route used to build inline
+ * `getClickHouseClientForTenant` resolver the route used to build inline
  * — this test asserts on aliases/policy rules, not spend, so it does not
  * need to control which ClickHouse client that resolves to.
  *
@@ -24,7 +24,7 @@
 import { createHash, createHmac } from "crypto";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
@@ -39,7 +39,7 @@ vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
     gateway: {
       budgets: new GatewayBudgetClickHouseRepository(async (projectId) => {
-        const client = await getClickHouseClientForProject(projectId);
+        const client = await getClickHouseClientForTenant(projectId);
         if (!client) throw new Error("ClickHouse is not configured");
         return client;
       }),

@@ -1,4 +1,6 @@
+import type { LedgerActor } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
+import { nanoid } from "nanoid";
 import {
   type CustomRole,
   type Prisma,
@@ -6,8 +8,15 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import {
+  type GrantsLedgerWriter,
+  grantsLedgerWriter,
+} from "~/server/app-layer/authz/ledger";
+import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
 import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { RoleDuplicateNameError, RoleNotFoundError } from "../errors";
 import { CUSTOM_ROLE_KIND } from "../role-kind";
 
 export type RolePrismaDelegate = PrismaClient | Prisma.TransactionClient;
@@ -32,7 +41,23 @@ export type UpdateRoleParams = Partial<
  * Single Responsibility: Handle all database operations for CustomRole
  */
 export class RoleRepository {
-  constructor(private readonly prisma: RolePrismaDelegate) {}
+  constructor(
+    private readonly prisma: RolePrismaDelegate,
+    /**
+     * Role definitions and the grants that carry them are ledger facts
+     * (ADR-092 §13). The writer never rides the caller's transaction — it
+     * appends to ClickHouse and folds through the queue — so it is composed
+     * over the app's own client rather than `prisma` above, which may be a
+     * transaction client.
+     */
+    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
+    // Listing reads go through the per-organization fork (ADR-092,
+    // delivery-plan PR 3 follow-up): a cut-over organization's role editor
+    // lists from the ledger's own Role head.
+    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
+      prisma,
+    ),
+  ) {}
 
   async findAllByOrganization(organizationId: string) {
     return this.prisma.customRole.findMany({
@@ -42,13 +67,10 @@ export class RoleRepository {
   }
 
   async findUserCreatedByOrganization(organizationId: string) {
-    return this.prisma.customRole.findMany({
-      where: {
-        organizationId,
-        kind: CUSTOM_ROLE_KIND.CUSTOM,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    // Through the per-organization fork (ADR-092, delivery-plan PR 3
+    // follow-up): a cut-over organization's role editor is served from the
+    // ledger's own Role head.
+    return this.accessListing.findUserCreatedRoles({ organizationId });
   }
 
   async findById(roleId: string) {
@@ -159,13 +181,16 @@ export class RoleRepository {
    * Deletes the role only if nothing references it, and reports whether it
    * went.
    *
-   * The condition rides on the delete rather than sitting in a separate read
-   * before it: a binding written in between would otherwise be silently
-   * unhooked from the role that grants it, because the relation is emulated in
-   * the client (`relationMode = "prisma"`), so deleting the parent nulls the
-   * reference instead of refusing. One statement leaves nothing to interleave
-   * with, and a delete that finds a holder leaves the role standing for the
-   * caller to refuse over.
+   * The reference check is a read taken immediately before the delete is
+   * emitted, not a condition riding on the delete itself: the role is a
+   * ledger fact (ADR-092 §13) and its deletion is a command, so the check
+   * cannot be part of the write. What that costs is one race: a binding
+   * created between the read and the append is silently
+   * unhooked from the role that grants it, because the relation is emulated
+   * in the client (`relationMode = "prisma"`), so deleting the parent nulls
+   * the reference instead of refusing. What survives is the guarantee callers
+   * actually rely on — a role somebody holds at the moment of the check is
+   * left standing, and the caller is told so rather than finding it gone.
    *
    * The role row is scoped to the organization; the reference checks are not.
    * There are no database foreign keys here, so a binding in another
@@ -176,22 +201,32 @@ export class RoleRepository {
   async deleteIfUnused({
     roleId,
     organizationId,
+    actor,
   }: {
     roleId: string;
     organizationId: string;
+    actor: LedgerActor;
   }): Promise<boolean> {
-    const deleted = await this.prisma.$executeRaw`
-      DELETE FROM "CustomRole"
-      WHERE "id" = ${roleId}
-        AND "organizationId" = ${organizationId}
-        AND NOT EXISTS (
-          SELECT 1 FROM "RoleBinding" WHERE "customRoleId" = ${roleId}
-        )
-        AND NOT EXISTS (
-          SELECT 1 FROM "TeamUser" WHERE "assignedRoleId" = ${roleId}
-        )
-    `;
-    return deleted > 0;
+    // Raw SQL on purpose: the reference check spans every organization (a
+    // binding in another org can point at this role, see the doc block), and
+    // the tenancy guard rightly refuses a cross-org `roleBinding.count` on
+    // the model client.
+    const [role, holderRows, assignedUsers] = await Promise.all([
+      this.prisma.customRole.findFirst({
+        where: { id: roleId, organizationId },
+        select: { id: true },
+      }),
+      this.prisma.$queryRaw<
+        { count: bigint }[]
+      >`-- @tenancy: the delete refuses while ANY organization's binding still references the role (relationMode = "prisma" has no FK to refuse for us)
+        SELECT COUNT(*) AS count FROM "RoleBinding" WHERE "customRoleId" = ${roleId}`,
+      this.prisma.teamUser.count({ where: { assignedRoleId: roleId } }),
+    ]);
+    const holders = Number(holderRows[0]?.count ?? 0n);
+    if (!role || holders > 0 || assignedUsers > 0) return false;
+
+    await this.writer.deleteRole({ organizationId, roleId, actor });
+    return true;
   }
 
   async findByNameAndOrganization(name: string, organizationId: string) {
@@ -205,34 +240,139 @@ export class RoleRepository {
     });
   }
 
-  async create(params: CreateRoleParams) {
-    return this.prisma.customRole.create({
-      data: {
-        organizationId: params.organizationId,
-        name: params.name,
-        description: params.description,
-        permissions: params.permissions,
-        kind: params.kind,
-      },
+  /**
+   * Define a role. `role_defined` carries the whole fact, so this is the same
+   * verb behind a create and an edit, and the fold upserts the projection row.
+   *
+   * The id is minted here because the ledger, not the database, writes the
+   * row - `nanoid()` is exactly the default the column carried, so ids keep
+   * their shape. The returned value IS the emitted fact rather than a row
+   * read back: the fact is durable the moment the append lands, and the row
+   * follows through the fold.
+   */
+  async create({
+    params,
+    actor,
+  }: {
+    params: CreateRoleParams;
+    actor: LedgerActor;
+  }): Promise<CustomRole> {
+    const roleId = nanoid();
+    await this.assertNameFree({
+      organizationId: params.organizationId,
+      name: params.name,
+      exceptRoleId: null,
     });
+    const kind = params.kind ?? CUSTOM_ROLE_KIND.CUSTOM;
+    await this.writer.defineRole({
+      organizationId: params.organizationId,
+      roleId,
+      name: params.name,
+      // Present-or-absent, not truthy-or-absent: an empty description is a
+      // description the caller wrote, and the column stores it.
+      ...(params.description != null
+        ? { description: params.description }
+        : {}),
+      permissions: params.permissions as string[],
+      kind: kind as "custom" | "system_api_key",
+      actor,
+    });
+    const now = new Date();
+    return {
+      id: roleId,
+      organizationId: params.organizationId,
+      name: params.name,
+      description: params.description ?? null,
+      permissions: params.permissions as Prisma.JsonValue,
+      kind,
+      createdAt: now,
+      updatedAt: now,
+    };
   }
 
-  async update(roleId: string, params: UpdateRoleParams) {
-    return this.prisma.customRole.update({
+  /**
+   * Redefine a role. The event carries the whole fact, so the fields the
+   * caller left out are read off the current definition and re-stated.
+   */
+  async update({
+    roleId,
+    params,
+    actor,
+  }: {
+    roleId: string;
+    params: UpdateRoleParams;
+    actor: LedgerActor;
+  }): Promise<CustomRole> {
+    const existing = await this.prisma.customRole.findUnique({
       where: { id: roleId },
-      data: {
-        name: params.name,
-        description: params.description,
-        permissions: params.permissions as Prisma.InputJsonValue | undefined,
-      },
     });
+    if (!existing) {
+      // Knowable and actionable: the role was deleted between the caller
+      // opening the editor and saving it, and there is nothing to redefine.
+      // A plain Error degraded this to an "unknown error" with a trace id.
+      throw new RoleNotFoundError(roleId);
+    }
+    const name = params.name ?? existing.name;
+    const description =
+      params.description !== undefined
+        ? params.description
+        : existing.description;
+    const permissions = (params.permissions ??
+      existing.permissions) as string[];
+
+    if (name !== existing.name) {
+      await this.assertNameFree({
+        organizationId: existing.organizationId,
+        name,
+        exceptRoleId: roleId,
+      });
+    }
+
+    await this.writer.defineRole({
+      organizationId: existing.organizationId,
+      roleId,
+      name,
+      // `!== null` rather than a truthy test: an empty description is the
+      // caller clearing it, and a falsy check dropped that from the fact, so
+      // the fold re-stated the description the role already had.
+      ...(description !== null ? { description } : {}),
+      permissions,
+      kind: existing.kind as "custom" | "system_api_key",
+      actor,
+    });
+    return {
+      ...existing,
+      name,
+      description,
+      permissions: permissions as Prisma.JsonValue,
+      updatedAt: new Date(),
+    };
   }
 
-  async deleteByIds(roleIds: string[]) {
-    if (roleIds.length === 0) return;
-    await this.prisma.customRole.deleteMany({
-      where: { id: { in: roleIds } },
+  /**
+   * The `(organizationId, name)` natural key, checked immediately before the
+   * append: the ledger writes the row through the fold, where a collision
+   * would stall the organization rather than refuse the caller, so the read
+   * has to be the gate rather than a unique-index constraint failure. Two
+   * renames to one name inside the same instant is the residual race, and
+   * it is the same one the pre-check above always had.
+   */
+  private async assertNameFree({
+    organizationId,
+    name,
+    exceptRoleId,
+  }: {
+    organizationId: string;
+    name: string;
+    exceptRoleId: string | null;
+  }): Promise<void> {
+    const collision = await this.prisma.customRole.findUnique({
+      where: { organizationId_name: { organizationId, name } },
+      select: { id: true },
     });
+    if (collision && collision.id !== exceptRoleId) {
+      throw new RoleDuplicateNameError();
+    }
   }
 
   async isExclusiveToApiKey({
@@ -256,30 +396,48 @@ export class RoleRepository {
   async deleteExclusiveToApiKey({
     roleIds,
     apiKeyId,
+    organizationId,
+    actor,
   }: {
     roleIds: string[];
     apiKeyId: string;
+    organizationId: string;
+    actor: LedgerActor;
   }) {
     if (roleIds.length === 0) return;
-    // Drop this api key's CUSTOM bindings that point at these roles FIRST.
-    // The customRoleId FK is ON DELETE SET NULL, but the
+    // Revoke this api key's CUSTOM grants on these roles FIRST. The
+    // customRoleId FK is ON DELETE SET NULL, but the
     // RoleBinding_custom_role_check constraint forbids a CUSTOM binding with a
     // null customRoleId, so deleting the role while its binding still exists
-    // throws. Once the binding is gone the role can be deleted cleanly (and an
-    // exclusive role is left with zero bindings, which `every` matches
-    // vacuously). Bindings of a revoked key are void anyway — the key row
-    // survives (revokedAt) as the audit record. Shared roles (bindings from
-    // other keys remain) fail the `every` guard and are correctly kept.
-    await this.prisma.roleBinding.deleteMany({
+    // throws. Once the grant is gone the role can be deleted cleanly (and an
+    // exclusive role is left with zero bindings). Grants of a revoked key are
+    // void anyway — the key row survives (revokedAt) as the audit record.
+    // Shared roles (grants from other keys remain) fail the exclusivity check
+    // below and are correctly kept.
+    await this.writer.revokeBindingsWhere({
+      organizationId,
       where: { apiKeyId, customRoleId: { in: roleIds } },
+      actor,
+      reason: "api key credential retired",
     });
-    await this.prisma.customRole.deleteMany({
-      where: {
-        id: { in: roleIds },
-        roleBindings: { every: { apiKeyId } },
-        assignedUsers: { none: {} },
-      },
-    });
+
+    for (const roleId of roleIds) {
+      const [holders, assignedUsers] = await Promise.all([
+        // organizationId is load-bearing: the tenancy guard refuses a
+        // RoleBinding query whose only api-key predicate is `{ not: ... }`,
+        // and a system_api_key role's bindings live in its own organization.
+        this.prisma.roleBinding.count({
+          where: {
+            organizationId,
+            customRoleId: roleId,
+            apiKeyId: { not: apiKeyId },
+          },
+        }),
+        this.prisma.teamUser.count({ where: { assignedRoleId: roleId } }),
+      ]);
+      if (holders > 0 || assignedUsers > 0) continue;
+      await this.writer.deleteRole({ organizationId, roleId, actor });
+    }
   }
 
   async findTeamById(teamId: string) {
@@ -356,63 +514,94 @@ export class RoleRepository {
     return this.prisma;
   }
 
-  async assignToUser(userId: string, teamId: string, customRoleId: string) {
+  async assignToUser({
+    userId,
+    teamId,
+    customRoleId,
+    actor,
+  }: {
+    userId: string;
+    teamId: string;
+    customRoleId: string;
+    actor: LedgerActor;
+  }) {
+    await this.replaceTeamGrant({
+      userId,
+      teamId,
+      role: TeamUserRole.CUSTOM,
+      customRoleId,
+      actor,
+    });
+  }
+
+  async removeFromUser({
+    userId,
+    teamId,
+    actor,
+  }: {
+    userId: string;
+    teamId: string;
+    actor: LedgerActor;
+  }) {
+    await this.replaceTeamGrant({
+      userId,
+      teamId,
+      role: TeamUserRole.VIEWER,
+      customRoleId: null,
+      actor,
+    });
+  }
+
+  /**
+   * Point this member at exactly one role on the team: revoke whatever they
+   * hold there, then attach the one the caller asked for. Revoke first, so a
+   * crash between the two leaves less access than asked for and the retry
+   * converges - the transaction this replaced offered atomicity, and the
+   * ledger offers a fail-safe order instead.
+   */
+  private async replaceTeamGrant({
+    userId,
+    teamId,
+    role,
+    customRoleId,
+    actor,
+  }: {
+    userId: string;
+    teamId: string;
+    role: TeamUserRole;
+    customRoleId: string | null;
+    actor: LedgerActor;
+  }) {
     const prisma = this.requireFullClient();
     const team = await prisma.team.findUniqueOrThrow({
       where: { id: teamId },
       select: { organizationId: true },
     });
 
-    await prisma.$transaction(async (tx) => {
-      await tx.roleBinding.deleteMany({
-        where: {
-          organizationId: team.organizationId,
-          userId,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: teamId,
-        },
-      });
-      await tx.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: team.organizationId,
-          userId,
-          role: TeamUserRole.CUSTOM,
+    await this.writer.revokeBindingsWhere({
+      organizationId: team.organizationId,
+      where: {
+        userId,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: teamId,
+      },
+      actor,
+      reason: "team role replaced",
+    });
+    await this.writer.attachBindings({
+      organizationId: team.organizationId,
+      bindings: [
+        {
+          bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          principal: { userId },
+          role,
           customRoleId,
           scopeType: RoleBindingScopeType.TEAM,
           scopeId: teamId,
         },
-      });
-    });
-  }
-
-  async removeFromUser(userId: string, teamId: string) {
-    const prisma = this.requireFullClient();
-    const team = await prisma.team.findUniqueOrThrow({
-      where: { id: teamId },
-      select: { organizationId: true },
-    });
-
-    await prisma.$transaction(async (tx) => {
-      await tx.roleBinding.deleteMany({
-        where: {
-          organizationId: team.organizationId,
-          userId,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: teamId,
-        },
-      });
-      await tx.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: team.organizationId,
-          userId,
-          role: TeamUserRole.VIEWER,
-          customRoleId: null,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: teamId,
-        },
-      });
+      ],
+      actor,
+      onDuplicate: "skip",
     });
   }
 }

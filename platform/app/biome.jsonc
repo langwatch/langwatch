@@ -264,6 +264,25 @@
 			}
 		},
 		{
+			// These files hold the legacy avatar menu and the legacy page body.
+			// They keep the shape they had inside DashboardLayout because the
+			// legacy-mode pinning tests compare the rendered chrome item by
+			// item, so a split changes the output the tests hold. Removal of the
+			// navigation flag deletes the legacy shell and this override.
+			"includes": [
+				"src/components/AppHeaderUserMenu.tsx",
+				"src/components/DashboardPageBody.tsx"
+			],
+			"linter": {
+				"rules": {
+					"complexity": {
+						"noExcessiveCognitiveComplexity": "off",
+						"noExcessiveLinesPerFunction": "off"
+					}
+				}
+			}
+		},
+		{
 			// e2e/ and scripts/dogfood/ are throwaway operator scripts — browser
 			// QA walkthroughs and seed/demo tooling — not product code. They are
 			// full of best-effort `catch {}` around actions allowed to fail, and

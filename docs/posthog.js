@@ -27,7 +27,7 @@ document.addEventListener('click', function(e) {
   var accHeader = e.target.closest('.lw-accordion-header');
   if (accHeader) {
     var acc = accHeader.closest('.lw-accordion');
-    if (acc) {
+    if (acc && !acc.classList.contains('lw-accordion-static')) {
       var isOpen = acc.hasAttribute('data-open');
       if (isOpen) {
         acc.removeAttribute('data-open');

@@ -5,20 +5,37 @@ import {
   Box,
   Button,
   Code,
+  Collapsible,
   Heading,
   HStack,
   Input,
-  NativeSelect,
   Spacer,
   Spinner,
   Text,
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { AddIngestionSourceMenu } from "@ee/governance/dashboard/components/AddIngestionSourceMenu";
+import {
+  groupForMode,
+  SOURCE_GROUP_META,
+  SOURCE_TYPE_LABEL,
+  SOURCE_TYPE_OPTIONS,
+  type SourceGroup,
+  type SourceType,
+  SourceTypeIconGlyph,
+} from "@ee/governance/dashboard/components/ingestionSourceCatalog";
 import { OttlEditor } from "@ee/governance/dashboard/components/OttlEditor";
+import { PullCadenceField } from "@ee/governance/dashboard/components/PullCadenceField";
+import {
+  composerCadenceError,
+  PULL_ADAPTER_FOR_SOURCE,
+  PULL_SCHEDULE_DEFAULTS,
+} from "@ee/governance/dashboard/logic/pullCadence";
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/activity-monitor/ingestionSource.constants";
 import { isOttlEnabledSourceType } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
 import {
+  ChevronRight,
   CircleCheck,
   CircleDashed,
   CircleX,
@@ -31,6 +48,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -68,107 +86,6 @@ type SecretDetails = {
   sourceName: string;
   sourceType: SourceType;
 };
-type SourceType =
-  | "otel_generic"
-  | "claude_code"
-  | "claude_cowork"
-  | "workato"
-  | "copilot_studio"
-  | "openai_compliance"
-  | "claude_compliance"
-  | "anthropic_admin"
-  | "databricks_genie"
-  | "s3_custom"
-  | "http_custom";
-
-const SOURCE_TYPE_OPTIONS: Array<{
-  value: SourceType;
-  label: string;
-  mode: "push" | "pull" | "s3";
-  blurb: string;
-}> = [
-  {
-    value: "otel_generic",
-    label: "Generic OTel",
-    mode: "push",
-    blurb:
-      "Anything that speaks OTLP/HTTP. Simplest setup - paste an OTLP URL + bearer token into the upstream agent's exporter config.",
-  },
-  {
-    value: "claude_code",
-    label: "Claude Code (Anthropic OAuth)",
-    mode: "push",
-    blurb:
-      "Native OTLP from Anthropic's Claude Code (the standalone CLI authed against an OAuth seat - distinct from the Cowork workspace path). Cost lands as a first-class signal via the claude_code.cost.usage metric + per-request claude_code.api_request events; no token-catalog lookup needed. Admins paste the bare endpoint into Claude Code's OTEL_EXPORTER_OTLP_ENDPOINT and the SDK suffixes /v1/logs and /v1/metrics itself.",
-  },
-  {
-    value: "claude_cowork",
-    label: "Anthropic Claude (Cowork)",
-    mode: "push",
-    blurb:
-      "Claude Cowork pushes telemetry via OTLP. Configure under Anthropic Admin Console → Cowork → Telemetry.",
-  },
-  {
-    value: "workato",
-    label: "Workato",
-    mode: "push",
-    blurb:
-      "Workato pushes job-completed webhooks. Generate an HMAC shared secret, paste into Workato → Connection Profile → Webhook destination.",
-  },
-  {
-    value: "copilot_studio",
-    label: "Microsoft Copilot Studio (Purview)",
-    mode: "pull",
-    blurb:
-      "Polls Microsoft Purview Audit API for Copilot Studio activity. Needs an Azure AD app registration with `AuditLog.Read.All` permission.",
-  },
-  {
-    value: "openai_compliance",
-    label: "OpenAI Enterprise Compliance",
-    mode: "s3",
-    blurb:
-      "Pulls compliance JSONL drops from an S3 bucket OpenAI writes to (Enterprise Compliance API).",
-  },
-  {
-    value: "claude_compliance",
-    label: "Anthropic Claude Enterprise Compliance",
-    mode: "pull",
-    blurb: "Polls Anthropic's compliance API with a workspace API key.",
-  },
-  {
-    value: "anthropic_admin",
-    label: "Anthropic Admin API (usage & cost)",
-    mode: "pull",
-    blurb:
-      "Polls Anthropic's organization usage/cost reports with an Admin API key (sk-ant-admin-...). Pick ONE report per source: usage (token counts, we price them) or cost (invoice amounts, carried verbatim). Never create both for the same org — the same spend would be counted twice.",
-  },
-  {
-    value: "databricks_genie",
-    label: "Databricks AI/BI Genie",
-    mode: "pull",
-    blurb:
-      "Records who asked what in Genie and the SQL it ran against your warehouse. Needs a workspace token with Can Manage on every Genie space you want covered — anything less returns only that token's own conversations.",
-  },
-  {
-    value: "s3_custom",
-    label: "Custom S3 audit log",
-    mode: "s3",
-    blurb:
-      "For homegrown agent systems writing audit logs to S3. Provide a parser DSL describing how each line maps to OCSF ActivityEvent fields.",
-  },
-  {
-    value: "http_custom",
-    label: "Custom HTTP audit-log API",
-    mode: "pull",
-    blurb:
-      "Bring-your-own paginated REST audit-log API. Declare URL + auth + cursor + JSON-path field mappings; the universal HTTP-polling adapter handles paging + retries + OCSF fold.",
-  },
-];
-
-const SOURCE_TYPE_LABEL: Record<SourceType, string> = Object.fromEntries(
-  SOURCE_TYPE_OPTIONS.map((o) => [o.value, o.label]),
-) as Record<SourceType, string>;
-
 const STATUS_META: Record<
   string,
   { icon: typeof CircleCheck; label: string; color: string }
@@ -195,45 +112,14 @@ export interface ComposerState {
    */
   ottlStatements: string[];
   /**
-   * Phase 10: optional cron override for puller-mode sources. When the
-   * source-type maps to a registered PullerAdapter, the composer
-   * auto-fills this with the adapter's locked default schedule (15min
-   * for copilot_studio); admins can edit before save. Ignored for
-   * push/webhook source types.
+   * Cron override for puller-mode sources. Stays "" while the admin
+   * leaves the Cadence picker untouched — meaning "the recommended
+   * schedule", which `buildCreateInput` resolves to an explicit cron at
+   * create (a stored null would mean the source never runs). Ignored
+   * for push/webhook source types.
    */
   pullSchedule: string;
 }
-
-/**
- * Maps user-facing pull-mode source-types onto the PullerAdapter id
- * registered server-side (`pullerAdapterRegistry.ids()`). Hardcoded
- * curated list per @ai_gateway_sergey_2's directive - keeps the UI
- * free of a round-trip enumeration call. Entries land in lockstep
- * with the reference adapters Sergey ships in `services/pullers/`.
- */
-const PULL_ADAPTER_FOR_SOURCE: Partial<Record<SourceType, string>> = {
-  copilot_studio: "copilot_studio",
-  openai_compliance: "openai_compliance",
-  claude_compliance: "claude_compliance",
-  anthropic_admin: "anthropic_admin",
-  databricks_genie: "databricks_genie",
-  http_custom: "http_polling",
-};
-
-/**
- * Default cron schedule per puller adapter - mirrors the locked
- * `*_PULL_CONFIG.schedule` from the reference impl. Keeps the UI in
- * sync without a server round-trip; if the locked default ever
- * diverges, update both ends.
- */
-const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
-  copilot_studio: "*/15 * * * *",
-  openai_compliance: "*/15 * * * *",
-  claude_compliance: "*/15 * * * *",
-  anthropic_admin: "0 * * * *",
-  databricks_genie: "*/15 * * * *",
-  http_polling: "*/15 * * * *",
-};
 
 const blankComposer = (): ComposerState => ({
   sourceType: "otel_generic",
@@ -283,7 +169,7 @@ function resolvePullConfig(
     databricks_genie: [
       () => buildDatabricksGeniePullConfig(composer),
       "Missing required Databricks fields",
-      "Workspace URL and workspace token are both required.",
+      "Workspace URL is required, plus a way to sign in: either a workspace token, or a service principal's client ID and secret together.",
     ],
     anthropic_admin: [
       () => buildAnthropicAdminPullConfig(composer),
@@ -308,11 +194,13 @@ function resolvePullConfig(
 function IngestionSourcesHeader({
   isEnterprise,
   sourceCount,
+  canManage,
   onAdd,
 }: {
   isEnterprise: boolean;
   sourceCount: number;
-  onAdd: () => void;
+  canManage: boolean;
+  onAdd: (sourceType: SourceType) => void;
 }) {
   return (
     <HStack alignItems="end">
@@ -334,24 +222,15 @@ function IngestionSourcesHeader({
         </Text>
       </VStack>
       <Spacer />
-      <VStack align="end" gap={1}>
-        <Button
-          size="sm"
-          colorPalette="blue"
-          disabled={
-            !isEnterprise && sourceCount >= NON_ENTERPRISE_INGESTION_SOURCE_CAP
-          }
-          onClick={onAdd}
-        >
-          <Plus size={14} /> Add source
-        </Button>
-        {!isEnterprise && (
-          <Text fontSize="xs" color="fg.muted">
-            {sourceCount} / {NON_ENTERPRISE_INGESTION_SOURCE_CAP} sources used.
-            Upgrade to Enterprise for unlimited.
-          </Text>
-        )}
-      </VStack>
+      {/* The writes are all `ingestionSources:manage`. A viewer who only
+          reads is not offered a composer the server refuses. */}
+      {canManage && (
+        <AddSourceControl
+          isEnterprise={isEnterprise}
+          sourceCount={sourceCount}
+          onAdd={onAdd}
+        />
+      )}
     </HStack>
   );
 }
@@ -367,38 +246,28 @@ function pendingId(mutation: {
   return mutation.isPending ? (mutation.variables?.id ?? null) : null;
 }
 
-const MODE_COPY: Record<"push" | "pull" | "s3", [string, string]> = {
-  push: [
-    "Push (OTLP / webhooks)",
-    "Upstream pushes events to LangWatch in near-real-time.",
-  ],
-  pull: [
-    "Pull (admin API polling)",
-    "LangWatch polls upstream's admin API on a cadence.",
-  ],
-  s3: ["S3 audit drops", "LangWatch reads JSONL drops from an S3 bucket."],
-};
-
-function SourceModeSection({
-  mode,
+function SourceGroupSection({
+  group,
   sources,
   knowsFleetIsEmpty,
   rotatingId,
   archivingId,
+  canManage,
   onEdit,
   onRotate,
   onArchive,
 }: {
-  mode: "push" | "pull" | "s3";
+  group: SourceGroup;
   sources: Source[];
   knowsFleetIsEmpty: boolean;
   rotatingId: string | null;
   archivingId: string | null;
+  canManage: boolean;
   onEdit: (id: string) => void;
   onRotate: (id: string) => void;
   onArchive: (id: string) => void;
 }) {
-  const [title, blurb] = MODE_COPY[mode];
+  const { title, blurb } = SOURCE_GROUP_META[group];
   return (
     <Box
       borderWidth="1px"
@@ -420,7 +289,7 @@ function SourceModeSection({
       <VStack align="stretch" gap={2}>
         {sources.length === 0 && knowsFleetIsEmpty && (
           <Text fontSize="sm" color="fg.muted">
-            No {mode}-mode sources configured.
+            No sources configured here yet.
           </Text>
         )}
         {sources.map((source) => (
@@ -429,6 +298,7 @@ function SourceModeSection({
             source={source}
             isPendingRotate={rotatingId === source.id}
             isPendingArchive={archivingId === source.id}
+            canManage={canManage}
             onEdit={() => onEdit(source.id)}
             onRotate={() => onRotate(source.id)}
             onArchive={() => onArchive(source.id)}
@@ -440,11 +310,93 @@ function SourceModeSection({
 }
 
 /**
+ * The source list: what the viewer may read, what went wrong when it could
+ * not be read, the two delivery-group sections, and the note naming the
+ * grant that unlocks the writes.
+ */
+function IngestionSourceList({
+  canRead,
+  canManage,
+  isLoading,
+  error,
+  grouped,
+  rotatingId,
+  archivingId,
+  onEdit,
+  onRotate,
+  onArchive,
+}: {
+  canRead: boolean;
+  canManage: boolean;
+  isLoading: boolean;
+  error: unknown;
+  grouped: Record<SourceGroup, Source[]>;
+  rotatingId: string | null;
+  archivingId: string | null;
+  onEdit: (id: string) => void;
+  onRotate: (id: string) => void;
+  onArchive: (id: string) => void;
+}) {
+  return (
+    <>
+      {!canRead && (
+        <PermissionRequiredNotice
+          permission="ingestionSources:view"
+          detail="The source list stays hidden until then."
+        />
+      )}
+
+      {isLoading && <Spinner size="sm" />}
+
+      {/* The list is the page. Without this the group sections below
+          render "No sources configured here yet." off an empty `?? []`,
+          which tells an admin their entire ingest fleet is gone when all
+          that actually happened was a 403 or a DB blip. */}
+      <HandledErrorAlert
+        error={error}
+        fallbackTitle="Couldn't load ingestion sources"
+      />
+
+      {canRead &&
+        (["realtime", "scheduled"] as const).map((group) => (
+          <SourceGroupSection
+            key={group}
+            group={group}
+            sources={grouped[group]}
+            // Only claim "none configured" when we actually know: on a load
+            // failure the alert above says what went wrong instead.
+            knowsFleetIsEmpty={!error}
+            rotatingId={rotatingId}
+            archivingId={archivingId}
+            canManage={canManage}
+            onEdit={onEdit}
+            onRotate={onRotate}
+            onArchive={onArchive}
+          />
+        ))}
+
+      {canRead && !canManage && (
+        <PermissionRequiredNotice
+          permission="ingestionSources:manage"
+          detail="You can read the sources. Adding, editing, rotating a secret, and archiving need this grant."
+        />
+      )}
+    </>
+  );
+}
+
+/**
  * The create payload for the composer, or `null` when the form is not ready —
  * either unnamed, or carrying a pull config the adapter cannot honour (which
  * `resolvePullConfig` has already toasted about).
  */
-function buildCreateInput(composer: ComposerState, organizationId: string) {
+export function buildCreateInput({
+  composer,
+  organizationId,
+}: {
+  composer: ComposerState;
+  organizationId: string;
+}) {
   if (!composer.name.trim()) return null;
   const resolved = resolvePullConfig(composer);
   if (!resolved) return null;
@@ -464,17 +416,16 @@ function buildCreateInput(composer: ComposerState, organizationId: string) {
   };
 }
 
-/** Sources split into the three sections the page renders. */
+/** Sources split into the two group sections the page renders. */
 function useGroupedSources(sources: Source[] | undefined) {
   return useMemo(() => {
-    const out: Record<"push" | "pull" | "s3", Source[]> = {
-      push: [],
-      pull: [],
-      s3: [],
+    const out: Record<SourceGroup, Source[]> = {
+      realtime: [],
+      scheduled: [],
     };
     for (const s of sources ?? []) {
       const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === s.sourceType);
-      out[meta?.mode ?? "push"].push(s);
+      out[groupForMode(meta?.mode ?? "push")].push(s);
     }
     return out;
   }, [sources]);
@@ -557,15 +508,17 @@ function useIngestionSourceMutations({
  * callbacks only — the component owns the markup.
  */
 function useIngestionSourcesPage() {
-  const { organization } = useOrganizationTeamProject({
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
   const { isEnterprise } = useActivePlan();
+  const canRead = hasAnyPermission("ingestionSources:view");
+  const canManage = hasAnyPermission("ingestionSources:manage");
 
   const sourcesQuery = api.ingestionSources.list.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+    { enabled: !!orgId && canRead, refetchOnWindowFocus: false },
   );
   const utils = api.useUtils();
   const refetch = () =>
@@ -585,7 +538,7 @@ function useIngestionSourcesPage() {
   });
 
   const onSubmit = () => {
-    const input = buildCreateInput(composer, orgId);
+    const input = buildCreateInput({ composer, organizationId: orgId });
     // A null input means a required field is missing or malformed;
     // resolvePullConfig has already said which, and the drawer stays open so
     // the user can fix it.
@@ -595,6 +548,8 @@ function useIngestionSourcesPage() {
   return {
     orgId,
     isEnterprise,
+    canRead,
+    canManage,
     sourcesQuery,
     grouped: useGroupedSources(sourcesQuery.data),
     composing,
@@ -614,6 +569,8 @@ function IngestionSourcesPage() {
   const {
     orgId,
     isEnterprise,
+    canRead,
+    canManage,
     sourcesQuery,
     grouped,
     composing,
@@ -634,8 +591,12 @@ function IngestionSourcesPage() {
         <IngestionSourcesHeader
           isEnterprise={isEnterprise}
           sourceCount={sourcesQuery.data?.length ?? 0}
-          onAdd={() => {
-            setComposer(blankComposer());
+          canManage={canManage}
+          onAdd={(sourceType) => {
+            // Always start from a blank composer for the picked type — a
+            // draft left over from a different type must never leak its
+            // parser or OTTL state into this one.
+            setComposer({ ...blankComposer(), sourceType });
             setComposing(true);
           }}
         />
@@ -653,36 +614,22 @@ function IngestionSourcesPage() {
           }}
         />
 
-        {sourcesQuery.isLoading && <Spinner size="sm" />}
-
-        {/* The list is the page. Without this the three mode sections below
-            render "No push-mode sources configured." off an empty `?? []`,
-            which tells an admin their entire ingest fleet is gone when all
-            that actually happened was a 403 or a DB blip. */}
-        <HandledErrorAlert
+        <IngestionSourceList
+          canRead={canRead}
+          canManage={canManage}
+          isLoading={sourcesQuery.isLoading}
           error={sourcesQuery.error}
-          fallbackTitle="Couldn't load ingestion sources"
+          grouped={grouped}
+          rotatingId={pendingId(mutations.rotate)}
+          archivingId={pendingId(mutations.archive)}
+          onEdit={setEditingSourceId}
+          onRotate={(id) =>
+            mutations.rotate.mutate({ organizationId: orgId, id })
+          }
+          onArchive={(id) =>
+            mutations.archive.mutate({ organizationId: orgId, id })
+          }
         />
-
-        {(["push", "pull", "s3"] as const).map((mode) => (
-          <SourceModeSection
-            key={mode}
-            mode={mode}
-            sources={grouped[mode]}
-            // Only claim "none configured" when we actually know: on a load
-            // failure the alert above says what went wrong instead.
-            knowsFleetIsEmpty={!sourcesQuery.error}
-            rotatingId={pendingId(mutations.rotate)}
-            archivingId={pendingId(mutations.archive)}
-            onEdit={setEditingSourceId}
-            onRotate={(id) =>
-              mutations.rotate.mutate({ organizationId: orgId, id })
-            }
-            onArchive={(id) =>
-              mutations.archive.mutate({ organizationId: orgId, id })
-            }
-          />
-        ))}
       </VStack>
 
       <SecretModal details={secretModal} onClose={() => setSecretModal(null)} />
@@ -702,6 +649,40 @@ function IngestionSourcesPage() {
   );
 }
 
+/** Mounted only for a viewer holding `ingestionSources:manage`. */
+function AddSourceControl({
+  isEnterprise,
+  sourceCount,
+  onAdd,
+}: {
+  isEnterprise: boolean;
+  sourceCount: number;
+  onAdd: (sourceType: SourceType) => void;
+}) {
+  const atCap =
+    !isEnterprise && sourceCount >= NON_ENTERPRISE_INGESTION_SOURCE_CAP;
+  return (
+    <AddIngestionSourceMenu
+      isEnterprise={isEnterprise}
+      disabledReason={
+        atCap
+          ? "Source limit reached. Upgrade to Enterprise for unlimited sources."
+          : undefined
+      }
+      hint={
+        !isEnterprise
+          ? `Your plan includes up to ${NON_ENTERPRISE_INGESTION_SOURCE_CAP} sources. Upgrade to Enterprise for unlimited.`
+          : undefined
+      }
+      onPick={onAdd}
+    >
+      <Button variant="outline" size="sm" disabled={atCap}>
+        <Plus size={14} /> Add source
+      </Button>
+    </AddIngestionSourceMenu>
+  );
+}
+
 function SourceRow({
   source,
   isPendingRotate,
@@ -709,6 +690,7 @@ function SourceRow({
   onEdit,
   onRotate,
   onArchive,
+  canManage,
 }: {
   source: Source;
   isPendingRotate: boolean;
@@ -716,6 +698,7 @@ function SourceRow({
   onEdit: () => void;
   onRotate: () => void;
   onArchive: () => void;
+  canManage: boolean;
 }) {
   const status =
     STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
@@ -733,7 +716,7 @@ function SourceRow({
       <VStack align="start" gap={0} flex={1} minWidth={0}>
         <HStack gap={2}>
           <Link
-            href={`/settings/governance/ingestion-sources/${source.id}`}
+            href={`/governance/ingestion-sources/${source.id}`}
             color="fg"
             _hover={{ color: "orange.600" }}
           >
@@ -764,33 +747,37 @@ function SourceRow({
           </Text>
         </HStack>
       </VStack>
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={onEdit}
-        title="Edit source - name, description, OTTL statements"
-      >
-        <Pencil size={14} /> Edit
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={onRotate}
-        loading={isPendingRotate}
-        title="Mint a new ingestSecret (24h grace on the old one)"
-      >
-        <RotateCw size={14} /> Rotate secret
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        colorPalette="red"
-        onClick={onArchive}
-        loading={isPendingArchive}
-        title="Archive (preserves history)"
-      >
-        <Trash2 size={14} />
-      </Button>
+      {canManage && (
+        <>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onEdit}
+            title="Edit source - name, description, OTTL statements"
+          >
+            <Pencil size={14} /> Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onRotate}
+            loading={isPendingRotate}
+            title="Mint a new ingestSecret (24h grace on the old one)"
+          >
+            <RotateCw size={14} /> Rotate secret
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            colorPalette="red"
+            onClick={onArchive}
+            loading={isPendingArchive}
+            title="Archive (preserves history)"
+          >
+            <Trash2 size={14} />
+          </Button>
+        </>
+      )}
     </HStack>
   );
 }
@@ -813,14 +800,10 @@ function SourceComposerDrawer({
   onClose: () => void;
 }) {
   const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === composer.sourceType);
-  // 4b-3 license gate: non-enterprise plans see only otel_generic.
-  // Surfaces the available-tier list in the dropdown so the upsell
-  // narrative aligns with the EnterpriseLockedSurface page-level gate
-  // already shipped in 4b-2.
-  const { isEnterprise } = useActivePlan();
-  const sourceTypeOptions = isEnterprise
-    ? SOURCE_TYPE_OPTIONS
-    : SOURCE_TYPE_OPTIONS.filter((o) => o.value === "otel_generic");
+  // The type was picked from the Add source menu, which is where the plan
+  // gate lives (see gatedSourceTypeOptions) — the composer is committed to
+  // it. Changing type means closing and picking again, exactly like the
+  // model-provider drawer.
   return (
     <Drawer.Root
       open={isOpen}
@@ -833,57 +816,28 @@ function SourceComposerDrawer({
       <Drawer.Content>
         <Drawer.Header>
           <Drawer.CloseTrigger />
-          <Heading as="h2" size="md">
-            Add ingestion source
-          </Heading>
+          <HStack gap={3}>
+            <SourceTypeIconGlyph sourceType={composer.sourceType} size="24px" />
+            <Heading as="h2" size="md">
+              Add {meta?.label ?? "ingestion source"}
+            </Heading>
+          </HStack>
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={3}>
-            <HStack gap={3}>
-              <VStack align="stretch" gap={1} flex={1}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Source type
-                </Text>
-                <NativeSelect.Root size="sm">
-                  <NativeSelect.Field
-                    value={composer.sourceType}
-                    onChange={(e) =>
-                      setComposer({
-                        ...composer,
-                        sourceType: e.target.value as SourceType,
-                        parserConfig: {},
-                        ottlStatements: [],
-                      })
-                    }
-                  >
-                    {sourceTypeOptions.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label} · {o.mode}
-                      </option>
-                    ))}
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-                {!isEnterprise && (
-                  <Text fontSize="xs" color="fg.muted">
-                    Other source types are available on Enterprise plans.
-                  </Text>
-                )}
-              </VStack>
-              <VStack align="stretch" gap={1} flex={2}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Display name
-                </Text>
-                <Input
-                  size="sm"
-                  value={composer.name}
-                  onChange={(e) =>
-                    setComposer({ ...composer, name: e.target.value })
-                  }
-                  placeholder="Display name for this source"
-                />
-              </VStack>
-            </HStack>
+            <VStack align="stretch" gap={1}>
+              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                Display name
+              </Text>
+              <Input
+                size="sm"
+                value={composer.name}
+                onChange={(e) =>
+                  setComposer({ ...composer, name: e.target.value })
+                }
+                placeholder="Display name for this source"
+              />
+            </VStack>
             {meta && (
               <Text fontSize="xs" color="fg.muted">
                 {meta.blurb}
@@ -922,7 +876,7 @@ function SourceComposerDrawer({
               enabled={isOttlEnabledSourceType(composer.sourceType)}
             />
 
-            <PullScheduleField
+            <PullCadenceField
               sourceType={composer.sourceType}
               value={composer.pullSchedule}
               onChange={(pullSchedule) =>
@@ -942,7 +896,13 @@ function SourceComposerDrawer({
               colorPalette="blue"
               onClick={onSubmit}
               loading={isPending}
-              disabled={!composer.name.trim()}
+              disabled={
+                !composer.name.trim() ||
+                composerCadenceError({
+                  sourceType: composer.sourceType,
+                  pullSchedule: composer.pullSchedule,
+                }) !== null
+              }
             >
               Create source
             </Button>
@@ -1124,6 +1084,12 @@ interface FieldDef {
    * that matters.
    */
   secret?: boolean;
+  /**
+   * True for fields most admins never need: rendered inside a collapsed
+   * "Advanced" group so the form leads with the required path. Leaving
+   * every advanced field untouched must always produce a working source.
+   */
+  advanced?: boolean;
 }
 
 export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
@@ -1263,22 +1229,44 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       required: true,
     },
     {
-      // Named `credentialsToken` on purpose: `buildParserConfig` routes every
+      // Named `credentials*` on purpose: `buildParserConfig` routes every
       // `credentials*` field into the `credentials` subtree, which is the ONLY
       // part of parserConfig the server encrypts before it reaches the
-      // database. A field named `token` would sit in the JSONB in plaintext.
+      // database. A field named `clientId` would sit in the JSONB in plaintext.
+      key: "credentialsClientId",
+      label: "Service principal client ID",
+      placeholder: "0a1b2c3d-4e5f-6789-abcd-ef0123456789",
+      hint: "The source signs in with this service principal at the start of every run. It needs Can Manage on every Genie space you want covered — read access is not enough. Databricks only returns other people's conversations to an identity that can manage the space, so a weaker one records nothing and reports no error.",
+      secret: true,
+    },
+    {
+      key: "credentialsClientSecret",
+      label: "Service principal secret",
+      placeholder: "dose...",
+      hint: "The OAuth secret for that service principal. We encrypt this server-side.",
+      secret: true,
+    },
+    {
       key: "credentialsToken",
       label: "Workspace token",
       placeholder: "dapi...",
-      hint: "A personal access token or OAuth token for a service principal holding Can Manage on every Genie space you want covered. Read access is not enough — Databricks only returns other people's conversations to a token that can manage the space, so a weaker token records nothing and reports no error. We encrypt this server-side.",
-      required: true,
+      hint: "A personal access token, pasted instead of the service principal client ID and secret; when both are given, the token wins. Databricks expires these about an hour after issuing them, so a source that runs on a schedule is dead by the next morning — only use a token for a one-off backfill. It needs the same Can Manage on every Genie space. We encrypt this server-side.",
       secret: true,
+      advanced: true,
     },
     {
       key: "spaceIds",
       label: "Genie space IDs (optional)",
-      placeholder: "Leave empty to cover every space the token can see",
-      hint: "Comma-separated. Empty is the usual setting — new spaces are then covered the day someone creates them.",
+      placeholder: "Leave empty to cover every space the credential can see",
+      hint: "Comma-separated. Empty is the usual setting — every space the credential can see is covered, including spaces created later.",
+      advanced: true,
+    },
+    {
+      key: "warehouseId",
+      label: "SQL warehouse ID (optional)",
+      advanced: true,
+      placeholder: "095eb666b2ed2762",
+      hint: "Any warehouse this credential can run a query on. It is where the billing lookup itself runs — NOT the warehouse being priced, which is every warehouse the questions used. Set it to attribute the compute behind each question to the person who asked; leave it empty and questions are recorded at zero cost, which is what Genie itself charges. Naming one makes every run submit a query, so a stopped warehouse is started and billed on the source's schedule. The token additionally needs SELECT on the `system` catalogue, which only a metastore admin can grant — without it questions are still recorded, without cost. The figure is a share of the hourly bill at list prices, so it is an estimate, not the invoice.",
     },
   ],
   s3_custom: [
@@ -1588,8 +1576,9 @@ function buildDatabricksGeniePullConfig(
 ): Record<string, unknown> | null {
   const p = c.parserConfig;
   const workspaceUrl = (p.workspaceUrl ?? "").trim().replace(/\/+$/, "");
-  const token = (p.credentialsToken ?? "").trim();
-  if (!workspaceUrl || !token) return null;
+  const credentials = genieCredentialsFrom(p);
+  const warehouseId = (p.warehouseId ?? "").trim();
+  if (!workspaceUrl || !credentials) return null;
 
   return {
     adapter: "databricks_genie",
@@ -1604,11 +1593,84 @@ function buildDatabricksGeniePullConfig(
       c.pullSchedule.trim() ||
       PULL_SCHEDULE_DEFAULTS.databricks_genie ||
       "*/15 * * * *",
-    credentials: { token },
+    // Omitted rather than sent empty: the adapter reads "no warehouse named" as
+    // "do not price these questions", and an empty string is a warehouse id it
+    // would then ask the workspace about.
+    ...(warehouseId ? { warehouseId } : {}),
+    credentials,
   };
 }
 
-function ParserConfigFields({
+/**
+ * The credential subtree for a Genie source, holding only what was actually
+ * given: an empty string is not a credential, and sending one would make the
+ * adapter prefer a token that does not exist. Null when neither way of
+ * signing in is complete — half of the service principal pair is not one,
+ * and accepting it would save a source that cannot run.
+ */
+function genieCredentialsFrom(
+  p: Record<string, string>,
+): Record<string, string> | null {
+  const token = (p.credentialsToken ?? "").trim();
+  const clientId = (p.credentialsClientId ?? "").trim();
+  const clientSecret = (p.credentialsClientSecret ?? "").trim();
+
+  const credentials: Record<string, string> = {};
+  if (token) credentials.token = token;
+  if (clientId && clientSecret) {
+    credentials.clientId = clientId;
+    credentials.clientSecret = clientSecret;
+  }
+  return Object.keys(credentials).length > 0 ? credentials : null;
+}
+
+function ParserConfigField({
+  field,
+  values,
+  onChange,
+}: {
+  field: FieldDef;
+  values: Record<string, string>;
+  onChange: (next: Record<string, string>) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={1}>
+      <Text fontSize="xs" fontWeight="medium">
+        {field.label}
+        {field.required && (
+          <Text as="span" color="red.500" marginLeft={1}>
+            *
+          </Text>
+        )}
+      </Text>
+      {field.key === "parserDsl" || field.key === "eventMappingDsl" ? (
+        <Textarea
+          size="sm"
+          rows={6}
+          value={values[field.key] ?? ""}
+          onChange={(e) => onChange({ ...values, [field.key]: e.target.value })}
+          placeholder={field.placeholder}
+          fontFamily="mono"
+        />
+      ) : (
+        <Input
+          size="sm"
+          type={isSecretFieldKey(field.key) ? "password" : "text"}
+          value={values[field.key] ?? ""}
+          onChange={(e) => onChange({ ...values, [field.key]: e.target.value })}
+          placeholder={field.placeholder}
+        />
+      )}
+      {field.hint && (
+        <Text fontSize="xs" color="fg.muted">
+          {field.hint}
+        </Text>
+      )}
+    </VStack>
+  );
+}
+
+export function ParserConfigFields({
   sourceType,
   values,
   onChange,
@@ -1618,80 +1680,46 @@ function ParserConfigFields({
   onChange: (next: Record<string, string>) => void;
 }) {
   const fields = PARSER_FIELDS[sourceType];
+  const primaryFields = fields.filter((f) => !f.advanced);
+  const advancedFields = fields.filter((f) => f.advanced);
   if (fields.length === 0) return null;
   return (
     <VStack align="stretch" gap={3}>
       <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
         Source-specific configuration
       </Text>
-      {fields.map((f) => (
-        <VStack key={f.key} align="stretch" gap={1}>
-          <Text fontSize="xs" fontWeight="medium">
-            {f.label}
-            {f.required && (
-              <Text as="span" color="red.500" marginLeft={1}>
-                *
-              </Text>
-            )}
-          </Text>
-          {f.key === "parserDsl" || f.key === "eventMappingDsl" ? (
-            <Textarea
-              size="sm"
-              rows={6}
-              value={values[f.key] ?? ""}
-              onChange={(e) => onChange({ ...values, [f.key]: e.target.value })}
-              placeholder={f.placeholder}
-              fontFamily="mono"
-            />
-          ) : (
-            <Input
-              size="sm"
-              type={isSecretFieldKey(f.key) ? "password" : "text"}
-              value={values[f.key] ?? ""}
-              onChange={(e) => onChange({ ...values, [f.key]: e.target.value })}
-              placeholder={f.placeholder}
-            />
-          )}
-          {f.hint && (
-            <Text fontSize="xs" color="fg.muted">
-              {f.hint}
-            </Text>
-          )}
-        </VStack>
+      {primaryFields.map((f) => (
+        <ParserConfigField
+          key={f.key}
+          field={f}
+          values={values}
+          onChange={onChange}
+        />
       ))}
-    </VStack>
-  );
-}
-
-function PullScheduleField({
-  sourceType,
-  value,
-  onChange,
-}: {
-  sourceType: SourceType;
-  value: string;
-  onChange: (next: string) => void;
-}) {
-  const adapter = PULL_ADAPTER_FOR_SOURCE[sourceType];
-  if (!adapter) return null;
-  const defaultSchedule = PULL_SCHEDULE_DEFAULTS[adapter] ?? "";
-  return (
-    <VStack align="stretch" gap={1}>
-      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-        Polling schedule
-      </Text>
-      <Input
-        size="sm"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={defaultSchedule}
-        fontFamily="mono"
-      />
-      <Text fontSize="xs" color="fg.muted">
-        Standard 5-field cron. Leave blank to use the adapter default (
-        <code>{defaultSchedule}</code>). The puller worker honors this on the
-        next BullMQ tick after save.
-      </Text>
+      {advancedFields.length > 0 && (
+        // Unmounted while closed so the collapsed state genuinely holds
+        // nothing the admin needs: create must work without ever opening it.
+        <Collapsible.Root lazyMount unmountOnExit>
+          <Collapsible.Trigger asChild>
+            <Button size="xs" variant="ghost" color="fg.muted">
+              <ChevronRight />
+              Advanced
+            </Button>
+          </Collapsible.Trigger>
+          <Collapsible.Content>
+            <VStack align="stretch" gap={3} paddingTop={2}>
+              {advancedFields.map((f) => (
+                <ParserConfigField
+                  key={f.key}
+                  field={f}
+                  values={values}
+                  onChange={onChange}
+                />
+              ))}
+            </VStack>
+          </Collapsible.Content>
+        </Collapsible.Root>
+      )}
     </VStack>
   );
 }
@@ -1714,7 +1742,10 @@ const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
     // winning the merge would fail the adapter's `.datetime()` check at
     // pull time.
     anthropic_admin: ["report", "bucketWidth", "startingAt"],
-    databricks_genie: ["workspaceUrl", "spaceIds"],
+    // `warehouseId` is here because the builder DROPS it when empty. Left to
+    // the merge, the raw form value would persist `warehouseId: ""`, which the
+    // adapter reads as a warehouse to go ask the workspace about.
+    databricks_genie: ["workspaceUrl", "spaceIds", "warehouseId"],
   };
 
 // Skip sentinel for a parserConfig entry that must not be persisted, kept
@@ -1763,6 +1794,365 @@ export function buildParserConfig(c: ComposerState): Record<string, unknown> {
   return out;
 }
 
+/**
+ * Claude Code's monitoring-usage doc requires CLAUDE_CODE_ENABLE_TELEMETRY=1
+ * plus the standard OTEL_*_EXPORTER env vars. We recommend
+ * OTEL_TRACES_EXPORTER=otlp so spans claude-code instruments propagate to
+ * LangWatch and logs/metrics emitted inside those spans get correlated; the
+ * session.id resource attribute is then mapped to gen_ai.conversation.id by
+ * the OpenInference extractor so the UI groups the session as one thread.
+ * Pre-build the shell export block so admins paste once instead of stitching
+ * seven lines off the docs page.
+ *
+ * Plus the four content-unlock knobs (USER_PROMPTS + TOOL_DETAILS +
+ * TOOL_CONTENT + RAW_API_BODIES). Without these, the OTel wire is
+ * metadata-only, tokens, cost, durations and tool sizes-in-bytes, and user
+ * prompt text, assistant response text and tool I/O content are silently
+ * absent. With them on, langwatch.input + langwatch.output lift verbatim from
+ * claude's api_request + api_response_body events. Payload risk is bounded by
+ * claude's 60KB inline cap plus the langwatch receiver content cap.
+ */
+function buildClaudeCodeEnvBlock({
+  details,
+  otlpUrl,
+}: {
+  details: SecretDetails;
+  otlpUrl: string;
+}): string {
+  return [
+    `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
+    `export OTEL_TRACES_EXPORTER=otlp`,
+    `export OTEL_LOGS_EXPORTER=otlp`,
+    `export OTEL_METRICS_EXPORTER=otlp`,
+    `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+    `export OTEL_LOG_USER_PROMPTS=1`,
+    `export OTEL_LOG_TOOL_DETAILS=1`,
+    `export OTEL_LOG_TOOL_CONTENT=1`,
+    `export OTEL_LOG_RAW_API_BODIES=1`,
+    `export OTEL_EXPORTER_OTLP_ENDPOINT="${otlpUrl}"`,
+    `export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${details.secret}"`,
+  ].join("\n");
+}
+
+/**
+ * A copy-paste curl that exercises the full happy path: the body parses, the
+ * attribute parser sees the canonical gen_ai.* + user.email keys, and the KPI
+ * strip moves on the first event. The timestamp is fresh at modal open so the
+ * test event lands inside the 24h health window even if the admin waits a
+ * little before pasting. Null for source types with no push endpoint.
+ */
+function buildTestCurl({
+  details,
+  otlpUrl,
+  webhookUrl,
+  usesPushUrl,
+  usesWebhookUrl,
+}: {
+  details: SecretDetails;
+  otlpUrl: string;
+  webhookUrl: string;
+  usesPushUrl: boolean;
+  usesWebhookUrl: boolean;
+}): string | null {
+  if (usesPushUrl) {
+    const otlpBody = JSON.stringify({
+      resource_spans: [
+        {
+          resource: {
+            attributes: [
+              {
+                key: "service.name",
+                value: { stringValue: details.sourceName },
+              },
+            ],
+          },
+          scope_spans: [
+            {
+              spans: [
+                {
+                  name: "chat.completion",
+                  startTimeUnixNano: `${Date.now()}000000`,
+                  attributes: [
+                    {
+                      key: "gen_ai.usage.input_tokens",
+                      value: { intValue: 120 },
+                    },
+                    {
+                      key: "gen_ai.usage.output_tokens",
+                      value: { intValue: 480 },
+                    },
+                    {
+                      key: "gen_ai.usage.cost_usd",
+                      value: { doubleValue: 0.025 },
+                    },
+                    {
+                      key: "user.email",
+                      value: { stringValue: "you@your.org" },
+                    },
+                    {
+                      key: "gen_ai.request.model",
+                      value: { stringValue: "claude-sonnet-4" },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    return [
+      `curl -X POST '${otlpUrl}' \\`,
+      `  -H 'Authorization: Bearer ${details.secret}' \\`,
+      `  -H 'Content-Type: application/json' \\`,
+      `  -d '${otlpBody}'`,
+    ].join("\n");
+  }
+  if (usesWebhookUrl) {
+    return [
+      `curl -X POST '${webhookUrl}' \\`,
+      `  -H 'Authorization: Bearer ${details.secret}' \\`,
+      `  -H 'Content-Type: application/json' \\`,
+      `  -d '{"event":"test.smoke","actor":"you@your.org"}'`,
+    ].join("\n");
+  }
+  return null;
+}
+
+/** The bearer token itself, shown once. */
+function IngestSecretPanel({
+  secret,
+  copied,
+  onCopy,
+}: {
+  secret: string;
+  copied: boolean;
+  onCopy: (value: string) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={1}>
+      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+        Ingest secret (bearer token)
+      </Text>
+      <HStack gap={2}>
+        <Code
+          flex={1}
+          padding={2}
+          fontSize="xs"
+          whiteSpace="pre-wrap"
+          wordBreak="break-all"
+        >
+          {secret}
+        </Code>
+        <Button size="sm" variant="outline" onClick={() => onCopy(secret)}>
+          <Copy size={14} /> {copied ? "Copied" : "Copy"}
+        </Button>
+      </HStack>
+    </VStack>
+  );
+}
+
+/** Where a webhook-mode source posts its events. */
+function WebhookEndpointPanel({
+  webhookUrl,
+  onCopy,
+}: {
+  webhookUrl: string;
+  onCopy: (value: string) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={1}>
+      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+        Webhook URL (paste into upstream webhook config)
+      </Text>
+      <HStack gap={2}>
+        <Code flex={1} padding={2} fontSize="xs">
+          {webhookUrl}
+        </Code>
+        <Button size="sm" variant="outline" onClick={() => onCopy(webhookUrl)}>
+          <Copy size={14} />
+        </Button>
+      </HStack>
+    </VStack>
+  );
+}
+
+/** The one-shot warning, and how long the old secret keeps working. */
+function SecretGraceNotice() {
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="amber.300"
+      backgroundColor="amber.50"
+      padding={3}
+      borderRadius="sm"
+    >
+      <Text fontSize="xs" color="amber.900">
+        <strong>Important:</strong> the secret above will not be shown again. We
+        retained the prior secret&apos;s hash for a 24h grace window if
+        you&apos;re rotating, so you have time to roll the new value through
+        every upstream client.
+      </Text>
+    </Box>
+  );
+}
+
+/** Where a push-mode source sends its OTLP, and which endpoint is which. */
+function OtlpEndpointPanel({
+  otlpUrl,
+  onCopy,
+}: {
+  otlpUrl: string;
+  onCopy: (value: string) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={1}>
+      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+        OTLP ingestion endpoint (paste into upstream exporter)
+      </Text>
+      <HStack gap={2}>
+        <Code flex={1} padding={2} fontSize="xs">
+          {otlpUrl}
+        </Code>
+        <Button size="sm" variant="outline" onClick={() => onCopy(otlpUrl)}>
+          <Copy size={14} />
+        </Button>
+      </HStack>
+      <Text fontSize="xs" color="fg.muted">
+        Spans push into the LangWatch trace store with this source&apos;s origin
+        tag and become viewable in the trace viewer. If you are sending agent
+        traces from your own LangWatch SDK, use{" "}
+        <Code fontSize="xs">/api/otel/v1/traces</Code> with your project API key
+        - different auth, same trace store. See{" "}
+        <Link
+          href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
+          color="blue.600"
+        >
+          Choosing the right OTel endpoint
+        </Link>
+        .
+      </Text>
+    </VStack>
+  );
+}
+
+/** The paste-once shell block a Claude Code source is configured with. */
+function ClaudeCodeEnvBlockPanel({
+  envBlock,
+  onCopy,
+}: {
+  envBlock: string;
+  onCopy: (value: string) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={1}>
+      <HStack justify="space-between" alignItems="center">
+        <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+          Claude Code shell env block
+        </Text>
+        <Button size="xs" variant="outline" onClick={() => onCopy(envBlock)}>
+          <Copy size={12} /> Copy block
+        </Button>
+      </HStack>
+      <Code
+        padding={3}
+        fontSize="xs"
+        whiteSpace="pre"
+        display="block"
+        overflowX="auto"
+      >
+        {envBlock}
+      </Code>
+      <Text fontSize="xs" color="fg.muted">
+        Paste into your Claude Code shell, then run{" "}
+        <Code fontSize="xs" backgroundColor="transparent">
+          claude
+        </Code>
+        . Claude Code&apos;s SDK appends{" "}
+        <Code fontSize="xs" backgroundColor="transparent">
+          /v1/logs
+        </Code>{" "}
+        and{" "}
+        <Code fontSize="xs" backgroundColor="transparent">
+          /v1/metrics
+        </Code>{" "}
+        itself off the base endpoint. To attribute spend to a specific team or
+        department, also export{" "}
+        <Code fontSize="xs" backgroundColor="transparent">
+          OTEL_RESOURCE_ATTRIBUTES=team.id=…,department=…
+        </Code>{" "}
+        - those land as resource attributes and slot into /governance&apos;s
+        spendByTeam without further config.
+      </Text>
+    </VStack>
+  );
+}
+
+/** The smoke-test curl, and how to read what it returns. */
+function TestCurlPanel({
+  curl,
+  copied,
+  onCopy,
+}: {
+  curl: string;
+  copied: boolean;
+  onCopy: (value: string) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={1}>
+      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+        Test it now - paste this into a terminal
+      </Text>
+      <Box position="relative">
+        <Code
+          display="block"
+          padding={3}
+          fontSize="xs"
+          whiteSpace="pre"
+          overflowX="auto"
+        >
+          {curl}
+        </Code>
+        <Button
+          size="xs"
+          variant="outline"
+          position="absolute"
+          top={2}
+          right={2}
+          onClick={() => onCopy(curl)}
+        >
+          <Copy size={12} /> {copied ? "Copied" : "Copy"}
+        </Button>
+      </Box>
+      <Text fontSize="xs" color="fg.muted">
+        Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on success.
+        If you get <Code fontSize="xs">events: 0</Code> with a hint, the body
+        shape didn&apos;t parse - check the docs.
+      </Text>
+    </VStack>
+  );
+}
+
+/** The endpoints and source-type flags a secret reveal is rendered against. */
+function secretModalTargets(details: SecretDetails | null) {
+  const baseUrl =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://langwatch.invalid";
+  return {
+    otlpUrl: details ? `${baseUrl}/api/ingest/otel/${details.sourceId}` : "",
+    webhookUrl: details
+      ? `${baseUrl}/api/ingest/webhook/${details.sourceId}`
+      : "",
+    usesPushUrl:
+      details?.sourceType === "otel_generic" ||
+      details?.sourceType === "claude_cowork" ||
+      details?.sourceType === "claude_code",
+    usesWebhookUrl: details?.sourceType === "workato",
+    isClaudeCode: details?.sourceType === "claude_code",
+  };
+}
+
 function SecretModal({
   details,
   onClose,
@@ -1771,137 +2161,30 @@ function SecretModal({
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
-  const baseUrl =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : "https://langwatch.invalid";
-  const otlpUrl = details
-    ? `${baseUrl}/api/ingest/otel/${details.sourceId}`
-    : "";
-  const webhookUrl = details
-    ? `${baseUrl}/api/ingest/webhook/${details.sourceId}`
-    : "";
-  const usesPushUrl =
-    details?.sourceType === "otel_generic" ||
-    details?.sourceType === "claude_cowork" ||
-    details?.sourceType === "claude_code";
-  const usesWebhookUrl = details?.sourceType === "workato";
-  const isClaudeCode = details?.sourceType === "claude_code";
+  const { otlpUrl, webhookUrl, usesPushUrl, usesWebhookUrl, isClaudeCode } =
+    secretModalTargets(details);
 
-  // Claude Code's monitoring-usage doc requires CLAUDE_CODE_ENABLE_TELEMETRY=1
-  // plus the standard OTEL_*_EXPORTER env vars. We recommend
-  // OTEL_TRACES_EXPORTER=otlp so spans claude-code instruments propagate to
-  // LangWatch and logs/metrics emitted inside those spans get correlated;
-  // the session.id resource attribute is then mapped to gen_ai.conversation.id
-  // by the OpenInference extractor so the UI groups the session as one thread.
-  // Pre-build the shell export block so admins paste once instead of stitching
-  // seven lines off the docs page.
-  // Plus the four content-unlock knobs (USER_PROMPTS + TOOL_DETAILS +
-  // TOOL_CONTENT + RAW_API_BODIES). Without these, the OTel wire is
-  // metadata-only - tokens, cost, durations, tool sizes-in-bytes -
-  // and user prompt text, assistant response text, and tool I/O
-  // content are silently absent. With them on, langwatch.input +
-  // langwatch.output lift verbatim from claude's api_request +
-  // api_response_body events. Payload risk is bounded by claude's
-  // 60KB inline cap + the langwatch receiver content cap.
-  const claudeCodeEnvBlock = useMemo(() => {
-    if (!isClaudeCode || !details) return "";
-    return [
-      `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
-      `export OTEL_TRACES_EXPORTER=otlp`,
-      `export OTEL_LOGS_EXPORTER=otlp`,
-      `export OTEL_METRICS_EXPORTER=otlp`,
-      `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
-      `export OTEL_LOG_USER_PROMPTS=1`,
-      `export OTEL_LOG_TOOL_DETAILS=1`,
-      `export OTEL_LOG_TOOL_CONTENT=1`,
-      `export OTEL_LOG_RAW_API_BODIES=1`,
-      `export OTEL_EXPORTER_OTLP_ENDPOINT="${otlpUrl}"`,
-      `export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${details.secret}"`,
-    ].join("\n");
-  }, [isClaudeCode, details, otlpUrl]);
+  const claudeCodeEnvBlock = useMemo(
+    () =>
+      isClaudeCode && details
+        ? buildClaudeCodeEnvBlock({ details, otlpUrl })
+        : "",
+    [isClaudeCode, details, otlpUrl],
+  );
 
-  // F-OTEL-3 (Sergey draft): a copy-paste curl that exercises the full
-  // happy path - body parses, attribute parser sees the canonical
-  // gen_ai.* + user.email keys, KPI strip moves on the first event.
-  // Timestamp is fresh at modal open so the test event lands inside
-  // the 24h health window even if the user delays a bit before
-  // pasting.
-  const testCurl = useMemo(() => {
-    if (!details) return null;
-    if (usesPushUrl) {
-      const nowNs = `${Date.now()}000000`;
-      const otlpBody = JSON.stringify({
-        resource_spans: [
-          {
-            resource: {
-              attributes: [
-                {
-                  key: "service.name",
-                  value: { stringValue: details.sourceName },
-                },
-              ],
-            },
-            scope_spans: [
-              {
-                spans: [
-                  {
-                    name: "chat.completion",
-                    startTimeUnixNano: nowNs,
-                    attributes: [
-                      {
-                        key: "gen_ai.usage.input_tokens",
-                        value: { intValue: 120 },
-                      },
-                      {
-                        key: "gen_ai.usage.output_tokens",
-                        value: { intValue: 480 },
-                      },
-                      {
-                        key: "gen_ai.usage.cost_usd",
-                        value: { doubleValue: 0.025 },
-                      },
-                      {
-                        key: "user.email",
-                        value: { stringValue: "you@your.org" },
-                      },
-                      {
-                        key: "gen_ai.request.model",
-                        value: { stringValue: "claude-sonnet-4" },
-                      },
-                    ],
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      });
-      return [
-        `curl -X POST '${otlpUrl}' \\`,
-        `  -H 'Authorization: Bearer ${details.secret}' \\`,
-        `  -H 'Content-Type: application/json' \\`,
-        `  -d '${otlpBody}'`,
-      ].join("\n");
-    }
-    if (usesWebhookUrl) {
-      return [
-        `curl -X POST '${webhookUrl}' \\`,
-        `  -H 'Authorization: Bearer ${details.secret}' \\`,
-        `  -H 'Content-Type: application/json' \\`,
-        `  -d '{"event":"test.smoke","actor":"you@your.org"}'`,
-      ].join("\n");
-    }
-    return null;
-  }, [
-    details?.secret,
-    details?.sourceName,
-    details,
-    otlpUrl,
-    webhookUrl,
-    usesPushUrl,
-    usesWebhookUrl,
-  ]);
+  const testCurl = useMemo(
+    () =>
+      details
+        ? buildTestCurl({
+            details,
+            otlpUrl,
+            webhookUrl,
+            usesPushUrl,
+            usesWebhookUrl,
+          })
+        : null,
+    [details, otlpUrl, webhookUrl, usesPushUrl, usesWebhookUrl],
+  );
 
   if (!details) return null;
 
@@ -1945,181 +2228,31 @@ function SecretModal({
                 </Badge>
               </Text>
             </VStack>
-            <VStack align="stretch" gap={1}>
-              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                Ingest secret (bearer token)
-              </Text>
-              <HStack gap={2}>
-                <Code
-                  flex={1}
-                  padding={2}
-                  fontSize="xs"
-                  whiteSpace="pre-wrap"
-                  wordBreak="break-all"
-                >
-                  {details.secret}
-                </Code>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => copy(details.secret)}
-                >
-                  <Copy size={14} /> {copied ? "Copied" : "Copy"}
-                </Button>
-              </HStack>
-            </VStack>
+            <IngestSecretPanel
+              secret={details.secret}
+              copied={copied}
+              onCopy={copy}
+            />
             {usesPushUrl && (
-              <VStack align="stretch" gap={1}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  OTLP ingestion endpoint (paste into upstream exporter)
-                </Text>
-                <HStack gap={2}>
-                  <Code flex={1} padding={2} fontSize="xs">
-                    {otlpUrl}
-                  </Code>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => copy(otlpUrl)}
-                  >
-                    <Copy size={14} />
-                  </Button>
-                </HStack>
-                <Text fontSize="xs" color="fg.muted">
-                  Spans push into the LangWatch trace store with this
-                  source&apos;s origin tag and become viewable in the trace
-                  viewer. If you are sending agent traces from your own
-                  LangWatch SDK, use{" "}
-                  <Code fontSize="xs">/api/otel/v1/traces</Code> with your
-                  project API key - different auth, same trace store. See{" "}
-                  <Link
-                    href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
-                    color="blue.600"
-                  >
-                    Choosing the right OTel endpoint
-                  </Link>
-                  .
-                </Text>
-              </VStack>
+              <OtlpEndpointPanel otlpUrl={otlpUrl} onCopy={copy} />
             )}
             {usesWebhookUrl && (
-              <VStack align="stretch" gap={1}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Webhook URL (paste into upstream webhook config)
-                </Text>
-                <HStack gap={2}>
-                  <Code flex={1} padding={2} fontSize="xs">
-                    {webhookUrl}
-                  </Code>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => copy(webhookUrl)}
-                  >
-                    <Copy size={14} />
-                  </Button>
-                </HStack>
-              </VStack>
+              <WebhookEndpointPanel webhookUrl={webhookUrl} onCopy={copy} />
             )}
             {isClaudeCode && (
-              <VStack align="stretch" gap={1}>
-                <HStack justify="space-between" alignItems="center">
-                  <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                    Claude Code shell env block
-                  </Text>
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    onClick={() => copy(claudeCodeEnvBlock)}
-                  >
-                    <Copy size={12} /> Copy block
-                  </Button>
-                </HStack>
-                <Code
-                  padding={3}
-                  fontSize="xs"
-                  whiteSpace="pre"
-                  display="block"
-                  overflowX="auto"
-                >
-                  {claudeCodeEnvBlock}
-                </Code>
-                <Text fontSize="xs" color="fg.muted">
-                  Paste into your Claude Code shell, then run{" "}
-                  <Code fontSize="xs" backgroundColor="transparent">
-                    claude
-                  </Code>
-                  . Claude Code&apos;s SDK appends{" "}
-                  <Code fontSize="xs" backgroundColor="transparent">
-                    /v1/logs
-                  </Code>{" "}
-                  and{" "}
-                  <Code fontSize="xs" backgroundColor="transparent">
-                    /v1/metrics
-                  </Code>{" "}
-                  itself off the base endpoint. To attribute spend to a specific
-                  team or department, also export{" "}
-                  <Code fontSize="xs" backgroundColor="transparent">
-                    OTEL_RESOURCE_ATTRIBUTES=team.id=…,department=…
-                  </Code>{" "}
-                  - those land as resource attributes and slot into
-                  /governance&apos;s spendByTeam without further config.
-                </Text>
-              </VStack>
+              <ClaudeCodeEnvBlockPanel
+                envBlock={claudeCodeEnvBlock}
+                onCopy={copy}
+              />
             )}
             {testCurl && (
-              <VStack align="stretch" gap={1}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Test it now - paste this into a terminal
-                </Text>
-                <Box position="relative">
-                  <Code
-                    display="block"
-                    padding={3}
-                    fontSize="xs"
-                    whiteSpace="pre"
-                    overflowX="auto"
-                  >
-                    {testCurl}
-                  </Code>
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    position="absolute"
-                    top={2}
-                    right={2}
-                    onClick={() => copy(testCurl)}
-                  >
-                    <Copy size={12} /> {copied ? "Copied" : "Copy"}
-                  </Button>
-                </Box>
-                <Text fontSize="xs" color="fg.muted">
-                  Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on
-                  success. If you get <Code fontSize="xs">events: 0</Code> with
-                  a hint, the body shape didn&apos;t parse - check the docs.
-                </Text>
-              </VStack>
+              <TestCurlPanel curl={testCurl} copied={copied} onCopy={copy} />
             )}
-            <Box
-              borderWidth="1px"
-              borderColor="amber.300"
-              backgroundColor="amber.50"
-              padding={3}
-              borderRadius="sm"
-            >
-              <Text fontSize="xs" color="amber.900">
-                <strong>Important:</strong> the secret above will not be shown
-                again. We retained the prior secret&apos;s hash for a 24h grace
-                window if you&apos;re rotating, so you have time to roll the new
-                value through every upstream client.
-              </Text>
-            </Box>
+            <SecretGraceNotice />
           </VStack>
         </DialogBody>
         <DialogFooter>
-          <Link
-            href={`/settings/governance/ingestion-sources/${details.sourceId}`}
-          >
+          <Link href={`/governance/ingestion-sources/${details.sourceId}`}>
             <Button variant="outline">View source page →</Button>
           </Link>
           <Button colorPalette="blue" onClick={onClose}>
@@ -2134,7 +2267,7 @@ function SecretModal({
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
 })(
-  withPermissionGuard("organization:manage", {
+  withPermissionGuard("governance:view", {
     bypassOnboardingRedirect: true,
   })(IngestionSourcesPage),
 );

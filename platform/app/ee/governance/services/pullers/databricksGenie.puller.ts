@@ -57,6 +57,16 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import {
+  allocateWarehouseCost,
+  costReadFloorMs,
+  GENIE_CLIENT_APPLICATION,
+  WAREHOUSE_COST_MAX_HOLD_MS,
+  type WarehousePricedStatement,
+  warehouseCostChunks,
+  warehouseCostPieces,
+  warehouseCostRowSchema,
+} from "./databricksWarehouseCost";
 import { PULLED_USAGE_HINT_KEY } from "./pulledUsageRecord";
 import type {
   NormalizedPullEvent,
@@ -146,6 +156,25 @@ export const databricksGeniePullConfigSchema = z.object({
   /** ISO instant the very first run starts from. Later runs use the cursor. */
   startingAt: z.string().datetime().optional(),
   schedule: z.string().default("*/15 * * * *"),
+  /**
+   * A SQL warehouse this credential can run a query on. Naming it is what opts
+   * the source into attributing the compute behind each question; leaving it
+   * out keeps the source's records at a cost of zero, which is what Genie
+   * itself charges.
+   *
+   * This is the executor, not the subject. The billing query reads every
+   * warehouse the workspace's Genie questions actually ran on and prices each
+   * hour against that warehouse's own bill — a space answers on whichever
+   * warehouse it was authored against, and expecting that to be the one the
+   * credential can sign in to is how a whole workspace prices at nothing. Any
+   * warehouse the credential holds `CAN USE` on will do.
+   *
+   * It is optional because the grants it needs are not the ones the rest of this
+   * adapter needs. Reading the billing tables requires `SELECT` on `system` from
+   * a metastore administrator, and a workspace whose owner has not issued it
+   * should still get its Genie activity rather than a failing source.
+   */
+  warehouseId: z.string().min(1).optional(),
 });
 export type DatabricksGeniePullConfig = z.infer<
   typeof databricksGeniePullConfigSchema
@@ -163,6 +192,580 @@ export type DatabricksGeniePullConfig = z.infer<
  * sinks; the alternative silently loses messages at the boundary.
  */
 const WATERMARK_LAG_MS = 5 * 60 * 1000;
+
+/**
+ * Longer than a Genie list call, because this one asks the metastore to
+ * aggregate two system tables and the warehouse may be asleep when it arrives.
+ * A serverless warehouse cold-starts in seconds, but not always in five.
+ */
+const WAREHOUSE_COST_TIMEOUT_MS = 60_000;
+
+/**
+ * A sign-in is one small POST. The job has five minutes for everything, so a
+ * token endpoint that never answers must not be allowed to spend it: without a
+ * bound of its own the run would hit the per-job deadline having read nothing
+ * and report a timeout that names no cause.
+ */
+const TOKEN_TIMEOUT_MS = 15_000;
+
+/**
+ * What a Databricks OAuth token endpoint returns. Only `access_token` is
+ * load-bearing — `expires_in` is not kept, because a token is minted per run
+ * and never outlives it.
+ */
+const tokenResponseSchema = z.object({
+  access_token: z.string().min(1),
+});
+
+/**
+ * The bearer to present on this run's Genie calls.
+ *
+ * A pasted workspace token expires about an hour after Databricks issues it,
+ * so a source configured that way works when the admin saves it and is dead by
+ * the next scheduled run, with nothing on the source to say why. A service
+ * principal's client id and secret do not expire, so the source signs in at
+ * the start of every run and the schedule keeps running unattended.
+ *
+ * A pasted token wins when both are present. Someone pasting one into a source
+ * that already had a secret is rotating by hand — usually because the secret
+ * stopped working — and silently preferring the secret would ignore the thing
+ * they just did.
+ *
+ * Minted once per run rather than per request: the sweep walks several pages
+ * across several spaces, and a token per request would multiply one sign-in by
+ * the whole walk for no benefit, since the token outlives any single run.
+ */
+async function resolveWorkspaceToken(params: {
+  credentials: Record<string, string> | undefined;
+  workspaceUrl: string;
+  signal?: AbortSignal;
+}): Promise<string> {
+  const { credentials, workspaceUrl, signal } = params;
+
+  const pasted = credentials?.token;
+  if (pasted) return pasted;
+
+  const clientId = credentials?.clientId;
+  const clientSecret = credentials?.clientSecret;
+  if (!clientId || !clientSecret) {
+    throw new Error(
+      "databricks genie puller needs either a workspace token in credentials.token, " +
+        "or a service principal's credentials.clientId and credentials.clientSecret",
+    );
+  }
+
+  // HTTP Basic rather than the secret in the body: the header is not written
+  // to the request line, so it stays out of proxy and access logs.
+  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+  const timeout = AbortSignal.timeout(TOKEN_TIMEOUT_MS);
+
+  const response = await ssrfSafeFetch(
+    `${workspaceUrl.replace(/\/+$/, "")}/oidc/v1/token`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Basic ${basic}`,
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: "grant_type=client_credentials&scope=all-apis",
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+    },
+  );
+
+  if (!response.ok) {
+    // The status alone, never the body: a token endpoint may echo the request
+    // back, and this reason is logged and shown on the source.
+    throw new Error(
+      `databricks genie puller could not sign in: the workspace refused the ` +
+        `service principal's credentials (HTTP ${response.status})`,
+    );
+  }
+
+  const parsed = tokenResponseSchema.safeParse(await response.json());
+  if (!parsed.success) {
+    // A proxy or captive portal answering 200 with something that is not a
+    // token must not be carried forward as one — it would fail later as an
+    // unauthorised Genie call and read as a permissions problem.
+    throw new Error(
+      "databricks genie puller could not sign in: the workspace answered the " +
+        "sign-in without an access token",
+    );
+  }
+
+  return parsed.data.access_token;
+}
+
+/**
+ * Per-statement cost for the window, from the warehouse's own billing.
+ *
+ * Read it as three independent facts joined by the hour they share:
+ *
+ *   `windowed`    every statement the warehouse ran, Genie's or not
+ *   `hour_total`  how much execution time that hour held IN TOTAL
+ *   `hour_dbu`    what the warehouse was billed for that hour, per SKU
+ *
+ * `hour_total` deliberately sums `windowed` rather than filtering to Genie. A
+ * warehouse shared with dashboards and scheduled jobs whose denominator counted
+ * only Genie's queries would hand Genie the entire warehouse bill. Live
+ * validation put Genie at 13.3% of one workspace's warehouse compute; the rest
+ * is real spend belonging to traffic nobody asked Genie for, and it stays
+ * unattributed rather than being redistributed to whoever happens to be here.
+ *
+ * `priced` picks ONE price row per hour and SKU, preferring USD and then the
+ * most recently effective. Without that the join fans out: a SKU listed in two
+ * currencies would return the hour's bill twice and double every question in
+ * it. Rows with no matching price come back with nulls rather than being
+ * dropped, so the caller can say so instead of silently reporting zero.
+ *
+ * Statements are bucketed by the hour their `start_time` falls in, which is how
+ * the billing table buckets too. A statement straddling an hour boundary is
+ * charged wholly to the hour it began — an approximation, and the same one the
+ * live validation used.
+ */
+/**
+ * The most rows one cost read will accept.
+ *
+ * The cap is a guard against holding a whole busy warehouse's hour-by-hour
+ * detail in memory, not a sampling decision. Hitting it means the answer is
+ * missing statements we cannot identify, so the read is refused whole rather
+ * than used: a partial answer prices some questions and silently leaves the
+ * rest at nothing.
+ *
+ * The cap applies per CHUNK, not per window — see `WAREHOUSE_COST_CHUNK_MS`. That
+ * is what keeps a refusal survivable: only the day that tripped it goes
+ * unpriced, the days read before it keep their cost, and the watermark stops
+ * there so the refused day is asked about again rather than being recorded at
+ * zero for good.
+ */
+export const WAREHOUSE_COST_ROW_LIMIT = 50_000;
+
+const WAREHOUSE_COST_STATEMENT = `
+WITH windowed AS (
+  SELECT
+    statement_id,
+    client_application,
+    -- Projected for the final WHERE only — the outer scope sees the CTE's
+    -- output, not the base table. \`hour_total\` deliberately ignores it: the
+    -- share's denominator is the WHOLE warehouse, so the CTE must keep every
+    -- statement and the Genie filter must wait until after the totals.
+    query_source.genie_space_id AS genie_space_id,
+    execution_duration_ms,
+    compute.warehouse_id AS warehouse_id,
+    date_trunc('HOUR', start_time) AS usage_hour
+  FROM system.query.history
+  WHERE start_time >= :from_ts
+    AND start_time < :to_ts
+    AND execution_duration_ms IS NOT NULL
+    AND compute.warehouse_id IS NOT NULL
+),
+hour_total AS (
+  SELECT usage_hour, warehouse_id, SUM(execution_duration_ms) AS total_ms
+  FROM windowed
+  GROUP BY usage_hour, warehouse_id
+),
+hour_dbu AS (
+  SELECT
+    date_trunc('HOUR', usage_start_time) AS usage_hour,
+    usage_metadata.warehouse_id AS warehouse_id,
+    sku_name,
+    SUM(usage_quantity) AS dbu
+  FROM system.billing.usage
+  WHERE usage_start_time >= :from_ts
+    AND usage_start_time < :to_ts
+    AND usage_unit = 'DBU'
+    AND usage_metadata.warehouse_id IS NOT NULL
+  GROUP BY 1, 2, 3
+),
+priced AS (
+  SELECT usage_hour, warehouse_id, sku_name, currency_code, billable_usd
+  FROM (
+    SELECT
+      d.usage_hour,
+      d.warehouse_id,
+      d.sku_name,
+      p.currency_code,
+      CAST(d.dbu * p.pricing.effective_list.default AS DECIMAL(38, 12)) AS billable_usd,
+      ROW_NUMBER() OVER (
+        PARTITION BY d.usage_hour, d.warehouse_id, d.sku_name
+        ORDER BY CASE WHEN p.currency_code = 'USD' THEN 0 ELSE 1 END,
+                 p.price_start_time DESC
+      ) AS pick
+    FROM hour_dbu d
+    LEFT JOIN system.billing.list_prices p
+      ON p.sku_name = d.sku_name
+     AND d.usage_hour >= p.price_start_time
+     AND (p.price_end_time IS NULL OR d.usage_hour < p.price_end_time)
+  )
+  WHERE pick = 1
+)
+SELECT
+  w.statement_id                          AS statement_id,
+  CAST(w.execution_duration_ms AS STRING) AS execution_duration_ms,
+  CAST(t.total_ms AS STRING)              AS hour_total_ms,
+  CAST(pr.billable_usd AS STRING)         AS hour_billable_usd,
+  pr.currency_code                        AS currency_code,
+  pr.sku_name                             AS sku_name
+FROM windowed w
+JOIN hour_total t
+  ON t.usage_hour = w.usage_hour AND t.warehouse_id = w.warehouse_id
+-- LEFT, not inner, and that is the whole fix for the zero-cost stall. An inner
+-- join drops any Genie statement whose hour is not in \`system.billing.usage\`
+-- yet, and that table lands minutes to days behind the question. Dropped, a
+-- not-yet-billed statement is indistinguishable from a genuinely free one: both
+-- are simply absent, the chunk reads as fully priced, the watermark moves past
+-- them, and the fixed settling re-read never reaches back far enough to correct
+-- them — a permanent zero. Kept, a not-yet-billed statement returns with a null
+-- \`sku_name\`, which the allocator reads as "seen but unbilled" and holds the
+-- watermark for until its bill lands (or the max hold expires).
+LEFT JOIN priced pr
+  ON pr.usage_hour = w.usage_hour AND pr.warehouse_id = w.warehouse_id
+-- A union, because each half alone is a cliff. The label is a display string
+-- the provider can rename or localize at will; the space id is structural but
+-- observed on 103/103 Genie statements over 60 days, not documented as
+-- guaranteed. Either change alone silently shrinks the priced set to zero —
+-- together, both have to break at once.
+WHERE (w.genie_space_id IS NOT NULL OR w.client_application = :genie_app)
+LIMIT ${WAREHOUSE_COST_ROW_LIMIT}
+`;
+
+/**
+ * The Statement Execution API's reply, as far as this adapter cares.
+ *
+ * `data_array` is rows of strings — the API stringifies every value, including
+ * the decimal this query casts — which is exactly what money needs, because a
+ * float never exists anywhere along the path.
+ */
+const warehouseCostResponseSchema = z.object({
+  status: z.object({
+    state: z.string(),
+    error: z.object({ message: z.string() }).partial().optional(),
+  }),
+  manifest: z
+    .object({
+      schema: z
+        .object({
+          columns: z.array(z.object({ name: z.string() })).optional(),
+        })
+        .optional(),
+      /** How many rows the query produced, which is not how many arrived. */
+      total_row_count: z.number().optional(),
+    })
+    .optional(),
+  result: z
+    .object({
+      data_array: z.array(z.array(z.string().nullable())).optional(),
+      /**
+       * Present when the answer did not fit in one chunk.
+       *
+       * An `INLINE` answer is capped by size as well as by row count, so a
+       * reply can be short of the `LIMIT` and still be missing rows. This is
+       * the only field that says so.
+       */
+      next_chunk_index: z.number().optional(),
+    })
+    .optional(),
+});
+
+/**
+ * The columns `WAREHOUSE_COST_STATEMENT` selects, in order.
+ *
+ * The API answers in `JSON_ARRAY` form — rows are positional, with the names
+ * only in the manifest — so reading a row means trusting that its third value
+ * is still the hour's total. Every value here is a string, which means a
+ * reordered SELECT would not fail any parse: it would quietly price questions
+ * off the wrong column. Checking the manifest turns that into a refusal.
+ */
+const WAREHOUSE_COST_COLUMNS = [
+  "statement_id",
+  "execution_duration_ms",
+  "hour_total_ms",
+  "hour_billable_usd",
+  "currency_code",
+  "sku_name",
+] as const;
+
+/**
+ * What one cost reply turned out to be worth.
+ *
+ * The two refusals are kept apart because the caller can do something about
+ * one of them and nothing about the other. `cut_short` means rows exist that
+ * did not arrive — asking about a smaller window can get them, so the window
+ * is worth holding open and retrying. `failed` means the question was not
+ * answered at all; a smaller window would be refused the same way, and holding
+ * the watermark on it would stall a workspace whose billing tables simply
+ * cannot be read, forever, with no way out but turning the feature off.
+ *
+ * Collapsing the two — which is what a bare `null` did — is what let a busy
+ * first sweep record a month of questions at zero and move on.
+ */
+type WarehouseCostRead =
+  | {
+      outcome: "priced";
+      costByStatementId: Map<string, WarehousePricedStatement>;
+      /**
+       * At least one statement in this window was seen but has no billing row
+       * yet — its cost has not settled. The window priced, but not wholly, so
+       * the watermark must hold here rather than move past the unbilled
+       * statement and record it at zero for good.
+       */
+      owed: boolean;
+    }
+  /** More rows exist than arrived. A smaller question would carry them. */
+  | { outcome: "cut_short" }
+  /**
+   * The answer never came back: cancelled for exceeding its time limit, given
+   * up on by this end, or refused by something that will not still be refusing
+   * next run.
+   *
+   * Split out from `failed` because the two are opposites in the only way that
+   * matters here — whether asking again is worth anything. Collapsed together
+   * they were, and a workspace whose billing tables are merely slow had the
+   * whole unpriced remainder of its window written off at zero for good.
+   */
+  | { outcome: "timed_out" }
+  /** Answered, and the answer was no. Asking again would be answered no. */
+  | { outcome: "failed" };
+
+type WarehouseCostStatement = z.infer<typeof warehouseCostResponseSchema>;
+
+/**
+ * Statement states that mean the answer did not arrive in time, as opposed to
+ * the workspace declining to give one.
+ *
+ * `CANCELED` is what `on_wait_timeout: "CANCEL"` produces, and it is by far the
+ * common one. The other two are the shapes a reply takes when it is still being
+ * worked on — which the request asks never to receive, so seeing one means the
+ * assumption behind that request no longer holds, and treating it as a refusal
+ * would write off a window nobody ever declined to price.
+ */
+const WAREHOUSE_COST_UNFINISHED_STATES = new Set([
+  "CANCELED",
+  "PENDING",
+  "RUNNING",
+]);
+
+/**
+ * The last instant still covered by what this run priced, given that `chunk` is
+ * the first piece it could not.
+ *
+ * One millisecond before the chunk starts, and the millisecond is the whole
+ * point. Both boundaries here are half-open in the same direction and that is
+ * what makes the naive answer wrong: the cost query asks
+ * `start_time >= :from_ts`, so a statement AT `chunk.fromMs` belongs to the
+ * unpriced piece, while message enumeration keeps only `createdMs > sinceMs`,
+ * so a watermark of `chunk.fromMs` drops a question asked at that same instant.
+ * It would be emitted once at zero and then filtered out of every later run —
+ * the exact permanence this ceiling exists to prevent, reintroduced on a
+ * one-millisecond seam.
+ *
+ * Chunks are hour-aligned, so this only bites a question asked exactly on the
+ * hour. That is rare and completely deterministic when it happens, which is the
+ * worst combination to leave in: too rare to notice, permanent when it lands.
+ */
+function unpricedFloor(chunk: { fromMs: number }): number {
+  return chunk.fromMs - 1;
+}
+
+/** Fold one chunk's priced statements into the sweep's running total. */
+function mergeWarehouseCost(
+  into: Map<string, WarehousePricedStatement>,
+  from: Map<string, WarehousePricedStatement>,
+): void {
+  for (const [statementId, priced] of from) into.set(statementId, priced);
+}
+
+/**
+ * The shape of a cost question, for the log line. Every defect this puller has
+ * had was a timing one — too many questions for the run's deadline, or a wait
+ * that sat inside the spread of how long answers take — and neither is visible
+ * from an outcome alone, so each question records how wide it was.
+ */
+function warehouseCostObserved({
+  adapter,
+  warehouseId,
+  chunk,
+}: {
+  adapter: string;
+  warehouseId: string;
+  chunk: { fromMs: number; toMs: number };
+}) {
+  return {
+    adapter,
+    warehouseId,
+    askedFrom: new Date(startOfHourMs(chunk.fromMs)).toISOString(),
+    askedTo: new Date(endOfHourMs(chunk.toMs)).toISOString(),
+    askedHours: Math.round(
+      (endOfHourMs(chunk.toMs) - startOfHourMs(chunk.fromMs)) / ONE_HOUR_MS,
+    ),
+  };
+}
+
+/**
+ * The window is unpriced and we know why. Whether it is worth asking about
+ * again is decided entirely here, and every state that is not a success used to
+ * answer no. A statement cancelled for running past its wait is the one this
+ * gets wrong most often: the warehouse was answering it perfectly well and
+ * simply ran out of the time the request allowed, so the same question asked
+ * again — or asked about less — answers fine.
+ */
+function readUnsuccessfulWarehouseCost({
+  statement,
+  log,
+}: {
+  statement: WarehouseCostStatement;
+  log: Record<string, unknown>;
+}): WarehouseCostRead {
+  const unfinished = WAREHOUSE_COST_UNFINISHED_STATES.has(
+    statement.status.state,
+  );
+  logger.warn(
+    {
+      ...log,
+      state: statement.status.state,
+      error: statement.status.error?.message,
+    },
+    unfinished
+      ? "databricks warehouse cost query ran out of time; holding the window so it is asked again"
+      : "databricks warehouse cost query did not succeed; recording the questions without cost",
+  );
+  return { outcome: unfinished ? "timed_out" : "failed" };
+}
+
+/**
+ * An answer can be cut short three ways, and only the first is obvious. A full
+ * page means the LIMIT bit. A `next_chunk_index` means the reply was too large
+ * to send at once and the rest is elsewhere — that one arrives *under* the
+ * LIMIT, so a row count alone would call it complete. And a manifest that counts
+ * more rows than arrived says so outright.
+ *
+ * Which statements are missing is exactly what none of these can tell us, so
+ * pricing the ones that did arrive would put a confident zero on the rest.
+ */
+function warehouseAnswerCutShort({
+  statement,
+  dataLength,
+}: {
+  statement: WarehouseCostStatement;
+  dataLength: number;
+}): boolean {
+  const total = statement.manifest?.total_row_count;
+  return (
+    dataLength >= WAREHOUSE_COST_ROW_LIMIT ||
+    statement.result?.next_chunk_index !== undefined ||
+    (total !== undefined && total > dataLength)
+  );
+}
+
+/**
+ * Turn one cost reply into per-statement cost, or refuse the whole reply.
+ *
+ * A refusal prices nothing from this reply — the questions are still recorded,
+ * and a re-read leaves any cost an earlier run worked out alone. Refusing whole
+ * is deliberate: a partial answer prices some questions and leaves the rest at
+ * nothing, and nothing is indistinguishable from a question that genuinely cost
+ * nothing.
+ */
+function readWarehouseCost({
+  payload,
+  adapter,
+  warehouseId,
+}: {
+  payload: unknown;
+  adapter: string;
+  warehouseId: string;
+}): WarehouseCostRead {
+  const statement = warehouseCostResponseSchema.parse(payload);
+  // Named for what it is. This warehouse ran the billing query; it is not the
+  // warehouse whose compute the reply is about, and a log line that conflates
+  // the two sends whoever reads it to the wrong workspace object.
+  const log = { adapter, executorWarehouseId: warehouseId };
+
+  if (statement.status.state !== "SUCCEEDED") {
+    return readUnsuccessfulWarehouseCost({ statement, log });
+  }
+
+  // No manifest is a refusal, not a pass. The rows are positional and every
+  // value in them is a string, so without the names there is nothing that could
+  // tell a correct answer from a reordered one — which is the whole case this
+  // check exists for. An answer we cannot check is one we cannot price from.
+  const served = statement.manifest?.schema?.columns?.map((c) => c.name);
+  if (!served || !WAREHOUSE_COST_COLUMNS.every((n, i) => served[i] === n)) {
+    logger.error(
+      { ...log, expected: WAREHOUSE_COST_COLUMNS, served },
+      "databricks warehouse cost query answered with unexpected columns; refusing to price from it",
+    );
+    // Not `cut_short`: the answer arrived, it just could not be trusted. A
+    // narrower window would be answered with the same columns.
+    return { outcome: "failed" };
+  }
+
+  const data = statement.result?.data_array ?? [];
+
+  if (warehouseAnswerCutShort({ statement, dataLength: data.length })) {
+    logger.error(
+      {
+        ...log,
+        rows: data.length,
+        limit: WAREHOUSE_COST_ROW_LIMIT,
+        totalRowCount: statement.manifest?.total_row_count,
+        nextChunkIndex: statement.result?.next_chunk_index,
+      },
+      "databricks warehouse cost answer was cut short; refusing a partial answer",
+    );
+    return { outcome: "cut_short" };
+  }
+
+  let unreadable = 0;
+  const rows = data.flatMap((columns) => {
+    const parsed = warehouseCostRowSchema.safeParse({
+      statementId: columns[0],
+      executionDurationMs: columns[1],
+      hourTotalMs: columns[2],
+      hourBillableUsd: columns[3] ?? null,
+      currencyCode: columns[4] ?? null,
+      // Null is meaningful now, not an empty-string fallback: the LEFT JOIN
+      // returns a null SKU for a statement whose hour has no billing row yet,
+      // and the allocator reads that as "seen but unbilled".
+      skuName: columns[5] ?? null,
+    });
+    if (!parsed.success) {
+      unreadable += 1;
+      return [];
+    }
+    return [parsed.data];
+  });
+
+  // Every other refusal reaches the log through `skipped`. A row that would not
+  // parse is the one case that would otherwise under-price in silence.
+  if (unreadable > 0) {
+    logger.warn(
+      { ...log, unreadable, rows: data.length },
+      "some databricks warehouse cost rows could not be read; those questions carry no cost",
+    );
+  }
+
+  const { costByStatementId, skipped, owed } = allocateWarehouseCost({ rows });
+  if (skipped.length > 0) {
+    logger.warn(
+      {
+        ...log,
+        skipped: skipped.length,
+        // The reasons, not the rows: a workspace priced in one currency
+        // produces one reason repeated a thousand times.
+        reasons: [...new Set(skipped.map((entry) => entry.reason))],
+        skus: [...new Set(skipped.map((entry) => entry.skuName))],
+      },
+      "some databricks warehouse compute could not be priced; those questions carry no cost",
+    );
+  }
+  if (owed.size > 0) {
+    logger.info(
+      { ...log, owed: owed.size },
+      "some databricks questions were seen but not billed yet; holding the watermark until their cost settles",
+    );
+  }
+  return { outcome: "priced", costByStatementId, owed: owed.size > 0 };
+}
 
 /**
  * Anything below this is epoch SECONDS; anything above it is epoch
@@ -184,6 +787,16 @@ const EPOCH_SECONDS_CEILING = 1e11;
 /** Databricks' integer timestamp, in whichever unit it arrived, as epoch ms. */
 function toEpochMs(value: number): number {
   return value < EPOCH_SECONDS_CEILING ? value * 1000 : value;
+}
+
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
+function startOfHourMs(ms: number): number {
+  return Math.floor(ms / ONE_HOUR_MS) * ONE_HOUR_MS;
+}
+
+function endOfHourMs(ms: number): number {
+  return Math.ceil(ms / ONE_HOUR_MS) * ONE_HOUR_MS;
 }
 
 /**
@@ -315,6 +928,24 @@ const cursorSchema = z.object({
    * stamped it — hence the cursor rather than a local.
    */
   sweepStartedAtMs: z.number().int().positive().nullable().default(null),
+  /**
+   * When the watermark first stopped for a bill it could not read, or null when
+   * it is not stopped for one.
+   *
+   * The age of the hold, not its depth. A hold is a bet that the bill is merely
+   * late, and the bet has to be callable: a day with more statements than one
+   * reply can carry is cut short identically on every future run, and a hold
+   * with no expiry pins the source to that instant forever while the sweep it
+   * repeats grows wider each time. Depth cannot tell those apart — a first
+   * sweep is legitimately thirty days back on its first run — so the instant
+   * the hold BEGAN is what is carried, and it is cleared the moment a run
+   * prices its window whole.
+   *
+   * Same shape as `sweepHadGap` above, and for the same reason: that flag
+   * exists because making the resume point hang back at an unreadable space
+   * bought starvation. This is the billing tables' version of the same trade.
+   */
+  costHeldSinceMs: z.number().int().positive().nullable().default(null),
 });
 type GenieCursor = z.infer<typeof cursorSchema>;
 
@@ -346,6 +977,8 @@ function nextWatermark({
   sweepStartedAtMs,
   complete,
   oldestPendingMs,
+  pricedThroughMs,
+  holdExpired,
 }: {
   previousMs: number;
   sweepStartedAtMs: number;
@@ -357,14 +990,52 @@ function nextWatermark({
    * re-read window without bound.
    */
   oldestPendingMs: number | null;
+  /**
+   * The instant past which this run could not work out what anything cost.
+   *
+   * A second ceiling, and it exists because a question recorded at zero is
+   * indistinguishable from one that genuinely cost nothing. Moving the
+   * watermark past a period whose bill we could have read but did not means no
+   * later run ever looks at it again — later runs re-read only the settling
+   * window — so the zero becomes the permanent answer. Stopping here costs a
+   * re-read of a period already recorded, and re-emitting a message REPLACES
+   * its ledger row, so the correct figure lands the moment the bill does.
+   *
+   * `null` when nothing is owed: the window priced whole, or the billing
+   * question could not be answered at all and holding would stall forever.
+   */
+  pricedThroughMs: number | null;
+  /**
+   * Whether this hold has gone on long enough to stop being a bet on lateness.
+   *
+   * Decided by the caller from `costHeldSinceMs`, which the cursor carries —
+   * same shape as `sweepHadGap`, and for the same reason: a hold with no way to
+   * expire starves the thing it is protecting.
+   */
+  holdExpired: boolean;
 }): number {
   if (!complete) return previousMs;
   const swept = sweepStartedAtMs - WATERMARK_LAG_MS;
-  const capped =
+  const pending =
     oldestPendingMs === null ? swept : Math.min(swept, oldestPendingMs - 1);
+  // At, not just short of: `pricedThroughMs` is the END of the last period read
+  // whole, so everything up to and including that instant has its cost.
+  //
+  // Only while the hold is still worth honouring. `holdExpired` is decided by
+  // how LONG the watermark has been held, not by how far back it sits: a first
+  // sweep starts thirty days behind and that is not a stall, whereas the same
+  // instant refused for a week running is.
+  const capped =
+    pricedThroughMs === null || holdExpired
+      ? pending
+      : Math.min(pending, pricedThroughMs);
   // Never backwards. An unsettled message always sits above the previous
   // watermark (it passed that filter to be read at all), so this only guards
   // the arithmetic, but a watermark that could move back would re-read forever.
+  //
+  // It also absorbs the case where NOTHING priced: the cost read starts at or
+  // below the watermark, so its ceiling lands under `previousMs` and the
+  // watermark simply holds.
   return Math.max(previousMs, capped);
 }
 
@@ -428,6 +1099,7 @@ function parseCursor(
     spaceSetFingerprint: null,
     sweepOldestPendingMs: null,
     sweepStartedAtMs: null,
+    costHeldSinceMs: null,
   };
 }
 
@@ -584,6 +1256,22 @@ class RunBudget {
   exhausted(): boolean {
     if (this.requests >= this.maxRequests) return true;
     return this.deadlineMs !== undefined && Date.now() > this.deadlineMs;
+  }
+
+  /**
+   * `exhausted`, asked on behalf of work that cannot be given up once it has
+   * started: true when fewer than `reserveMs` of the deadline remain.
+   *
+   * `exhausted` is the wrong question before a long request. It only answers
+   * once the deadline has ALREADY passed, and by then the worker has killed the
+   * run and thrown away every event the sweep read — the request's own graceful
+   * failure never gets to matter. Declining to start it is what keeps them.
+   */
+  exhaustedWithin(reserveMs: number): boolean {
+    if (this.requests >= this.maxRequests) return true;
+    return (
+      this.deadlineMs !== undefined && Date.now() + reserveMs > this.deadlineMs
+    );
   }
 }
 
@@ -874,12 +1562,11 @@ export class DatabricksGeniePuller
     options: PullRunOptions,
     config: DatabricksGeniePullConfig,
   ): Promise<PullResult> {
-    const token = options.credentials?.token;
-    if (!token) {
-      throw new Error(
-        "databricks genie puller requires a workspace bearer token in credentials.token",
-      );
-    }
+    const token = await resolveWorkspaceToken({
+      credentials: options.credentials,
+      workspaceUrl: config.workspaceUrl,
+      signal: options.signal,
+    });
 
     const cursor = parseCursor(options.cursor, config);
     const budget = new RunBudget(options.deadlineMs, this.maxRequests);
@@ -915,9 +1602,42 @@ export class DatabricksGeniePuller
       return { events: [], cursor: options.cursor, errorCount: 1 };
     }
 
+    // After the sweep, not during it: the billing read covers the whole run at
+    // once, and the window it asks about is the window the sweep actually read.
+    // Asking first would either guess that window or ask per space. It is one
+    // read of that window, taken a day at a time — see `warehouseCost`.
+    const { costByStatementId, pricedThroughMs } = await this.warehouseCost({
+      config,
+      token,
+      options,
+      budget,
+      fromMs: costReadFloorMs({
+        sinceMs: cursor.sinceMs,
+        nowMs: sweepStartedAtMs,
+        costEnabled: config.warehouseId !== undefined,
+      }),
+      toMs: Date.now(),
+    });
+
     return {
-      events: sweep.events,
-      cursor: encode(nextCursor({ previous: cursor, sweep, sweepStartedAtMs })),
+      events: withWarehouseCost({
+        events: sweep.events,
+        costByStatementId,
+        costEnabled: config.warehouseId !== undefined,
+        watermarkMs: cursor.sinceMs,
+      }),
+      cursor: encode(
+        // The cost read is part of what this run knows, so the watermark answers
+        // to it as well as to the sweep. Without that, a window whose bill could
+        // not be read is still recorded, still advanced past, and never revisited.
+        nextCursor({
+          previous: cursor,
+          sweep,
+          sweepStartedAtMs,
+          pricedThroughMs,
+          nowMs: Date.now(),
+        }),
+      ),
       errorCount: 0,
     };
   }
@@ -1000,7 +1720,20 @@ export class DatabricksGeniePuller
         options,
         budget,
         space,
-        sinceMs: cursor.sinceMs,
+        // Not `cursor.sinceMs` directly: a source that prices its questions
+        // reads further back than its watermark, because a question's compute
+        // is published well after the question. The watermark itself is
+        // untouched — `nextCursor` derives it from the cursor, not from this —
+        // so this only ever widens what a run reads.
+        // Read against the clock rather than the sweep's anchor: "far enough
+        // back that the bill has landed" is a statement about now. A resumed
+        // sweep carries an anchor that may be hours old, and deriving the floor
+        // from it would widen the window for no benefit.
+        sinceMs: costReadFloorMs({
+          sinceMs: cursor.sinceMs,
+          nowMs: Date.now(),
+          costEnabled: config.warehouseId !== undefined,
+        }),
         identities,
         resumeConversationId,
       });
@@ -1669,10 +2402,11 @@ export class DatabricksGeniePuller
       actor: identity.email || identity.key,
       action: "genie_query",
       target: space.title ?? space.space_id,
-      // Genie bills nothing per message. See the file header: the warehouse
-      // DBUs the generated SQL burns are billed elsewhere and are not on this
-      // API, so the record says zero and declines to call it the full invoice.
-      cost_usd: 0,
+      // Zero at the point the message is built, always. Genie bills nothing per
+      // message, and the warehouse compute behind it is not on this API — a
+      // source that names a warehouse has that share attached afterwards, once
+      // the run's billing read has answered. See `withWarehouseCost`.
+      cost_usd: "0",
       tokens_input: 0,
       tokens_output: 0,
       raw_payload: JSON.stringify(message),
@@ -1697,10 +2431,11 @@ export class DatabricksGeniePuller
         actorUserId: message.user_id === null ? "" : String(message.user_id),
         [PULLED_USAGE_HINT_KEY]: {
           costBasis: "provider_reported",
-          // Not `exact`. Zero is Genie's own per-message price, but the
-          // warehouse cost behind the question is invoiced through Databricks'
-          // system tables, which this API does not expose. `estimate` says
-          // that plainly instead of claiming we hold the whole figure.
+          // Never `exact`, whether or not a warehouse is named. With none, zero
+          // is only Genie's own per-message price and says nothing about the
+          // compute behind the question. With one, the figure is a share of an
+          // hourly bill worked out from LIST prices, because the account's
+          // negotiated rate is on no table this token can read.
           costStatus: "estimate",
           costUsd: "0",
           dimensions,
@@ -1710,7 +2445,491 @@ export class DatabricksGeniePuller
     };
   }
 
-  /** One authenticated GET, budgeted and abortable. */
+  /**
+   * What each Genie statement in the window cost, and how much of that window
+   * the answer actually covers.
+   *
+   * Never throws, in any failure mode. This runs alongside a sweep whose job is
+   * to record what people asked of the data, and that job does not depend on
+   * this one: a workspace that has not granted the billing tables, or whose
+   * metastore is briefly unavailable, should still get its activity. The
+   * alternative trades the thing that always works for the thing that sometimes
+   * does.
+   *
+   * The window is read a chunk at a time, oldest first, and the walk stops at
+   * the first period it cannot price. `pricedThroughMs` is where it stopped,
+   * and the caller keeps the watermark at or below it so that period is asked
+   * about again next run instead of being written off. A first sweep spans
+   * thirty days, and without that the whole month would be recorded at zero the
+   * one time a busy warehouse tripped the row cap — permanently, because later
+   * runs only re-read the settling window and would never look at those days
+   * again.
+   *
+   * A chunk that cannot be answered whole is re-asked in days before the walk
+   * gives up on it. Only a chunk that is REFUSED — the question reached billing
+   * and billing said no — skips that, since asking the same question about less
+   * gets the same no.
+   *
+   * `null` means no ceiling is owed: either the whole window priced, or the
+   * question was refused and re-asking it would not help.
+   */
+  private async warehouseCost({
+    config,
+    token,
+    options,
+    budget,
+    fromMs,
+    toMs,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+    fromMs: number;
+    toMs: number;
+  }): Promise<{
+    costByStatementId: Map<string, WarehousePricedStatement> | null;
+    /** The instant past which cost is not known. `null` owes no ceiling. */
+    pricedThroughMs: number | null;
+  }> {
+    const warehouseId = config.warehouseId;
+    if (!warehouseId) return { costByStatementId: null, pricedThroughMs: null };
+
+    const costByStatementId = new Map<string, WarehousePricedStatement>();
+
+    for (const chunk of warehouseCostChunks({ fromMs, toMs })) {
+      const outcome = await this.priceWarehouseCostChunk({
+        config,
+        token,
+        options,
+        budget,
+        warehouseId,
+        chunk,
+        costByStatementId,
+      });
+      if (outcome.done) {
+        return { costByStatementId, pricedThroughMs: outcome.pricedThroughMs };
+      }
+    }
+
+    return { costByStatementId, pricedThroughMs: null };
+  }
+
+  /**
+   * One chunk of the sweep: whether the run still has room for it, the answer,
+   * and — when the answer is not whole — the pieces. `done` stops the walk with
+   * a ceiling; `!done` carries it to the next chunk.
+   */
+  private async priceWarehouseCostChunk({
+    config,
+    token,
+    options,
+    budget,
+    warehouseId,
+    chunk,
+    costByStatementId,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+    warehouseId: string;
+    chunk: { fromMs: number; toMs: number };
+    costByStatementId: Map<string, WarehousePricedStatement>;
+  }): Promise<
+    { done: true; pricedThroughMs: number | null } | { done: false }
+  > {
+    // Out of requests, or out of the time one more would need, with days still
+    // unpriced. Those days are not refused, just unread, so the watermark holds
+    // here and the next run starts its cost read where this one ran out — which
+    // is what turns a month-long backfill into several runs that each progress.
+    //
+    // The time half has to be asked BEFORE the request, against the whole of
+    // `WAREHOUSE_COST_TIMEOUT_MS`. A billing read still in flight when the
+    // worker's deadline lands does not merely go unpriced: the worker kills the
+    // run and discards the questions the sweep had already read, and the cursor
+    // stays where it was, so the next run reads them and stalls in the same
+    // place. Unpriced questions are recoverable; a run killed holding them is
+    // the sweep done for nothing.
+    if (budget.exhaustedWithin(WAREHOUSE_COST_TIMEOUT_MS)) {
+      logger.warn(
+        {
+          adapter: this.id,
+          warehouseId,
+          pricedThrough: new Date(chunk.fromMs).toISOString(),
+        },
+        "databricks warehouse cost has no room left in this run; holding the watermark at the last priced day",
+      );
+      return { done: true, pricedThroughMs: unpricedFloor(chunk) };
+    }
+
+    const read = await this.warehouseCostChunk({
+      config,
+      token,
+      options,
+      budget,
+      warehouseId,
+      chunk,
+    });
+
+    // The question itself was answered, and the answer was no. Asking about
+    // less would be answered no the same way, so no ceiling is owed: the
+    // questions are recorded without cost, exactly as they were before any of
+    // this existed, and the source keeps moving rather than stalling on billing
+    // tables it may never read.
+    if (read.outcome === "failed") {
+      return { done: true, pricedThroughMs: null };
+    }
+
+    if (read.outcome === "priced") {
+      // A statement is bucketed by the hour it started in and every hour lies
+      // inside exactly one chunk, so no two chunks answer for the same one.
+      mergeWarehouseCost(costByStatementId, read.costByStatementId);
+      // Priced, but not wholly: a statement here was seen and has no bill yet.
+      // Hold the watermark at the chunk's start so the whole chunk is re-read
+      // once billing lands, rather than moving past the unbilled statement and
+      // recording it at zero for good. The statements that did price keep the
+      // cost merged above; a re-read simply replaces their ledger rows with the
+      // same figure. The hold is bounded by `WAREHOUSE_COST_MAX_HOLD_MS`, so a
+      // statement that is never billed stops holding the source after that.
+      if (read.owed) {
+        return { done: true, pricedThroughMs: unpricedFloor(chunk) };
+      }
+      return { done: false };
+    }
+
+    // Either more rows exist here than one reply can carry, or the answer did
+    // not come back in time. Both are reasons to ask about LESS rather than to
+    // give up on the period: surrendering the whole chunk costs every question
+    // inside it its cost figure, including the days that would have answered on
+    // their own.
+    return this.warehouseCostChunkInPieces({
+      config,
+      token,
+      options,
+      budget,
+      warehouseId,
+      chunk,
+      read,
+      costByStatementId,
+    });
+  }
+
+  /**
+   * A chunk that could not be priced whole, re-asked in smaller pieces. Every
+   * piece that answers is priced into the shared map; the walk stops at the
+   * first that does not.
+   *
+   * Paid for only once a chunk has actually been refused, so a workspace whose
+   * chunks answer never spends a request here. `done` tells the walk whether to
+   * stop with a ceiling — some piece was refused, or the run ran out of room —
+   * or carry on to the next chunk because every piece priced. When a piece is
+   * refused the ceiling holds at that piece, not at the start of the chunk it
+   * was in: the pieces answered before it keep their cost and are never asked
+   * about again.
+   */
+  private async warehouseCostChunkInPieces({
+    config,
+    token,
+    options,
+    budget,
+    warehouseId,
+    chunk,
+    read,
+    costByStatementId,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+    warehouseId: string;
+    chunk: { fromMs: number; toMs: number };
+    read: WarehouseCostRead;
+    costByStatementId: Map<string, WarehousePricedStatement>;
+  }): Promise<
+    { done: true; pricedThroughMs: number | null } | { done: false }
+  > {
+    const pieces = warehouseCostPieces(chunk);
+    logger.warn(
+      {
+        adapter: this.id,
+        warehouseId,
+        outcome: read.outcome,
+        chunkFrom: new Date(chunk.fromMs).toISOString(),
+        chunkTo: new Date(chunk.toMs).toISOString(),
+        pieces: pieces.length,
+      },
+      "databricks warehouse cost could not price a period whole; asking about smaller pieces of it",
+    );
+
+    const walked =
+      pieces.length === 0
+        ? chunk
+        : await this.walkWarehouseCostPieces({
+            config,
+            token,
+            options,
+            budget,
+            warehouseId,
+            pieces,
+            costByStatementId,
+          });
+
+    // A refusal to a piece is still a refusal to the question, and it is the
+    // same one whichever size it was asked at.
+    if (walked === "failed") {
+      return { done: true, pricedThroughMs: null };
+    }
+    const refused = walked;
+
+    if (refused) {
+      logger.error(
+        {
+          adapter: this.id,
+          warehouseId,
+          pricedThrough: new Date(refused.fromMs).toISOString(),
+          refusedTo: new Date(refused.toMs).toISOString(),
+        },
+        "databricks warehouse cost could not price a period even in pieces; holding the watermark so it is asked again",
+      );
+      return { done: true, pricedThroughMs: unpricedFloor(refused) };
+    }
+
+    return { done: false };
+  }
+
+  /**
+   * The pieces in order: each that prices whole is merged, and the first that
+   * cannot be — refused, still owing a bill, or outrunning the run's budget —
+   * is returned as where the watermark holds. `"failed"` ends the whole sweep;
+   * `null` says every piece priced.
+   */
+  private async walkWarehouseCostPieces({
+    config,
+    token,
+    options,
+    budget,
+    warehouseId,
+    pieces,
+    costByStatementId,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+    warehouseId: string;
+    pieces: { fromMs: number; toMs: number }[];
+    costByStatementId: Map<string, WarehousePricedStatement>;
+  }): Promise<{ fromMs: number; toMs: number } | "failed" | null> {
+    for (const piece of pieces) {
+      if (budget.exhaustedWithin(WAREHOUSE_COST_TIMEOUT_MS)) {
+        return piece;
+      }
+
+      const pieceRead = await this.warehouseCostChunk({
+        config,
+        token,
+        options,
+        budget,
+        warehouseId,
+        chunk: piece,
+      });
+
+      if (pieceRead.outcome === "failed") {
+        return "failed";
+      }
+      if (pieceRead.outcome !== "priced") {
+        return piece;
+      }
+      // Priced, but a statement in this piece has no bill yet. Hold at the
+      // piece, exactly as a refusal to it would: the pieces before it kept
+      // their cost and are never re-asked, and this one is re-read once its
+      // billing settles. Merging the piece first would be overwritten by that
+      // re-read, so it is left for the re-read to price whole.
+      if (pieceRead.owed) {
+        return piece;
+      }
+      mergeWarehouseCost(costByStatementId, pieceRead.costByStatementId);
+    }
+    return null;
+  }
+
+  /** One chunk of the window, priced or refused. */
+  private async warehouseCostChunk({
+    config,
+    token,
+    options,
+    budget,
+    warehouseId,
+    chunk,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+    warehouseId: string;
+    chunk: { fromMs: number; toMs: number };
+  }): Promise<WarehouseCostRead> {
+    const { fromMs, toMs } = chunk;
+    const askedAtMs = Date.now();
+    const observed = warehouseCostObserved({
+      adapter: this.id,
+      warehouseId,
+      chunk,
+    });
+
+    try {
+      const payload = await this.post({
+        config,
+        token,
+        options,
+        budget,
+        path: "/api/2.0/sql/statements",
+        body: {
+          warehouse_id: warehouseId,
+          statement: WAREHOUSE_COST_STATEMENT,
+          // One request, no polling. A query that cannot finish inside the
+          // wait is cancelled, and the window it covered is held rather than
+          // written off, so the next run asks about it again. Polling would
+          // hold a run open on the slowest thing it does.
+          //
+          // Fifty seconds is the most the API accepts, and it is asked for
+          // because the warehouse routinely needs more than the thirty this
+          // used to allow. Measured against a real workspace on 2026-08-19,
+          // five reads of a week each came back in 10.8s, 23.4s, 26.9s, 37.7s
+          // and 22.0s — a thirty-second limit sits inside that spread and
+          // cancels answers that were on their way.
+          //
+          // Still inside the client's own `WAREHOUSE_COST_TIMEOUT_MS`, which
+          // stays the outer bound: the warehouse gives up before this end does,
+          // so a cancelled statement is reported rather than merely abandoned.
+          wait_timeout: "50s",
+          on_wait_timeout: "CANCEL",
+          format: "JSON_ARRAY",
+          disposition: "INLINE",
+          // Bound, never interpolated. The window arrives from a clock, but the
+          // statement is a constant either way and this keeps it one.
+          //
+          // The warehouse id is deliberately absent. It says where this query
+          // runs, not what it may answer about: a Genie space answers on the
+          // warehouse it was authored against, which is routinely not the one
+          // the credential holds `CAN USE` on, and filtering to the executor
+          // would price every question at nothing.
+          parameters: [
+            // Whole hours, both ends. The warehouse is billed per hour and the
+            // statements are bucketed per hour, but the two are filtered
+            // separately: a window starting at 10:37 keeps hour 10's queries
+            // and drops hour 10's bill, so every question in that hour prices
+            // at nothing — and on a re-read that nothing would overwrite a
+            // cost an earlier run had already worked out correctly.
+            {
+              name: "from_ts",
+              value: new Date(startOfHourMs(fromMs)).toISOString(),
+              type: "TIMESTAMP",
+            },
+            {
+              name: "to_ts",
+              value: new Date(endOfHourMs(toMs)).toISOString(),
+              type: "TIMESTAMP",
+            },
+            {
+              name: "genie_app",
+              value: GENIE_CLIENT_APPLICATION,
+              type: "STRING",
+            },
+          ],
+        },
+      });
+
+      const read = readWarehouseCost({
+        payload,
+        adapter: this.id,
+        warehouseId,
+      });
+      logger.info(
+        {
+          ...observed,
+          outcome: read.outcome,
+          elapsedMs: Date.now() - askedAtMs,
+          statements:
+            read.outcome === "priced" ? read.costByStatementId.size : 0,
+          owed: read.outcome === "priced" ? read.owed : false,
+        },
+        "databricks warehouse cost question answered",
+      );
+      return read;
+    } catch (error) {
+      // The same split the statement states get, at the other door. A request
+      // this end gave up on, or one the workspace could not serve right now,
+      // says nothing about whether the window can ever be priced — writing it
+      // off puts a permanent zero on questions over a hiccup. Only an answer
+      // that will be the same next run is a refusal: a token without the grant
+      // is refused identically forever, and holding for it would stall the
+      // source with no way out but turning the feature off.
+      const unfinished =
+        !(error instanceof GenieHttpError) ||
+        error.status === 429 ||
+        error.status >= 500;
+      logger.warn(
+        {
+          ...observed,
+          elapsedMs: Date.now() - askedAtMs,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        unfinished
+          ? "databricks warehouse cost could not be reached; holding the window so it is asked again"
+          : "databricks warehouse cost is unavailable; recording the questions without cost",
+      );
+      return { outcome: unfinished ? "timed_out" : "failed" };
+    }
+  }
+
+  /** One authenticated POST, budgeted and abortable. */
+  private async post({
+    config,
+    token,
+    options,
+    budget,
+    path,
+    body,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+    path: string;
+    body: unknown;
+  }): Promise<unknown> {
+    const url = new URL(path, config.workspaceUrl);
+
+    const signal = options.signal
+      ? AbortSignal.any([
+          options.signal,
+          AbortSignal.timeout(WAREHOUSE_COST_TIMEOUT_MS),
+        ])
+      : AbortSignal.timeout(WAREHOUSE_COST_TIMEOUT_MS);
+
+    budget.spend();
+    const response = await ssrfSafeFetch(url.toString(), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal,
+    });
+    if (!response.ok) {
+      throw new GenieHttpError({
+        status: response.status,
+        statusText: response.statusText,
+        path,
+      });
+    }
+    return await response.json();
+  }
+
   private async get({
     config,
     token,
@@ -1755,6 +2974,105 @@ export class DatabricksGeniePuller
   }
 }
 
+/**
+ * The swept events with each question's share of the warehouse bill attached.
+ *
+ * Attached here rather than where the event is built, because the bill is one
+ * query for the whole run and a message does not know what its statement cost
+ * until that query has come back.
+ *
+ * Because the restatement key is the message's own coordinates and excludes
+ * cost, re-emitting a message REPLACES its ledger row rather than adding a
+ * second one. That is what lets a late-arriving cost correct an earlier zero —
+ * and it is also why a re-read must never carry a cost it does not know.
+ *
+ * So the three cases are kept apart:
+ *
+ *   priced          → carry the cost.
+ *   new, unpriced   → carry zero, as a question with no known cost always has.
+ *   re-read, unpriced → carry NO usage hint at all, so the event is audit-only
+ *                     and the ledger is not asked to write anything.
+ *
+ * That last case is the whole reason this function knows about the watermark.
+ * A re-read happens only because the source is trying to learn a cost; if it
+ * did not learn one — billing was refused, the hour is not published yet — then
+ * emitting zero would overwrite a figure an earlier run had already worked out
+ * correctly, and a few minutes of billing trouble would quietly wipe the spend
+ * it could not confirm.
+ */
+function withWarehouseCost({
+  events,
+  costByStatementId,
+  costEnabled,
+  watermarkMs,
+}: {
+  events: NormalizedPullEvent[];
+  costByStatementId: Map<string, WarehousePricedStatement> | null;
+  costEnabled: boolean;
+  /** The watermark this run started from: anything at or below it is a re-read. */
+  watermarkMs: number;
+}): NormalizedPullEvent[] {
+  if (!costEnabled) return events;
+
+  return events.map((event) =>
+    withCost({ event, costByStatementId, watermarkMs }),
+  );
+}
+
+/** One event's share of the warehouse bill, or its hint removed, or it unchanged. */
+function withCost({
+  event,
+  costByStatementId,
+  watermarkMs,
+}: {
+  event: NormalizedPullEvent;
+  costByStatementId: Map<string, WarehousePricedStatement> | null;
+  watermarkMs: number;
+}): NormalizedPullEvent {
+  const extra = event.extra;
+  if (!extra) return event;
+
+  const hint = extra[PULLED_USAGE_HINT_KEY];
+  if (typeof hint !== "object" || hint === null) return event;
+
+  const statementId = extra.statementId;
+  const priced =
+    typeof statementId === "string" && statementId !== ""
+      ? costByStatementId?.get(statementId)
+      : undefined;
+
+  if (priced !== undefined) {
+    return {
+      ...event,
+      // The audit row's own cost field, a decimal string since the Zod
+      // boundary stringified it — the same exact figure the ledger reads from
+      // `costUsd` below, so neither surface ever sees a float.
+      cost_usd: priced.costUsd,
+      extra: {
+        ...extra,
+        // The share's raw ingredients, for the human reading the record: an
+        // hourly bill charges for being awake, so a lone question on a quiet
+        // warehouse absorbs the idle time and its correct cost looks absurd
+        // without them. Display-only and OUTSIDE the hint below — derived
+        // values in the hint would enter the restatement key and mint a new
+        // ledger record per correction (ADR-088 Decision 5).
+        warehouseHour: {
+          totalExecutionMs: priced.hourTotalExecutionMs,
+          billableUsd: priced.hourBillableUsd,
+        },
+        [PULLED_USAGE_HINT_KEY]: { ...hint, costUsd: priced.costUsd },
+      },
+    };
+  }
+
+  const askedAtMs = Date.parse(event.event_timestamp);
+  const isReread = Number.isFinite(askedAtMs) && askedAtMs <= watermarkMs;
+  if (!isReread) return event;
+
+  const { [PULLED_USAGE_HINT_KEY]: _dropped, ...auditOnly } = extra;
+  return { ...event, extra: auditOnly };
+}
+
 function encode(cursor: GenieCursor): string {
   return JSON.stringify(cursor);
 }
@@ -1770,15 +3088,31 @@ function nextCursor({
   previous,
   sweep,
   sweepStartedAtMs,
+  pricedThroughMs,
+  nowMs,
 }: {
   previous: GenieCursor;
   sweep: SweepResult;
   sweepStartedAtMs: number;
+  /** Where cost knowledge ran out this run — see `nextWatermark`. */
+  pricedThroughMs: number | null;
+  /** This run's clock, for ageing the cost hold. */
+  nowMs: number;
 }): GenieCursor {
   // `sweep.hadGap` is already sweep-scoped — it was seeded from this cursor —
   // so there is nothing to fold here. One name, one meaning, one place it
   // accumulates.
   const stillSweeping = sweep.resumeSpaceId !== null;
+
+  // The hold starts the first run that owes a ceiling and survives across runs
+  // that keep owing one; any run that prices its window whole clears it, so a
+  // billing table that recovers costs nothing and the clock does not carry over
+  // to the next thing that goes wrong.
+  const costHeldSinceMs =
+    pricedThroughMs === null ? null : (previous.costHeldSinceMs ?? nowMs);
+  const holdExpired =
+    costHeldSinceMs !== null &&
+    nowMs - costHeldSinceMs > WAREHOUSE_COST_MAX_HOLD_MS;
 
   return {
     // A sweep that walked past something it never read is not whole, no matter
@@ -1790,6 +3124,8 @@ function nextCursor({
       sweepStartedAtMs,
       complete: sweep.complete && !sweep.hadGap,
       oldestPendingMs: sweep.oldestPendingMs,
+      pricedThroughMs,
+      holdExpired,
     }),
     spaceId: sweep.resumeSpaceId,
     // Meaningless without a space to resume into, so it is cleared with it
@@ -1807,5 +3143,9 @@ function nextCursor({
     // Held only while the sweep is still in flight, so the next run stamps a
     // fresh anchor rather than inheriting a stale one and re-reading forever.
     sweepStartedAtMs: stillSweeping ? sweepStartedAtMs : null,
+    // Cleared once expired as well as once priced: the watermark has already
+    // moved past the period, so leaving the stamp would expire every subsequent
+    // hold on arrival and the retry would never work again.
+    costHeldSinceMs: holdExpired ? null : costHeldSinceMs,
   };
 }

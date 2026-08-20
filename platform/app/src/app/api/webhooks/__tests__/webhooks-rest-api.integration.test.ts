@@ -18,7 +18,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   verifyWebhookSignature,
@@ -45,7 +45,7 @@ vi.mock("~/server/app-layer/app", () => ({
     },
     gateway: {
       webhookEvents: new WebhookEventsClickHouseRepository(async (tenantId) => {
-        const client = await getClickHouseClientForProject(tenantId);
+        const client = await getClickHouseClientForTenant(tenantId);
         if (!client) throw new Error("ClickHouse is not configured");
         return client;
       }),

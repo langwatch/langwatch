@@ -9,12 +9,14 @@
  *                           inside the instance)
  *   GrantsService           the one write surface, over AuthzGrantsRepository
  *   AuthzShadowService      the legacy resolvers' engine comparison
+ *   AuthzForkService        the engine ANSWERING for a cut-over organization,
+ *                           with legacy as the reverse-shadow comparison
  *
  * No storage engine lives here, and no environment read either: every knob
  * arrives as a closure through a service's options. The app implements the
  * repository interfaces with Prisma
- * (platform/app/src/server/authz/repositories/) and composes everything
- * once in its runtime (platform/app/src/server/authz/runtime.ts). The pure
+ * (platform/app/src/server/app-layer/authz/repositories/) and composes everything
+ * once in its runtime (platform/app/src/server/app-layer/authz/runtime.ts). The pure
  * half (registry, roles, decide()) is `@langwatch/authz`.
  */
 export { AuthzCollectorService } from "./authz-collector.service";
@@ -24,6 +26,7 @@ export {
   type BindingPrincipalWhere,
   DuplicateBindingError,
   type AuthzGrantsRepository,
+  type LedgerActor,
   type OffboardCounts,
   type RoleBindingWrite,
 } from "./authz-grants.repository";
@@ -34,11 +37,32 @@ export type {
   ScopeLineageRepository,
   ShareLinkRow,
 } from "./authz-read.repository";
+export {
+  AuthzForkService,
+  awaitForkComparisonsForTesting,
+} from "./authz-fork.service";
 export type {
+  AuthzForkOptions,
+  ForkedAnyDecision,
+  ForkedBatchDecision,
+  ForkedDecision,
+} from "./authz-fork.service";
+export type {
+  AuthzCutoverRepository,
+  AuthzGenesisRepository,
   AuthzMigrationRepository,
   ExistingTeamBinding,
+  ExternalMemberFact,
+  LegacyBindingRow,
+  LegacyRoleRow,
   LegacyTeamRow,
+  OrganizationMemberFact,
   OrganizationScopeInventory,
+  ProjectCredentialFact,
+  ResourceGrantRow,
+  ResourceGrantUsageSeed,
+  RoleHeadRow,
+  ShareLinkFactRow,
   TeamBindingWrite,
 } from "./authz-migration.repository";
 export { AuthzShadowService } from "./authz-shadow.service";
@@ -48,7 +72,7 @@ export type {
   AuthzEpochReader,
   AuthzServiceOptions,
 } from "./authz.service";
-export { GrantValidationError } from "./grant-validation";
+export { DuplicateGrantError, GrantValidationError } from "./grant-validation";
 export { GrantsService } from "./grants.service";
 export type {
   AuthzAuditWriter,
@@ -62,25 +86,45 @@ export type { OffboardResult } from "./offboard";
 export { TEAM_USER_BACKFILL_MIGRATION_NAME } from "./team-user-backfill.name";
 export {
   grantFactToCompatBinding,
+  grantFactToCompatShareLink,
   grantFactToRow,
   grantRowToFact,
+  PRINCIPAL_TO_DB,
+  RESOURCE_KIND_TO_DB,
   roleFactToRow,
   roleRowToFact,
+  SHARE_LINK_PERMISSION,
+  SHARE_VISIBILITY_BY_PRINCIPAL,
+  SHARE_VISIBILITY_BY_PRINCIPAL_DB,
+  shareVisibilityAudience,
 } from "./ledger/projection-mapping";
 export type {
   CompatBindingRowShape,
+  CompatShareLinkRowShape,
   GrantPrincipalTypeDb,
+  GrantResourceKindDb,
   GrantRowShape,
   GrantScopeTypeDb,
   RoleRowShape,
+  ShareLinkAudience,
 } from "./ledger/projection-mapping";
+// Grant identity derivation is deliberately NOT re-exported here: it imports
+// `node:crypto`, and this root entry is browser-evaluable by construction
+// (see the header of ./migration.ts). The values live on
+// `@langwatch/authz-server/migration`; only the erased types stay.
+export type {
+  BindingIdentityInput,
+  BindingIdentityPrincipal,
+} from "./ledger/grant-identity";
 export {
+  CUTOVER_COMPLETION_REFUSALS,
   emptyGrantsLedgerState,
   reduceGrantsLedger,
 } from "./ledger/grants-ledger.reducer";
 export type {
   GrantEventSource,
   GrantFact,
+  GrantRevocationSelector,
   GrantsLedgerActor,
   GrantsLedgerCutover,
   GrantsLedgerEvent,

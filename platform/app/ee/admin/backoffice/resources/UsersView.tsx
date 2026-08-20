@@ -252,7 +252,6 @@ export function ImpersonateDialog({
         description: "Saved to the audit log alongside the impersonation.",
         type: "error",
         duration: 3000,
-        meta: { closable: true },
       });
       return;
     }
@@ -382,7 +381,6 @@ function UserEditDrawer({
             title: "User updated",
             type: "success",
             duration: 3000,
-            meta: { closable: true },
           });
           onClose();
         },

@@ -3,6 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import type { ApiKey, PrismaClient } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
+import { ledgerActorFor } from "~/server/app-layer/authz/ledger-actor";
 import {
   MalformedCustomRolePermissionsError,
   parseCustomRolePermissions,
@@ -35,6 +36,7 @@ import {
   ApiKeyReservedNameError,
   ApiKeyScopeViolationError,
 } from "./errors";
+import { mintLegacyKeyGrant } from "./legacy-grant-mint";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
 
 const logger = createLogger("langwatch:api-key:service");
@@ -104,19 +106,30 @@ export class ApiKeyService {
   private readonly repo: ApiKeyRepository;
   private readonly roleRepo: RoleRepository;
   private readonly prisma: PrismaClient;
+  private readonly mintLegacyGrant: (args: {
+    apiKey: ApiKeyWithBindings;
+  }) => void;
 
   constructor({
     prisma,
     repo,
     roleRepo,
+    mintLegacyGrant = mintLegacyKeyGrant,
   }: {
     prisma: PrismaClient;
     repo: ApiKeyRepository;
     roleRepo: RoleRepository;
+    /**
+     * The read-through mint a verified legacy key triggers (decision 1).
+     * Injectable so a test can watch the seam without an event-sourcing
+     * stack behind it.
+     */
+    mintLegacyGrant?: (args: { apiKey: ApiKeyWithBindings }) => void;
   }) {
     this.prisma = prisma;
     this.repo = repo;
     this.roleRepo = roleRepo;
+    this.mintLegacyGrant = mintLegacyGrant;
   }
 
   static create(prisma: PrismaClient): ApiKeyService {
@@ -128,8 +141,13 @@ export class ApiKeyService {
   }
 
   /**
-   * Creates a new API key with the given role bindings inside a transaction.
-   * Returns the plaintext token (shown once) plus the persisted record.
+   * Creates a new API key with the given role bindings. Returns the plaintext
+   * token (shown once) plus the persisted record.
+   *
+   * There is no transaction to hold the two together — the grants are ledger
+   * commands — so the key is written revoked and activated only after they
+   * land. A create that dies halfway leaves an inert credential rather than a
+   * live one with no grants.
    *
    * Enforces two invariants before persisting:
    *   1. The target user is a member of the target organization.
@@ -253,70 +271,86 @@ export class ApiKeyService {
       ingestSourceType ? { prefix: INGEST_KEY_PREFIX } : undefined,
     );
 
-    const apiKey = await this.prisma.$transaction(async (tx) => {
-      const txRepo = ApiKeyRepository.create(tx);
-      const txRoleRepo = new RoleRepository(tx);
-
-      if (userId) {
-        await this.assertBindingsWithinCeiling({
-          prisma: tx as unknown as PrismaClient,
-          ceilingUserId: userId,
-          organizationId,
-          bindings,
-          rawPermissions: sortedPermissions,
-        });
-      }
-
-      const created = await txRepo.create({
-        name,
-        description,
-        lookupId,
-        hashedSecret,
-        permissionMode,
-        userId,
-        createdByUserId,
+    // Everything the request can be refused over is decided before anything
+    // is written: the key's own row is a plain insert, and its private role
+    // and grants are ledger commands, so there is no transaction left to roll
+    // a late refusal back with.
+    if (userId) {
+      await this.assertBindingsWithinCeiling({
+        prisma: this.prisma,
+        ceilingUserId: userId,
         organizationId,
-        expiresAt,
-        ingestSourceType,
-        ingestionTemplateId,
-        createdByDeviceLabel,
+        bindings,
+        rawPermissions: sortedPermissions,
       });
+    }
+    if (effectiveBindings.length > 0) {
+      // A key may reach a personal workspace only as its owner's own
+      // credential, whose ceiling already caps it. A service key or a key
+      // owned by anyone else binding in would hand the private workspace to
+      // a second principal.
+      await assertPersonalTeamScopesOwnedBy({
+        client: this.prisma,
+        scopes: effectiveBindings,
+        ownerUserId: userId ?? null,
+      });
+    }
 
-      if (sortedPermissions) {
-        const customRole = await txRoleRepo.create({
-          name: `apikey:${created.id}`,
+    const actor = ledgerActorFor({
+      userId: createdByUserId ?? userId,
+      fallback: "apiKeyService",
+    });
+    // BORN DISABLED, ACTIVATED LAST. The row is a plain insert and the grants
+    // are ledger commands, so nothing can wrap the two in one transaction.
+    // The key is therefore created revoked and un-revoked only once its
+    // grants are facts: a crash, a throw, or a queue outage anywhere in
+    // between leaves a credential that authenticates nothing — the invariant
+    // is that a failed create leaves less-or-equal access, never a live token
+    // with no grants (which is also the shape the read-through mint refuses
+    // to widen, see ./legacy-grant-mint.ts).
+    const apiKey = await this.repo.create({
+      name,
+      description,
+      lookupId,
+      hashedSecret,
+      permissionMode,
+      userId,
+      createdByUserId,
+      organizationId,
+      expiresAt,
+      ingestSourceType,
+      ingestionTemplateId,
+      createdByDeviceLabel,
+      startsDisabled: true,
+    });
+
+    if (sortedPermissions) {
+      const customRole = await this.roleRepo.create({
+        params: {
+          name: `apikey:${apiKey.id}`,
           organizationId,
           permissions: sortedPermissions,
           kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
-        });
-        effectiveBindings = effectiveBindings.map((b) =>
-          b.role === TeamUserRole.CUSTOM
-            ? { ...b, customRoleId: customRole.id }
-            : b,
-        );
-      }
+        },
+        actor,
+      });
+      effectiveBindings = effectiveBindings.map((b) =>
+        b.role === TeamUserRole.CUSTOM
+          ? { ...b, customRoleId: customRole.id }
+          : b,
+      );
+    }
 
-      if (effectiveBindings.length > 0) {
-        // A key may reach a personal workspace only as its owner's own
-        // credential, whose ceiling already caps it. A service key or a key
-        // owned by anyone else binding in would hand the private workspace to
-        // a second principal.
-        await assertPersonalTeamScopesOwnedBy({
-          client: tx,
-          scopes: effectiveBindings,
-          ownerUserId: userId ?? null,
-        });
-        await txRepo.createRoleBindings({
-          apiKeyId: created.id,
-          organizationId,
-          bindings: effectiveBindings,
-        });
-      }
+    if (effectiveBindings.length > 0) {
+      await this.repo.createRoleBindings({
+        apiKeyId: apiKey.id,
+        organizationId,
+        bindings: effectiveBindings,
+        actor,
+      });
+    }
 
-      return created;
-    });
-
-    return { token, apiKey };
+    return { token, apiKey: await this.repo.activate({ id: apiKey.id }) };
   }
 
   /**
@@ -422,99 +456,97 @@ export class ApiKeyService {
       ),
     ];
 
-    return this.prisma.$transaction(async (tx) => {
-      const txRepo = ApiKeyRepository.create(tx);
-      const txRoleRepo = new RoleRepository(tx);
+    const actor = ledgerActorFor({
+      userId: callerUserId,
+      fallback: "apiKeyService",
+    });
 
-      if (bindings && existing.userId) {
-        await this.assertBindingsWithinCeiling({
-          prisma: tx as unknown as PrismaClient,
-          ceilingUserId: existing.userId,
+    if (bindings && existing.userId) {
+      await this.assertBindingsWithinCeiling({
+        prisma: this.prisma,
+        ceilingUserId: existing.userId,
+        organizationId,
+        bindings,
+        rawPermissions: sortedPermissions,
+      });
+    }
+    if (bindings) {
+      // Same personal-workspace line as create(): replacement bindings may
+      // reach a personal workspace only when this key acts as its owner.
+      await assertPersonalTeamScopesOwnedBy({
+        client: this.prisma,
+        scopes: bindings,
+        ownerUserId: existing.userId,
+      });
+    }
+
+    let effectiveBindings = bindings;
+
+    if (sortedPermissions && effectiveBindings) {
+      // Always mint a fresh role rather than updating the existing exclusive
+      // role's permissions in place: that path mutated the live role before
+      // replaceRoleBindings pointed the binding at it, so a crash mid-update
+      // could leave the key holding new permissions with stale binding
+      // state, and any request racing the update would read a half-applied
+      // role. A fresh role is atomic with respect to every reader; the
+      // orphan cleanup below (after replaceRoleBindings) deletes the
+      // superseded role once nothing points at it any more.
+      const customRole = await this.roleRepo.create({
+        params: {
+          name: `apikey:${id}:${generate(KSUID_RESOURCES.API_KEY_ROLE).toString()}`,
           organizationId,
-          bindings,
-          rawPermissions: sortedPermissions,
-        });
-      }
+          permissions: sortedPermissions,
+          kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
+        },
+        actor,
+      });
+      effectiveBindings = effectiveBindings.map((b) =>
+        b.role === TeamUserRole.CUSTOM
+          ? { ...b, customRoleId: customRole.id }
+          : b,
+      );
+    }
 
-      let effectiveBindings = bindings;
+    await this.repo.update({
+      id,
+      name,
+      description,
+      permissionMode,
+    });
 
-      if (sortedPermissions && effectiveBindings) {
-        const existingCustomRoleId = existing.roleBindings.find(
-          (rb) => rb.customRoleId !== null,
-        )?.customRoleId;
-
-        const canReuse = existingCustomRoleId
-          ? await txRoleRepo.isExclusiveToApiKey({
-              roleId: existingCustomRoleId,
-              apiKeyId: id,
-            })
-          : false;
-
-        let customRole;
-        if (canReuse && existingCustomRoleId) {
-          customRole = await txRoleRepo.update(existingCustomRoleId, {
-            permissions: sortedPermissions,
-          });
-        } else {
-          customRole = await txRoleRepo.create({
-            name: `apikey:${id}:${generate(KSUID_RESOURCES.API_KEY_ROLE).toString()}`,
-            organizationId,
-            permissions: sortedPermissions,
-            kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
-          });
-        }
-        effectiveBindings = effectiveBindings.map((b) =>
-          b.role === TeamUserRole.CUSTOM
-            ? { ...b, customRoleId: customRole.id }
-            : b,
-        );
-      }
-
-      await txRepo.update({
-        id,
-        name,
-        description,
-        permissionMode,
+    if (effectiveBindings) {
+      await this.repo.replaceRoleBindings({
+        apiKeyId: id,
+        organizationId,
+        bindings: effectiveBindings,
+        actor,
       });
 
-      if (effectiveBindings) {
-        // Same personal-workspace line as create(): replacement bindings may
-        // reach a personal workspace only when this key acts as its owner.
-        await assertPersonalTeamScopesOwnedBy({
-          client: tx,
-          scopes: effectiveBindings,
-          ownerUserId: existing.userId,
-        });
-        await txRepo.replaceRoleBindings({
+      const newCustomRoleIds = new Set(
+        effectiveBindings
+          .filter(
+            (b): b is Extract<RoleBindingInput, { role: "CUSTOM" }> =>
+              b.role === "CUSTOM",
+          )
+          .map((b) => b.customRoleId)
+          .filter((cid): cid is string => !!cid),
+      );
+      const orphanedRoleIds = oldCustomRoleIds.filter(
+        (roleId) => !newCustomRoleIds.has(roleId),
+      );
+      if (orphanedRoleIds.length > 0) {
+        await this.roleRepo.deleteExclusiveToApiKey({
+          roleIds: orphanedRoleIds,
           apiKeyId: id,
           organizationId,
-          bindings: effectiveBindings,
+          actor,
         });
-
-        const newCustomRoleIds = new Set(
-          effectiveBindings
-            .filter(
-              (b): b is Extract<RoleBindingInput, { role: "CUSTOM" }> =>
-                b.role === "CUSTOM",
-            )
-            .map((b) => b.customRoleId)
-            .filter((cid): cid is string => !!cid),
-        );
-        const orphanedRoleIds = oldCustomRoleIds.filter(
-          (roleId) => !newCustomRoleIds.has(roleId),
-        );
-        if (orphanedRoleIds.length > 0) {
-          await txRoleRepo.deleteExclusiveToApiKey({
-            roleIds: orphanedRoleIds,
-            apiKeyId: id,
-          });
-        }
       }
+    }
 
-      const updated = await txRepo.findById({ id });
-      if (!updated) throw new ApiKeyNotFoundError(id);
-      return updated;
-    });
+    const updated = await this.repo.findById({ id });
+    if (!updated) throw new ApiKeyNotFoundError(id);
+    return updated;
   }
 
   /**
@@ -540,8 +572,15 @@ export class ApiKeyService {
 
   /**
    * Validates every requested binding against the ceiling user's permissions.
-   * Must be called inside a transaction to prevent TOCTOU races where
-   * the user's bindings change between validation and write.
+   *
+   * A read taken immediately before the grants are appended, not a check
+   * riding a transaction: the writes it guards are ledger commands now
+   * (ADR-092 §13), so neither caller opens one — see the comment above the
+   * create-path call. The accepted race is the ceiling shrinking between this
+   * read and the append: the key can end up with grants its owner held at the
+   * moment of the check rather than at the moment of the write. What a key
+   * can never do is exceed a ceiling its owner never had, which is the
+   * guarantee callers rely on.
    */
   private async assertBindingsWithinCeiling({
     prisma,
@@ -873,6 +912,13 @@ export class ApiKeyService {
         });
     }
 
+    // A key whose access predates the grants ledger writes that access down
+    // the first time it is used (ADR-092 decision 1 — no key sunset, ever).
+    // Fire-and-forget for the same reason the hash upgrade above is: the
+    // answer to "is this credential real" cannot wait on, or be failed by, a
+    // write nobody asked for.
+    this.mintLegacyGrant({ apiKey });
+
     return apiKey;
   }
 
@@ -944,30 +990,29 @@ export class ApiKeyService {
     }
     if (apiKey.revokedAt) throw new ApiKeyAlreadyRevokedError(id);
 
-    return this.prisma.$transaction(async (tx) => {
-      const txRepo = ApiKeyRepository.create(tx);
-      const txRoleRepo = new RoleRepository(tx);
+    const customRoleIds = [
+      ...new Set(
+        apiKey.roleBindings
+          .map((rb) => rb.customRoleId)
+          .filter((cid): cid is string => cid !== null),
+      ),
+    ];
 
-      const fresh = await txRepo.findById({ id });
-      const customRoleIds = [
-        ...new Set(
-          (fresh?.roleBindings ?? [])
-            .map((rb) => rb.customRoleId)
-            .filter((cid): cid is string => cid !== null),
-        ),
-      ];
+    const result = await this.repo.revoke({ id });
 
-      const result = await txRepo.revoke({ id });
+    if (customRoleIds.length > 0) {
+      await this.roleRepo.deleteExclusiveToApiKey({
+        roleIds: customRoleIds,
+        apiKeyId: id,
+        organizationId,
+        actor: ledgerActorFor({
+          userId: callerUserId,
+          fallback: "apiKeyService",
+        }),
+      });
+    }
 
-      if (customRoleIds.length > 0) {
-        await txRoleRepo.deleteExclusiveToApiKey({
-          roleIds: customRoleIds,
-          apiKeyId: id,
-        });
-      }
-
-      return result;
-    });
+    return result;
   }
 
   /**

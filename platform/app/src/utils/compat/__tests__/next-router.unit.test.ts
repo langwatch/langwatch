@@ -87,18 +87,22 @@ describe("resolvePathname()", () => {
       expect(resolvePathname("/me/pull-requests")).toBe("/me/pull-requests");
     });
 
-    it("returns /settings/gateway/usage as-is instead of the settings wildcard", () => {
-      // Without the literal entry the /settings/* wildcard wins, the
-      // pathname resolves to /settings/[[...path]], and a self-push from
-      // the usage page's filter controls collapses to /settings/.
-      expect(resolvePathname("/settings/gateway/usage")).toBe(
-        "/settings/gateway/usage",
-      );
+    it("returns /gateway/usage as-is so filter self-pushes keep their path", () => {
+      // Without the literal entry the /:project pattern wins, the pathname
+      // resolves to /[project], and a self-push from the usage page's filter
+      // controls loses its path.
+      expect(resolvePathname("/gateway/usage")).toBe("/gateway/usage");
     });
 
-    it("converts /settings/gateway/virtual-keys/vk_123 to /settings/gateway/virtual-keys/[id]", () => {
-      expect(resolvePathname("/settings/gateway/virtual-keys/vk_123")).toBe(
-        "/settings/gateway/virtual-keys/[id]",
+    it("returns /gateway as-is instead of the /:project catch-all", () => {
+      // Without the literal entry /:project wins and the gateway root
+      // resolves to /[project], which classifies it as a project page.
+      expect(resolvePathname("/gateway")).toBe("/gateway");
+    });
+
+    it("converts /gateway/virtual-keys/vk_123 to /gateway/virtual-keys/[id]", () => {
+      expect(resolvePathname("/gateway/virtual-keys/vk_123")).toBe(
+        "/gateway/virtual-keys/[id]",
       );
     });
   });

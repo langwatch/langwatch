@@ -24,11 +24,12 @@ import {
   Trash2,
 } from "lucide-react";
 import numeral from "numeral";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { NotFoundScene } from "~/components/NotFoundScene";
+import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -85,14 +86,18 @@ const STATUS_META: Record<
  * and a `NotFoundError` carries `httpStatus` 404 whatever tRPC code wrapped
  * it. The second branch that sniffed the tRPC envelope for a bare
  * `NOT_FOUND` is gone with the bare throw it existed to cover. Anything else
- * is a load failure, not a deletion.
+ * is a load failure, not a deletion: a permission denial, a 500 or a dropped
+ * connection used to land on the not-found scene too, so an admin whose
+ * source was very much alive was told it had been deleted.
  */
 function isNotFoundError(error: unknown): boolean {
   return readHandledError(error)?.httpStatus === 404;
 }
 
-const fmtUsd = (n: number) =>
-  n === 0 ? "$0.00" : numeral(n).format("$0,0.0000");
+const fmtUsd = (n: number | string) => {
+  const v = typeof n === "string" ? Number(n) : n;
+  return v === 0 ? "$0.00" : numeral(v).format("$0,0.0000");
+};
 
 const fmtRelative = (iso: string | null): string => {
   if (!iso) return "-";
@@ -107,39 +112,316 @@ const fmtRelative = (iso: string | null): string => {
   return `${days}d ago`;
 };
 
-function IngestionSourceDetailPage() {
+/** Back link, name, status, and the two manage-only controls. */
+function SourceDetailHeader({
+  source,
+  canManage,
+  isRotating,
+  isArchiving,
+  onRotate,
+  onArchive,
+}: {
+  source: Source;
+  canManage: boolean;
+  isRotating: boolean;
+  isArchiving: boolean;
+  onRotate: () => void;
+  onArchive: () => void;
+}) {
+  const status =
+    STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
+  const StatusIcon = status.icon;
+  return (
+    <HStack alignItems="end">
+      <VStack align="start" gap={1}>
+        <HStack gap={2}>
+          <Link
+            href="/governance/ingestion-sources"
+            color="blue.600"
+            fontSize="xs"
+          >
+            <HStack gap={1}>
+              <ArrowLeft size={12} />
+              <Text>All sources</Text>
+            </HStack>
+          </Link>
+        </HStack>
+        <HStack gap={2}>
+          <Heading size="md">{source.name}</Heading>
+          <Badge size="sm" variant="surface">
+            {source.sourceType}
+          </Badge>
+          <HStack gap={1}>
+            <Box color={status.color} display="flex">
+              <StatusIcon size={14} />
+            </Box>
+            <Text fontSize="sm" color="fg.muted">
+              {status.label}
+            </Text>
+          </HStack>
+        </HStack>
+        {source.description && (
+          <Text fontSize="sm" color="fg.muted">
+            {source.description}
+          </Text>
+        )}
+      </VStack>
+      <Spacer />
+      {/* Rotating a secret and archiving are both
+          `ingestionSources:manage`. */}
+      {canManage && (
+        <>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onRotate}
+            loading={isRotating}
+            title="Mint a new ingestSecret (24h grace on the old one)"
+          >
+            <RotateCw size={14} /> Rotate secret
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            colorPalette="red"
+            onClick={() => {
+              if (
+                !confirm(
+                  `Archive "${source.name}"? Historical events stay readable.`,
+                )
+              )
+                return;
+              onArchive();
+            }}
+            loading={isArchiving}
+          >
+            <Trash2 size={14} /> Archive
+          </Button>
+        </>
+      )}
+    </HStack>
+  );
+}
+
+/**
+ * The four event-count cards. They read `health?.events24h ?? 0`, so a failed
+ * health query would render "0 events", indistinguishable from a silent
+ * source, and the first thing an admin does about a silent source is go
+ * rebuild an integration that was never broken. The alert takes their place.
+ */
+function SourceHealthCards({
+  health,
+  error,
+  isLoading,
+}: {
+  health: SourceHealthMetrics | undefined;
+  error: unknown;
+  isLoading: boolean;
+}) {
+  if (error) {
+    return (
+      <HandledErrorAlert
+        error={error}
+        fallbackTitle="Couldn't load health metrics for this source"
+      />
+    );
+  }
+  return (
+    <SimpleGrid columns={{ base: 2, md: 4 }} gap={4}>
+      <MetricCard
+        title="Events 24h"
+        value={numeral(health?.events24h ?? 0).format("0,0")}
+        isLoading={isLoading}
+      />
+      <MetricCard
+        title="Events 7d"
+        value={numeral(health?.events7d ?? 0).format("0,0")}
+        isLoading={isLoading}
+      />
+      <MetricCard
+        title="Events 30d"
+        value={numeral(health?.events30d ?? 0).format("0,0")}
+        isLoading={isLoading}
+      />
+      <MetricCard
+        title="Last event"
+        value={fmtRelative(health?.lastSuccessIso ?? null)}
+        isLoading={isLoading}
+      />
+    </SimpleGrid>
+  );
+}
+
+/** The newest 50 OCSF-normalised events, raw next to normalised. */
+function RecentEventsPanel({
+  source,
+  events,
+  error,
+  isLoading,
+}: {
+  source: Source;
+  events: EventRow[];
+  error: unknown;
+  isLoading: boolean;
+}) {
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      padding={5}
+    >
+      <VStack align="start" gap={1} marginBottom={3}>
+        <Heading as="h3" size="sm">
+          Recent events
+        </Heading>
+        {!error && (
+          <Text fontSize="sm" color="fg.muted">
+            Last {events.length} OCSF-normalised events from this source. Raw
+            payload + normalised fields shown side-by-side. Newest first.
+          </Text>
+        )}
+      </VStack>
+
+      {isLoading && <Spinner size="sm" />}
+
+      {/* `EmptyEventsHint` walks an admin through setting up an integration.
+          Showing it because the events query failed sends someone debugging a
+          live source off to re-install something that is already working. */}
+      <HandledErrorAlert
+        error={error}
+        fallbackTitle="Couldn't load recent events"
+      />
+
+      {!isLoading && !error && events.length === 0 && (
+        <EmptyEventsHint source={source} />
+      )}
+
+      {events.length > 0 && (
+        <VStack align="stretch" gap={2}>
+          {events.map((ev) => (
+            <EventRow key={ev.eventId} event={ev} />
+          ))}
+        </VStack>
+      )}
+    </Box>
+  );
+}
+
+/**
+ * Health counts, the stale-timestamp callout and the event feed. All three
+ * come from the activity monitor, which has a grant of its own, so naming
+ * that grant here keeps the source's own configuration readable to whoever
+ * holds only `ingestionSources:view`.
+ */
+function SourceActivityPanels({
+  source,
+  canReadActivity,
+  healthQuery,
+  eventsQuery,
+}: {
+  source: Source;
+  canReadActivity: boolean;
+  healthQuery: {
+    data: SourceHealthMetrics | undefined;
+    error: unknown;
+    isLoading: boolean;
+  };
+  eventsQuery: {
+    data: EventRow[] | undefined;
+    error: unknown;
+    isLoading: boolean;
+  };
+}) {
+  if (!canReadActivity) {
+    return (
+      <PermissionRequiredNotice
+        permission="activityMonitor:view"
+        detail="Event counts and the recent-event feed stay hidden until then."
+      />
+    );
+  }
+  const health = healthQuery.data;
+  const events = eventsQuery.data ?? [];
+  return (
+    <>
+      <SourceHealthCards
+        health={health}
+        error={healthQuery.error}
+        isLoading={healthQuery.isLoading}
+      />
+      <StaleTimestampCallout
+        health={health ?? null}
+        eventsCount={events.length}
+      />
+      <RecentEventsPanel
+        source={source}
+        events={events}
+        error={eventsQuery.error}
+        isLoading={eventsQuery.isLoading}
+      />
+    </>
+  );
+}
+
+/**
+ * What a viewer without `ingestionSources:view` sees. No enterprise upsell
+ * here: the grant, not the plan, is what is missing.
+ */
+function SourceAccessDenied({ pageTitle }: { pageTitle: string }) {
+  return (
+    <GovernanceLayout pageTitle={pageTitle}>
+      <PermissionRequiredNotice
+        permission="ingestionSources:view"
+        detail="This source's configuration and health stay hidden until then."
+      />
+    </GovernanceLayout>
+  );
+}
+
+/** The page chrome every state of this page renders inside. */
+function SourceDetailShell({
+  pageTitle,
+  children,
+}: {
+  pageTitle: string;
+  children: ReactNode;
+}) {
+  return (
+    <GovernanceLayout pageTitle={pageTitle}>
+      <EnterpriseLockedSurface
+        featureName="Ingestion Source detail"
+        description="Source-level health metrics and event drill-downs are part of the Enterprise plan."
+      >
+        {children}
+      </EnterpriseLockedSurface>
+    </GovernanceLayout>
+  );
+}
+
+/**
+ * The two writes this page offers. Both are `ingestionSources:manage`; a
+ * rotate reveals the new secret once, an archive sends the admin back to the
+ * list.
+ */
+function useSourceDetailMutations({
+  orgId,
+  sourceId,
+  onSecretRevealed,
+}: {
+  orgId: string;
+  sourceId: string | undefined;
+  onSecretRevealed: (details: { secret: string; sourceName: string }) => void;
+}) {
   const router = useRouter();
-  const sourceId = router.query.id as string | undefined;
-  const { organization } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-  });
-  const orgId = organization?.id ?? "";
-
-  const sourceQuery = api.ingestionSources.get.useQuery(
-    { organizationId: orgId, id: sourceId ?? "" },
-    { enabled: !!orgId && !!sourceId, refetchOnWindowFocus: false },
-  );
-  const healthQuery = api.activityMonitor.sourceHealthMetrics.useQuery(
-    { organizationId: orgId, sourceId: sourceId ?? "" },
-    { enabled: !!orgId && !!sourceId, refetchOnWindowFocus: false },
-  );
-  const eventsQuery = api.activityMonitor.eventsForSource.useQuery(
-    { organizationId: orgId, sourceId: sourceId ?? "", limit: 20 },
-    { enabled: !!orgId && !!sourceId, refetchOnWindowFocus: false },
-  );
   const utils = api.useUtils();
-  const [secretReveal, setSecretReveal] = useState<{
-    secret: string;
-    sourceName: string;
-  } | null>(null);
-
-  const rotateMutation = api.ingestionSources.rotateSecret.useMutation({
+  const rotate = api.ingestionSources.rotateSecret.useMutation({
     onSuccess: (data) => {
       void utils.ingestionSources.get.invalidate({
         organizationId: orgId,
         id: sourceId,
       });
-      setSecretReveal({
+      onSecretRevealed({
         secret: data.ingestSecret,
         sourceName: data.source.name,
       });
@@ -147,10 +429,10 @@ function IngestionSourceDetailPage() {
     onError: (e) =>
       showErrorToast({ error: e, fallbackTitle: "Couldn't rotate the secret" }),
   });
-  const archiveMutation = api.ingestionSources.archive.useMutation({
+  const archive = api.ingestionSources.archive.useMutation({
     onSuccess: () => {
       toaster.create({ title: "Source archived", type: "success" });
-      void router.push("/settings/governance/ingestion-sources");
+      void router.push("/governance/ingestion-sources");
     },
     onError: (e) =>
       showErrorToast({
@@ -158,224 +440,153 @@ function IngestionSourceDetailPage() {
         fallbackTitle: "Couldn't archive the source",
       }),
   });
+  return { rotate, archive };
+}
+
+/**
+ * Everything the page needs: the source it addresses, what the viewer may do,
+ * the three queries behind it and the two mutations that act on it. State and
+ * callbacks only, the component owns the markup.
+ */
+function useIngestionSourceDetailPage() {
+  const router = useRouter();
+  const sourceId = router.query.id as string | undefined;
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
+  const orgId = organization?.id ?? "";
+  const canRead = hasAnyPermission("ingestionSources:view");
+  const canReadActivity = hasAnyPermission("activityMonitor:view");
+
+  const sourceQuery = api.ingestionSources.get.useQuery(
+    { organizationId: orgId, id: sourceId ?? "" },
+    { enabled: !!orgId && !!sourceId && canRead, refetchOnWindowFocus: false },
+  );
+  const healthQuery = api.activityMonitor.sourceHealthMetrics.useQuery(
+    { organizationId: orgId, sourceId: sourceId ?? "" },
+    {
+      enabled: !!orgId && !!sourceId && canReadActivity,
+      refetchOnWindowFocus: false,
+    },
+  );
+  const eventsQuery = api.activityMonitor.eventsForSource.useQuery(
+    { organizationId: orgId, sourceId: sourceId ?? "", limit: 20 },
+    {
+      enabled: !!orgId && !!sourceId && canReadActivity,
+      refetchOnWindowFocus: false,
+    },
+  );
+  const [secretReveal, setSecretReveal] = useState<{
+    secret: string;
+    sourceName: string;
+  } | null>(null);
+
+  const { rotate: rotateMutation, archive: archiveMutation } =
+    useSourceDetailMutations({
+      orgId,
+      sourceId,
+      onSecretRevealed: setSecretReveal,
+    });
+
+  return {
+    sourceId,
+    orgId,
+    canRead,
+    canManage: hasAnyPermission("ingestionSources:manage"),
+    canReadActivity,
+    sourceQuery,
+    healthQuery,
+    eventsQuery,
+    secretReveal,
+    setSecretReveal,
+    rotateMutation,
+    archiveMutation,
+  };
+}
+
+function IngestionSourceDetailPage() {
+  const {
+    sourceId,
+    orgId,
+    canRead,
+    canManage,
+    canReadActivity,
+    sourceQuery,
+    healthQuery,
+    eventsQuery,
+    secretReveal,
+    setSecretReveal,
+    rotateMutation,
+    archiveMutation,
+  } = useIngestionSourceDetailPage();
 
   if (!sourceId) {
     return <NotFoundScene />;
   }
 
   const source = sourceQuery.data;
-  const health = healthQuery.data;
-  const events = eventsQuery.data ?? [];
   const pageTitle = source?.name
     ? `${source.name} · Ingestion Source · LangWatch`
     : "Ingestion Source · LangWatch";
 
+  if (!canRead) {
+    return <SourceAccessDenied pageTitle={pageTitle} />;
+  }
+
   // "This source doesn't exist" is a claim, and only a genuine 404 earns it.
-  // Every other failure — a permission denial, a 500, a dropped connection —
-  // used to land here too, so an admin whose source was very much alive was
-  // told it had been deleted and went looking for who removed it.
   if (isNotFoundError(sourceQuery.error)) {
     return <NotFoundScene />;
   }
   if (sourceQuery.error) {
     return (
-      <GovernanceLayout pageTitle={pageTitle}>
-        <EnterpriseLockedSurface
-          featureName="Ingestion Source detail"
-          description="Source-level health metrics and event drill-downs are part of the Enterprise plan."
-        >
-          <HandledErrorAlert
-            error={sourceQuery.error}
-            fallbackTitle="Couldn't load this ingestion source"
-          />
-        </EnterpriseLockedSurface>
-      </GovernanceLayout>
+      <SourceDetailShell pageTitle={pageTitle}>
+        <HandledErrorAlert
+          error={sourceQuery.error}
+          fallbackTitle="Couldn't load this ingestion source"
+        />
+      </SourceDetailShell>
     );
   }
 
   if (!source) {
     return (
-      <GovernanceLayout pageTitle={pageTitle}>
-        <EnterpriseLockedSurface
-          featureName="Ingestion Source detail"
-          description="Source-level health metrics and event drill-downs are part of the Enterprise plan."
-        >
-          <Spinner size="sm" />
-        </EnterpriseLockedSurface>
-      </GovernanceLayout>
+      <SourceDetailShell pageTitle={pageTitle}>
+        <Spinner size="sm" />
+      </SourceDetailShell>
     );
   }
 
-  const status =
-    STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
-  const StatusIcon = status.icon;
-
   return (
-    <GovernanceLayout pageTitle={pageTitle}>
-      <EnterpriseLockedSurface
-        featureName="Ingestion Source detail"
-        description="Source-level health metrics and event drill-downs are part of the Enterprise plan."
-      >
-        <VStack align="stretch" gap={6} width="full" maxW="container.xl">
-          <HStack alignItems="end">
-            <VStack align="start" gap={1}>
-              <HStack gap={2}>
-                <Link
-                  href="/settings/governance/ingestion-sources"
-                  color="blue.600"
-                  fontSize="xs"
-                >
-                  <HStack gap={1}>
-                    <ArrowLeft size={12} />
-                    <Text>All sources</Text>
-                  </HStack>
-                </Link>
-              </HStack>
-              <HStack gap={2}>
-                <Heading size="md">{source.name}</Heading>
-                <Badge size="sm" variant="surface">
-                  {source.sourceType}
-                </Badge>
-                <HStack gap={1}>
-                  <Box color={status.color} display="flex">
-                    <StatusIcon size={14} />
-                  </Box>
-                  <Text fontSize="sm" color="fg.muted">
-                    {status.label}
-                  </Text>
-                </HStack>
-              </HStack>
-              {source.description && (
-                <Text fontSize="sm" color="fg.muted">
-                  {source.description}
-                </Text>
-              )}
-            </VStack>
-            <Spacer />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() =>
-                rotateMutation.mutate({ organizationId: orgId, id: source.id })
-              }
-              loading={rotateMutation.isPending}
-              title="Mint a new ingestSecret (24h grace on the old one)"
-            >
-              <RotateCw size={14} /> Rotate secret
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              colorPalette="red"
-              onClick={() => {
-                if (
-                  !confirm(
-                    `Archive "${source.name}"? Historical events stay readable.`,
-                  )
-                )
-                  return;
-                archiveMutation.mutate({
-                  organizationId: orgId,
-                  id: source.id,
-                });
-              }}
-              loading={archiveMutation.isPending}
-            >
-              <Trash2 size={14} /> Archive
-            </Button>
-          </HStack>
-
-          {/* The metric cards read `health?.eventsNd ?? 0`, so a failed
-              health query renders "0 events" — indistinguishable from a
-              silent source, and the first thing an admin does about a silent
-              source is go rebuild an integration that was never broken. */}
-          {healthQuery.error ? (
-            <HandledErrorAlert
-              error={healthQuery.error}
-              fallbackTitle="Couldn't load health metrics for this source"
-            />
-          ) : (
-            <SimpleGrid columns={{ base: 2, md: 4 }} gap={4}>
-              <MetricCard
-                title="Events 24h"
-                value={numeral(health?.events24h ?? 0).format("0,0")}
-                isLoading={healthQuery.isLoading}
-              />
-              <MetricCard
-                title="Events 7d"
-                value={numeral(health?.events7d ?? 0).format("0,0")}
-                isLoading={healthQuery.isLoading}
-              />
-              <MetricCard
-                title="Events 30d"
-                value={numeral(health?.events30d ?? 0).format("0,0")}
-                isLoading={healthQuery.isLoading}
-              />
-              <MetricCard
-                title="Last event"
-                value={fmtRelative(health?.lastSuccessIso ?? null)}
-                isLoading={healthQuery.isLoading}
-              />
-            </SimpleGrid>
-          )}
-
-          <StaleTimestampCallout
-            health={health ?? null}
-            eventsCount={events.length}
-          />
-
-          <Box
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="md"
-            padding={5}
-          >
-            <VStack align="start" gap={1} marginBottom={3}>
-              <Heading as="h3" size="sm">
-                Recent events
-              </Heading>
-              {!eventsQuery.error && (
-                <Text fontSize="sm" color="fg.muted">
-                  Last {events.length} OCSF-normalised events from this source.
-                  Raw payload + normalised fields shown side-by-side. Newest
-                  first.
-                </Text>
-              )}
-            </VStack>
-
-            {eventsQuery.isLoading && <Spinner size="sm" />}
-
-            {/* `EmptyEventsHint` walks an admin through setting up an
-                integration. Showing it because the events query failed sends
-                someone debugging a live source off to re-install something
-                that is already working. */}
-            <HandledErrorAlert
-              error={eventsQuery.error}
-              fallbackTitle="Couldn't load recent events"
-            />
-
-            {!eventsQuery.isLoading &&
-              !eventsQuery.error &&
-              events.length === 0 && <EmptyEventsHint source={source} />}
-
-            {events.length > 0 && (
-              <VStack align="stretch" gap={2}>
-                {events.map((ev) => (
-                  <EventRow key={ev.eventId} event={ev} />
-                ))}
-              </VStack>
-            )}
-          </Box>
-        </VStack>
-
-        <SecretRevealModal
-          details={secretReveal}
-          sourceId={source.id}
-          sourceType={source.sourceType}
-          onClose={() => setSecretReveal(null)}
+    <SourceDetailShell pageTitle={pageTitle}>
+      <VStack align="stretch" gap={6} width="full" maxW="container.xl">
+        <SourceDetailHeader
+          source={source}
+          canManage={canManage}
+          isRotating={rotateMutation.isPending}
+          isArchiving={archiveMutation.isPending}
+          onRotate={() =>
+            rotateMutation.mutate({ organizationId: orgId, id: source.id })
+          }
+          onArchive={() =>
+            archiveMutation.mutate({ organizationId: orgId, id: source.id })
+          }
         />
-      </EnterpriseLockedSurface>
-    </GovernanceLayout>
+
+        <SourceActivityPanels
+          source={source}
+          canReadActivity={canReadActivity}
+          healthQuery={healthQuery}
+          eventsQuery={eventsQuery}
+        />
+      </VStack>
+
+      <SecretRevealModal
+        details={secretReveal}
+        sourceId={source.id}
+        sourceType={source.sourceType}
+        onClose={() => setSecretReveal(null)}
+      />
+    </SourceDetailShell>
   );
 }
 
@@ -875,7 +1086,7 @@ function SecretRevealModal({
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
 })(
-  withPermissionGuard("organization:manage", {
+  withPermissionGuard("governance:view", {
     bypassOnboardingRedirect: true,
   })(IngestionSourceDetailPage),
 );

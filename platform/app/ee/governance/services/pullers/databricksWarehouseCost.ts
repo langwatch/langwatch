@@ -1,0 +1,489 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+/**
+ * What a Genie question cost, worked out from the warehouse's bill.
+ *
+ * Databricks does not price a Genie question. It prices the SQL warehouse for
+ * the hours it was awake, in DBU, and separately publishes what a DBU of that
+ * SKU lists for. A question's cost is therefore always a SHARE, never a
+ * reading: the fraction of the hour's warehouse time that the question's SQL
+ * spent, applied to that hour's bill.
+ *
+ * Three things about that share are worth stating, because getting any of them
+ * wrong produces a number that looks entirely plausible:
+ *
+ *  1. The denominator is the WHOLE warehouse, not the Genie queries on it. A
+ *     warehouse shared with dashboards and jobs that divides only across Genie
+ *     hands Genie the entire bill. Validated against a live workspace at 13.3%
+ *     of warehouse compute — the other 86.7% belongs to traffic nobody asked
+ *     Genie for, and it stays unattributed rather than being redistributed.
+ *
+ *  2. It is a LIST price. The account's negotiated discount is on no table this
+ *     token can read, so the figure is an estimate by construction and is
+ *     recorded as one. Presenting it as the invoice is the failure mode; being
+ *     approximately right is the whole point.
+ *
+ *  3. It arrives late. A query's compute reaches the billing tables well after
+ *     the query, so the question is recorded first at zero and corrected once
+ *     the bill lands — which only works if the puller is still looking. See
+ *     `costReadFloorMs`.
+ *
+ * The arithmetic is bigint nanoUSD throughout. A share of an hourly bill is
+ * routinely a fraction of a cent, and float division on money is how a busy
+ * workspace comes to report nothing at all.
+ */
+
+import { z } from "zod";
+
+import {
+  nanoUsdToDecimalString,
+  usdToNanoUsd,
+} from "~/server/gateway/wireMoney";
+
+/**
+ * How far back a cost-bearing source keeps reading questions it has already
+ * recorded.
+ *
+ * Databricks documents the billing and query-history system tables as lagging
+ * the activity they describe; the observed lag is well under an hour but the
+ * published ceiling is around one. The puller's own watermark sits five minutes
+ * behind the sweep, so without this a question is unreadable long before its
+ * cost exists and would sit at zero forever, with nothing reporting a problem.
+ *
+ * Two hours buys the whole documented lag plus room for a workspace whose
+ * tables are behind. It is paid for in requests: at the default fifteen-minute
+ * schedule a question is re-read roughly eight times before it settles, bounded
+ * by the adapter's per-run request budget.
+ */
+export const WAREHOUSE_COST_SETTLING_LAG_MS = 2 * 60 * 60 * 1000;
+
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * How much of the window one cost request asks about.
+ *
+ * Bounded from both ends, and the two bounds were in conflict until this was
+ * measured.
+ *
+ * From above: the reply is capped, and a cut-short reply is refused whole, so a
+ * first sweep asked as ONE question has a single cap to trip and tripping it
+ * leaves the whole month unpriced. Smaller pieces mean a piece busy enough to
+ * trip the cap on its own, with the pieces before it keeping their cost.
+ *
+ * From below: every piece is a request, and a request is not cheap in the only
+ * currency that binds here. The run gets five minutes (`PER_JOB_DEADLINE_MS`)
+ * and a run that overruns is killed holding the questions its sweep had already
+ * read — it discards them and keeps its cursor, so the next run stalls in the
+ * same place. A day at a time made a thirty-day sweep thirty sequential
+ * requests, and it could never finish one.
+ *
+ * A week is what the measurement supports. Against a real workspace on
+ * 2026-08-19 the reply time barely moved with the size of the question — five
+ * weekly reads of a thirty-day window took 10.8s, 23.4s, 26.9s, 37.7s and 22.0s
+ * for 120.8s in total, against 648s for the same window read daily and 22.6s
+ * for it read whole. Latency is nearly all fixed cost per question, so asking
+ * fewer, larger questions is very close to free, and the cap is the only reason
+ * not to ask exactly one.
+ *
+ * A week that still cannot be answered whole is not surrendered: the caller
+ * re-asks it in days (`warehouseCostPieces`). So this size is a bet on the
+ * common case, not a limit on what can be priced — which is what lets it be
+ * this large.
+ *
+ * Whole hours either way. The bill is published per hour and the statements are
+ * bucketed per hour, so a boundary inside an hour would separate that hour's
+ * queries from that hour's bill and price every one of them at nothing.
+ */
+export const WAREHOUSE_COST_CHUNK_MS = 7 * 24 * ONE_HOUR_MS;
+
+/**
+ * How much of one refused chunk a follow-up request asks about.
+ *
+ * A day, because that is the size the whole window used to be read at: it is
+ * known to be answerable on workspaces busy enough to refuse a week, and it is
+ * the smallest piece worth asking for given the bill is published per hour.
+ */
+const WAREHOUSE_COST_PIECE_MS = 24 * ONE_HOUR_MS;
+
+/**
+ * How long the watermark may be held waiting for a bill before it gives up.
+ *
+ * Elapsed time, not distance. A first sweep is thirty days behind on its first
+ * run and that is healthy; the same instant refused for a week running is not,
+ * and only a clock can tell the two apart.
+ *
+ * Holding is worth it when the bill is merely late — the tables settle in hours
+ * (`WAREHOUSE_COST_SETTLING_LAG_MS`), so a week of retries is far more than
+ * lateness ever needs. Past that the problem is not lateness but volume: a day
+ * with more Genie statements than one reply can carry is refused identically on
+ * every future run, and volume does not resolve itself.
+ *
+ * Without this bound that case pins the source to a fixed instant forever. It
+ * never prices the day it is waiting on, and it re-sweeps an ever-widening
+ * window to do it — paying more every run for an answer that cannot arrive.
+ * Giving up costs those days their cost figure, which is what they had before
+ * any of this existed; not giving up costs the source its ability to move at
+ * all. The comment on `warehouseCost` states the priority this follows: a
+ * workspace whose billing cannot be read should still get its activity.
+ */
+export const WAREHOUSE_COST_MAX_HOLD_MS = 7 * 24 * ONE_HOUR_MS;
+
+/**
+ * The window as oldest-first pieces, each small enough to stand a chance of
+ * being answered whole.
+ *
+ * Oldest first is the load-bearing part. The caller stops at the first piece it
+ * cannot price and holds the watermark there, so the answered pieces are always
+ * the OLDEST ones and the unpriced remainder is always a suffix — which is
+ * exactly the shape a watermark can describe. Newest-first would answer pieces
+ * scattered through the window and leave holes no single instant could mark.
+ *
+ * Both ends are rounded OUT to whole hours, so no hour is ever split across two
+ * pieces and every hour's statements are weighed against that same hour's bill.
+ */
+export function warehouseCostChunks({
+  fromMs,
+  toMs,
+  chunkMs = WAREHOUSE_COST_CHUNK_MS,
+}: {
+  fromMs: number;
+  toMs: number;
+  /** Overridden only to re-ask a refused chunk in smaller pieces. */
+  chunkMs?: number;
+}): Array<{ fromMs: number; toMs: number }> {
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) return [];
+
+  const start = Math.floor(fromMs / ONE_HOUR_MS) * ONE_HOUR_MS;
+  const end = Math.ceil(toMs / ONE_HOUR_MS) * ONE_HOUR_MS;
+  if (end <= start) return [];
+
+  const chunks: Array<{ fromMs: number; toMs: number }> = [];
+  for (let at = start; at < end; at += chunkMs) {
+    chunks.push({
+      fromMs: at,
+      toMs: Math.min(at + chunkMs, end),
+    });
+  }
+  return chunks;
+}
+
+/**
+ * One refused chunk, as the smaller pieces to ask about instead.
+ *
+ * The caller refuses a reply whole, so a chunk with more statements than one
+ * reply can carry costs every question inside it its cost figure — including
+ * the days that would have answered on their own. Asking again in pieces buys
+ * those days back, and it is only ever paid for after a chunk was actually
+ * refused, so a workspace whose chunks answer never spends a request on it.
+ *
+ * Oldest first, hour-aligned, and half-open exactly like `warehouseCostChunks`,
+ * for the same reason: the caller stops at the first piece it cannot price and
+ * holds the watermark there, which only describes the truth if the unpriced
+ * remainder is a suffix.
+ *
+ * One level deep and no further. A piece that is still refused holds the
+ * watermark, and `WAREHOUSE_COST_MAX_HOLD_MS` decides how long that may go on —
+ * splitting further would spend the run's whole budget chasing an answer that a
+ * day-sized question already failed to get.
+ */
+export function warehouseCostPieces(chunk: {
+  fromMs: number;
+  toMs: number;
+}): Array<{ fromMs: number; toMs: number }> {
+  const pieces = warehouseCostChunks({
+    fromMs: chunk.fromMs,
+    toMs: chunk.toMs,
+    chunkMs: WAREHOUSE_COST_PIECE_MS,
+  });
+  // A chunk already at or below the piece size has nothing smaller to be asked
+  // as. Reporting no pieces is what tells the caller re-asking is pointless.
+  return pieces.length > 1 ? pieces : [];
+}
+
+/**
+ * How Genie's own queries identify themselves in `system.query.history`.
+ *
+ * This is also what keeps the puller's own billing query off the bill: that
+ * query reports a different client application, so it is never one of the
+ * statements cost is allocated to. It still counts toward the hour's total
+ * execution time, which dilutes Genie's share very slightly — the safe
+ * direction, and preferable to carving an exception into the denominator.
+ */
+export const GENIE_CLIENT_APPLICATION = "Databricks SQL Genie Space";
+
+/**
+ * Genie's free line in `system.billing.usage`.
+ *
+ * A distinct SKU billed at zero DBU-price today, tracked because Databricks may
+ * start charging for it. Matched on a marker rather than the full SKU name
+ * because the name is regionalised.
+ */
+export const GENIE_FREE_USAGE_SKU_MARKER = "GENIE_FREE_USAGE";
+
+/**
+ * One row of the allocation query: a Genie statement, its execution time, and
+ * the hour it ran in, priced.
+ *
+ * Every numeric arrives as a string. That is not a defensive choice — the SQL
+ * Statement Execution API returns every value as a string, which is exactly
+ * what money wants, so the value reaches `usdToNanoUsd` without a float ever
+ * existing. The type is derived from the schema rather than written beside it.
+ */
+export const warehouseCostRowSchema = z.object({
+  statementId: z.string().min(1),
+  executionDurationMs: z.string(),
+  hourTotalMs: z.string(),
+  /** Null when the workspace publishes no USD price for the hour's SKU. */
+  hourBillableUsd: z.string().nullable(),
+  currencyCode: z.string().nullable(),
+  /**
+   * Null when the statement's hour has no billing row yet — the LEFT JOIN in
+   * the cost query kept the statement but found nothing in `system.billing.usage`
+   * to price it against. A present SKU means the hour was billed; a null one
+   * means "seen but unbilled", which is a hold, not a zero.
+   */
+  skuName: z.string().nullable(),
+});
+
+export type WarehouseCostRow = z.infer<typeof warehouseCostRowSchema>;
+
+export type WarehouseCostSkipReason =
+  | "currency_not_usd"
+  | "no_published_price"
+  | "hour_has_no_execution_time"
+  | "unreadable_row";
+
+export type WarehouseCostSkip = {
+  statementId: string;
+  skuName: string;
+  currencyCode: string | null;
+  reason: WarehouseCostSkipReason;
+};
+
+/**
+ * One priced statement: its share of the bill, and the two numbers the share
+ * was worked out from.
+ *
+ * The ingredients travel with the cost because the share alone reads as
+ * nonsense on an idle warehouse — "$4 for a five-second question" is correct
+ * and looks broken. They are deliberately RAW: an earlier design shipped
+ * `hourTotalExecutionMs / 3_600_000` as a "busy fraction", and it was refuted
+ * on both ends — the sum is unclamped over concurrent statements (two parallel
+ * full-hour queries read as 200%), and on a serverless warehouse that
+ * auto-stops mid-hour the clock-hour denominator inverts the story (two
+ * minutes of flat-out work reads as 97% idle when the billed idle was zero).
+ * A true utilization needs billed uptime, which no table this token reads
+ * carries. So the record says what was measured and claims nothing more.
+ */
+export type WarehousePricedStatement = {
+  /** The statement's share of its hour's bill, as an exact decimal USD string. */
+  costUsd: string;
+  /**
+   * Executed milliseconds across ALL statements on the warehouse that hour —
+   * the share's denominator. A sum, not a utilization: concurrency can carry
+   * it past one hour of wall clock.
+   */
+  hourTotalExecutionMs: string;
+  /**
+   * The hour's bill across the lines this statement priced on, as an exact
+   * decimal USD string — the share's other ingredient, so
+   * `costUsd ≈ hourBillableUsd × executionMs / hourTotalExecutionMs` holds on
+   * the record itself.
+   */
+  hourBillableUsd: string;
+};
+
+export type WarehouseCostAllocation = {
+  /** Statement id → its share of the bill and the numbers behind it. */
+  costByStatementId: Map<string, WarehousePricedStatement>;
+  /**
+   * Rows that were deliberately not priced. Reported rather than dropped: a
+   * question with no cost and a question whose cost could not be worked out
+   * look identical on the record, and only one of them is a problem.
+   */
+  skipped: WarehouseCostSkip[];
+  /**
+   * Statements seen in the window whose hour has no billing row yet, and which
+   * did not also price on another line. Not a skip and not a zero: their cost
+   * has not settled, so the caller holds the watermark for them rather than
+   * moving past and recording them at zero. Distinct from `no_published_price`,
+   * which is a billing row that names no USD rate — a genuine, permanent gap.
+   */
+  owed: Set<string>;
+};
+
+/** Whole milliseconds, or null when the workspace sent something else. */
+function wholeMs(value: string): bigint | null {
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  return BigInt(trimmed);
+}
+
+/**
+ * One row's share of its hour, or why it has none.
+ *
+ * `"free"` is not a skip: Genie's own line being unpriced is the correct answer
+ * for it, not a gap in what we could read, and reporting it would train whoever
+ * reads the logs to ignore them.
+ */
+function shareOf(
+  row: WarehouseCostRow,
+):
+  | { nanoUsd: bigint; hourNanoUsd: bigint }
+  | { reason: WarehouseCostSkipReason }
+  | "free"
+  | "owed" {
+  // No billing row for this statement's hour yet. Checked first, before every
+  // other branch: a null SKU is not a free line and not an unreadable one, it
+  // is a bill that has not landed. Reading it as anything else — or letting
+  // `.includes` run on a null — is the zero-cost stall this branch exists to
+  // stop.
+  if (row.skuName === null) return "owed";
+
+  // Genie's own line is free today. Pricing it would invent spend for the one
+  // thing Databricks is explicit about not charging for.
+  if (row.skuName.includes(GENIE_FREE_USAGE_SKU_MARKER)) return "free";
+
+  if (row.hourBillableUsd === null) return { reason: "no_published_price" };
+
+  // A rate in another currency is not a rate. Converting it would need a number
+  // from outside Databricks, and the result would be indistinguishable from a
+  // figure someone could reconcile.
+  if (row.currencyCode !== null && row.currencyCode !== "USD") {
+    return { reason: "currency_not_usd" };
+  }
+
+  const executionMs = wholeMs(row.executionDurationMs);
+  const totalMs = wholeMs(row.hourTotalMs);
+  if (executionMs === null || totalMs === null) {
+    return { reason: "unreadable_row" };
+  }
+  if (totalMs === 0n) return { reason: "hour_has_no_execution_time" };
+
+  let hourNanoUsd: bigint;
+  try {
+    hourNanoUsd = usdToNanoUsd(row.hourBillableUsd);
+  } catch {
+    return { reason: "unreadable_row" };
+  }
+
+  // Integer division truncates, so the shares of an hour sum to at most that
+  // hour's bill. Erring downward is the only direction that cannot overstate
+  // what the customer was charged. The hour's own bill rides along so the
+  // record can carry the share's ingredients, not just its result.
+  return {
+    nanoUsd: (hourNanoUsd * executionMs) / totalMs,
+    hourNanoUsd,
+  };
+}
+
+/** A statement's running totals while its hour's lines are being folded in. */
+type PricedTotals = {
+  costNanoUsd: bigint;
+  hourNanoUsd: bigint;
+  hourTotalExecutionMs: string;
+};
+
+/** Fold one priced line into its statement's running totals. */
+function foldPricedLine(
+  into: Map<string, PricedTotals>,
+  row: WarehouseCostRow,
+  share: { nanoUsd: bigint; hourNanoUsd: bigint },
+): void {
+  const entry = into.get(row.statementId);
+  if (entry) {
+    entry.costNanoUsd += share.nanoUsd;
+    // Several lines are several PARTS of one hour's bill, so the hour's
+    // billable figure sums the same way the cost does.
+    entry.hourNanoUsd += share.hourNanoUsd;
+    return;
+  }
+  into.set(row.statementId, {
+    costNanoUsd: share.nanoUsd,
+    hourNanoUsd: share.hourNanoUsd,
+    // A statement lives in exactly one hour (bucketed by start_time), so
+    // every one of its lines names the same total.
+    hourTotalExecutionMs: row.hourTotalMs,
+  });
+}
+
+/**
+ * The per-statement share of each hour's warehouse bill.
+ *
+ * A statement may appear more than once: serverless SQL bills several lines for
+ * the same hour, and each is a PART of the statement's cost. They are summed,
+ * not treated as competing answers for the same thing.
+ */
+export function allocateWarehouseCost({
+  rows,
+}: {
+  rows: WarehouseCostRow[];
+}): WarehouseCostAllocation {
+  const nanoByStatementId = new Map<string, PricedTotals>();
+  const skipped: WarehouseCostSkip[] = [];
+  const owed = new Set<string>();
+
+  for (const row of rows) {
+    const share = shareOf(row);
+    if (share === "free") continue;
+    if (share === "owed") {
+      owed.add(row.statementId);
+      continue;
+    }
+
+    if ("reason" in share) {
+      skipped.push({
+        statementId: row.statementId,
+        // A skipped row always has a real SKU — the null-SKU case returns
+        // "owed" above and never reaches here. The fallback only satisfies the
+        // narrower type.
+        skuName: row.skuName ?? "",
+        currencyCode: row.currencyCode,
+        reason: share.reason,
+      });
+      continue;
+    }
+
+    foldPricedLine(nanoByStatementId, row, share);
+  }
+
+  const costByStatementId = new Map<string, WarehousePricedStatement>();
+  for (const [statementId, entry] of nanoByStatementId) {
+    costByStatementId.set(statementId, {
+      costUsd: nanoUsdToDecimalString(entry.costNanoUsd),
+      hourTotalExecutionMs: entry.hourTotalExecutionMs,
+      hourBillableUsd: nanoUsdToDecimalString(entry.hourNanoUsd),
+    });
+  }
+
+  // A statement that priced on any line is priced, even if another of its lines
+  // had not been billed yet. Only statements with no priced line at all are
+  // owed.
+  for (const statementId of costByStatementId.keys()) owed.delete(statementId);
+
+  return { costByStatementId, skipped, owed };
+}
+
+/**
+ * The oldest question a run reads.
+ *
+ * A source that prices its questions has to keep reading them after the
+ * watermark would otherwise have moved on, because the cost shows up later than
+ * the question does. `Math.min` is deliberate and load-bearing: the look-back
+ * may only ever WIDEN the window. A source whose watermark has fallen further
+ * behind than the settling window — paused, or working through a backfill —
+ * must not be dragged forward to it, which would skip everything in between and
+ * then report a complete sweep.
+ */
+export function costReadFloorMs({
+  sinceMs,
+  nowMs,
+  costEnabled,
+}: {
+  sinceMs: number;
+  nowMs: number;
+  costEnabled: boolean;
+}): number {
+  if (!costEnabled) return sinceMs;
+  return Math.min(sinceMs, nowMs - WAREHOUSE_COST_SETTLING_LAG_MS);
+}

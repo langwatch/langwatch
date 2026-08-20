@@ -3222,7 +3222,7 @@ Requires `gatewaySpend:manage`. The endpoint must be an active endpoint of your 
 
 ## The ledger UI
 
-**Settings > Gateway > Billing events** (`/settings/gateway/billing-events`) renders the spend ledger: cursor-paged, filterable by virtual key, end user, model, status, and date range, with token classes and cost per row and drill-through to the trace. Delivery health lives one screen over, on each endpoint's deliveries view under **Settings > Webhooks**, so the pair to keep open during an integration bring-up is this ledger beside your endpoint's health strip: if the numbers here match your ledger and the lag there stays near zero, the pipeline works.
+**Settings > Gateway > Billing events** (`/gateway/billing-events`) renders the spend ledger: cursor-paged, filterable by virtual key, end user, model, status, and date range, with token classes and cost per row and drill-through to the trace. Delivery health lives one screen over, on each endpoint's deliveries view under **Settings > Webhooks**, so the pair to keep open during an integration bring-up is this ledger beside your endpoint's health strip: if the numbers here match your ledger and the lag there stays near zero, the pipeline works.
 
 ## Operational notes
 
@@ -12500,7 +12500,7 @@ password, bind it to your existing secret-management workflow.
 
 ## 3. Publish a default RoutingPolicy
 
-In the UI: **Settings → Routing Policies → New policy**, scope =
+In the UI: **Gateway → Routing Policies → New policy**, scope =
 `organization`. Mark it default. Pick the providers from step 2 in
 your preferred fallback order. Optionally add a model allowlist,
 e.g. `claude-3-5-*` and `gpt-4o*`, to keep personal keys out of the
@@ -13703,9 +13703,9 @@ sidebarTitle: Anomaly rules
 
 <Info>**Pairs with:** [AI Gateway → Budgets](/ai-gateway/budgets). Budgets enforce hard spend limits; anomaly rules detect patterns *before* a budget breach (spend-spike, geo-mismatch, off-hours).</Info>
 
-<Note>**Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on `/settings/governance/anomaly-rules` instead of the composer. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
+<Note>**Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on `/governance/anomaly-rules` instead of the composer. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
-Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/settings/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing detector](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
+Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing detector](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
 
 This page documents what the detector evaluates today and what is preview-only, so you don't author rules that look "active" in the list but never fire.
 
@@ -13732,7 +13732,7 @@ If you need detection beyond `spend_spike` today, the recommended shape is one o
 
 ## Writing a working `spend_spike` rule
 
-Open `/settings/governance/anomaly-rules` → click **New anomaly rule**.
+Open `/governance/anomaly-rules` → click **New anomaly rule**.
 
 Fields the detector reads:
 
@@ -13742,7 +13742,7 @@ Fields the detector reads:
 | **Severity** | `warning`, `critical` | Drives the `/governance` KPI breakdown (`anomalyBreakdown.{critical,warning,info}`) and downstream dispatch routing once C3 ships. |
 | **Rule type** | `spend_spike` | Pick exactly this, see coverage table above. |
 | **Scope** | `organization`, `source_type`, `source` | Filters which IngestionSources the rule applies to (see Scope coverage below). |
-| **Scope ID** | (cuid) | Required when scope is `source_type` or `source`. The IngestionSource ID can be copied from `/settings/governance/ingestion-sources/<id>` or the URL of the per-source detail page. |
+| **Scope ID** | (cuid) | Required when scope is `source_type` or `source`. The IngestionSource ID can be copied from `/governance/ingestion-sources/<id>` or the URL of the per-source detail page. |
 | **Threshold config** | (JSON object, see below) | The detector's per-rule-type tuning knobs. |
 | **Destination config** | `{}` (today) | Reserved for future Slack, PagerDuty, SIEM dispatch, see Dispatch coverage below. |
 
@@ -14296,14 +14296,14 @@ $ langwatch login --device
 … opening https://app.langwatch.ai/cli/auth?code=ABCD-EFGH …
 Error: HTTP 409, no_default_routing_policy
        Your organization has no default routing policy published.
-       Ask your admin to publish one at Settings → Routing Policies
-       (/settings/routing-policies), then re-run `langwatch login`.
+       Ask your admin to publish one at Gateway → Routing Policies
+       (/gateway/routing-policies), then re-run `langwatch login`.
 ```
 
 **Admin remediation:**
 
 1. Sign in to the LangWatch web app as an org admin.
-2. Navigate to **Settings → Routing Policies** (`/settings/routing-policies`).
+2. Navigate to **Gateway → Routing Policies** (`/gateway/routing-policies`).
 3. Create at least one routing policy and toggle it to **Default**.
 4. Ask the developer to re-run `langwatch login --device`.
 
@@ -14335,7 +14335,7 @@ Three surfaces, one backend:
 | Surface | Audience | Contract |
 |---------|----------|----------|
 | Web `/governance` admin oversight | Governance admin in a browser | tRPC: `api.governance.setupState`, `api.activityMonitor.*`, `api.ingestionSources.*` |
-| Web `/settings/governance/ingestion-sources/:id` detail | Per-source SRE | tRPC: `api.activityMonitor.eventsForSource`, `api.activityMonitor.sourceHealthMetrics` |
+| Web `/governance/ingestion-sources/:id` detail | Per-source SRE | tRPC: `api.activityMonitor.eventsForSource`, `api.activityMonitor.sourceHealthMetrics` |
 | **CLI `governance status`, `ingest list/health/tail`** | **Terminal-first SRE, on-call** | **REST: `GET /api/auth/cli/governance/*`, Bearer adapter that imports the same service classes the tRPC procedures use, byte-for-byte matching IO** |
 
 The REST endpoints reuse the existing `validateAccessToken()` Bearer helper that's been in production since the device-flow CLI shipped, so opening this surface doesn't introduce a new auth path. Per-account governance entitlement is enforced at the endpoint layer.
@@ -14594,7 +14594,7 @@ LangWatch's RBAC layer (`platform/app/src/server/api/rbac.ts`) is the single sou
 
 **Chrome visibility gates**: `hasPermission('governance:view') && release_ui_ai_governance_enabled` for the Govern sidebar section; `hasPermission('virtualKeys:view') && release_ui_ai_gateway_menu_enabled` for the AI Gateway sidebar section. The feature flags are operator rollout knobs; the permissions are the audience predicate. Two flags preserve pilot flexibility so Gateway and Governance can roll out independently.
 
-**tRPC + REST enforcement**: every governance procedure currently checks `organization:manage` (broad). Granularization to the new dedicated permissions (`governance:manage`, `ingestionSources:manage`, etc.) is a deferred follow-up, existing checks still work; the catalog addition unblocks the gate-side migration.
+**tRPC + REST enforcement**: every governance procedure checks the dedicated permission for its resource. Reads use `<resource>:view` (`governance:view`, `ingestionSources:view`, `anomalyRules:view`, `activityMonitor:view`, `routingPolicies:view`) and writes use `<resource>:manage`. The page guards match the read grant, so the custom-role delegation above reaches the pages and each panel names the grant it still needs.
 
 ### 4. Org-tenancy isolation
 
@@ -14671,16 +14671,15 @@ existing routes:
 
 | Surface | Purpose | Audience | Where it lives |
 |---------|---------|----------|----------------|
-| `/governance` (forthcoming top-level home) | Daily-use **org governance home**: spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing--the-setup-state-signal) below) | Top-level route, org-scoped. Replaces the read-mostly content currently temporarily under `/settings/governance`. |
+| `/governance` | Daily-use **org governance home**: spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing--the-setup-state-signal) below) | Top-level route, org-scoped. |
 | `/me`, `/me/settings` | Daily-use **personal home**: your usage, your budget, your personal VK, your IDE setup snippet. | Any user with a personal VK | Top-level route, principal-scoped. |
 | `/[project]/...` | LLMOps daily-use, traces, evals, datasets, scenarios, workflows. | Project members | Per-project routes. **Unchanged** from current LangWatch. |
-| `/settings/governance/ingestion-sources`, `/settings/governance/anomaly-rules`, `/settings/routing-policies` | Admin-authoring (CRUD), create, rotate, archive sources, write rules, publish routing policies. | Org admins with `organization:manage` | Settings sub-routes, deliberately separate from daily-use surfaces. |
+| `/governance/ingestion-sources`, `/governance/anomaly-rules`, `/gateway/routing-policies` | Admin-authoring (CRUD), create, rotate, archive sources, write rules, publish routing policies. | The governance pages open on `governance:view` and `/gateway/routing-policies` on `routingPolicies:view`. Each write control needs the matching `:manage` grant (`ingestionSources:manage`, `anomalyRules:manage`, `routingPolicies:manage`) and is hidden without it. | Governance sub-routes, deliberately separate from daily-use surfaces. |
 
-This split is the answer to "why is governance overview hidden under
-Settings?", it shouldn't be. The read-mostly daily home is moving
-out to `/governance` (top-level); only the create, rotate, archive
-admin tools stay in Settings, where every other admin authoring
-tool lives.
+The whole governance product sits at the top level, not under Settings.
+The daily home is `/governance`, and the create, rotate and archive tools
+are its own sub-routes. Settings keeps the account and workspace
+administration that every product shares.
 
 ### Persona-based home routing: the setup-state signal
 
@@ -14927,7 +14926,7 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   validation).
 - ✅ **`/me` + `/me/settings`** dashboards (web app, gated behind the
   `release_ui_ai_governance_enabled` flag).
-- ✅ **`/settings/governance`** admin oversight dashboard
+- ✅ **`/governance`** admin oversight dashboard
   (org-admin-only via `organization:manage` permission, plus the
   governance flag). Wired to real `api.activityMonitor.{summary,
   spendByUser, ingestionSourcesHealth, recentAnomalies}` tRPC
@@ -14935,7 +14934,7 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   checklist (publish a RoutingPolicy, connect an IngestionSource),
   data renders live cards + per-user table + source-health strip.
   Read-mostly daily-use surface; admin authoring lives at the
-  `/settings/governance/*` sub-routes.
+  `/governance/*` sub-routes.
 - ✅ **Budget enforcement** (cross-surface, gateway 402 ↔ CLI
   Screen-8 box ↔ web `BudgetExceededBanner` all derive from
   `GatewayBudgetService.check()`).
@@ -14965,7 +14964,7 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   `organization:manage` permission AND
   `api.governance.setupState.governanceActive === true`. Renders
   a "GOVERN · Preview" section between LIBRARY and AI GATEWAY ·
-  Beta with an Eye-icon link to `/settings/governance`. Current
+  Beta with an Eye-icon link to `/governance`. Current
   LLMOps admins with no governance state see no nav change at all.
 
   ![MainMenu showing GOVERN Preview section with Governance entry, only visible when governanceActive=true](https://i.img402.dev/mck1l1ar3g.png)
@@ -14980,7 +14979,7 @@ In flight on the same branch:
 ## Admin oversight on real data
 
 Once a source is `active` and events are flowing, the admin
-oversight dashboard at `/settings/governance` queries
+oversight dashboard at `/governance` queries
 `gateway_activity_events` via the `api.activityMonitor.*` tRPC
 procedures. Empty data renders a setup checklist; data present
 renders live cards + per-user table + source-health strip.
@@ -15344,7 +15343,7 @@ The **departments page** itself only creates, renames, and archives departments,
 
 ### Managing departments
 
-Open the departments page under **Settings → AI Governance → Departments** to:
+Open the departments page under **Governance → Departments** to:
 
 - **Create** a department by name (Engineering, Marketing, ...).
 - **Edit** a department's name.
@@ -15390,8 +15389,9 @@ Every underlying query is tenant-isolated: a department rollup for your org cont
 
 ## Permissions
 
-- Creating, renaming, and archiving departments requires `organization:manage` (granted to ADMIN by default).
-- Assigning people, teams, and projects to a department happens on the respective surfaces under the same admin permission.
+- Reading the department list requires `governance:view`, which is also what opens the page.
+- Creating, renaming, and archiving departments requires `governance:manage` (granted to ADMIN by default). Without it, the page shows the list and hides the write controls.
+- Assigning people, teams, and projects to a department happens on the respective surfaces under the same `governance:manage` permission.
 - Departments never appear in any access-control decision. They are an accounting dimension only.
 
 ## Where to next
@@ -15489,12 +15489,12 @@ After sign-in you'll land on `/governance` (the org governance home, see the [co
 
 ```
 HTTP 409, error: "no_default_routing_policy"
-Ask your admin to publish a default routing policy at Settings → Routing Policies.
+Ask your admin to publish a default routing policy at Gateway → Routing Policies.
 ```
 
 Publish at least one policy *before* opening CLI sign-in to your team:
 
-1. Navigate to **Settings → Routing Policies** (`/settings/routing-policies`).
+1. Navigate to **Gateway → Routing Policies** (`/gateway/routing-policies`).
 2. Click **+ New routing policy**.
 3. Pick a recommended starter shape: "Anthropic primary, OpenAI fallback, prompt caching on" works on day one.
 4. Tick **Mark as default** before saving.
@@ -15507,7 +15507,7 @@ The same chain controls cost, latency, fallback, and prompt caching across every
 
 For a brand-new org, the cheapest first source is `otel_generic`, it's available on the **Apache 2.0** open-core floor (no Enterprise license required) and accepts any OTLP/HTTP push:
 
-1. Navigate to **Settings → AI Governance → Ingestion Sources** (`/settings/governance/ingestion-sources`).
+1. Navigate to **Governance → Ingestion Sources** (`/governance/ingestion-sources`).
 2. Click **+ New source**, pick **Generic OTLP (`otel_generic`)**, and fill the form.
 3. The backend mints a `lw_is_<base64url>` ingest secret and shows it **once** in a one-time-reveal modal, copy it now. The list endpoint never returns it again.
 4. Paste the secret into the upstream platform's OTLP exporter as `Authorization: Bearer lw_is_<secret>`. The receiver endpoint is on the same host as the rest of LangWatch.
@@ -15518,9 +15518,9 @@ If no upstream is ready yet, skip this step. Your gateway itself is an implicit 
 
 ## Step 4: Import the AI Tools Portal starter pack
 
-The [AI Tools Portal](/ai-governance/personal-portal/overview) is the card grid every developer sees on `/me`. A fresh org has an empty catalog; the [admin editor](/ai-governance/personal-portal/admin-catalog) at `/settings/governance/tool-catalog` shows you a one-click **Import starter pack** CTA on first visit:
+The [AI Tools Portal](/ai-governance/personal-portal/overview) is the card grid every developer sees on `/me`. A fresh org has an empty catalog; the [admin editor](/ai-governance/personal-portal/admin-catalog) at `/governance/tool-catalog` shows you a one-click **Import starter pack** CTA on first visit:
 
-1. Navigate to **Settings → AI Governance → Tool catalog** (`/settings/governance/tool-catalog`).
+1. Navigate to **Governance → Tool Catalog** (`/governance/tool-catalog`).
 2. Click **Import starter pack**.
 
 What you get out of the box:
@@ -15570,7 +15570,7 @@ langwatch ingest health <sourceId>
 
 Budgets are the gateway's hard cost gate. With a default routing policy in place, you can attach budgets at four scopes: **organization**, **team**, **project**, and **principal**. Org-wide is the broadest safety net, set this first if your org doesn't yet have per-team budgets dialled in.
 
-1. Navigate to **Gateway → Budgets** under any project (`/<project>/gateway/budgets`).
+1. Navigate to **Gateway → Budgets** (`/gateway/budgets`).
 2. Click **+ New budget**.
 3. Pick **Organization, all AI spend** in the Scope dropdown. The picker also offers Team, Project, and Principal scopes for narrower caps.
 4. Pick a window (`Per calendar month` is the default), a USD limit, and an `On breach` action (`Block` rejects requests at the limit, `Warn` tags responses but keeps serving).
@@ -15586,7 +15586,7 @@ Budgets enforce *at* the limit. [Anomaly rules](/ai-governance/anomaly-rules) de
 
 Write a starter `spend_spike` rule:
 
-1. Navigate to **Settings → AI Governance → Anomaly Rules** (`/settings/governance/anomaly-rules`).
+1. Navigate to **Governance → Anomaly Rules** (`/governance/anomaly-rules`).
 2. Click **+ New anomaly rule**.
 3. Fill in:
    - **Name**: `Daily spend doubles vs last week`
@@ -15618,7 +15618,7 @@ The detector starts evaluating from the next ingest event. When today's 24h spen
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Developer sees `409 no_default_routing_policy` on `langwatch login` | Step 2 skipped or no policy marked default | [Routing Policies](/ai-gateway/governance/routing-policies): pick one, tick **Mark as default**. |
-| `/me` shows "your IT team is still setting things up" empty state | Step 4 skipped | Open `/settings/governance/tool-catalog` → **Import starter pack**. |
+| `/me` shows "your IT team is still setting things up" empty state | Step 4 skipped | Open `/governance/tool-catalog` → **Import starter pack**. |
 | Ingestion source sits at `awaiting_first_event` forever | Source-type doesn't have a wired adapter yet | [Ingestion Sources index → State of each receiver](/ai-governance/ingestion-sources/index#state-of-each-receiver--at-a-glance): three rows are setup-contract-only as of this release. |
 | `/governance` doesn't appear in your sidebar | Org's [setup-state OR-of-flags](/ai-governance/control-plane#persona-based-home-routing--the-setup-state-signal) hasn't tripped yet | Need any 3 of 5: Personal VKs, Routing Policies, Ingestion Sources, Anomaly Rules, Recent activity (30d). After Steps 2–7 above, you'll have 4. |
 | Member colleague got an `Access Restricted` page on `/settings/audit-log` | Working as designed, audit log is admin-only | Either elevate them to `Admin` or grant a custom role with `organization:manage` (delegable via the `CustomRolePermissions` JSON column). |
@@ -15766,17 +15766,17 @@ Your spend, budget, and audit trail still flow normally, the portal grid is a co
 
 ---
 title: /governance dashboard
-description: The daily-use org governance home, spend, anomalies, ingestion-source health, per-user activity. Read-mostly; the admin-authoring CRUD pages still live under /settings/governance/*. Available only after the org's setup-state OR-of-flags trips.
+description: The daily-use org governance home, spend, anomalies, ingestion-source health, per-user activity. Read-mostly; the admin-authoring CRUD pages still live under /governance/*. Available only after the org's setup-state OR-of-flags trips.
 sidebarTitle: /governance dashboard
 ---
 
 The `/governance` route is the **org governance daily home**: the read-mostly oversight dashboard an admin opens to answer *"is the gateway healthy, are we within budget, did anything anomalous happen overnight, are users actually using this?"*. It's the counterpart of `/me` for the admin persona.
 
-It is intentionally distinct from the **admin-authoring** surface at `/settings/governance/*`, see [Control plane → Daily-use vs admin-authoring](/ai-governance/control-plane#daily-use-surfaces-vs-admin-authoring-surfaces) for why the split exists.
+It is intentionally distinct from the **admin-authoring** surface at `/governance/*`, see [Control plane → Daily-use vs admin-authoring](/ai-governance/control-plane#daily-use-surfaces-vs-admin-authoring-surfaces) for why the split exists.
 
 <Info>**Pairs with:** [Control plane & integration tiers](/ai-governance/control-plane) for the surface map, [Anomaly rules](/ai-governance/anomaly-rules) for what populates the anomalies strip, and [Departments](/ai-governance/departments) for how the **Spend by department** card attributes spend across the org.</Info>
 
-<Note>**Visibility**: the `/governance` entry only appears in the main sidebar once the org's setup-state OR-of-flags trips (see [When the entry shows up](#when-the-entry-shows-up) below). A brand-new org sees the **Settings → AI Governance** admin pages instead until they have data flowing.</Note>
+<Note>**Visibility**: the `/governance` entry only appears in the main sidebar once the org's setup-state OR-of-flags trips (see [When the entry shows up](#when-the-entry-shows-up) below). A brand-new org sees the **Governance** admin pages instead until they have data flowing.</Note>
 
 ## What you see
 
@@ -15851,7 +15851,7 @@ The same signal drives:
 
 - The **Govern (Preview)** entry visibility in the main sidebar.
 - The CLI `langwatch governance status` output (mirrors the same booleans).
-- The post-onboarding redirect, when an admin lands on `/`, the persona-2 home picker sends them to `/governance` if active, else to `/settings/governance` to keep configuring.
+- The post-onboarding redirect, when an admin lands on `/`, the persona-2 home picker sends them to `/governance` if active, else to `/governance` to keep configuring.
 
 ## Permissions
 
@@ -15873,7 +15873,7 @@ The dashboard is read-mostly, but every section deep-links into the admin-author
 - Ingestion-source health row → click into the per-source detail page.
 - Anomalies row → click the rule name → opens the [anomaly-rule editor](/ai-governance/anomaly-rules) at that rule.
 
-If the dashboard surfaces something you want to *act* on (rotate a key, edit a rule threshold, archive a source), follow the deep link into the corresponding admin-authoring page under `/settings/governance/*`.
+If the dashboard surfaces something you want to *act* on (rotate a key, edit a rule threshold, archive a source), follow the deep link into the corresponding admin-authoring page under `/governance/*`.
 
 ## Where to next
 
@@ -15901,7 +15901,7 @@ The configuration contract below lets admins pre-stage workspace keys; the match
 
 ## Currently implemented
 
-- **CRUD:** the source can be created via the admin composer at `/settings/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
+- **CRUD:** the source can be created via the admin composer at `/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
 - **Receiver:** none. There is no `/api/ingest/claude-compliance/:id` endpoint and the OTLP, webhook receivers reject `claude_compliance` sources with `400 wrong_endpoint`.
 - **Poller:** none.
 - **Normaliser:** none.
@@ -16008,7 +16008,7 @@ The configuration contract below lets admins pre-stage Azure AD app registration
 
 ## Currently implemented
 
-- **CRUD:** the source can be created via the admin composer at `/settings/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
+- **CRUD:** the source can be created via the admin composer at `/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
 - **Receiver:** none. There is no `POST /api/ingest/copilot/:id` endpoint and the OTLP, webhook receivers reject `copilot_studio` sources with `400 wrong_endpoint`.
 - **Poller:** none.
 - **Normaliser:** none.
@@ -16069,7 +16069,7 @@ sidebarTitle: Ingestion sources
 
 <Info>**Pairs with:** [AI Gateway → Observability](/ai-gateway/observability). The gateway is itself an ingestion source (its spans land in the same trace store); IngestionSources extend that substrate to platforms whose API key path you don't own (Workato, Copilot Studio, OpenAI/Anthropic compliance APIs). Also pairs with [Audit log](/ai-governance/audit-log): S3 audit log feeds (Workato, Copilot Studio, Anthropic Compliance) become OTel-shaped events through this same pipeline, so a single audit log query at `/settings/audit-log` covers in-platform mutations and third-party-tool activity uniformly.</Info>
 
-<Note>**One `otel_generic` source is Apache 2.0 floor; multiple sources and configurable retention require Enterprise.** Self-hosted Apache 2.0 deployments can wire one OTel receiver at the platform default retention window; the additional source types on this page (Workato, S3, Copilot Studio, OpenAI, Anthropic compliance APIs) and [retention policies](/platform/data-retention) ship under the Enterprise license. Non-enterprise organizations see an upgrade card on `/settings/governance/ingestion-sources`. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full split.</Note>
+<Note>**One `otel_generic` source is Apache 2.0 floor; multiple sources and configurable retention require Enterprise.** Self-hosted Apache 2.0 deployments can wire one OTel receiver at the platform default retention window; the additional source types on this page (Workato, S3, Copilot Studio, OpenAI, Anthropic compliance APIs) and [retention policies](/platform/data-retention) ship under the Enterprise license. Non-enterprise organizations see an upgrade card on `/governance/ingestion-sources`. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full split.</Note>
 
 LangWatch governance ingest accepts events from upstream agent and audit-log platforms and lands them in the **same `recorded_spans` + `log_records` tables** that power the rest of LangWatch, distinguished by `langwatch.origin.kind = "ingestion_source"` origin metadata stamped at the receiver edge. Same trace viewer, same compliance + RBAC + retention machinery, surfaced in the [governance dashboard](/ai-governance/control-plane), the per-source detail page, and the [`langwatch ingest tail`](/ai-governance/cli-debug) CLI.
 
@@ -16108,7 +16108,7 @@ Different upstreams emit different event shapes:
 
 Independent of source type, the lifecycle is:
 
-1. Admin opens `/settings/governance/ingestion-sources`, picks a source type, fills the per-type config form (including the [retention class](/ai-gateway/governance/retention)), clicks Create.
+1. Admin opens `/governance/ingestion-sources`, picks a source type, fills the per-type config form (including the [retention class](/ai-gateway/governance/retention)), clicks Create.
 2. Backend mints a `lw_is_<base64url>` ingest secret, hashes it, persists the source with status `awaiting_first_event`. The secret is shown **once** in a one-time-reveal modal, it's never returned by the list/get endpoints again.
 3. Admin pastes the secret + per-source endpoint into the upstream platform (OTLP exporter URL, webhook destination, Azure app secret, S3 bucket policy, etc.).
 4. First event arrives at the receiver → receiver lazy-ensures the hidden Governance Project for the org (if not already), stamps the `langwatch.origin.*` attributes, hands off to the existing trace pipeline. Source status flips to `active` + `lastEventAt` updates.
@@ -16188,7 +16188,7 @@ The configuration contract below lets admins pre-stage IAM trust policies and bu
 
 ## Currently implemented
 
-- **CRUD:** the source can be created via the admin composer at `/settings/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
+- **CRUD:** the source can be created via the admin composer at `/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
 - **Receiver:** none. There is no `/api/ingest/openai-compliance/:id` endpoint and the OTLP, webhook receivers reject `openai_compliance` sources with `400 wrong_endpoint`.
 - **Puller:** none.
 - **Normaliser:** none.
@@ -16331,7 +16331,7 @@ langwatch ingest tail <sourceId> --follow
 langwatch ingest health <sourceId>
 ```
 
-The web equivalent is `/settings/governance/ingestion-sources/<sourceId>`, same data, same poll cadence semantics.
+The web equivalent is `/governance/ingestion-sources/<sourceId>`, same data, same poll cadence semantics.
 
 A successful smoke test produces output like:
 
@@ -16560,7 +16560,7 @@ So the CLI tail row looks like:
 langwatch ingest tail <sourceId> --follow
 ```
 
-Hit a Workato recipe that's connected to the webhook, you should see one event row appear within ~3 s of the recipe completing. The per-source detail page at `/settings/governance/ingestion-sources/<sourceId>` shows the same row; click to expand and inspect `rawPayload` to confirm Workato's envelope shape matches what you expect.
+Hit a Workato recipe that's connected to the webhook, you should see one event row appear within ~3 s of the recipe completing. The per-source detail page at `/governance/ingestion-sources/<sourceId>` shows the same row; click to expand and inspect `rawPayload` to confirm Workato's envelope shape matches what you expect.
 
 If you want to dry-run without a Workato recipe:
 
@@ -16628,7 +16628,7 @@ That's an Ingestion Template:
   Claude Code, Cursor, and Claude cowork all emit OpenTelemetry `gen_ai.*` canonical
   spans natively, so no transform is needed for the common case. **Org admins can clone
   a platform-default template into an org-authored template** and author OTTL via the
-  OttlEditor at `/settings/governance/tool-catalog → Ingestion Templates → Clone to
+  OttlEditor at `/governance/tool-catalog → Ingestion Templates → Clone to
   customise → Edit OTTL`, to adapt a template to their org's upstream-tool quirks (an
   internal IDE wrapper, a custom Cursor build, etc). Platform rows are read-only:
   admins click **Clone to customise** which calls
@@ -16748,7 +16748,7 @@ An `IngestionTemplate` row has:
   because Claude Code, Cursor, and Claude cowork all emit OpenTelemetry `gen_ai.*`
   canonical spans natively, there is nothing to reshape for the common case. **Org
   admins can fork a platform-default template into an org-authored template and author
-  OTTL via the OttlEditor** in `/settings/governance/tool-catalog → Ingestion
+  OTTL via the OttlEditor** in `/governance/tool-catalog → Ingestion
   Templates → Edit OTTL`. Forking lets the admin adapt a template to their org's
   upstream-tool quirks (an internal IDE wrapper, a custom Cursor build, a corporate
   Claude Code variant) without filing a request for a platform change.
@@ -16898,7 +16898,7 @@ Claude Code, Cursor, and Claude cowork to populate `gen_ai.usage.*` correctly pe
 OTel semantic-conventions spec.
 
 **Tier 2, Org-authored templates** (`organizationId NOT NULL`, forked from a tier-1
-template via the OttlEditor at `/settings/governance/tool-catalog → Ingestion
+template via the OttlEditor at `/governance/tool-catalog → Ingestion
 Templates → Edit OTTL`). Admins author OTTL to adapt a template to their org's
 upstream-tool quirks. Trust here rides on **org-admin review at save time**: the
 admin who clicks "Save & validate" is accepting within-org responsibility for the
@@ -16918,7 +16918,7 @@ Cross-org cost integrity is structurally protected on both tiers by the attribut
 re-stamp regardless of OTTL, admin OTTL in org-A cannot misattribute cost to org-B.
 
 A tile flips to green-checked only after the template is verified end to end on a real
-install: an admin publishes it via `/settings/governance/tool-catalog`, a user installs it
+install: an admin publishes it via `/governance/tool-catalog`, a user installs it
 via `/me`, the upstream tool emits a real trace, and the resulting attribution holds up
 under cross-user isolation and forge attempts against both protected lists.
 
@@ -17243,12 +17243,12 @@ What the user controls about their own account lives at `/settings/authenticatio
 
 The page is per-user. There's no admin gate, every member of the org can manage their own credentials here. Admins don't manage other users' sign-in methods from this page; user-account-management is by-design self-service.
 
-Org-level SSO configuration (IdP metadata, SAML cert, SCIM provisioning) is **separate** from this page, it lives at `/settings/governance/scim-provisioning` (admin-only) and the SSO-provider env config in your deployment's helm values, `.env`.
+Org-level SSO configuration (IdP metadata, SAML cert, SCIM provisioning) is **separate** from this page, it lives at `/settings/scim` (admin-only) and the SSO-provider env config in your deployment's helm values, `.env`.
 
 ## Where to next
 
 - **Self-service for me**: [/settings/authentication](#per-user-sign-in-methods-at-settingsauthentication) (this page) and [Devices](/ai-governance/personal-portal/sessions).
-- **Org SSO + SCIM auto-provisioning**: `/settings/governance/scim-provisioning` (admin-only).
+- **Org SSO + SCIM auto-provisioning**: `/settings/scim` (admin-only).
 - **Role catalog**: [Roles & permissions](/ai-governance/roles-and-permissions).
 - **Audit who did what when**: [Audit log](/ai-governance/audit-log).
 
@@ -17380,7 +17380,7 @@ LangWatch is open-core. Some governance surfaces work for every self-hosted depl
 | Surface | License | Notes |
 |---|---|---|
 | [Personal IDE keys](/ai-gateway/governance/personal-keys) | Apache 2.0 | Always available. The Personal Virtual Key + `langwatch login` flow is the open-core floor. |
-| [AI Tools Portal at `/me`](/ai-governance/personal-portal/overview) | Apache 2.0 | Always available. Catalog editor at `/settings/governance/tool-catalog`, three tile classes, admin-curated. |
+| [AI Tools Portal at `/me`](/ai-governance/personal-portal/overview) | Apache 2.0 | Always available. Catalog editor at `/governance/tool-catalog`, three tile classes, admin-curated. |
 | [Routing Policies](/ai-gateway/governance/routing-policies) | Apache 2.0 | Always available. The gateway-side policy chain is core. |
 | [CLI debugging](/ai-governance/cli-debug) | Apache 2.0 | Always available. CLI 409, 401, 403 catalog. |
 | [Ingestion Sources](/ai-governance/ingestion-sources/index) | Enterprise | The `otel_generic` source type at the platform default retention window is available on the Apache 2.0 floor; multiple sources and configurable retention require Enterprise. |
@@ -17467,13 +17467,13 @@ Every span the wrapper produces lands in the developer's own Trace Explorer, wit
 
 ### For an admin
 
-The bird-eye view at `/governance` is the daily home for admin oversight: org-wide spend, top spenders, open anomaly count, ingestion-source health, recent activity. Below it, `/settings/governance/*` is the authoring surface where routing policies, ingestion sources, anomaly rules, the AI Tools Portal catalog, and the audit log all live.
+The bird-eye view at `/governance` is the daily home for admin oversight: org-wide spend, top spenders, open anomaly count, ingestion-source health, recent activity. Below it, `/governance/*` is the authoring surface where routing policies, ingestion sources, anomaly rules, the AI Tools Portal catalog, and the audit log all live.
 
 <Frame caption="The /governance dashboard. KPI summary (org-wide spend, active users, open anomalies), 30-day spend-over-time chart bucketed per team, spend-share-across-teams bar, ingestion-source health, recent activity. Read-mostly oversight, the place admins check before standup.">
   ![Governance bird-eye](/images/ai-governance/post-bypass/06-governance-birdeye.png)
 </Frame>
 
-The Tool Catalog at `/settings/governance/tool-catalog` stocks the developer-facing `/me` portal. Pick a fixed roster of coding assistants and model providers, scope to the org or to specific teams, publish.
+The Tool Catalog at `/governance/tool-catalog` stocks the developer-facing `/me` portal. Pick a fixed roster of coding assistants and model providers, scope to the org or to specific teams, publish.
 
 <Frame caption="Tool Catalog editor. Three tile classes, preset picker, custom icon upload, scope binding, publish lifecycle.">
   ![Tool catalog editor](/images/ai-governance/post-bypass/07-tool-catalog.png)
@@ -17501,7 +17501,7 @@ LangWatch governance is shaped around two people who never need the same screen:
 - **End user**: a developer or analyst who needs a Personal Virtual Key, wants to see their own usage and budget at `/me`, and sometimes switches between Personal, Team, and Project workspaces. They never see the admin surface.
 - **Admin**: an org-level operator who configures ingestion sources, publishes routing policies, defines anomaly rules, and signs off on OCSF and SIEM export. They never see the end-user `/me` chrome.
 
-The persona-aware chrome (single-chip header on `/me`, full sidebar on `/settings/governance/*`) keeps both surfaces clean, so neither has to navigate around the other.
+The persona-aware chrome (single-chip header on `/me`, full sidebar on `/governance/*`) keeps both surfaces clean, so neither has to navigate around the other.
 
 ## Get started
 
@@ -17533,8 +17533,8 @@ sidebarTitle: Admin catalog
 ---
 
 Org admins curate the AI Tools Portal from
-**Settings → AI Governance → Tool catalog**
-(`/settings/governance/tool-catalog`). Anything you publish here lands on
+**Governance → Tool Catalog**
+(`/governance/tool-catalog`). Anything you publish here lands on
 every matching user's `/me` portal grid.
 
 ![Admin catalog editor, section-grouped list of published tiles](/images/ai-governance/portal/admin-catalog-overview.png)
@@ -17787,7 +17787,7 @@ HTTP 422 response with an actionable hint rather than a green key that
 returns 504 on every call.
 
 Ask your admin to bind at least one provider in
-`/settings/governance/routing-policies`. Once a provider is bound,
+`/gateway/routing-policies`. Once a provider is bound,
 retry, issuance will succeed and your key works immediately.
 
 ### When to create a project instead
@@ -17843,7 +17843,7 @@ If your admin hasn't published the catalog yet, you'll see:
 
 This is normal during a brand-new organization's onboarding. Ask your
 admin to import the starter pack at
-`/settings/governance/tool-catalog`.
+`/governance/tool-catalog`.
 
 ## Where to next
 
@@ -17928,7 +17928,7 @@ team entry overrides for users in that team. This is how admins say
 ## Empty state
 
 A fresh organization has an empty catalog. The first admin to visit
-`/settings/governance/tool-catalog` sees a starter-pack import CTA
+`/governance/tool-catalog` sees a starter-pack import CTA
 ([Admin catalog](/ai-governance/personal-portal/admin-catalog#starter-pack)).
 End users on `/me` see a "your IT team is still setting things up"
 message until the admin publishes the catalog.
@@ -17944,7 +17944,7 @@ Two new RBAC permissions gate the portal surfaces:
   This is intentionally broad: the portal is the company's curated AI
   starting point and must work for everyone.
 - `aiTools:manage`, granted to ADMIN by default. Required to access
-  `/settings/governance/tool-catalog` and to run any catalog
+  `/governance/tool-catalog` and to run any catalog
   mutation. Delegable to non-ADMIN roles via the `CustomRolePermissions`
   JSON column.
 
@@ -17954,7 +17954,7 @@ Two new RBAC permissions gate the portal surfaces:
   walks through each tile-class expand UX.
 - **Admin:** [Admin catalog](/ai-governance/personal-portal/admin-catalog)
   walks through the catalog editor at
-  `/settings/governance/tool-catalog`, including starter-pack import,
+  `/governance/tool-catalog`, including starter-pack import,
   scope binding, and per-tile editing.
 - **Developer integrating with the catalog API:** the underlying tRPC
   router is `aiToolsCatalogRouter` (see source, not yet stable for
@@ -18076,8 +18076,7 @@ Recommended values:
 - **Standard enterprises**: 30 days
 - **Open-source, small teams**: 0 (unbounded)
 
-Admins set this at **Settings → Governance → Security policies →
-Maximum session duration**.
+Admins set this at **Governance → Overview → CLI session policy**.
 
 ## What about virtual keys themselves?
 
@@ -18173,7 +18172,7 @@ Override applies after the next sign-in.
 ## Per-org enforcement (admin)
 
 Org admins can enforce a persona-based default on all members of their org
-via the upcoming `/settings/governance/persona-policy` setting (deferred to
+via the upcoming `/governance/persona-policy` setting (deferred to
 a later iteration). Today, the per-user override is the only knob.
 
 ## Related references
@@ -18376,8 +18375,8 @@ auto-discover it; no other glue code needed.
 
 The Copilot Studio reference puller wraps `http_polling` with a
 locked-down config matching Microsoft's documented audit-log API
-shape. Admins enable it at **Settings → Governance → Ingestion
-sources → Add → Microsoft Copilot Studio**, enter their tenant
+shape. Admins enable it at **Governance → Ingestion Sources → Add →
+Microsoft Copilot Studio**, enter their tenant
 credentials, and the framework handles the rest. URL + auth shape are
 fixed (only credentials are admin-editable).
 
@@ -18761,9 +18760,9 @@ An `ik-lw-` write-only ingest key also authenticates the project OTLP endpoint, 
 
 Commit `.claude/settings.json` with the exporter wiring, and keep the bearer token, the `CLAUDE_CODE_ENABLE_TELEMETRY` enable flag and **every content flag** in a gitignored `.claude/settings.local.json`. Telemetry is **off by default**: nothing exports until the enable flag is set, so a fresh clone carrying only the committed `settings.json` sends nothing.
 
-The committed file decides the shape of the export. What that export carries is decided by four flags, and they stay out of the repository so each person turns them on for themselves: `OTEL_LOG_USER_PROMPTS` puts prompt text on the wire, `OTEL_LOG_TOOL_DETAILS` and `OTEL_LOG_TOOL_CONTENT` put the input and output of every tool call on it, and `OTEL_LOG_RAW_API_BODIES` puts the Messages API request and response JSON on it. Inline bodies are truncated at 60 KB (`CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH` raises the limit, `file:<dir>` writes untruncated bodies to disk instead) and extended thinking is redacted.
+The committed file decides the shape of the export. What that export carries is decided by five flags, and they stay out of the repository so each person turns them on for themselves: `OTEL_LOG_USER_PROMPTS` puts prompt text on the wire, `OTEL_LOG_TOOL_DETAILS` and `OTEL_LOG_TOOL_CONTENT` put the input and output of every tool call on it, `OTEL_LOG_RAW_API_BODIES` puts the Messages API request and response JSON on it, and `OTEL_LOG_ASSISTANT_RESPONSES` puts just the assistant's response text on it without the rest of the body. Inline bodies are truncated at 60 KB (`CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH` raises the limit, `file:<dir>` writes untruncated bodies to disk instead) and extended thinking is redacted.
 
-<Warning>Those four flags are what put your session content in LangWatch: prompt text, the input and output of every tool call, including file contents, and the model request and response bodies of every turn. A committed content flag does not switch telemetry on by itself, because Claude Code exports nothing until `CLAUDE_CODE_ENABLE_TELEMETRY` is set. It does not have to be set in the repository for that to happen, though: a managed settings file, a shell export, or a contributor's own `~/.claude/settings.json` can each turn telemetry on, and from that moment a content flag sitting in the committed file applies to everyone who cloned the repo. That is why the recipe keeps all four in each person's own gitignored file.</Warning>
+<Warning>Those five flags are what put your session content in LangWatch: prompt text, the input and output of every tool call, including file contents, the model request and response bodies of every turn, and the assistant's response text on its own. A committed content flag does not switch telemetry on by itself, because Claude Code exports nothing until `CLAUDE_CODE_ENABLE_TELEMETRY` is set. It does not have to be set in the repository for that to happen, though: a managed settings file, a shell export, or a contributor's own `~/.claude/settings.json` can each turn telemetry on, and from that moment a content flag sitting in the committed file applies to everyone who cloned the repo. That is why the recipe keeps all five in each person's own gitignored file.</Warning>
 
 `settings.local.json`'s `env` merges per-key with `settings.json`'s `env`, so the local flags combine with the committed ones rather than replacing them.
 
@@ -18801,6 +18800,7 @@ For self-hosted (`npx @langwatch/server`), replace the endpoint with `http://loc
     "OTEL_LOG_TOOL_DETAILS": "1",
     "OTEL_LOG_TOOL_CONTENT": "1",
     "OTEL_LOG_RAW_API_BODIES": "1",
+    "OTEL_LOG_ASSISTANT_RESPONSES": "1",
     "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer sk-lw-…",
     "OTEL_RESOURCE_ATTRIBUTES": "project.repo=my-repo-name,cost_center=my-team,enduser.id=you@example.com"
   }
@@ -18938,7 +18938,7 @@ Choose by what the artifact is *for*, not what's convenient.
 | Cap spend "for marketing only" | **Team** | Same shape as the org cap, narrower scope. |
 | Cap spend for one engineer | **Principal** | A Personal workspace's owner is the principal, pin a budget there. |
 
-The chrome's [Workspace Switcher](#workspace-switcher) shows you the workspaces you can see; the [admin catalog](/ai-governance/personal-portal/admin-catalog) at `/settings/governance/tool-catalog` controls which ones developers see entries for.
+The chrome's [Workspace Switcher](#workspace-switcher) shows you the workspaces you can see; the [admin catalog](/ai-governance/personal-portal/admin-catalog) at `/governance/tool-catalog` controls which ones developers see entries for.
 
 ## Personal Workspace
 
@@ -19029,7 +19029,7 @@ Budgets are evaluated in scope order, broadest first. A request that would breac
 
 ## How routing policies attach to workspaces
 
-Routing Policies live at `/settings/routing-policies` (org-scoped). One policy is marked `default` and is the policy every Personal VK binds to on first sign-in.
+Routing Policies live at `/gateway/routing-policies` (org-scoped). One policy is marked `default` and is the policy every Personal VK binds to on first sign-in.
 
 Workspace overrides:
 
@@ -30841,6 +30841,8 @@ The setup that `langwatch claude` and `langwatch instrument claude` write turns 
 
 Remove the flags from `~/.claude/settings.json` to keep only the usage numbers: tokens, cost, model, latency, the tool call tree and the subagent tree stay, and the content stops.
 
+`langwatch claude` and `langwatch instrument claude` set `OTEL_LOG_RAW_API_BODIES`, which already carries the assistant's response text along with the rest of the request and response body. If you want the response text on its own, without the full body, add `OTEL_LOG_ASSISTANT_RESPONSES` yourself: the wrapper does not set it for you.
+
 Claude Code shortens each inline body at 60 kilobytes. `CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH` raises that limit. Claude Code always removes extended thinking from the bodies, so LangWatch never receives it.
 
 ## Troubleshooting
@@ -30861,9 +30863,11 @@ Claude Code shortens each inline body at 60 kilobytes. `CLAUDE_CODE_OTEL_CONTENT
   </Accordion>
 
   <Accordion title="The trace has no response">
-    `OTEL_LOG_RAW_API_BODIES` is missing. Claude Code reports the response text of the assistant on its `api_response_body` event only, and that event is off by default.
+    Both `OTEL_LOG_RAW_API_BODIES` and `OTEL_LOG_ASSISTANT_RESPONSES` are missing. Claude Code reports the response text of the assistant on its `api_response_body` event (needs `OTEL_LOG_RAW_API_BODIES=1`, and carries the full request and response JSON) or on its lighter `assistant_response` event (needs `OTEL_LOG_ASSISTANT_RESPONSES=1`, and carries only the response text). Both are off by default. Set `OTEL_LOG_ASSISTANT_RESPONSES=1` if you want the response without the rest of the body.
 
-    Claude Code also reports `api_response_body` for work that is not a conversation, such as an autosuggestion or a session title. LangWatch filters those out, so a title never becomes the output of a trace.
+    Claude Code docs describe `OTEL_LOG_ASSISTANT_RESPONSES` as falling back to the value of `OTEL_LOG_USER_PROMPTS`. Don't rely on that fallback: set it explicitly.
+
+    Claude Code also reports `api_response_body` and `assistant_response` for work that is not a conversation, such as an autosuggestion or a session title. LangWatch filters those out, so a title never becomes the output of a trace.
   </Accordion>
 
   <Accordion title="The telemetry goes to the wrong workspace">
@@ -30885,7 +30889,7 @@ For more failure modes see [CLI debug](/ai-governance/cli-debug).
 
 ## Manual OpenTelemetry setup
 
-Use this when you cannot install the LangWatch command line tool. The variables below are the ones `langwatch instrument claude` writes for you.
+Use this when you cannot install the LangWatch command line tool. The block below mirrors the variables `langwatch instrument claude` writes for you, plus the optional `OTEL_LOG_ASSISTANT_RESPONSES` flag, which the wrapper does not set. Drop that line if you only want what the wrapper gives you.
 
 ### Environment variables
 
@@ -30899,6 +30903,7 @@ export OTEL_LOG_USER_PROMPTS=1
 export OTEL_LOG_TOOL_DETAILS=1
 export OTEL_LOG_TOOL_CONTENT=1
 export OTEL_LOG_RAW_API_BODIES=1
+export OTEL_LOG_ASSISTANT_RESPONSES=1
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
@@ -30911,7 +30916,7 @@ The header takes an ingest key (`ik-lw-…`), which can create traces and nothin
 For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. Claude Code appends `/v1/traces`, `/v1/logs` and `/v1/metrics` on its own. Never write the per-signal path yourself.
 
 <Warning>
-  The four `OTEL_LOG_*` flags put your session content in LangWatch. Read [Content and privacy](#content-and-privacy) before you use them where the content matters.
+  The five `OTEL_LOG_*` flags put your session content in LangWatch. Read [Content and privacy](#content-and-privacy) before you use them where the content matters.
 </Warning>
 
 ### Settings file
@@ -30930,6 +30935,7 @@ Claude Code reads the same variables from the `env` block of `~/.claude/settings
     "OTEL_LOG_TOOL_DETAILS": "1",
     "OTEL_LOG_TOOL_CONTENT": "1",
     "OTEL_LOG_RAW_API_BODIES": "1",
+    "OTEL_LOG_ASSISTANT_RESPONSES": "1",
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "https://app.langwatch.ai/api/otel",
     "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer ik-lw-your-ingest-key",
@@ -32835,7 +32841,7 @@ That answer exists only behind the auth wall, so the scenario passing is the pro
 
 ---
 title: Connect Your Agent
-sidebarTitle: Connect your agent
+sidebarTitle: Overview
 keywords: langwatch, agent simulations, http agent, black box testing, traceparent, trace propagation, scenario suite, coding agent prompt
 description: Register your agent's HTTP endpoint as a simulation target, so your team runs scenario suites from the platform and the judge verifies behavior against the agent's own traces.
 ---
@@ -32846,10 +32852,9 @@ The fastest path is the connect-agent skill. Install it in your coding agent (Cl
 
 {/* lw-generated:connect-agent:start */}
 
-<div className="lw-accordion">
-  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+<div className="lw-accordion lw-accordion-static" data-open="true">
+  <div className="lw-accordion-header">
     <span className="lw-accordion-title">Connect my agent to LangWatch simulations</span>
-    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
   </div>
   <div className="lw-accordion-body">
     <div className="lw-accordion-commands">
@@ -32910,7 +32915,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -32924,7 +32929,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 ## Step 2: Locate the agent's HTTP endpoint
 
@@ -33046,7 +33051,7 @@ Report to the user:
 - What changed in the codebase: the endpoint, the authentication path, the trace adoption.
 - The result of the first run.
 
-Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and the error, and stop there. Do NOT claim a scenario or a suite ran when it did not.
+Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and what the failure means for the user, and stop there. Do not paste the raw error text, stack trace or debug URL: those can carry secrets and tell the user nothing they can act on. Do NOT claim a scenario or a suite ran when it did not.
 
 A connected setup shows, on the run page: the conversation transcript with the reply text `outputPath` extracted, a trace link on each turn opening the agent's own spans, and judge reasoning that cites spans. A trace-dependent criterion that comes back inconclusive means the traces did not arrive.
 
@@ -33190,6 +33195,16 @@ The agent must report its traces to the same LangWatch project that runs the sce
 
 In the platform, create the agent on the **Agents** page: type **HTTP**, then the URL, authentication, body template and output path from the steps above. The same registration is available as `POST /api/agents`.
 
+<Frame>
+<img className="block" src="/images/agent-simulations/register-http-agent.png" alt="The HTTP agent editor with the endpoint URL, request body template and output path" />
+</Frame>
+
+The **Test** tab of the agent editor sends one real request to your endpoint with the current configuration. Use it to confirm the endpoint answers and the output path extracts the reply text before you run any scenario:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/agent-test-request.png" alt="The Test tab showing a 200 response from the agent endpoint and the extracted reply" />
+</Frame>
+
 With the CLI:
 
 ```bash
@@ -33220,6 +33235,20 @@ Open the run in the **Simulations** section of your project. A connected setup s
 - The conversation transcript, with the reply text your `outputPath` extracted.
 - A trace link on each turn in the run detail, opening the agent's own spans for that turn.
 - Judge reasoning that cites spans, naming the tool call or lookup that satisfied a criterion.
+
+<Frame>
+<img className="block" src="/images/agent-simulations/run-detail-conversation.png" alt="The run detail with the conversation transcript and a View trace link on the turn" />
+</Frame>
+
+<Frame>
+<img className="block" src="/images/agent-simulations/run-detail-verdict.png" alt="The run results with the verdict and the judge reasoning citing a tool call span from the trace" />
+</Frame>
+
+The trace link on a turn opens the full trace: the simulation's own steps first, then your agent's spans for that turn, adopted through the `traceparent` header. This is the evidence the judge reads:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/run-trace.png" alt="The trace waterfall with the simulation spans and the agent's own spans in one trace" />
+</Frame>
 
 A trace-dependent criterion that comes back inconclusive means the traces did not arrive; see the failures below.
 
@@ -34315,6 +34344,155 @@ The platform runs these checks before it schedules any jobs. A rejected run sche
     The full request and response for a suite run
   </Card>
 </CardGroup>
+
+---
+
+# FILE: ./agent-simulations/testing-your-agent.mdx
+
+---
+title: Testing Your Agent
+sidebarTitle: Testing your agent
+keywords: langwatch, agent simulations, scenarios, run plans, product managers, domain experts, no code, langy
+description: Create scenarios, run them against your agent, and read the results, all from the LangWatch interface. Written for product managers and domain experts, no code involved.
+---
+
+# Testing Your Agent
+
+This guide shows how to test your AI agent with simulations, entirely from the LangWatch interface. You write scenarios that describe real situations, run them against your agent, and read a clear verdict for each one. No code is involved in any step.
+
+<Note>
+One technical step happens before this guide: a developer connects the agent to LangWatch, so simulations can talk to it and the judge can see what the agent did internally. Send your developer the [Connect your agent](/agent-simulations/connect-your-agent) guide. It is a one-time setup and usually takes under an hour.
+</Note>
+
+## What a scenario is
+
+A scenario has two parts:
+
+- **Situation**: who the user is and what they want. A simulated user plays this role and talks to your agent, turn by turn, like a real customer would.
+- **Criteria**: what the agent must do, and must not do, for the conversation to pass. A judge model reads the full conversation, and the agent's internal actions, and decides each criterion.
+
+You do not write the conversation itself. The simulated user improvises within the situation, so every run exercises your agent the way real users do: with slightly different words each time.
+
+Write criteria about outcomes, not wording. "The agent looks up the order before answering" and "The agent does not promise a refund" are strong criteria. "The agent says exactly this sentence" is not.
+
+## Where your scenarios live
+
+Open **Simulations → Scenarios** in the sidebar. The Scenario Library lists every scenario in the project, with labels to organize them:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/scenario-library.png" alt="The Scenario Library with scenarios and their labels" />
+</Frame>
+
+## Create a scenario
+
+Click **New Scenario**. You can describe what you want and let AI draft it, or build it yourself.
+
+<Note>
+A scenario is saved in your project, and everyone with access to the project can read it. The AI draft step also sends the text you give it to a model. Remove names, contact details, account numbers and other personal data before you paste, or replace them with invented equivalents. The test works the same way with invented details.
+</Note>
+
+### Draft with AI
+
+Describe the behavior you care about in your own words. Paste in real material: a support ticket, a complaint email, a paragraph from a requirements document, or a snippet of a real conversation that went wrong. AI turns it into an editable situation and criteria:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/scenario-create-with-ai.png" alt="The Create new scenario dialog with a behavior description ready to draft with AI" />
+</Frame>
+
+### Build it yourself
+
+The editor asks for the name, the situation, and the criteria, with guidance next to it. You can hand any half-written scenario to AI for a draft at any point:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/scenario-editor.png" alt="The scenario editor with a situation and two criteria filled in" />
+</Frame>
+
+Two tips that make scenarios much more useful:
+
+- Include at least one criterion about what the agent does internally, such as "looks up the order before answering" or "reads the tender documents". The judge verifies these against the agent's real actions, not against what the reply claims.
+- Write at least one "must not" criterion for each scenario. The most valuable tests describe the failure you are afraid of: inventing a date, quoting another customer's data, promising something the policy forbids.
+
+## Create scenarios with Langy
+
+Langy, the assistant in the bottom corner of every page, creates scenarios for you. Paste text from documents or conversations you already have, describe what must hold, and Langy writes and saves the scenario in one step:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/langy-creates-scenario.png" alt="Langy creating a scenario from a pasted snippet of a customer chat" />
+</Frame>
+
+Good material to paste: notes from a lost deal or an escalation, user interview quotes, acceptance criteria from a ticket, or a transcript of a conversation where the agent got it wrong. Each of these becomes a permanent test, so the same mistake cannot come back unnoticed. Remove personal data from the text first, as above.
+
+## Create scenarios from your own tools
+
+Your team's AI assistants can create scenarios too. Through the [LangWatch MCP integration](/integration/mcp), tools such as Claude and Cursor can read and write scenarios in your project. A teammate can highlight a bug report in their editor and ask their assistant to turn it into a LangWatch scenario, without opening the platform.
+
+## Run your scenarios
+
+### Run one scenario
+
+From the scenario editor, **Save and Run** asks which agent to run against:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/scenario-run-target.png" alt="The target picker with the registered agent to run the scenario against" />
+</Frame>
+
+Then it asks which models play the simulated user and the judge. The defaults are fine; change them only if your team has a preference:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/scenario-choose-models.png" alt="The model picker for the user simulator and the judge" />
+</Frame>
+
+### Run a set of scenarios with a run plan
+
+A run plan groups scenarios and runs them together against a target. This is what you run before a release, or after every change. Open **Simulations → Runs**, create a run plan with **New Run Plan**, pick the scenarios and the agent, and press **Run**:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/run-plan.png" alt="A run plan with its scenarios, pass rate and run history" />
+</Frame>
+
+The confirmation shows what is about to run, including any parameters the scenarios declare, such as which test account to act as:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/run-plan-confirm.png" alt="The run confirmation with the scenario count and the run parameters" />
+</Frame>
+
+### Watch it run
+
+Runs execute live. Each card is one conversation with your agent, and you can watch the messages arrive as the simulated user and the agent talk:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/run-live.png" alt="A run in progress with two conversations running live" />
+</Frame>
+
+A full run of a few scenarios usually takes a few minutes. You can leave the page; the results are there when you come back.
+
+## Read the results
+
+Open any finished run. The top shows the conversation exactly as it happened, with the simulated user's messages and your agent's replies:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/run-detail-conversation.png" alt="The run detail with the full conversation transcript" />
+</Frame>
+
+Below it, the verdict: which criteria were met, which were not, and the judge's reasoning in plain language. The reasoning cites what the agent actually did, such as which lookup it performed before answering:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/run-detail-verdict.png" alt="The run results with the pass verdict and the judge reasoning" />
+</Frame>
+
+Three outcomes are possible for a criterion:
+
+- **Met**: the conversation, or the agent's internal actions, prove it.
+- **Not met**: the agent did the thing the criterion forbids, or failed to do the thing it requires. Read the reasoning, then the conversation, and share both with your team; the run page link is enough for a developer to investigate.
+- **Inconclusive**: the judge did not find evidence either way. For criteria about internal actions, this usually means the agent's traces did not arrive; ask your developer to check the connection with the [Connect your agent](/agent-simulations/connect-your-agent) guide.
+
+Each turn also carries a **View trace** link, opening the exact steps the agent took for that reply. You do not need to read traces yourself, but the link is the fastest thing to hand a developer when something looks wrong.
+
+## Make it a habit
+
+- Run your run plan before every release. The history on the run plan page shows the pass rate over time, so a regression is visible the moment it happens.
+- After every incident or complaint, add a scenario for it. The library becomes the collective memory of everything your agent must never do again.
+- Keep scenarios short and focused: one situation, a handful of criteria. Ten small scenarios find more than one large one.
 
 ---
 
@@ -37312,7 +37490,7 @@ An endpoint belongs to your **organization** and carries:
 | Signing secret | Shown **once** at creation. Roll it to get a new one. Every delivery is signed with it. |
 | Delivery controls | `max_batch_size`, `max_batch_delay_ms`, `max_in_flight` (bounds below). |
 
-Manage endpoints under **AI Gateway > Webhooks** (`/settings/gateway/webhooks`) or over REST with an organization API key:
+Manage endpoints under **AI Gateway > Webhooks** (`/gateway/webhooks`) or over REST with an organization API key:
 
 ```
 POST   /api/webhooks/v1/endpoints                    webhookEndpoints:manage
@@ -47310,7 +47488,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -47324,7 +47502,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 Then fetch the integration guide for this project's framework:
 
@@ -47501,7 +47679,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -47515,7 +47693,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 Read the experiment documentation before writing code:
 
@@ -47658,7 +47836,7 @@ After delivering initial results, transition to consultant mode to help the user
 
 **Phase 1: read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits because the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
 
-**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. Show the user what works.
+**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run the tests and iterate, but stop after two attempts at the same failure and report what is blocking it rather than repeating the run. Show the user what works.
 
 **Phase 3: go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue. Add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
 
@@ -47783,7 +47961,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -47797,7 +47975,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 Read the relevant documentation before changing configuration or code:
 
@@ -48076,7 +48254,7 @@ If the user's request is **general** ("add scenarios", "test my agent"):
 - Study git history to understand what changed and why: focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Generate comprehensive coverage (happy path, edge cases, error handling)
 - For conversational agents, include multi-turn scenarios, because that's where the interesting edge cases live (context retention, topic switching, recovery from misunderstandings)
-- ALWAYS run the tests after writing them. If they fail, debug and fix the test or the agent code.
+- ALWAYS run the tests after writing them. If they fail, first decide which side is wrong. Change the test only when you have evidence that its criteria or its fixture are wrong; otherwise the agent is what needs the fix (see Improving the Agent When a Scenario Fails below). A scenario that goes green because its assertions got weaker has tested nothing.
 - After tests are green, transition to consultant mode (see Consultant Mode below) and suggest 2-3 domain-specific improvements.
 
 If the user's request is **specific** ("test the refund flow"):
@@ -48104,6 +48282,19 @@ Best practices:
 - NEVER check for regex or word matches in agent responses. Use JudgeAgent criteria instead
 - Use script functions for deterministic checks (tool calls, file existence) and judge criteria for semantic evaluation
 - Cover more ground with fewer well-designed scenarios rather than many shallow ones
+
+## Improving the Agent When a Scenario Fails
+
+A failing test tells you WHERE the agent fails, not that the prompt is where to fix it. One more rule is the cheapest edit that turns it green, and a prompt maintained that way overfits: it passes exactly the cases it was patched against and degrades everywhere else.
+
+1. **Diagnose the layer.** Five can own a failure: the harness (tools, permissions, context assembly), the model, the knowledge (skills, docs, retrieval), the prompt, or the test itself. The prompt is the last resort. If the fix is "never use tool X", remove tool X from the configuration. Diagnose from the failing run's trace: it holds every tool call, and the assembled input too where the project captures content.
+2. **Fix the class, not the transcript.** State the one principle that makes the whole class impossible. Never paste the failing conversation into the prompt. If you cannot name the class, keep diagnosing.
+3. **Prove it generalizes.** Re-run with varied wording. The simulator improvises, so a fix that survives one phrasing was a patch for that phrasing.
+4. **Pair each prohibition with an overshoot test.** A "decline out-of-scope requests" rule needs a greeting scenario that fails if the agent declines a greeting.
+5. **Refactor under green.** Merge overlapping rules, delete what a newer principle covers, re-run. Track prompt size like bundle size: pass rate holds while the prompt trends down.
+6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
+
+Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
 
 ## Plan Limits
 
@@ -48136,7 +48327,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -48150,7 +48341,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 Then read the Scenario-specific pages:
 
@@ -48926,7 +49117,7 @@ After delivering initial results, transition to consultant mode to help the user
 
 **Phase 1: read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits because the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
 
-**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. Show the user what works.
+**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run the tests and iterate, but stop after two attempts at the same failure and report what is blocking it rather than repeating the run. Show the user what works.
 
 **Phase 3: go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue. Add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
 
@@ -48941,6 +49132,8 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - Do NOT write a `main.py` / `run_scenarios.py` / custom runner that loops over scenarios. Each scenario IS a test (`it(...)` / `async def test_*`). Run them with `pytest` or `vitest`. The test runner already gives you parallelism, retries of just the failing case, watch mode, CI integration, and per-test timeouts; a runner script re-implements all of that and ships with none of it wired up.
 - Do NOT invent a JSON / YAML / TOML "scenario DSL" with keys like `{ "name": ..., "description": ..., "criteria": [...] }` and then load it into a generic loop. The whole point of Scenario being code is that each test is real code: you can use `for`, `if`, parametrize (`@pytest.mark.parametrize`, `it.each(...)`), pull a fixture, call a helper to mint a session, branch by environment, share setup via a `conftest.py`, mock a tool inline, none of which a DSL gives you. The moment a teammate needs a new edge case ("only on Tuesdays the agent should escalate"), the DSL grows another key, then another, until it's a worse version of Python/TypeScript with none of the tooling. If the same boilerplate repeats across scenarios, extract a helper FUNCTION that returns an `AgentAdapter` / a built `UserSimulatorAgent` / a script tuple, and keep each scenario its own test case so it stays grep-able and debuggable.
 - Do NOT use regex or word matching to evaluate responses. Always use `JudgeAgent` natural-language criteria
+- Do NOT fix a failing scenario by pasting new rules, or the failing conversation itself, into the agent's system prompt (see Improving the Agent When a Scenario Fails)
+- Do NOT write judge criteria by restating the agent's system prompt. Criteria describe user outcomes; a rubric that quotes the prompt grades obedience, not quality
 - Do NOT forget `@pytest.mark.asyncio` and `@pytest.mark.agent_test` (Python)
 - Do NOT forget a generous timeout (e.g. `30_000` ms) for TypeScript tests
 - Do NOT import from made-up packages like `agent_tester`, `simulation_framework`, `langwatch.testing`. The only valid imports are `scenario` (Python) and `@langwatch/scenario` (TypeScript)
@@ -49053,7 +49246,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -49067,7 +49260,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 ## Step 2: Locate the agent's HTTP endpoint
 
@@ -49189,7 +49382,7 @@ Report to the user:
 - What changed in the codebase: the endpoint, the authentication path, the trace adoption.
 - The result of the first run.
 
-Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and the error, and stop there. Do NOT claim a scenario or a suite ran when it did not.
+Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and what the failure means for the user, and stop there. Do not paste the raw error text, stack trace or debug URL: those can carry secrets and tell the user nothing they can act on. Do NOT claim a scenario or a suite ran when it did not.
 
 A connected setup shows, on the run page: the conversation transcript with the reply text `outputPath` extracted, a trace link on each turn opening the agent's own spans, and judge reasoning that cites spans. A trace-dependent criterion that comes back inconclusive means the traces did not arrive.
 
@@ -49325,7 +49518,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -49339,7 +49532,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 Then specifically read the Prompts CLI guide:
 
@@ -49367,9 +49560,12 @@ langwatch prompt create <name>
 
 Edit the generated `.prompt.yaml` file to match the original prompt content.
 
-**Model:** keep the generated `model` on a current model (the latest OpenAI
-generation is `openai/gpt-5.5`). Never downgrade a new prompt to a legacy
-model like `gpt-4o-mini`.
+**Model:** keep the generated `model` on a current model. Store the alias
+`openai/latest` rather than a version number: LangWatch resolves it to the
+current flagship at run time, so the prompt does not go a generation stale
+every release. Do not default a new prompt to a legacy model like
+`gpt-4o-mini`; pick one only when the user is trading quality for cost or
+latency on purpose.
 
 **Temperature:** the gpt-5 family rejects a custom `temperature`, so do not add
 `modelParameters.temperature` for those models. `create` omits it on purpose.
@@ -49457,7 +49653,7 @@ Run `langwatch prompt list` to confirm everything synced, or open the Prompts se
 - Do NOT add a hardcoded fallback string in a try/catch; that silently defeats versioning
 - Do NOT manually edit `prompts.json`. Use the CLI
 - Do NOT skip `langwatch prompt sync` after creating prompts
-- Prefer the current flagship (`openai/gpt-5.5`). Pick an older model like `gpt-4o-mini` only when intentionally optimizing for cost or latency
+- Prefer the flagship alias `openai/latest` (or `openai/latest-mini` for the fast tier). Pin a version only when a prompt is tuned to one, and pick an older model like `gpt-4o-mini` only when intentionally optimizing for cost or latency
 - Do NOT set `modelParameters.temperature` on a gpt-5-family model; the family rejects it
 - Do NOT ask for JSON in the prompt text when output must be structured. Use a `response_format` block
 ````
@@ -50034,7 +50230,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -50048,7 +50244,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 Then fetch the integration guide for this project's framework:
 
@@ -50170,9 +50366,12 @@ langwatch prompt create <name>
 
 Edit the generated `.prompt.yaml` file to match the original prompt content.
 
-**Model:** keep the generated `model` on a current model (the latest OpenAI
-generation is `openai/gpt-5.5`). Never downgrade a new prompt to a legacy
-model like `gpt-4o-mini`.
+**Model:** keep the generated `model` on a current model. Store the alias
+`openai/latest` rather than a version number: LangWatch resolves it to the
+current flagship at run time, so the prompt does not go a generation stale
+every release. Do not default a new prompt to a legacy model like
+`gpt-4o-mini`; pick one only when the user is trading quality for cost or
+latency on purpose.
 
 **Temperature:** the gpt-5 family rejects a custom `temperature`, so do not add
 `modelParameters.temperature` for those models. `create` omits it on purpose.
@@ -50260,7 +50459,7 @@ Run `langwatch prompt list` to confirm everything synced, or open the Prompts se
 - Do NOT add a hardcoded fallback string in a try/catch; that silently defeats versioning
 - Do NOT manually edit `prompts.json`. Use the CLI
 - Do NOT skip `langwatch prompt sync` after creating prompts
-- Prefer the current flagship (`openai/gpt-5.5`). Pick an older model like `gpt-4o-mini` only when intentionally optimizing for cost or latency
+- Prefer the flagship alias `openai/latest` (or `openai/latest-mini` for the fast tier). Pin a version only when a prompt is tuned to one, and pick an older model like `gpt-4o-mini` only when intentionally optimizing for cost or latency
 - Do NOT set `modelParameters.temperature` on a gpt-5-family model; the family rejects it
 - Do NOT ask for JSON in the prompt text when output must be structured. Use a `response_format` block
 
@@ -50451,7 +50650,7 @@ After delivering initial results, transition to consultant mode to help the user
 
 **Phase 1: read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits because the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
 
-**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. Show the user what works.
+**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run the tests and iterate, but stop after two attempts at the same failure and report what is blocking it rather than repeating the run. Show the user what works.
 
 **Phase 3: go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue. Add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
 
@@ -50621,7 +50820,7 @@ If the user's request is **general** ("add scenarios", "test my agent"):
 - Study git history to understand what changed and why: focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Generate comprehensive coverage (happy path, edge cases, error handling)
 - For conversational agents, include multi-turn scenarios, because that's where the interesting edge cases live (context retention, topic switching, recovery from misunderstandings)
-- ALWAYS run the tests after writing them. If they fail, debug and fix the test or the agent code.
+- ALWAYS run the tests after writing them. If they fail, first decide which side is wrong. Change the test only when you have evidence that its criteria or its fixture are wrong; otherwise the agent is what needs the fix (see Improving the Agent When a Scenario Fails below). A scenario that goes green because its assertions got weaker has tested nothing.
 - After tests are green, transition to consultant mode (see Consultant Mode below) and suggest 2-3 domain-specific improvements.
 
 If the user's request is **specific** ("test the refund flow"):
@@ -50649,6 +50848,19 @@ Best practices:
 - NEVER check for regex or word matches in agent responses. Use JudgeAgent criteria instead
 - Use script functions for deterministic checks (tool calls, file existence) and judge criteria for semantic evaluation
 - Cover more ground with fewer well-designed scenarios rather than many shallow ones
+
+## Improving the Agent When a Scenario Fails
+
+A failing test tells you WHERE the agent fails, not that the prompt is where to fix it. One more rule is the cheapest edit that turns it green, and a prompt maintained that way overfits: it passes exactly the cases it was patched against and degrades everywhere else.
+
+1. **Diagnose the layer.** Five can own a failure: the harness (tools, permissions, context assembly), the model, the knowledge (skills, docs, retrieval), the prompt, or the test itself. The prompt is the last resort. If the fix is "never use tool X", remove tool X from the configuration. Diagnose from the failing run's trace: it holds every tool call, and the assembled input too where the project captures content.
+2. **Fix the class, not the transcript.** State the one principle that makes the whole class impossible. Never paste the failing conversation into the prompt. If you cannot name the class, keep diagnosing.
+3. **Prove it generalizes.** Re-run with varied wording. The simulator improvises, so a fix that survives one phrasing was a patch for that phrasing.
+4. **Pair each prohibition with an overshoot test.** A "decline out-of-scope requests" rule needs a greeting scenario that fails if the agent declines a greeting.
+5. **Refactor under green.** Merge overlapping rules, delete what a newer principle covers, re-run. Track prompt size like bundle size: pass rate holds while the prompt trends down.
+6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
+
+Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
 
 ## Plan Limits
 
@@ -51445,6 +51657,8 @@ Once tests are green, summarize what you delivered and suggest 2-3 domain-specif
 - Do NOT write a `main.py` / `run_scenarios.py` / custom runner that loops over scenarios. Each scenario IS a test (`it(...)` / `async def test_*`). Run them with `pytest` or `vitest`. The test runner already gives you parallelism, retries of just the failing case, watch mode, CI integration, and per-test timeouts; a runner script re-implements all of that and ships with none of it wired up.
 - Do NOT invent a JSON / YAML / TOML "scenario DSL" with keys like `{ "name": ..., "description": ..., "criteria": [...] }` and then load it into a generic loop. The whole point of Scenario being code is that each test is real code: you can use `for`, `if`, parametrize (`@pytest.mark.parametrize`, `it.each(...)`), pull a fixture, call a helper to mint a session, branch by environment, share setup via a `conftest.py`, mock a tool inline, none of which a DSL gives you. The moment a teammate needs a new edge case ("only on Tuesdays the agent should escalate"), the DSL grows another key, then another, until it's a worse version of Python/TypeScript with none of the tooling. If the same boilerplate repeats across scenarios, extract a helper FUNCTION that returns an `AgentAdapter` / a built `UserSimulatorAgent` / a script tuple, and keep each scenario its own test case so it stays grep-able and debuggable.
 - Do NOT use regex or word matching to evaluate responses. Always use `JudgeAgent` natural-language criteria
+- Do NOT fix a failing scenario by pasting new rules, or the failing conversation itself, into the agent's system prompt (see Improving the Agent When a Scenario Fails)
+- Do NOT write judge criteria by restating the agent's system prompt. Criteria describe user outcomes; a rubric that quotes the prompt grades obedience, not quality
 - Do NOT forget `@pytest.mark.asyncio` and `@pytest.mark.agent_test` (Python)
 - Do NOT forget a generous timeout (e.g. `30_000` ms) for TypeScript tests
 - Do NOT import from made-up packages like `agent_tester`, `simulation_framework`, `langwatch.testing`. The only valid imports are `scenario` (Python) and `@langwatch/scenario` (TypeScript)
@@ -51576,7 +51790,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -51590,7 +51804,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 ## Step 2: Gather Evidence Before Proposing Anything
 
@@ -51639,6 +51853,19 @@ Sanitize before you commit: production traces can carry names, emails, account d
 
 Make the fix on a branch: prompt edits (versioned through the `prompts` skill when prompts are managed in LangWatch), retrieval or tool-code changes, guardrails. The PR description must tell the whole story: observation, hypothesis, evidence links, what changed, and which scenario test proves it. The user reviews and merges; you never push to main.
 
+Pick the layer before you edit, and report the prompt's size change in the PR:
+
+A failing test tells you WHERE the agent fails, not that the prompt is where to fix it. One more rule is the cheapest edit that turns it green, and a prompt maintained that way overfits: it passes exactly the cases it was patched against and degrades everywhere else.
+
+1. **Diagnose the layer.** Five can own a failure: the harness (tools, permissions, context assembly), the model, the knowledge (skills, docs, retrieval), the prompt, or the test itself. The prompt is the last resort. If the fix is "never use tool X", remove tool X from the configuration. Diagnose from the failing run's trace: it holds every tool call, and the assembled input too where the project captures content.
+2. **Fix the class, not the transcript.** State the one principle that makes the whole class impossible. Never paste the failing conversation into the prompt. If you cannot name the class, keep diagnosing.
+3. **Prove it generalizes.** Re-run with varied wording. The simulator improvises, so a fix that survives one phrasing was a patch for that phrasing.
+4. **Pair each prohibition with an overshoot test.** A "decline out-of-scope requests" rule needs a greeting scenario that fails if the agent declines a greeting.
+5. **Refactor under green.** Merge overlapping rules, delete what a newer principle covers, re-run. Track prompt size like bundle size: pass rate holds while the prompt trends down.
+6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
+
+Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
+
 ### Capture production signals with evaluators and monitors
 
 When a hypothesis needs more production data, or a fixed issue must stay fixed, add detection:
@@ -51681,6 +51908,7 @@ After executing:
 - Do NOT paste raw customer content from traces into committed tests or PR text; link the trace instead
 - Do NOT merge or push anything yourself; changes ship as PRs the user reviews
 - Do NOT create evaluators or monitors for signals no one will act on; every artifact needs an owner and a purpose
+- Do NOT grow the system prompt one rule per fixed failure; a prompt that only ever grows is accumulating patches, and it overfits to the tests it was patched against
 ````
 
         </div>
@@ -51758,7 +51986,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -51772,7 +52000,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 ## Step 2: Baseline the Vital Signs
 
@@ -51821,7 +52049,8 @@ Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 6. **Outliers**: the single weirdest traces by duration, cost, span count, and output size. Read them individually.
 
 ```bash
-langwatch trace search -q "<keyword from a pattern>" --origin application --limit 10 --format json   # Chase a specific pattern
+langwatch trace search --errors-only --origin application --limit 25 --format json  # Every failure, without guessing at text
+langwatch trace search -q "<one phrase from a pattern>" --origin application --limit 10 --format json   # Chase a specific pattern
 langwatch trace get <traceId>                                                   # Read a representative trace in full
 langwatch trace get <traceId> -f json                                           # Every span, token count, and timing
 ```
@@ -51843,7 +52072,7 @@ Open the report path for the user and also summarize the top findings directly i
 
 ## Step 5: Hand Off to Improvement
 
-If the `agent-improve` skill is installed, run it on the findings right away: it turns each finding into tested hypotheses, scenario tests, evaluators, and PR-ready changes. Pass along the report: agent-improve uses these findings and trace examples as its evidence base.
+If the `agent-improve` skill is installed, offer it as the next step: it turns each finding into tested hypotheses, scenario tests, evaluators, and PR-ready changes. It writes to the platform, which this skill does not, so run it only once the user says to. Pass along the report: agent-improve uses these findings and trace examples as its evidence base.
 
 ## Common Mistakes
 
@@ -52068,15 +52297,17 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
 
 ## Step 1: Fetch Recent Traces
 
 ```bash
-langwatch trace search --limit 25 --start-date "$(date -u -Iseconds -d '7 days ago')" --format json
+langwatch trace search --limit 25 --start-date "$(( ($(date +%s) - 7*24*3600) * 1000 ))" --format json
 ```
 
-(Widen or narrow the window as needed. The CLI accepts ISO strings for `--start-date`.)
+(Widen or narrow the window as needed. `--start-date` accepts an ISO string or
+epoch milliseconds, and defaults to the last 24 hours. The epoch form above is
+used because `date -d '7 days ago'` is GNU-only and fails on macOS.)
 
 For each trace, ask:
 
@@ -52220,7 +52451,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
 
 ## Step 0: Point the CLI at the Right Project
 
@@ -52233,12 +52464,13 @@ A fast sanity check that the API key, endpoint, and project are the ones you mea
 ## Step 1: Find the Errored Traces
 
 ```bash
-langwatch trace search --limit 25 -o json
-langwatch trace search -q "timeout" --start-date 2026-01-01 -o json
+langwatch trace search --errors-only --limit 25 -o json
+langwatch trace search --errors-only -q "timeout" --start-date 2026-01-01 -o json
 ```
 
+- `--errors-only` is how you find failures. An error is recorded on the span, not in the trace's searchable text, so `-q "error"` finds nothing and reads like a clean project.
 - `--start-date`/`--end-date` bound the window (ISO strings or epoch ms; default is the last 24h).
-- `-q` does a text search: the error message, a user id, a thread id.
+- `-q` does a text search over one phrase: the error message, a user id, a thread id. AND, OR and NOT are matched as words, not as operators.
 - The result is `{ "traces": [...], "pagination": { "totalHits": N } }`. Pull fields out with `--jq` instead of reading the whole payload:
 
 ```bash
@@ -52373,7 +52605,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
 
 ## Step 1: Find the Failing Run
 
@@ -52886,7 +53118,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
 
 ## Troubleshooting
 
@@ -53091,12 +53323,22 @@ Create reusable criteria for your domain:
 - "Agent includes a disclaimer that this is not legal advice"
 - "Agent suggests consulting a licensed attorney"
 
-## Step 5: Run All Tests and Iterate
+## Step 5: Run All Tests and Improve the Agent
 
 1. Run boundary scenarios first to verify basic compliance
 2. Run red team tests to verify adversarial resilience
-3. If any test fails, strengthen the agent's system prompt or add guardrails
-4. Re-run until all tests pass
+3. When a test fails, follow the ladder below. A compliance prompt that only ever grows is accumulating patches, not protection
+
+A failing test tells you WHERE the agent fails, not that the prompt is where to fix it. One more rule is the cheapest edit that turns it green, and a prompt maintained that way overfits: it passes exactly the cases it was patched against and degrades everywhere else.
+
+1. **Diagnose the layer.** Five can own a failure: the harness (tools, permissions, context assembly), the model, the knowledge (skills, docs, retrieval), the prompt, or the test itself. The prompt is the last resort. If the fix is "never use tool X", remove tool X from the configuration. Diagnose from the failing run's trace: it holds every tool call, and the assembled input too where the project captures content.
+2. **Fix the class, not the transcript.** State the one principle that makes the whole class impossible. Never paste the failing conversation into the prompt. If you cannot name the class, keep diagnosing.
+3. **Prove it generalizes.** Re-run with varied wording. The simulator improvises, so a fix that survives one phrasing was a patch for that phrasing.
+4. **Pair each prohibition with an overshoot test.** A "decline out-of-scope requests" rule needs a greeting scenario that fails if the agent declines a greeting.
+5. **Refactor under green.** Merge overlapping rules, delete what a newer principle covers, re-run. Track prompt size like bundle size: pass rate holds while the prompt trends down.
+6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
+
+Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
 
 ## Common Mistakes
 
@@ -53104,6 +53346,7 @@ Create reusable criteria for your domain:
 - Do NOT skip multi-turn escalation scenarios. Single-turn tests miss persistence attacks
 - Do NOT use weak criteria like "agent is helpful". Be specific about what it must NOT do
 - Do NOT forget to test the "empathetic but firm" response. The agent should show care while maintaining boundaries
+- Do NOT respond to every failing test with another system-prompt rule. A prompt patched once per failure passes exactly those tests and degrades the agent everywhere else
 ````
 
         </div>
@@ -53350,7 +53593,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -53364,7 +53607,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 ## Step 2: Baseline the Vital Signs
 
@@ -53413,7 +53656,8 @@ Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 6. **Outliers**: the single weirdest traces by duration, cost, span count, and output size. Read them individually.
 
 ```bash
-langwatch trace search -q "<keyword from a pattern>" --origin application --limit 10 --format json   # Chase a specific pattern
+langwatch trace search --errors-only --origin application --limit 25 --format json  # Every failure, without guessing at text
+langwatch trace search -q "<one phrase from a pattern>" --origin application --limit 10 --format json   # Chase a specific pattern
 langwatch trace get <traceId>                                                   # Read a representative trace in full
 langwatch trace get <traceId> -f json                                           # Every span, token count, and timing
 ```
@@ -53435,7 +53679,7 @@ Open the report path for the user and also summarize the top findings directly i
 
 ## Step 5: Hand Off to Improvement
 
-If the `agent-improve` skill is installed, run it on the findings right away: it turns each finding into tested hypotheses, scenario tests, evaluators, and PR-ready changes. Pass along the report: agent-improve uses these findings and trace examples as its evidence base.
+If the `agent-improve` skill is installed, offer it as the next step: it turns each finding into tested hypotheses, scenario tests, evaluators, and PR-ready changes. It writes to the platform, which this skill does not, so run it only once the user says to. Pass along the report: agent-improve uses these findings and trace examples as its evidence base.
 
 ## Common Mistakes
 
@@ -53491,7 +53735,7 @@ If the user's request is **general** ("add scenarios", "test my agent"):
 - Study git history to understand what changed and why: focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Generate comprehensive coverage (happy path, edge cases, error handling)
 - For conversational agents, include multi-turn scenarios, because that's where the interesting edge cases live (context retention, topic switching, recovery from misunderstandings)
-- ALWAYS run the tests after writing them. If they fail, debug and fix the test or the agent code.
+- ALWAYS run the tests after writing them. If they fail, first decide which side is wrong. Change the test only when you have evidence that its criteria or its fixture are wrong; otherwise the agent is what needs the fix (see Improving the Agent When a Scenario Fails below). A scenario that goes green because its assertions got weaker has tested nothing.
 - After tests are green, transition to consultant mode (see Consultant Mode below) and suggest 2-3 domain-specific improvements.
 
 If the user's request is **specific** ("test the refund flow"):
@@ -53519,6 +53763,19 @@ Best practices:
 - NEVER check for regex or word matches in agent responses. Use JudgeAgent criteria instead
 - Use script functions for deterministic checks (tool calls, file existence) and judge criteria for semantic evaluation
 - Cover more ground with fewer well-designed scenarios rather than many shallow ones
+
+## Improving the Agent When a Scenario Fails
+
+A failing test tells you WHERE the agent fails, not that the prompt is where to fix it. One more rule is the cheapest edit that turns it green, and a prompt maintained that way overfits: it passes exactly the cases it was patched against and degrades everywhere else.
+
+1. **Diagnose the layer.** Five can own a failure: the harness (tools, permissions, context assembly), the model, the knowledge (skills, docs, retrieval), the prompt, or the test itself. The prompt is the last resort. If the fix is "never use tool X", remove tool X from the configuration. Diagnose from the failing run's trace: it holds every tool call, and the assembled input too where the project captures content.
+2. **Fix the class, not the transcript.** State the one principle that makes the whole class impossible. Never paste the failing conversation into the prompt. If you cannot name the class, keep diagnosing.
+3. **Prove it generalizes.** Re-run with varied wording. The simulator improvises, so a fix that survives one phrasing was a patch for that phrasing.
+4. **Pair each prohibition with an overshoot test.** A "decline out-of-scope requests" rule needs a greeting scenario that fails if the agent declines a greeting.
+5. **Refactor under green.** Merge overlapping rules, delete what a newer principle covers, re-run. Track prompt size like bundle size: pass rate holds while the prompt trends down.
+6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
+
+Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
 
 ## Plan Limits
 
@@ -53551,7 +53808,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -53565,7 +53822,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 Then read the Scenario-specific pages:
 
@@ -54341,7 +54598,7 @@ After delivering initial results, transition to consultant mode to help the user
 
 **Phase 1: read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits because the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
 
-**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. Show the user what works.
+**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run the tests and iterate, but stop after two attempts at the same failure and report what is blocking it rather than repeating the run. Show the user what works.
 
 **Phase 3: go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue. Add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
 
@@ -54356,6 +54613,8 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - Do NOT write a `main.py` / `run_scenarios.py` / custom runner that loops over scenarios. Each scenario IS a test (`it(...)` / `async def test_*`). Run them with `pytest` or `vitest`. The test runner already gives you parallelism, retries of just the failing case, watch mode, CI integration, and per-test timeouts; a runner script re-implements all of that and ships with none of it wired up.
 - Do NOT invent a JSON / YAML / TOML "scenario DSL" with keys like `{ "name": ..., "description": ..., "criteria": [...] }` and then load it into a generic loop. The whole point of Scenario being code is that each test is real code: you can use `for`, `if`, parametrize (`@pytest.mark.parametrize`, `it.each(...)`), pull a fixture, call a helper to mint a session, branch by environment, share setup via a `conftest.py`, mock a tool inline, none of which a DSL gives you. The moment a teammate needs a new edge case ("only on Tuesdays the agent should escalate"), the DSL grows another key, then another, until it's a worse version of Python/TypeScript with none of the tooling. If the same boilerplate repeats across scenarios, extract a helper FUNCTION that returns an `AgentAdapter` / a built `UserSimulatorAgent` / a script tuple, and keep each scenario its own test case so it stays grep-able and debuggable.
 - Do NOT use regex or word matching to evaluate responses. Always use `JudgeAgent` natural-language criteria
+- Do NOT fix a failing scenario by pasting new rules, or the failing conversation itself, into the agent's system prompt (see Improving the Agent When a Scenario Fails)
+- Do NOT write judge criteria by restating the agent's system prompt. Criteria describe user outcomes; a rubric that quotes the prompt grades obedience, not quality
 - Do NOT forget `@pytest.mark.asyncio` and `@pytest.mark.agent_test` (Python)
 - Do NOT forget a generous timeout (e.g. `30_000` ms) for TypeScript tests
 - Do NOT import from made-up packages like `agent_tester`, `simulation_framework`, `langwatch.testing`. The only valid imports are `scenario` (Python) and `@langwatch/scenario` (TypeScript)

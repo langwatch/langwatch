@@ -154,9 +154,31 @@ const SEAT_LIMIT_LABELS: Record<string, string> = {
  * underscores would reach a customer half-converted.
  */
 const MIGRATION_STATUS_LABELS: Record<string, string> = {
-  migrated: "still held for parity review",
   parked: "parked for retry",
   rolled_back: "already rolled back",
+};
+
+/**
+ * Registered migration names, in the operator's words rather than the
+ * column's. Stable identifiers (renaming one orphans its state rows), so
+ * keying copy on them is safe; an unmapped name falls back to the generic
+ * sentence rather than leaking the identifier.
+ */
+const MIGRATION_NAME_LABELS: Record<string, string> = {
+  "authz-team-user-backfill": "the team membership backfill",
+  "authz-grants-genesis-import": "the grants ledger import",
+  "authz-grants-cutover": "the authorization engine cutover",
+};
+
+/**
+ * The migrations another migration's rollback can be blocked by, as the
+ * operator should read them. Registered migration names are stable
+ * identifiers (renaming one orphans its state rows), so keying copy on them
+ * is safe; an unmapped name falls back to the generic sentence rather than
+ * leaking the identifier.
+ */
+const BLOCKING_MIGRATION_LABELS: Record<string, string> = {
+  "authz-grants-cutover": "authorization cutover",
 };
 
 /**
@@ -518,6 +540,11 @@ const presentations = {
   api_key_permission_denied: {
     title: "You don't have permission to manage API keys",
     describe: () => "Ask an admin on your team for access.",
+  },
+  api_key_permission_not_delegable: {
+    title: "This is not something the assistant can do for you",
+    describe: () =>
+      "A wider key or a higher role will not change it. Make this change in LangWatch yourself.",
   },
   api_key_reserved_name: {
     title: "That name is reserved",
@@ -1000,18 +1027,91 @@ const presentations = {
     describe: () =>
       "Free a seat by disabling a membership, or upgrade the plan to add more.",
   },
+  migration_enrollment_already_exists: {
+    title: "This organization is already enrolled",
+    describe: (error) => {
+      const migration = label(
+        MIGRATION_NAME_LABELS,
+        str(error, "migrationName", ""),
+      );
+      return migration
+        ? `It is already enrolled for ${migration}, so the next pass will process it. Nothing to do.`
+        : "It is already enrolled for that migration, so the next pass will process it. Nothing to do.";
+    },
+  },
+  migration_enrollment_cloud_only: {
+    title: "Enrollment does not apply to this installation",
+    describe: () =>
+      "Self-hosted installations run released migrations automatically for every organization, so there is nothing to enroll or withdraw.",
+  },
+  migration_enrollment_not_found: {
+    title: "This organization is not enrolled",
+    describe: (error) => {
+      const migration = label(
+        MIGRATION_NAME_LABELS,
+        str(error, "migrationName", ""),
+      );
+      return migration
+        ? `There is no enrollment for ${migration} for this organization to withdraw. Check the organization and the migration.`
+        : "There is no enrollment for this organization to withdraw. Check the organization and the migration.";
+    },
+  },
+  migration_unknown: {
+    title: "No migration exists with that name",
+    describe: () =>
+      "Pick one of the migrations listed on the page — the name may have come from an older link or a typo.",
+  },
+  migration_run_requires_enrollment: {
+    title: "Enroll this organization first",
+    describe: (error) => {
+      const migration = label(
+        MIGRATION_NAME_LABELS,
+        str(error, "migrationName", ""),
+      );
+      return migration
+        ? `Targeted runs follow enrollment: enroll the organization for ${migration}, then run it.`
+        : "Targeted runs follow enrollment: enroll the organization for the migration, then run it.";
+    },
+  },
+  migration_pass_already_running: {
+    title: "A migration pass is already running",
+    describe: () =>
+      "Only one pass runs at a time, and it may already be processing this organization. Wait for it to conclude, then retry.",
+  },
+  migration_not_available_on_installation: {
+    title: "This migration is not available here yet",
+    describe: () =>
+      "It arrives in a later release and will run automatically then — nothing to do until that release.",
+  },
   migration_state_not_found: {
     title: "No migration state for that organization",
     describe: () =>
       "Check the organization id — only organizations a migration has already processed have state to act on.",
   },
-  migration_rollback_requires_finalized: {
-    title: "Only a finalized organization can be rolled back",
+  migration_rollback_blocked_by_dependent: {
+    title: "Another migration still stands on this one",
+    describe: (error) => {
+      const blocking = label(
+        BLOCKING_MIGRATION_LABELS,
+        str(error, "blockingMigration", ""),
+      );
+      return blocking
+        ? `This organization's ${blocking} is still in force and depends on this migration's data. Roll the ${blocking} back first, then retry.`
+        : "A migration that depends on this one is still in force. Roll that one back first, then retry.";
+    },
+  },
+  migration_rollback_cutover_not_started: {
+    title: "This organization has not been cut over",
+    describe: () =>
+      "It is still waiting to cut over, so there is nothing to roll back. It stays on the legacy path until the cutover runs.",
+  },
+  migration_rollback_requires_migrated_or_finalized: {
+    title: "Only a migrated or finalized organization can be rolled back",
     describe: (error) => {
       const state = label(MIGRATION_STATUS_LABELS, str(error, "status", ""));
       return state
         ? `This organization is ${state}, so it is already on — or on its way back to — the legacy path.`
-        : "This organization is not finalized, so it is already on the legacy path.";
+        : "This organization has not reached the ledger, so it is already on the legacy path.";
     },
   },
   duplicate_invite: {
@@ -1107,6 +1207,11 @@ const presentations = {
     title: "Role binding not found",
     describe: () =>
       "It may have been removed already. Reload to see the current bindings.",
+  },
+  authz_ledger_unavailable: {
+    title: "Access changes are paused",
+    describe: () =>
+      "We could not record the change just now. Nothing was applied — try again in a moment.",
   },
   role_binding_already_exists: {
     title: "That role is already bound",

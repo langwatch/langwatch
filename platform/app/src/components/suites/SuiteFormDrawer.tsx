@@ -174,7 +174,6 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       toaster.create({
         title: "Run plan created",
         type: "success",
-        meta: { closable: true },
       });
     },
     onError: (err) => {
@@ -204,7 +203,6 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       toaster.create({
         title: "Run plan updated",
         type: "success",
-        meta: { closable: true },
       });
     },
     onError: (err) => {

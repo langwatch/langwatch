@@ -44,12 +44,23 @@ fail.
 
 ## Workflow: open a PR
 
+If the user did not name the repo, discover it before asking them:
+
+```bash
+gh api --paginate /installation/repositories --jq '.repositories[].full_name'
+```
+
+That lists every repository this installation reaches, across every page. One
+result is the repo; several, ask which one with a `choices` card; zero results,
+or a failure here, is the concrete blocker to report (the GitHub App is not
+installed for this project).
+
 You do not need to narrate your progress. The platform watches the commands you
 actually run (`gh repo clone`, `git checkout -b`, `git commit`, `git push`,
 `gh pr create`) and renders the live steps card from those, reading the PR's URL
 straight out of `gh pr create`'s output. Just run the steps.
 
-For a bigger change, keep a `todowrite` todo list (see global rule 14). It
+For a bigger change, keep a `todowrite` todo list (see "How you work" in the global instructions). It
 renders live as the user's checklist while you work, so plan it there, not in
 prose.
 

@@ -1,7 +1,9 @@
 import type { TenantMigrationRecord } from "@langwatch/system-migrations";
 import { describe, expect, it, vi } from "vitest";
-import { WitnessingSystemMigrationStateRepository } from "../repositories/witnessing-migration-state.repository";
-import type { SystemMigrationStateReader } from "../system-migrations.service";
+import {
+  type WitnessedStateRepository,
+  WitnessingSystemMigrationStateRepository,
+} from "../repositories/witnessing-migration-state.repository";
 
 const RECORD: TenantMigrationRecord = {
   migrationName: "authz-team-user-backfill",
@@ -10,7 +12,7 @@ const RECORD: TenantMigrationRecord = {
   report: { kind: "parity_clean", backfilled: 3, usersVerified: 3 },
 };
 
-function makeInner(): SystemMigrationStateReader {
+function makeInner(): WitnessedStateRepository {
   return {
     findRecord: vi.fn(async () => null),
     findStatusCounts: vi.fn(async () => ({
@@ -21,6 +23,7 @@ function makeInner(): SystemMigrationStateReader {
     })),
     findRecordsByStatus: vi.fn(async () => []),
     upsertRecord: vi.fn(async () => undefined),
+    upsertRecordUnlessRolledBack: vi.fn(async () => true),
   };
 }
 
@@ -51,6 +54,47 @@ describe("WitnessingSystemMigrationStateRepository", () => {
       expect(
         vi.mocked(inner.upsertRecord).mock.invocationCallOrder[0],
       ).toBeLessThan(witness.mock.invocationCallOrder[0]!);
+    });
+  });
+
+  describe("when the runner's compare-and-set write goes through", () => {
+    it("witnesses it exactly like an unconditional write", async () => {
+      const inner = makeInner();
+      const witness = vi.fn(async () => undefined);
+      const repository = new WitnessingSystemMigrationStateRepository({
+        inner,
+        witness,
+        now: () => 42,
+      });
+
+      await expect(
+        repository.upsertRecordUnlessRolledBack(RECORD),
+      ).resolves.toBe(true);
+      expect(witness).toHaveBeenCalledWith({
+        migrationName: RECORD.migrationName,
+        tenantId: RECORD.tenantId,
+        status: "finalized",
+        report: RECORD.report,
+        occurredAtMs: 42,
+      });
+    });
+  });
+
+  describe("when the compare-and-set is refused by a standing rollback pin", () => {
+    it("witnesses nothing - a refused write is not a transition", async () => {
+      const inner = makeInner();
+      vi.mocked(inner.upsertRecordUnlessRolledBack).mockResolvedValue(false);
+      const witness = vi.fn(async () => undefined);
+      const repository = new WitnessingSystemMigrationStateRepository({
+        inner,
+        witness,
+        now: () => 42,
+      });
+
+      await expect(
+        repository.upsertRecordUnlessRolledBack(RECORD),
+      ).resolves.toBe(false);
+      expect(witness).not.toHaveBeenCalled();
     });
   });
 

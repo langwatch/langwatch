@@ -22,7 +22,7 @@ contract; new ledger scenarios to be added).
 the stage-by-stage (A–F) rollout entirely. The stages survive only as names for
 work already merged (A = the engine #6894, B = the self-migration #7079).
 
-## Decisions log (all 2026-08-17, Alex)
+## Decisions log (2026-08-17 unless dated otherwise, Alex)
 
 | # | Decision |
 |---|---|
@@ -36,7 +36,7 @@ work already merged (A = the engine #6894, B = the self-migration #7079).
 | 8 | **Migration uses normal events.** The backfill emits plain `grant_attached` with `source: "backfill-b"` and `occurredAt` carried from the legacy row's `createdAt` (business time survives); `acceptedAt` is ledger time. One reducer path; replay exercises the live code. Only *process* facts get their own events: `migration_parity_proved`, `cutover_completed`, `cutover_rolled_back`. |
 | 9 | **Batched appends.** Migration events append in chunks per org (producer-append-coalescing already exists as a framework concept); efficiency comes from batching appends, not from fattening events. |
 | 10 | **`Grant` and `Role` are born as new, clean tables in PR 1** — never a rename of a live table, never hybrid columns on `RoleBinding`. During the transition the ledger is the single writer with two projections: events project into `Grant`/`Role` (the future) AND into legacy-shaped `RoleBinding`/`CustomRole` rows (the compat view the legacy path keeps reading). Contract deletes the compat projection and the old tables. Alex's mandate, stated 2026-08-17: this is the last rewrite of this flow — correct over expedient, everywhere the two diverge. |
-| 11 | **Collectives as principals.** WHO ∈ user, apiKey, group, team, organization (+ project and anyone at the resource tier only). The org-role-floor quirk becomes a stored row: `Grant { who: members-of(org O), role: member, scope: ORG O }`, minted at cutover. Orgs gain the ability to change their own baseline. |
+| 11 | **Collectives as principals.** WHO ∈ user, apiKey, group, team, organization (+ anyone at the resource tier only; project at the resource tier and, as the one exception, its OWN project's PROJECT scope — the project-credential self-grant, decided 2026-08-20). The org-role-floor quirk becomes a stored row: `Grant { who: members-of(org O), role: member, scope: ORG O }`, minted at cutover. Orgs gain the ability to change their own baseline. |
 | 12 | **One `Grant` table across all five scope types** (ORGANIZATION, TEAM, PROJECT, RESOURCE, PLATFORM), absorbing ShareLink's role as the resource-grant store (token kept, possession preserved) and `ADMIN_EMAILS` as the platform-scope authority. A partial index keeps RESOURCE rows off the collector's principal-scan hot path. |
 | 13 | **Platform grants minted from `ADMIN_EMAILS` by the cutover migration itself** — not manual insertion, because self-hosted operators never run anything (the in-place doctrine). The env var becomes bootstrap input, not live authority. |
 | 14 | **The projection cursor replaces `Organization.authzEpoch`.** The cursor is a monotonic per-org version written by the thing that writes the data, so it cannot drift. M7 is deleted from the runbook; stage-F passports key on the cursor. |
@@ -44,11 +44,12 @@ work already merged (A = the engine #6894, B = the self-migration #7079).
 | 16 | **ADRs are revised in place, not superseded by new numbers.** ADR-092's storage/rollout sections get rewritten; ADR-001 → Superseded at contract. New numbers only for genuinely new ground, taken after rebasing off origin/main. |
 | 17 | **The audit log is an insert-only event subscriber**, not a projection. Each runtime grant event inserts one `AuditLog` row in the existing shape — row id derived from the event id, `ON CONFLICT DO NOTHING`, never an update. A `when` guard skips `genesis-import` / `backfill-b` / `read-through-mint` sources so cutover never floods the audit page with backdated history. Subscribers are excluded from replay (ADR-098), so rebuilds can't touch it either. Grant write paths stop writing `AuditLog` directly when they become command emitters. The audit UI, table, and retention are untouched. |
 | 18 | **SCIM is a reconciler.** IdP pushes are declarative state; the handler diffs desired state against the Postgres projection and emits only the difference as `grants.*` commands (`source: "scim"`) — idempotent by construction, replayed pushes diff to nothing (the same diff-and-emit shape as the genesis import). SCIM **removals carry instant enforcement** (decision 7 — an IdP deprovision is the fired-employee case); additions are plain queued commands. `scim-group-mapping.feature` is rewritten storage-neutral once, so it is true before and after cutover. |
-| 19 | **The epoch stays until contract.** The Redis authz epoch store (`server/authz/epoch.ts`) is live, cheap, and spec-bound (`in-place-authz-migration.feature:112`, bound at `team-user-backfill.unit.test.ts:179`) — PR 1 keeps bumping it alongside the new cursor, which is what makes "passes unchanged" honestly true. The epoch dies in the contract PR, where its two spec scenarios are truthed-up to the cursor. (The `Organization.authzEpoch` *column* never shipped; the Redis store did.) |
-| 20 | **Per-user legacy ADMIN facts are in the import inventory.** `OrganizationUser.role = ADMIN` with zero bindings is a live fallback path (`specs/ai-gateway/rbac-legacy-admin-fallback.feature`); the floor row covers members only. The genesis import mints an org-scoped admin grant per such user, `occurredAt` from the row's `createdAt`. |
+| 19 | **The epoch stays until contract.** The Redis authz epoch store (`server/app-layer/authz/epoch.ts`) is live, cheap, and spec-bound (`in-place-authz-migration.feature:112`, bound at `team-user-backfill.unit.test.ts:179`) — PR 1 keeps bumping it alongside the new cursor, which is what makes "passes unchanged" honestly true. The epoch dies in the contract PR, where its two spec scenarios are truthed-up to the cursor. (The `Organization.authzEpoch` *column* never shipped; the Redis store did.) |
+| 20 | **Per-user legacy ADMIN facts are in the import inventory.** `OrganizationUser.role = ADMIN` with zero bindings is a live fallback path (`specs/ai-gateway/rbac-legacy-admin-fallback.feature`); the floor row covers members only. The genesis import mints an org-scoped grant per such user, `occurredAt` from the row's `createdAt` — with roleKey `legacy-admin`, a deliberately untranslatable key (revised 2026-08-20): the fact is DORMANT like the rest of the imported inventory, because a translatable `admin` key was collected as a live full-admin binding on the grants head with no legacy counterpart, out-granting the fallback and failing the cutover parity proof for every organization holding such an admin. Contract gives `legacy-admin` the bag the fallback actually grants when the fallback retires. |
 | 21 | **Public REST names are frozen.** `/role-bindings`, the `bindings` wire shape, and `role_binding_already_exists` (409, `role-bindings-rest-api.feature:92`) are customer contracts — the no-sunset philosophy applies to API names exactly as to old keys. The Grant/Role rename never leaks to the wire; no `/grants` API until a customer need exists. |
 | 22 | **Resource-tier facts live on `Grant`; accounting does not.** `token`, `permission`, `expiresAt`, `maxViews` are fact columns set by the mint event, fold-owned like every other column. `viewCount` has a different writer (ShareService, per view), so it moves to a ShareService-owned accounting row (`GrantUsage { grantId, viewCount, lastViewedAt }`) when ShareService moves onto the ledger in PR 3 — never onto the projection table. |
-| 23 | **Event idempotency is commandId-based.** Every command mints a random `commandId` at the boundary; retries reuse it; each emitted event carries `idempotencyKey = <commandId>:<index>`. Legitimate repeats (same action twice in a second) can never be deduped away, and retries always are. Migrations derive commandIds deterministically from source rows (`genesis:<rowId>`, `backfill-b:<rowId>` — the identity programme's backfill shape). Where an upstream system id exists (the general house pattern, e.g. trace ids) it remains the key; commandId is for facts born from direct user action. Grant ids stay content-derived on top, so re-imports converge by upsert regardless. |
+| 23 | **Event idempotency is commandId-based.** Every command mints a random `commandId` at the boundary; retries reuse it; each emitted event carries `idempotencyKey = <commandId>:<index>`. Legitimate repeats (same action twice in a second) can never be deduped away, and retries always are. Migrations derive commandIds deterministically — but from chunk position over the id-sorted source rows, not from row identity: the genesis import emits `genesis:<kind>:<org>:<index>` and the stage-B backfill `backfill-b:<org>:<index>` plus `backfill-b:parity:<org>`; that is what ships today. Runtime commandIds are caller-minted KSUIDs; imports adopt the legacy row's own id as the grant/role id, never as the commandId. OPEN: whether migration commandIds should be re-keyed per source row — chunk membership can shift when a source row is deleted between an aborted pass and its retry — is under discussion on PR 2's review (comment 3802500637) and not yet decided. Where an upstream system id exists (the general house pattern, e.g. trace ids) it remains the key; commandId is for facts born from direct user action. Grant ids stay content-derived on top, so re-imports converge by upsert regardless. |
+| 24 | *(2026-08-18)* **Write paths fork per org.** The ledger becomes the writer for an organization only when its genesis import completes; everyone else keeps the imperative path. Deploy changes nothing until an org migrates. |
 
 ## The final data structure
 
@@ -60,7 +61,10 @@ Grant                              -- NEW table, born in PR 1; RoleBinding
   id                deterministic from event content (idempotent upserts)
   organizationId    tenant on every row
   principalType     user | api_key | group | team | organization
-                    | project | anyone          -- last two: resource tier only
+                    | project | anyone          -- anyone: resource tier only;
+                                                -- project: resource tier, plus its own
+                                                -- project's PROJECT scope (the credential
+                                                -- self-grant the cutover imports)
   principalId       null for anyone
   roleKey           admin | member | viewer | lite-member | custom:<id>
   legacyRole        an IMPORTED custom binding's original role column, which
@@ -365,10 +369,162 @@ PR 1's remainder, all delivered 2026-08-17:
    Redis-down revocation test rides with PR 2, where the revoke path it
    exercises first exists.
 
-The rollout after PR 1–2 merge is one organization at a time: cut an org
-over in one batch (its whole surface into `Grant`s via the ledger), then
-that org reads from the engine — the fork, the collector repoint, and the
-batch import are PR 3.
+PR 2, delivered 2026-08-17 on `feat/adr-092-ledger-only-writer` (stacked on
+PR 1) — the ledger is the only writer, still dark:
+
+1. **The genesis import** (`GrantsGenesisImportMigration`): per org, batched,
+   backdated to each row's `createdAt`, source `genesis-import`, commandIds
+   `genesis:<kind>:<org>:<chunk>`. It ADOPTS rather than re-creates — the
+   legacy row's id becomes the fact's id, so the identity the REST surface
+   already hands customers survives, and the fold updates the adopted compat
+   row instead of authoring a second one. It mints the org-member floor row
+   at the organization's own creation time and a per-user org-scoped admin
+   grant for every zero-binding `OrganizationUser.role = ADMIN`
+   (decision 20). The proof re-reads the compat view field for field against
+   the originals; drift holds the org with a bounded report. No column is
+   carved out, `role` included: a custom row's emission carries the stored
+   value as `legacyRole`, the compat upsert reproduces it, and a rewrite to
+   CUSTOM is drift like any other.
+2. **Every write path emits commands and writes no grant table, for an
+   organization migrated or finalized (decision 24) — unmigrated, pending,
+   parked, and rolled-back organizations keep the imperative write intact**:
+   the
+   role-binding service and its REST surface, org/team/project/group writes,
+   the role editor and API-key bindings, invites, the signup bootstrap and
+   the better-auth hooks, and SCIM as a reconciler (decision 18) that diffs
+   desired IdP state against the projection and emits only the difference,
+   removals carrying instant enforcement. `revokeBindings` / `offboardMember`
+   carry decision 7's synchronous deny effect, so the seam PR 1 shipped now
+   has its production callers.
+3. **The audit subscriber** (decision 17): insert-only, row id derived from
+   the event id, `ON CONFLICT DO NOTHING`, and a `when` guard skipping
+   `genesis-import` / `backfill-b` / `read-through-mint`, so a cutover never
+   floods the audit page with backdated history. The write paths stopped
+   writing `AuditLog` directly in the same change.
+4. **Read-through minting** for legacy keys (decision 1): a zero-binding
+   service key states its organization-scoped admin grant the first time it
+   authenticates — source `read-through-mint`, business time the key's own
+   creation time — off the request's critical path, minting once under
+   concurrency, and never able to fail the authentication that triggered it.
+5. **REST error-code reconciliation** before the write paths moved, not
+   after: the duplicate is `role_binding_already_exists` / 409 all the way
+   through (decision 21), and `GrantsService` carries the write actor rather
+   than writing audit rows of its own.
+6. **The doctrine's second test**
+   (`app-layer/authz/__tests__/ledger-instant-revoke.integration.test.ts`,
+   datastore lane): queue leg severed, Redis handle disconnected, and both
+   heads — the `Grant` row and its compat `RoleBinding` — gone from Postgres
+   before `revokeBindings` returns. The import, the single-writer rule, the
+   audit guard and the mint are tagged and bound in
+   `in-place-authz-migration.feature`; the Redis-stopped revocation scenario
+   in `unified-authorization-engine.feature` drops `@unimplemented` and binds
+   to that test.
+
+**Amended 2026-08-18 (decision 24): the write-path move is per organization,
+not per deploy.** As first written, PR 2 flipped every organization onto
+ledger-emitting writes the moment it deployed — an all-at-once behaviour
+change, which is exactly what the in-place doctrine (decision 4) exists to
+avoid. The fork now lives in one place, `GrantsLedgerWriter`, and every verb
+asks `app-layer/authz/ledger-write-gate.ts` first: an organization is on
+ledger writes iff its `SystemMigrationTenantState` row for
+`authz-grants-genesis-import` reads `migrated` or `finalized`. Absent,
+`pending`, `parked` or `rolled_back` all mean the imperative write, with the
+pre-conversion semantics intact — `create` / `createMany skipDuplicates` /
+`update` / `deleteMany` / the role upsert — so the deploy is inert until an
+organization migrates and no converted call site changes at all. Rollback is
+the operator's `rolled_back` flip on that row, fleet-wide within the gate's
+cache TTL and with no deploy; rows written imperatively meanwhile are adopted
+by the next genesis pass (adoption ids make re-runs convergent), which is what
+makes flip → rollback → re-flip safe. Decision 17 holds either side of the
+fork: a migrated organization's audit rows come from the subscriber, and an
+unmigrated one's are written by the writer in the same shape, best-effort, so
+removing the call sites' audit writes lost no trail. Read-through minting is
+gated the same way — an unmigrated organization's legacy keys keep their
+existing branch and state nothing. Bound in `in-place-authz-migration.feature`
+under "Per-organization write cutover".
+
+Reads still do not move: every permission check keeps reading the legacy
+tables, per org, until PR 3.
+
+PR 3, delivered 2026-08-18 on `feat/adr-092-per-org-cutover` (stacked on
+PR 2) — reads move, one organization at a time:
+
+1. **The gate** (`app-layer/authz/cutover-gate.ts`): `cutoverOnEngine` reads
+   `AuthzCutoverProjection.onEngine` through a 60s cache in BOTH directions,
+   browser-safe like `legacy-fallback-gate.ts` (caller-supplied Prisma, no
+   module-scope storage), storage error → legacy. Unlike stage B's
+   finalization latch a cutover is reversible, so neither answer may be
+   cached forever: the positive bound is the rollback lever's budget, the
+   negative bound is what lets a completed cutover land fleet-wide with no
+   deploy.
+2. **The fork at the seams**: seven in `api/rbac.ts`, three in
+   `rbac/role-binding-resolver.ts`. A cut-over organization is DECIDED by the
+   engine and the legacy walk runs behind it as the reverse-shadow
+   comparison (`AuthzForkService`, logger `langwatch:authz:fork`,
+   `primary: "engine"`); everyone else keeps the legacy answer with stage
+   A4's shadow behind IT. Each seam's legacy body was factored into one thunk
+   both paths call, so there is a single legacy implementation, not two.
+3. **The collector repoint**: `GrantsAuthzReadRepository` reads
+   `Grant`/`Role` (+`GrantUsage` for share links) with the legacy repo's
+   query shapes and tenancy fencing, and `CutoverAwareAuthzReadRepository`
+   picks the head per organization off the same gate — so "on the engine"
+   means on everywhere at once, and a request can never mix heads.
+4. **The composite cutover migration** (`GrantsCutoverMigration`, registered
+   last): it holds any tenant whose backfill and genesis import have not
+   finalized, then imports the four families of fact that never had a
+   binding row — share links as RESOURCE grants (adopting the link's own id,
+   so circulated tokens keep resolving), `OrganizationUser.role = EXTERNAL`
+   as org-scoped `lite-member`, `Project.apiKey` as a PROJECT-principal
+   grant, and `ADMIN_EMAILS` operators as PLATFORM grants on a sentinel
+   `"platform"` aggregate whose command ids are a function of the user
+   alone, so the hundredth organization's emission dedupes. Then two proofs:
+   the resource import re-read field for field, and the decision-parity
+   sweep — every registry permission, for every member and every key, at
+   organization, team and project scope, collected once through each head
+   and decided by the pure engine. Diffs are recorded as a
+   `proveMigrationParity` fact and hold the organization; clean means
+   `proveMigrationParity` with an empty list, then `completeCutover`, then
+   `onEngine`. Everything imported is a dormant fact in PR 3 — the engine
+   still infers those decisions from membership, so the flip changes who
+   decides and not what is decided.
+5. **ShareService on the ledger** for cut-over organizations: mints and
+   revocations become commands, reads stay on the compat `ShareLink` head
+   (complete by construction), and `viewCount` moves to a ShareService-owned
+   `GrantUsage` row (decision 22) incremented conditionally against the cap
+   and mirrored back onto the compat row, so a rollback finds the count
+   where it left it. The fold never writes accounting.
+6. **Enrollment in the app, not the environment.** The two cohort env vars
+   (`SYSTEM_MIGRATIONS_COHORT`, `AUTHZ_CUTOVER_COHORT`) are gone; the ops
+   migrations page enrolls a cloud organization per stage — `migrations`
+   (backfill + genesis) and `cutover` pace independently — stored as
+   `SystemMigrationEnrollment` rows and read fresh every pass, so web and
+   worker can never disagree the way a per-deployment env var could. A set
+   env var is ignored with a loud warn. Self-hosted never enrolls: released
+   migrations run automatically (the in-place doctrine), and each migration
+   declares `runsAutomaticallyOnSelfHosted` in code — flipping it in a later
+   release, after the cloud soak, IS the self-hosted release act (the
+   cutover ships `false`).
+7. **Instant rollback**: the generic ops rollback gained per-migration
+   `rollbackEffects`, invoked after the `rolled_back` pin is written. For
+   the cutover: the `cutover_rolled_back` fact, then the projection flipped
+   off synchronously (decision 7's revocation class), then the epoch bump.
+   The organization is back on legacy within the gate's 60s window, with no
+   deploy and with the queue stopped.
+8. **The doctrine's tests**, on the datastore lane
+   (`app-layer/authz/__tests__/cutover-{fork,rollback,import}.integration.test.ts`):
+   a whole pass to a clean proof with the fork then serving a grant-head-only
+   fact, a rollback applied before the call returns with the queue severed and
+   Redis disconnected, and the three import families landing with their source
+   rows' business time. The three cutover scenarios in
+   `in-place-authz-migration.feature` drop `@unimplemented` and bind to them,
+   and `unified-authorization-engine.feature` gains the per-organization fork
+   block.
+
+**Next is our own organization first, in production** — cut over, watched, and
+used end to end before anyone else is enrolled for cutover. Then enrollment
+widens organization by organization from the ops page, each one behind its
+own parity proof, with the rollback lever as the only thing anyone has to
+remember.
 
 ## The identity platform (the next programme) — doors left open
 

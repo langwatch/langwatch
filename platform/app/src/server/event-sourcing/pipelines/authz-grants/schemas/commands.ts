@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   grantEventSourceSchema,
+  grantRevocationSelectorSchema,
   grantShapeRefinement,
   grantsLedgerActorSchema,
   ledgerPrincipalSchema,
@@ -54,7 +55,7 @@ export const attachGrantEntrySchema = z
   .object({
     grantId: z.string().min(1),
     principal: ledgerPrincipalSchema,
-    roleKey: z.string().nullable(),
+    roleKey: z.string().min(1).nullable(),
     scope: ledgerScopeSchema,
     resource: resourceGrantTermsSchema.optional(),
     /** Imported bindings only — the legacy `role` column a `custom:<id>`
@@ -82,8 +83,94 @@ export type AttachGrantsCommandData = z.infer<
   typeof attachGrantsCommandDataSchema
 >;
 
+export const changeGrantRoleCommandDataSchema = commandDataSchema({
+  grantId: z.string().min(1),
+  from: z.string().min(1).nullable(),
+  to: z.string().min(1),
+  actor: grantsLedgerActorSchema,
+  occurredAtMs: z.number().int().nonnegative(),
+});
+export type ChangeGrantRoleCommandData = z.infer<
+  typeof changeGrantRoleCommandDataSchema
+>;
+
+/**
+ * One revocation: a grant id, an identity selector, or both.
+ *
+ * The selector is what makes a revoke-by-filter honest. Its ids come from the
+ * compat projection, which lags the ledger by a fold, so a grant appended a
+ * moment earlier is missing from the list; carrying the identity lets the fold
+ * sweep it (see `grantRevocationSelectorSchema`). A revocation naming neither
+ * is a no-op the caller cannot have meant, so the wire refuses it.
+ */
+export const revokeGrantEntrySchema = z
+  .object({
+    grantId: z.string().min(1).optional(),
+    selector: grantRevocationSelectorSchema.optional(),
+    reason: z.string().min(1).optional(),
+  })
+  .refine(
+    (entry) => entry.grantId !== undefined || entry.selector !== undefined,
+    {
+      message:
+        "a revocation names a grant id, an identity selector, or both — never neither",
+      path: ["grantId"],
+    },
+  );
+export type RevokeGrantEntry = z.infer<typeof revokeGrantEntrySchema>;
+
+export const revokeGrantsCommandDataSchema = commandDataSchema({
+  revocations: z.array(revokeGrantEntrySchema).min(1),
+  actor: grantsLedgerActorSchema,
+  occurredAtMs: z.number().int().nonnegative(),
+});
+export type RevokeGrantsCommandData = z.infer<
+  typeof revokeGrantsCommandDataSchema
+>;
+
+export const defineRoleEntrySchema = z.object({
+  roleId: z.string().min(1),
+  name: z.string().min(1),
+  /** No `.min(1)`: an imported role may carry an empty description (see the
+   *  event schema), and refusing it would park a genesis import. */
+  description: z.string().optional(),
+  permissions: z.array(z.string().min(1)),
+  kind: z.enum(["custom", "system_api_key"]),
+  /** Business time of the fact — an imported role carries the legacy
+   *  row's createdAt; it becomes the emitted event's `occurredAt`. */
+  occurredAtMs: z.number().int().nonnegative(),
+});
+export type DefineRoleEntry = z.infer<typeof defineRoleEntrySchema>;
+
+export const defineRolesCommandDataSchema = commandDataSchema({
+  roles: z.array(defineRoleEntrySchema).min(1),
+  actor: grantsLedgerActorSchema,
+});
+export type DefineRolesCommandData = z.infer<
+  typeof defineRolesCommandDataSchema
+>;
+
+export const deleteRoleCommandDataSchema = commandDataSchema({
+  roleId: z.string().min(1),
+  actor: grantsLedgerActorSchema,
+  occurredAtMs: z.number().int().nonnegative(),
+});
+export type DeleteRoleCommandData = z.infer<typeof deleteRoleCommandDataSchema>;
+
+export const offboardMemberCommandDataSchema = commandDataSchema({
+  userId: z.string().min(1),
+  /** What the writer could see. The fold sweeps by principal, so an
+   *  incomplete list cannot leave the member holding access. */
+  revokedGrantIds: z.array(z.string().min(1)),
+  actor: grantsLedgerActorSchema,
+  occurredAtMs: z.number().int().nonnegative(),
+});
+export type OffboardMemberCommandData = z.infer<
+  typeof offboardMemberCommandDataSchema
+>;
+
 export const proveMigrationParityCommandDataSchema = commandDataSchema({
-  diffs: z.array(z.string()),
+  diffs: z.array(z.string().min(1)),
   occurredAtMs: z.number().int().nonnegative(),
 });
 export type ProveMigrationParityCommandData = z.infer<
@@ -100,7 +187,7 @@ export type CompleteCutoverCommandData = z.infer<
 
 export const rollBackCutoverCommandDataSchema = commandDataSchema({
   actor: grantsLedgerActorSchema,
-  reason: z.string().optional(),
+  reason: z.string().min(1).optional(),
   occurredAtMs: z.number().int().nonnegative(),
 });
 export type RollBackCutoverCommandData = z.infer<

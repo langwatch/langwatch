@@ -98,6 +98,17 @@ updates:
         patterns:
           - "posthog-js"
           - "posthog-node"
+      langchain:
+        # Real coupled-release family (sdks/typescript depends on langchain +
+        # @langchain/core + @langchain/langgraph + @langchain/openai together).
+        # Bumping them independently is what produced #6804/#7207: two
+        # separate PRs each moved part of the family out of lockstep and each
+        # broke imports on its own. A group only opens once every member
+        # resolves together, which is the actual fix, not just fewer PRs.
+        applies-to: version-updates
+        patterns:
+          - "langchain"
+          - "@langchain/*"
       minor-and-patch:
         applies-to: version-updates
         patterns:
@@ -124,6 +135,49 @@ updates:
         applies-to: version-updates
         patterns:
           - "langchain*"
+      minor-and-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # services/langevals was missing here, so it never got scheduled version
+  # updates and its lock only ever moved when an advisory-triggered security
+  # PR fired — which for services/langevals was never: it had accrued 47 open
+  # alerts, two of them critical, with zero dependabot PRs raised in the
+  # project's history. A lock that never moves also drifts far enough that a
+  # single security bump stops resolving cleanly, which is how the backlog
+  # became self-sustaining. Same shape as /sdks/python above.
+  #
+  # Deliberately NOT covering /mcp/typescript. Its uv.lock exists only to
+  # typecheck Python fixture files under tests/fixtures/ for the MCP server's
+  # instrumentation-codegen — nothing in CI installs or executes it. A first
+  # scheduled sweep here on 2026-08-19 dumped 24 individual PRs (bump one dev
+  # fixture's transitive typing dep, repeat) for zero coverage gain and
+  # meaningfully added to the org's ~76-slot concurrent-job ceiling. If this
+  # directory starts being actually installed/run, re-add the entry then.
+  - package-ecosystem: "uv"
+    directory: "/services/langevals"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 50
+    cooldown:
+      default-days: 8
+    groups:
+      langchain:
+        applies-to: version-updates
+        patterns:
+          - "langchain*"
+      arize:
+        # arize-phoenix today; grouped pre-emptively because upstream ships
+        # sibling packages (arize-phoenix-otel/-evals/-client) that release in
+        # step with it and would otherwise fragment the same way once used.
+        applies-to: version-updates
+        patterns:
+          - "arize*"
       minor-and-patch:
         applies-to: version-updates
         patterns:

@@ -47,13 +47,11 @@ export const GovernSection = React.memo(function GovernSection({
   if (!showGatewayEntry && !showGovernanceEntry) return null;
 
   const isGatewayActive =
-    router.pathname.startsWith("/settings/gateway") ||
-    router.pathname === "/settings/routing-policies" ||
+    router.pathname.startsWith("/gateway") ||
     router.pathname === "/settings/model-providers";
   const isGovernanceActive =
     router.pathname === "/governance" ||
-    router.pathname === "/settings/governance" ||
-    router.pathname.startsWith("/settings/governance/");
+    router.pathname.startsWith("/governance/");
 
   return (
     <SidebarSection
@@ -66,7 +64,7 @@ export const GovernSection = React.memo(function GovernSection({
         <SideMenuLink
           icon={featureIcons.gateway.icon}
           label="AI Gateway"
-          href="/settings/gateway/virtual-keys"
+          href="/gateway/virtual-keys"
           isActive={isGatewayActive}
           showLabel={showExpanded}
         />

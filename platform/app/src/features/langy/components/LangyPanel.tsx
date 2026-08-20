@@ -1030,7 +1030,6 @@ function LangyPanel({
             : "This answer is still starting up — try stopping it again in a moment.",
         type: "info",
         duration: 5000,
-        meta: { closable: true },
       });
       return;
     }
@@ -1550,7 +1549,6 @@ function LangyPanel({
         description: "Failed to delete conversation.",
         type: "error",
         duration: 5000,
-        meta: { closable: true },
       });
     }
   };
@@ -1564,7 +1562,6 @@ function LangyPanel({
         description: "Failed to rename conversation.",
         type: "error",
         duration: 5000,
-        meta: { closable: true },
       });
       throw new Error("Failed to rename conversation");
     }
@@ -1582,7 +1579,6 @@ function LangyPanel({
           description: `No handler for '${proposal.kind}' on this page.`,
           type: "error",
           duration: 5000,
-          meta: { closable: true },
         });
         return;
       }
@@ -1595,7 +1591,6 @@ function LangyPanel({
           description: proposal.summary,
           type: "success",
           duration: 3000,
-          meta: { closable: true },
         });
       } catch (error) {
         showErrorToast({

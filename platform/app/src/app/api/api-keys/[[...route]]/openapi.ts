@@ -23,8 +23,27 @@
  */
 
 import type { DescribeRouteOptions } from "hono-openapi";
+import type { OpenAPIV3_1 } from "openapi-types";
 
 type ResponseSpec = NonNullable<DescribeRouteOptions["responses"]>[string];
+
+/**
+ * Accepts a schema written the 3.0 way in a 3.1 document.
+ *
+ * `nullable: true` was removed in OpenAPI 3.1 in favour of a type array
+ * (`type: ["string", "null"]`), and this document declares `openapi: 3.1.0`.
+ * hono-openapi v0.4's types were loose enough not to notice; v1 types responses
+ * as `OpenAPIV3_1.SchemaObject` and rejects the key outright.
+ *
+ * The keys stay as they are. They are already published — 80 of them across the
+ * document, most from the hand-maintained JSON rather than this file — and
+ * rewriting them changes what generators emit for those fields. That is a
+ * correctness fix worth making on its own, against the whole document and with
+ * the client-side change understood; smuggling it into a library upgrade would
+ * mean shipping it unannounced.
+ */
+const legacySchema = (schema: object): OpenAPIV3_1.SchemaObject =>
+  schema as OpenAPIV3_1.SchemaObject;
 
 /** The organization admin key every operation in this family takes. */
 const ADMIN_KEY_SECURITY: DescribeRouteOptions["security"] = [
@@ -56,7 +75,7 @@ const apiKeyDetailResponse = (description: string): ResponseSpec => ({
   description,
   content: {
     "application/json": {
-      schema: {
+      schema: legacySchema({
         type: "object",
         properties: {
           id: { type: "string" },
@@ -107,7 +126,7 @@ const apiKeyDetailResponse = (description: string): ResponseSpec => ({
             },
           },
         },
-      },
+      }),
     },
   },
 });

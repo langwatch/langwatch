@@ -31,7 +31,11 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
+import { tryGetApp } from "~/server/app-layer/app";
+import {
+  nanoUsdToDecimalString,
+  usdToNanoUsd,
+} from "~/server/gateway/wireMoney";
 import {
   resolveTraceDepartmentId,
   UNASSIGNED_DEPARTMENT,
@@ -60,7 +64,7 @@ export interface SummaryResult {
 
 export interface SpendByUserRow {
   actor: string;
-  spendUsd: number;
+  spendUsd: string;
   requests: number;
   lastActivityIso: string;
   trendVsPreviousPct: number;
@@ -80,7 +84,7 @@ export interface SpendByTeamRow {
   teamId: string | null;
   /** Team.name, or "Org-wide" for non-team-scoped sources. */
   teamName: string;
-  spendUsd: number;
+  spendUsd: string;
   requestCount: number;
   /**
    * Spend change vs the previous equal-length window (e.g. last 30
@@ -108,7 +112,7 @@ export interface SpendByDepartmentRow {
   departmentId: string | null;
   /** Department.name, or "Unassigned". */
   departmentName: string;
-  spendUsd: number;
+  spendUsd: string;
   requestCount: number;
   lastActivityIso: string | null;
 }
@@ -139,7 +143,7 @@ export interface SpendOverTimeBucket {
     key: string;
     /** Human-readable label for legend / tooltip. */
     label: string;
-    spendUsd: number;
+    spendUsd: string;
   }>;
 }
 
@@ -175,12 +179,12 @@ const SORT_FIELD_TO_AGG_EXPR: Record<SpendSortField, string> = {
 const TEAM_ROW_SORT_KEYS: Record<
   SpendSortField,
   (row: {
-    thisSpend: number;
+    thisSpendNano: bigint;
     requestCount: number;
     lastActivityMs: number;
   }) => number
 > = {
-  spend: (r) => r.thisSpend,
+  spend: (r) => Number(r.thisSpendNano),
   requests: (r) => r.requestCount,
   lastActivity: (r) => r.lastActivityMs,
 };
@@ -191,7 +195,7 @@ export interface ActivityEventDetailRow {
   actor: string;
   action: string;
   target: string;
-  costUsd: number;
+  costUsd: string;
   tokensInput: number;
   tokensOutput: number;
   eventTimestampIso: string;
@@ -288,18 +292,28 @@ function startOfUtcDay(ms: number): number {
  * contains. Only unrepresentable values — `NaN`, `Infinity`, a string, an
  * object — collapse to 0, because those have no figure to show.
  */
-const ZERO_PULLED_USAGE = { cost_usd: 0, tokens_input: 0, tokens_output: 0 };
+const ZERO_PULLED_USAGE = {
+  cost_usd: "0",
+  tokens_input: 0,
+  tokens_output: 0,
+};
 
 const pulledUsageExtensionSchema = z
   .object({
-    cost_usd: z.coerce.number().finite().catch(0),
+    cost_usd: z
+      .union([z.string(), z.number()])
+      .transform((v) => {
+        const s = String(v).trim();
+        return s !== "" && Number.isFinite(Number(s)) ? s : "0";
+      })
+      .catch("0"),
     tokens_input: z.coerce.number().finite().catch(0),
     tokens_output: z.coerce.number().finite().catch(0),
   })
   .catch(ZERO_PULLED_USAGE);
 
 function pulledUsageFromRawOcsf(rawPayload: string): {
-  costUsd: number;
+  costUsd: string;
   tokensInput: number;
   tokensOutput: number;
 } {
@@ -345,7 +359,7 @@ type PushedEventRow = {
   eventType: string;
   actor: string;
   target: string | null;
-  costUsd: number | string;
+  costUsd: string;
   tokensInput: number | string;
   tokensOutput: number | string;
   occurredMs: string;
@@ -372,7 +386,7 @@ function toPushedEvent(row: PushedEventRow): ActivityEventDetailRow {
     actor: row.actor ?? "",
     action: "trace.recorded",
     target: row.target ?? "",
-    costUsd: Number(row.costUsd ?? 0),
+    costUsd: String(row.costUsd ?? "0"),
     tokensInput: Number(row.tokensInput ?? 0),
     tokensOutput: Number(row.tokensOutput ?? 0),
     eventTimestampIso: new Date(Number(row.occurredMs)).toISOString(),
@@ -443,7 +457,9 @@ export class ActivityMonitorService {
   private async getClickhouse(
     organizationId: string,
   ): Promise<ClickHouseClient | null> {
-    return await getClickHouseClientForOrganization(organizationId);
+    const app = tryGetApp();
+    if (!app?.clickhouse.enabled) return null;
+    return app.clickhouse.resolveOrganizationClient(organizationId);
   }
 
   async summary(input: {
@@ -630,7 +646,7 @@ export class ActivityMonitorService {
     }>;
     return rows.map((r) => ({
       actor: r.actor,
-      spendUsd: Number(r.spendUsdStr),
+      spendUsd: r.spendUsdStr,
       requests: Number(r.requests),
       lastActivityIso: new Date(Number(r.lastActivityMs)).toISOString(),
       // Trend-vs-previous needs a windowed CTE comparison; deferred to 3b.
@@ -728,7 +744,7 @@ export class ActivityMonitorService {
 
     const acc = new Map<
       string,
-      { spendUsd: number; requestCount: number; lastActivityMs: number }
+      { spendNanoUsd: bigint; requestCount: number; lastActivityMs: number }
     >();
     for (const r of rows) {
       const hasPrincipalUser = r.actor !== "";
@@ -746,12 +762,12 @@ export class ActivityMonitorService {
           ? departmentId
           : UNASSIGNED_DEPARTMENT;
       const prior = acc.get(key) ?? {
-        spendUsd: 0,
+        spendNanoUsd: 0n,
         requestCount: 0,
         lastActivityMs: 0,
       };
       acc.set(key, {
-        spendUsd: prior.spendUsd + Number(r.spendUsdStr),
+        spendNanoUsd: prior.spendNanoUsd + usdToNanoUsd(r.spendUsdStr),
         requestCount: prior.requestCount + Number(r.requests),
         lastActivityMs: Math.max(
           prior.lastActivityMs,
@@ -767,14 +783,18 @@ export class ActivityMonitorService {
           key === UNASSIGNED_DEPARTMENT
             ? "Unassigned"
             : activeDepartmentNames.get(key)!,
-        spendUsd: v.spendUsd,
+        spendUsd: nanoUsdToDecimalString(v.spendNanoUsd),
         requestCount: v.requestCount,
         lastActivityIso:
           v.lastActivityMs > 0
             ? new Date(v.lastActivityMs).toISOString()
             : null,
       }))
-      .sort((a, b) => b.spendUsd - a.spendUsd);
+      .sort((a, b) => {
+        const aNano = usdToNanoUsd(a.spendUsd);
+        const bNano = usdToNanoUsd(b.spendUsd);
+        return bNano > aNano ? 1 : bNano < aNano ? -1 : 0;
+      });
   }
 
   private async activeDepartmentNames(
@@ -943,8 +963,8 @@ export class ActivityMonitorService {
       {
         teamId: string | null;
         teamName: string;
-        thisSpend: number;
-        prevSpend: number;
+        thisSpendNano: bigint;
+        prevSpendNano: bigint;
         requestCount: number;
         lastActivityMs: number;
         sourceCount: number;
@@ -955,14 +975,14 @@ export class ActivityMonitorService {
       const key = team ? team.id : ORG_WIDE_KEY;
       const teamId = team?.id ?? null;
       const teamName = team?.name ?? "Org-wide";
-      const thisSpend = Number(row.thisSpendStr);
-      const prevSpend = Number(row.prevSpendStr);
+      const thisSpendNano = usdToNanoUsd(row.thisSpendStr);
+      const prevSpendNano = usdToNanoUsd(row.prevSpendStr);
       const requestCount = Number(row.thisRequests);
       const lastActivityMs = Number(row.lastActivityMs);
       const existing = byTeam.get(key);
       if (existing) {
-        existing.thisSpend += thisSpend;
-        existing.prevSpend += prevSpend;
+        existing.thisSpendNano += thisSpendNano;
+        existing.prevSpendNano += prevSpendNano;
         existing.requestCount += requestCount;
         existing.sourceCount += 1;
         existing.lastActivityMs = Math.max(
@@ -973,8 +993,8 @@ export class ActivityMonitorService {
         byTeam.set(key, {
           teamId,
           teamName,
-          thisSpend,
-          prevSpend,
+          thisSpendNano,
+          prevSpendNano,
           requestCount,
           lastActivityMs,
           sourceCount: 1,
@@ -985,16 +1005,19 @@ export class ActivityMonitorService {
     const sortKey = TEAM_ROW_SORT_KEYS[sortBy];
     const sign = sortDir === "asc" ? 1 : -1;
     return [...byTeam.values()]
-      .filter((t) => t.thisSpend > 0 || t.requestCount > 0)
+      .filter((t) => t.thisSpendNano > 0n || t.requestCount > 0)
       .sort((a, b) => sign * (sortKey(a) - sortKey(b)))
       .slice(offset, offset + limit)
       .map((t) => ({
         teamId: t.teamId,
         teamName: t.teamName,
-        spendUsd: t.thisSpend,
+        spendUsd: nanoUsdToDecimalString(t.thisSpendNano),
         requestCount: t.requestCount,
-        deltaPctVsPriorWindow: pctChange(t.thisSpend, t.prevSpend),
-        hasPriorBaseline: t.prevSpend > 0,
+        deltaPctVsPriorWindow: pctChange(
+          Number(t.thisSpendNano),
+          Number(t.prevSpendNano),
+        ),
+        hasPriorBaseline: t.prevSpendNano > 0n,
         lastActivityIso:
           t.lastActivityMs > 0
             ? new Date(t.lastActivityMs).toISOString()
@@ -1104,7 +1127,11 @@ export class ActivityMonitorService {
     }>;
 
     let labelByKey: Map<string, { key: string; label: string }>;
-    let rolledRows: Array<{ bucketMs: number; key: string; spendUsd: number }>;
+    let rolledRows: Array<{
+      bucketMs: number;
+      key: string;
+      spendNanoUsd: bigint;
+    }>;
 
     if (input.groupBy === "team") {
       const sourceIds = Array.from(
@@ -1140,7 +1167,7 @@ export class ActivityMonitorService {
         rolledRows.push({
           bucketMs: Number(row.bucketMs),
           key,
-          spendUsd: Number(row.spendUsdStr),
+          spendNanoUsd: usdToNanoUsd(row.spendUsdStr),
         });
       }
     } else {
@@ -1153,24 +1180,24 @@ export class ActivityMonitorService {
         rolledRows.push({
           bucketMs: Number(row.bucketMs),
           key,
-          spendUsd: Number(row.spendUsdStr),
+          spendNanoUsd: usdToNanoUsd(row.spendUsdStr),
         });
       }
     }
 
     // Roll up (bucket, key) duplicates that come out of the team-side
     // sourceId → teamId remapping (multiple sources can share one team).
-    const aggregated = new Map<string, number>();
+    const aggregated = new Map<string, bigint>();
     for (const r of rolledRows) {
       const k = `${r.bucketMs}::${r.key}`;
-      aggregated.set(k, (aggregated.get(k) ?? 0) + r.spendUsd);
+      aggregated.set(k, (aggregated.get(k) ?? 0n) + r.spendNanoUsd);
     }
 
     const buckets = emptyDenseBuckets(windowStart, windowDays);
     const bucketIndexByMs = new Map(
       buckets.map((b, i) => [Date.parse(b.bucketIso), i] as const),
     );
-    for (const [composite, spendUsd] of aggregated.entries()) {
+    for (const [composite, spendNanoUsd] of aggregated.entries()) {
       const sep = composite.indexOf("::");
       const bucketMs = Number(composite.slice(0, sep));
       const key = composite.slice(sep + 2);
@@ -1178,11 +1205,11 @@ export class ActivityMonitorService {
       if (idx === undefined) continue;
       const meta = labelByKey.get(key);
       if (!meta) continue;
-      if (spendUsd <= 0) continue;
+      if (spendNanoUsd <= 0n) continue;
       buckets[idx]!.points.push({
         key: meta.key,
         label: meta.label,
-        spendUsd,
+        spendUsd: nanoUsdToDecimalString(spendNanoUsd),
       });
     }
 
@@ -1190,7 +1217,11 @@ export class ActivityMonitorService {
     // contributor renders at the bottom of the stacked area (Recharts
     // stacks in array order; bottom-up = largest-first).
     for (const bucket of buckets) {
-      bucket.points.sort((a, b) => b.spendUsd - a.spendUsd);
+      bucket.points.sort((a, b) => {
+        const aN = usdToNanoUsd(a.spendUsd);
+        const bN = usdToNanoUsd(b.spendUsd);
+        return bN > aN ? 1 : bN < aN ? -1 : 0;
+      });
     }
 
     return { buckets };

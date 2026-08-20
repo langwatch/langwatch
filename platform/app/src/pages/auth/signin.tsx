@@ -152,9 +152,6 @@ function SignInForm() {
         title: "Could not sign in",
         description: message,
         type: "error",
-        meta: {
-          closable: true,
-        },
       });
     }
   };

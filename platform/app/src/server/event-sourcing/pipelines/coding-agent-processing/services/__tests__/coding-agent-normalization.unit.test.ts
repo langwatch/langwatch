@@ -295,6 +295,25 @@ describe("liftCodingAgentLogFacts", () => {
       expect(facts).toEqual(attributes);
     });
 
+    /** @scenario "The session's name lifts from the session context record" */
+    it("lifts the name and the derived title alongside the vcs attributes", () => {
+      const titled = {
+        ...attributes,
+        "langwatch.session.title": "Read notes.txt",
+        "langwatch.session.name": "pr-reviewer",
+      };
+
+      const facts = liftCodingAgentLogFacts({
+        scopeName: "langwatch.coding_agent.hook",
+        attributes: titled,
+      });
+
+      expect(facts).toMatchObject({
+        "langwatch.session.title": "Read notes.txt",
+        "langwatch.session.name": "pr-reviewer",
+      });
+    });
+
     /** @scenario A langwatch session context event passes the log lift without a vendor scope */
     it("required no vendor instrumentation scope to be admitted", () => {
       // The proof that the admission is the event name and nothing else: the

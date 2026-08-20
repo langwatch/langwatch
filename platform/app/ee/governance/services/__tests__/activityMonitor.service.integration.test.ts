@@ -38,6 +38,10 @@ import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
 import { ActivityMonitorService } from "../activity-monitor/activityMonitor.service";
 import {
   ensureHiddenGovernanceProject,
@@ -197,6 +201,9 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       throw new Error("ClickHouse test container not available");
     }
     ch = maybeCh;
+    // The service resolves its org client through getApp().clickhouse now
+    // (two-door access), so the fixture installs the App the seam expects.
+    installClickHouseTestApp({ resolveClient: async () => ch });
 
     primaryOrg = await prisma.organization.create({
       data: {
@@ -373,6 +380,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
   });
 
   afterAll(async () => {
+    await clearClickHouseTestApp();
     await ch
       .command({
         query:
@@ -536,7 +544,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       });
       // Cross-org trace had spend=$50; if any leaked, primary's largest row
       // would be far above $2 + $0.25.
-      const totalReturned = rows.reduce((sum, r) => sum + r.spendUsd, 0);
+      const totalReturned = rows.reduce(
+        (sum, r) => sum + Number(r.spendUsd),
+        0,
+      );
       expect(totalReturned).toBeLessThan(10);
       // Cross-org Team is a Team but its id should never surface here.
       const allTeamIds = rows.map((r) => r.teamId).filter(Boolean);
@@ -760,7 +771,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
           eventType: "anthropic_admin",
           action: "usage_report",
           target: "claude-haiku-4-5",
-          costUsd: 0.0042,
+          costUsd: "0.0042",
           tokensInput: 8,
           tokensOutput: 5,
         }),
@@ -813,7 +824,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
       const totalSpend = result.buckets
         .flatMap((b) => b.points)
-        .reduce((sum, p) => sum + p.spendUsd, 0);
+        .reduce((sum, p) => sum + Number(p.spendUsd), 0);
       // tr-primary-1 ($0.50) + tr-primary-2 ($1.50) + tr-primary-3 ($0.25)
       // governance-origin only — app trace ($99) excluded.
       expect(totalSpend).toBeCloseTo(2.25, 2);
@@ -822,7 +833,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
         .flatMap((b) => b.points)
         .filter((p) => p.key === primaryTeamId);
       const primarySpend = primaryTeamPoints.reduce(
-        (sum, p) => sum + p.spendUsd,
+        (sum, p) => sum + Number(p.spendUsd),
         0,
       );
       expect(primarySpend).toBeCloseTo(2.0, 2);
@@ -831,7 +842,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
         .flatMap((b) => b.points)
         .filter((p) => p.key === "__org_wide__");
       const orgWideSpend = orgWidePoints.reduce(
-        (sum, p) => sum + p.spendUsd,
+        (sum, p) => sum + Number(p.spendUsd),
         0,
       );
       expect(orgWideSpend).toBeCloseTo(0.25, 2);
@@ -896,7 +907,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       ).toBeUndefined();
       // Total spend bounded by primary's seeded amount (2.25) — proves no
       // cross-org $50 leaked even into a different attribution dimension.
-      const totalSpend = flatPoints.reduce((sum, p) => sum + p.spendUsd, 0);
+      const totalSpend = flatPoints.reduce(
+        (sum, p) => sum + Number(p.spendUsd),
+        0,
+      );
       expect(totalSpend).toBeCloseTo(2.25, 2);
     });
 
@@ -912,8 +926,8 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       const populated = result.buckets.find((b) => b.points.length >= 2);
       expect(populated).toBeDefined();
       // Sorted desc: bob (1.5) before alice (0.5).
-      expect(populated!.points[0]!.spendUsd).toBeGreaterThanOrEqual(
-        populated!.points[1]!.spendUsd,
+      expect(Number(populated!.points[0]!.spendUsd)).toBeGreaterThanOrEqual(
+        Number(populated!.points[1]!.spendUsd),
       );
     });
 
