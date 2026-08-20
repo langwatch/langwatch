@@ -18,6 +18,12 @@ Feature: Product sidebars in the new navigation modes
   the column, and the scrollbar sits against the content panel with no
   gap.
 
+  On a small screen the column collapses to a narrow icon rail that
+  widens again while the pointer is over it. The content stays laid out
+  at the full width and the column clips it, so collapsing slides the
+  same content out of view rather than reflowing it, and nothing may
+  move that content sideways behind the user's back.
+
   @integration
   Scenario: Quick Search sits first and opens the command bar
     Given a product sidebar in a new navigation mode
@@ -91,6 +97,12 @@ Feature: Product sidebars in the new navigation modes
   Scenario: Opening a page by its address reveals its sidebar entry
     Given I open a product page by its address
     Then the sidebar brings that page's entry into view
+
+  @integration
+  Scenario: The collapsed sidebar keeps its icons still until it is hovered
+    Given a collapsed sidebar on a page opened by its address
+    Then revealing that page's entry cannot shift the collapsed column
+    And the icons keep the same inset before and after the first hover
 
   @integration
   Scenario: Closing the Support menu with the pointer leaves no focus ring

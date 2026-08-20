@@ -1,14 +1,24 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
-import { LuChevronDown } from "react-icons/lu";
+import { Box, Button, HStack, Text } from "@chakra-ui/react";
+import { Check, ChevronDown } from "lucide-react";
 import { Menu } from "~/components/ui/menu";
-import { PropertySectionTitle } from "~/components/ui/PropertySectionTitle";
 
 /**
  * Editing mode for the prompt messages field.
- * - "prompt": Simple view showing only the system prompt
+ * - "prompt": Simple view showing only the system instructions
  * - "messages": Full view showing all messages with role labels
  */
 export type PromptEditingMode = "prompt" | "messages";
+
+/**
+ * What each mode is called in the UI. The stored key stays "prompt" because
+ * it is what getDefaultEditingMode returns and what the tests bind to; only
+ * the words the customer reads say "Instructions", which is what the system
+ * message actually is.
+ */
+const EDITING_MODE_LABELS: Record<PromptEditingMode, string> = {
+  prompt: "Instructions",
+  messages: "Messages",
+};
 
 /**
  * Determines the default editing mode based on the messages.
@@ -42,7 +52,13 @@ export const getDefaultEditingMode = (
 };
 
 /**
- * Title with dropdown menu for switching between Prompt and Messages modes.
+ * Mode switcher for the prompt editor.
+ *
+ * Rendered as a real button with a chevron rather than an uppercase section
+ * title, because the heading treatment read as a static label and gave no
+ * sign that a second mode existed behind it. Styling follows the lens-group
+ * dropdowns in the traces toolbar: quiet by default, bordered so it is
+ * obviously pressable.
  */
 export function EditingModeTitle({
   mode,
@@ -54,40 +70,87 @@ export function EditingModeTitle({
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <HStack
-          gap={1}
-          cursor="pointer"
-          role="button"
-          _hover={{ opacity: 0.8 }}
+        <Button
+          size="xs"
+          variant="outline"
+          type="button"
+          gap={1.5}
+          paddingX={2}
+          fontSize="xs"
+          fontWeight="medium"
+          color="fg"
+          borderColor="border.muted"
+          _hover={{ bg: "bg.subtle", borderColor: "border.emphasized" }}
+          aria-label={`Editing mode: ${EDITING_MODE_LABELS[mode]}`}
         >
-          <PropertySectionTitle padding={0} paddingY={1}>
-            {mode === "prompt" ? "Prompt" : "Messages"}
-          </PropertySectionTitle>
+          {EDITING_MODE_LABELS[mode]}
           <Box color="fg.muted" data-testid="editing-mode-chevron">
-            <LuChevronDown size={14} />
+            <ChevronDown size={14} />
           </Box>
-        </HStack>
+        </Button>
       </Menu.Trigger>
-      <Menu.Content portalled={false} backgroundColor="bg.panel">
-        <Menu.Item
+      <Menu.Content
+        portalled={false}
+        backgroundColor="bg.panel"
+        minWidth="260px"
+      >
+        <EditingModeItem
           value="prompt"
-          onClick={() => onChange("prompt")}
-          data-testid="editing-mode-prompt"
-        >
-          <Text fontWeight={mode === "prompt" ? "medium" : "normal"}>
-            Prompt
-          </Text>
-        </Menu.Item>
-        <Menu.Item
+          mode={mode}
+          onChange={onChange}
+          description="One set of instructions for the model"
+        />
+        <EditingModeItem
           value="messages"
-          onClick={() => onChange("messages")}
-          data-testid="editing-mode-messages"
-        >
-          <Text fontWeight={mode === "messages" ? "medium" : "normal"}>
-            Messages
-          </Text>
-        </Menu.Item>
+          mode={mode}
+          onChange={onChange}
+          description="Instructions plus user and assistant messages"
+        />
       </Menu.Content>
     </Menu.Root>
+  );
+}
+
+/**
+ * One row of the mode menu. The second line is what tells a first-time reader
+ * why they would pick the other mode, which a bare pair of nouns did not.
+ */
+function EditingModeItem({
+  value,
+  mode,
+  onChange,
+  description,
+}: {
+  value: PromptEditingMode;
+  mode: PromptEditingMode;
+  onChange: (mode: PromptEditingMode) => void;
+  description: string;
+}) {
+  const selected = mode === value;
+  return (
+    <Menu.Item
+      value={value}
+      onClick={() => onChange(value)}
+      data-testid={`editing-mode-${value}`}
+    >
+      <HStack width="full" gap={2} align="flex-start">
+        {/* Kept in the layout when unselected so the two rows' labels line up. */}
+        <Box
+          color={selected ? "fg" : "transparent"}
+          paddingTop="2px"
+          flexShrink={0}
+        >
+          <Check size={14} />
+        </Box>
+        <Box>
+          <Text fontWeight={selected ? "medium" : "normal"}>
+            {EDITING_MODE_LABELS[value]}
+          </Text>
+          <Text fontSize="xs" color="fg.muted">
+            {description}
+          </Text>
+        </Box>
+      </HStack>
+    </Menu.Item>
   );
 }

@@ -451,6 +451,13 @@ export const app = createService({
           throw error;
         }
 
+        // hono's streamSSE sets the content type, cache and connection
+        // headers but not this one, and a reverse proxy that buffers the
+        // response would hold every event until the run finished — which is
+        // indistinguishable from the engine not streaming at all. The app's
+        // other SSE surface sets it for the same reason.
+        c.header("X-Accel-Buffering", "no");
+
         return streamSSE(c, (stream) =>
           streamPromptExecution({
             stream,

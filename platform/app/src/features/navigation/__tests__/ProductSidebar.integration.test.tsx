@@ -150,10 +150,13 @@ import { MENU_WIDTH_EXPANDED } from "~/components/MainMenu";
 import { ProductSidebar } from "../shell/ProductSidebar";
 import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../shell/shellLayout";
 
-function renderSidebar(surface: "me" | "llm-ops" | "gateway" | "governance") {
+function renderSidebar(
+  surface: "me" | "llm-ops" | "gateway" | "governance",
+  { isCompact = false }: { isCompact?: boolean } = {},
+) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <ProductSidebar surface={surface} isCompact={false} />
+      <ProductSidebar surface={surface} isCompact={isCompact} />
     </ChakraProvider>,
   );
 }
@@ -275,6 +278,23 @@ describe("the product sidebar", () => {
         expect(
           scrolledInto.some((el) => el.textContent?.includes("Virtual Keys")),
         ).toBe(true);
+      });
+    });
+  });
+
+  describe("when the sidebar is collapsed on a page opened by its address", () => {
+    /** @scenario "The collapsed sidebar keeps its icons still until it is hovered" */
+    it("clips the column instead of letting it scroll sideways", () => {
+      mockPathname = "/gateway/virtual-keys";
+      renderSidebar("gateway", { isCompact: true });
+
+      // The column is the only thing between the expanded-width content
+      // and the narrow rail. `overflow: hidden` would leave it a scroll
+      // container that the active entry's `scrollIntoView` shifts on
+      // mount; `clip` is what makes that impossible. jsdom lays nothing
+      // out, so the property that rules the shift out is what we can read.
+      expect(screen.getByTestId("product-sidebar-column")).toHaveStyle({
+        overflow: "clip",
       });
     });
   });

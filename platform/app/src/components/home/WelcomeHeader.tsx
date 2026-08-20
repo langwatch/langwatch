@@ -2,29 +2,7 @@ import { Heading } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { SERIF } from "~/features/asaplangy";
 import { useSession } from "~/utils/auth-client";
-
-/**
- * Extract greeting name from user's name.
- * Returns the first name if available, null if unavailable or looks like an email.
- */
-export const getGreetingName = (
-  name: string | null | undefined,
-): string | null => {
-  if (!name?.trim()) {
-    return null;
-  }
-
-  const trimmedName = name.trim();
-
-  // If it looks like an email, don't use it
-  if (trimmedName.includes("@")) {
-    return null;
-  }
-
-  // Extract first name (before first space)
-  const firstName = trimmedName.split(" ")[0];
-  return firstName ?? null;
-};
+import { displayFirstName } from "~/utils/displayName";
 
 export type TimeOfDay = "morning" | "afternoon" | "evening";
 
@@ -66,7 +44,7 @@ export function useTimeOfDay(): TimeOfDay {
 
 export function WelcomeHeader() {
   const { data: session } = useSession();
-  const greetingName = getGreetingName(session?.user?.name);
+  const greetingName = displayFirstName(session?.user?.name);
   const timeOfDay = useTimeOfDay();
 
   return (

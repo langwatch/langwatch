@@ -1,4 +1,4 @@
-import { Box, Button, HStack, useDisclosure } from "@chakra-ui/react";
+import { Button, HStack, useDisclosure } from "@chakra-ui/react";
 import { useFormContext } from "react-hook-form";
 
 import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
@@ -58,10 +58,15 @@ export function PromptEditorHeader({
   const deployDialog = useDisclosure();
 
   return (
-    <Box width="full" display="flex" gap={8} justifyContent="space-between">
+    <HStack
+      width="full"
+      gap={3}
+      alignItems="center"
+      justifyContent="space-between"
+    >
       <ModelSelectFieldMini />
       {variant === "full" && (
-        <HStack gap={2} flexShrink={0}>
+        <HStack gap={1.5} flexShrink={0}>
           {configId && onVersionRestore && (
             <VersionHistoryButton
               configId={configId}
@@ -101,6 +106,6 @@ export function PromptEditorHeader({
           />
         </HStack>
       )}
-    </Box>
+    </HStack>
   );
 }

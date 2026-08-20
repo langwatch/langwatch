@@ -1,4 +1,4 @@
-import { Box, Field, HStack, Spacer, VStack } from "@chakra-ui/react";
+import { Box, Button, Field, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Controller,
@@ -6,6 +6,7 @@ import {
   useFieldArray,
   useFormContext,
 } from "react-hook-form";
+import { LuPlus } from "react-icons/lu";
 import {
   AddMessageButton,
   MessageRoleLabel,
@@ -266,6 +267,11 @@ export function PromptMessagesField({
   // This allows us to re-compute when messages change (e.g., form reset)
   const lastMessagesSignatureRef = useRef<string>("");
 
+  // Set when a message was just added or revealed, so the effect below can
+  // bring it into view once it has actually rendered.
+  const [pendingReveal, setPendingReveal] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   // Compute a signature from messages to detect changes
   const computeMessagesSignature = (
     messages: Array<{ role?: string; content?: string }>,
@@ -291,6 +297,24 @@ export function PromptMessagesField({
       lastMessagesSignatureRef.current = currentSignature;
     }
   }, [messageFields.fields, hasUserChangedMode]);
+
+  // Scroll the message that was just added or revealed into view and put the
+  // cursor in it. Adding a message you cannot see is the same as nothing
+  // happening, and the list is often taller than the pane.
+  useEffect(() => {
+    if (!pendingReveal || editingMode !== "messages") return;
+    setPendingReveal(false);
+
+    const container = containerRef.current;
+    if (!container) return;
+    const rows = container.querySelectorAll<HTMLElement>("[data-message-row]");
+    const target = rows[rows.length - 1];
+    if (!target) return;
+
+    // jsdom does not implement scrollIntoView, and this is presentation only.
+    target.scrollIntoView?.({ block: "nearest" });
+    target.querySelector("textarea")?.focus();
+  }, [pendingReveal, editingMode]);
 
   // Access inputs field array to add new variables
   const inputsFieldArray = useFieldArray({
@@ -348,7 +372,25 @@ export function PromptMessagesField({
 
   const handleAdd = (role: "user" | "assistant") => {
     messageFields.append({ role, content: "" });
+    setPendingReveal(true);
   };
+
+  /**
+   * Instructions mode hides every non-system message, so "Add user message"
+   * has to do two things: make sure a user message exists, and switch to the
+   * mode that shows it. A prompt often already carries a hidden `{{input}}`
+   * user message — appending a second empty one would leave the customer with
+   * a duplicate they never asked for, so we reveal the existing one instead.
+   */
+  const handleAddUserMessage = useCallback(() => {
+    const hasUserMessage = messageFields.fields.some((f) => f.role === "user");
+    if (!hasUserMessage) {
+      messageFields.append({ role: "user", content: "" });
+    }
+    setEditingMode("messages");
+    setHasUserChangedMode(true);
+    setPendingReveal(true);
+  }, [messageFields]);
 
   // Ensure system message exists when switching to prompt mode
   const handleModeChange = useCallback(
@@ -381,15 +423,46 @@ export function PromptMessagesField({
 
   return (
     <Box
+      ref={containerRef}
       width="full"
       padding={0}
       height={borderless ? "100%" : undefined}
       display={borderless ? "flex" : undefined}
       flexDirection={borderless ? "column" : undefined}
     >
-      <HStack width="full" flexShrink={0} paddingX={borderless ? 3 : 1}>
+      {/*
+        One action rail for the whole section: the mode switcher on the left,
+        the add action on the right, in the same slot in both modes. The add
+        control used to sit inside the system message's own row, which read as
+        an action on that message rather than on the list.
+      */}
+      <HStack
+        width="full"
+        flexShrink={0}
+        gap={2}
+        paddingX={borderless ? 3 : 1}
+        paddingY={borderless ? 2 : 0}
+        borderBottomWidth={borderless ? "1px" : 0}
+        borderColor="border.muted"
+      >
         <EditingModeTitle mode={editingMode} onChange={handleModeChange} />
         <Spacer />
+        {editingMode === "prompt" ? (
+          <Button
+            size="xs"
+            variant="ghost"
+            type="button"
+            gap={1}
+            color="fg.muted"
+            onClick={handleAddUserMessage}
+            data-testid="add-user-message-button"
+          >
+            <LuPlus />
+            Add user message
+          </Button>
+        ) : (
+          <AddMessageButton onAdd={handleAdd} />
+        )}
       </HStack>
 
       <VStack
@@ -445,10 +518,6 @@ export function PromptMessagesField({
                   paddingBottom={borderless ? 2 : 0}
                 >
                   <MessageRoleLabel role="system" />
-                  <Spacer />
-                  {editingMode === "messages" && (
-                    <AddMessageButton onAdd={handleAdd} />
-                  )}
                 </HStack>
                 <MessageRow
                   key="system-message-row"
@@ -477,6 +546,9 @@ export function PromptMessagesField({
               return (
                 <Box
                   key={`message-box-${idx}`}
+                  // Marks a row the reveal effect can scroll to; the last one
+                  // in DOM order is the message that was just added.
+                  data-message-row={field.role}
                   paddingBottom={borderless && !isLast ? 3 : 0}
                   borderBottomWidth={borderless && !isLast ? "1px" : 0}
                   borderColor="border"
