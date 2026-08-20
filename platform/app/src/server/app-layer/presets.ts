@@ -13,6 +13,10 @@ import { RedisConnectionService } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";
 import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { ClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
+import {
+  LwqlKeyMapClickHouseRepository,
+  NullLwqlKeyMapRepository,
+} from "~/server/analytics/lwql/lwqlKeyMap.repository";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import { liveTriggerNotifier } from "~/server/app-layer/automations/delivery/triggerNotifier";
@@ -416,7 +420,10 @@ export function initializeDefaultApp(options?: {
 
   const broadcast = new BroadcastService(redis);
   const projects = traced(
-    new ProjectService(new PrismaProjectRepository(prisma)),
+    new ProjectService(
+      new PrismaProjectRepository(prisma),
+      new LwqlKeyMapClickHouseRepository(resolveClickHouseClient),
+    ),
     "ProjectService",
   );
   const presence = new PresenceService(
@@ -1872,7 +1879,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     "OrganizationService",
   );
   const nullProjects = traced(
-    new ProjectService(new NullProjectRepository()),
+    new ProjectService(
+      new NullProjectRepository(),
+      new NullLwqlKeyMapRepository(),
+    ),
     "ProjectService",
   );
 

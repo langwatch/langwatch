@@ -1331,7 +1331,26 @@ export const opsRouter = createTRPCRouter({
     .input(
       z.object({
         key: z.string().min(1).max(200),
-        rules: featureFlagRulesSchema.max(50),
+        // Write-time only — the read path's `parseRules` must keep accepting
+        // whatever is already stored, so this refinement lives here and not on
+        // the shared schema. A blank id can never match any context (matching
+        // is exact string equality), so a rule carrying one is a dead rule the
+        // operator believes is live.
+        rules: featureFlagRulesSchema
+          .max(50)
+          .refine(
+            (rules) =>
+              rules.every((rule) =>
+                [rule.match.projectId, rule.match.organizationId].every(
+                  (id) =>
+                    id === undefined || (id.length > 0 && id === id.trim()),
+                ),
+              ),
+            {
+              message:
+                "A targeting rule's project/organization id must not be blank or padded",
+            },
+          ),
       }),
     )
     .mutation(async ({ ctx, input }) => {

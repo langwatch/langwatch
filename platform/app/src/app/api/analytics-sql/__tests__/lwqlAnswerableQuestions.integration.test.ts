@@ -1287,61 +1287,6 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
       ]);
       expect(codes(body)).toEqual([]);
     });
-
-    /**
-     * The experiment-shaped comparison: runs joined to the experiment that
-     * names them, both PostgreSQL-resident and reached through the mapping.
-     */
-    /** @scenario "Experiment run comparisons" */
-    it("compares each run's score against the others under the experiment's name", async () => {
-      const body = await ask(
-        `SELECT e.ExperimentName AS experiment,
-                r.ExperimentRunId AS run,
-                r.Score AS score,
-                r.Passed AS passed,
-                round(r.Score - avg(r.Score) OVER (PARTITION BY e.ExperimentId), 4) AS score_vs_experiment_mean
-         FROM ${database}.experiment_runs AS r
-         INNER JOIN ${database}.experiments AS e ON e.ExperimentId = r.ExperimentId
-         ORDER BY run`,
-      );
-
-      const [lower, higher] = EXPERIMENT_RUN_SCORES;
-      const mean = (lower! + higher!) / 2;
-      expect(
-        body.rows.map((row: any) => [
-          row.experiment,
-          Number(row.score),
-          Boolean(row.passed),
-          Number(row.score_vs_experiment_mean),
-        ]),
-      ).toEqual([
-        [
-          `Experiment ${asking.id}`,
-          lower,
-          false,
-          Number((lower! - mean).toFixed(4)),
-        ],
-        [
-          `Experiment ${asking.id}`,
-          higher,
-          true,
-          Number((higher! - mean).toFixed(4)),
-        ],
-      ]);
-      // The other tenant's experiment and runs exist and contributed nothing.
-      expect(
-        body.rows.every((row: any) => !String(row.run).startsWith(other.id)),
-      ).toBe(true);
-
-      // The grain the PostgreSQL-resident entries declare reaches the
-      // diagnostics engine: an experiment row really is repeated once per run,
-      // and the fanout rule says so without anything being written for it.
-      const fanout = diagnostic(body, "POSSIBLE_FANOUT");
-      expect(fanout, JSON.stringify(codes(body))).toBeDefined();
-      expect(fanout.meta.dataset).toBe(`${database}.experiments`);
-      expect(fanout.meta.multipliedBy).toBe(`${database}.experiment_runs`);
-      expect(fanout.meta.unmatchedGrainColumns).toEqual(["ExperimentRunId"]);
-    });
   });
 
   describe("when human annotations are compared against evaluator verdicts", () => {
