@@ -77,7 +77,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
     dataCapture?: SetupObservabilityOptions["dataCapture"];
   } = {}): ReturnType<typeof setupObservability> {
     logRecordExporter = new InMemoryLogRecordExporter();
-    logRecordProcessor = new SimpleLogRecordProcessor(logRecordExporter);
+    logRecordProcessor = new SimpleLogRecordProcessor({ exporter: logRecordExporter });
 
     return setupObservability({
       serviceName: "logger-integration-test",
@@ -928,7 +928,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       // A provider owned by the caller, not the one setupObservability registers
       const customExporter = new InMemoryLogRecordExporter();
       const customProvider = new LoggerProvider({
-        processors: [new SimpleLogRecordProcessor(customExporter)],
+        processors: [new SimpleLogRecordProcessor({ exporter: customExporter })],
       });
 
       const logger = getLangWatchLoggerFromProvider(

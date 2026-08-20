@@ -541,7 +541,9 @@ export function createAndStartNodeSdk(
   }
   if (options.debug?.consoleLogging) {
     logProcessors.push(
-      new SimpleLogRecordProcessor(new ConsoleLogRecordExporter()),
+      new SimpleLogRecordProcessor({
+        exporter: new ConsoleLogRecordExporter(),
+      }),
     );
     logger.debug(
       "Console recording of logs enabled; adding console log record processor",
@@ -560,13 +562,17 @@ export function createAndStartNodeSdk(
 
     if (langwatch.processorType === "batch") {
       spanProcessors.push(new BatchSpanProcessor(traceExporter));
-      logProcessors.push(new BatchLogRecordProcessor(logExporter));
+      logProcessors.push(
+        new BatchLogRecordProcessor({ exporter: logExporter }),
+      );
       logger.debug(
         `Added LangWatch ${langwatch.processorType} SpanProcessor and LogRecordProcessor to SDK`,
       );
     } else {
       spanProcessors.push(new SimpleSpanProcessor(traceExporter));
-      logProcessors.push(new SimpleLogRecordProcessor(logExporter));
+      logProcessors.push(
+        new SimpleLogRecordProcessor({ exporter: logExporter }),
+      );
       logger.debug(
         `Added LangWatch ${langwatch.processorType} SpanProcessor and LogRecordProcessor to SDK`,
       );

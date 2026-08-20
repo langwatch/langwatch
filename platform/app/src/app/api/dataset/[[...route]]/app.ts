@@ -1,6 +1,5 @@
 import { Readable } from "node:stream";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import {
   createProjectApp,
