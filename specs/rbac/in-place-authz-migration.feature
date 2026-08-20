@@ -249,6 +249,13 @@ Feature: In-place authorization data migration
     Then only "acme" is processed, and only by the team-user backfill
     And the operator is told the status the organization ended the run in
 
+  @integration
+  Scenario: A targeted cutover run takes the typed confirmation
+    Given "acme" is enrolled for the cutover
+    When an operator runs the cutover for "acme" now without confirming
+    Then the run is refused before any work starts
+    And the same run carrying the typed confirmation proceeds
+
   @unit
   Scenario: A targeted run that only waited says so, rather than reporting a held organization
     Given "acme" is enrolled for the cutover but its prerequisites have not finalized

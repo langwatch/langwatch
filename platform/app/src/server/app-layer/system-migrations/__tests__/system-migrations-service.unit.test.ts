@@ -20,11 +20,15 @@ import {
 const MIGRATION = "team-user-backfill";
 const TENANT = "org_acme";
 
-function migrationOf(
-  name: string,
+function migrationOf({
+  name,
   runsAutomaticallyOnSelfHosted = true,
   requiresOperatorConfirmation = false,
-) {
+}: {
+  name: string;
+  runsAutomaticallyOnSelfHosted?: boolean;
+  requiresOperatorConfirmation?: boolean;
+}) {
   return {
     name,
     title: name,
@@ -87,7 +91,7 @@ function serviceWith({
   rollbackGuards,
   isSaaS = true,
   enrollments = enrollmentStoreStub(),
-  migrations = [migrationOf(MIGRATION)],
+  migrations = [migrationOf({ name: MIGRATION })],
   runTargetedPass = targetedPassStub(),
 }: {
   record: TenantMigrationRecord | null;
@@ -636,8 +640,14 @@ describe("SystemMigrationsService enrollment", () => {
         record: null,
         isSaaS: false,
         migrations: [
-          migrationOf("released", true),
-          migrationOf("unreleased", false),
+          migrationOf({
+            name: "released",
+            runsAutomaticallyOnSelfHosted: true,
+          }),
+          migrationOf({
+            name: "unreleased",
+            runsAutomaticallyOnSelfHosted: false,
+          }),
         ],
       });
 
@@ -661,7 +671,12 @@ describe("SystemMigrationsService enrollment", () => {
       const { service } = serviceWith({
         record: null,
         isSaaS: true,
-        migrations: [migrationOf("unreleased", false)],
+        migrations: [
+          migrationOf({
+            name: "unreleased",
+            runsAutomaticallyOnSelfHosted: false,
+          }),
+        ],
       });
 
       const overview = await service.getOverview();
@@ -851,7 +866,12 @@ describe("SystemMigrationsService.runForOrganization", () => {
       const { service, runTargetedPass } = serviceWith({
         record: null,
         isSaaS: false,
-        migrations: [migrationOf(MIGRATION, false)],
+        migrations: [
+          migrationOf({
+            name: MIGRATION,
+            runsAutomaticallyOnSelfHosted: false,
+          }),
+        ],
       });
 
       await expect(

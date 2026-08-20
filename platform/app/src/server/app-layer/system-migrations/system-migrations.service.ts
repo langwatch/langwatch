@@ -265,6 +265,16 @@ export class SystemMigrationsService {
     return Promise.all(
       this.deps.migrations().map(async (migration) => {
         const enrolledCount = enrolledByMigration?.get(migration.name) ?? 0;
+        // Together, not one after the other: the page polls this, and the
+        // rollup does not feed the listing.
+        const [counts, attention] = await Promise.all([
+          this.deps.state.findStatusCounts({ migrationName: migration.name }),
+          this.deps.state.findRecordsByStatus({
+            migrationName: migration.name,
+            statuses: ["migrated", "parked"],
+            limit: ATTENTION_LIMIT,
+          }),
+        ]);
         return {
           name: migration.name,
           title: migration.title,
@@ -272,9 +282,7 @@ export class SystemMigrationsService {
           requiresOperatorConfirmation: migration.requiresOperatorConfirmation,
           availableOnThisInstallation:
             isSaaS || migration.runsAutomaticallyOnSelfHosted,
-          counts: await this.deps.state.findStatusCounts({
-            migrationName: migration.name,
-          }),
+          counts,
           enrollment: enrolledByMigration
             ? {
                 enrolledCount,
@@ -284,11 +292,7 @@ export class SystemMigrationsService {
                 ),
               }
             : null,
-          attention: await this.deps.state.findRecordsByStatus({
-            migrationName: migration.name,
-            statuses: ["migrated", "parked"],
-            limit: ATTENTION_LIMIT,
-          }),
+          attention,
         };
       }),
     );

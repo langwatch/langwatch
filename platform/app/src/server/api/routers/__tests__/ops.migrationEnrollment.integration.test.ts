@@ -133,7 +133,10 @@ describe("ops migration enrollment procedures", () => {
   describe("when an operator runs one migration for one organization", () => {
     /** @scenario "An operator runs one migration for one organization now" */
     it("delegates to the service and demands ops:manage", async () => {
-      service.runForOrganization.mockResolvedValue({ status: "finalized" });
+      service.runForOrganization.mockResolvedValue({
+        status: "finalized",
+        waiting: false,
+      });
       const caller = buildCaller();
 
       const result = await caller.runSystemMigrationForOrganization({
@@ -152,8 +155,12 @@ describe("ops migration enrollment procedures", () => {
       );
     });
 
+    /** @scenario "A targeted cutover run takes the typed confirmation" */
     it("runs the cutover only behind its typed confirmation", async () => {
-      service.runForOrganization.mockResolvedValue({ status: "finalized" });
+      service.runForOrganization.mockResolvedValue({
+        status: "finalized",
+        waiting: false,
+      });
       const caller = buildCaller();
 
       await expect(
