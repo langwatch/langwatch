@@ -132,10 +132,10 @@ const TEST_AGGREGATE_TYPE = "test_aggregate" as const;
  * via event handler in the trace-processing pipeline.
  */
 export const AGGREGATE_TYPE_IDENTIFIERS = [
-  // ADR-110: a grant is its own aggregate; the organization keeps only the
-  // facts that carry organization-wide invariants.
+  // ADR-110: a grant is its own aggregate, and so is a role. There is no
+  // organization-keyed authorization aggregate.
   "authz_grant",
-  "authz_org_policy",
+  "authz_role",
   "trigger",
   "trace",
   "metric",

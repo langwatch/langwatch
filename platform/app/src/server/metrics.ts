@@ -232,9 +232,9 @@ export const getEdgeMediaExtractFailOpenCounter = (
 ) => edgeMediaExtractFailOpenCounter.labels(reason);
 
 // Authorization writes that reach the projection WITHOUT going through the
-// group queue. Every other authz write is queued; these three are deliberate
-// exceptions, and each one only ever makes a denial true earlier:
-// a revocation, an offboarding, and a cutover rollback.
+// group queue. Every other authz write is queued; these two are deliberate
+// exceptions, and both only ever make a denial true earlier: a revocation
+// and an offboarding.
 //
 // The reason to count them is that a direct write is the one path whose
 // effect is NOT recorded as an event when Redis is down — the deny lands in
@@ -253,7 +253,7 @@ const authzDirectProjectionWriteCounter = new Counter({
 });
 
 export const getAuthzDirectProjectionWriteCounter = (
-  reason: "revocation" | "offboard" | "cutover_rollback",
+  reason: "revocation" | "offboard",
 ) => authzDirectProjectionWriteCounter.labels(reason);
 
 // Online-evaluator loop guard counter (post-2026-05-11 incident). A healthy

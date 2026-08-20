@@ -139,8 +139,8 @@ Feature: Authorization grants
     But no revocation event is recorded
 
   # ═══ Writes that bypass the queue ═════════════════════════════════════
-  # Three writes reach the projection directly. Each can only ever make a
-  # denial true earlier — none can grant. They are the only authz writes
+  # Two writes reach the projection directly. Both can only ever make a
+  # denial true earlier — neither can grant. They are the only authz writes
   # whose effect may exist without an event behind it.
 
   @unit
@@ -150,10 +150,9 @@ Feature: Authorization grants
     And a log line records the organization and the reason
 
     Examples:
-      | cause                | reason           |
-      | a revocation         | revocation       |
-      | an offboarding       | offboard         |
-      | a cutover rollback   | cutover_rollback |
+      | cause          | reason     |
+      | a revocation   | revocation |
+      | an offboarding | offboard   |
 
   @unit
   Scenario: A direct write can only deny
