@@ -52,10 +52,11 @@ export class RedisMigrationLeaseRepository implements MigrationLeaseRepository {
       );
       return result === "OK";
     } catch (error) {
-      // Standing down is right, but silence is not: the runner logs every
-      // falsy acquire as "another process holds the lease", so an unreachable
-      // Redis would read as ordinary contention and the migration would never
-      // run, on any boot, without a word anywhere.
+      // Standing down is right, but silence is not: the runner counts a
+      // falsy acquire as an organization claimed by another process, so an
+      // unreachable Redis would read as ordinary contention and no migration
+      // would ever run, on any boot. This warn is the evidence that it was
+      // an error, not contention.
       logger.warn(
         { error, name },
         "could not acquire the migration lease; treating it as held elsewhere",

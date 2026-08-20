@@ -82,6 +82,16 @@ export class SystemMigrationRunnerService {
     if (this.deps.migrations.length === 0) return summary;
 
     await this.driveTenants({ summary, signal });
+    if (summary.claimed > 0 && summary.claimed === summary.tenantsSeen) {
+      // Every organization read as claimed. Genuine when another pass is
+      // sweeping the same page at the same moment - but it is also the only
+      // face an unreachable Redis wears (acquire fails safe to "held"), so
+      // a pass that repeats this across boots deserves a line of evidence.
+      logger.warn(
+        { summary },
+        "every organization was claimed by another process; if this repeats across boots, check Redis",
+      );
+    }
     logger.info({ summary }, "system migration pass complete");
     return summary;
   }
@@ -123,7 +133,20 @@ export class SystemMigrationRunnerService {
         if (signal?.aborted) return;
         const tenantId = pending.shift();
         if (tenantId === undefined) return;
-        await this.driveTenant({ tenantId, summary, signal });
+        try {
+          await this.driveTenant({ tenantId, summary, signal });
+        } catch (error) {
+          // Contained here, not just around migrateTenant: a throw outside
+          // that inner net (the state read, the cohort read) would reject
+          // the pool's Promise.all, killing the pass while its surviving
+          // workers drain on, detached and unobserved. The tenant stays
+          // pending and the next pass retries it, like any park.
+          summary.parked += 1;
+          logger.error(
+            { error, tenantId },
+            "tenant drive failed outside the migration; continuing the pass",
+          );
+        }
       }
     };
     await Promise.all(Array.from({ length: width }, worker));

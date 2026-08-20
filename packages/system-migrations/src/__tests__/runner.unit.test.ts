@@ -158,6 +158,7 @@ describe("SystemMigrationRunnerService", () => {
     it("works them concurrently, so one slow organization never holds up the rest", async () => {
       let inFlight = 0;
       let peak = 0;
+      const completed: string[] = [];
       const migration = migrationOf("m1", async ({ tenantId }) => {
         inFlight += 1;
         peak = Math.max(peak, inFlight);
@@ -165,6 +166,7 @@ describe("SystemMigrationRunnerService", () => {
           setTimeout(resolve, tenantId === "org-00" ? 40 : 5),
         );
         inFlight -= 1;
+        completed.push(tenantId);
         return finalized;
       });
       const ids = Array.from(
@@ -183,6 +185,45 @@ describe("SystemMigrationRunnerService", () => {
 
       expect(summary.finalized).toBe(12);
       expect(peak).toBeGreaterThan(1);
+      // The LAST organization still finishes before the slow first one: a
+      // pool keeps pulling past the straggler, where a chunked convoy would
+      // hold the tail behind org-00's sleep.
+      expect(completed.indexOf("org-11")).toBeLessThan(
+        completed.indexOf("org-00"),
+      );
+    });
+  });
+
+  describe("when reading one tenant's state throws", () => {
+    it("parks that tenant in the summary and finishes the rest of the pass", async () => {
+      const failingState = new FakeStateRepository();
+      const originalFindRecord = failingState.findRecord.bind(failingState);
+      failingState.findRecord = async (args) => {
+        if (args.tenantId === "acme") throw new Error("postgres blinked");
+        return originalFindRecord(args);
+      };
+      const migrate = vi.fn(async () => finalized);
+      const runner = new SystemMigrationRunnerService({
+        state: failingState,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(["acme", "globex", "initech"]),
+        cohort: () => true,
+        migrations: [migrationOf("m1", migrate)],
+      });
+
+      const summary = await runner.runPass();
+
+      // The throw is contained in the pool worker: the pass resolves with a
+      // summary (never rejects), the broken tenant counts as parked with no
+      // record (still pending, retried next pass), and the others finalize.
+      expect(summary.parked).toBe(1);
+      expect(summary.finalized).toBe(2);
+      expect(
+        await failingState.findRecord({
+          migrationName: "m1",
+          tenantId: "globex",
+        }),
+      ).toMatchObject({ status: "finalized" });
     });
   });
 

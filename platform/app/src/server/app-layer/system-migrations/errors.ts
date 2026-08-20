@@ -178,7 +178,7 @@ export class MigrationPassAlreadyRunningError extends HandledError {
   constructor() {
     super(
       "migration_pass_already_running",
-      "This organization is already being migrated; try again once that pass concludes",
+      "Another migration pass appears to be working this organization; try again shortly",
       { httpStatus: 409, fault: "customer" },
     );
     this.name = "MigrationPassAlreadyRunningError";
