@@ -66,6 +66,38 @@ describe("Pre-compiled Scenario Child Process", () => {
       expect(stderr).not.toContain("Cannot find module");
     });
 
+    /** @scenario 'An inlined dependency binds only exports the external OTEL packages still have' */
+    it("evaluates its whole module graph against the installed OpenTelemetry", () => {
+      // The SDK is inlined but @opentelemetry/* is not, so every OTEL binding
+      // the inlined code reads is resolved against whatever version the app
+      // depends on. api-logs 0.221 dropped `NoopLoggerProvider`, the inlined
+      // SDK still constructed it, and the child died at module scope on every
+      // single run.
+      //
+      // The require-resolution test above cannot see this: nothing is missing
+      // a MODULE, only an export, so it fails as a TypeError instead. Nor can
+      // the exit code, which is 1 whether the child crashed at module scope or
+      // reached main() and rejected the empty input. Only the parse failure on
+      // stdout proves the graph evaluated end to end.
+      const boot = spawnSync("node", [BUNDLE_PATH], {
+        cwd: path.dirname(BUNDLE_PATH),
+        input: "{}",
+        stdio: "pipe",
+        env: {
+          ...process.env,
+          NODE_ENV: "production",
+          SKIP_ENV_VALIDATION: "1",
+          LANGWATCH_API_KEY: "test-key",
+          LANGWATCH_ENDPOINT: "http://localhost:9999",
+        },
+        timeout: 30000,
+      });
+
+      expect(boot.stdout?.toString() ?? "").toContain(
+        "Failed to parse job data",
+      );
+    }, 35000);
+
     /** @scenario 'A simulation still reports its spans' */
     it("keeps OpenTelemetry external so exactly one API instance exists", () => {
       const content = fs.readFileSync(BUNDLE_PATH, "utf8");
