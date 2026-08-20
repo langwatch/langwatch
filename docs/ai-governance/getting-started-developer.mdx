@@ -88,13 +88,13 @@ You should see Claude Code's normal startup banner. Make a request. The gateway 
 The same pattern works for [Codex](/ai-gateway/cli/codex) (`langwatch codex`), [Gemini CLI](/ai-gateway/cli/gemini-cli) (`langwatch gemini`), [Cursor](/ai-gateway/cli/cursor), and [opencode](/ai-gateway/cli/opencode). The full matrix lives in [Coding CLI Integrations](/ai-gateway/cli/overview).
 
 <Tip>
-**Always-on shell setup.** If you'd rather not type `langwatch claude` every time, paste this in your `~/.zshrc` (or `~/.bashrc`):
+**Capture without the wrapper.** If you'd rather not type `langwatch claude` every time, write the telemetry wiring once:
 
 ```bash
-eval "$(langwatch init-shell zsh)"
+langwatch instrument claude
 ```
 
-After a shell restart, plain `claude` (or `codex`, `gemini`, etc.) picks up the gateway automatically.
+A plain `claude` run then reports to LangWatch. Add `--project <id-or-slug>` to send it to a team project, or `--key <ingest-key>` on a machine that never logs in. Model calls keep going wherever the tool points them, so start the tool with the wrapper when you want the gateway. See the [Claude Code integration guide](/integration/tools/integrations/claude-code).
 </Tip>
 
 ## Step 5: Read your spend back

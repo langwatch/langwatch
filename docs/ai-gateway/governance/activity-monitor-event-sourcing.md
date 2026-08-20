@@ -1,6 +1,6 @@
 ---
 title: Activity Monitor event-sourcing architecture
-description: Why the receiver → event_log → projection reactor → anomaly reactor pipeline replaces the original direct-CH-write design, and how to extend it.
+description: Why the receiver → event_log → projection subscriber → anomaly subscriber pipeline replaces the original direct-CH-write design, and how to extend it.
 ---
 
 # Activity Monitor event-sourcing architecture
@@ -19,7 +19,7 @@ following the event-sourcing pattern from
 [PR #3351](https://github.com/langwatch/langwatch/pull/3351). The
 receiver appends an `ActivityEventReceived` event to `event_log`, and
 a dedicated `activity-monitor-processing` pipeline takes over from
-there. Anomaly detection is a reactor that fires as new events
+there. Anomaly detection is a subscriber that fires as new events
 arrive, not a worker that polls.
 
 ## The pipeline
@@ -52,7 +52,7 @@ arrive, not a worker that polls.
          │ wakes:                            │ wakes:
          ▼                                   ▼
 ┌──────────────────────────┐      ┌──────────────────────────────┐
-│ Reactor                  │      │ Reactor                      │
+│ Subscriber                  │      │ Subscriber                      │
 │  activityEventBroadcast  │      │  anomalyDetection            │
 │  (real-time UI push for  │      │  - load active AnomalyRules  │
 │   /governance dashboard) │      │  - evaluate per-rule type    │
@@ -64,9 +64,9 @@ arrive, not a worker that polls.
 ```
 
 The shape mirrors `pipelines/trace-processing/` (PR #3351's
-alertTrigger reactor): the same `definePipeline().withFoldProjection().
-withMapProjection().withReactor()` builder, the same
-`ReactorDefinition<EventShape, FoldState>` contract, the same
+alertTrigger subscriber): the same `definePipeline().withFoldProjection().
+withMapProjection().withSubscriber()` builder, the same
+`SubscriberDispatchDefinition<EventShape, FoldState>` contract, the same
 `triggerActionDispatch.ts` shared helper.
 
 ## Why a dedicated pipeline (not bolted onto trace-processing)
@@ -114,14 +114,14 @@ The redesign ships as four slices, C0 through C3:
 
 - This architecture doc.
 - `specs/ai-gateway/governance/anomaly-detection.feature` updated to
-  drop poller language; reactor framing throughout.
+  drop poller language; subscriber framing throughout.
 - `AnomalyAlert` Prisma model + migration `20260427020000_add_anomaly_alert/`
-  doc-comment updated to reference the reactor as producer.
+  doc-comment updated to reference the subscriber as producer.
 - Existing receivers continue to write CH directly until C1 lands.
   This slice is doc-only so the team can review the architecture
   before more code moves.
 
-### C1: receiver → event_log → projection reactor
+### C1: receiver → event_log → projection subscriber
 
 - New event schema: `ActivityEventReceived` with the OCSF-normalised
   ActivityEventRow shape.
@@ -135,12 +135,12 @@ The redesign ships as four slices, C0 through C3:
 - Manual check: curl → 202 → row visible in CH (same as today, just via
   event-sourced path).
 
-### C2: AnomalyAlert and anomaly reactor for one rule type
+### C2: AnomalyAlert and anomaly subscriber for one rule type
 
 - Apply the AnomalyAlert migration that's already drafted but
   doesn't ship behaviour yet.
 - Add `anomalyWindow` fold projection (per-tenant rolling totals).
-- Add `anomalyDetection` reactor for `spend_spike` only first
+- Add `anomalyDetection` subscriber for `spend_spike` only first
   (cleanest mapping to the existing CostUSD field).
 - Wire into `api.activityMonitor.recentAnomalies` (replaces current
   `[]` stub).
@@ -152,7 +152,7 @@ The redesign ships as four slices, C0 through C3:
 - Generic webhook + log-only first (matches PR #3351's
   triggerActionDispatch shape).
 - Slack / PagerDuty / SIEM / email follow as per-destination
-  adapter slices once the reactor pattern is proven.
+  adapter slices once the subscriber pattern is proven.
 
 ## What we keep from the v0 receiver code
 
@@ -171,7 +171,7 @@ The redesign ships as four slices, C0 through C3:
   receiver handler. The receiver instead enqueues an event into
   the pipeline; the map projection does the actual CH insert.
 - The poller-based AnomalyEvaluatorService design that was sketched
-  but never shipped. Replaced by the anomaly reactor.
+  but never shipped. Replaced by the anomaly subscriber.
 
 ## Test strategy per slice
 
@@ -179,17 +179,17 @@ The redesign ships as four slices, C0 through C3:
 |-------|----------|------------------|--------------|
 | C0 (this) | anomaly-detection.feature updated | n/a (doc + schema) | architecture review in-channel |
 | C1 | activity-monitor pipeline scenarios in `activity-monitor.feature` | pipeline test: append event → projection fires → CH row | curl → 202 → CH SELECT |
-| C2 | spend_spike scenario in anomaly-detection.feature | reactor test: violating fold state → AnomalyAlert.upsert called | UI rule + violating event → /governance shows alert |
-| C3 | dispatch scenarios in anomaly-detection.feature | reactor test: dispatch helper called with right shape | webhook receives canonical body |
+| C2 | spend_spike scenario in anomaly-detection.feature | subscriber test: violating fold state → AnomalyAlert.upsert called | UI rule + violating event → /governance shows alert |
+| C3 | dispatch scenarios in anomaly-detection.feature | subscriber test: dispatch helper called with right shape | webhook receives canonical body |
 
 Each slice ships its own BDD and integration coverage before code
-lands. The production architecture is reactor-only: `evaluateNow`
-appends a synthetic event and lets the reactor handle it (a test
+lands. The production architecture is subscriber-only: `evaluateNow`
+appends a synthetic event and lets the subscriber handle it (a test
 harness, not a parallel code path).
 
 ## Cross-references
 
-- [PR #3351: event-driven trace triggers via reactor](https://github.com/langwatch/langwatch/pull/3351)
+- [PR #3351: event-driven trace triggers via subscriber](https://github.com/langwatch/langwatch/pull/3351)
   (the pattern this redesign learns from).
 - [`anomaly-detection.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/anomaly-detection.feature):
   user-facing contract, updated for event-sourcing.

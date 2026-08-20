@@ -51,6 +51,11 @@ type Stack struct {
 	// responses, the Langy "view trace" link, and anywhere else a developer wants to
 	// jump straight to the failing trace.
 	ObservabilityGrafanaPort int `json:"observabilityGrafanaPort,omitempty"`
+	// ObservabilityPyroscopePort is the shared Pyroscope's loopback port while the
+	// stack is up, and 0 when it is not. Non-zero is what makes OverlayEnv name a
+	// profiling endpoint, so a worktree's processes profile themselves exactly when
+	// there is somewhere to push to — and pay nothing for the profiler otherwise.
+	ObservabilityPyroscopePort int `json:"observabilityPyroscopePort,omitempty"`
 	// ObservabilityGrafanaURL is the proxied browser address of the same Grafana
 	// (observability.langwatch.localhost) while the portless proxy is up, and ""
 	// when it is not. When set, OverlayEnv prefers it over the loopback port for

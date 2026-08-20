@@ -1,6 +1,6 @@
 /**
  * The single entry point for deciding whether a Vega-Lite specification may be
- * rendered over a governed query result.
+ * rendered over a LangWatchQL query result.
  *
  * The stages run in a deliberate order, each one bounding what the next has to
  * cope with:
@@ -10,7 +10,7 @@
  *   3. `$schema` version     — an explicit non-v6 spec is refused, never converted
  *   4. size and depth        — so the schema validator is never handed something huge
  *   5. the bundled v6 schema — official, static, never fetched
- *   6. the governed policy   — data sources, resource paths, transforms, ceilings
+ *   6. the LangWatchQL policy   — data sources, resource paths, transforms, ceilings
  *   7. field references      — resolved against the dataset feeding each branch
  *
  * The caller's specification is never mutated or rewritten: on success,
@@ -22,10 +22,10 @@ import {
   validateFieldReferences,
 } from "./vegaLiteFields";
 import {
-  applyGovernedVegaPolicy,
+  applyLangWatchQLVegaPolicy,
   checkDatasetRowLimits,
   checkSpecEnvelopeLimits,
-  governedVegaError,
+  lwqlVegaError,
 } from "./vegaLitePolicy";
 import {
   checkSchemaDeclaration,
@@ -71,7 +71,7 @@ export function validateVegaLiteSpecStructure({
   const schema = validateAgainstVegaLiteSchema(spec);
   if (schema.length > 0) return refused(schema);
 
-  const policy = applyGovernedVegaPolicy({ spec, registeredDatasets });
+  const policy = applyLangWatchQLVegaPolicy({ spec, registeredDatasets });
   if (policy.errors.length > 0) return refused(policy.errors, policy.warnings);
 
   return { ok: true, normalized: spec, warnings: policy.warnings };
@@ -115,7 +115,7 @@ function refused(
 }
 
 function notAnObjectError(spec: unknown): VegaValidationError {
-  return governedVegaError({
+  return lwqlVegaError({
     rule: "spec.not-object",
     path: JSON_POINTER_ROOT,
     message: `A chart specification must be a JSON object, but this is ${describeValue(spec)}. A link to a specification is not accepted — paste the specification itself.`,
@@ -145,7 +145,7 @@ export function parseVegaLiteSpecText(text: string): ParseVegaLiteSpecResult {
     return {
       ok: false,
       errors: [
-        governedVegaError({
+        lwqlVegaError({
           rule: "spec.not-json",
           path: JSON_POINTER_ROOT,
           message: `The chart specification is not valid JSON: ${error instanceof Error ? error.message : "it could not be parsed"}.`,

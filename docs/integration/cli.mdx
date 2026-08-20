@@ -73,7 +73,7 @@ You'll see two questions:
 
 1. **Where do you want to log in?**: LangWatch Cloud (`app.langwatch.ai`) or a self-hosted instance (custom URL).
 2. **How do you want to use it?**: three options:
-   - **AI tools, agentic flows**: `claude`, `codex`, `cursor`, `gemini`, `opencode`. Mints an OAuth-style device session in `~/.langwatch/config.json` (user-scoped) so `langwatch claude` etc. wrap any tool through your gateway.
+   - **AI tools, agentic flows**: `claude`, `codex`, `copilot`, `code`, `cursor`, `gemini`, `opencode`. Mints an OAuth-style device session in `~/.langwatch/config.json` (user-scoped) so `langwatch claude` etc. wrap any tool through your gateway.
    - **Project, SDK API key**: for `langwatch sync`, `langwatch eval`, and SDK auto-instrumentation. Writes the API key of the project you pick into `$CWD/.env` (project-scoped).
    - **Both**: runs both flows in sequence.
 
@@ -84,7 +84,7 @@ The browser shows an "Approve" or "Send API key" button (depending on the chosen
 | Scope | Path | What lives there |
 |---|---|---|
 | Project | `$CWD/.env` | `LANGWATCH_API_KEY`, used by SDK consumers + `langwatch sync`, `eval`, `prompt` |
-| User-global | `~/.langwatch/config.json` (mode `0600`) | Device session (`access_token` + `refresh_token`), control-plane URL, gateway URL, default org, used by `langwatch claude/codex/cursor/gemini/opencode`, `langwatch whoami`, `langwatch request-increase` |
+| User-global | `~/.langwatch/config.json` (mode `0600`) | Device session (`access_token` + `refresh_token`), control-plane URL, gateway URL, default org, used by `langwatch claude/codex/copilot/code/cursor/gemini/opencode`, `langwatch instrument`, `langwatch whoami` |
 
 The two stores serve different audiences and never leak into each other. Logging out of one (`langwatch logout` clears `~/.langwatch/config.json`) doesn't touch the other, the project API key in `.env` stays put.
 
@@ -810,7 +810,7 @@ Agents must ask the user for permission first, then pass `--user-approved`. Secr
 
 ## The background daemon
 
-Non-interactive invocations (an agent piping output, CI, any call whose stdin/stdout/stderr is not a TTY) are served by a warm background daemon instead of paying node's cold start on every call. Interactive (terminal) invocations always run in-process and are unaffected, as are commands that mutate auth or take over stdio (`login`, `logout`, `config`, `open`, `request-increase`, `init-shell`, `report`, the `claude`/`codex`/`cursor`/`gemini`/`opencode` wrappers, `daemon` itself) and long-running flags (`--follow`, `--watch`). Windows is excluded too: the daemon is not supported there, so on Windows every invocation runs in-process.
+Non-interactive invocations (an agent piping output, CI, any call whose stdin/stdout/stderr is not a TTY) are served by a warm background daemon instead of paying node's cold start on every call. Interactive (terminal) invocations always run in-process and are unaffected, as are commands that mutate auth or take over stdio (`login`, `logout`, `config`, `open`, `instrument`, `report`, the `claude`/`codex`/`copilot`/`code`/`cursor`/`gemini`/`opencode` wrappers, `daemon` itself) and long-running flags (`--follow`, `--watch`). Windows is excluded too: the daemon is not supported there, so on Windows every invocation runs in-process.
 
 What to know:
 

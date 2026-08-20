@@ -272,7 +272,14 @@ registry, and dashboard stay the same.
   `HAVEN_TSGO_TOTAL_BUDGET_MB` (default two thirds of RAM, never below the
   per-run ceiling) — the youngest run
   until the rest fits. The check queue also sets `GOMEMLIMIT` on the runs it
-  spawns so the common case degrades to "slower", not "10 GiB resident". The
+  spawns — half the machine, clamped to `[3, 6]` GiB — so the common case
+  degrades to "slower" rather than expanding into whatever room the machine
+  happens to have (`dev/docs/adr/100-the-typecheck-memory-ceiling.md`). On a
+  machine already under memory pressure (ADR-090's levels) the queue goes
+  further: the derived slot limit narrows to one, `GOMEMLIMIT` drops to its
+  3 GiB floor and `GOMAXPROCS` is halved, so the check pays for the shortage
+  instead of everything else swapping. `CHECK_PRESSURE=green|amber|red`
+  forces the level; explicit `GOMEMLIMIT`/`GOMAXPROCS`/`CHECK_SLOTS` win. The
   same watch observes gopls, biome, vitest workers, node, bun and claude
   agents (never touched — observed only) and ships every class's footprint to
   the local Grafana as `haven_proc_*` metrics. See

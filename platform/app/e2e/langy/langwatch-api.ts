@@ -126,6 +126,27 @@ export async function mostRecentTraceId(): Promise<string | null> {
   return traces[0]?.trace_id ?? null;
 }
 
+/**
+ * Whether a trace with this exact id exists in the project. Layer-2 grounding
+ * check: a scenario that saw Langy report trace ids asserts they are real
+ * through the same REST surface any integration would use, instead of asking
+ * the LLM judge to verify ids it has no evidence for.
+ */
+export async function traceExists(traceId: string): Promise<boolean> {
+  const result = await lwPost({
+    path: "/api/traces/search",
+    body: {
+      startDate: new Date("2020-01-01").getTime(),
+      endDate: Date.now() + 365 * 24 * 60 * 60 * 1000,
+      traceIds: [traceId],
+      pageSize: 5,
+      format: "json",
+    },
+  });
+  const traces = toArray<{ trace_id?: string }>(result?.traces ?? result);
+  return traces.some((t) => t.trace_id === traceId);
+}
+
 export async function listAnnotations(): Promise<
   Array<{ id: string; traceId?: string; comment?: string }>
 > {

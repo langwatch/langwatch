@@ -220,3 +220,35 @@ Feature: Shared ops snapshot with a single elected writer
     When the writer completes a live cycle and a detail cycle
     Then the reader's dashboard payload reports the exact counts
     And the blocked clusters and parked tenant rows match the queues' state
+
+  # ── Reading the same artifact repeatedly ──────────────────────────────
+
+  # Readers poll one fixed key on an interval, so between writes they read the
+  # same bytes over and over. Checking that shape again on every poll was a
+  # measurable share of the app's time, so an unchanged artifact is checked
+  # once and the result reused. Bytes that have not changed cannot describe a
+  # different shape than the ones already checked.
+  #
+  # What that buys has to be paid for in staleness, and staleness here is
+  # invisible: a reader that failed to notice a rewritten artifact would hold
+  # the dashboard on old numbers while the platform moved underneath it, and
+  # it would read as a quiet platform rather than as a broken reader. The
+  # second scenario is the one that catches it.
+  @unit
+  Scenario: An unchanged snapshot is validated once and reused
+    Given a snapshot artifact has been read once
+    When it is read again before the writer has replaced it
+    Then the reader returns what it already validated
+    And it does not check the shape a second time
+
+  @unit
+  Scenario: A rewritten snapshot is picked up on the next read
+    Given a snapshot artifact has been read once
+    When the writer replaces it and the reader reads again
+    Then the reader returns the new artifact, not the previous one
+
+  @unit
+  Scenario: A rejected snapshot does not stop a later valid one being read
+    Given a read found an artifact it could not understand
+    When a readable artifact is stored and read
+    Then the reader returns it

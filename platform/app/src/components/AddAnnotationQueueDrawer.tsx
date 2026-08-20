@@ -184,9 +184,6 @@ export const AddAnnotationQueueDrawer = ({
               data.name
             } annotation queue`,
             type: "success",
-            meta: {
-              closable: true,
-            },
           });
           handleClose();
           reset();

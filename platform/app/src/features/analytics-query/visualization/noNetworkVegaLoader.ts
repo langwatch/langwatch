@@ -10,7 +10,7 @@
 
 import type { Loader } from "vega";
 
-import { governedVegaError } from "./vegaLitePolicy";
+import { lwqlVegaError } from "./vegaLitePolicy";
 import { JSON_POINTER_ROOT } from "./vegaLiteStructure";
 import type { VegaValidationError } from "./visualization.types";
 
@@ -18,7 +18,7 @@ import type { VegaValidationError } from "./visualization.types";
  * The subset of Vega's `Loader` a view ever calls. Every method rejects, so the
  * return types matter only for assignability.
  */
-export interface GovernedVegaLoader {
+export interface LangWatchQLVegaLoader {
   load(uri: string, options?: unknown): Promise<string>;
   sanitize(uri: string, options?: unknown): Promise<{ href: string }>;
   http(uri: string, options?: unknown): Promise<string>;
@@ -35,15 +35,15 @@ export interface GovernedVegaLoader {
  *
  * Type-only, so no vega module is evaluated; see the file header.
  */
-type AssertGovernedLoaderMatchesVega =
-  GovernedVegaLoader extends Pick<Loader, keyof GovernedVegaLoader>
+type AssertLangWatchQLLoaderMatchesVega =
+  LangWatchQLVegaLoader extends Pick<Loader, keyof LangWatchQLVegaLoader>
     ? true
     : never;
-const _governedLoaderMatchesVega: AssertGovernedLoaderMatchesVega = true;
-void _governedLoaderMatchesVega;
+const _lwqlLoaderMatchesVega: AssertLangWatchQLLoaderMatchesVega = true;
+void _lwqlLoaderMatchesVega;
 
 /** The rejection every loader method produces, carrying its structured refusal. */
-export class GovernedVegaLoadBlockedError extends Error {
+export class LangWatchQLVegaLoadBlockedError extends Error {
   readonly detail: VegaValidationError;
 
   constructor({ reference, method }: { reference: string; method: string }) {
@@ -51,8 +51,8 @@ export class GovernedVegaLoadBlockedError extends Error {
     super(
       `Chart resource loading is disabled: refused ${method} of ${blocked}.`,
     );
-    this.name = "GovernedVegaLoadBlockedError";
-    this.detail = governedVegaError({
+    this.name = "LangWatchQLVegaLoadBlockedError";
+    this.detail = lwqlVegaError({
       rule: "loader.blocked",
       path: JSON_POINTER_ROOT,
       message: `This chart tried to load ${blocked}. Charts read only the datasets registered for this result, so the load was refused.`,
@@ -80,9 +80,9 @@ export function redactResourceReference(reference: string): string {
  * Builds a loader that refuses everything. A factory rather than a shared
  * constant so a view can never be handed an object another view has mutated.
  */
-export function createNoNetworkVegaLoader(): GovernedVegaLoader {
+export function createNoNetworkVegaLoader(): LangWatchQLVegaLoader {
   const refuse = (reference: string, method: string): Promise<never> =>
-    Promise.reject(new GovernedVegaLoadBlockedError({ reference, method }));
+    Promise.reject(new LangWatchQLVegaLoadBlockedError({ reference, method }));
 
   return {
     load: (uri) => refuse(uri, "load"),

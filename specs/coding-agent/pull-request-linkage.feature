@@ -5,7 +5,7 @@
 #   platform/app/src/server/app-layer/github/githubPullRequestEvent.ts                 (the pull_request webhook payload, validated)
 #   platform/app/src/server/routes/github.ts                                           (the webhook delivery target)
 #   platform/app/src/server/app-layer/github/github-pull-request-status.service.ts    (live status, Redis-cached, never the queue)
-#   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/reactors/pullRequestMapping.reactor.ts (fold trigger)
+#   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/subscribers/pullRequestMapping.subscriber.ts (fold trigger)
 #   platform/app/src/server/app-layer/coding-agent/pull-request-assignment.ts          (session-to-PR tenure rule)
 #   platform/app/src/server/app-layer/coding-agent/pull-request-usage.service.ts       (org-first usage rollup)
 #   platform/app/src/server/app-layer/coding-agent/coding-agent-source-type.ts         (agent id to ingestion source type)
@@ -459,6 +459,14 @@ Rule: A contributor is a person or a project, never an agent-reported id
     When the caller's project scope is resolved
     Then the workspace is named by itself
     And the name still opens nothing
+
+  # The schema has no foreign keys, so a membership row can outlive its user.
+  @integration
+  Scenario: A membership row that outlives its user still resolves the scope
+    Given a personal workspace whose membership row points at a deleted user
+    When the caller's project scope is resolved
+    Then the read does not fail
+    And the workspace is named by itself
 
   # Members answer "who worked here" only where the answer is one person, and
   # reading them for every team would cost a query nothing displays.

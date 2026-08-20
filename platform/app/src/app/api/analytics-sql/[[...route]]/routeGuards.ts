@@ -1,23 +1,23 @@
 /**
- * The two checks every governed analytics SQL route runs before it does
+ * The two checks every LangWatchQL analytics SQL route runs before it does
  * anything, and the ordered pair of them every route actually calls.
  *
  * They live here rather than beside one route file because there is more than
  * one now, and a copied gate is how a surface ends up switched on for a
  * population the other surface refuses. The flag itself is read in exactly one
- * place — `governedSqlEnabled` — for the same reason: it resolves the project's
+ * place — `lwqlEnabled` — for the same reason: it resolves the project's
  * *organization*, and a second copy that forgot to would silently answer "off"
  * for every organization-scoped grant.
  *
- * @see specs/analytics/governed-sql-api.feature
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-api.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { NotFoundError } from "@langwatch/handled-error";
 import type { Project } from "~/generated/prisma/client";
 
-import { governedSqlEnabled } from "~/server/analytics/governed-sql/access";
-import { GovernedSqlNotEnabledError } from "~/server/analytics/governed-sql/errors";
+import { lwqlEnabled } from "~/server/analytics/lwql/access";
+import { LangWatchQLNotEnabledError } from "~/server/analytics/lwql/errors";
 import { prisma } from "~/server/db";
 
 /**
@@ -54,20 +54,20 @@ export function callerProject({
  * tRPC router. Checked per request and server-side only; an API key has no
  * member behind it, so the project is the distinct identity.
  *
- * @throws {GovernedSqlNotEnabledError} when the flag is off for this project.
+ * @throws {LangWatchQLNotEnabledError} when the flag is off for this project.
  */
-export async function requireGovernedSqlEnabled(
+export async function requireLangWatchQLEnabled(
   project: Project,
 ): Promise<void> {
-  // Asked through `governedSqlEnabled` rather than evaluated here: it is the
+  // Asked through `lwqlEnabled` rather than evaluated here: it is the
   // one place the flag is read, so this boundary and the tRPC one cannot drift
   // into answering the same question differently.
-  const enabled = await governedSqlEnabled({ prisma, projectId: project.id });
-  if (!enabled) throw new GovernedSqlNotEnabledError();
+  const enabled = await lwqlEnabled({ prisma, projectId: project.id });
+  if (!enabled) throw new LangWatchQLNotEnabledError();
 }
 
 /**
- * The project a governed analytics SQL request runs for: the credential's, once
+ * The project a LangWatchQL analytics SQL request runs for: the credential's, once
  * the path has been checked against it and the surface has been found switched
  * on.
  *
@@ -80,9 +80,9 @@ export async function requireGovernedSqlEnabled(
  * it, and a second copy is exactly how one surface ends up running one guard.
  *
  * @throws {NotFoundError} `project_not_found` — see {@link callerProject}.
- * @throws {GovernedSqlNotEnabledError} — see {@link requireGovernedSqlEnabled}.
+ * @throws {LangWatchQLNotEnabledError} — see {@link requireLangWatchQLEnabled}.
  */
-export async function governedSqlProject({
+export async function lwqlProject({
   project,
   requestedProjectId,
 }: {
@@ -90,6 +90,6 @@ export async function governedSqlProject({
   requestedProjectId: string | undefined;
 }): Promise<Project> {
   const resolved = callerProject({ project, requestedProjectId });
-  await requireGovernedSqlEnabled(resolved);
+  await requireLangWatchQLEnabled(resolved);
   return resolved;
 }

@@ -13,6 +13,31 @@ import {
   type Permission,
   teamRoleHasPermission,
 } from "../api/rbac";
+import { cutoverOnEngine } from "../app-layer/authz/cutover-gate";
+import { authzForkFor } from "../app-layer/authz/fork";
+import { authzShadowFor } from "../app-layer/authz/shadow";
+// The shadow comparison runs on the APP's own Prisma handle, never the
+// caller's. The caller's handle is whatever it happened to pass — a
+// transaction client on any path that opens one — and a detached
+// fire-and-forget query on such a handle either lengthens a transaction it
+// was never part of or lands after the commit and fails with "Transaction
+// already closed". (The API-key mint path used to hold exactly that open
+// interactive transaction; it no longer does, and the rule outlives it,
+// because nothing here can tell what it was handed.) This module is
+// server-only — its importers are org-auth.ts, auth-middleware.ts and
+// api-key.service.ts — so the singleton is safe to hold here, unlike in
+// ./shadow.ts, which rbac.ts (client-reachable) imports.
+//
+// The FORK is the other way round, and deliberately so (delivery-plan PR 3):
+// the cutover gate read and the engine decision are AWAITED inside the
+// caller's own flow, not detached, so they carry none of the hazard above —
+// and being the answer rather than a comment on it, they must see exactly the
+// world the legacy walk they replace sees, which is the caller's handle. The
+// reverse-shadow thunk is the one detached leg, and it is skipped precisely
+// where a transaction is in play: the mint loops pass `skipShadow`. A thunk
+// that does outlive its transaction anyway logs "authz fork comparison
+// failed" and changes nothing.
+import { prisma as appPrisma } from "../db";
 import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 import {
   MalformedCustomRolePermissionsError,
@@ -274,6 +299,7 @@ export async function checkRoleBindingPermission({
   organizationId,
   scope,
   permission,
+  skipShadow = false,
 }: {
   prisma: PrismaClient;
   userId?: string;
@@ -281,15 +307,112 @@ export async function checkRoleBindingPermission({
   organizationId: string;
   scope: ScopeRef;
   permission: Permission;
+  /**
+   * Set by callers that ask this question once per permission in a loop (the
+   * API-key mint ceiling): one shadow comparison per permission is ~23
+   * detached collects for a single mint, and the mint path's engine coverage
+   * already comes from `enforceApiKeyCeiling`, which runs the same check
+   * per REQUEST for the key's whole life.
+   */
+  skipShadow?: boolean;
 }): Promise<boolean> {
   const resolvedPrincipal: Principal = principal ?? {
     type: "user",
     id: userId!,
   };
+  const legacyPermitted = () =>
+    checkRoleBindingPermissionInner({
+      prisma,
+      principal: resolvedPrincipal,
+      organizationId,
+      scope,
+      permission,
+    });
 
+  // ADR-092 delivery-plan PR 3: the fork. A cut-over organization is decided
+  // by the engine for the NAMED principal only — no owner ceiling, because
+  // this function reports one principal's own grants and nothing else, which
+  // is its contract and its suite's subject. `skipShadow` silences the
+  // comparison, never the fork.
+  if (await cutoverOnEngine({ prisma, organizationId })) {
+    const forkScopeIds = scopeRefToIds(scope, organizationId);
+    return authzForkFor(prisma).decidePrincipalPermission({
+      principal: resolvedPrincipal,
+      organizationId,
+      projectId: forkScopeIds.projectId,
+      teamId: forkScopeIds.teamId,
+      permission,
+      caller:
+        resolvedPrincipal.type === "user"
+          ? "apiKeyPath.userBindings"
+          : "apiKeyPath.keyBindings",
+      legacy: legacyPermitted,
+      compare: !skipShadow,
+    });
+  }
+
+  const permitted = await legacyPermitted();
+
+  // ADR-092 stage A4: engine shadow comparison. Mismatches on this path for
+  // EXTERNAL owners are the documented resolver divergence (no lite-member
+  // cap here), auto-tagged knownDivergence by shadow.ts.
+  if (skipShadow) return permitted;
+  const scopeIds = scopeRefToIds(scope, organizationId);
+  if (resolvedPrincipal.type === "user") {
+    authzShadowFor(appPrisma).userPermissionCheck({
+      userId: resolvedPrincipal.id,
+      permission,
+      legacyAllowed: permitted,
+      caller: "apiKeyPath.userBindings",
+      fromApiKeyPath: true,
+      ...scopeIds,
+    });
+  } else {
+    authzShadowFor(appPrisma).apiKeyPermissionCheck({
+      apiKeyId: resolvedPrincipal.id,
+      ownerUserId: null,
+      organizationId,
+      permission,
+      legacyAllowed: permitted,
+      caller: "apiKeyPath.keyBindings",
+      projectId: scopeIds.projectId,
+      teamId: scopeIds.teamId,
+    });
+  }
+
+  return permitted;
+}
+
+function scopeRefToIds(
+  scope: ScopeRef,
+  organizationId: string,
+): { projectId?: string; teamId?: string; organizationId?: string } {
+  switch (scope.type) {
+    case "project":
+      return { projectId: scope.id };
+    case "team":
+      return { teamId: scope.id };
+    case "org":
+      return { organizationId };
+  }
+}
+
+async function checkRoleBindingPermissionInner({
+  prisma,
+  principal,
+  organizationId,
+  scope,
+  permission,
+}: {
+  prisma: PrismaClient;
+  principal: Principal;
+  organizationId: string;
+  scope: ScopeRef;
+  permission: Permission;
+}): Promise<boolean> {
   const bindings = await collectBindingsForScope({
     prisma,
-    principal: resolvedPrincipal,
+    principal,
     organizationId,
     scope,
   });
@@ -313,7 +436,7 @@ export async function checkRoleBindingPermission({
         where: {
           id: binding.customRoleId,
           organizationId,
-          ...systemRoleGuard(resolvedPrincipal),
+          ...systemRoleGuard(principal),
         },
         select: { permissions: true },
       });
@@ -514,6 +637,7 @@ export async function resolveApiKeyPermission({
   organizationId,
   scope,
   permission,
+  skipShadow = false,
 }: {
   prisma: PrismaClient;
   apiKeyId: string;
@@ -521,49 +645,96 @@ export async function resolveApiKeyPermission({
   organizationId: string;
   scope: ScopeRef;
   permission: Permission;
+  /** See checkRoleBindingPermission - the per-permission mint loops opt out. */
+  skipShadow?: boolean;
 }): Promise<boolean> {
-  // 1. Check API key's own bindings
-  const apiKeyAllowed = await checkRoleBindingPermission({
-    prisma,
-    principal: { type: "apiKey", id: apiKeyId },
+  /**
+   * Steps 1-4 of the legacy ceiling, as ONE implementation both paths run:
+   * the answering path below when the organization is still on legacy, and
+   * the fork's reverse-shadow thunk when it is not.
+   */
+  const legacyPermitted = async (): Promise<boolean> => {
+    // 1. Check API key's own bindings (inner variant: the composite shadow
+    // below covers this path, so the per-leg wrapper shadow is skipped)
+    const apiKeyAllowed = await checkRoleBindingPermissionInner({
+      prisma,
+      principal: { type: "apiKey", id: apiKeyId },
+      organizationId,
+      scope,
+      permission,
+    });
+
+    if (!apiKeyAllowed) return false;
+    // 2. Service keys (no userId) have no user ceiling — binding check is
+    //    sufficient
+    if (!userId) return true;
+
+    // 3. Check owning user's current bindings (ceiling)
+    const userAllowed = await checkRoleBindingPermissionInner({
+      prisma,
+      principal: { type: "user", id: userId },
+      organizationId,
+      scope,
+      permission,
+    });
+    if (userAllowed) return true;
+
+    // 4. Fall back to legacy membership, the same way the mint-side ceiling
+    //    and the tRPC path do.
+    //
+    //    Without this the mint-side fix was no fix at all: the population it
+    //    targets is DEFINED by holding zero RoleBindings, so step 3 returns
+    //    false for every permission and the key it just allowed to be minted
+    //    is a dead credential. Every REST route funnels through
+    //    `enforceApiKeyCeiling`, so the failure only moved — from a refusal
+    //    at mint time to every tool call 403ing after the turn had already
+    //    started streaming, which is the worse of the two.
+    //
+    //    Safe by construction: this can only restore access the same legacy
+    //    role already grants through tRPC, which is what the key's
+    //    permission set was measured from in the first place.
+    const legacy = await resolveLegacyCeiling({
+      prisma,
+      userId,
+      organizationId,
+      scope,
+    });
+    return legacy.grants(permission);
+  };
+
+  // ADR-092 delivery-plan PR 3: the fork. The engine states the same ceiling
+  // as algebra — effective(key) = grants(key) ∩ grants(owner) — rather than as
+  // the four steps above, and a cut-over organization is answered by it.
+  if (await cutoverOnEngine({ prisma, organizationId })) {
+    const forkScopeIds = scopeRefToIds(scope, organizationId);
+    return authzForkFor(prisma).decideApiKeyPermission({
+      apiKeyId,
+      ownerUserId: userId,
+      organizationId,
+      projectId: forkScopeIds.projectId,
+      teamId: forkScopeIds.teamId,
+      permission,
+      caller: "apiKeyPath.ceiling",
+      legacy: legacyPermitted,
+      compare: !skipShadow,
+    });
+  }
+
+  const permitted = await legacyPermitted();
+
+  // ADR-092 stage A4: engine ceiling-algebra shadow comparison.
+  if (skipShadow) return permitted;
+  const scopeIds = scopeRefToIds(scope, organizationId);
+  authzShadowFor(appPrisma).apiKeyPermissionCheck({
+    apiKeyId,
+    ownerUserId: userId,
     organizationId,
-    scope,
     permission,
+    legacyAllowed: permitted,
+    caller: "apiKeyPath.ceiling",
+    projectId: scopeIds.projectId,
+    teamId: scopeIds.teamId,
   });
-  if (!apiKeyAllowed) return false;
 
-  // 2. Service keys (no userId) have no user ceiling — binding check is sufficient
-  if (!userId) return true;
-
-  // 3. Check owning user's current bindings (ceiling)
-  const userAllowed = await checkRoleBindingPermission({
-    prisma,
-    principal: { type: "user", id: userId },
-    organizationId,
-    scope,
-    permission,
-  });
-  if (userAllowed) return true;
-
-  // 4. Fall back to legacy membership, the same way the mint-side ceiling and
-  //    the tRPC path do.
-  //
-  //    Without this the mint-side fix was no fix at all: the population it
-  //    targets is DEFINED by holding zero RoleBindings, so step 3 returns
-  //    false for every permission and the key it just allowed to be minted is
-  //    a dead credential. Every REST route funnels through
-  //    `enforceApiKeyCeiling`, so the failure only moved — from a refusal at
-  //    mint time to every tool call 403ing after the turn had already started
-  //    streaming, which is the worse of the two.
-  //
-  //    Safe by construction: this can only restore access the same legacy role
-  //    already grants through tRPC, which is what the key's permission set was
-  //    measured from in the first place.
-  const legacy = await resolveLegacyCeiling({
-    prisma,
-    userId,
-    organizationId,
-    scope,
-  });
-  return legacy.grants(permission);
+  return permitted;
 }

@@ -16,7 +16,11 @@ import { PassThrough } from "node:stream";
 import { describe, expect, it } from "vitest";
 
 import { readStdin } from "../hook-input";
-import { installHookHarness, unreachableCollector } from "./hook-harness";
+import {
+  installHookHarness,
+  SESSION_ID,
+  unreachableCollector,
+} from "./hook-harness";
 
 const hook = installHookHarness();
 const { posted } = hook;
@@ -30,12 +34,27 @@ const oversizedWrite = () => {
 
 describe("the session context hook's silence", () => {
   describe("given a directory that is not a git repository", () => {
-    /** @scenario "Outside a git repository the hook sends nothing and exits zero" */
+    /** @scenario "Outside a git repository with nothing to declare the hook sends nothing and exits zero" */
     it("posts nothing, records nothing and exits zero", async () => {
       await hook.runHook({ git: {} });
 
       expect(posted).toEqual([]);
       expect(hook.stdout).toEqual([]);
+      expect(hook.exits).toEqual([]);
+    });
+
+    /** @scenario "A blank name is no name" */
+    it("treats a whitespace session title as nothing to say", async () => {
+      await hook.runHook({
+        git: {},
+        input: {
+          session_id: SESSION_ID,
+          cwd: "/repo/worktrees/review",
+          session_title: "   ",
+        },
+      });
+
+      expect(posted).toEqual([]);
       expect(hook.exits).toEqual([]);
     });
 

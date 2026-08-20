@@ -14,7 +14,7 @@
  * left alone for fifteen minutes; a branch nobody has asked about in a week
  * stops being swept at all.
  *
- * It never throws at its callers. The reactor that drives it runs on the fold's
+ * It never throws at its callers. The subscriber that drives it runs on the fold's
  * queue, and a rethrow there would turn one rate-limited read into a retry
  * storm against the same rate limit.
  *
@@ -130,6 +130,20 @@ export interface GithubPullRequestMappingServiceDeps {
   /** The organization's project ids, for the post-connect backfill. */
   findProjectIds(organizationId: string): Promise<string[]>;
   sessions: CodingAgentSessionBranchLookup;
+  /**
+   * Records on a project that one of its sessions' branches turned out to have
+   * a pull request, which is what puts the Pull requests destination in that
+   * project's sidebar. Only the demand path can call it, because it is the only
+   * one that names a project: a branch belongs to an organization, and the
+   * organization's other paths (the webhook, the sweep) have no project to
+   * attribute the answer to. Absent where nothing records it.
+   *
+   * See specs/coding-agent/project-menu-links.feature.
+   */
+  touchCodingAgentPullRequestSeen?: (params: {
+    projectId: string;
+    at: Date;
+  }) => Promise<void>;
   /** Injectable clock so the backoff can be tested without waiting it out. */
   now?: () => number;
 }
@@ -155,6 +169,16 @@ export interface BranchMappingTarget {
   repositoryName: string;
   headBranch: string;
   origin: BranchMappingOrigin;
+  /**
+   * The project whose folded session asked for this mapping, when one did.
+   *
+   * Carried only so a found pull request can be recorded against that project.
+   * Linkage itself is organization-scoped and reads none of it, and the paths
+   * with no project behind them (the webhook, the sweep) leave it unset, which
+   * is what keeps those paths from attributing an answer to a project that did
+   * not ask for it.
+   */
+  originProjectId?: string;
 }
 
 /** The same, addressed by the project a session was folded under. */
@@ -214,6 +238,7 @@ export class GithubPullRequestMappingService {
       repositoryName: request.repositoryName,
       headBranch: request.headBranch,
       origin: "demand",
+      originProjectId: request.tenantId,
     };
     // This entry point, and only this one, means a session just folded on the
     // branch. The sweep and the backfill call `mapBranch` directly and carry no
@@ -349,6 +374,7 @@ export class GithubPullRequestMappingService {
         pullRequests,
         isExhaustive: true,
         origin: target.origin,
+        originProjectId: target.originProjectId,
       });
     } catch (error) {
       await this.recordFailure({ scope, error, origin: target.origin });
@@ -379,7 +405,12 @@ export class GithubPullRequestMappingService {
         fromMs,
         toMs,
       });
-      this.collectBranchTargets({ organizationId, sessions, targets });
+      this.collectBranchTargets({
+        organizationId,
+        projectId,
+        sessions,
+        targets,
+      });
     }
 
     await this.mapAllWithConcurrency([...targets.values()]);
@@ -422,16 +453,22 @@ export class GithubPullRequestMappingService {
    */
   private collectBranchTargets({
     organizationId,
+    projectId,
     sessions,
     targets,
   }: {
     organizationId: string;
+    projectId: string;
     sessions: BackfillSessionRow[];
     targets: Map<string, BranchMappingTarget>;
   }): void {
     for (const session of sessions) {
       if (targets.size >= BACKFILL_BRANCH_CAP) break;
-      const target = this.targetFromSession({ organizationId, session });
+      const target = this.targetFromSession({
+        organizationId,
+        projectId,
+        session,
+      });
       if (!target) continue;
       const key = [
         target.repositoryHost,
@@ -445,9 +482,11 @@ export class GithubPullRequestMappingService {
 
   private targetFromSession({
     organizationId,
+    projectId,
     session,
   }: {
     organizationId: string;
+    projectId: string;
     session: BackfillSessionRow;
   }): BranchMappingTarget | null {
     if (!isMappableGithubHost(session.repositoryHost)) return null;
@@ -467,6 +506,13 @@ export class GithubPullRequestMappingService {
       // An operator connecting GitHub is asking for these branches, as plainly
       // as a fold does.
       origin: "demand",
+      // The backfill reads one project's sessions at a time, so it knows which
+      // project ran this branch and a found pull request is recorded against
+      // it. Without this the Pull requests destination stays hidden until the
+      // next live fold, which is exactly the moment the connection is supposed
+      // to pay off. Two projects on one branch dedupe to the first that
+      // claimed it, which attributes better than attributing to none.
+      originProjectId: projectId,
     };
   }
 
@@ -537,6 +583,7 @@ export class GithubPullRequestMappingService {
     pullRequests,
     isExhaustive,
     origin,
+    originProjectId,
   }: {
     scope: BranchScope;
     pullRequests: readonly GithubPullRequestSummary[];
@@ -549,6 +596,8 @@ export class GithubPullRequestMappingService {
      */
     isExhaustive: boolean;
     origin: BranchMappingOrigin;
+    /** Set only when a project's own session asked; see BranchMappingTarget. */
+    originProjectId?: string;
   }): Promise<void> {
     const now = new Date(nowMs(this.deps));
     if (pullRequests.length > 0) {
@@ -556,6 +605,10 @@ export class GithubPullRequestMappingService {
         pullRequests: pullRequests.map((pull) =>
           toUpsertInput({ scope, pull }),
         ),
+      });
+      await this.recordProjectPullRequestActivity({
+        projectId: originProjectId,
+        at: now,
       });
     }
 
@@ -578,6 +631,33 @@ export class GithubPullRequestMappingService {
       attempts,
       lastRequestedAt: origin === "demand" ? now : null,
     });
+  }
+
+  /**
+   * Record on the asking project that its work has pull requests, so the
+   * project's sidebar can offer the Pull requests destination.
+   *
+   * A no-op with no project to attribute the answer to, and with nothing wired
+   * to record it. Failures are logged and swallowed: linkage is already stored
+   * and correct, and losing a menu link until the branch's next answer is not
+   * worth failing the mapping over.
+   */
+  private async recordProjectPullRequestActivity({
+    projectId,
+    at,
+  }: {
+    projectId: string | undefined;
+    at: Date;
+  }): Promise<void> {
+    if (!projectId) return;
+    try {
+      await this.deps.touchCodingAgentPullRequestSeen?.({ projectId, at });
+    } catch (error) {
+      logger.warn(
+        { error, projectId },
+        "recording the project's pull-request activity failed, non-fatal",
+      );
+    }
   }
 
   /**

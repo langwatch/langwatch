@@ -1,7 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";

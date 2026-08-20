@@ -7,6 +7,9 @@ import type {
   ProcessAuditSink,
 } from "./process-audit.repository";
 import type {
+  DeadLetterCount,
+  DeadOutboxMessageView,
+  OutboxAttemptView,
   ProcessInstanceRow,
   ProcessOpsRepository,
   ProcessOutboxMessageView,
@@ -65,7 +68,7 @@ export interface AggregateProcessManagerInstance {
 export interface AggregateProcessManagerOutboxMessage {
   messageKey: string;
   intentType: string;
-  status: "pending" | "dispatched" | "dead";
+  status: "pending" | "dispatched" | "dead" | "discarded";
   attempts: number;
   nextAttemptAt: number;
   createdAt: number;
@@ -207,6 +210,36 @@ export class ManagerExplorerService {
   }
 
   /**
+   * Retired messages across the whole fleet.
+   *
+   * `getOutbox` needs a full process ref, so before this the only way to a
+   * dead message was to already know which instance held it — and the fleet
+   * table only ever reported a count. Work that has permanently stopped is
+   * the most urgent thing this substrate can tell an operator, so it gets a
+   * read that does not require knowing where to look.
+   */
+  async getDeadLetters(params: {
+    processName?: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{
+    messages: DeadOutboxMessageView[];
+    total: number;
+    byProcess: DeadLetterCount[];
+  }> {
+    const [page, byProcess] = await Promise.all([
+      this.fleet.findDeadMessages(params),
+      this.fleet.countDeadByProcessName(),
+    ]);
+    return { ...page, byProcess };
+  }
+
+  /** The fleet's dead totals alone, for the badge and the dashboard card. */
+  async getDeadLetterCounts(): Promise<DeadLetterCount[]> {
+    return this.fleet.countDeadByProcessName();
+  }
+
+  /**
    * Set one instance's next wake to now. Safe by construction: `evolve`
    * receives `now` as data and clamps, so the worst case is a wake that
    * decides to do nothing.
@@ -269,6 +302,90 @@ export class ManagerExplorerService {
       metadata: { messageKey: result.messageKey },
     });
     return { redriven: true };
+  }
+
+  /**
+   * One dead message marked never-to-be-sent, audited. A mark, not a
+   * delete — the row stays as its own audit trail
+   * (specs/ops/dead-letter-recovery.feature).
+   */
+  async discardDeadMessage(params: {
+    ref: ProcessRef;
+    messageId: string;
+    actorUserId: string;
+  }): Promise<{ discarded: boolean }> {
+    const result = await this.fleet.discardDeadMessage({
+      ref: params.ref,
+      messageId: params.messageId,
+      now: Date.now(),
+    });
+    if (!result) return { discarded: false };
+    await this.audit.append({
+      actorUserId: params.actorUserId,
+      action: "process_discard_dead_message",
+      ...params.ref,
+      metadata: { messageKey: result.messageKey },
+    });
+    return { discarded: true };
+  }
+
+  /**
+   * Dead letters back to pending — one process name, or every process when
+   * omitted. Bounded per call by the repository, so the returned count is
+   * what moved rather than what existed; pressing again takes the next
+   * batch. The count is the blast radius the audit row records.
+   */
+  async redriveDeadLetters(params: {
+    processName?: string;
+    actorUserId: string;
+  }): Promise<{ redriven: number }> {
+    const redriven = await this.fleet.redriveAllDeadMessages({
+      ...(params.processName ? { processName: params.processName } : {}),
+      now: Date.now(),
+    });
+    if (redriven > 0) {
+      await this.audit.append({
+        actorUserId: params.actorUserId,
+        action: "process_redrive_dead_letters",
+        // No single process, and no single project: the scope this act ran
+        // under is the metadata, not a placeholder in the identity columns.
+        processName: params.processName ?? null,
+        projectId: null,
+        processKey: null,
+        metadata: { redriven, scope: params.processName ?? "every process" },
+      });
+    }
+    return { redriven };
+  }
+
+  /** Dead letters marked discarded; same scoping and bound, audited with count. */
+  async discardDeadLetters(params: {
+    processName?: string;
+    actorUserId: string;
+  }): Promise<{ discarded: number }> {
+    const discarded = await this.fleet.discardAllDeadMessages({
+      ...(params.processName ? { processName: params.processName } : {}),
+      now: Date.now(),
+    });
+    if (discarded > 0) {
+      await this.audit.append({
+        actorUserId: params.actorUserId,
+        action: "process_discard_dead_letters",
+        processName: params.processName ?? null,
+        projectId: null,
+        processKey: null,
+        metadata: { discarded, scope: params.processName ?? "every process" },
+      });
+    }
+    return { discarded };
+  }
+
+  /** The message's failed attempts, oldest first — why a dead letter died. */
+  async getOutboxAttempts(params: {
+    outboxId: string;
+    projectId: string;
+  }): Promise<OutboxAttemptView[]> {
+    return this.fleet.findAttempts(params);
   }
 
   /**

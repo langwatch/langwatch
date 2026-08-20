@@ -1041,6 +1041,16 @@ const ProviderRequestTimeoutSeconds = 14 * 60
 
 func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfschemas.ProviderConfig, error) {
 	cfg := &bfschemas.ProviderConfig{}
+	// Every provider is sized explicitly, standard ones included. A zero here
+	// is not "no opinion": CheckAndSetDefaults at the bottom of this function
+	// replaces it with bifrost's own 1000 workers and 5000-slot queue, and
+	// GetConfiguredProviders registers the whole standard list up front, so
+	// leaving it zero bought a worker pool per provider whether or not this
+	// install ever dispatches to it. See standardProviderConcurrency.
+	cfg.ConcurrencyAndBufferSize = bfschemas.ConcurrencyAndBufferSize{
+		Concurrency: standardProviderConcurrency,
+		BufferSize:  standardProviderBufferSize,
+	}
 	if strings.HasPrefix(string(provider), anthropicCompatPrefix) ||
 		strings.HasPrefix(string(provider), geminiCompatPrefix) {
 		endpoint, ok := a.anthropicCompat.lookup(string(provider))
@@ -1304,6 +1314,30 @@ const anthropicCompatMaxEndpoints = 32
 const (
 	anthropicCompatConcurrency = 128
 	anthropicCompatBufferSize  = 1024
+)
+
+// standardProviderConcurrency and standardProviderBufferSize size the worker
+// pool bifrost creates for each entry in bfschemas.StandardProviders.
+//
+// GetConfiguredProviders returns that whole list, because a virtual key may
+// name any provider and bifrost resolves config by provider key alone. Left
+// unset, each of the 23 entries took bifrost's own defaults — 1000 workers
+// and a 5000-slot queue, sized for a deployment where one provider fronts the
+// entire gateway. Paid 23 times over, that was ~21,000 permanently parked
+// goroutines per pod in production (99.85% of the process's goroutines), for
+// providers most installs never dispatch to. Their only measurable effect was
+// making the GC rescan 21,000 stacks on every mark cycle and the profiler
+// serialize them every 15 seconds.
+//
+// 128 is the figure the compat path above already arrived at, for the same
+// reason: the pool bounds in-flight upstream requests, and a burst past it
+// queues rather than fails — bifrost drops queued requests only under
+// DropExcessRequests, which the gateway leaves off. Across the production
+// pods that is several hundred concurrent upstream requests per provider,
+// far above what the gateway's own request ceiling makes reachable.
+const (
+	standardProviderConcurrency = 128
+	standardProviderBufferSize  = 1024
 )
 
 // anthropicCompatRegistry maps derived provider keys to their endpoints.

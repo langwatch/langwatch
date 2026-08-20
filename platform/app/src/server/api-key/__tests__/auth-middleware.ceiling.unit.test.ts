@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { Permission } from "~/server/api/rbac";
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
 import {
   apiKeyCeilingDenialResponse,
@@ -42,6 +43,17 @@ const apiKeyToken: ResolvedToken = {
   project,
 };
 
+const langySessionKeyToken: ResolvedToken = {
+  type: "apiKey",
+  apiKeyId: "langykey1",
+  userId: "user1",
+  organizationId: "org1",
+  ingestSourceType: null,
+  ingestionTemplateId: null,
+  isLangySessionKey: true,
+  project,
+};
+
 const legacyProjectKeyToken: ResolvedToken = {
   type: "legacyProjectKey",
   project,
@@ -51,7 +63,10 @@ const legacyProjectKeyToken: ResolvedToken = {
  * Mounts the middleware behind a stub that seeds `resolvedToken`, so the test
  * drives it through a real Hono request rather than a hand-built context.
  */
-function appWith(resolved: ResolvedToken | undefined) {
+function appWith(
+  resolved: ResolvedToken | undefined,
+  permission: Permission = "project:update",
+) {
   const handler = vi.fn((c: { text: (body: string) => Response }) =>
     c.text("reached"),
   );
@@ -60,10 +75,7 @@ function appWith(resolved: ResolvedToken | undefined) {
     if (resolved) c.set("resolvedToken" as never, resolved as never);
     await next();
   });
-  app.use(
-    "*",
-    requireApiKeyPermission({ prisma, permission: "project:update" }),
-  );
+  app.use("*", requireApiKeyPermission({ prisma, permission }));
   app.get("/", handler as never);
   return { app, handler };
 }
@@ -125,6 +137,68 @@ describe("enforceApiKeyCeiling()", () => {
     });
   });
 
+  /**
+   * A refused Langy session key has two causes that look identical at the
+   * ceiling, and only one of them has an action behind it. The customer can
+   * be granted a permission they lack; nobody can be granted one Langy is
+   * never delegated, so telling them to widen the key sends them to a door
+   * that does not open. Langy did exactly that with `triggers:create`, and
+   * offered to retry once the user "granted the permission".
+   */
+  describe("given the ephemeral key a Langy chat mints", () => {
+    describe("when the permission is one Langy is never delegated", () => {
+      /** @scenario "A permission Langy is never delegated says so" */
+      it("says it is not delegable rather than not granted", async () => {
+        resolveMock.mockResolvedValue(false);
+
+        await expect(
+          enforceApiKeyCeiling({
+            prisma,
+            resolved: langySessionKeyToken,
+            permission: "triggers:create",
+          }),
+        ).rejects.toMatchObject({
+          code: "api_key_permission_not_delegable",
+        });
+      });
+    });
+
+    describe("when the permission is one Langy may hold", () => {
+      /**
+       * The session key mirrors its owner, so a delegable permission can still
+       * be refused because the human does not hold it — and there, widening
+       * the key or asking an admin is exactly the right advice.
+       */
+      it("keeps the ordinary refusal", async () => {
+        resolveMock.mockResolvedValue(false);
+
+        await expect(
+          enforceApiKeyCeiling({
+            prisma,
+            resolved: langySessionKeyToken,
+            permission: "prompts:create",
+          }),
+        ).rejects.toMatchObject({ code: "api_key_permission_denied" });
+      });
+    });
+  });
+
+  describe("given an ordinary API key", () => {
+    describe("when the permission is one Langy is never delegated", () => {
+      it("keeps the ordinary refusal, since the Langy policy is not its rule", async () => {
+        resolveMock.mockResolvedValue(false);
+
+        await expect(
+          enforceApiKeyCeiling({
+            prisma,
+            resolved: apiKeyToken,
+            permission: "triggers:create",
+          }),
+        ).rejects.toMatchObject({ code: "api_key_permission_denied" });
+      });
+    });
+  });
+
   describe("given a legacy project key", () => {
     /**
      * Characterization, not endorsement: legacy project keys are exempt from
@@ -174,6 +248,27 @@ describe("requireApiKeyPermission()", () => {
         await expect(res.json()).resolves.toMatchObject({
           error: "api_key_permission_denied",
         });
+        expect(handler).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a Langy session key asks for a permission it is never delegated", () => {
+      it("answers 403 with the not-delegable code and a tip that does not send the user to an admin", async () => {
+        resolveMock.mockResolvedValue(false);
+        const { app, handler } = appWith(
+          langySessionKeyToken,
+          "triggers:create",
+        );
+
+        const res = await app.request("/");
+        const body = (await res.json()) as {
+          error: string;
+          tips?: string[];
+        };
+
+        expect(res.status).toBe(403);
+        expect(body.error).toBe("api_key_permission_not_delegable");
+        expect(body.tips?.join(" ")).toContain("LangWatch");
         expect(handler).not.toHaveBeenCalled();
       });
     });

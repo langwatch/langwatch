@@ -231,9 +231,6 @@ function AutomationsPage() {
             title: "Update automation",
             type: "error",
             description: "Failed to update automation",
-            meta: {
-              closable: true,
-            },
           });
         },
       },
@@ -264,9 +261,6 @@ function AutomationsPage() {
             title: "Delete automation",
             type: "success",
             description: "Automation deleted",
-            meta: {
-              closable: true,
-            },
           });
           void triggers.refetch();
         },
@@ -275,9 +269,6 @@ function AutomationsPage() {
             title: "Delete automation",
             type: "error",
             description: "Failed to delete automation",
-            meta: {
-              closable: true,
-            },
           });
         },
       },

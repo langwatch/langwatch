@@ -29,7 +29,7 @@ import { seedDemoPlatform } from "../prisma/seed-demo-platform";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { resetApp } from "../src/server/app-layer/app";
 import { initializeDefaultApp } from "../src/server/app-layer/presets";
-import { getClickHouseClientForProject } from "../src/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "../src/server/clickhouse/clickhouseClient";
 import { DEFAULT_PII_REDACTION_LEVEL } from "../src/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 import { getSuiteSetId } from "../src/server/suites/suite-set-id";
@@ -290,7 +290,7 @@ interface SeedWindow {
  * cold ones on S3) — this runs every 2s for up to ten minutes.
  */
 async function projectionCounts(window: SeedWindow): Promise<ProjectionCounts> {
-  const client = await getClickHouseClientForProject(PROJECT_ID);
+  const client = await getClickHouseClientForTenant(PROJECT_ID);
   if (!client) throw new Error("ClickHouse client is unavailable");
   const result = await client.query({
     query: `

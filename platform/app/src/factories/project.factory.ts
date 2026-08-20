@@ -14,7 +14,7 @@ export const projectFactory = Factory.define<
   name: `Test Project ${sequence}`,
   slug: `test-project-${sequence}`,
   apiKey: `test-api-key-${nanoid()}`,
-  governedSqlKey: `test-governed-sql-key-${nanoid()}`,
+  lwqlKey: `test-lwql-key-${nanoid()}`,
   teamId: nanoid(),
   language: "en",
   framework: "langchain",
@@ -34,4 +34,6 @@ export const projectFactory = Factory.define<
   ownerUserId: null,
   presenceEnabled: false,
   departmentId: null,
+  lastCodingAgentSessionAt: null,
+  lastCodingAgentPullRequestAt: null,
 }));

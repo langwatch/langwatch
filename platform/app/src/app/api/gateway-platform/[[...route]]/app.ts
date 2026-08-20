@@ -24,8 +24,7 @@ import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import type { AuthMiddlewareVariables } from "~/app/api/middleware/auth";
 import type { GatewayCacheRule, Project } from "~/generated/prisma/client";
@@ -178,10 +177,17 @@ const virtualKeyDtoSchema = z.object({
   routing_mode: routingModeWireSchema,
   config: z.unknown(),
   revision: z.string(),
-  created_at: z.string(),
-  updated_at: z.string(),
-  last_used_at: z.string().nullable(),
-  revoked_at: z.string().nullable(),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+  last_used_at: z.string().datetime().nullable(),
+  revoked_at: z.string().datetime().nullable(),
+  expires_at: z
+    .string()
+    .datetime()
+    .nullable()
+    .describe(
+      "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.",
+    ),
 });
 
 const budgetDtoSchema = z.object({
@@ -483,6 +489,12 @@ const createVirtualKeySchema = z.object({
   trace_project_id: z.string().nullable().optional(),
   routing_policy_id: z.string().nullable().optional(),
   routing_mode: routingModeWireSchema.optional(),
+  expires_at: z.coerce
+    .date()
+    .optional()
+    .describe(
+      "When the key stops serving. Omit it and the key never expires. A date that has already passed is refused with `virtual_key_expiry_in_past`, rather than writing a key that is dead on arrival.",
+    ),
   /** Optional cap created atomically with the key, targeted at the key. */
   budget: budgetWireSchema.nullable().optional(),
   config: virtualKeyConfigSchema.partial().optional(),
@@ -512,6 +524,13 @@ const updateVirtualKeySchema = z.object({
     ),
   routing_policy_id: z.string().nullable().optional(),
   routing_mode: routingModeWireSchema.optional(),
+  expires_at: z.coerce
+    .date()
+    .nullable()
+    .optional()
+    .describe(
+      "When the key stops serving. Omit it and the stored date stays where it is; null clears it, so the key never expires; a date moves it. A key whose date has already passed accepts this edit like any other, which is how an expired key is put back in service without minting a new secret. A date in the past is refused with `virtual_key_expiry_in_past`.",
+    ),
   /** Undefined leaves the key's cap alone; a value upserts it; null archives it. */
   budget: budgetWireSchema.nullable().optional(),
   config: virtualKeyConfigSchema.partial().optional(),
@@ -1034,6 +1053,7 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
         routingPolicyId: body.data.routing_policy_id ?? null,
         routingMode:
           body.data.routing_mode && toStoredEnum(body.data.routing_mode),
+        expiresAt: body.data.expires_at ?? null,
         budget: budgetFromWire(body.data.budget),
         config: body.data.config,
         externalId: body.data.external_id,
@@ -1264,6 +1284,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
         routingPolicyId: body.data.routing_policy_id,
         routingMode:
           body.data.routing_mode && toStoredEnum(body.data.routing_mode),
+        expiresAt: body.data.expires_at,
         budget: budgetFromWire(body.data.budget),
         config: body.data.config,
         externalId: body.data.external_id,

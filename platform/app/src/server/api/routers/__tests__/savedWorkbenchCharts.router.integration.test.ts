@@ -11,7 +11,7 @@
  * force-enables the very flag under test — so consulting the real one would
  * make the switched-off case answer "on" and pass vacuously.
  *
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { nanoid } from "nanoid";
@@ -265,14 +265,14 @@ describe("the saved workbench chart router", () => {
 
         expect(
           await refusalOf(() => author.getAll({ projectId: PROJECT })),
-        ).toBe("governed_sql_not_enabled");
+        ).toBe("lwql_not_enabled");
         expect(
           await refusalOf(() =>
             author.getById({ projectId: PROJECT, id: saved.id }),
           ),
-        ).toBe("governed_sql_not_enabled");
+        ).toBe("lwql_not_enabled");
         expect(await refusalOf(() => saveChart("Another"))).toBe(
-          "governed_sql_not_enabled",
+          "lwql_not_enabled",
         );
         expect(
           await refusalOf(() =>
@@ -282,12 +282,12 @@ describe("the saved workbench chart router", () => {
               name: "Renamed",
             }),
           ),
-        ).toBe("governed_sql_not_enabled");
+        ).toBe("lwql_not_enabled");
         expect(
           await refusalOf(() =>
             author.delete({ projectId: PROJECT, id: saved.id }),
           ),
-        ).toBe("governed_sql_not_enabled");
+        ).toBe("lwql_not_enabled");
       });
     });
   });
@@ -420,7 +420,7 @@ describe("the saved workbench chart router", () => {
               definition: { ...DEFINITION, sql: "DROP TABLE analytics.traces" },
             }),
           ),
-        ).toBe("governed_sql_not_permitted");
+        ).toBe("lwql_not_permitted");
 
         expect(
           await refusalOf(() =>

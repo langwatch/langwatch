@@ -366,7 +366,6 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
         title: copy.successTitle,
         type: "success",
         duration: 2500,
-        meta: { closable: true },
       });
       onSaved();
       onClose();

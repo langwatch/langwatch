@@ -173,7 +173,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .option("--endpoint <url>", "Override the LangWatch control-plane URL for this login (self-hosted instances)")
     .option(
       "--device",
-      "RFC 8628 device-flow login via your company SSO; provisions a personal virtual key for Claude Code / Codex / Cursor / Gemini CLI",
+      "RFC 8628 device-flow login via your company SSO; signs this device in for the coding-assistant wrappers (credentials are issued on first use)",
     )
     .option(
       "--project [slug]",
@@ -261,21 +261,6 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       }
     });
 
-  program
-    .command("request-increase")
-    .description("Open the budget-increase request page (uses the gateway-issued signed URL when available).")
-    .option("--browser <name>", "browser to open (chrome|chromium|firefox|safari|none|<path>)")
-    .action(async (options: { browser?: string }) => {
-      try {
-        const { requestIncreaseCommand } = await import("./commands/request-increase.js");
-        await requestIncreaseCommand(options);
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    });
-
   // AI Gateway governance — wrapped tool runners.
   // Each `langwatch <tool>` exec's the underlying binary with the
   // right ANTHROPIC_*/OPENAI_*/GEMINI_* env vars injected pointing
@@ -352,8 +337,48 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       }
     });
 
+  program
+    .command("instrument", { hidden: true })
+    .description(
+      "Write persistent telemetry wiring for a coding agent without launching it, so a plain `<tool>` run captures. Scope with --project (team project), --key (pasted ingest key, no login), or the default personal workspace.",
+    )
+    .argument("<tool>", "claude|codex|gemini|opencode|copilot|code")
+    .option(
+      "--project <idOrSlug>",
+      "scope telemetry to a team project (mints a project ingest key; needs login)",
+    )
+    .option(
+      "--key <ingestKey>",
+      "use a pasted ingest key; no login needed (or set LANGWATCH_INGEST_KEY)",
+    )
+    .option(
+      "--endpoint <url>",
+      "control plane base URL for --key (default: the configured instance)",
+    )
+    .option("--personal", "clear a project pin and rewire the personal scope")
+    .action(
+      async (
+        tool: string,
+        options: {
+          project?: string;
+          key?: string;
+          endpoint?: string;
+          personal?: boolean;
+        },
+      ) => {
+        try {
+          const { instrumentCommand } = await import("./commands/instrument.js");
+          await instrumentCommand(tool, options);
+        } catch (error) {
+          const { reportCommandError } = await import("./utils/errorOutput.js");
+          reportCommandError({ error });
+          process.exit(1);
+        }
+      },
+    );
+
   const copilotAppCmd = program
-    .command("copilot-app")
+    .command("copilot-app", { hidden: true })
     .description(
       "Manage LangWatch capture for the standalone GitHub Copilot app (ADR-039).",
     );
@@ -410,7 +435,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     });
 
   program
-    .command("opencode")
+    .command("opencode", { hidden: true })
     .description("Run `opencode` routed through the LangWatch gateway (multi-provider; injects both Anthropic and OpenAI env vars).")
     .allowUnknownOption(true)
     .allowExcessArguments(true)
@@ -440,8 +465,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       "  cursor          Run `cursor` routed through the gateway",
       "  gemini          Run `gemini` (Gemini CLI) routed through the gateway",
       "  opencode        Run `opencode` (multi-provider) routed through the gateway",
+      "  copilot-app     Set up capture for the standalone GitHub Copilot app",
+      "  instrument      Write persistent telemetry wiring for a tool without launching it",
       "",
-      "`lw` and `langwatch` are the same binary — use whichever you prefer.",
+      "`lw` and `langwatch` are the same binary: use whichever you prefer.",
       "",
       "IMPORTANT, for AI agents reading this: if you struggled with anything",
       "while setting up or using LangWatch (confusing docs, broken commands,",
@@ -562,23 +589,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       }
     });
 
-  program
-    .command("init-shell")
-    .description("Print an eval-able shell snippet so any shell session auto-exports the gateway env vars (alternative to `langwatch claude`).")
-    .argument("[shell]", "zsh|bash|fish|cmd|powershell", "zsh")
-    .action(async (shell: string) => {
-      try {
-        const { initShellCommand } = await import("./commands/init-shell.js");
-        await initShellCommand(shell);
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    });
-
   // `langwatch ingest *` — read-only debug tools for the IngestionSource
-  // + Activity Monitor surfaces. Mirrors the web admin /settings/governance
+  // + Activity Monitor surfaces. Mirrors the web admin /governance
   // flows for ops folks who live in terminal. Authoring stays browser-only.
   const ingestCmd = program
     .command("ingest")
@@ -1597,6 +1609,35 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
+  // A live, human-only session: it never returns a CommandResult, so it is
+  // registered with a plain action and the format gate honestly refuses
+  // `-o json` instead of accepting a format the command never renders.
+  agentCmd
+    .command("dev")
+    .alias("tunnel")
+    .description("Expose a local agent server through a public tunnel and point a registered HTTP agent at it (Ctrl-C restores the previous URL)")
+    .option("--port <number>", "Local port to expose (tunnels http://localhost:<number>)")
+    .option("--url <url>", "Local URL to expose (mutually exclusive with --port)")
+    .option("--agent <idOrName>", "Which registered HTTP agent to point at the tunnel (when omitted: picker, and in an interactive terminal it creates one if the project has none)")
+    .option("--tunnel-url <url>", "Bring your own tunnel URL and skip tunnel provisioning")
+    .option("--no-update-url", "Print the tunnel URL without changing the agent")
+    .option("--no-auth", "Skip the local auth proxy (for servers that already authenticate requests)")
+    .option("--api-key <key>", "API key to use for this run")
+    .action(
+      async (options: {
+        port?: string;
+        url?: string;
+        agent?: string;
+        tunnelUrl?: string;
+        updateUrl?: boolean;
+        auth?: boolean;
+        apiKey?: string;
+      }) => {
+        const { agentDevCommand: impl } = await import("./commands/agents/dev.js");
+        return impl(options);
+      },
+    );
+
   emitsResult(
     agentCmd
       .command("update <id>")
@@ -2428,13 +2469,20 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     traceCmd
       .command("search")
       .description("Search traces with optional text query and date range")
-      .option("-q, --query <query>", "Text search query")
+      .option(
+        "-q, --query <query>",
+        "Text search query. Plain text only: AND, OR and NOT are matched as words, not as operators",
+      )
       .option("--start-date <date>", "Start date (ISO string or epoch ms, default: 24h ago)")
       .option("--end-date <date>", "End date (ISO string or epoch ms, default: now)")
       .option("--limit <n>", "Max results to return (default: 25)")
       .option(
         "--origin <origins>",
         "Filter by trace origin, comma-separated (e.g. application,evaluation,simulation,playground,langy); 'application' includes traces with no recorded origin",
+      )
+      .option(
+        "--errors-only",
+        "Only traces that contain an error. The error is on the span, not in the searchable text, so this is the way to find failures",
       )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
   ).action(async (_options: unknown, command: Command) => {
@@ -2450,10 +2498,17 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .description("Export traces as CSV, JSONL, or JSON")
     .option("--start-date <date>", "Start date (ISO string, default: 7 days ago)")
     .option("--end-date <date>", "End date (ISO string, default: now)")
-    .option("-q, --query <query>", "Text search query to filter traces")
+    .option(
+      "-q, --query <query>",
+      "Text search query to filter traces. Plain text only: AND, OR and NOT are matched as words, not as operators",
+    )
     .option(
       "--origin <origins>",
       "Filter by trace origin, comma-separated (e.g. application,evaluation,simulation,playground,langy); 'application' includes traces with no recorded origin",
+    )
+    .option(
+      "--errors-only",
+      "Only traces that contain an error. The error is on the span, not in the searchable text, so this is the way to find failures",
     )
     .option("-f, --format <format>", "Output format: jsonl (default), csv, or json", "jsonl")
     .option("-o, --output <file>", "Write output to file instead of stdout")

@@ -25,6 +25,9 @@ const createScenarioSchema = projectSchema.extend({
   // The parameters the scenario declares, each with an optional description
   // and default. A run supplies values for these names.
   parameters: scenarioParameterDefinitionsSchema.optional(),
+  // Turn config (ADR-015); null clears back to SDK default.
+  maxTurns: z.number().int().min(1).max(100).nullish(),
+  minTurns: z.number().int().min(0).max(100).nullish(),
 });
 
 const updateScenarioSchema = projectSchema.extend({
@@ -36,6 +39,8 @@ const updateScenarioSchema = projectSchema.extend({
   simulatorModel: z.string().nullish(),
   judgeModel: z.string().nullish(),
   parameters: scenarioParameterDefinitionsSchema.optional(),
+  maxTurns: z.number().int().min(1).max(100).nullish(),
+  minTurns: z.number().int().min(0).max(100).nullish(),
 });
 
 /**

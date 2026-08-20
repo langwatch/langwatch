@@ -268,7 +268,7 @@ export class TraceEvaluationsClickHouseRepository
         );
         return null;
       }
-      logger.error(
+      logger.warn(
         {
           tenantId,
           evaluationId,

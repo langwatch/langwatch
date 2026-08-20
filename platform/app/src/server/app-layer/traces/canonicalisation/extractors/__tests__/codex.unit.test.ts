@@ -423,7 +423,7 @@ describe("CodexExtractor.applyLog", () => {
   });
 });
 
-describe("CodexExtractor.apply on the codex_exec scope (exec wire, no turn rollup)", () => {
+describe("CodexExtractor.apply on the codex_exec scope (exec wire)", () => {
   it("keeps the response span's tokens counted: no skip marker under codex_exec", () => {
     const ctx = createExtractorContext(
       {
@@ -502,6 +502,48 @@ describe("CodexExtractor.apply on the codex_exec scope (exec wire, no turn rollu
 
     expect(ctx.out["gen_ai.request.reasoning_effort"]).toBe("high");
     expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe("true");
+  });
+
+  // Newer codex emits a `session_task.turn` rollup under exec too, carrying
+  // the same totals its response spans already report per call. The response
+  // spans stay the counted record on this wire, so the rollup defers.
+  /** @scenario "Codex exec turn tokens are counted once when the rollup repeats the response spans' usage" */
+  it("flags a usage-bearing exec turn rollup as the redundant token copy", () => {
+    const ctx = createExtractorContext(
+      {
+        "codex.turn.token_usage.non_cached_input_tokens": "5842",
+        "codex.turn.token_usage.total_tokens": "30112",
+        "gen_ai.usage.input_tokens": 29906,
+        "gen_ai.usage.output_tokens": 206,
+        "gen_ai.usage.cache_read.input_tokens": "24064",
+      },
+      {
+        name: "session_task.turn",
+        instrumentationScope: { name: "codex_exec", version: null },
+      },
+    );
+
+    new CodexExtractor().apply(ctx);
+
+    expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe("true");
+    expect(ctx.recordRule).toHaveBeenCalledWith("codex/skip-exec-rollup-usage");
+  });
+
+  /** @scenario "Codex exec turn tokens are counted once when the rollup repeats the response spans' usage" */
+  it("leaves an exec turn rollup without usage unflagged", () => {
+    const ctx = createExtractorContext(
+      { "codex.turn.reasoning_effort": "high" },
+      {
+        name: "session_task.turn",
+        instrumentationScope: { name: "codex_exec", version: null },
+      },
+    );
+
+    new CodexExtractor().apply(ctx);
+
+    expect(
+      ctx.out["langwatch.reserved.skip_token_accumulation"],
+    ).toBeUndefined();
   });
 });
 

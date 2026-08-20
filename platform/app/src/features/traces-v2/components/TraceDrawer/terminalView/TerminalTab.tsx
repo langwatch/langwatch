@@ -136,6 +136,8 @@ export function TerminalTab({
       toolSpans={session.toolSpans}
       turnDividers={session.turnDividers}
       scrollback={scrollback}
+      earlierTotals={session.earlierTotals}
+      sessionStartAtMs={session.sessionStartAtMs}
       banner={banner}
       sessionName={sessionName}
     />

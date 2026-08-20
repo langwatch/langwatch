@@ -9,7 +9,6 @@ import type { FilterService } from "~/server/filters/filter.service";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import type { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
-import type { OrphanedRunFinder } from "~/server/scenarios/orphaned-run-reconciliation";
 import type { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import type { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
@@ -219,6 +218,16 @@ export interface AppDependencies {
   clickhouse: {
     enabled: boolean;
     resolveClient: ClickHouseClientResolver;
+    /** Per-organization resolution, for aggregates keyed by organization
+     *  rather than project (usage rollups, the grants ledger). */
+    resolveOrganizationClient: (
+      organizationId: string,
+    ) => Promise<ClickHouseClient>;
+    /** Every configured instance - shared plus private - for fleet sweeps
+     *  and admin surfaces that legitimately touch all of them. */
+    allInstances: () => Promise<
+      Array<{ target: string; client: ClickHouseClient }>
+    >;
   };
   /**
    * The process's one Redis connection, owned by the composition root and
@@ -247,20 +256,9 @@ export interface AppDependencies {
     instance: InstanceUsageStatsRepository;
   };
   /**
-   * Cross-tenant boot-sweep dependencies for the two orphaned-run
-   * reconciliation sweeps (QUEUED and IN_PROGRESS). Null when ClickHouse is
-   * not configured, in which case both sweeps no-op.
-   */
-  scenarios: {
-    orphanReconciliation: {
-      client: ClickHouseClient | null;
-      finder: OrphanedRunFinder | null;
-    };
-  };
-  /**
    * Governance's OCSF SIEM-export sink (`governance_ocsf_events`). One
    * repository for both directions — the puller worker, the workspace-view
-   * audit trail and the reactor sync write through it; the SIEM export
+   * audit trail and the subscriber sync write through it; the SIEM export
    * procedure reads through it. Undefined on a deployment without
    * ClickHouse.
    */

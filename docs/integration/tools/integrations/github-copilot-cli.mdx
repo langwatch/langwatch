@@ -1,0 +1,262 @@
+---
+title: GitHub Copilot Integration Guide
+sidebarTitle: GitHub Copilot
+description: Send GitHub Copilot CLI and Copilot Chat sessions, cost and traces to LangWatch with the LangWatch command line tool.
+---
+
+GitHub Copilot reports its work over OpenTelemetry, in the command line tool and in the Visual Studio Code chat extension. The LangWatch command line tool connects that report to your workspace, so you can read the cost of each session, the trace of each turn, and the prompt and the response behind both.
+
+This page covers two surfaces:
+
+- `copilot`, the GitHub Copilot command line tool. Version 1.0.41 or later.
+- `code`, Visual Studio Code, for the GitHub Copilot Chat extension inside it.
+
+Each one has two ways to set it up:
+
+- `langwatch copilot` or `langwatch code` starts the tool and sets up the connection on the first run. Use it on a machine you work on.
+- `langwatch instrument copilot` or `langwatch instrument code` writes the same setup and exits. Use it on a server, or when the telemetry must go to a team project.
+
+## Before you start
+
+- Install the GitHub Copilot command line tool, Visual Studio Code, or both.
+- Install the LangWatch command line tool: `npm install -g langwatch`
+- Create an account at [app.langwatch.ai](https://app.langwatch.ai), or run your own instance with `npx @langwatch/server`.
+
+## Run Copilot through the wrapper
+
+```bash
+langwatch login --device
+langwatch copilot
+```
+
+The first run asks one question:
+
+| Answer | What it does |
+| --- | --- |
+| **Using your own copilot plan** | Copilot keeps your own seat and your own login. LangWatch receives telemetry only. |
+| **Using an API key** | Copilot calls travel through the LangWatch gateway with your own provider keys. |
+
+LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch copilot` accepts the same flags and the same subcommands as `copilot`, and it returns the same exit code.
+
+<Warning>
+  The gateway answer moves the model spend off your Copilot seat and onto your organization's gateway budget. Pick it only when that is what you want. The command line tool names the change every time it takes that route.
+</Warning>
+
+For Copilot Chat inside Visual Studio Code, start the editor the same way:
+
+```bash
+langwatch code
+```
+
+The editor opens as usual, and every chat turn in it reports to LangWatch. Copilot Chat has no gateway option, so it asks nothing and always sends telemetry only.
+
+## Set up a machine without starting the tool
+
+`langwatch instrument copilot` writes the connection and exits. A plain `copilot` run on that machine then sends its telemetry to LangWatch. This is the setup for a server that holds many agents, for a machine image, or for a configuration management run.
+
+```bash
+langwatch instrument copilot
+langwatch instrument code
+```
+
+Each command writes a function of the same name in your shell start file, which applies the LangWatch settings to that tool and to nothing else. The file is `~/.zshrc`, `~/.bashrc`, or `~/.config/fish/config.fish`. Open a new terminal after the command, or read the start file again, so the function is in place.
+
+<Note>
+  The shell function needs zsh, bash or fish. On Windows, start the tool with `langwatch copilot` or `langwatch code` each time instead.
+</Note>
+
+For `code`, LangWatch also removes the same settings from the Visual Studio Code integrated terminal configuration. The editor keeps the key, and the terminals inside it do not.
+
+### Choose where the telemetry goes
+
+Pass one scope flag, and one only.
+
+| Command | Destination | Needs a login |
+| --- | --- | --- |
+| `langwatch instrument copilot` | Your personal workspace | Yes |
+| `langwatch instrument copilot --project <id-or-slug>` | A team project | Yes |
+| `langwatch instrument copilot --key <ingest-key>` | The project that owns the key | No |
+| `langwatch instrument copilot --personal` | Back to your personal workspace | Yes |
+
+Replace `copilot` with `code` for the Visual Studio Code extension. The two are separate, so you can send the command line tool to a team project and keep the editor on your personal workspace.
+
+### Send the telemetry to a team project
+
+```bash
+langwatch instrument copilot --project acme-app
+```
+
+This creates an ingest key for this device and holds Copilot to that project. LangWatch creates one key per device and never replaces the key of another device, so many machines can report to one project at the same time. You need a login and the `traces:create` permission on the project. See [Roles and permissions](/ai-governance/roles-and-permissions).
+
+The wrapper accepts the same flags. This pins the project and then starts Copilot:
+
+```bash
+langwatch copilot --project acme-app
+```
+
+`--project` and `--personal` are LangWatch flags. LangWatch removes them from the command line before Copilot reads it, so they never reach the agent.
+
+### Set up a machine that never logs in
+
+`--key` takes an ingest key (`ik-lw-…`). It needs no login and contacts no server, which makes it the option for a shared machine, a build agent, or a base image.
+
+```bash
+langwatch instrument copilot --key ik-lw-...
+```
+
+The command reads the same value from the `LANGWATCH_INGEST_KEY` environment variable:
+
+```bash
+export LANGWATCH_INGEST_KEY=ik-lw-...
+langwatch instrument copilot
+```
+
+For a self-hosted instance, add its address:
+
+```bash
+langwatch instrument copilot --key ik-lw-... --endpoint https://langwatch.your-company.internal
+```
+
+To get an ingest key without the command line tool, install an ingestion template for the tool in the dashboard: the setup drawer mints one for you. See [Ingestion templates](/ai-governance/ingestion-templates).
+
+### Move a tool back to your personal workspace
+
+```bash
+langwatch instrument copilot --personal
+```
+
+This removes the project pin and writes the personal connection again.
+
+### Remove the setup
+
+```bash
+langwatch logout
+```
+
+This deletes every connection the command line tool wrote, for every tool.
+
+## The GitHub Copilot app
+
+The standalone GitHub Copilot app is a separate surface with its own command:
+
+```bash
+langwatch copilot-app connect
+```
+
+This mints an ingest key and installs a small agent that starts with your session, so every app session is captured without a wrapper. Add `--tokens-only` to collect the usage numbers and no content.
+
+## What you get in LangWatch
+
+Open your personal page at `/me`, or open the project you pinned Copilot to.
+
+- **Sessions**: one row per Copilot session, with the context it carried and how long it worked.
+- **Traces**: one trace per turn, with the model, the tokens and the timing of each step.
+- **Content**: the prompt of each turn and the response of the model.
+
+Copilot reports the number of premium requests a turn used, not an amount of money, so a Copilot trace carries a request count where a pay-per-token trace carries a cost.
+
+Your agent can read all of this back. See [Explore your usage with your own agent](/ai-governance/explore-your-usage-with-your-own-agent).
+
+## Content and privacy
+
+The setup turns on `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT`, which is what puts the prompt and the response on the wire. Without it a trace carries the tokens, the model and the timing, and no text.
+
+Set `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false` in your own environment to keep the content off. LangWatch never overrides that value, and it reports that the traces carry usage only.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Nothing arrives in LangWatch">
+    Open a new terminal. The `copilot` and `code` functions are read from the shell start file when a shell begins, so a terminal that was already open does not have them.
+
+    Then check the Copilot version with `copilot --version`. Reporting needs 1.0.41 or later.
+  </Accordion>
+
+  <Accordion title="The traces stopped after a previous telemetry setup">
+    An earlier setup that wrote Copilot telemetry to a local file leaves `COPILOT_OTEL_EXPORTER_TYPE=file` in your environment. Copilot then writes everything to that file and sends nothing. Remove the variable from your shell start file, or set it to `otlp-http`.
+  </Accordion>
+
+  <Accordion title="Copilot Chat in Visual Studio Code reports nothing">
+    Start the editor with `langwatch code`, or run `langwatch instrument code` and then open a new terminal before you start `code`. The extension reads the settings when the editor starts, so an editor that was already open keeps its old configuration.
+  </Accordion>
+
+  <Accordion title="The traces have tokens but no text">
+    `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` is `false` in your environment. Remove it, or set it to `true`, and start the tool again.
+  </Accordion>
+
+  <Accordion title="The telemetry goes to the wrong workspace">
+    Run `langwatch instrument copilot --project <id-or-slug>` to move it to a team project, or `langwatch instrument copilot --personal` to move it back to your own.
+  </Accordion>
+
+  <Accordion title="Authentication errors">
+    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and nothing else, so a key that works for ingestion still fails on other endpoints.
+
+    On a machine with a login, run `langwatch login --device` again to refresh the session.
+  </Accordion>
+</AccordionGroup>
+
+For more failure modes see [CLI debug](/ai-governance/cli-debug).
+
+## Manual OpenTelemetry setup
+
+Use this when you cannot install the LangWatch command line tool. The variables below are the ones `langwatch instrument copilot` writes for you.
+
+### GitHub Copilot CLI
+
+```bash
+export COPILOT_OTEL_ENABLED=true
+export COPILOT_OTEL_EXPORTER_TYPE=otlp-http
+export OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true
+export OTEL_TRACES_EXPORTER=otlp
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
+export OTEL_RESOURCE_ATTRIBUTES="service.name=copilot-cli"
+copilot
+```
+
+The header takes an ingest key (`ik-lw-…`), which can create traces and nothing else. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+
+Copilot reports spans and metrics, and no separate log records, so there is no logs exporter to set. It sends over HTTP only: a `grpc` protocol value is accepted and then ignored.
+
+### Copilot Chat in Visual Studio Code
+
+Same block, without the exporter type, and with the service name of the extension:
+
+```bash
+export COPILOT_OTEL_ENABLED=true
+export OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true
+export OTEL_TRACES_EXPORTER=otlp
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
+export OTEL_RESOURCE_ATTRIBUTES="service.name=copilot-chat"
+code
+```
+
+`COPILOT_OTEL_ENABLED` takes precedence over the `github.copilot.chat.otel.enabled` setting of the extension, so the editor reports even with an empty settings file.
+
+For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. Copilot appends `/v1/traces` and `/v1/metrics` on its own. Never write the per-signal path yourself.
+
+<Warning>
+  A plain `export` applies the key to every program the shell starts, and Visual Studio Code passes its own environment to every integrated terminal. To keep the key to one tool, put the variables in a shell function. This is the function `langwatch instrument copilot` writes to your shell rc file:
+
+  ```bash
+  copilot() {
+      COPILOT_OTEL_ENABLED=true \
+      COPILOT_OTEL_EXPORTER_TYPE=otlp-http \
+      OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true \
+      OTEL_TRACES_EXPORTER=otlp \
+      OTEL_METRICS_EXPORTER=otlp \
+      OTEL_EXPORTER_OTLP_PROTOCOL=http/json \
+      OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel \
+      OTEL_EXPORTER_OTLP_HEADERS='Authorization=Bearer ik-lw-your-ingest-key' \
+      OTEL_RESOURCE_ATTRIBUTES=service.name=copilot-cli \
+      command copilot "$@"
+  }
+  ```
+
+  `langwatch instrument code` writes the same function for `code`, without `COPILOT_OTEL_EXPORTER_TYPE` and with `service.name=copilot-chat`. On fish, both are a function with `set -lx` for each variable.
+</Warning>

@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { ledgerActorFor } from "~/server/app-layer/authz/ledger-actor";
 import { permissionFormatSchema } from "../../rbac/custom-role-permissions";
 import { RoleService } from "../../role";
 import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
@@ -72,10 +73,16 @@ export const roleRouter = createTRPCRouter({
 
       const roleService = new RoleService(ctx.prisma);
       return await roleService.createRole({
-        organizationId: input.organizationId,
-        name: input.name,
-        description: input.description,
-        permissions: input.permissions,
+        params: {
+          organizationId: input.organizationId,
+          name: input.name,
+          description: input.description,
+          permissions: input.permissions,
+        },
+        actor: ledgerActorFor({
+          userId: ctx.session.user.id,
+          fallback: "managementApi",
+        }),
       });
     }),
 
@@ -115,10 +122,17 @@ export const roleRouter = createTRPCRouter({
     })
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
-      return await roleService.updateRole(input.roleId, {
-        name: input.name,
-        description: input.description,
-        permissions: input.permissions,
+      return await roleService.updateRole({
+        roleId: input.roleId,
+        params: {
+          name: input.name,
+          description: input.description,
+          permissions: input.permissions,
+        },
+        actor: ledgerActorFor({
+          userId: ctx.session.user.id,
+          fallback: "managementApi",
+        }),
       });
     }),
 
@@ -145,7 +159,13 @@ export const roleRouter = createTRPCRouter({
     })
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
-      return await roleService.deleteRole(input.roleId);
+      return await roleService.deleteRole({
+        roleId: input.roleId,
+        actor: ledgerActorFor({
+          userId: ctx.session.user.id,
+          fallback: "managementApi",
+        }),
+      });
     }),
 
   assignToUser: protectedProcedure
@@ -188,11 +208,15 @@ export const roleRouter = createTRPCRouter({
     })
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
-      return await roleService.assignRoleToUser(
-        input.userId,
-        input.teamId,
-        input.customRoleId,
-      );
+      return await roleService.assignRoleToUser({
+        userId: input.userId,
+        teamId: input.teamId,
+        customRoleId: input.customRoleId,
+        actor: ledgerActorFor({
+          userId: ctx.session.user.id,
+          fallback: "managementApi",
+        }),
+      });
     }),
 
   removeFromUser: protectedProcedure
@@ -206,6 +230,13 @@ export const roleRouter = createTRPCRouter({
     .use(checkTeamPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
-      return await roleService.removeRoleFromUser(input.userId, input.teamId);
+      return await roleService.removeRoleFromUser({
+        userId: input.userId,
+        teamId: input.teamId,
+        actor: ledgerActorFor({
+          userId: ctx.session.user.id,
+          fallback: "managementApi",
+        }),
+      });
     }),
 });

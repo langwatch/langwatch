@@ -74,13 +74,68 @@ Rule: The page lists my sessions with their context economics
     When the user opens their Sessions page
     Then the page says no sessions have been recorded yet
 
-Rule: A session is named by its generated title
+Rule: A session row exists once the session says something
+
+  A coding agent that starts and then dies before its first prompt still
+  emits lifecycle telemetry: session start, auth errors, config reads. A
+  fleet of agents resuming at boot with expired credentials produced twelve
+  such rows in one morning, every one untitled with a dash in every column.
+  A row that can never say what the session did or even what it was asked
+  is noise, so it is not created; the session's records stay stored and the
+  row appears the moment a real signal arrives.
+
+  @unit
+  Scenario: Lifecycle-only telemetry creates no session row
+    Given a session that emitted only lifecycle and error events
+    And it never carried a prompt, a model call, a title or a repository
+    When its telemetry is folded
+    Then no session row is stored
+
+  @unit
+  Scenario: The first real signal creates the row
+    Given a session whose lifecycle telemetry created no row
+    When its first user prompt arrives
+    Then the session row is stored
+    And it is named by that prompt
+
+  @unit
+  Scenario: A session announced with a name is a row from the start
+    Given a session its harness already named
+    When the session-context record arrives before any prompt
+    Then the session row is stored under that name
+    # An agent that wedges before its first prompt still shows up,
+    # attributable by name, rather than vanishing entirely.
+
+Rule: A session is named by its generated title, else by its first prompt
+
+  Most agents rarely generate a title, so a title-only session list reads as
+  a wall of untitled rows. The first thing the user actually asked names the
+  session until a generated title arrives; a generated title always wins.
 
   @unit
   Scenario: A row is named by the title the session generated
     Given a session whose agent generated a title for it
     When the sessions list is read
     Then the row carries that title
+
+  @unit
+  Scenario: A session with no generated title is named by the first thing the user asked
+    Given a session whose agent never generated a title
+    When its first prompt event arrives
+    Then the session is named by the prompt's first line
+    And a later prompt does not rename it
+
+  @unit
+  Scenario: A generated title replaces the prompt-derived name
+    Given a session named by its first prompt
+    When the agent generates a title for it
+    Then the generated title replaces the prompt-derived name
+
+  @unit
+  Scenario: A machine-injected first prompt does not name the session
+    Given a session whose first prompt event is machine-injected or withheld
+    When the prompt event arrives
+    Then the session stays unnamed
 
   @unit
   Scenario: A viewer who may not read captured content gets no session title
@@ -91,9 +146,55 @@ Rule: A session is named by its generated title
 
   @integration
   Scenario: A session with no title reads as untitled
-    Given a session whose agent never generated a title
+    Given a session whose agent never generated a title or received a prompt
     When the user reads its row
     Then the row names it as an untitled session
+
+Rule: The session's own name outranks every derived title
+
+  Every harness names its sessions and can rename them: claude with --name
+  and /rename, codex with its thread names. The capture MIRRORS that name
+  on the session-context record, the fold writes the newest name onto the
+  one Title column in place, and neither the generated conversation title
+  nor the first typed prompt may clobber it. A fleet whose sessions all
+  open with the same scripted greeting reads as its agents' names, because
+  the launcher names each session through the harness's own flag.
+
+  @unit
+  Scenario: The session's own name outranks the generated title
+    Given a session whose context record carries its name
+    When the agent later generates its own title
+    Then the row keeps the name
+
+  @unit
+  Scenario: The session's own name outranks the prompt-derived name
+    Given a session whose context record carries its name
+    When a prompt event arrives carrying a name candidate
+    Then the row keeps the name
+
+  @unit
+  Scenario: A renamed session renames its row
+    Given a session named by its harness
+    When a later context record carries a different name
+    Then the row wears the newest name
+
+  @unit
+  Scenario: A blank name does not rename the session
+    Given a session named by its harness
+    When a later context record carries a whitespace name
+    Then the row keeps the name it already had
+
+  @unit
+  Scenario: The session's own name is the title the list shows
+    Given a stored session row named by its harness
+    When the sessions list is read
+    Then the row's title is that name
+
+  @unit
+  Scenario: A row from before the source column still takes a generated title
+    Given a session row stored before the title source column existed
+    When the agent generates a new title
+    Then the row wears the generated title
 
 Rule: A session lists every pull request it drove
 

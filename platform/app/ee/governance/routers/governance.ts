@@ -308,7 +308,7 @@ export const governanceRouter = createTRPCRouter({
    * Resolves a CH-side `actor` token (typically the email stamped on
    * spans as `langwatch.user_id`, occasionally the User.id directly)
    * to that user's Personal Workspace inside the given org. Drives
-   * the bird's-eye `/settings/governance/users/[id]` "View their
+   * the bird's-eye `/governance/users/[id]` "View their
    * workspace →" link — without this, admins can see who's been
    * active but can't drill into their traces from the user row.
    *

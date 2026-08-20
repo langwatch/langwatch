@@ -82,41 +82,41 @@ const registry = {
   time_range_too_wide: {
     tips: ["Query in smaller windows and paginate through the results"],
   },
-  governed_sql_unparseable: {
+  lwql_unparseable: {
     tips: [
       "Read `meta.violations` — each entry carries the line and column the parser stopped at",
       "The endpoint accepts native ClickHouse SQL; check for an unclosed quote, bracket, or parenthesis first",
     ],
   },
-  governed_sql_not_permitted: {
+  lwql_not_permitted: {
     tips: [
       "Read `meta.violations` — each entry names the rule (`code`) and the clause (`clause`) that was refused",
       "Submit one read-only SELECT; writes, DDL, SETTINGS, FORMAT, INTO OUTFILE and table functions are all refused",
       "Read only the datasets the schema endpoint lists for this key, and select fields by name rather than with `*`",
     ],
   },
-  governed_sql_parameter_missing: {
+  lwql_parameter_missing: {
     tips: [
       "Read `meta.parameters` — it lists every parameter the SQL declares that the request left unset",
       "Send a value for each under `parameters`, keyed by the name inside the braces: `{since:DateTime}` reads `parameters.since`",
       "`period_start` and `period_end` are the exception — send them as `timeWindow: { start, end }`, never under `parameters`",
     ],
   },
-  governed_sql_reserved_parameter_supplied: {
+  lwql_reserved_parameter_supplied: {
     tips: [
       "Read `meta.parameters` — it lists the reserved names the request set for itself",
       "`period_start` and `period_end` are supplied by the surface showing the chart; send `timeWindow: { start, end }` instead and drop them from `parameters`",
     ],
   },
-  governed_sql_reserved_parameter_type: {
+  lwql_reserved_parameter_type: {
     tips: [
       "Read `meta.parameters` — it lists the reserved names declared with the wrong type",
       "Declare each as `DateTime` or `DateTime64`, for example `{period_start:DateTime}`; the interval they describe is half-open, `>= {period_start:DateTime} AND < {period_end:DateTime}`",
     ],
   },
-  governed_sql_not_enabled: {
+  lwql_not_enabled: {
     tips: [
-      "The governed SQL feature is not enabled for this project — retrying will not help",
+      "The LangWatchQL feature is not enabled for this project — retrying will not help",
       "Ask an administrator to enable the SQL workbench for this project",
     ],
   },
@@ -145,9 +145,9 @@ const registry = {
       "Save the chart again from the workbench to replace the unreadable definition",
     ],
   },
-  governed_sql_unavailable: {
+  lwql_unavailable: {
     tips: [
-      "The governed analytics SQL API is not provisioned on this deployment — retrying will not help",
+      "The LangWatchQL analytics SQL API is not provisioned on this deployment — retrying will not help",
       "Contact support to have it enabled for this workspace",
     ],
   },
@@ -191,6 +191,12 @@ const registry = {
   api_key_permission_denied: {
     tips: [
       "Re-create the API key with the required scope, or ask an admin to raise your role",
+    ],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
+  api_key_permission_not_delegable: {
+    tips: [
+      "A wider key or a higher role does not change this — make the change in LangWatch instead",
     ],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
@@ -272,6 +278,14 @@ const registry = {
   personal_usage_key_mismatch: {
     tips: [
       "Send a key scoped to your own personal workspace; being allowed to view a workspace is not the same as it being yours",
+    ],
+  },
+
+  // ---- agent dev tunnel ----
+  agent_dev_tunnel_unreachable: {
+    tips: [
+      "Run `langwatch agent dev` again on the machine that started the tunnel; a new session repoints the agent automatically",
+      "If you are done developing locally, restore the agent's URL in its settings",
     ],
   },
 

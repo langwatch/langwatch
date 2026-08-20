@@ -294,11 +294,11 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
 
   afterAll(async () => {
     // Clean up clickhouseClient caches
-    const { clearCustomClientCache, clearProjectOrgCache } = await import(
+    const { clearCustomClientCache, clearTenantOrgCache } = await import(
       "../clickhouseClient"
     );
     await clearCustomClientCache();
-    clearProjectOrgCache();
+    clearTenantOrgCache();
 
     // Clean up Prisma data
     if (createdProjectIds.length > 0) {
@@ -323,15 +323,15 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
   }, 60_000);
 
   /**
-   * Builds a ClickHouseClientResolver that uses getClickHouseClientForProject
+   * Builds a ClickHouseClientResolver that uses getClickHouseClientForTenant
    * and throws if the client is null (mirrors production wiring).
    */
   async function buildResolver(): Promise<ClickHouseClientResolver> {
-    const { getClickHouseClientForProject } = await import(
+    const { getClickHouseClientForTenant } = await import(
       "../clickhouseClient"
     );
     return async (tenantId: string) => {
-      const client = await getClickHouseClientForProject(tenantId);
+      const client = await getClickHouseClientForTenant(tenantId);
       if (!client) {
         throw new Error(
           `No ClickHouse client resolved for tenantId: ${tenantId}`,

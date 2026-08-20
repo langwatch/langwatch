@@ -11,7 +11,7 @@
  * `__tests__` directory, is deliberate: the promise is about the surface, not
  * about the file that happens to hold the request state today.
  *
- * Spec: specs/analytics/governed-sql-workbench.feature
+ * Spec: specs/analytics/lwql-workbench.feature
  */
 
 import { readdirSync, readFileSync } from "node:fs";

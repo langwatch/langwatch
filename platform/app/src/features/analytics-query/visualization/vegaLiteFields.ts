@@ -18,7 +18,7 @@
  * at the dot.
  */
 
-import { governedVegaError } from "./vegaLitePolicy";
+import { lwqlVegaError } from "./vegaLitePolicy";
 import {
   collectViewNodes,
   isPlainObject,
@@ -27,13 +27,13 @@ import {
 } from "./vegaLiteStructure";
 import { analyzeTransform } from "./vegaLiteTransforms";
 import type {
-  GovernedDatasetColumn,
+  LangWatchQLDatasetColumn,
   VegaValidationError,
   VegaValidationWarning,
 } from "./visualization.types";
 
 export type ColumnsByDataset = Readonly<
-  Record<string, readonly GovernedDatasetColumn[]>
+  Record<string, readonly LangWatchQLDatasetColumn[]>
 >;
 
 export interface FieldValidationOutcome {
@@ -269,7 +269,7 @@ function unboundRepeatError({
   path: string;
   variable: string;
 }): VegaValidationError {
-  return governedVegaError({
+  return lwqlVegaError({
     rule: "field.unknown",
     path,
     message: `This field reads the repeat variable "${variable}", which no enclosing repeat definition binds. Add it to the repeat list or name a column directly.`,
@@ -287,7 +287,7 @@ function unknownFieldError({
   scope: BranchScope;
 }): VegaValidationError {
   const columns = [...scope.available].sort();
-  return governedVegaError({
+  return lwqlVegaError({
     rule: "field.unknown",
     path,
     message: `"${field}" is not a column of ${describeDataset(scope)}. Available columns: ${columns.join(", ") || "none"}.`,

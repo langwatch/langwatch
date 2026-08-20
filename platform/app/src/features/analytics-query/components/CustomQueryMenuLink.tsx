@@ -1,11 +1,11 @@
 /**
  * The analytics menu's entry for the Custom query page.
  *
- * Offered only where the backend says the governed query path is provisioned.
+ * Offered only where the backend says the LangWatchQL query path is provisioned.
  * The gate is a server answer, never a client flag: nothing a browser can be
  * told puts this link on a deployment that could not run the query behind it.
  *
- * @see specs/analytics/governed-sql-workbench.feature
+ * @see specs/analytics/lwql-workbench.feature
  */
 
 import { MenuLink } from "~/components/MenuLink";
@@ -20,7 +20,7 @@ export function CustomQueryMenuLink({
   projectId,
   projectSlug,
 }: CustomQueryMenuLinkProps) {
-  const availability = api.analytics.governedSql.availability.useQuery(
+  const availability = api.analytics.lwql.availability.useQuery(
     { projectId },
     {
       enabled: projectId.length > 0,

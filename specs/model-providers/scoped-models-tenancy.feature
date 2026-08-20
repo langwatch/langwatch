@@ -127,3 +127,26 @@ Feature: SCOPED_MODELS predicate-based tenancy guard
     Then the guard throws
     # Bare deleteMany would wipe every tenant's bindings; the guard
     # rejects the same shape it rejects on findMany.
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # System migration state (SystemMigrationTenantState)
+  # ────────────────────────────────────────────────────────────────────────────
+  #
+  # The one model whose read rule and write rule differ. Its tenancy column is
+  # `tenantId`, but the ops dashboard legitimately reads one MIGRATION across
+  # every tenant to show the rollup. That predicate is a bounded view of many
+  # tenants and an unbounded edit of them, so it may not be used to write.
+
+  @integration
+  Scenario: Migration-wide reads are the ops rollup and stay allowed
+    When I call SystemMigrationTenantState.findMany with only a migrationName
+    Then the guard allows the call
+    # This is the Ops → Migrations page listing one migration's tenants.
+
+  @integration
+  Scenario: A migration-wide bulk write is refused
+    When I call SystemMigrationTenantState.deleteMany with only a migrationName
+    Then the guard throws because a bulk write must name a tenant
+    # The rows such a delete would drop include the `finalized` latches, so it
+    # would silently return every switched-over organization to its legacy
+    # authorization path with no error anywhere.

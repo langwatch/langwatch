@@ -32,6 +32,11 @@ import {
   type VirtualKeyBudgetValue,
   type VirtualKeyBudgetWindow,
 } from "./VirtualKeyBudgetSection";
+import {
+  NEVER_EXPIRES,
+  VirtualKeyExpirationSection,
+  type VirtualKeyExpirationValue,
+} from "./VirtualKeyExpirationSection";
 import { VirtualKeyOwnershipReadOnly } from "./VirtualKeyOwnershipSection";
 import {
   ALL_PROVIDERS,
@@ -46,18 +51,24 @@ import {
   type VirtualKeyRoutingValue,
 } from "./VirtualKeyRoutingSection";
 import {
+  expirationStateFromStored,
+  expiryFieldErrorFrom,
+  expiryIncompleteReason,
+  resolveExpiresAt,
+} from "./virtualKeyExpiration";
+import {
   parseTagsCsv,
   TAGS_CSV_MAX_LENGTH,
   tagsBeyondLimitsNotice,
   VK_TAGS_FIELD_DESCRIPTION,
 } from "./virtualKeyTagsField";
 
-type VirtualKeyDetail = {
+export type VirtualKeyDetail = {
   id: string;
   organizationId: string;
   name: string;
   description: string | null;
-  status: "active" | "revoked";
+  status: "active" | "disabled" | "revoked";
   scopes: VirtualKeyScopeEntry[];
   routingPolicyId: string | null;
   routingMode?: "NONE" | "FALLBACK_ALL" | "POLICY";
@@ -66,6 +77,8 @@ type VirtualKeyDetail = {
   traceProjectArchived?: boolean;
   principalUserId?: string | null;
   principalUser?: { name: string | null; email: string | null } | null;
+  /** When the key stops serving; null or absent means it never expires. */
+  expiresAt?: string | null;
   config: {
     // null / undefined = no allowlist = every eligible model is allowed.
     modelsAllowed?: string[] | null;
@@ -140,6 +153,9 @@ export function VirtualKeyEditDrawer({
   const [tpm, setTpm] = useState<string>("");
   const [rpd, setRpd] = useState<string>("");
   const [maxOpenSessions, setMaxOpenSessions] = useState<string>("");
+  const [expiration, setExpiration] =
+    useState<VirtualKeyExpirationValue>(NEVER_EXPIRES);
+  const [expiryFieldError, setExpiryFieldError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!vk) return;
@@ -168,6 +184,8 @@ export function VirtualKeyEditDrawer({
     setBudgetLoaded(false);
     setIsBudgetDirty(false);
     setHadManagedBudget(false);
+    setExpiration(expirationStateFromStored(vk.expiresAt ?? null));
+    setExpiryFieldError(null);
   }, [vk]);
 
   const availableTeams = useMemo(
@@ -255,15 +273,29 @@ export function VirtualKeyEditDrawer({
   }>;
   const eligible = useMemo(
     () =>
-      resolveEligible(
-        vk?.scopes ?? [],
+      resolveEligible({
+        scopes: vk?.scopes ?? [],
         providers,
-        buildScopeHierarchy(availableProjects, organizationId),
-      ),
+        hierarchy: buildScopeHierarchy(availableProjects, organizationId),
+      }),
     [vk?.scopes, providers, availableProjects, organizationId],
   );
 
   const tagsNotice = tagsBeyondLimitsNotice(tagsCsv);
+  const seededExpiration = expirationStateFromStored(vk?.expiresAt ?? null);
+  const expirationUntouched =
+    expiration.preset === seededExpiration.preset &&
+    expiration.customDate === seededExpiration.customDate;
+  const expiresAt = resolveExpiresAt({
+    preset: expiration.preset,
+    customDate: expiration.customDate,
+  });
+  // Omitted leaves the stored date alone, which is what an untouched block
+  // means. Sending it back would round a stored instant to the end of the
+  // day it was seeded as, and would fail the future-date check on every
+  // unrelated edit to a key that has already expired: renaming an expired
+  // key or extending it is exactly what this drawer is for.
+  const expiresAtPatch = expirationUntouched ? undefined : expiresAt;
 
   const close = () => {
     if (updateMutation.isPending) return;
@@ -289,7 +321,7 @@ export function VirtualKeyEditDrawer({
       eligible,
     );
     if (providerReason) return providerReason;
-    return null;
+    return expiryIncompleteReason({ preset: expiration.preset, expiresAt });
   })();
 
   const submit = async () => {
@@ -298,6 +330,7 @@ export function VirtualKeyEditDrawer({
       toaster.create({ title: cannotSaveReason, type: "error" });
       return;
     }
+    setExpiryFieldError(null);
     try {
       const access = providerAccessToConfig(providerAccess, eligible);
       const trimmedLimit = budget.limitUsd.trim();
@@ -308,6 +341,9 @@ export function VirtualKeyEditDrawer({
         description: description || null,
         routingMode: routing.mode,
         routingPolicyId: routing.mode === "POLICY" ? routing.policyId : null,
+        // Absent leaves the stored date alone; null clears it, which is
+        // what "Never" means here; a date moves it.
+        ...(expiresAtPatch !== undefined ? { expiresAt: expiresAtPatch } : {}),
         // Undefined leaves an absent budget alone; null archives one the
         // key had; a value creates or updates it.
         budget: trimmedLimit
@@ -340,6 +376,13 @@ export function VirtualKeyEditDrawer({
       onSaved();
       onOpenChange(false);
     } catch (error) {
+      // A rejected date belongs on the field the reader is still looking
+      // at; everything else has nowhere better to go than the toast.
+      const expiryError = expiryFieldErrorFrom(error);
+      if (expiryError) {
+        setExpiryFieldError(expiryError);
+        return;
+      }
       toaster.create({
         title: humanizeGatewayError(error, "Failed to update virtual key"),
         type: "error",
@@ -583,6 +626,16 @@ export function VirtualKeyEditDrawer({
                 </Field.HelperText>
               </Field.Root>
             </HStack>
+            {vk && (
+              <>
+                <Separator />
+                <VirtualKeyExpirationSection
+                  value={expiration}
+                  onChange={setExpiration}
+                  fieldError={expiryFieldError}
+                />
+              </>
+            )}
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>

@@ -110,7 +110,7 @@ export interface LangyContextChip {
  * Null means the skill has no specific target — a perfectly good state, and the
  * default until the user says otherwise.
  *
- * It stores the chip's ID, not its label: labels change (a title reactor lands,
+ * It stores the chip's ID, not its label: labels change (a title subscriber lands,
  * a filter is edited) and a binding that silently pointed at a stale string
  * would be worse than no binding. The label is resolved at send time, from the
  * chip that is actually present — and if that chip has since been removed, the
@@ -767,7 +767,7 @@ export const useLangyStore = create<LangyState>()(
             (attached) => attached.id === item.id,
           );
           // Re-attaching an id is a refresh, not a duplicate: replace in place so
-          // a label/meta that changed (a title reactor landed) updates without
+          // a label/meta that changed (a title subscriber landed) updates without
           // stacking a second chip or losing the item's position.
           if (existingIndex >= 0) {
             const next = [...state.attachedContext];

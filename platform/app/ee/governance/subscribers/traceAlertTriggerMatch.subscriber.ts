@@ -5,8 +5,8 @@ import type { TriggerService } from "~/server/app-layer/automations/trigger.serv
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { RecordTriggerMatchPort } from "~/server/event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
-import { passesTraceOriginGuards } from "~/server/event-sourcing/pipelines/trace-processing/reactors/_originGuardedReactor";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import { passesTraceOriginGuards } from "~/server/event-sourcing/pipelines/trace-processing/subscribers/_originGuardedSubscriber";
 import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import { incrementAutomationMatchRecordsTotal } from "~/server/metrics";
 
@@ -21,8 +21,8 @@ export function createTraceAlertTriggerMatchHandler(deps: {
   ): Promise<void> => {
     if (!passesTraceOriginGuards(event, context.state)) return;
     // Events already committed with an empty aggregateId (see the traceId
-    // guard in originGate.reactor) would fail recordTriggerMatch validation
-    // and poison the reactor job. There is no trace to match a trigger
+    // guard in originGate.subscriber) would fail recordTriggerMatch validation
+    // and poison the subscriber job. There is no trace to match a trigger
     // against, so skip rather than throw.
     if (!context.aggregateId) return;
     const triggers = await deps.triggers.getActiveTraceTriggersForProject(

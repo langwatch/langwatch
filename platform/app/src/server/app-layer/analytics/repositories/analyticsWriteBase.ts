@@ -87,7 +87,7 @@ export abstract class BaseAnalyticsSlimClickHouseRepository<
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
       });
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         {
           tenantId: row.tenantId,
           ...this.config.entityIdOf(row),
@@ -127,7 +127,7 @@ export abstract class BaseAnalyticsSlimClickHouseRepository<
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         {
           tenantId,
           count: entries.length,
@@ -178,7 +178,7 @@ export abstract class BaseAnalyticsRollupClickHouseRepository<
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         {
           tenantId: row.tenantId,
           ...this.config.entityIdOf(row),
@@ -212,7 +212,7 @@ export abstract class BaseAnalyticsRollupClickHouseRepository<
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         {
           tenantId,
           count: rows.length,

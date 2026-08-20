@@ -79,6 +79,7 @@ interface OutboxSectionProps {
   grafana?: GrafanaDeepLinkConfig | null;
   canManage: boolean;
   onRedriveMessage?: (messageId: string) => void;
+  onDiscardMessage?: (message: { id: string; intentType: string }) => void;
   onReleaseLease?: (messageId: string) => void;
   actionPending?: boolean;
   now: number;
@@ -93,6 +94,7 @@ function InstanceOutboxSection({
   grafana,
   canManage,
   onRedriveMessage,
+  onDiscardMessage,
   onReleaseLease,
   actionPending,
   now,
@@ -141,6 +143,7 @@ function InstanceOutboxSection({
               grafana={grafana}
               canManage={canManage}
               onRedrive={onRedriveMessage}
+              onDiscard={onDiscardMessage}
               onReleaseLease={onReleaseLease}
               actionPending={actionPending}
             />
@@ -173,6 +176,7 @@ export function ProcessInstanceContent({
   grafana,
   canManage,
   onRedriveMessage,
+  onDiscardMessage,
   onReleaseLease,
   actionPending,
   now = Date.now(),
@@ -187,6 +191,7 @@ export function ProcessInstanceContent({
   grafana?: GrafanaDeepLinkConfig | null;
   canManage?: boolean;
   onRedriveMessage?: (messageId: string) => void;
+  onDiscardMessage?: (message: { id: string; intentType: string }) => void;
   onReleaseLease?: (messageId: string) => void;
   actionPending?: boolean;
   now?: number;
@@ -243,6 +248,7 @@ export function ProcessInstanceContent({
         grafana={grafana}
         canManage={canManage ?? false}
         onRedriveMessage={onRedriveMessage}
+        onDiscardMessage={onDiscardMessage}
         onReleaseLease={onReleaseLease}
         actionPending={actionPending}
         now={now}

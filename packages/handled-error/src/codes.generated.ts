@@ -420,6 +420,16 @@ export const goErrorCodes = {
    */
   virtual_key_disabled: { service: "aigateway", httpStatus: 403 },
   /**
+   * ErrKeyExpired — is the stop nobody pressed: the key carries an expiration
+   * date and that date has passed. The key material is intact and the key is
+   * still ACTIVE in the control plane, so the fix is a new date rather than a
+   * new secret. Distinct from revoked and disabled so a tenant can tell
+   * "extend it" from "ask an administrator" from "mint a new one".
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  virtual_key_expired: { service: "aigateway", httpStatus: 403 },
+  /**
    * ErrKeyRevoked
    *
    * @source services/aigateway/domain/errors.go

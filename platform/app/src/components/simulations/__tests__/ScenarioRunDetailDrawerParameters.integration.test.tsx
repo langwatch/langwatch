@@ -37,9 +37,6 @@ vi.mock("~/components/scenarios/RunScenarioModal", () => ({
 vi.mock("~/components/scenarios/ScenarioFormDrawer", () => ({
   ScenarioFormDrawer: () => null,
 }));
-vi.mock("../../traces/TraceDetails", () => ({
-  TraceDetails: () => null,
-}));
 vi.mock("../ScenarioRunActions", () => ({
   ScenarioRunActions: () => null,
 }));

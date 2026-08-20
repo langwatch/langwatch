@@ -31,6 +31,15 @@ Feature: CLI commands address endpoints the app actually serves
     Then it follows the cursor until there are no more pages
     And the total counts every run, not just the first page
 
+  # Deployed servers only apply the batchRunId filter when scenarioSetId is
+  # also present, and answer with the whole project's runs otherwise. A stale
+  # in-progress run from an old batch then counts as in flight forever, and
+  # the wait times out even though the batch finished in seconds.
+  Scenario: Runs from other batches never count toward the wait
+    Given the run list endpoint answers with runs from the whole project
+    When the CLI polls for the batch's progress
+    Then only runs carrying the batch's own id are tallied
+
   Scenario: A status endpoint that answers 404 ends the wait
     Given the run list endpoint answers 404
     When the CLI polls for the batch's progress

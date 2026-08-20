@@ -5,13 +5,13 @@ import {
   expandSetIdFilter,
   INTERNAL_SET_PREFIX,
 } from "~/server/scenarios/internal-set-id";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type {
   BatchHistoryItem,
   ExternalSetSummary,
   ScenarioRunData,
   ScenarioSetData,
 } from "~/server/scenarios/scenario-event.types";
-import { resolveRunStatus } from "~/server/scenarios/stall-detection";
 import {
   type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,
@@ -581,7 +581,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       itemsByBatch.set(row.BatchRunId, list);
     }
 
-    const now = Date.now();
     let globalLastUpdatedAt = 0;
 
     const batches: BatchHistoryItem[] = pageRows.map((b) => {
@@ -593,13 +592,13 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         const baseStatus = mapStatus(r.Status);
         const durationMs =
           r.DurationMs != null ? parseInt(r.DurationMs, 10) : 0;
-        const perRunUpdatedAt = Number(r.UpdatedAt);
         const hasFinished = r.FinishedAt != null && Number(r.FinishedAt) > 0;
-        const resolvedStatus = resolveRunStatus({
-          finishedStatus: hasFinished ? baseStatus : undefined,
-          lastEventTimestamp: perRunUpdatedAt,
-          now,
-        });
+        // Stored status is the only truth: unfinished runs collapse to
+        // IN_PROGRESS; stalled runs arrive as stored ERROR via the
+        // process-manager stall watchdog.
+        const resolvedStatus = hasFinished
+          ? baseStatus
+          : ScenarioRunStatus.IN_PROGRESS;
         return {
           scenarioRunId: r.ScenarioRunId,
           name: r.Name,
@@ -650,7 +649,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     sinceTimestamp,
   }: {
     projectId: string;
-    scenarioSetId: string;
+    scenarioSetId?: string;
     batchRunId: string;
     sinceTimestamp?: number;
   }): Promise<
@@ -672,6 +671,18 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       }
     }
 
+    // The batch id identifies the batch within the tenant on its own; the
+    // scenario set id narrows the scan when the caller sends one. The CLI's
+    // --wait polls with just the batch id. An empty string is a real value
+    // that selects the default set, so only an absent id drops the predicate.
+    const scenarioSetIds =
+      scenarioSetId === undefined
+        ? undefined
+        : expandSetIdFilter(scenarioSetId);
+    const setFilter = (alias: string) =>
+      scenarioSetIds
+        ? `AND ${alias}ScenarioSetId IN ({scenarioSetIds:Array(String)})`
+        : "";
     const rows = await this.queryRows<
       ClickHouseSimulationRunRow & { ExportSortKey: string }
     >(
@@ -679,27 +690,26 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
-         AND t.ScenarioSetId IN ({scenarioSetIds:Array(String)})
+         ${setFilter("t.")}
          AND t.BatchRunId = {batchRunId:String}
          AND t.ArchivedAt IS NULL
          AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
            SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
            FROM ${TABLE_NAME}
            WHERE TenantId = {tenantId:String}
-             AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+             ${setFilter("")}
              AND BatchRunId = {batchRunId:String}
            GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
          )
        ORDER BY CreatedAt ASC`,
       {
         tenantId: projectId,
-        scenarioSetIds: expandSetIdFilter(scenarioSetId),
+        ...(scenarioSetIds ? { scenarioSetIds } : {}),
         batchRunId,
       },
     );
 
-    const now = Date.now();
-    const runs = rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
+    const runs = rows.map((row) => mapClickHouseRowToScenarioRunData(row));
     const lastUpdatedAt = runs.reduce(
       (max, r) => Math.max(max, r.timestamp),
       0,
@@ -765,8 +775,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       { tenantId: projectId, scenarioSetIds: expandSetIdFilter(scenarioSetId) },
     );
 
-    const now = Date.now();
-    return rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
+    return rows.map((row) => mapClickHouseRowToScenarioRunData(row));
   }
 
   async getRunDataForScenarioSet({
@@ -1328,10 +1337,9 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         ? this.encodeExportCursor(lastRow.ExportSortKey, lastRow.ScenarioRunId)
         : undefined;
 
-    const now = Date.now();
     return {
       runs: pageRows.map((row) => ({
-        ...mapClickHouseRowToScenarioRunData(row, now),
+        ...mapClickHouseRowToScenarioRunData(row),
         scenarioSetId:
           row.ScenarioSetId === "" ? DEFAULT_SET_ID : row.ScenarioSetId,
         traceIds: row.TraceIds ?? [],
@@ -1366,9 +1374,10 @@ export class SimulationClickHouseRepository implements SimulationRepository {
    * the trade: an export that is cheaper but occasionally wrong around a range
    * boundary is not worth having.
    *
-   * Note the pass/fail filter is deliberately absent: STALLED is derived from
-   * timestamps by resolveRunStatus at map time, not stored in the table, so it
-   * cannot be expressed in SQL. Category filtering happens after mapping.
+   * Note the pass/fail filter is deliberately absent: outcome categories
+   * (success/failure/stalled/…) are derived from the mapped status by
+   * categorizeRunStatus, so filtering happens after mapping, keeping the
+   * export consistent with what the run history shows.
    */
   private buildExportFilters({
     scenarioSetId,
@@ -1514,7 +1523,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       },
     );
 
-    const now = Date.now();
-    return rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
+    return rows.map((row) => mapClickHouseRowToScenarioRunData(row));
   }
 }

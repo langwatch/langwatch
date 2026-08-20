@@ -1462,6 +1462,7 @@ func registerErrorStatusesOnce() {
 	herr.RegisterStatus(domain.ErrInvalidAPIKey, http.StatusUnauthorized)
 	herr.RegisterStatus(domain.ErrKeyRevoked, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrKeyDisabled, http.StatusForbidden)
+	herr.RegisterStatus(domain.ErrKeyExpired, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrRateLimited, http.StatusTooManyRequests)
 	herr.RegisterStatus(domain.ErrBudgetExceeded, http.StatusPaymentRequired)
 	herr.RegisterStatus(domain.ErrGuardrailBlocked, http.StatusForbidden)

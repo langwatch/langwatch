@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/langwatch/langwatch/pkg/herr"
@@ -72,7 +74,7 @@ func TestEligibleCredentials(t *testing.T) {
 			wantIDs:  []string{"anthropic_1", "openai_1", "gemini_1", "anthropic_2"},
 		},
 		{
-			name:     "explicit provider with no matching cred hard-fails as not bound",
+			name:     "explicit provider not reachable from scope hard-fails as not bound",
 			resolved: &domain.ResolvedModel{ProviderID: domain.ProviderBedrock, ModelID: "bedrock-only"},
 			wantErr:  domain.ErrProviderNotBound,
 		},
@@ -345,5 +347,276 @@ func TestProviderNames(t *testing.T) {
 		if got := providerNames(tc.in); got != tc.want {
 			t.Errorf("providerNames(%v) = %s, want %s", tc.in, got, tc.want)
 		}
+	}
+}
+
+func herrMessage(t *testing.T, err error) string {
+	t.Helper()
+	if err == nil {
+		t.Fatal("expected an error, got nil")
+	}
+	var e herr.E
+	if !errors.As(err, &e) {
+		t.Fatalf("error is not a herr.E: %v", err)
+	}
+	msg, _ := e.Meta["message"].(string)
+	return msg
+}
+
+// translatedChat is a /v1 request (no surface pin) resolved to an explicit
+// provider, so routableChain's surface trim is a no-op and the model-aware
+// trim decides. Used to drive the reason branches.
+func translatedChat(kind domain.ProviderID) *domain.Request {
+	return &domain.Request{
+		Type:     domain.RequestTypeChat,
+		Model:    "claude-3-5-sonnet",
+		Resolved: &domain.ResolvedModel{ProviderID: kind, ModelID: "claude-3-5-sonnet"},
+	}
+}
+
+// A key on a routing policy that omits the resolved provider is blocked with a
+// message that names the routing policy, so the caller learns WHY the request
+// was blocked rather than seeing an opaque wrong-provider failure.
+//
+// @scenario "A blocked request names why the resolved provider was not used"
+func TestRoutableChain_BlockedByRoutingNamesPolicy(t *testing.T) {
+	bundle := &domain.Bundle{
+		Credentials: []domain.Credential{{ID: "openai_1", ProviderID: domain.ProviderOpenAI}},
+		Config: domain.BundleConfig{
+			RoutingExcludedProviders: []domain.ExcludedModelProvider{
+				{ID: "anthropic_1", ProviderID: domain.ProviderAnthropic},
+			},
+			RoutingPolicyName: "Cheap models",
+		},
+	}
+	_, err := routableChain(context.Background(), bundle, translatedChat(domain.ProviderAnthropic))
+	if !herr.IsCode(err, domain.ErrModelNotAllowed) {
+		t.Fatalf("got err %v, want code %s", err, domain.ErrModelNotAllowed)
+	}
+	msg := herrMessage(t, err)
+	if !strings.Contains(msg, "routing policy") || !strings.Contains(msg, "Cheap models") {
+		t.Errorf("message must name the routing policy: %q", msg)
+	}
+}
+
+func TestRoutableChain_BlockedByProviderAccess(t *testing.T) {
+	bundle := &domain.Bundle{
+		Credentials: []domain.Credential{{ID: "openai_1", ProviderID: domain.ProviderOpenAI}},
+		Config: domain.BundleConfig{
+			AccessExcludedProviders: []domain.ExcludedModelProvider{
+				{ID: "anthropic_1", ProviderID: domain.ProviderAnthropic},
+			},
+		},
+	}
+	_, err := routableChain(context.Background(), bundle, translatedChat(domain.ProviderAnthropic))
+	if !herr.IsCode(err, domain.ErrModelNotAllowed) {
+		t.Fatalf("got err %v, want code %s", err, domain.ErrModelNotAllowed)
+	}
+	msg := herrMessage(t, err)
+	if !strings.Contains(msg, "provider access") {
+		t.Errorf("message must name provider access: %q", msg)
+	}
+}
+
+func TestRoutableChain_NotReachableFromScope(t *testing.T) {
+	bundle := &domain.Bundle{
+		Credentials: []domain.Credential{{ID: "openai_1", ProviderID: domain.ProviderOpenAI}},
+	}
+	_, err := routableChain(context.Background(), bundle, translatedChat(domain.ProviderAnthropic))
+	if !herr.IsCode(err, domain.ErrProviderNotBound) {
+		t.Fatalf("got err %v, want code %s", err, domain.ErrProviderNotBound)
+	}
+	msg := herrMessage(t, err)
+	if !strings.Contains(msg, "not reachable from this key's scope") {
+		t.Errorf("message must name the scope reason: %q", msg)
+	}
+}
+
+// The surface trim runs BEFORE the model-aware trim: a raw-forward route whose
+// key lacks the route's provider refuses on the surface, even when the model
+// does not infer a provider (so the model-aware trim would otherwise let the
+// chain through and dispatch the route-shaped body to a wrong vendor).
+func TestRoutableChain_RawForwardSurfaceRefusesBeforeModelTrim(t *testing.T) {
+	bundle := &domain.Bundle{
+		Credentials: []domain.Credential{{ID: "openai_1", ProviderID: domain.ProviderOpenAI}},
+	}
+	req := geminiPassthrough()
+	// A model that does not infer a provider: only the surface trim can catch
+	// the wrong-vendor dispatch here.
+	req.Resolved = &domain.ResolvedModel{ProviderID: "", ModelID: "some-unlisted-model"}
+
+	_, err := routableChain(context.Background(), bundle, req)
+	if !herr.IsCode(err, domain.ErrProviderNotBound) {
+		t.Fatalf("got err %v, want code %s", err, domain.ErrProviderNotBound)
+	}
+	msg := herrMessage(t, err)
+	if !strings.Contains(msg, "gemini") {
+		t.Errorf("the surface refusal must name the route's providers: %q", msg)
+	}
+}
+
+// A raw-forward Gemini route whose key has no Google credential because the
+// routing policy dropped Gemini names the routing policy, not the generic
+// surface not-reachable message. The surface trim empties the chain first, so
+// the reason has to reach the caller through the surface-miss branch.
+func TestRoutableChain_RawForwardSurfaceBlockedByRouting(t *testing.T) {
+	bundle := &domain.Bundle{
+		Credentials: []domain.Credential{{ID: "openai_1", ProviderID: domain.ProviderOpenAI}},
+		Config: domain.BundleConfig{
+			RoutingExcludedProviders: []domain.ExcludedModelProvider{
+				{ID: "gemini_1", ProviderID: domain.ProviderGemini},
+			},
+			RoutingPolicyName: "Cheap models",
+		},
+	}
+	req := geminiPassthrough()
+	req.Resolved = &domain.ResolvedModel{ProviderID: domain.ProviderGemini, ModelID: "gemini-2.5-flash"}
+
+	_, err := routableChain(context.Background(), bundle, req)
+	if !herr.IsCode(err, domain.ErrModelNotAllowed) {
+		t.Fatalf("got err %v, want code %s", err, domain.ErrModelNotAllowed)
+	}
+	msg := herrMessage(t, err)
+	if !strings.Contains(msg, "routing policy") || !strings.Contains(msg, "Cheap models") {
+		t.Errorf("message must name the routing policy: %q", msg)
+	}
+}
+
+// The same raw-forward surface miss, but Gemini sits outside the key's provider
+// access rather than being dropped by the routing policy.
+func TestRoutableChain_RawForwardSurfaceBlockedByProviderAccess(t *testing.T) {
+	bundle := &domain.Bundle{
+		Credentials: []domain.Credential{{ID: "openai_1", ProviderID: domain.ProviderOpenAI}},
+		Config: domain.BundleConfig{
+			AccessExcludedProviders: []domain.ExcludedModelProvider{
+				{ID: "gemini_1", ProviderID: domain.ProviderGemini},
+			},
+		},
+	}
+	req := geminiPassthrough()
+	req.Resolved = &domain.ResolvedModel{ProviderID: domain.ProviderGemini, ModelID: "gemini-2.5-flash"}
+
+	_, err := routableChain(context.Background(), bundle, req)
+	if !herr.IsCode(err, domain.ErrModelNotAllowed) {
+		t.Fatalf("got err %v, want code %s", err, domain.ErrModelNotAllowed)
+	}
+	msg := herrMessage(t, err)
+	if !strings.Contains(msg, "provider access") {
+		t.Errorf("message must name provider access: %q", msg)
+	}
+}
+
+// A raw-forward surface miss where the route's provider is genuinely not
+// reachable from the key's scope keeps the surface's own message: nothing in
+// the excluded lists names it, so there is no more specific reason to give.
+func TestRoutableChain_RawForwardSurfaceMissWithoutExclusionKeepsSurfaceReason(t *testing.T) {
+	bundle := &domain.Bundle{
+		Credentials: []domain.Credential{{ID: "openai_1", ProviderID: domain.ProviderOpenAI}},
+	}
+	req := geminiPassthrough()
+	req.Resolved = &domain.ResolvedModel{ProviderID: domain.ProviderGemini, ModelID: "gemini-2.5-flash"}
+
+	_, err := routableChain(context.Background(), bundle, req)
+	if !herr.IsCode(err, domain.ErrProviderNotBound) {
+		t.Fatalf("got err %v, want code %s", err, domain.ErrProviderNotBound)
+	}
+	msg := herrMessage(t, err)
+	if !strings.Contains(msg, "gemini") {
+		t.Errorf("the surface refusal must name the route's providers: %q", msg)
+	}
+}
+
+// The Phase 1 configuration that surfaced this gap: a key whose allowlist names
+// only a scope-reachable provider its routing policy omits. The bundle then
+// carries no dispatchable credential at all, so the chain is empty. An explicit
+// request for that provider must still be told the routing policy blocked it,
+// not the generic no_provider_configured that candidateChain raises from an
+// empty chain. No spare credential is seeded: an unrelated one is exactly what
+// hid the gap.
+func TestRoutableChain_EmptyChainBlockedByRoutingNamesPolicy(t *testing.T) {
+	bundle := &domain.Bundle{
+		Config: domain.BundleConfig{
+			RoutingExcludedProviders: []domain.ExcludedModelProvider{
+				{ID: "anthropic_1", ProviderID: domain.ProviderAnthropic},
+			},
+			RoutingPolicyName: "Cheap models",
+		},
+	}
+	_, err := routableChain(context.Background(), bundle, translatedChat(domain.ProviderAnthropic))
+	if !herr.IsCode(err, domain.ErrModelNotAllowed) {
+		t.Fatalf("got err %v, want code %s", err, domain.ErrModelNotAllowed)
+	}
+	if herr.IsCode(err, domain.ErrNoProviderConfigured) {
+		t.Fatal("an excluded provider must not read as an unconfigured organization")
+	}
+	msg := herrMessage(t, err)
+	if !strings.Contains(msg, "routing policy") || !strings.Contains(msg, "Cheap models") {
+		t.Errorf("message must name the routing policy: %q", msg)
+	}
+}
+
+// The raw-forward variant of the empty-chain gap: a Gemini passthrough whose key
+// dispatches to nothing because Gemini is the only allowlisted provider and the
+// routing policy omits it.
+func TestRoutableChain_EmptyChainRawForwardBlockedByRoutingNamesPolicy(t *testing.T) {
+	bundle := &domain.Bundle{
+		Config: domain.BundleConfig{
+			RoutingExcludedProviders: []domain.ExcludedModelProvider{
+				{ID: "gemini_1", ProviderID: domain.ProviderGemini},
+			},
+			RoutingPolicyName: "Cheap models",
+		},
+	}
+	req := geminiPassthrough()
+	req.Resolved = &domain.ResolvedModel{ProviderID: domain.ProviderGemini, ModelID: "gemini-2.5-flash"}
+
+	_, err := routableChain(context.Background(), bundle, req)
+	if !herr.IsCode(err, domain.ErrModelNotAllowed) {
+		t.Fatalf("got err %v, want code %s", err, domain.ErrModelNotAllowed)
+	}
+	if herr.IsCode(err, domain.ErrNoProviderConfigured) {
+		t.Fatal("an excluded provider must not read as an unconfigured organization")
+	}
+	msg := herrMessage(t, err)
+	if !strings.Contains(msg, "routing policy") || !strings.Contains(msg, "Cheap models") {
+		t.Errorf("message must name the routing policy: %q", msg)
+	}
+}
+
+// The same empty chain, but the only allowlisted provider is outside provider
+// access rather than dropped by the routing policy.
+func TestRoutableChain_EmptyChainBlockedByProviderAccess(t *testing.T) {
+	bundle := &domain.Bundle{
+		Config: domain.BundleConfig{
+			AccessExcludedProviders: []domain.ExcludedModelProvider{
+				{ID: "anthropic_1", ProviderID: domain.ProviderAnthropic},
+			},
+		},
+	}
+	_, err := routableChain(context.Background(), bundle, translatedChat(domain.ProviderAnthropic))
+	if !herr.IsCode(err, domain.ErrModelNotAllowed) {
+		t.Fatalf("got err %v, want code %s", err, domain.ErrModelNotAllowed)
+	}
+	msg := herrMessage(t, err)
+	if !strings.Contains(msg, "provider access") {
+		t.Errorf("message must name provider access: %q", msg)
+	}
+}
+
+// An empty chain with no exclusion metadata is a genuinely unconfigured bundle:
+// routableChain leaves it empty with no error, so candidateChain still raises
+// no_provider_configured. The reason branch must not manufacture a block here.
+func TestRoutableChain_EmptyChainNoExclusionStaysUnconfigured(t *testing.T) {
+	bundle := &domain.Bundle{}
+	creds, err := routableChain(
+		context.Background(),
+		bundle,
+		translatedChat(domain.ProviderAnthropic),
+	)
+	if err != nil {
+		t.Fatalf("a bundle with no exclusion metadata must stay unconfigured, got %v", err)
+	}
+	if len(creds) != 0 {
+		t.Errorf("expected an empty chain, got %v", creds)
 	}
 }

@@ -1,5 +1,5 @@
 /**
- * Specifications the governed policy admits, including one sitting exactly on
+ * Specifications the LangWatchQL policy admits, including one sitting exactly on
  * each ceiling that can be reached with a checked-in file.
  */
 

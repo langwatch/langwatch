@@ -4,7 +4,7 @@ import { createLogger } from "@langwatch/observability";
 /**
  * GovernanceOcsfEventsClickHouseRepository — write side of the
  * `governance_ocsf_events` fold projection. Each call inserts ONE
- * OCSF row keyed by (TenantId, EventId) so reactor replays of the
+ * OCSF row keyed by (TenantId, EventId) so subscriber replays of the
  * same event collapse at merge time.
  *
  * Read side is the SIEM export tRPC procedure (3f) which cursor-

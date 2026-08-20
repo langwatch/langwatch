@@ -135,7 +135,7 @@ dev's CLI / agent  ──┐
                 │  - canonicalise attributes          │
                 │  - cost calc per token usage        │
                 │  - emit to ClickHouse               │
-                │  - emit to GatewayBudget reactor    │
+                │  - emit to GatewayBudget subscriber    │
                 └────────────────────────────────────┘
 ```
 
@@ -258,7 +258,7 @@ What's on this branch today:
 - ✅ RoutingPolicy admin UI + provider-cred org validation
 - ✅ Personal VirtualKeys + admin catalog
 - ✅ Unified `langwatch` CLI (10 governance subcommands, device-flow auth)
-- ✅ `/me` + `/me/settings` + `/settings/routing-policies`
+- ✅ `/me` + `/me/settings` + `/gateway/routing-policies`
 - ✅ AI Gateway with personal-key support
 - ✅ `user.personalBudget` tRPC + `BudgetExceededBanner`
 - ✅ Helm NOTES + post-install docs

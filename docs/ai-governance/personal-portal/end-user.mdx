@@ -29,11 +29,11 @@ Click expands the tile inline with the setup walkthrough:
 │                                                                     │
 │  This will:                                                         │
 │   1. Open a browser tab to sign you in via your company SSO        │
-│   2. Provision a personal virtual key bound to your identity       │
+│   2. Ask whether to use your own subscription or an API key         │
 │   3. exec `claude` with the right env vars pre-injected            │
 │                                                                     │
-│  Always-on: paste this in your ~/.zshrc                            │
-│   $ eval "$(langwatch init-shell zsh)"                       [📋]  │
+│  No wrapper: wire it once with                                     │
+│   $ langwatch instrument claude                              [📋]  │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -41,9 +41,13 @@ The first time you run the command:
 
 1. Your terminal prints a device-flow URL with a one-time code.
 2. Your browser opens. You sign in via your company SSO.
-3. The CLI receives a personal virtual key, persists it at
-   `~/.langwatch/config.json` (mode 0600), and exec's the underlying
-   tool (Claude Code in this case).
+3. The CLI asks how to run the tool. Pick **Using an API key** for the
+   gateway, or your own subscription to send telemetry only. The CLI
+   remembers the answer.
+4. On the gateway answer, the CLI receives a personal virtual key,
+   persists it at `~/.langwatch/config.json` (mode 0600), and exec's the
+   underlying tool (Claude Code in this case). On the subscription
+   answer, no virtual key is issued.
 
 The personal virtual key is bound to your identity via JWT claims
 (`organization_id`, `principal_id`, `personal: true`), so every request
@@ -114,7 +118,7 @@ HTTP 422 response with an actionable hint rather than a green key that
 returns 504 on every call.
 
 Ask your admin to bind at least one provider in
-`/settings/governance/routing-policies`. Once a provider is bound,
+`/gateway/routing-policies`. Once a provider is bound,
 retry, issuance will succeed and your key works immediately.
 
 ### When to create a project instead
@@ -170,7 +174,7 @@ If your admin hasn't published the catalog yet, you'll see:
 
 This is normal during a brand-new organization's onboarding. Ask your
 admin to import the starter pack at
-`/settings/governance/tool-catalog`.
+`/governance/tool-catalog`.
 
 ## Where to next
 

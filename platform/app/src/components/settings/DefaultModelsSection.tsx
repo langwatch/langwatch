@@ -54,6 +54,7 @@ import {
   resolveScopeFilter,
   type ScopeHierarchy,
 } from "~/utils/filterProvidersByScope";
+import { scopeBreadthRank } from "~/utils/scopeBreadth";
 // Wrapped Menu uses a Portal under the hood so Menu.Content overlays
 // the page instead of rendering inline inside the <td>, which would
 // push the row's other cells to a wrapped line on open (caught on
@@ -77,6 +78,30 @@ const ROLE_LABEL: Record<ModelRoleKey, string> = {
   LANGY: "Langy",
   EMBEDDINGS: "Embeddings",
 };
+
+/**
+ * Broadest scope a config attaches to, in breadth order (organization, then
+ * team, then project), tie-broken by name. Drives the table row order so a
+ * config sorts by the widest tier it reaches.
+ */
+function broadestScopeOfConfig(
+  scopes: ConfigRow["scopes"],
+): ConfigRow["scopes"][number] | undefined {
+  return [...scopes].sort(
+    (a, b) =>
+      scopeBreadthRank(a.type) - scopeBreadthRank(b.type) ||
+      (a.name ?? "").localeCompare(b.name ?? ""),
+  )[0];
+}
+
+/** Orders config rows broadest scope first, then by that scope's name. */
+function compareConfigsByScopeThenName(a: ConfigRow, b: ConfigRow): number {
+  const sa = broadestScopeOfConfig(a.scopes);
+  const sb = broadestScopeOfConfig(b.scopes);
+  const ra = sa ? scopeBreadthRank(sa.type) : Number.MAX_SAFE_INTEGER;
+  const rb = sb ? scopeBreadthRank(sb.type) : Number.MAX_SAFE_INTEGER;
+  return ra - rb || (sa?.name ?? "").localeCompare(sb?.name ?? "");
+}
 
 interface DefaultModelsSectionProps {
   /** Optional controlled filter from the page-level header dropdown.
@@ -142,7 +167,6 @@ export function DefaultModelsSection({
         title: "Config deleted",
         type: "success",
         duration: 2500,
-        meta: { closable: true },
       });
     } catch (err) {
       showErrorToast({
@@ -173,16 +197,22 @@ export function DefaultModelsSection({
       currentTeamId: team?.id ?? null,
       currentProjectId: project?.id ?? null,
     });
-    if (resolved.kind === "all") return all;
-    return all.filter((c) =>
-      c.scopes.some((s) =>
-        isScopeInFilter(
-          { scopeType: s.type, scopeId: s.id },
-          resolved,
-          effectiveHierarchy,
-        ),
-      ),
-    );
+    const filtered =
+      resolved.kind === "all"
+        ? all
+        : all.filter((c) =>
+            c.scopes.some((s) =>
+              isScopeInFilter(
+                { scopeType: s.type, scopeId: s.id },
+                resolved,
+                effectiveHierarchy,
+              ),
+            ),
+          );
+    // Rows read broadest scope first (organization, then team, then project),
+    // and by scope name within a tier, so the same order the Model Providers
+    // table above and the virtual-key picker use.
+    return [...filtered].sort(compareConfigsByScopeThenName);
   }, [
     dataQuery.data?.configs,
     filter,

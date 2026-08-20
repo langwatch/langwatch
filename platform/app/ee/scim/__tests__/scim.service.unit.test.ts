@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { User } from "~/generated/prisma/client";
+import type { PrismaClient, User } from "~/generated/prisma/client";
 import { ScimService } from "../scim.service";
 
 // An App carrying no Redis, so the revoke helper reachable from the SCIM
@@ -12,10 +13,37 @@ vi.mock("~/server/app-layer/app", () => ({
   tryGetApp: () => ({ redis: null }),
 }));
 
+// A directory push is reconciled against the projection and emitted as
+// grants-ledger commands (ADR-092 decision 18), so the writer is the seam.
+const ledger = vi.hoisted(() => ({
+  attachBindings: vi.fn(),
+  revokeBindings: vi.fn(),
+  revokeBindingsWhere: vi.fn(),
+  offboardMember: vi.fn(),
+  defineRole: vi.fn(),
+  deleteRole: vi.fn(),
+}));
+vi.mock("~/server/app-layer/authz/ledger", () => ({
+  grantsLedgerWriter: () => ledger,
+}));
+
 function createMockPrisma() {
+  // The reconciler reads the grants this push is authoritative over. The
+  // write path must never reach the three write methods: since PR 2 the
+  // tables are projection-fed and the ledger is the only writer. Each throws
+  // so a regression reads as this named failure rather than as a mock
+  // missing a method.
+  const forbiddenWrite = (method: string) =>
+    vi.fn().mockImplementation(() => {
+      throw new Error(
+        `roleBinding.${method} reached from ScimService — the grants ledger is the only writer`,
+      );
+    });
   const roleBinding = {
-    create: vi.fn().mockResolvedValue({}),
-    deleteMany: vi.fn().mockResolvedValue({}),
+    findMany: vi.fn().mockResolvedValue([]),
+    create: forbiddenWrite("create"),
+    update: forbiddenWrite("update"),
+    deleteMany: forbiddenWrite("deleteMany"),
   };
   const organizationUser = {
     findUnique: vi.fn(),
@@ -42,7 +70,7 @@ function createMockPrisma() {
       .fn()
       .mockImplementation((ops: unknown[]) => Promise.all(ops)),
   };
-  return mock as unknown as Parameters<typeof ScimService.create>[0];
+  return mock as unknown as PrismaClient;
 }
 
 function buildMockUser(overrides: Partial<User> = {}): User {
@@ -68,8 +96,12 @@ describe("ScimService", () => {
   let service: ScimService;
 
   beforeEach(() => {
+    vi.clearAllMocks();
+    ledger.attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
+    ledger.revokeBindings.mockResolvedValue(undefined);
+    ledger.offboardMember.mockResolvedValue(undefined);
     prisma = createMockPrisma();
-    service = ScimService.create(prisma);
+    service = ScimService.create({ prisma });
   });
 
   describe("toScimUser()", () => {
@@ -211,6 +243,50 @@ describe("ScimService", () => {
         });
       });
     });
+
+    describe("when the membership already exists (P2002 race)", () => {
+      it("reconciles the membership grant before returning the user", async () => {
+        const existingUser = buildMockUser();
+        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+          existingUser,
+        );
+        (
+          prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
+        ).mockResolvedValue(null);
+        (
+          prisma.organizationUser.create as ReturnType<typeof vi.fn>
+        ).mockRejectedValue(
+          new PrismaClientKnownRequestError("Unique constraint failed", {
+            code: "P2002",
+            clientVersion: "7.0.0",
+          }),
+        );
+
+        const result = await service.createUser({
+          request: {
+            schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+            userName: "alice@acme.com",
+          },
+          organizationId: "org-1",
+        });
+
+        expect(result).toHaveProperty("id", "user-1");
+        expect(prisma.roleBinding.findMany).toHaveBeenCalled();
+        expect(ledger.attachBindings).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId: "org-1",
+            bindings: expect.arrayContaining([
+              expect.objectContaining({
+                principal: { userId: "user-1" },
+                role: "MEMBER",
+                scopeType: "ORGANIZATION",
+                scopeId: "org-1",
+              }),
+            ]),
+          }),
+        );
+      });
+    });
   });
 
   describe("getUser()", () => {
@@ -326,6 +402,30 @@ describe("ScimService", () => {
         expect(prisma.user.update).toHaveBeenCalledWith({
           where: { id: "user-1" },
           data: { deactivatedAt: expect.any(Date) },
+        });
+      });
+
+      it("issues an offboard sweep instead of an id-diff revoke, so a grant the projection hasn't caught up to still gets swept", async () => {
+        (
+          prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({
+          userId: "user-1",
+          organizationId: "org-1",
+        });
+        (
+          prisma.roleBinding.findMany as ReturnType<typeof vi.fn>
+        ).mockResolvedValue([{ id: "rb-1" }, { id: "rb-2" }]);
+        (prisma.user.update as ReturnType<typeof vi.fn>).mockResolvedValue(
+          buildMockUser({ deactivatedAt: new Date() }),
+        );
+
+        await service.deleteUser({ id: "user-1", organizationId: "org-1" });
+
+        expect(ledger.offboardMember).toHaveBeenCalledWith({
+          organizationId: "org-1",
+          userId: "user-1",
+          revokedGrantIds: ["rb-1", "rb-2"],
+          actor: { type: "system", id: "system:scim" },
         });
       });
     });

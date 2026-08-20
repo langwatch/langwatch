@@ -84,7 +84,14 @@ const (
 	// ErrKeyDisabled is the REVERSIBLE stop: the key material is intact and
 	// an administrator can re-enable it. Distinct from revoked (one-way)
 	// so tenant tooling can branch on which one it is.
-	ErrKeyDisabled  = herr.Code("virtual_key_disabled")
+	ErrKeyDisabled = herr.Code("virtual_key_disabled")
+	// ErrKeyExpired is the stop nobody pressed: the key carries an
+	// expiration date and that date has passed. The key material is intact
+	// and the key is still ACTIVE in the control plane, so the fix is a new
+	// date rather than a new secret. Distinct from revoked and disabled so a
+	// tenant can tell "extend it" from "ask an administrator" from "mint a
+	// new one".
+	ErrKeyExpired   = herr.Code("virtual_key_expired")
 	ErrAuthUpstream = herr.Code("auth_upstream_unavailable")
 	// ErrNoProviderConfigured means the virtual key's bundle carries zero
 	// provider credentials — the organization has no ModelProvider configured.
@@ -113,3 +120,9 @@ const (
 	// session is voice nobody can bill and a cap nobody can enforce.
 	ErrRealtimeRegistryUnavailable = herr.Code("realtime_registry_unavailable")
 )
+
+// KeyExpiredMessage is what a tenant reads when a key's expiration date has
+// passed. One string in one place: the control plane's 403 and the auth
+// cache's own check are the same answer to the same person, and two copies of
+// it drift.
+const KeyExpiredMessage = "This key has expired. Extend its expiration date, or create a new key."

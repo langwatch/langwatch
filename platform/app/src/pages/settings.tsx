@@ -179,9 +179,6 @@ function SettingsForm({
             title: "Organization updated",
             description: "Your organization settings have been saved",
             type: "success",
-            meta: {
-              closable: true,
-            },
           });
         },
         onError: () => {
@@ -189,9 +186,6 @@ function SettingsForm({
             title: "Failed to update organization",
             description: "Your changes could not be saved. Please try again.",
             type: "error",
-            meta: {
-              closable: true,
-            },
           });
         },
       },
@@ -650,9 +644,6 @@ function ProjectSettingsForm({ project }: { project: Project }) {
             title: "Project updated",
             description: "Your project settings have been saved",
             type: "success",
-            meta: {
-              closable: true,
-            },
           });
         },
         onError: () => {
@@ -660,9 +651,6 @@ function ProjectSettingsForm({ project }: { project: Project }) {
             title: "Failed to update project",
             description: "Your changes could not be saved. Please try again.",
             type: "error",
-            meta: {
-              closable: true,
-            },
           });
         },
       },

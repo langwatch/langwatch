@@ -31,6 +31,7 @@ import {
   GatewayTraceProjectRequiredError,
   GatewayTraceProjectUnknownError,
   translateExternalIdConflict,
+  VirtualKeyExpiryInPastError,
 } from "./errors";
 import {
   identityPatchData,
@@ -39,7 +40,7 @@ import {
 } from "./resourceMetadata";
 import {
   decideTraceDestination,
-  eligibleModelProvidersForVk,
+  scopeReachableModelProvidersForVk,
   type TraceDestinationInput,
 } from "./scopeResolver";
 import {
@@ -144,6 +145,13 @@ export type CreateVirtualKeyInput = {
    * time. Policy must belong to `organizationId`.
    */
   routingPolicyId?: string | null;
+  /**
+   * When the key stops serving. Absent or null means it never expires. A
+   * date that has already passed is refused rather than stored: the key
+   * would be dead on arrival and nothing about its first refusal would
+   * point back at this field.
+   */
+  expiresAt?: Date | null;
   config?: Partial<VirtualKeyConfig>;
   /**
    * USER (default) for keys created via the gateway UI / API; LANGY when
@@ -173,6 +181,13 @@ export type UpdateVirtualKeyInput = {
   traceProjectId?: string | null;
   routingPolicyId?: string | null;
   routingMode?: VirtualKeyRoutingMode;
+  /**
+   * Undefined leaves the expiration where it is; null clears it, so the key
+   * never expires; a date moves it. Extending an expired key is the whole
+   * reason expiry is a date rather than a status, so a key whose date has
+   * already passed accepts this edit like any other.
+   */
+  expiresAt?: Date | null;
   config?: Partial<VirtualKeyConfig>;
   /**
    * Undefined leaves the key's budget alone; a value creates or updates
@@ -290,6 +305,7 @@ export class VirtualKeyService {
       input.routingPolicyId ?? null,
     );
     assertProvidersAllowedShape(input.config?.providersAllowed);
+    assertExpiryInFuture({ expiresAt: input.expiresAt });
 
     const id = this.nextVirtualKeyId();
 
@@ -318,6 +334,7 @@ export class VirtualKeyService {
             createdById: input.actorUserId,
             scopes: input.scopes,
             traceProjectId,
+            expiresAt: input.expiresAt ?? null,
             routingPolicyId: input.routingPolicyId ?? null,
             routingMode,
             purpose: input.purpose,
@@ -419,6 +436,7 @@ export class VirtualKeyService {
           )
         : existing.routingMode;
     assertProvidersAllowedShape(input.config?.providersAllowed);
+    assertExpiryInFuture({ expiresAt: input.expiresAt });
 
     const updated = await this.prisma
       .$transaction(async (tx) => {
@@ -446,6 +464,9 @@ export class VirtualKeyService {
             ...identityPatchData(input),
             ...(input.routingPolicyId !== undefined
               ? { routingPolicyId: input.routingPolicyId }
+              : {}),
+            ...(input.expiresAt !== undefined
+              ? { expiresAt: input.expiresAt }
               : {}),
             traceProjectId,
             routingMode,
@@ -998,10 +1019,13 @@ export class VirtualKeyService {
   }
 
   /**
-   * An explicit provider allowlist may only name providers the key can
-   * actually reach through its scope graph. Without this a key could be
-   * saved pointing at another team's provider row and the mistake would
-   * only surface as an unexplained "model not available" at dispatch.
+   * An explicit provider allowlist may only name providers the key can reach
+   * through its SCOPE graph. It is validated against the scope-reachable set,
+   * not the routing-policy-narrowed dispatch set: a provider the scope reaches
+   * but the key's routing policy omits is still a valid allowlist entry,
+   * because the policy blocks it at dispatch, not at save. Blocking the save
+   * too would be over-strict. A provider the scope does not reach at all still
+   * fails here, so a key can never point at another team's provider row.
    */
   private async assertProvidersAllowedReachable(
     vk: VirtualKeyWithScopes,
@@ -1009,9 +1033,13 @@ export class VirtualKeyService {
     tx: Prisma.TransactionClient,
   ): Promise<void> {
     if (!providersAllowed) return;
-    const eligible = await eligibleModelProvidersForVk(this.prisma, vk, tx);
-    const eligibleIds = new Set(eligible.map((mp) => mp.id));
-    const unreachable = providersAllowed.filter((id) => !eligibleIds.has(id));
+    const reachable = await scopeReachableModelProvidersForVk(
+      this.prisma,
+      vk,
+      tx,
+    );
+    const reachableIds = new Set(reachable.map((mp) => mp.id));
+    const unreachable = providersAllowed.filter((id) => !reachableIds.has(id));
     if (unreachable.length > 0) {
       throw new TRPCError({
         code: "BAD_REQUEST",
@@ -1091,6 +1119,25 @@ function assertProvidersAllowedShape(
       message:
         "providers_allowed_empty: select at least one provider, or allow all providers",
     });
+  }
+}
+
+/**
+ * A key is never written already expired.
+ *
+ * Absence leaves the stored date alone and null clears it, so only a real
+ * date is checked. The comparison is against the moment of the write, which
+ * makes "now" itself a refusal: a key that expires at the instant it is
+ * saved serves nothing and reads as a bug in whatever wrote it.
+ */
+function assertExpiryInFuture({
+  expiresAt,
+}: {
+  expiresAt: Date | null | undefined;
+}): void {
+  if (!expiresAt) return;
+  if (expiresAt.getTime() <= Date.now()) {
+    throw new VirtualKeyExpiryInPastError();
   }
 }
 

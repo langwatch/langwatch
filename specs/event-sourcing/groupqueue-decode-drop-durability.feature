@@ -7,21 +7,21 @@ Feature: GroupQueue decode-drop durability and attribution
   not destroyed on the way out.
 
   # Issue #5538. Prod: "Failed to parse staged job data" 100+ times in ~31h across
-  # 12 reactors, biggest single loser scenario simulation runs.
+  # 12 subscribers, biggest single loser scenario simulation runs.
   #
   # WHY THIS IS P1, and the thing every reader gets wrong:
   #   Every discarding path in this module is justified by "recover via event
-  #   replay". For reactor-bearing folds that claim is FALSE. The replay service
-  #   rebuilds fold projections and never invokes reactors (projectionRouter.ts
-  #   :61-71); replay's only reactor references (replayMarkers.ts, the done
+  #   replay". For subscriber-bearing folds that claim is FALSE. The replay service
+  #   rebuilds fold projections and never invokes subscribers (projectionRouter.ts
+  #   :61-71); replay's only subscriber references (replayMarkers.ts, the done
   #   markers) exist to SUPPRESS re-fires. governanceOcsfEventsSync
   #   (OCSF security/audit) and governanceKpisSync are both registered
-  #   via builder.withReactor("traceSummary", ...) — on a fold, where replay
+  #   via builder.withSubscriber(..., { fold: "traceSummary" }) — on a fold, where replay
   #   never reaches them. So a dropped audit event is permanently
   #   lost. Scoped honestly: fold/map drops ARE replay-covered (the fold/map
-  #   engine in replayEngine.ts drives both) — the falsity is reactor-specific.
+  #   engine in replayEngine.ts drives both) — the falsity is subscriber-specific.
   #
-  #   Do not confuse this with idempotency. Those reactors cite a
+  #   Do not confuse this with idempotency. Those subscribers cite a
   #   ReplacingMergeTree key as their "idempotency" — that makes a SECOND firing
   #   harmless, but nothing produces a second firing.
   #
@@ -42,8 +42,8 @@ Feature: GroupQueue decode-drop durability and attribution
   # Scope (Option A). This spec makes every loss named, counted, and
   # non-destructive. It does NOT make missing-blob drops recoverable — that body
   # is genuinely gone, and that loss is irreducible at this layer. Fully
-  # discharging durability for reactor jobs needs a re-fire key + driver, split
-  # to follow-ups: reactor jobs stage {event, foldState} with no top-level .id,
+  # discharging durability for subscriber jobs needs a re-fire key + driver, split
+  # to follow-ups: subscriber jobs stage {event, foldState} with no top-level .id,
   # so generateStagedJobId falls back to crypto.randomUUID() and the event id
   # exists only inside the lost blob. You cannot drive what you cannot name.
 

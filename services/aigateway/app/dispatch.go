@@ -143,7 +143,7 @@ func translateWalkError(ctx context.Context, err error) error {
 //     iterated; with several simultaneous exclusions any of them is an
 //     accurate answer to "why was nothing dispatchable").
 func (a *App) candidateChain(ctx context.Context, call *pipeline.Call) ([]domain.Credential, error) {
-	creds, err := routableChain(ctx, call.Request, call.Bundle.Credentials)
+	creds, err := routableChain(ctx, call.Bundle, call.Request)
 	if err != nil {
 		return nil, err
 	}

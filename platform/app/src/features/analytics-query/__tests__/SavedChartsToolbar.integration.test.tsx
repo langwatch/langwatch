@@ -9,7 +9,7 @@
  * Save with a chart open writes back to that chart instead of quietly leaving
  * them with two.
  *
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

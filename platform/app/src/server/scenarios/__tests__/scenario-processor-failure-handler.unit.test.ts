@@ -59,7 +59,8 @@ describe("handleFailedJobResult", () => {
         id: "scen_456",
       });
 
-      // And: failureEmitter.ensureFailureEventsEmitted is called with all data
+      // And: failureEmitter.ensureFailureEventsEmitted is called with all data,
+      // including the run's target so a dead dev tunnel can be named.
       expect(mockEnsureFailureEventsEmitted).toHaveBeenCalledWith({
         projectId: "proj_123",
         scenarioId: "scen_456",
@@ -69,6 +70,7 @@ describe("handleFailedJobResult", () => {
         error: "Prefetch failed: Scenario not found",
         name: "Test Scenario",
         description: "Test description for the scenario",
+        target: { type: "http", referenceId: "agent_123" },
       });
     });
 

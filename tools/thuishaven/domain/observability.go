@@ -44,18 +44,31 @@ type ObservabilityEndpoints struct {
 	GrafanaPort  int `json:"grafanaPort"`
 	OTLPHTTPPort int `json:"otlpHttpPort"`
 	OTLPGRPCPort int `json:"otlpGrpcPort"`
+	// PyroscopePort is Pyroscope's HTTP port — both the profile ingest endpoint
+	// services push to and the query API the provisioned Grafana datasource reads.
+	//
+	// The bundle has run Pyroscope since well before the 0.28.0 pin and provisions
+	// a `pyroscope` datasource over it; the port was simply never published, so the
+	// process was running, reachable from Grafana inside the container, and
+	// unreachable from anything on the host that wanted to push it a profile.
+	PyroscopePort int `json:"pyroscopePort"`
 }
 
 // DefaultObservabilityEndpoints is the conventional port set. They are fixed
 // rather than ephemeral because agents and gcx all need to find
 // the stack without asking haven first.
 func DefaultObservabilityEndpoints() ObservabilityEndpoints {
-	return ObservabilityEndpoints{GrafanaPort: 3000, OTLPHTTPPort: 4318, OTLPGRPCPort: 4317}
+	return ObservabilityEndpoints{GrafanaPort: 3000, OTLPHTTPPort: 4318, OTLPGRPCPort: 4317, PyroscopePort: 4040}
 }
 
 // OTLPHTTPURL is the collector endpoint every service exports to.
 func (e ObservabilityEndpoints) OTLPHTTPURL() string {
 	return fmt.Sprintf("http://127.0.0.1:%d", e.OTLPHTTPPort)
+}
+
+// PyroscopeURL is where services push CPU and heap profiles.
+func (e ObservabilityEndpoints) PyroscopeURL() string {
+	return fmt.Sprintf("http://127.0.0.1:%d", e.PyroscopePort)
 }
 
 // GrafanaURL is where the UI and the Grafana HTTP API answer.

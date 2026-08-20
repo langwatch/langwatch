@@ -15,9 +15,15 @@ import type {
   Project,
 } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
+// A pure rule with a type-only dependency of its own, so reading it here adds
+// no module cycle back into the Langy feature.
+import { classifyForLangy } from "~/server/app-layer/langy/langyPermissionPolicy";
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
 import { getTokenType } from "./api-key-token.utils";
-import { ApiKeyPermissionDeniedError } from "./errors";
+import {
+  ApiKeyPermissionDeniedError,
+  ApiKeyPermissionNotDelegableError,
+} from "./errors";
 import {
   type OrgResolution,
   type OrgResolvedToken,
@@ -647,22 +653,42 @@ export async function enforceApiKeyCeiling({
   });
 
   if (!allowed) {
+    // A Langy session key is refused for two different reasons that look
+    // identical from here: the human it mirrors does not hold the permission,
+    // or Langy is never delegated it at all. Only the first one is fixed by a
+    // wider key, so the policy that decides the second gets to say so.
+    const langyVerdict = resolved.isLangySessionKey
+      ? classifyForLangy(permission)
+      : undefined;
+    const notDelegableReason =
+      langyVerdict?.disposition === "excluded"
+        ? langyVerdict.reason
+        : undefined;
+
     permissionLogger.warn(
       {
         apiKeyId: resolved.apiKeyId,
         userId: resolved.userId,
         projectId: resolved.project.id,
         permission,
+        // The policy's own words, which name the constants a reader of the
+        // rule needs and a customer must never see.
+        ...(notDelegableReason ? { notDelegableReason } : {}),
       },
       "API key ceiling check failed",
     );
-    throw new ApiKeyPermissionDeniedError(permission, {
-      meta: {
-        apiKeyId: resolved.apiKeyId,
-        userId: resolved.userId,
-        projectId: resolved.project.id,
-      },
-    });
+    const meta = {
+      apiKeyId: resolved.apiKeyId,
+      userId: resolved.userId,
+      projectId: resolved.project.id,
+    };
+    if (notDelegableReason) {
+      throw new ApiKeyPermissionNotDelegableError(permission, {
+        subject: "Langy",
+        meta,
+      });
+    }
+    throw new ApiKeyPermissionDeniedError(permission, { meta });
   }
 }
 
@@ -689,7 +715,8 @@ export function apiKeyCeilingDenialResponse(error: unknown): {
 } {
   if (
     HandledError.isHandled(error) &&
-    error.code === "api_key_permission_denied"
+    (error.code === "api_key_permission_denied" ||
+      error.code === "api_key_permission_not_delegable")
   ) {
     const { statusCode, body } = handledErrorResponseBody(error);
     return { status: statusCode, body, message: error.message };

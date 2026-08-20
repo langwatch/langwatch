@@ -194,6 +194,42 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
     Then the connections are closed anyway
     So that nothing else has to reclaim handles no dying process will free
 
+  # The projection registry must outlive the queue that feeds it
+  #
+  # 2026-08-17: `EventSourcing.close()` closed the projection registry BEFORE
+  # the global queue. Closing the registry only releases its router, and every
+  # dispatch arriving afterwards drops its events — the guard logs and RETURNS,
+  # nothing is thrown, and the one caller (`eventSourcingService`) catches the
+  # dispatch failure and carries on. Two swallowing layers in a row, nothing
+  # above either to retry.
+  #
+  # But the queue closed LAST, so for the whole length of the drain the workers
+  # were still processing jobs and still storing events — into a registry that
+  # had already let go of its router. Every one of the 55 dropped batches in the
+  # 48h to 2026-08-17 landed after its own pod's SIGTERM (55 of 55, zero before
+  # initialize), the latest 26 seconds into the drain.
+  #
+  # It read as a startup race for five days because the log line said "called
+  # before initialize()" and named only the half that never actually happens.
+  #
+  # Ordering is the whole fix, and it is free: `QueueManager.close()` is a no-op
+  # for the globally-owned queue, so the registry's close releases nothing the
+  # queue still needs.
+
+  @unit @shutdown-ordering
+  Scenario: The projection registry is closed after the queue that feeds it
+    Given an event-sourcing instance with an initialized projection registry
+    When it is closed
+    Then the global queue is closed before the projection registry
+    So that work still draining cannot dispatch into a released router
+
+  @unit @shutdown-ordering
+  Scenario: A dispatch arriving after the router is gone is still reported
+    Given a projection registry that has already closed
+    When events are dispatched to it
+    Then the loss is logged at error level with the event count
+    And the record does not blame initialization alone
+
   # Error classification — the shutdown abort must be retryable
 
   @unit @socket-classification

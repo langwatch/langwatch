@@ -18,12 +18,11 @@ import { randomUUID } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
 import { OpenAI } from "openai";
 import type Stripe from "stripe";
-import { type ZodError, z } from "zod";
+import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { env } from "~/env.mjs";
 import type { Project } from "~/generated/prisma/client";
@@ -94,6 +93,7 @@ import { encrypt } from "~/utils/encryption";
 import { getClientIpFromHonoContext } from "~/utils/getClientIp";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import { zodErrorMessage } from "~/utils/zodErrorMessage";
 import { bodyLimit } from "./_lib/body-limit";
 import {
   experimentInitBadRequestSchema,
@@ -256,8 +256,7 @@ secured.access(analyticsViewAuth).post(
         .extend(timeseriesSeriesInput.shape)
         .parse(input);
     } catch (error) {
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
+      return c.json({ error: zodErrorMessage(error) }, 400);
     }
 
     try {
@@ -474,8 +473,7 @@ secured.access(experimentsManageAuth).post(
         "invalid log_steps data received",
       );
       captureException(toError(error), { extra: { projectId: project.id } });
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
+      return c.json({ error: zodErrorMessage(error) }, 400);
     }
 
     for (const param of params) {
@@ -699,8 +697,7 @@ secured.access(experimentsManageAuth).post(
         "invalid init data received",
       );
       captureException(toError(error), { extra: { projectId: project.id } });
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
+      return c.json({ error: zodErrorMessage(error) }, 400);
     }
 
     let experiment;
@@ -1155,8 +1152,7 @@ secured.access(tracesCreateAuth).post(
         "invalid event received",
       );
       captureException(toError(error));
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
+      return c.json({ error: zodErrorMessage(error) }, 400);
     }
 
     if (predefinedEventTypes.includes(rawBody.event_type)) {
@@ -1168,8 +1164,7 @@ secured.access(tracesCreateAuth).post(
           "invalid event received",
         );
         captureException(toError(error));
-        const validationError = fromZodError(error as ZodError);
-        return c.json({ error: validationError.message }, 400);
+        return c.json({ error: zodErrorMessage(error) }, 400);
       }
     }
 

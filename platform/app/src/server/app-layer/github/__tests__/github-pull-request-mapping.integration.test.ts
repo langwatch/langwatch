@@ -27,7 +27,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
-import { createPullRequestMappingReactor } from "../../../event-sourcing/pipelines/coding-agent-processing/reactors/pullRequestMapping.reactor";
+import { createPullRequestMappingHandler } from "../../../event-sourcing/pipelines/coding-agent-processing/subscribers/pullRequestMapping.subscriber";
 import { CodingAgentSessionService } from "../../coding-agent/coding-agent-session.service";
 import { CodingAgentSessionClickHouseRepository } from "../../coding-agent/repositories/coding-agent-session.clickhouse.repository";
 import { NullCodingAgentSessionEventsRepository } from "../../coding-agent/repositories/coding-agent-session-events.repository";
@@ -86,9 +86,15 @@ function apiPullRequest(over: Partial<Record<string, unknown>> = {}) {
 function servicesWith({
   listPullRequestsForHead,
   sessions,
+  touchCodingAgentPullRequestSeen,
 }: {
   listPullRequestsForHead: ReturnType<typeof vi.fn>;
   sessions?: CodingAgentSessionService;
+  /** The project-side recording of a found pull request, when a test reads it. */
+  touchCodingAgentPullRequestSeen?: (params: {
+    projectId: string;
+    at: Date;
+  }) => Promise<void>;
 }) {
   const appTokens = {
     configured: true,
@@ -136,6 +142,7 @@ function servicesWith({
         id === projectId ? organizationId : undefined,
       findProjectIds: async () => [projectId],
       sessions: sessionService,
+      touchCodingAgentPullRequestSeen,
     }),
     "GithubPullRequestMappingService",
   );
@@ -313,17 +320,17 @@ describe("branch pull-request mapping", () => {
       ]);
       const { mapping } = servicesWith({ listPullRequestsForHead });
 
-      // Driven through the reactor, so the fold-side trigger is part of what
-      // this proves rather than something the test steps around.
-      const reactor = createPullRequestMappingReactor({
+      // Driven through the subscriber handler, so the fold-side trigger is
+      // part of what this proves rather than something the test steps around.
+      const handler = createPullRequestMappingHandler({
         requestBranchMapping: (params) => mapping.requestBranchMapping(params),
       });
-      await reactor.handle(
+      await handler(
         {} as never,
         {
           tenantId: projectId,
           aggregateId: "session-1",
-          foldState: {
+          state: {
             repositoryHost: "github.com",
             repositoryOwner: `acme-${tag}`,
             repositoryName: "widgets",
@@ -614,6 +621,54 @@ describe("branch pull-request mapping", () => {
         "feat/backfill-a",
         "feat/backfill-b",
       ]);
+    });
+
+    /** @scenario "Connecting GitHub records the backfilled pull requests on their projects" */
+    it("records the pull requests it finds on the project whose sessions it read", async () => {
+      const sessionRepository = new CodingAgentSessionClickHouseRepository(
+        async () => ch,
+      );
+      await sessionRepository.upsert(
+        codingAgentSessionRow({
+          tenantId: projectId,
+          sessionId: `${tag}-feat/backfill-attributed`,
+          startedAtMs: Date.now() - 2 * 24 * 60 * 60 * 1000,
+          repositoryHost: "github.com",
+          repositoryOwner: `acme-${tag}`,
+          repositoryName: "widgets",
+          gitBranch: "feat/backfill-attributed",
+        }),
+      );
+
+      const touchCodingAgentPullRequestSeen = vi
+        .fn()
+        .mockResolvedValue(undefined);
+      const { installations } = servicesWith({
+        listPullRequestsForHead: vi
+          .fn()
+          .mockResolvedValue([apiPullRequest({ number: 103 })]),
+        touchCodingAgentPullRequestSeen,
+      });
+      await seedInstallation();
+
+      await installations.recordInstallation({
+        installationId: INSTALLATION_ID,
+        organizationId,
+      });
+
+      // Connecting GitHub is the moment the destination is supposed to
+      // appear, so the backfill has to attribute what it finds rather than
+      // leaving the project waiting for the next live fold.
+      await vi.waitFor(
+        () => {
+          expect(
+            touchCodingAgentPullRequestSeen.mock.calls.map(
+              (call) => (call[0] as { projectId: string }).projectId,
+            ),
+          ).toContain(projectId);
+        },
+        { timeout: 15_000, interval: 250 },
+      );
     });
   });
 
@@ -1242,6 +1297,90 @@ describe("branch pull-request mapping", () => {
       await mapping.requestBranchMapping(request);
 
       expect(listPullRequestsForHead).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // The project's Pull requests destination is grown by this recording. See
+  // specs/coding-agent/project-menu-links.feature.
+  describe("given a project's own session asked about the branch", () => {
+    const requestFor = (headBranch: string) => ({
+      tenantId: projectId,
+      repositoryHost: "github.com",
+      repositoryOwner: `acme-${tag}`,
+      repositoryName: "widgets",
+      headBranch,
+    });
+
+    /** @scenario "A pull request found for a project's session records it on the project" */
+    it("records the pull-request activity on that project", async () => {
+      await seedInstallation();
+      const touchCodingAgentPullRequestSeen = vi
+        .fn()
+        .mockResolvedValue(undefined);
+      const { mapping } = servicesWith({
+        listPullRequestsForHead: vi.fn().mockResolvedValue([apiPullRequest()]),
+        touchCodingAgentPullRequestSeen,
+      });
+
+      await mapping.requestBranchMapping(requestFor("feat/records"));
+
+      expect(touchCodingAgentPullRequestSeen).toHaveBeenCalledTimes(1);
+      expect(touchCodingAgentPullRequestSeen.mock.calls[0]?.[0]).toMatchObject({
+        projectId,
+      });
+    });
+
+    /** @scenario "A branch with no pull request records nothing on the project" */
+    it("records nothing when the branch has no pull request", async () => {
+      await seedInstallation();
+      const touchCodingAgentPullRequestSeen = vi
+        .fn()
+        .mockResolvedValue(undefined);
+      const { mapping } = servicesWith({
+        listPullRequestsForHead: vi.fn().mockResolvedValue([]),
+        touchCodingAgentPullRequestSeen,
+      });
+
+      await mapping.requestBranchMapping(requestFor("feat/nothing-yet"));
+
+      expect(touchCodingAgentPullRequestSeen).not.toHaveBeenCalled();
+    });
+
+    // A delivery names an organization and a branch, never a project, so
+    // attributing it would be guessing which of the organization's projects
+    // the work belongs to.
+    /** @scenario "A pull request announced over the webhook records nothing on any project" */
+    it("records nothing for a pull request announced over the webhook", async () => {
+      await seedInstallation();
+      const touchCodingAgentPullRequestSeen = vi
+        .fn()
+        .mockResolvedValue(undefined);
+      const { mapping } = servicesWith({
+        listPullRequestsForHead: vi.fn().mockResolvedValue([]),
+        touchCodingAgentPullRequestSeen,
+      });
+
+      const applied = await deliver(
+        mapping,
+        pullRequestDelivery({ branch: "feat/announced-only" }),
+      );
+
+      expect(applied).toBe(true);
+      expect(touchCodingAgentPullRequestSeen).not.toHaveBeenCalled();
+    });
+
+    it("keeps the linkage when the recording fails", async () => {
+      await seedInstallation();
+      const { mapping } = servicesWith({
+        listPullRequestsForHead: vi.fn().mockResolvedValue([apiPullRequest()]),
+        touchCodingAgentPullRequestSeen: vi
+          .fn()
+          .mockRejectedValue(new Error("postgres is unhappy")),
+      });
+
+      await mapping.requestBranchMapping(requestFor("feat/still-linked"));
+
+      expect(await storedFor("feat/still-linked")).toHaveLength(1);
     });
   });
 });
