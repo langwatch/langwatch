@@ -320,8 +320,9 @@ export function cutoverMigrations({
         ),
       },
       // The third leg, composed exactly as production composes it: the real
-      // `hasOrganizationPermission`, which at proof time still runs its
-      // legacy body because the organization is not on the engine yet.
+      // legacy body of `hasOrganizationPermission`, called directly so a
+      // re-run after a landed flip still compares the engine with legacy
+      // rather than with itself.
       legacyDecide: legacyOrganizationDecide(prisma),
       cutoverCohort,
       adminEmails,

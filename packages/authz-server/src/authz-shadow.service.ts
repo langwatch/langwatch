@@ -20,6 +20,12 @@
  * path) gates that fallback on having no chain bindings — tagged
  * `ceiling-legacy-fallback`.
  *
+ * The comparisons are detached, so they are also BOUNDED: a process-wide
+ * ceiling on how many are in flight at once, over which a comparison is
+ * dropped rather than queued. Nothing waits for one, so queueing would only
+ * hold connections; and the cutover's parity proof asks the resolver once per
+ * member per permission, each of which fires one of these.
+ *
  * Every environment read this service needs arrives through its constructor
  * options; the app's composition root owns the env.
  */
@@ -34,13 +40,42 @@ import type { AuthzCollectorService } from "./authz-collector.service";
 
 const logger = createLogger("langwatch:authz:shadow");
 
+/**
+ * Every detached comparison still running, across every service instance -
+ * module scope on purpose, because the composition builds a service per call
+ * and an instance-local counter would bound nothing at all: each request's
+ * fresh service would start back at zero. Two consumers: the in-flight bound
+ * (`admitsComparison` reads its size) and a test that must not assert on
+ * silence while a comparison is still in flight.
+ */
+const detachedComparisons = new Set<Promise<void>>();
+
+/** Test hook: resolves once every detached shadow comparison has settled. */
+export async function awaitShadowComparisonsForTesting(): Promise<void> {
+  while (detachedComparisons.size > 0) {
+    await Promise.allSettled([...detachedComparisons]);
+  }
+}
+
 export type AuthzShadowOptions = {
   /** Fraction of checks to compare, read per check: 0 disables shadow mode
    *  entirely, 1 compares every check. */
   sampleRate: () => number;
   /** Mirrors isDemoProject()'s dynamic env read. */
   demoProjectId: () => string | undefined;
+  /**
+   * Ceiling on comparisons in flight at once, process-wide. The comparisons
+   * are detached, so this is the only thing standing between a slow read
+   * path and unbounded queued work - and the cutover's parity proof spawns
+   * one per member per permission, which is where a shadow with no ceiling
+   * turns a migration into a pool outage. Defaults to 100.
+   */
+  maxInFlightComparisons?: number;
 };
+
+/** The default in-flight ceiling; generous enough that a healthy read path
+ *  never reaches it, small enough that a stalled one cannot pile up. */
+const DEFAULT_MAX_IN_FLIGHT_COMPARISONS = 100;
 
 /**
  * The legacy resolvers' fire-and-forget engine comparison. The app composes
@@ -73,6 +108,44 @@ export class AuthzShadowService {
     if (!(rate > 0)) return false;
     if (rate >= 1) return true;
     return Math.random() < rate;
+  }
+
+  /**
+   * Whether THIS check's comparison runs: the rate has to admit it, and
+   * there has to be room in flight for it. Both are decided before any work
+   * starts, so a refused comparison costs nothing - not a query, not a
+   * promise. Over the bound the comparison is DROPPED, never queued: a
+   * queued one would still be holding the connection the bound exists to
+   * protect.
+   */
+  private admitsComparison(): boolean {
+    if (!this.sampled()) return false;
+    const ceiling =
+      this.options.maxInFlightComparisons ?? DEFAULT_MAX_IN_FLIGHT_COMPARISONS;
+    if (detachedComparisons.size >= ceiling) {
+      // Debug, not warn: shedding a detached comparison is the bound doing
+      // its job, and nothing about the caller's answer depends on it.
+      logger.debug(
+        { inFlight: detachedComparisons.size, ceiling },
+        "authz shadow comparison shed",
+      );
+      return false;
+    }
+    return true;
+  }
+
+  /** Run the comparison detached, registered in the module-scope set so the
+   *  in-flight bound counts it. The body already swallows its own failures;
+   *  the `finally` is what guarantees the registration comes back out. */
+  private runDetached(caller: string, body: () => Promise<void>): void {
+    const settled = body()
+      .catch((error: unknown) => {
+        logger.warn({ error, caller }, "authz shadow comparison failed");
+      })
+      .finally(() => {
+        detachedComparisons.delete(settled);
+      });
+    detachedComparisons.add(settled);
   }
 
   private announceRate(rate: number): void {
@@ -183,8 +256,8 @@ export class AuthzShadowService {
      *  caller label is free-form and must never be parsed for this. */
     fromApiKeyPath?: boolean;
   }): void {
-    if (!this.sampled()) return;
-    void (async () => {
+    if (!this.admitsComparison()) return;
+    this.runDetached(caller, async () => {
       try {
         const scope = await this.collector.resolveScopeRef({
           projectId,
@@ -232,7 +305,7 @@ export class AuthzShadowService {
       } catch (error) {
         logger.warn({ error, caller }, "authz shadow comparison failed");
       }
-    })();
+    });
   }
 
   /**
@@ -267,8 +340,8 @@ export class AuthzShadowService {
     }>;
     caller: string;
   }): void {
-    if (!this.sampled()) return;
-    void (async () => {
+    if (!this.admitsComparison()) return;
+    this.runDetached(caller, async () => {
       try {
         const principal: AuthzPrincipalRef = { type: "user", id: userId };
         const grants = await this.collector.collectGrants({
@@ -331,7 +404,7 @@ export class AuthzShadowService {
       } catch (error) {
         logger.warn({ error, caller }, "authz shadow comparison failed");
       }
-    })();
+    });
   }
 
   apiKeyPermissionCheck({
@@ -353,8 +426,8 @@ export class AuthzShadowService {
     teamId?: string;
     caller: string;
   }): void {
-    if (!this.sampled()) return;
-    void (async () => {
+    if (!this.admitsComparison()) return;
+    this.runDetached(caller, async () => {
       try {
         const scope = await this.collector.resolveScopeRef({
           projectId,
@@ -411,6 +484,6 @@ export class AuthzShadowService {
       } catch (error) {
         logger.warn({ error, caller }, "authz shadow comparison failed");
       }
-    })();
+    });
   }
 }

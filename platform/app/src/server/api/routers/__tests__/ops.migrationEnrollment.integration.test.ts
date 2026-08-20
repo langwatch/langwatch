@@ -59,10 +59,18 @@ vi.mock("~/server/api/rbac", async (importOriginal) => {
 
 import { opsRouter } from "../ops";
 
-function buildCaller() {
+function buildCaller({
+  impersonator,
+}: {
+  impersonator?: { id: string; email: string };
+} = {}) {
   const ctx = createInnerTRPCContext({
     session: {
-      user: { id: "user_alex", email: "staff@langwatch.ai" },
+      user: {
+        id: "user_alex",
+        email: "staff@langwatch.ai",
+        ...(impersonator ? { impersonator } : {}),
+      },
       expires: "1",
     },
     req: undefined,
@@ -87,6 +95,7 @@ describe("ops migration enrollment procedures", () => {
       const result = await caller.enrollMigrationTenant({
         organizationId: "org_acme",
         stage: "migrations",
+        confirm: "ENROLL",
       });
 
       expect(result).toEqual({ enrolled: true });
@@ -100,31 +109,53 @@ describe("ops migration enrollment procedures", () => {
       );
     });
 
-    it("enrolls for cutover only behind its typed confirmation", async () => {
-      // Cutover enrollment has the rollback's blast radius: the next pass
-      // may flip which tables answer the organization's permission checks.
+    it.each([
+      "migrations",
+      "cutover",
+    ] as const)("enrolls for %s only behind its typed confirmation", async (stage) => {
+      // Both stages take the guard: an impersonated session's actor id
+      // lands durably in `enrolledByUserId`, whichever stage it enrolls
+      // for.
       service.enroll.mockResolvedValue(undefined);
       const caller = buildCaller();
 
       await expect(
         caller.enrollMigrationTenant({
           organizationId: "org_acme",
-          stage: "cutover",
+          stage,
         }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
       expect(service.enroll).not.toHaveBeenCalled();
 
       const result = await caller.enrollMigrationTenant({
         organizationId: "org_acme",
-        stage: "cutover",
+        stage,
         confirm: "ENROLL",
       });
       expect(result).toEqual({ enrolled: true });
       expect(service.enroll).toHaveBeenCalledWith({
         organizationId: "org_acme",
-        stage: "cutover",
+        stage,
         actorUserId: "user_alex",
       });
+    });
+
+    it.each([
+      "migrations",
+      "cutover",
+    ] as const)("refuses enrolling for %s from an impersonated session", async (stage) => {
+      const caller = buildCaller({
+        impersonator: { id: "admin_1", email: "admin@langwatch.ai" },
+      });
+
+      await expect(
+        caller.enrollMigrationTenant({
+          organizationId: "org_acme",
+          stage,
+          confirm: "ENROLL",
+        }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(service.enroll).not.toHaveBeenCalled();
     });
 
     it("refuses a stage outside the vocabulary at the boundary", async () => {
@@ -135,6 +166,7 @@ describe("ops migration enrollment procedures", () => {
           organizationId: "org_acme",
           // Deliberately invalid input - the router's schema must refuse it.
           stage: "everything" as unknown as "migrations",
+          confirm: "ENROLL",
         }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
       expect(service.enroll).not.toHaveBeenCalled();
@@ -149,6 +181,7 @@ describe("ops migration enrollment procedures", () => {
       const result = await caller.withdrawMigrationTenant({
         organizationId: "org_acme",
         stage: "migrations",
+        confirm: "WITHDRAW",
       });
 
       expect(result).toEqual({ withdrawn: true });
@@ -160,6 +193,34 @@ describe("ops migration enrollment procedures", () => {
       expect(demandedPermissions.get("withdrawMigrationTenant")).toBe(
         "ops:manage",
       );
+    });
+
+    it("withdraws only behind its typed confirmation", async () => {
+      service.withdraw.mockResolvedValue(undefined);
+      const caller = buildCaller();
+
+      await expect(
+        caller.withdrawMigrationTenant({
+          organizationId: "org_acme",
+          stage: "cutover",
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(service.withdraw).not.toHaveBeenCalled();
+    });
+
+    it("refuses a withdrawal from an impersonated session", async () => {
+      const caller = buildCaller({
+        impersonator: { id: "admin_1", email: "admin@langwatch.ai" },
+      });
+
+      await expect(
+        caller.withdrawMigrationTenant({
+          organizationId: "org_acme",
+          stage: "cutover",
+          confirm: "WITHDRAW",
+        }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(service.withdraw).not.toHaveBeenCalled();
     });
   });
 

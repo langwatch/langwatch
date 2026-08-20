@@ -451,6 +451,17 @@ export class PrismaAuthzMigrationRepository
     if (emails.length === 0) return [];
     // Case-insensitive, exactly as the live admin check compares: a stored
     // address that differs only in case is the same operator.
+    //
+    // The query is a CANDIDATE fetch, never the match itself. Prisma's
+    // Postgres compiler renders `mode: "insensitive"` as ILIKE with no
+    // ESCAPE clause, so the address is read as a PATTERN: `_` matches any
+    // character and `%` matches everything, which turns
+    // `first_last@corp.com` into a match for `firstXlast@corp.com` and one
+    // stray `%` in ADMIN_EMAILS into every account on the platform. Each
+    // match becomes a durable PLATFORM-scope admin grant, so the comparison
+    // that decides one is done here, on the whole address, and candidates
+    // the pattern dragged in are dropped.
+    const wanted = new Set(emails.map((email) => email.toLowerCase()));
     const rows = await this.prisma.user.findMany({
       where: {
         OR: emails.map((email) => ({
@@ -459,17 +470,17 @@ export class PrismaAuthzMigrationRepository
       },
       select: { id: true, email: true, createdAt: true },
     });
-    return rows.flatMap((row) =>
-      row.email === null
-        ? []
-        : [
-            {
-              userId: row.id,
-              email: row.email.toLowerCase(),
-              createdAtMs: row.createdAt.getTime(),
-            },
-          ],
-    );
+    return rows.flatMap((row) => {
+      const email = row.email?.toLowerCase();
+      if (email === undefined || !wanted.has(email)) return [];
+      return [
+        {
+          userId: row.id,
+          email,
+          createdAtMs: row.createdAt.getTime(),
+        },
+      ];
+    });
   }
 
   async findResourceGrantRows({

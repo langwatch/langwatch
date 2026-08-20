@@ -27,6 +27,13 @@
  *      This is the universal guard: it does not care what the two readers
  *      disagree ABOUT, only that they must not.
  *
+ * The resource proof then runs a second time, with the budget seed ahead of
+ * it, immediately before the flip. The organization is live on its legacy
+ * path for the whole of the decision sweep, so a view spent or a share link
+ * revoked in the meantime is invisible to the first proof — and an orphaned
+ * resource grant left behind by a revoke would become live access the moment
+ * the flip landed.
+ *
  * Clean, and only then, the cutover becomes a fact: `migration_parity_proved`
  * with an empty diff list, `cutover_completed`, and the flip is observed on
  * the projection the request-path gate reads before the tenant finalizes.
@@ -127,6 +134,15 @@ const MAX_REPORTED_DIFFS = 50;
 const MAX_PROVEN_DIFFS = 200;
 
 const DEFAULT_POLL = { intervalMs: 500, timeoutMs: 120_000 };
+
+/**
+ * How many live-resolver questions the third parity leg has in flight at
+ * once, per member. Each one is three to five queries against the pool every
+ * co-resident tenant is served from, so this is the migration's share of it —
+ * enough overlap that the sweep is not one round trip at a time, small enough
+ * that it can never be the reason somebody else's request waits.
+ */
+const RESOLVER_FAN_OUT = 12;
 
 /**
  * The report kinds that mean the cutover has DONE nothing for this tenant
@@ -281,16 +297,11 @@ export class GrantsCutoverMigration implements SystemMigration {
 
     const resourceDiffs = await this.proveResourceImport({ organizationId });
     if (resourceDiffs.length > 0) {
-      return {
-        status: "migrated",
-        report: {
-          kind: "cutover_resource_drift",
-          ...counts,
-          unmatchedAdminEmails,
-          totalDiffs: resourceDiffs.length,
-          diffs: resourceDiffs.slice(0, MAX_REPORTED_DIFFS),
-        },
-      };
+      return this.resourceDriftOutcome({
+        counts,
+        unmatchedAdminEmails,
+        diffs: resourceDiffs,
+      });
     }
 
     const parity = await this.proveDecisionParity({ organizationId, signal });
@@ -324,6 +335,31 @@ export class GrantsCutoverMigration implements SystemMigration {
       };
     }
 
+    // The decision sweep is minutes long for a large organization, and the
+    // organization is still LIVE on its legacy path throughout: a visitor
+    // spends a view, an operator revokes a share link, and neither reaches
+    // the grant rows the earlier proof passed on. So the budget seed and the
+    // import proof both run a SECOND time here, against the world as of
+    // just-before-flip.
+    //
+    // The seed first, because the proof compares view counts field for field
+    // and the legacy counter is the one that moved. The proof second,
+    // because it is the last thing standing between an orphaned resource
+    // grant - a link whose ShareLink row was deleted mid-sweep, leaving a
+    // grant that resolves for whoever still holds the token - and a flip
+    // that would make that grant the live answer.
+    await this.seedShareViewBudgets({ organizationId });
+    const preFlipResourceDiffs = await this.proveResourceImport({
+      organizationId,
+    });
+    if (preFlipResourceDiffs.length > 0) {
+      return this.resourceDriftOutcome({
+        counts,
+        unmatchedAdminEmails,
+        diffs: preFlipResourceDiffs,
+      });
+    }
+
     await this.deps.ledger.proveMigrationParity({
       organizationId,
       commandId: parityCommandId({ organizationId, diffs: [] }),
@@ -352,6 +388,33 @@ export class GrantsCutoverMigration implements SystemMigration {
         ...counts,
         ...parity.verified,
         unmatchedAdminEmails,
+      },
+    };
+  }
+
+  /**
+   * The held outcome both import proofs report, so the one before the sweep
+   * and the one just before the flip are indistinguishable to an operator:
+   * the resource tier and the legacy table disagree, and the organization
+   * stays where it is until they do not.
+   */
+  private resourceDriftOutcome({
+    counts,
+    unmatchedAdminEmails,
+    diffs,
+  }: {
+    counts: CutoverCounts;
+    unmatchedAdminEmails: UnmatchedAdminEmailsReport;
+    diffs: CutoverResourceDiff[];
+  }): TenantMigrationOutcome {
+    return {
+      status: "migrated",
+      report: {
+        kind: "cutover_resource_drift",
+        ...counts,
+        unmatchedAdminEmails,
+        totalDiffs: diffs.length,
+        diffs: diffs.slice(0, MAX_REPORTED_DIFFS),
       },
     };
   }
@@ -567,6 +630,11 @@ export class GrantsCutoverMigration implements SystemMigration {
    * held organization's legacy path has since outgrown. The port refuses to
    * lower a count, so a re-run can never walk a view that has since been
    * consumed back off the row.
+   *
+   * Which is what makes calling it TWICE per pass free, and calling it once
+   * wrong: the first call feeds the import proof a budget to compare, and the
+   * second, immediately before the flip, carries whatever the organization's
+   * still-live legacy path spent during the minutes the decision sweep took.
    */
   private async seedShareViewBudgets({
     organizationId,
@@ -789,9 +857,13 @@ export class GrantsCutoverMigration implements SystemMigration {
    * something else - which is the only kind of disagreement the flip can
    * actually surprise anybody with.
    *
-   * Every permission is asked in parallel: the resolver is several queries
-   * per call, and the registry is a fixed, small list, so the sweep costs one
-   * round of concurrent reads per member rather than one after another.
+   * Permissions are asked concurrently but BOUNDED. The resolver is three to
+   * five queries per call and the registry is a hundred-odd permissions, so
+   * asking them all at once is several hundred simultaneous queries per
+   * member on a pool every other tenant on the machine shares - a sweep that
+   * starves its co-residents to save seconds on a migration nobody is
+   * waiting on. `RESOLVER_FAN_OUT` keeps the round trips overlapping without
+   * that.
    */
   private async resolverDiffs({
     userId,
@@ -805,8 +877,10 @@ export class GrantsCutoverMigration implements SystemMigration {
     const legacyDecide = this.deps.legacyDecide;
     if (!legacyDecide) return [];
     const scope: AuthzScopeRef = { type: "organization", id: organizationId };
-    const outcomes = await Promise.all(
-      ALL_PERMISSIONS.map(async (permission) => ({
+    const outcomes = await mapWithConcurrency({
+      items: ALL_PERMISSIONS,
+      concurrency: RESOLVER_FAN_OUT,
+      fn: async (permission) => ({
         permission,
         fromResolver: await legacyDecide({
           userId,
@@ -814,8 +888,8 @@ export class GrantsCutoverMigration implements SystemMigration {
           permission,
         }),
         fromEngine: this.engine.decide({ grants, permission, scope }).allowed,
-      })),
-    );
+      }),
+    });
     return outcomes.flatMap(({ permission, fromResolver, fromEngine }) =>
       fromResolver === fromEngine
         ? []
@@ -888,6 +962,42 @@ type PlannedEmissions = {
   projectCredentials: BackfillGrantEmission[];
   platform: BackfillGrantEmission[];
 };
+
+/**
+ * `items.map(fn)` with at most `concurrency` calls in flight, results in the
+ * input's own order.
+ *
+ * A fixed pool of workers pulling from one cursor, rather than slice-shaped
+ * batches: a batch is only as fast as its slowest member, and the resolver's
+ * per-permission cost varies by an order of magnitude. The first rejection
+ * rejects the whole map, exactly as `Promise.all` does — a parity leg that
+ * failed halfway proves nothing, so the sweep must not carry on with a short
+ * answer.
+ */
+async function mapWithConcurrency<Item, Result>({
+  items,
+  fn,
+  concurrency,
+}: {
+  items: readonly Item[];
+  fn: (item: Item) => Promise<Result>;
+  concurrency: number;
+}): Promise<Result[]> {
+  const results = new Array<Result>(items.length);
+  const pending = items.map((item, index) => ({ item, index }));
+  let cursor = 0;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const next = pending[cursor++];
+      if (!next) return;
+      results[next.index] = await fn(next.item);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, worker),
+  );
+  return results;
+}
 
 /**
  * A short, stable digest of a list of strings (FNV-1a, base 36).

@@ -131,9 +131,7 @@ export interface AccessListingRepository {
 
   /** The user-created roles of one organization, newest first - the role
    *  editor's list. */
-  findUserCreatedRoles(args: {
-    organizationId: string;
-  }): Promise<CustomRole[]>;
+  findUserCreatedRoles(args: { organizationId: string }): Promise<CustomRole[]>;
 }
 
 /** Shared select shapes, so the legacy implementation and the grants

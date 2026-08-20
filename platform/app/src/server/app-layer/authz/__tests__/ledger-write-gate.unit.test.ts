@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
   isOrgOnLedgerWrites,
+  isOrgOnLedgerWritesForRevocation,
   resetLedgerWriteGateForTests,
 } from "../ledger-write-gate";
 import { authzLedgerWriteGateReadFailuresTotal } from "../metrics";
@@ -181,6 +182,154 @@ describe("the ledger write gate", () => {
       await expect(
         isOrgOnLedgerWrites({ organizationId: ORG_ID, prisma }),
       ).resolves.toBe(true);
+    });
+  });
+});
+
+/**
+ * The revocation class asks the same gate a harder question, because its
+ * legacy branch has no repair: a delete with no fact leaves the deciding
+ * grant row live on an organization the engine already reads for.
+ */
+function revocationTables({
+  status,
+  onEngine,
+}: {
+  status: string | null;
+  onEngine: boolean | null;
+}) {
+  const state = vi.fn().mockResolvedValue(status === null ? null : { status });
+  const cutover = vi
+    .fn()
+    .mockResolvedValue(onEngine === null ? null : { onEngine });
+  return {
+    state,
+    cutover,
+    prisma: {
+      systemMigrationTenantState: { findUnique: state },
+      authzCutoverProjection: { findUnique: cutover },
+    } as unknown as Pick<
+      PrismaClient,
+      "systemMigrationTenantState" | "authzCutoverProjection"
+    >,
+  };
+}
+
+describe("the ledger write gate, asked by a revocation-class write", () => {
+  beforeEach(() => {
+    resetLedgerWriteGateForTests();
+    vi.useRealTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    resetLedgerWriteGateForTests();
+  });
+
+  describe("when the genesis state row already answers yes", () => {
+    it("answers from the cached gate without reading the projection", async () => {
+      const { cutover, prisma } = revocationTables({
+        status: "finalized",
+        onEngine: true,
+      });
+
+      await expect(
+        isOrgOnLedgerWritesForRevocation({ organizationId: ORG_ID, prisma }),
+      ).resolves.toBe(true);
+      expect(cutover).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a cached legacy answer disagrees with the cutover", () => {
+    /** @scenario "A revocation-class write never trusts a cached legacy answer from the write gate" */
+    it("routes on the projection, past the answer the cache is still holding", async () => {
+      const { state, cutover, prisma } = revocationTables({
+        status: "pending",
+        onEngine: false,
+      });
+
+      await expect(
+        isOrgOnLedgerWrites({ organizationId: ORG_ID, prisma }),
+      ).resolves.toBe(false);
+      cutover.mockResolvedValue({ onEngine: true });
+
+      await expect(
+        isOrgOnLedgerWritesForRevocation({ organizationId: ORG_ID, prisma }),
+      ).resolves.toBe(true);
+      // The state row is still the cached `false` the mint class keeps
+      // reading; the projection is what the revocation asked.
+      expect(state).toHaveBeenCalledTimes(1);
+      expect(cutover).toHaveBeenCalledTimes(1);
+    });
+
+    it("reads the projection again on every revocation, never a cached answer", async () => {
+      const { cutover, prisma } = revocationTables({
+        status: "pending",
+        onEngine: true,
+      });
+
+      const ask = () =>
+        isOrgOnLedgerWritesForRevocation({ organizationId: ORG_ID, prisma });
+      await ask();
+      await ask();
+      await ask();
+
+      expect(cutover).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  describe("when the genesis state table cannot be read at all", () => {
+    it("still routes a cut-over organization through the ledger", async () => {
+      const { prisma, state } = revocationTables({
+        status: null,
+        onEngine: true,
+      });
+      state.mockRejectedValue(new Error("pg is down"));
+
+      await expect(
+        isOrgOnLedgerWritesForRevocation({ organizationId: ORG_ID, prisma }),
+      ).resolves.toBe(true);
+    });
+  });
+
+  describe("when the cutover projection cannot be read", () => {
+    /** @scenario "A failed gate read routes a revocation-class write toward the ledger" */
+    it("fails toward the ledger rather than the branch that appends nothing", async () => {
+      const { cutover, prisma } = revocationTables({
+        status: "pending",
+        onEngine: false,
+      });
+      cutover.mockRejectedValue(new Error("projection unavailable"));
+
+      await expect(
+        isOrgOnLedgerWritesForRevocation({ organizationId: ORG_ID, prisma }),
+      ).resolves.toBe(true);
+    });
+
+    it("counts the failure so the diverted window is observable", async () => {
+      const { cutover, prisma } = revocationTables({
+        status: "pending",
+        onEngine: false,
+      });
+      cutover.mockRejectedValue(new Error("projection unavailable"));
+      const before = await counterValue();
+
+      await isOrgOnLedgerWritesForRevocation({
+        organizationId: ORG_ID,
+        prisma,
+      });
+
+      expect(await counterValue()).toBe(before + 1);
+    });
+  });
+
+  describe("when neither the state row nor the projection names the organization", () => {
+    it("leaves the revocation on the legacy path", async () => {
+      const { prisma } = revocationTables({ status: null, onEngine: null });
+
+      await expect(
+        isOrgOnLedgerWritesForRevocation({ organizationId: ORG_ID, prisma }),
+      ).resolves.toBe(false);
     });
   });
 });

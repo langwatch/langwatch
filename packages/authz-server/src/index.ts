@@ -66,7 +66,10 @@ export type {
   ShareLinkFactRow,
   TeamBindingWrite,
 } from "./authz-migration.repository";
-export { AuthzShadowService } from "./authz-shadow.service";
+export {
+  AuthzShadowService,
+  awaitShadowComparisonsForTesting,
+} from "./authz-shadow.service";
 export type { AuthzShadowOptions } from "./authz-shadow.service";
 export { AuthzService } from "./authz.service";
 export type {

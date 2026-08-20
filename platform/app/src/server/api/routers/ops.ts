@@ -1486,6 +1486,13 @@ export const opsRouter = createTRPCRouter({
    * Takes effect on the next pass - enrollment is read fresh each time. The
    * service refuses duplicates, unknown organizations, and any enrollment on
    * a self-hosted installation, each with a handled error the page renders.
+   *
+   * Both stages take the destructive-ops guard, not only cutover: an
+   * impersonated session's actor id is `ctx.session.user.id`, which is the
+   * IMPERSONATED CUSTOMER's id, not the operator's - and that id is what
+   * lands durably in `enrolledByUserId`. Letting the migrations stage
+   * through under impersonation would misattribute the enrollment as
+   * customer-initiated as well as bypassing the guard entirely.
    */
   enrollMigrationTenant: protectedProcedure
     .use(opsManagePermission)
@@ -1493,19 +1500,14 @@ export const opsRouter = createTRPCRouter({
       z.object({
         organizationId: z.string().min(1).max(200),
         stage: z.enum(MIGRATION_ENROLLMENT_STAGES),
-        // Typed confirmation for the cutover stage, same reasoning as the
-        // rollback's: enrolling an organization for cutover is what lets the
-        // next pass flip which tables answer every permission check for it.
+        // Typed confirmation for both stages, same reasoning as the
+        // rollback's: enrolling an organization is what lets the next pass
+        // start moving that organization onto the engine.
         confirm: z.literal("ENROLL").optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // The `migrations` stage is behavior-neutral (backfill and genesis
-      // change nothing about who decides); the cutover stage has the
-      // rollback's blast radius, so it takes the rollback's guard.
-      if (input.stage === "cutover") {
-        requireDestructiveOpsAuth(ctx, input.confirm);
-      }
+      requireDestructiveOpsAuth(ctx, input.confirm);
       await systemMigrationsService.enroll({
         organizationId: input.organizationId,
         stage: input.stage,
@@ -1518,6 +1520,10 @@ export const opsRouter = createTRPCRouter({
    * Withdraw an enrollment: later passes stop processing the organization
    * for that stage. State already recorded stays exactly as it is - pausing
    * the rollout is this action's whole job; undoing it is the rollback's.
+   *
+   * Takes the same destructive-ops guard as enroll, for the same reason: an
+   * impersonated session must not be able to change an organization's
+   * rollout pacing.
    */
   withdrawMigrationTenant: protectedProcedure
     .use(opsManagePermission)
@@ -1525,9 +1531,11 @@ export const opsRouter = createTRPCRouter({
       z.object({
         organizationId: z.string().min(1).max(200),
         stage: z.enum(MIGRATION_ENROLLMENT_STAGES),
+        confirm: z.literal("WITHDRAW").optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      requireDestructiveOpsAuth(ctx, input.confirm);
       await systemMigrationsService.withdraw({
         organizationId: input.organizationId,
         stage: input.stage,

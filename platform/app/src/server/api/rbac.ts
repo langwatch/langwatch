@@ -1473,7 +1473,17 @@ export async function hasOrganizationPermission(
   return permitted;
 }
 
-async function hasOrganizationPermissionLegacy(
+/**
+ * The legacy organization resolver, reachable on its own.
+ *
+ * Exported because the cutover's parity proof has to ask the LEGACY body
+ * specifically (ADR-092 delivery-plan PR 3): the wrapper above forks to the
+ * engine once an organization's flip has landed, so a proof that went through
+ * it would compare the engine with itself on any re-run after a completed
+ * cutover whose projection wait timed out. Nothing else may call this —
+ * request-path callers take the wrapper, fork and all.
+ */
+export async function hasOrganizationPermissionLegacy(
   ctx: { prisma: PrismaClient; session: Session },
   organizationId: string,
   permission: Permission,

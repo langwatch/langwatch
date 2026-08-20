@@ -12,9 +12,9 @@
  * different tables, and each has to be readable on its own for a listing
  * parity check to mean anything.
  */
-import type { Prisma } from "~/generated/prisma/client";
 import type {
   CustomRole,
+  Prisma,
   RoleBindingScopeType,
 } from "~/generated/prisma/client";
 import type {
@@ -126,9 +126,7 @@ export class PrismaAccessListingRepository implements AccessListingRepository {
         organizationId,
         OR: [
           { userId },
-          ...(groupIds.length > 0
-            ? [{ groupId: { in: [...groupIds] } }]
-            : []),
+          ...(groupIds.length > 0 ? [{ groupId: { in: [...groupIds] } }] : []),
         ],
       },
       include: DECORATION_INCLUDE,

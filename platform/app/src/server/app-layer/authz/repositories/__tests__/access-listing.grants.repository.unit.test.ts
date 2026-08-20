@@ -267,7 +267,12 @@ describe("GrantsAccessListingRepository", () => {
               scopeType: "TEAM",
               scopeId: "team-1",
               createdAt: new Date("2026-01-05T00:00:00Z"),
-              user: { id: "alice", name: "Alice", email: "a@x.io", image: null },
+              user: {
+                id: "alice",
+                name: "Alice",
+                email: "a@x.io",
+                image: null,
+              },
               group: null,
               apiKey: null,
               customRole: null,

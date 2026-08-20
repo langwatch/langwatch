@@ -24,6 +24,7 @@ import {
   SHARE_LINK_PERMISSION,
   shareVisibilityAudience,
 } from "@langwatch/authz-server";
+import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import type {
   Prisma,
@@ -49,6 +50,8 @@ import type {
  * of a link stays on the fact itself (`createdByUserId`).
  */
 const SYSTEM_ACTOR: LedgerActor = { type: "system", id: null };
+
+const logger = createLogger("langwatch:share:ledger-repository");
 
 /** Prisma's unique-constraint failure, read off the code so it survives a
  *  client instance boundary. */
@@ -208,18 +211,22 @@ export class LedgerShareRepository implements ShareRepository {
       // pair is the tenancy fence every other query here carries.
       return;
     }
-    await this.writer().revokeResourceGrants({
-      organizationId,
-      grantIds: [id],
-      actor: SYSTEM_ACTOR,
-    });
     // Enforcement locates the compat head THROUGH the Grant row, so when
     // that head has not landed it cannot delete the row the token resolves
     // by. Revocation is instant-enforcement class (decision 7): the compat
     // row goes here, before the call returns, queue running or not. For a
     // link minted during a rollback window this is also the delete that
     // removes it (its revoke fact folds as a no-op).
-    await this.legacy.deleteById({ id, projectId });
+    await this.appendThenDeleteHeads({
+      organizationId,
+      append: () =>
+        this.writer().revokeResourceGrants({
+          organizationId,
+          grantIds: [id],
+          actor: SYSTEM_ACTOR,
+        }),
+      deleteHeads: () => this.legacy.deleteById({ id, projectId }),
+    });
   }
 
   /**
@@ -494,14 +501,80 @@ export class LedgerShareRepository implements ShareRepository {
       }),
     ]);
     const ids = [...new Set([...compatRows.map((row) => row.id), ...grantIds])];
-    if (ids.length > 0) {
-      await this.writer().revokeResourceGrants({
-        organizationId,
-        grantIds: ids,
-        actor: SYSTEM_ACTOR,
-      });
+    if (ids.length === 0) {
+      await sweep();
+      return;
     }
-    await sweep();
+    await this.appendThenDeleteHeads({
+      organizationId,
+      append: () =>
+        this.writer().revokeResourceGrants({
+          organizationId,
+          grantIds: ids,
+          actor: SYSTEM_ACTOR,
+        }),
+      deleteHeads: sweep,
+    });
+  }
+
+  /**
+   * The revocation append, and the compat delete that must follow it —
+   * INCLUDING when the append throws and the organization cannot be shown
+   * to be on the engine.
+   *
+   * `revocationOrganizationFor` fails toward this branch, so an organization
+   * that was never enrolled arrives here whenever the projection read trips
+   * on the same load that is about to fail the append. Appending first and
+   * deleting second then means one transient failure deletes nothing at all,
+   * and the customer's unshare simply does not happen — a regression on the
+   * single `deleteMany` this path replaced, and correlated exactly with the
+   * moment it is least affordable.
+   *
+   * So an append failure re-asks the projection. Only an organization that
+   * can still be READ to be on the engine keeps the strict order: for it, a
+   * compat delete with no fact behind it is the resurrection the fold would
+   * undo, and refusing is the safe half. Everything else — read false, or
+   * unreadable a second time — takes the delete, because for an organization
+   * with no fact to fold there is nothing to resurrect and the delete is the
+   * whole revocation. The append error propagates either way: nothing here
+   * reports a fact that was never recorded as recorded.
+   */
+  private async appendThenDeleteHeads({
+    organizationId,
+    append,
+    deleteHeads,
+  }: {
+    organizationId: string;
+    append: () => Promise<void>;
+    deleteHeads: () => Promise<void>;
+  }): Promise<void> {
+    try {
+      await append();
+    } catch (error) {
+      if (await this.readsOnEngine(organizationId)) throw error;
+      logger.warn(
+        { organizationId, error },
+        "a share revocation could not be recorded on the grants ledger; deleting the compat row so the link stops resolving, and surfacing the append failure",
+      );
+      await deleteHeads();
+      throw error;
+    }
+    await deleteHeads();
+  }
+
+  /** Whether the projection can still be read to say this organization is
+   *  served by the engine. An unreadable projection answers false HERE — the
+   *  opposite direction from the routing read above, and for the same
+   *  reason: this answer only ever withholds a delete. */
+  private async readsOnEngine(organizationId: string): Promise<boolean> {
+    try {
+      return await queryCutoverOnEngine({
+        prisma: this.prisma,
+        organizationId,
+      });
+    } catch {
+      return false;
+    }
   }
 
   /** The RESOURCE grants this organization holds for a project, narrowed by
@@ -575,7 +648,9 @@ export class LedgerShareRepository implements ShareRepository {
    * appends the fact. That direction is harmless when the organization
    * turns out to be on legacy (the sweep still deletes the plain rows, and
    * a fact no mint stands behind folds as a no-op) and is the only correct
-   * one when it is not.
+   * one when it is not. What keeps it harmless when the SAME pressure that
+   * broke this read also breaks the append is `appendThenDeleteHeads`,
+   * which will not let a diverted revoke delete nothing at all.
    */
   private async revocationOrganizationFor(
     projectId: string,

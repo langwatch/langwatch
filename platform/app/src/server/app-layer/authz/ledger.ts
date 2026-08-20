@@ -25,6 +25,14 @@
  * adopted by the next genesis pass (it takes each legacy row's own id as
  * the fact's id), which is what makes flip → rollback → re-flip safe.
  *
+ * That adoption is what lets a MINT tolerate a stale gate answer, and it is
+ * exactly what a REVOCATION does not have: its legacy branch deletes a
+ * compat row and appends nothing, so on an organization the engine already
+ * reads for, the deciding row survives a revoke nobody ever revisits. The
+ * revocation class — revoke, role downgrade, role deletion, offboarding —
+ * therefore asks a gate that cannot answer a stale or failed "legacy"
+ * (`onLedgerForRevocation`).
+ *
  * The audit trail forks with the writes: a migrated organization gets its
  * rows from the insert-only subscriber (decision 17); an unmigrated one
  * writes the same-shaped `AuditLog` row itself, best-effort, since a failed
@@ -80,7 +88,10 @@ import { prisma as appPrisma } from "../../db";
 import { RoleDuplicateNameError } from "../../role/errors/role-duplicate-name.error";
 import { tryGetApp } from "../app";
 import { bumpAuthzEpoch } from "./epoch";
-import { isOrgOnLedgerWrites } from "./ledger-write-gate";
+import {
+  isOrgOnLedgerWrites,
+  isOrgOnLedgerWritesForRevocation,
+} from "./ledger-write-gate";
 import { PrismaAuthzGrantsProjectionRepository } from "./repositories/authz-grants-projection.prisma.repository";
 
 const logger = createLogger("langwatch:authz:ledger");
@@ -310,8 +321,19 @@ export class GrantsLedgerWriter {
        * The per-organization write fork (decision 4). Injectable so a test
        * can put an organization on either side without a state row; in
        * production it is the genesis-import gate next door.
+       *
+       * `forRevocation` names the CLASS of write asking, because the two
+       * classes tolerate a wrong answer differently: a mint sent to the
+       * legacy path by a stale gate is adopted by the next genesis pass, and
+       * a revocation sent there is lost. The gate answers the harder,
+       * uncached question for the revocation class (see
+       * `isOrgOnLedgerWritesForRevocation`), and an injected gate that
+       * ignores the flag simply puts both classes on the same side.
        */
-      onLedgerWrites?: (args: { organizationId: string }) => Promise<boolean>;
+      onLedgerWrites?: (args: {
+        organizationId: string;
+        forRevocation: boolean;
+      }) => Promise<boolean>;
     } = {},
   ) {
     this.enforcement = new PrismaAuthzGrantsProjectionRepository(prisma);
@@ -327,9 +349,30 @@ export class GrantsLedgerWriter {
 
   /** Whether THIS organization's grant writes go through the ledger yet. */
   private onLedger(organizationId: string): Promise<boolean> {
-    return (this.deps.onLedgerWrites ?? isOrgOnLedgerWrites)({
-      organizationId,
-    });
+    const injected = this.deps.onLedgerWrites;
+    if (injected) {
+      return injected({ organizationId, forRevocation: false });
+    }
+    return isOrgOnLedgerWrites({ organizationId });
+  }
+
+  /**
+   * The same question for a REVOCATION-class write — a revoke, a role
+   * downgrade, a role deletion, an offboarding.
+   *
+   * Separate because the legacy branch of those verbs deletes a compat row
+   * and appends nothing. For an organization whose reads the engine already
+   * serves, that leaves the deciding `Grant` row live with nothing left to
+   * revisit it, so a cached or failed `false` from the gate above does not
+   * delay the revocation — it loses it. The revocation gate asks the cutover
+   * projection directly, uncached, and fails toward the ledger.
+   */
+  private onLedgerForRevocation(organizationId: string): Promise<boolean> {
+    const injected = this.deps.onLedgerWrites;
+    if (injected) {
+      return injected({ organizationId, forRevocation: true });
+    }
+    return isOrgOnLedgerWritesForRevocation({ organizationId });
   }
 
   /**
@@ -832,7 +875,7 @@ export class GrantsLedgerWriter {
     });
     if (sibling) throw new DuplicateBindingError();
 
-    if (!(await this.onLedger(organizationId))) {
+    if (!(await this.onLedgerForRevocation(organizationId))) {
       return await this.changeBindingRoleImperatively({
         organizationId,
         bindingId,
@@ -1095,7 +1138,7 @@ export class GrantsLedgerWriter {
   }): Promise<void> {
     if (bindingIds.length === 0 && selector === undefined) return;
     if (skipAppendWhenNoMatches && bindingIds.length === 0) return;
-    if (!(await this.onLedger(organizationId))) {
+    if (!(await this.onLedgerForRevocation(organizationId))) {
       // The pre-ledger revoke. An imperative delete IS instant enforcement —
       // decision 7's synchronous deny effect is what this path always was —
       // so there is no event and nothing to converge on.
@@ -1171,7 +1214,7 @@ export class GrantsLedgerWriter {
     // tenancy the caller named.
     const legacyWhere = { ...where, organizationId };
 
-    if (!(await this.onLedger(organizationId))) {
+    if (!(await this.onLedgerForRevocation(organizationId))) {
       // The pre-ledger, filtered revoke: ONE `deleteMany(where)` statement,
       // not a read followed by a delete-by-ids. There is no fold here to
       // sweep a row that lands in the gap between the two — a row matching
@@ -1234,7 +1277,7 @@ export class GrantsLedgerWriter {
     revokedGrantIds: string[];
     actor: LedgerActor;
   }): Promise<void> {
-    if (!(await this.onLedger(organizationId))) {
+    if (!(await this.onLedgerForRevocation(organizationId))) {
       // The pre-ledger offboard: the member's grant rows go, and the
       // membership tables stay with the caller exactly as they do on the
       // ledger side.
@@ -1426,7 +1469,7 @@ export class GrantsLedgerWriter {
     roleId: string;
     actor: LedgerActor;
   }): Promise<void> {
-    if (!(await this.onLedger(organizationId))) {
+    if (!(await this.onLedgerForRevocation(organizationId))) {
       // The pre-ledger role delete. `deleteMany` rather than `delete` keeps
       // the imperative writer's shape: a role already gone is not an error,
       // and the organization scoping is in the filter, not a later check.

@@ -233,10 +233,14 @@ function EnrollForm() {
         onClick={() => {
           // Cutover enrollment is what lets the next pass change which
           // tables answer the organization's permission checks, so it takes
-          // the rollback's confirmation; migration enrollment changes no
-          // decision and enrolls directly.
+          // a dialog on top of the typed confirmation every stage carries.
           if (stage === "cutover") setCutoverConfirmOpen(true);
-          else enroll.mutate({ organizationId: organizationId.trim(), stage });
+          else
+            enroll.mutate({
+              organizationId: organizationId.trim(),
+              stage,
+              confirm: "ENROLL",
+            });
         }}
       >
         <UserPlus size={14} /> Enroll
@@ -360,6 +364,7 @@ function EnrollmentRow({
               withdraw.mutate({
                 organizationId: enrollment.organizationId,
                 stage: enrollment.stage,
+                confirm: "WITHDRAW",
               })
             }
           >

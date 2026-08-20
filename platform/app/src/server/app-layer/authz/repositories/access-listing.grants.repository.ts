@@ -276,7 +276,9 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
     ];
     const roleIds = [
       ...new Set(
-        grants.flatMap(({ customRoleId }) => (customRoleId ? [customRoleId] : [])),
+        grants.flatMap(({ customRoleId }) =>
+          customRoleId ? [customRoleId] : [],
+        ),
       ),
     ];
     const [users, roles] = await Promise.all([
@@ -479,14 +481,21 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
     grants: readonly ListableGrant[];
     dropUndecoratedPrincipals?: boolean;
   }): Promise<AccessListingBindingRow[]> {
-    const ids = { user: new Set<string>(), group: new Set<string>(), apiKey: new Set<string>() };
+    const ids = {
+      user: new Set<string>(),
+      group: new Set<string>(),
+      apiKey: new Set<string>(),
+    };
     const roleIds = new Set<string>();
     for (const grant of grants) {
       if (grant.customRoleId) roleIds.add(grant.customRoleId);
       if (!grant.row.principalId) continue;
-      if (grant.row.principalType === "USER") ids.user.add(grant.row.principalId);
-      else if (grant.row.principalType === "GROUP") ids.group.add(grant.row.principalId);
-      else if (grant.row.principalType === "API_KEY") ids.apiKey.add(grant.row.principalId);
+      if (grant.row.principalType === "USER")
+        ids.user.add(grant.row.principalId);
+      else if (grant.row.principalType === "GROUP")
+        ids.group.add(grant.row.principalId);
+      else if (grant.row.principalType === "API_KEY")
+        ids.apiKey.add(grant.row.principalId);
     }
 
     const [users, groups, apiKeys, roles] = await Promise.all([

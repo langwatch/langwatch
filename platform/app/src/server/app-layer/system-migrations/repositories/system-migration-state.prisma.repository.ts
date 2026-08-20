@@ -20,6 +20,13 @@ function parseStatus(raw: string): TenantMigrationStatus {
   return status;
 }
 
+function isRecordNotFound(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2025"
+  );
+}
+
 /**
  * The stored per-(migration, tenant) state - the runner's port plus the ops
  * finders the dashboard reads. `SystemMigrationTenantState` has no tenant FK
@@ -85,15 +92,21 @@ export class PrismaSystemMigrationStateRepository
   }
 
   /**
-   * The runner's compare-and-set (see the port's own doc): the update is
-   * guarded on `status != rolled_back` in the same statement, so an
-   * operator's pin written between the pass's read and this write can never
-   * be overwritten - the guarded UPDATE simply matches nothing. A row that
-   * does not exist yet is created; a create that collides on the unique key
-   * means the row appeared since the guarded update ran, and the only
-   * writer that creates nothing-to-rolled_back transitions is nobody (the
-   * operator can only pin an EXISTING record), so the collision is read as
-   * the pin standing and answered `false`.
+   * The runner's compare-and-set (see the port's own doc): `update` with the
+   * guard in its (filtered-unique) where, NOT `updateMany` — Prisma 7's
+   * compiler splits a conditional `updateMany` into a SELECT of matching ids
+   * and an UPDATE keyed on those ids ALONE, so the `status != rolled_back`
+   * guard does not ride the UPDATE statement and an operator's pin written
+   * between the SELECT and the UPDATE gets silently overwritten
+   * (read-then-write, not compare-and-swap). `update` keeps its full filter
+   * on the UPDATE itself, where Postgres re-evaluates it against the current
+   * row after the lock wait — the loser matches zero rows and surfaces as
+   * P2025 instead of clobbering the pin. A row that does not exist yet is
+   * created; a create that collides on the unique key means the row appeared
+   * since the guarded update ran, and the only writer that creates
+   * nothing-to-rolled_back transitions is nobody (the operator can only pin
+   * an EXISTING record), so the collision is read as the pin standing and
+   * answered `false`.
    */
   async upsertRecordUnlessRolledBack(
     record: TenantMigrationRecord,
@@ -103,15 +116,21 @@ export class PrismaSystemMigrationStateRepository
         ? Prisma.DbNull
         : (record.report as Prisma.InputJsonValue);
     const occurredAt = new Date();
-    const updated = await this.prisma.systemMigrationTenantState.updateMany({
-      where: {
-        migrationName: record.migrationName,
-        tenantId: record.tenantId,
-        NOT: { status: "rolled_back" },
-      },
-      data: { status: record.status, report, occurredAt },
-    });
-    if (updated.count > 0) return true;
+    try {
+      await this.prisma.systemMigrationTenantState.update({
+        where: {
+          migrationName_tenantId: {
+            migrationName: record.migrationName,
+            tenantId: record.tenantId,
+          },
+          NOT: { status: "rolled_back" },
+        },
+        data: { status: record.status, report, occurredAt },
+      });
+      return true;
+    } catch (error) {
+      if (!isRecordNotFound(error)) throw error;
+    }
     try {
       await this.prisma.systemMigrationTenantState.create({
         data: {

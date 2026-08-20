@@ -1,4 +1,4 @@
-import type { CollectedGrants } from "@langwatch/authz";
+import { ALL_PERMISSIONS, type CollectedGrants } from "@langwatch/authz";
 import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AuthzCollectorService } from "../authz-collector.service";
@@ -299,6 +299,32 @@ function collectorOf({
   } as unknown as AuthzCollectorService;
 }
 
+/**
+ * Two collectors that run `duringSweep` before every snapshot they hand
+ * back. The decision proof is the only thing that asks for one, so the
+ * callback fires between the two import proofs — the window the organization
+ * spends still live on its legacy path.
+ */
+function collectorsRunningMidSweep(duringSweep: () => void): {
+  legacy: AuthzCollectorService;
+  grants: AuthzCollectorService;
+} {
+  const collector = () =>
+    ({
+      collectGrants: async ({
+        principal,
+      }: {
+        principal: CollectedGrants["principal"];
+        organizationId: string;
+      }) => {
+        duringSweep();
+        return emptyGrants({ principal });
+      },
+      findApiKeyOwner: async () => null,
+    }) as unknown as AuthzCollectorService;
+  return { legacy: collector(), grants: collector() };
+}
+
 function shareLinkRow(
   overrides: Partial<ShareLinkFactRow> = {},
 ): ShareLinkFactRow {
@@ -327,11 +353,37 @@ describe("GrantsCutoverMigration", () => {
    *  millisecond are still two passes. */
   let clock: number;
 
-  const migration = () =>
+  const migration = ({
+    collectors = { legacy: collectorOf(), grants: collectorOf() },
+  }: {
+    collectors?: {
+      legacy: AuthzCollectorService;
+      grants: AuthzCollectorService;
+    };
+  } = {}) =>
+    new GrantsCutoverMigration({
+      repository,
+      ledger,
+      collectors,
+      cutoverCohort: () => cohort,
+      adminEmails: () => adminEmails,
+      now: () => clock++,
+      poll: { intervalMs: 1, timeoutMs: 50 },
+    });
+
+  /** The same migration with the third leg wired in. Both readers agree
+   *  about everything, so the row-level comparison has nothing at all to
+   *  report and the resolver is the only thing that can speak. */
+  const withResolver = (
+    legacyDecide: NonNullable<
+      ConstructorParameters<typeof GrantsCutoverMigration>[0]["legacyDecide"]
+    >,
+  ) =>
     new GrantsCutoverMigration({
       repository,
       ledger,
       collectors: { legacy: collectorOf(), grants: collectorOf() },
+      legacyDecide,
       cutoverCohort: () => cohort,
       adminEmails: () => adminEmails,
       now: () => clock++,
@@ -1079,7 +1131,11 @@ describe("GrantsCutoverMigration", () => {
         const outcome = await migration().migrateTenant({ tenantId: ORG });
 
         expect(outcome.status).toBe("finalized");
+        // Twice in one pass: once so the import proof has a budget to compare
+        // against, and once immediately before the flip, which is what carries
+        // a view the legacy path spent while the decision proof was running.
         expect(repository.seedCalls).toEqual([
+          [{ grantId: "share_1", projectId: "proj_chatbot", viewCount: 2 }],
           [{ grantId: "share_1", projectId: "proj_chatbot", viewCount: 2 }],
         ]);
         expect(repository.usageRows.get("share_1")).toBe(2);
@@ -1157,6 +1213,123 @@ describe("GrantsCutoverMigration", () => {
   });
 
   /**
+   * The window both import proofs exist to close: the organization is still
+   * live on its legacy path for the whole of the decision sweep, so anything
+   * a customer does in those minutes lands on the legacy rows and on nothing
+   * the first proof read.
+   */
+  describe("given a customer acting on the legacy path while the decision proof runs", () => {
+    beforeEach(() => {
+      repository.memberIds = ["user_sam"];
+    });
+
+    describe("when a share link is revoked mid-sweep", () => {
+      /** @scenario "A share link revoked while the decision proof runs holds the cutover" */
+      it("holds the organization rather than flipping with a grant no link accounts for", async () => {
+        repository.shareLinkRows = [shareLinkRow({ id: "share_1" })];
+        // The revoke routes legacy while the organization is not on the
+        // engine, so it deletes the ShareLink and leaves the imported grant -
+        // a link nobody can see any more, resolving for whoever holds its
+        // token the moment the flip lands.
+        const revokeMidSweep = () => {
+          repository.shareLinkRows = [];
+        };
+
+        const outcome = await migration({
+          collectors: collectorsRunningMidSweep(revokeMidSweep),
+        }).migrateTenant({ tenantId: ORG });
+
+        expect(outcome.status).toBe("migrated");
+        const report = outcome.report as {
+          kind: string;
+          diffs: CutoverResourceDiff[];
+        };
+        expect(report.kind).toBe("cutover_resource_drift");
+        expect(report.diffs).toEqual([
+          { kind: "resource_extra", id: "share_1" },
+        ]);
+        expect(
+          ledger.calls.some((call) => call.verb === "completeCutover"),
+        ).toBe(false);
+        expect(repository.onEngine).toBe(false);
+      });
+    });
+
+    describe("when a visitor spends a view mid-sweep", () => {
+      /** @scenario "A view spent while the decision proof runs is carried before the flip" */
+      it("carries the spent view onto the usage row before cutting the organization over", async () => {
+        repository.shareLinkRows = [
+          shareLinkRow({ id: "share_1", maxViews: 3, viewCount: 2 }),
+        ];
+        const spendViewMidSweep = () => {
+          repository.shareLinkRows = [
+            shareLinkRow({ id: "share_1", maxViews: 3, viewCount: 3 }),
+          ];
+        };
+
+        const outcome = await migration({
+          collectors: collectorsRunningMidSweep(spendViewMidSweep),
+        }).migrateTenant({ tenantId: ORG });
+
+        // Seeded again just before the flip, so the budget the engine
+        // inherits is the one the legacy counter ended on - a link with one
+        // view left, not two.
+        expect(repository.usageRows.get("share_1")).toBe(3);
+        expect(outcome.status).toBe("finalized");
+      });
+    });
+  });
+
+  /**
+   * The third leg asks the LIVE resolver, which is three to five queries a
+   * call against the pool every co-resident tenant is served from. A
+   * migration nobody is waiting on must not be the reason somebody else's
+   * request waits.
+   */
+  describe("given a proof wired to the legacy resolver", () => {
+    beforeEach(() => {
+      repository.memberIds = ["user_sam"];
+    });
+
+    describe("when the sweep asks the resolver about every permission", () => {
+      /** @scenario "The proof's questions to the legacy resolver stay bounded" */
+      it("keeps the questions in flight bounded and still asks all of them", async () => {
+        const asked: string[] = [];
+        let inFlight = 0;
+        let peak = 0;
+        const settle: Array<() => void> = [];
+        const legacyDecide = async ({ permission }: { permission: string }) => {
+          asked.push(permission);
+          inFlight += 1;
+          peak = Math.max(peak, inFlight);
+          // Held open until every question that got a slot is waiting, so
+          // the peak is what the bound allows rather than what the event
+          // loop happened to overlap.
+          await new Promise<void>((resolve) => settle.push(resolve));
+          inFlight -= 1;
+          return false;
+        };
+        const drain = setInterval(() => {
+          for (const resolve of settle.splice(0)) resolve();
+        }, 0);
+
+        const outcome = await withResolver(legacyDecide).migrateTenant({
+          tenantId: ORG,
+        });
+        clearInterval(drain);
+
+        expect(outcome.status).toBe("finalized");
+        expect(new Set(asked).size).toBe(ALL_PERMISSIONS.length);
+        // The resolver is three to five queries per call, so an unbounded
+        // fan-out is hundreds of simultaneous queries per member on a pool
+        // every co-resident tenant shares.
+        expect(peak).toBeLessThanOrEqual(16);
+        expect(peak).toBeGreaterThan(1);
+      });
+    });
+  });
+
+  /**
    * The third leg (finding: the two-collector proof cannot see a resolver
    * quirk, because both of its sides run the same decision function). The
    * quirk fixture is the shape that comparison is blind to by construction:
@@ -1167,24 +1340,6 @@ describe("GrantsCutoverMigration", () => {
     beforeEach(() => {
       repository.memberIds = ["user_sam"];
     });
-
-    const withResolver = (
-      legacyDecide: NonNullable<
-        ConstructorParameters<typeof GrantsCutoverMigration>[0]["legacyDecide"]
-      >,
-    ) =>
-      new GrantsCutoverMigration({
-        repository,
-        ledger,
-        // Both readers agree about everything: the row-level comparison has
-        // nothing at all to report.
-        collectors: { legacy: collectorOf(), grants: collectorOf() },
-        legacyDecide,
-        cutoverCohort: () => cohort,
-        adminEmails: () => adminEmails,
-        now: () => clock++,
-        poll: { intervalMs: 1, timeoutMs: 50 },
-      });
 
     describe("when the parity proof sweeps", () => {
       it("catches the disagreement the two readers cannot see, as its own family", async () => {

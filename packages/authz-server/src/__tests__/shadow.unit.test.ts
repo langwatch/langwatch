@@ -13,7 +13,10 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ warn, debug, info, error: vi.fn() }),
 }));
 
-import { AuthzShadowService } from "../authz-shadow.service";
+import {
+  AuthzShadowService,
+  awaitShadowComparisonsForTesting,
+} from "../authz-shadow.service";
 
 const ORG = "org-1";
 const TEAM = "team-1";
@@ -39,11 +42,15 @@ function makeShadowReader(overrides: Partial<AuthzReadRepository> = {}) {
 
 function makeShadow(
   reader: AuthzReadRepository,
-  { sampleRate = 1 }: { sampleRate?: number } = {},
+  {
+    sampleRate = 1,
+    maxInFlightComparisons,
+  }: { sampleRate?: number; maxInFlightComparisons?: number } = {},
 ) {
   return new AuthzShadowService(new AuthzCollectorService(reader), {
     sampleRate: () => sampleRate,
     demoProjectId: () => undefined,
+    maxInFlightComparisons,
   });
 }
 
@@ -478,6 +485,54 @@ describe("authz shadow mode", () => {
         }),
         "authz shadow mismatch",
       );
+    });
+  });
+
+  describe("given more comparisons than the in-flight bound allows", () => {
+    /** @scenario "Shadow comparisons past the in-flight ceiling are dropped" */
+    it("drops the ones over the bound instead of queueing them", async () => {
+      // The set is process-wide, so an earlier test's comparison still
+      // sitting in it would eat part of this test's ceiling.
+      await awaitShadowComparisonsForTesting();
+      // A read that only settles when the test lets it: exactly the shape
+      // the bound exists for, since nothing upstream waits for these.
+      let release: () => void = () => undefined;
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const findOrganizationRole = vi.fn(async () => {
+        await held;
+        return null;
+      });
+      const shadow = makeShadow(makeShadowReader({ findOrganizationRole }), {
+        maxInFlightComparisons: 2,
+      });
+
+      for (const userId of ["alice", "bob", "carol", "dave"]) {
+        shadow.userPermissionCheck({
+          userId,
+          permission: "traces:view",
+          legacyAllowed: true,
+          projectId: PROJECT,
+          caller: "trpc.project",
+        });
+      }
+      // The shed happens synchronously at admission; the two admitted
+      // comparisons reach the held read only after their scope resolution
+      // settles, so the wait must be on the read itself.
+      await vi.waitFor(() =>
+        expect(findOrganizationRole).toHaveBeenCalledTimes(2),
+      );
+      expect(debug).toHaveBeenCalledWith(
+        expect.objectContaining({ ceiling: 2 }),
+        "authz shadow comparison shed",
+      );
+
+      release();
+      await awaitShadowComparisonsForTesting();
+      // Dropped, not deferred: the two shed checks never run once there is
+      // room again.
+      expect(findOrganizationRole).toHaveBeenCalledTimes(2);
     });
   });
 

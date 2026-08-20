@@ -8,27 +8,35 @@
  * out of the comparison exactly. That is the half of "will the flip change an
  * answer?" the readers cannot answer.
  *
- * So this is the real thing: `hasOrganizationPermission`, the entry point the
- * request path actually calls, asked at ORGANIZATION scope for one member and
- * one permission. `@langwatch/authz-server` cannot import it (a package may
- * not reach into the app), so the migration takes it as a callback the same
- * way it takes its two collectors.
+ * So this is the real thing: the legacy body of `hasOrganizationPermission`,
+ * the resolver the request path has been answering this customer from, asked
+ * at ORGANIZATION scope for one member and one permission.
+ * `@langwatch/authz-server` cannot import it (a package may not reach into
+ * the app), so the migration takes it as a callback the same way it takes its
+ * two collectors.
  *
- * Two properties make calling the live entry point safe here rather than
- * reckless:
+ * The LEGACY BODY specifically, not the wrapper around it. The wrapper is a
+ * fork: once an organization's cutover fact has landed, it answers from the
+ * engine and runs legacy behind it as the reverse-shadow comparison. A proof
+ * that called the wrapper would therefore compare the engine with itself the
+ * moment a pass re-runs after `completeCutover` landed but the projection
+ * wait timed out - and it would report a healthy `resolverSubjectsVerified`
+ * while doing it, which is the one failure mode a self-comparison has: it
+ * always agrees. Calling `hasOrganizationPermissionLegacy` keeps a re-run
+ * meaningful, and skips the wrapper's own shadow comparison, which the proof
+ * has no use for.
  *
- *   - It is READ-ONLY. Nothing about asking it changes any row.
- *   - At proof time the organization is by definition NOT on the engine yet -
- *     the whole point of the proof is that it runs before the flip - so the
- *     wrapper's own cutover gate sends it down the legacy body. Which is the
- *     body under test.
+ * Calling it here is read-only: nothing about asking it changes any row.
  *
- * A synthetic session is what the entry point takes; it carries the user id
- * and nothing else, because that is all the legacy body reads from it.
+ * A synthetic session is what the resolver takes; it carries the user id and
+ * nothing else, because that is all the legacy body reads from it.
  */
 import { ALL_PERMISSIONS } from "@langwatch/authz";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { hasOrganizationPermission, type Permission } from "~/server/api/rbac";
+import {
+  hasOrganizationPermissionLegacy,
+  type Permission,
+} from "~/server/api/rbac";
 import type { Session } from "~/server/auth";
 
 /**
@@ -53,7 +61,7 @@ export function legacyOrganizationDecide(prisma: PrismaClient) {
   }): Promise<boolean> => {
     if (!isRegistryPermission(permission)) return false;
     const session = { user: { id: userId } } as unknown as Session;
-    return hasOrganizationPermission(
+    return hasOrganizationPermissionLegacy(
       { prisma, session },
       organizationId,
       permission,

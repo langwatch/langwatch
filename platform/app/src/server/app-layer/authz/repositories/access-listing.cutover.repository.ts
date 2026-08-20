@@ -26,12 +26,12 @@ import type {
   TeamScopedMemberBinding,
 } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import { cutoverOnEngine } from "../cutover-gate";
+import { GrantsAccessListingRepository } from "./access-listing.grants.repository";
+import { PrismaAccessListingRepository } from "./access-listing.prisma.repository";
 import type {
   AccessListingBindingRow,
   AccessListingRepository,
 } from "./access-listing.repository";
-import { GrantsAccessListingRepository } from "./access-listing.grants.repository";
-import { PrismaAccessListingRepository } from "./access-listing.prisma.repository";
 
 export class CutoverAwareAccessListingRepository
   implements AccessListingRepository

@@ -52,9 +52,19 @@ export function recordNotFound(): Error {
 
 export function harness({
   onLedger,
+  onLedgerRevocations = onLedger,
   poll,
 }: {
   onLedger: boolean;
+  /**
+   * The side the REVOCATION class lands on, when it has to differ from the
+   * mint class's. In production the two gates answer the same question from
+   * different reads — a cached genesis-state row and an uncached cutover
+   * projection — so an organization the engine already serves can have its
+   * mints cached onto legacy while its revocations must not be. Defaults to
+   * `onLedger`, which is every test that is not about that skew.
+   */
+  onLedgerRevocations?: boolean;
   /** Defaults to a poll that never retries — one failed `check()` times out
    *  immediately. Override to exercise the read-your-writes retry loop. */
   poll?: { intervalMs: number; timeoutMs: number };
@@ -92,7 +102,8 @@ export function harness({
     auditLog: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
   };
   const writer = new GrantsLedgerWriter(db as unknown as PrismaClient, {
-    onLedgerWrites: async () => onLedger,
+    onLedgerWrites: async ({ forRevocation }) =>
+      forRevocation ? onLedgerRevocations : onLedger,
     now: () => 1_700_000_000_000,
     poll: poll ?? { intervalMs: 0, timeoutMs: 0 },
     commands: async () => ({

@@ -307,6 +307,14 @@ Feature: In-place authorization data migration
     And turning it off again is announced too
 
   @unit
+  Scenario: Shadow comparisons past the in-flight ceiling are dropped
+    Given shadow comparison is enabled
+    And the ceiling on comparisons running at once is already reached
+    When another permission check runs through a legacy resolver
+    Then that comparison is skipped rather than queued behind the others
+    And the check still answers the customer
+
+  @unit
   Scenario: A shadow comparison that fails is a warning, not silence
     Given shadow comparison is enabled
     When the engine's comparison throws
@@ -383,7 +391,7 @@ Feature: In-place authorization data migration
   Scenario: A migration the cutover stands on cannot be rolled back from under it
     Given "acme" was cut over and is served by the engine
     When an operator tries to roll back its genesis import or its team backfill
-    Then the rollback is refused, naming the cutover as what stands on it
+    Then the rollback is refused with error code "migration_rollback_blocked_by_dependent", naming the cutover as what stands on it
     And nothing about "acme"'s state changes
     And rolling the cutover back first re-opens the path
 
@@ -391,7 +399,7 @@ Feature: In-place authorization data migration
   Scenario: Rolling back a cutover that never started is refused
     Given "acme" is only waiting to cut over and is not served by the engine
     When an operator tries to roll its cutover back
-    Then the rollback is refused because there is nothing to roll back
+    Then the rollback is refused with error code "migration_rollback_cutover_not_started"
     And "acme" is not pinned, so it still cuts over once its wait ends
 
   @integration
@@ -410,6 +418,36 @@ Feature: In-place authorization data migration
     When the cutover proves the resource import
     Then "acme" is held with that grant reported as extra
     And "acme" is not cut over
+
+  @unit
+  Scenario: The proof's questions to the legacy resolver stay bounded
+    Given "acme" has a member and the proof is wired to the legacy resolver
+    When the proof sweeps every permission for that member
+    Then only a bounded number of those questions are asked at once
+    And every permission is still asked
+
+  @unit
+  Scenario: A share link revoked while the decision proof runs holds the cutover
+    Given "acme"'s share links were proved against their grant rows
+    And a customer revokes one of those links while the decision proof is still running
+    When the cutover reaches the flip
+    Then "acme" is held with the leftover grant reported as extra
+    And "acme" is not cut over
+
+  @unit
+  Scenario: A view spent while the decision proof runs is carried before the flip
+    Given "acme"'s share budgets were seeded before the decision proof
+    And a visitor spends another view on the legacy path while the proof runs
+    When the cutover reaches the flip
+    Then the usage row carries that view before the organization is cut over
+
+  @unit
+  Scenario: A platform admin address is matched in full, never as a pattern
+    Given the platform admin list names an address containing an underscore
+    And an account exists whose address differs only where the underscore is
+    When the cutover plans its platform grants
+    Then that account holds no platform grant
+    And the address is reported as having no account behind it
 
   @unit
   Scenario: A view spent while an organization is held is handed over on the next pass
@@ -596,6 +634,28 @@ Feature: In-place authorization data migration
       fact
     And it has the same shape the ledger's subscriber writes
 
+  # A stale "legacy" answer costs a MINT nothing - the row it writes is adopted
+  # by the next genesis pass. It costs a REVOCATION everything: the legacy
+  # branch deletes the compat row and records no fact, so on an organization
+  # the engine already reads for, the deciding grant stays live and nothing
+  # ever revisits it. Revocations, role downgrades, role deletions and
+  # offboardings therefore route on a fresh answer, never a cached one.
+
+  @unit
+  Scenario: A revocation-class write never trusts a cached legacy answer from the write gate
+    Given the engine serves "acme" while this process still answers legacy for its writes
+    When an admin revokes a binding, downgrades a role, deletes a role, or offboards a member
+    Then the write is recorded as a fact rather than deleted imperatively
+    And no grant outlives an access change the customer asked for
+    But a grant minted in the same window still takes the legacy path
+
+  @unit
+  Scenario: A failed gate read routes a revocation-class write toward the ledger
+    Given neither the migration state nor the cutover projection can be read
+    When an admin revokes a binding in "acme"
+    Then the revocation is routed through the ledger, which deletes both heads
+    And the failed read is counted so the window is visible
+
   # ============================================================================
   # Share-link revocation survives every crash window (decisions 7 and 22)
   # ============================================================================
@@ -642,6 +702,15 @@ Feature: In-place authorization data migration
     When a share link is revoked
     Then the revoke is written through the ledger and the compat row is swept
     And no failure window leaves the customer with more access than before
+
+  @unit
+  Scenario: A diverted share revocation still deletes the compat row when its append fails
+    Given a failed cutover read routed an organization's revoke through the ledger
+    And the organization cannot be read to be served by the engine
+    When the ledger append fails as well
+    Then the share link is deleted anyway, so the token stops resolving
+    And the append failure is surfaced to the caller rather than swallowed
+    But an organization still readable as cut over keeps its link until the fact lands
 
   @unit
   Scenario: A consumed view and its compat mirror commit together

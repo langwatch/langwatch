@@ -411,6 +411,87 @@ describe("LedgerShareRepository", () => {
           projectId: PROJECT_ID,
         });
       });
+
+      /**
+       * The load that trips the routing read is the load that trips the
+       * append, so the two failures arrive together - and the organization
+       * the gate diverted may never have been enrolled at all. Appending
+       * first and deleting second would then delete nothing, and the
+       * customer's unshare simply would not happen.
+       */
+      describe("when the append then fails as well", () => {
+        /** @scenario "A diverted share revocation still deletes the compat row when its append fails" */
+        it("deletes the compat row anyway for an organization the projection cannot confirm", async () => {
+          const { repository, legacy, writer, cutoverFindUnique } =
+            buildRepository({ onEngine: false });
+          const appendFailure = new Error("pool timeout");
+          cutoverFindUnique.mockRejectedValue(new Error("pool timeout"));
+          vi.mocked(writer.revokeResourceGrants).mockRejectedValue(
+            appendFailure,
+          );
+
+          await expect(
+            repository.deleteById({ id: "share_1", projectId: PROJECT_ID }),
+          ).rejects.toBe(appendFailure);
+
+          expect(legacy.deleteById).toHaveBeenCalledWith({
+            id: "share_1",
+            projectId: PROJECT_ID,
+          });
+        });
+
+        it("sweeps the compat rows of a resource-wide revoke the same way", async () => {
+          const { repository, legacy, writer, cutoverFindUnique } =
+            buildRepository({
+              onEngine: false,
+              compat: {
+                findMany: vi.fn().mockResolvedValue([{ id: "share_1" }]),
+              },
+            });
+          const appendFailure = new Error("pool timeout");
+          cutoverFindUnique.mockRejectedValue(new Error("pool timeout"));
+          vi.mocked(writer.revokeResourceGrants).mockRejectedValue(
+            appendFailure,
+          );
+
+          await expect(
+            repository.deleteByResource({
+              projectId: PROJECT_ID,
+              resourceType: "TRACE",
+              resourceId: TRACE_ID,
+            }),
+          ).rejects.toBe(appendFailure);
+
+          expect(legacy.deleteByResource).toHaveBeenCalledWith({
+            projectId: PROJECT_ID,
+            resourceType: "TRACE",
+            resourceId: TRACE_ID,
+          });
+        });
+
+        /**
+         * The other half: an organization the projection still names as
+         * cut over must NOT get a compat delete with no fact behind it -
+         * that is the row the fold would put back. The error stands, and
+         * the retry is the caller's.
+         */
+        it("refuses the compat delete for an organization still readable as cut over", async () => {
+          const { repository, legacy, writer } = buildRepository({
+            onEngine: true,
+            grantIds: ["share_1"],
+          });
+          const appendFailure = new Error("clickhouse unavailable");
+          vi.mocked(writer.revokeResourceGrants).mockRejectedValue(
+            appendFailure,
+          );
+
+          await expect(
+            repository.deleteById({ id: "share_1", projectId: PROJECT_ID }),
+          ).rejects.toBe(appendFailure);
+
+          expect(legacy.deleteById).not.toHaveBeenCalled();
+        });
+      });
     });
 
     describe("when every link for a resource is revoked", () => {

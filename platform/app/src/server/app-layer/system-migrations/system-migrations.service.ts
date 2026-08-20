@@ -204,6 +204,30 @@ export class SystemMigrationsService {
   ) {}
 
   /**
+   * Best-effort write to the ops audit trail. A write that already landed -
+   * the enrollment row, the withdrawal, the listing read - must not turn
+   * into a 500 for the operator because the trail itself failed to record;
+   * the caller's retry would then hit the store's own uniqueness refusal for
+   * an action that already happened. Same posture as
+   * `GrantsLedgerWriter.recordLegacyAudit` in ../authz/ledger.ts.
+   */
+  private async recordAudit(entry: {
+    userId: string;
+    organizationId?: string;
+    action: string;
+    args?: Record<string, unknown>;
+  }): Promise<void> {
+    try {
+      await this.deps.audit(entry);
+    } catch (err) {
+      logger.warn(
+        { err, action: entry.action, organizationId: entry.organizationId },
+        "failed to record the audit row for a system migration action; the action itself landed",
+      );
+    }
+  }
+
+  /**
    * Per migration: the status rollup, plus the tenants needing attention -
    * held (`migrated`, parity disagreements in the report) and `parked`
    * (errored, retried next pass). Finalized tenants are a count, not a
@@ -244,7 +268,7 @@ export class SystemMigrationsService {
         this.deps.enrollments.findAllByStage({ stage }),
       ),
     );
-    await this.deps.audit({
+    await this.recordAudit({
       userId: requestedBy,
       action: "systemMigrations.listEnrollments",
     });
@@ -285,7 +309,7 @@ export class SystemMigrationsService {
       { organizationId, stage, actorUserId },
       "operator enrolled an organization for the in-place migration rollout",
     );
-    await this.deps.audit({
+    await this.recordAudit({
       userId: actorUserId,
       organizationId,
       action: "systemMigrations.enroll",
@@ -314,7 +338,7 @@ export class SystemMigrationsService {
       { organizationId, stage, actorUserId },
       "operator withdrew an organization from the in-place migration rollout",
     );
-    await this.deps.audit({
+    await this.recordAudit({
       userId: actorUserId,
       organizationId,
       action: "systemMigrations.withdraw",

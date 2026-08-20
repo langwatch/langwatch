@@ -373,3 +373,138 @@ describe("given an organization whose genesis import has landed", () => {
     expect(db.auditLog.createMany).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * The skew the revocation gate exists for: the engine already serves this
+ * organization's reads, and this process is still holding a `false` from the
+ * genesis-state row - stale, or cached from a read that failed. Every write
+ * whose failure mode is MORE access has to ignore that answer, because its
+ * legacy branch deletes a compat row and appends nothing: the deciding grant
+ * row would stay live with nothing left to revisit it.
+ */
+describe("given an organization the engine serves while the write gate still answers legacy", () => {
+  describe("when bindings are revoked", () => {
+    /** @scenario "A revocation-class write never trusts a cached legacy answer from the write gate" */
+    it("appends the revocation rather than deleting the rows on its own authority", async () => {
+      const { writer, db, sent } = harness({
+        onLedger: false,
+        onLedgerRevocations: true,
+      });
+
+      await writer.revokeBindings({
+        organizationId: ORG_ID,
+        bindingIds: ["rb_1"],
+        actor: ACTOR,
+      });
+
+      expect(sent.map((command) => command.verb)).toEqual(["revokeGrants"]);
+      // Enforcement deletes both heads (decision 7), so the grant row cannot
+      // outlive the revoke - which is exactly what the legacy branch would
+      // have left standing.
+      expect(db.grant.deleteMany).toHaveBeenCalledTimes(1);
+      expect(db.auditLog.createMany).not.toHaveBeenCalled();
+    });
+
+    it("routes a filtered revoke the same way", async () => {
+      const { writer, db, sent } = harness({
+        onLedger: false,
+        onLedgerRevocations: true,
+      });
+      db.roleBinding.findMany.mockResolvedValueOnce([{ id: "rb_7" }]);
+
+      await writer.revokeBindingsWhere({
+        organizationId: ORG_ID,
+        where: { apiKeyId: "key_1" },
+        actor: ACTOR,
+      });
+
+      expect(sent.map((command) => command.verb)).toEqual(["revokeGrants"]);
+      expect(db.roleBinding.deleteMany).not.toHaveBeenCalledWith({
+        where: { apiKeyId: "key_1", organizationId: ORG_ID },
+      });
+    });
+  });
+
+  describe("when a binding's role is downgraded", () => {
+    /** @scenario "A revocation-class write never trusts a cached legacy answer from the write gate" */
+    it("appends the role change rather than updating the row imperatively", async () => {
+      const { writer, db, sent } = harness({
+        onLedger: false,
+        onLedgerRevocations: true,
+      });
+      db.roleBinding.findFirst
+        .mockResolvedValueOnce(legacyRow({ id: "rb_1" }))
+        .mockResolvedValueOnce(null);
+
+      await writer.changeBindingRole({
+        organizationId: ORG_ID,
+        bindingId: "rb_1",
+        role: TeamUserRole.ADMIN,
+        customRoleId: null,
+        actor: ACTOR,
+      });
+
+      expect(sent.map((command) => command.verb)).toEqual(["changeGrantRole"]);
+      expect(db.roleBinding.updateMany).not.toHaveBeenCalled();
+      expect(db.auditLog.createMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a role definition is deleted", () => {
+    /** @scenario "A revocation-class write never trusts a cached legacy answer from the write gate" */
+    it("appends the deletion rather than dropping the row imperatively", async () => {
+      const { writer, db, sent } = harness({
+        onLedger: false,
+        onLedgerRevocations: true,
+      });
+
+      await writer.deleteRole({
+        organizationId: ORG_ID,
+        roleId: "role_1",
+        actor: ACTOR,
+      });
+
+      expect(sent.map((command) => command.verb)).toEqual(["deleteRole"]);
+      expect(db.customRole.deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a member is offboarded", () => {
+    /** @scenario "A revocation-class write never trusts a cached legacy answer from the write gate" */
+    it("appends the offboarding rather than deleting the grants imperatively", async () => {
+      const { writer, db, sent } = harness({
+        onLedger: false,
+        onLedgerRevocations: true,
+      });
+
+      await writer.offboardMember({
+        organizationId: ORG_ID,
+        userId: "user_sam",
+        revokedGrantIds: ["rb_1"],
+        actor: ACTOR,
+      });
+
+      expect(sent.map((command) => command.verb)).toEqual(["offboardMember"]);
+      expect(db.auditLog.createMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the same organization mints a grant", () => {
+    it("keeps the mint on the legacy path, where the next genesis pass adopts it", async () => {
+      const { writer, db, sent } = harness({
+        onLedger: false,
+        onLedgerRevocations: true,
+      });
+
+      await writer.attachBindings({
+        organizationId: ORG_ID,
+        bindings: [binding],
+        actor: ACTOR,
+        onDuplicate: "reject",
+      });
+
+      expect(sent).toEqual([]);
+      expect(db.roleBinding.create).toHaveBeenCalledTimes(1);
+    });
+  });
+});

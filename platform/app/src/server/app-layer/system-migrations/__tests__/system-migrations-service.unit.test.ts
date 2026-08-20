@@ -38,6 +38,7 @@ function serviceWith({
   isSaaS = true,
   enrollments = enrollmentStoreStub(),
   migrations = [{ name: MIGRATION, runsAutomaticallyOnSelfHosted: true }],
+  audit = vi.fn().mockResolvedValue(undefined),
 }: {
   record: TenantMigrationRecord | null;
   rollbackEffects?: Record<
@@ -55,9 +56,9 @@ function serviceWith({
   isSaaS?: boolean;
   enrollments?: ReturnType<typeof enrollmentStoreStub>;
   migrations?: Array<{ name: string; runsAutomaticallyOnSelfHosted: boolean }>;
+  audit?: ReturnType<typeof vi.fn>;
 }) {
   const upserts: TenantMigrationRecord[] = [];
-  const audit = vi.fn().mockResolvedValue(undefined);
   // Stored, not fixed: a rollback retry re-reads the record the previous call
   // pinned, so the stub has to answer with what was actually written.
   let stored = record;
@@ -426,6 +427,27 @@ describe("SystemMigrationsService enrollment", () => {
           args: { stage: "cutover" },
         });
       });
+
+      /** @scenario "An enrollment lands even when its audit write fails" */
+      it("returns normally when the audit write throws, since the enrollment already landed", async () => {
+        const enrollments = enrollmentStoreStub();
+        const audit = vi.fn().mockRejectedValue(new Error("connection reset"));
+        const { service } = serviceWith({ record: null, enrollments, audit });
+
+        await expect(
+          service.enroll({
+            organizationId: "org_acme",
+            stage: "cutover",
+            actorUserId: "user_alex",
+          }),
+        ).resolves.toBeUndefined();
+
+        expect(enrollments.create).toHaveBeenCalledWith({
+          organizationId: "org_acme",
+          stage: "cutover",
+          enrolledByUserId: "user_alex",
+        });
+      });
     });
 
     describe("when the organization id matches nothing", () => {
@@ -472,6 +494,26 @@ describe("SystemMigrationsService enrollment", () => {
           organizationId: "org_acme",
           action: "systemMigrations.withdraw",
           args: { stage: "migrations" },
+        });
+      });
+
+      /** @scenario "A withdrawal lands even when its audit write fails" */
+      it("returns normally when the audit write throws, since the withdrawal already landed", async () => {
+        const enrollments = enrollmentStoreStub();
+        const audit = vi.fn().mockRejectedValue(new Error("connection reset"));
+        const { service } = serviceWith({ record: null, enrollments, audit });
+
+        await expect(
+          service.withdraw({
+            organizationId: "org_acme",
+            stage: "migrations",
+            actorUserId: "user_alex",
+          }),
+        ).resolves.toBeUndefined();
+
+        expect(enrollments.delete).toHaveBeenCalledWith({
+          organizationId: "org_acme",
+          stage: "migrations",
         });
       });
     });
@@ -568,6 +610,16 @@ describe("SystemMigrationsService enrollment", () => {
         userId: "user_ops",
         action: "systemMigrations.listEnrollments",
       });
+    });
+
+    /** @scenario "An enrollment listing is returned even when its audit write fails" */
+    it("answers the listing when the audit write throws, since the read already happened", async () => {
+      const audit = vi.fn().mockRejectedValue(new Error("connection reset"));
+      const { service } = serviceWith({ record: null, audit });
+
+      await expect(
+        service.getEnrollments({ requestedBy: "user_ops" }),
+      ).resolves.toMatchObject({ isSaaS: true, enrollments: [] });
     });
   });
 
