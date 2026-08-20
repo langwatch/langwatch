@@ -53,7 +53,6 @@ const repositoryFor = (onEngineByOrg: Record<string, boolean>) => {
     }),
   );
   const prisma = {
-    authzCutoverProjection: { findUnique },
   } as unknown as Prisma.TransactionClient;
   return {
     legacy,
@@ -256,7 +255,6 @@ describe("CutoverAwareAccessListingRepository", () => {
         .mockResolvedValueOnce({ onEngine: false })
         .mockResolvedValue({ onEngine: false });
       const prisma = {
-        authzCutoverProjection: { findUnique },
       } as unknown as Prisma.TransactionClient;
       const repository = new CutoverAwareAccessListingRepository(prisma, {
         legacy,
@@ -297,9 +295,11 @@ describe("CutoverAwareAccessListingRepository", () => {
       const grantFindMany = vi.fn().mockResolvedValue([]);
       const roleBindingFindMany = vi.fn().mockResolvedValue([]);
       const prisma = {
-        authzCutoverProjection: {
-          findUnique: vi.fn().mockResolvedValue({ onEngine }),
-        },
+        systemMigrationTenantState: {
+      findUnique: vi
+        .fn()
+        .mockResolvedValue(onEngine ? { status: "migrated" } : null),
+    },
         grant: { findMany: grantFindMany },
         roleBinding: { findMany: roleBindingFindMany },
         user: { findMany: vi.fn().mockResolvedValue([]) },

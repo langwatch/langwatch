@@ -79,7 +79,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
     // and the engine's steps assume it either way.
     if (!(await this.isCurrentMember({ userId, organizationId }))) return [];
     const rows = await this.prisma.grant.findMany({
-      where: {
+      where: { revokedAt: null,
         organizationId,
         principalType: "USER",
         principalId: userId,
@@ -110,7 +110,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
     // it names, which is the `viaGroupId` the collector needs stamped on each
     // binding.
     const rows = await this.prisma.grant.findMany({
-      where: {
+      where: { revokedAt: null,
         organizationId,
         principalType: "GROUP",
         principalId: { in: memberships.map((row) => row.groupId) },
@@ -137,7 +137,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
     // no OrganizationUser row of its own, and its owner's standing enters as
     // the §9 ceiling, computed elsewhere.
     const rows = await this.prisma.grant.findMany({
-      where: {
+      where: { revokedAt: null,
         organizationId,
         principalType: "API_KEY",
         principalId: apiKeyId,
@@ -219,7 +219,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
     if (customRoleIds.length === 0) return [];
     const apiKeyId = principal.type === "apiKey" ? principal.id : null;
     const rows = await this.prisma.role.findMany({
-      where: {
+      where: { deletedAt: null,
         id: { in: [...customRoleIds] },
         organizationId,
         // A user, a group, or an anonymous caller may never carry a key's
@@ -329,7 +329,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
     links: ReadonlyArray<{ kind: ShareableResourceKind; id: string }>;
   }): Promise<ShareLinkGrantCandidateRow[]> {
     return this.prisma.grant.findMany({
-      where: {
+      where: { revokedAt: null,
         organizationId,
         projectId,
         scopeType: "RESOURCE",
@@ -430,7 +430,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
     roleIds: readonly string[];
   }): Promise<Set<string>> {
     const holders = await this.prisma.grant.findMany({
-      where: {
+      where: { revokedAt: null,
         organizationId,
         roleKey: { in: roleIds.map((roleId) => `custom:${roleId}`) },
       },

@@ -111,9 +111,6 @@ function buildRepository({
         .fn()
         .mockResolvedValue({ team: { organizationId: ORGANIZATION_ID } }),
     },
-    authzCutoverProjection: {
-      findUnique: cutoverFindUnique,
-    },
     grant: { findMany: grantFindMany },
     grantUsage: rootGrantUsage,
     shareLink,

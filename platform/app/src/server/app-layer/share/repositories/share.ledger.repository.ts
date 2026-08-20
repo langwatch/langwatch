@@ -520,7 +520,7 @@ export class LedgerShareRepository implements ShareRepository {
     resourceId?: string;
   }): Promise<string[]> {
     const rows = await this.prisma.grant.findMany({
-      where: {
+      where: { revokedAt: null,
         // organizationId on every grant read (the org guard's requirement,
         // and the tenancy the lineage read already established).
         organizationId,

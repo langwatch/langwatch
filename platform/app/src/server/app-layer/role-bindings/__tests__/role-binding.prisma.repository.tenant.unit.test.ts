@@ -14,8 +14,10 @@ import { PrismaRoleBindingRepository } from "../repositories/role-binding.prisma
 const legacyPrisma = (roleBindingFindMany: ReturnType<typeof vi.fn>) =>
   ({
     roleBinding: { findMany: roleBindingFindMany },
-    authzCutoverProjection: {
-      findUnique: vi.fn().mockResolvedValue({ onEngine: false }),
+    systemMigrationTenantState: {
+      findUnique: vi
+        .fn()
+        .mockResolvedValue(null),
     },
   }) as unknown as PrismaClient;
 

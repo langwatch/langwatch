@@ -22,6 +22,7 @@
  * @see specs/traces-v2/sharing.feature
  */
 import { AuthzCollectorService } from "@langwatch/authz-server";
+import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../authz/migration-name";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -114,10 +115,15 @@ describe("given a cut-over organization's capped share link", () => {
     traceId = `trace_${ns}`;
     token = `--test-share-token-${ns}`;
 
-    // The organization as a finished cutover leaves it: on the engine, with
-    // the link's fact on the grant head and its compat row alongside.
-    await prisma.authzCutoverProjection.create({
-      data: { organizationId: organization.id, onEngine: true },
+    // The organization as a finished migration leaves it: on the engine,
+    // with the link's fact on the grant head.
+    await prisma.systemMigrationTenantState.create({
+      data: {
+        migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
+        tenantId: organization.id,
+        status: "migrated",
+        occurredAt: new Date(),
+      },
     });
     const shareLink = await prisma.shareLink.create({
       data: {
@@ -177,7 +183,10 @@ describe("given a cut-over organization's capped share link", () => {
       ["grantUsage", { organizationId: organization.id }],
       ["shareLink", { projectId: project.id }],
       ["grant", { organizationId: organization.id }],
-      ["authzCutoverProjection", { organizationId: organization.id }],
+      [
+        "systemMigrationTenantState",
+        { tenantId: organization.id },
+      ],
       ["project", { id: project.id }],
       ["team", { id: team.id }],
       ["organization", { id: organization.id }],

@@ -33,7 +33,7 @@ import { organizationOnAuthzEngine } from "../app-layer/authz/engine-gate";
 // and being the answer rather than a comment on it, they must see exactly the
 // world the legacy walk they replace sees, which is the caller's handle. The
 // reverse-shadow thunk is the one detached leg, and it is skipped precisely
-// where a transaction is in play: the mint loops pass `skipShadow`. A thunk
+// where a transaction is in play. A thunk
 // that does outlive its transaction anyway logs "authz fork comparison
 // failed" and changes nothing.
 import { prisma as appPrisma } from "../db";
@@ -298,7 +298,6 @@ export async function checkRoleBindingPermission({
   organizationId,
   scope,
   permission,
-  skipShadow = false,
 }: {
   prisma: PrismaClient;
   userId?: string;
@@ -313,7 +312,6 @@ export async function checkRoleBindingPermission({
    * already comes from `enforceApiKeyCeiling`, which runs the same check
    * per REQUEST for the key's whole life.
    */
-  skipShadow?: boolean;
 }): Promise<boolean> {
   const resolvedPrincipal: Principal = principal ?? {
     type: "user",
@@ -598,7 +596,6 @@ export async function resolveApiKeyPermission({
   organizationId,
   scope,
   permission,
-  skipShadow = false,
 }: {
   prisma: PrismaClient;
   apiKeyId: string;
@@ -607,7 +604,6 @@ export async function resolveApiKeyPermission({
   scope: ScopeRef;
   permission: Permission;
   /** See checkRoleBindingPermission - the per-permission mint loops opt out. */
-  skipShadow?: boolean;
 }): Promise<boolean> {
   /**
    * Steps 1-4 of the legacy ceiling, as ONE implementation both paths run:

@@ -29,8 +29,6 @@ function purgingPrisma() {
     "grantUsage",
     "grant",
     "role",
-    "authzProjectionCursor",
-    "authzCutoverProjection",
     "systemMigrationTenantState",
     "systemMigrationEnrollment",
     "apiKey",
@@ -68,8 +66,6 @@ describe("PrismaOrganizationRepository.deleteProvisionedOrganization", () => {
         "grantUsage",
         "grant",
         "role",
-        "authzProjectionCursor",
-        "authzCutoverProjection",
         // The migration machinery's own per-tenant rows: nothing cascades
         // them either, and leaving them would keep a deleted tenant enrolled.
         "systemMigrationTenantState",

@@ -51,7 +51,9 @@ const buildPrisma = (teamRole: TeamUserRole) => {
       ]),
     },
     teamUser: { findFirst: vi.fn().mockResolvedValue(null) },
-    authzCutoverProjection: { findUnique: vi.fn().mockResolvedValue(null) },
+    systemMigrationTenantState: {
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
     systemMigrationTenantState: { findUnique: vi.fn().mockResolvedValue(null) },
   };
   return { prisma, projectFindUnique, organizationUserFindFirst };

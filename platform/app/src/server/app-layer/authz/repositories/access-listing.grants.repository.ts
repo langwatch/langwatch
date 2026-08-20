@@ -335,7 +335,7 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
     });
 
     const rows = await this.prisma.grant.findMany({
-      where: {
+      where: { revokedAt: null,
         organizationId: { in: [...orgIds] },
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
         AND: [LISTABLE_ROLE_KEY_WHERE],
@@ -448,7 +448,7 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
     organizationId: string;
   }): Promise<CustomRole[]> {
     const roles = await this.prisma.role.findMany({
-      where: { organizationId, kind: CUSTOM_ROLE_KIND.CUSTOM },
+      where: { deletedAt: null, organizationId, kind: CUSTOM_ROLE_KIND.CUSTOM },
       orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
     });
     return roles.map((role) => toCustomRoleShape(role));
@@ -467,7 +467,7 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
     where: Prisma.GrantWhereInput;
   }): Promise<GrantListRow[]> {
     return this.prisma.grant.findMany({
-      where: {
+      where: { revokedAt: null,
         organizationId,
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
         principalType: { in: [...BINDING_PRINCIPAL_TYPES] },
@@ -490,7 +490,7 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
   }): Promise<CustomRole[]> {
     if (roleIds.length === 0) return [];
     const roles = await this.prisma.role.findMany({
-      where: { id: { in: [...roleIds] }, organizationId },
+      where: { deletedAt: null, id: { in: [...roleIds] }, organizationId },
     });
     return roles.map((role) => toCustomRoleShape(role));
   }

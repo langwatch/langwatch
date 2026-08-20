@@ -42,10 +42,6 @@ const stubs = vi.hoisted(() => {
         findUnique: migrationStateFindUnique,
         upsert: migrationStateUpsert,
       },
-      authzCutoverProjection: {
-        upsert: cutoverProjectionUpsert,
-        findUnique: cutoverProjectionFindUnique,
-      },
     },
   };
 });

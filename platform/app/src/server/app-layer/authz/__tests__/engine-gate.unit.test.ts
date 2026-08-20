@@ -3,7 +3,7 @@
  *
  * @see specs/rbac/in-place-authz-migration.feature
  */
-import { GRANTS_GENESIS_IMPORT_MIGRATION_NAME } from "@langwatch/authz-server/migration";
+import { AUTHZ_ENGINE_MIGRATION_NAME } from "../migration-name";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
@@ -31,7 +31,7 @@ function stateTable(status: string | null) {
   };
 }
 
-describe("the ledger write gate", () => {
+describe("the authz engine gate", () => {
   beforeEach(() => {
     resetAuthzEngineGateForTesting();
     vi.useRealTimers();
@@ -42,15 +42,15 @@ describe("the ledger write gate", () => {
     resetAuthzEngineGateForTesting();
   });
 
-  describe("when the organization has a genesis import state row", () => {
-    it("asks about the genesis import, not any other migration", async () => {
+  describe("when the organization has an authz migration state row", () => {
+    it("asks about the authz migration, not any other", async () => {
       const { findUnique, prisma } = stateTable("migrated");
 
       await organizationOnAuthzEngine({ organizationId: ORG_ID, prisma });
 
       expect(findUnique.mock.calls[0]![0].where).toEqual({
         migrationName_tenantId: {
-          migrationName: GRANTS_GENESIS_IMPORT_MIGRATION_NAME,
+          migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
           tenantId: ORG_ID,
         },
       });
@@ -160,7 +160,7 @@ describe("the ledger write gate", () => {
       expect(findUnique).toHaveBeenCalledTimes(2);
     });
 
-    /** @scenario "Completing the genesis import moves an organization's writes onto the ledger" */
+    /** @scenario "Completing the authz migration moves an organization's writes onto the ledger" */
     it("moves onto the ledger once the import lands and the cached answer expires", async () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date("2026-08-18T09:00:00.000Z"));

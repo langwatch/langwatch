@@ -909,7 +909,7 @@ export class GrantsLedgerWriter {
     actor: LedgerActor;
   }): Promise<void> {
     const known = await this.prisma.grant.findFirst({
-      where: { id: bindingId, organizationId },
+      where: { revokedAt: null, id: bindingId, organizationId },
       select: { id: true },
     });
     if (!known) {

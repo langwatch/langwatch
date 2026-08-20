@@ -19,7 +19,6 @@ import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/cutover
 import { type Permission, resolveTeamPermission } from "../rbac";
 
 const mockPrisma = {
-  authzCutoverProjection: { findUnique: vi.fn() },
   team: { findUnique: vi.fn() },
   organizationUser: { findFirst: vi.fn() },
   teamUser: { findFirst: vi.fn(), findMany: vi.fn() },
@@ -40,9 +39,7 @@ describe("legacy TeamUser fallback at the resolver seam", () => {
     // no other test's cached read leaks in, and the projection stub is what
     // keeps this suite on the legacy resolver path it exists to pin.
     resetAuthzEngineGateForTesting();
-    mockPrisma.authzCutoverProjection.findUnique.mockResolvedValue({
-      onEngine: false,
-    });
+    mockPrisma.systemMigrationTenantState.findUnique.mockResolvedValue(null);
     mockPrisma.team.findUnique.mockResolvedValue({
       id: "team-1",
       organizationId: "org-1",

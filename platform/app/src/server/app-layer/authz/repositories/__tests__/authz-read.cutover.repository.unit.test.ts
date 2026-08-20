@@ -33,8 +33,10 @@ const repositoryFor = (onEngine: boolean) => {
   const legacy = spyRepository("legacy");
   const grants = spyRepository("grants");
   const prisma = {
-    authzCutoverProjection: {
-      findUnique: vi.fn().mockResolvedValue({ onEngine }),
+    systemMigrationTenantState: {
+      findUnique: vi
+        .fn()
+        .mockResolvedValue(onEngine ? { status: "migrated" } : null),
     },
   } as unknown as Prisma.TransactionClient;
   return {
@@ -208,7 +210,6 @@ describe("CutoverAwareAuthzReadRepository", () => {
     it("reads the projection once, because the gate caches the answer", async () => {
       const findUnique = vi.fn().mockResolvedValue({ onEngine: true });
       const prisma = {
-        authzCutoverProjection: { findUnique },
       } as unknown as Prisma.TransactionClient;
       const repository = new CutoverAwareAuthzReadRepository(prisma, {
         legacy: spyRepository("legacy"),
@@ -236,7 +237,6 @@ describe("CutoverAwareAuthzReadRepository", () => {
         .mockResolvedValueOnce({ onEngine: true })
         .mockResolvedValue({ onEngine: false });
       const prisma = {
-        authzCutoverProjection: { findUnique },
       } as unknown as Prisma.TransactionClient;
       const legacy = spyRepository("legacy");
       const grants = spyRepository("grants");

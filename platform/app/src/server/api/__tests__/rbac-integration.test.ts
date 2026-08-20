@@ -19,7 +19,7 @@ import {
 
 // Mock Prisma client
 const mockPrisma = {
-  authzCutoverProjection: {
+  systemMigrationTenantState: {
     findUnique: vi.fn(),
   },
   project: {
@@ -65,9 +65,7 @@ describe("RBAC Integration Tests", () => {
     // the legacy path these tests pin instead of the gate caching a failed
     // read of a missing delegate.
     resetAuthzEngineGateForTesting();
-    mockPrisma.authzCutoverProjection.findUnique.mockResolvedValue({
-      onEngine: false,
-    });
+    mockPrisma.systemMigrationTenantState.findUnique.mockResolvedValue(null);
     // Default: the caller IS a current member of the owning org — scoped
     // resolution fails closed on membership, so every test that exercises a
     // binding/group path needs one. Tests about non-members override this with

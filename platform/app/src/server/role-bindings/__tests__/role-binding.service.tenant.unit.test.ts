@@ -30,9 +30,11 @@ const prisma = {
   // The listing reads go through the per-organization fork, which asks the
   // gate first. Answering it keeps these tests on the legacy head by choice;
   // without it the gate's read throws and they pass on the fail-safe.
-  authzCutoverProjection: {
-    findUnique: vi.fn().mockResolvedValue({ onEngine: false }),
-  },
+  systemMigrationTenantState: {
+      findUnique: vi
+        .fn()
+        .mockResolvedValue(null),
+    },
   $transaction: vi.fn(),
 } as unknown as PrismaClient;
 
