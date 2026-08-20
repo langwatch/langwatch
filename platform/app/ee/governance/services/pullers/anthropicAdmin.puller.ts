@@ -140,7 +140,7 @@ function parseCursor({
 }: {
   cursor: string | null;
   config: AnthropicAdminPullConfig;
-}): { startingAt: string; page: string | null } {
+}): Pick<z.infer<typeof cursorSchema>, "startingAt" | "page"> {
   if (cursor) {
     try {
       const parsed = cursorSchema.parse(JSON.parse(cursor));
