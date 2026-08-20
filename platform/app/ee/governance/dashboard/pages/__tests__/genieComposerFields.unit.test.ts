@@ -86,7 +86,10 @@ describe("given the create input for a pull-mode source", () => {
   describe("when the admin never touched the cadence", () => {
     /** @scenario "Leaving the cadence untouched keeps the recommended schedule" */
     it("carries the recommended schedule, never a schedule of none", () => {
-      const input = buildCreateInput(genieComposer({}), "org-1");
+      const input = buildCreateInput({
+        composer: genieComposer({}),
+        organizationId: "org-1",
+      });
       expect(input?.pullSchedule).toBe("*/15 * * * *");
     });
   });
@@ -94,10 +97,10 @@ describe("given the create input for a pull-mode source", () => {
   describe("when the admin picked an hourly cadence", () => {
     /** @scenario "Picking a cadence saves exactly that schedule" */
     it("carries that schedule everywhere the schedule travels", () => {
-      const input = buildCreateInput(
-        genieComposer({ pullSchedule: "0 * * * *" }),
-        "org-1",
-      );
+      const input = buildCreateInput({
+        composer: genieComposer({ pullSchedule: "0 * * * *" }),
+        organizationId: "org-1",
+      });
       expect(input?.pullSchedule).toBe("0 * * * *");
       // The Genie pull settings carry their own copy of the schedule; a
       // mismatch here means the puller runs a different cadence than the
@@ -111,7 +114,10 @@ describe("given the create input for a pull-mode source", () => {
   describe("when the Advanced group was never opened", () => {
     /** @scenario "Advanced options stay collapsed and never block create" */
     it("creates with an empty space list covering every visible space", () => {
-      const input = buildCreateInput(genieComposer({}), "org-1");
+      const input = buildCreateInput({
+        composer: genieComposer({}),
+        organizationId: "org-1",
+      });
       expect(input).not.toBeNull();
       expect((input?.pullConfig as { spaceIds?: string[] }).spaceIds).toEqual(
         [],

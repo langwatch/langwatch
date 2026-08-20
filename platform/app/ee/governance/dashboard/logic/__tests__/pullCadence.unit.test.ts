@@ -13,19 +13,23 @@ import {
   composerCadenceError,
   cronFromPullParts,
   MINUTE_INTERVALS,
+  PULL_SCHEDULE_DEFAULTS,
   partsFromPullCron,
   pullCadenceCronError,
   summarizePullCadence,
 } from "../pullCadence";
 
-/** Mirrors PULL_SCHEDULE_DEFAULTS in ingestion-sources.tsx — restated here
- *  so a default added there without picker support fails loudly. */
-const RECOMMENDED_SCHEDULES = ["*/15 * * * *", "0 * * * *"];
+/** Derived from the real defaults so an adapter added with a schedule the
+ *  picker cannot speak fails here the day it lands. */
+const RECOMMENDED_SCHEDULES = [
+  ...new Set(Object.values(PULL_SCHEDULE_DEFAULTS)),
+];
 
 describe("given the pull-cadence cron mapping", () => {
   describe("when a recommended adapter schedule arrives", () => {
     /** @scenario "The picker speaks every recommended schedule" */
     it("round-trips every recommended schedule through the friendly parts", () => {
+      expect(RECOMMENDED_SCHEDULES.length).toBeGreaterThan(0);
       for (const cron of RECOMMENDED_SCHEDULES) {
         const parts = partsFromPullCron(cron);
         expect(parts, `picker cannot speak ${cron}`).not.toBeNull();
@@ -143,16 +147,34 @@ describe("given the pull-cadence cron mapping", () => {
       // This is the predicate the Create button's disabled state reads, so
       // "the create button refuses until it is fixed" is pinned here.
       expect(
-        composerCadenceError("databricks_genie", "99 * * * *"),
+        composerCadenceError({
+          sourceType: "databricks_genie",
+          pullSchedule: "99 * * * *",
+        }),
       ).not.toBeNull();
-      expect(composerCadenceError("databricks_genie", "0 * * * *")).toBeNull();
+      expect(
+        composerCadenceError({
+          sourceType: "databricks_genie",
+          pullSchedule: "0 * * * *",
+        }),
+      ).toBeNull();
     });
 
     /** @scenario "Leaving the cadence untouched keeps the recommended schedule" */
     it("never blocks an untouched cadence or a source without one", () => {
-      expect(composerCadenceError("databricks_genie", "")).toBeNull();
+      expect(
+        composerCadenceError({
+          sourceType: "databricks_genie",
+          pullSchedule: "",
+        }),
+      ).toBeNull();
       // Push sources carry no cadence; junk in the field must not block them.
-      expect(composerCadenceError("otel_generic", "junk")).toBeNull();
+      expect(
+        composerCadenceError({
+          sourceType: "otel_generic",
+          pullSchedule: "junk",
+        }),
+      ).toBeNull();
     });
   });
 

@@ -126,6 +126,11 @@ describe("given the Cadence section of the composer", () => {
       expect(
         screen.getByText(/five fields|can't run|cannot run/i),
       ).toBeTruthy();
+      // A cron that parses but never fires — February 30th — gets its own
+      // message, matching the server's next-run refusal.
+      await user.clear(input);
+      await user.type(input, "0 9 30 2 *");
+      expect(screen.getByText(/never comes around/i)).toBeTruthy();
     });
   });
 
