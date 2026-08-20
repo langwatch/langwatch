@@ -421,7 +421,7 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
   });
 
   describe("when a usage report arrives from a different key in the same project", () => {
-    /** @scenario A usage report names the key that opened the session */
+    /** @scenario A usage report from another key in the same project is refused */
     it("refuses the report and leaves the session open", async () => {
       const opener = await keyWithCap(`vk-opener-${nanoid(6)}`, null);
       const other = await keyWithCap(`vk-other-${nanoid(6)}`, null);

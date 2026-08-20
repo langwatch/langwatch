@@ -272,6 +272,23 @@ export async function closeAndConfirmRealtimeSession(params: {
     cost_nano_usd: rated.costNanoUsd,
     rate_version: rated.rateVersion,
     duration_ms: params.durationMs ?? 0,
+    // Attribution. A voice confirmation is emitted here rather than by the
+    // gateway, so it has to carry what the gateway would have carried; the
+    // session row recorded it at the mint.
+    organization_id: params.session.organizationId,
+    virtual_key_id: params.session.virtualKeyId,
+    request_type: "realtime_session",
+    admitted_at: params.session.mintedAt.getTime(),
+    // Not known on this path. A brokered call runs client to vendor, so no
+    // span reaches us to carry a trace id, and the mint takes no end-user
+    // header. The principal and the team are joined by the ingest seam from
+    // the virtual key.
+    end_user_id: "",
+    trace_id: "",
+    principal_user_id: "",
+    team_id: "",
+    labels: [],
+    metadata: "",
   });
 
   const closed = await prisma.gatewayRealtimeSession.updateMany({
