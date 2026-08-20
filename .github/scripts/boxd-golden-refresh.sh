@@ -13,7 +13,12 @@ EXPECTED_SHA="${1:?expected commit SHA is required}"
 # Per-run status file, so a run cancelled by the job timeout cannot leave a
 # status behind for the next run to read.
 STATUS="${2:?status file path is required}"
-LOCK=/tmp/golden-refresh.lock
+# Everything this refresh writes lives beside the status file, in the private
+# 0700 directory the workflow creates. Nothing goes to a world-writable path,
+# so no other local user can pre-create or symlink what we open.
+WORKDIR="$(dirname "$STATUS")"
+LOCK="$WORKDIR/golden-refresh.lock"
+DEV_LOG="$WORKDIR/pnpm-dev.log"
 
 # Single-flight on the machine itself. GitHub's concurrency group serializes
 # the jobs, but a cancelled job leaves this script running detached, and two
@@ -71,6 +76,6 @@ pkill -9 -f "start:ap[p]" 2>/dev/null || true
 sleep 3
 # 9>&- matters: the dev stack outlives this script, and an inherited lock fd
 # would keep the flock held for the life of the machine.
-nohup pnpm dev > /tmp/pnpm-dev.log 2>&1 9>&- &
+nohup pnpm dev > "$DEV_LOG" 2>&1 9>&- &
 
 echo done > "$STATUS"

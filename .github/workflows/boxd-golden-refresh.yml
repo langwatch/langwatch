@@ -64,13 +64,19 @@ jobs:
       # Per-run paths: a run cancelled by the job timeout can leave its detached
       # refresh alive on the golden, and shared file names would let the next
       # run read the dead run's status.
+      # Everything the refresh writes goes in a private 0700 directory owned by
+      # the refresh user, not a world-writable path — a local user on the golden
+      # must not be able to pre-create or symlink a file we open. The names are
+      # run-scoped so an abandoned run's status can never be read as this run's.
       - name: Per-run remote paths
         run: |
           RUN="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          DIR=/home/boxd/.golden-refresh
           {
-            echo "REMOTE_SCRIPT=/tmp/golden-refresh.$RUN.sh"
-            echo "REMOTE_STATUS=/tmp/golden-refresh.$RUN.status"
-            echo "REMOTE_LOG=/tmp/golden-refresh.$RUN.log"
+            echo "REMOTE_DIR=$DIR"
+            echo "REMOTE_SCRIPT=$DIR/refresh.$RUN.sh"
+            echo "REMOTE_STATUS=$DIR/refresh.$RUN.status"
+            echo "REMOTE_LOG=$DIR/refresh.$RUN.log"
           } >> "$GITHUB_ENV"
 
       - name: Golden is running and exec channel works
@@ -86,7 +92,7 @@ jobs:
         run: |
           B64=$(base64 -w0 .github/scripts/boxd-golden-refresh.sh)
           boxd machine exec --timeout 60 "$GOLDEN" -- bash -c \
-            "echo $B64 | base64 -d > $REMOTE_SCRIPT && chmod +x $REMOTE_SCRIPT && rm -f $REMOTE_STATUS"
+            "mkdir -p $REMOTE_DIR && chmod 700 $REMOTE_DIR && echo $B64 | base64 -d > $REMOTE_SCRIPT && chmod +x $REMOTE_SCRIPT && rm -f $REMOTE_STATUS"
           boxd machine exec --timeout 30 "$GOLDEN" -- bash -c \
             "nohup $REMOTE_SCRIPT '$GITHUB_SHA' '$REMOTE_STATUS' > $REMOTE_LOG 2>&1 & echo launched"
 
@@ -154,4 +160,4 @@ jobs:
           BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
         run: |
           boxd machine exec --timeout 30 "$GOLDEN" -- \
-            pkill -9 -f "golden-refresh.${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.s[h]" || true
+            pkill -9 -f "refresh.${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.s[h]" || true
