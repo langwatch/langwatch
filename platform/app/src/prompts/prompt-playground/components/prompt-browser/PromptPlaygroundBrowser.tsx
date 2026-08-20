@@ -1,8 +1,7 @@
-import { Box, HStack, IconButton } from "@chakra-ui/react";
+import { HStack, IconButton } from "@chakra-ui/react";
 import { LuColumns2 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
-import { AddPromptButton } from "../sidebar/AddPromptButton";
 import { ExperimentFromPlaygroundButton } from "./ExperimentFromPlaygroundButton";
 import { PromptTabStrip } from "./PromptTabStrip";
 import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowserWindowContent";
@@ -97,18 +96,17 @@ export function PromptPlaygroundBrowser() {
             />
             {/* Strip chrome, not a toolbar: these are secondary to the tabs
                 they sit beside, so they run at the strip's own button scale
-                rather than the editor toolbar's. Opening another prompt is the
-                strip's own gesture and gets the browser's "+" next to the last
-                tab; splitting the pane and starting an experiment act on what
-                is open, so they sit past a hairline, and only the one that
-                leaves the playground keeps a word on it.
+                rather than the editor toolbar's. Both act on what is already
+                open, and only the one that leaves the playground keeps a word
+                on it. Adding a prompt is not among them: that action belongs to
+                the rail that lists the prompts, which is where it lives.
 
                 Every pane carries the same set. Showing them on the active pane
                 only made two panes that are otherwise identical disagree about
                 what they can do, and left the user hunting for the controls
                 after clicking into the other one. Pointer-down claims the pane
-                before the button's own click runs, so "+" opens the prompt in
-                the strip the user actually reached for. */}
+                before the button's own click runs, so a button acts on the
+                strip the user actually reached for. */}
             <HStack
               flexShrink={0}
               gap={1}
@@ -121,13 +119,6 @@ export function PromptPlaygroundBrowser() {
                 setActiveWindow({ windowId: tabbedWindow.id })
               }
             >
-              <AddPromptButton iconOnly size="xs" variant="ghost" />
-              <Box
-                width="1px"
-                height="16px"
-                background="border.muted"
-                marginX={0.5}
-              />
               <Tooltip content="Compare prompts side by side">
                 <IconButton
                   aria-label="Compare prompts side by side"
