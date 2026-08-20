@@ -43,7 +43,7 @@ export const ledgerPrincipalSchema = z
   .object({
     type: z.enum([
       "user",
-      "api_key",
+      "apiKey",
       "group",
       "team",
       "organization",

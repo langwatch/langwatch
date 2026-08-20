@@ -103,11 +103,11 @@ describe("grant row mapping", () => {
 
     it("uppercases the principal type for the table and lowers it back", () => {
       const row = grantFactToRow({
-        grant: fact({ principal: { type: "api_key", id: "key_1" } }),
+        grant: fact({ principal: { type: "apiKey", id: "key_1" } }),
         organizationId: ORG,
       });
       expect(row.principalType).toBe("API_KEY");
-      expect(grantRowToFact(row).principal.type).toBe("api_key");
+      expect(grantRowToFact(row).principal.type).toBe("apiKey");
     });
   });
 });
@@ -223,7 +223,7 @@ describe("compat binding mapping", () => {
       expect(group?.userId).toBeNull();
       expect(group?.apiKeyId).toBeNull();
       const key = grantFactToCompatBinding({
-        grant: fact({ principal: { type: "api_key", id: "key_1" } }),
+        grant: fact({ principal: { type: "apiKey", id: "key_1" } }),
         organizationId: ORG,
       });
       expect(key?.apiKeyId).toBe("key_1");

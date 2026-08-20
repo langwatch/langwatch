@@ -1,4 +1,12 @@
-import type { TeamUserRole } from "@langwatch/authz";
+import {
+  PRINCIPAL_KIND_FROM_STORED,
+  STORED_PRINCIPAL_KIND,
+} from "@langwatch/authz";
+import type {
+  StoredPrincipalKind,
+  StoredScopeTier,
+  TeamUserRole,
+} from "@langwatch/authz";
 import type {
   GrantEventSource,
   GrantFact,
@@ -27,43 +35,17 @@ export const SHARE_LINK_PERMISSION = "traces:view";
  * structurally — its generated enums are these same string literals.
  */
 
-/** The Grant table's principal vocabulary (uppercase, the DB's spelling). */
-export type GrantPrincipalTypeDb =
-  | "USER"
-  | "API_KEY"
-  | "GROUP"
-  | "TEAM"
-  | "ORGANIZATION"
-  | "PROJECT"
-  | "ANYONE";
+/** The Grant table's principal and scope vocabularies. Both are the stored
+ *  spellings from `@langwatch/authz`, not restatements of them — a kind
+ *  added to the vocabulary appears in the column type with no edit here. */
+export type GrantPrincipalTypeDb = StoredPrincipalKind;
+export type GrantScopeTypeDb = StoredScopeTier;
 
-/** The Grant table's scope vocabulary — same five names as the ledger's. */
-export type GrantScopeTypeDb = LedgerScopeType;
+/** Kept as a name because call sites read better for it; the translation
+ *  itself is the vocabulary's, so there is no second table to go stale. */
+export const PRINCIPAL_TO_DB = STORED_PRINCIPAL_KIND;
 
-/** The ledger's principal vocabulary → the Grant table's, the only place this
- *  translation may be written (module docblock, decision 10). Every other
- *  site that needs it - the cutover import's diff report, the read
- *  repository's exclusivity check - imports this map rather than restating
- *  it, so a vocabulary added here cannot go stale anywhere else. */
-export const PRINCIPAL_TO_DB: Record<LedgerPrincipalType, GrantPrincipalTypeDb> = {
-  user: "USER",
-  api_key: "API_KEY",
-  group: "GROUP",
-  team: "TEAM",
-  organization: "ORGANIZATION",
-  project: "PROJECT",
-  anyone: "ANYONE",
-};
-
-const PRINCIPAL_FROM_DB: Record<GrantPrincipalTypeDb, LedgerPrincipalType> = {
-  USER: "user",
-  API_KEY: "api_key",
-  GROUP: "group",
-  TEAM: "team",
-  ORGANIZATION: "organization",
-  PROJECT: "project",
-  ANYONE: "anyone",
-};
+const PRINCIPAL_FROM_DB = PRINCIPAL_KIND_FROM_STORED;
 
 /** The Grant table's resource-kind vocabulary. Uppercase, because the
  *  column restates ShareLink's own Prisma enum — same reasoning as
@@ -299,7 +281,7 @@ export function grantFactToCompatBinding({
   if (
     principal.type !== "user" &&
     principal.type !== "group" &&
-    principal.type !== "api_key"
+    principal.type !== "apiKey"
   ) {
     return null;
   }
@@ -323,7 +305,7 @@ export function grantFactToCompatBinding({
     organizationId,
     userId: principal.type === "user" ? principal.id : null,
     groupId: principal.type === "group" ? principal.id : null,
-    apiKeyId: principal.type === "api_key" ? principal.id : null,
+    apiKeyId: principal.type === "apiKey" ? principal.id : null,
     role,
     customRoleId,
     scopeType: scope.type,

@@ -1563,7 +1563,7 @@ function revocationEntries({
 const SELECTOR_PRINCIPAL_TYPE = {
   userId: "user",
   groupId: "group",
-  apiKeyId: "api_key",
+  apiKeyId: "apiKey",
 } as const;
 
 /** The filter keys a selector can express. Anything else — a customRoleId
@@ -1723,7 +1723,7 @@ function roleKeyFor({
 }
 
 function principalForWhere(principal: BindingPrincipalWhere): {
-  type: "user" | "group" | "api_key";
+  type: "user" | "group" | "apiKey";
   id: string;
 } {
   if (principal.userId !== undefined) {
@@ -1732,7 +1732,7 @@ function principalForWhere(principal: BindingPrincipalWhere): {
   if (principal.groupId !== undefined) {
     return { type: "group", id: principal.groupId };
   }
-  return { type: "api_key", id: principal.apiKeyId };
+  return { type: "apiKey", id: principal.apiKeyId };
 }
 
 function principalWhereForRow(row: {

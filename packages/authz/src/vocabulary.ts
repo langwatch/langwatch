@@ -79,40 +79,27 @@ export const CALLER_KINDS = [
 
 export type CallerKind = (typeof CALLER_KINDS)[number];
 
-const STORED_SCOPE_TIER = Object.fromEntries(
+export const STORED_SCOPE_TIER = Object.fromEntries(
   Object.entries(SCOPE_TIERS).map(([tier, spelling]) => [tier, spelling.stored]),
 ) as Record<ScopeTier, StoredScopeTier>;
 
-const SCOPE_TIER_FROM_STORED = Object.fromEntries(
+export const SCOPE_TIER_FROM_STORED = Object.fromEntries(
   Object.entries(SCOPE_TIERS).map(([tier, spelling]) => [spelling.stored, tier]),
 ) as Record<StoredScopeTier, ScopeTier>;
 
-const STORED_PRINCIPAL_KIND = Object.fromEntries(
+export const STORED_PRINCIPAL_KIND = Object.fromEntries(
   Object.entries(PRINCIPAL_KINDS).map(([kind, spelling]) => [
     kind,
     spelling.stored,
   ]),
 ) as Record<PrincipalKind, StoredPrincipalKind>;
 
-const PRINCIPAL_KIND_FROM_STORED = Object.fromEntries(
+export const PRINCIPAL_KIND_FROM_STORED = Object.fromEntries(
   Object.entries(PRINCIPAL_KINDS).map(([kind, spelling]) => [
     spelling.stored,
     kind,
   ]),
 ) as Record<StoredPrincipalKind, PrincipalKind>;
-
-export const storedScopeTier = (tier: ScopeTier): StoredScopeTier =>
-  STORED_SCOPE_TIER[tier];
-
-export const scopeTierFromStored = (stored: StoredScopeTier): ScopeTier =>
-  SCOPE_TIER_FROM_STORED[stored];
-
-export const storedPrincipalKind = (kind: PrincipalKind): StoredPrincipalKind =>
-  STORED_PRINCIPAL_KIND[kind];
-
-export const principalKindFromStored = (
-  stored: StoredPrincipalKind,
-): PrincipalKind => PRINCIPAL_KIND_FROM_STORED[stored];
 
 export const isScopeTier = (value: unknown): value is ScopeTier =>
   typeof value === "string" && value in SCOPE_TIERS;

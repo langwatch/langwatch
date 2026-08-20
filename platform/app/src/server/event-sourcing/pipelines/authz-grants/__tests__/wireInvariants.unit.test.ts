@@ -283,7 +283,7 @@ describe("the revocation wire boundary", () => {
   describe("given a revocation naming an identity instead", () => {
     it("accepts a principal with no scope, meaning every scope", () => {
       expect(
-        revoke({ selector: { principal: { type: "api_key", id: "key_1" } } })
+        revoke({ selector: { principal: { type: "apiKey", id: "key_1" } } })
           .success,
       ).toBe(true);
     });

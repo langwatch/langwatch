@@ -19,21 +19,15 @@
  * `grantIdsForUser` for the full argument and for what deliberately survives.
  */
 
-export type LedgerPrincipalType =
-  | "user"
-  | "api_key"
-  | "group"
-  | "team"
-  | "organization"
-  | "project"
-  | "anyone";
+import type { PrincipalKind, StoredScopeTier } from "@langwatch/authz";
 
-export type LedgerScopeType =
-  | "ORGANIZATION"
-  | "TEAM"
-  | "PROJECT"
-  | "RESOURCE"
-  | "PLATFORM";
+/**
+ * The event stream names principals and scopes with the shared vocabulary,
+ * not with a private copy of it. Scopes travel in their stored spelling
+ * because that is what the projection writes; principals travel canonical.
+ */
+export type LedgerPrincipalType = PrincipalKind;
+export type LedgerScopeType = StoredScopeTier;
 
 /** Which writer emitted the event. Backfill sources are skipped by the
  *  audit subscriber's when-guard; the reducer treats all sources alike.

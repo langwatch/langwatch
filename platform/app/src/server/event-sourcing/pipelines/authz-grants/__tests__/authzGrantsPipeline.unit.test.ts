@@ -311,7 +311,7 @@ describe("authzGrantsState projection", () => {
         state,
         ledgerEvent(GRANT_ATTACHED_EVENT_TYPE, {
           grantId: "grant_key",
-          principal: { type: "api_key", id: "key_1" },
+          principal: { type: "apiKey", id: "key_1" },
           roleKey: "member",
           scope: { type: "PROJECT", id: "proj_chatbot" },
           source: "grants-service",
@@ -321,7 +321,7 @@ describe("authzGrantsState projection", () => {
       state = projection.apply(
         state,
         ledgerEvent(GRANT_REVOKED_EVENT_TYPE, {
-          selector: { principal: { type: "api_key", id: "key_1" } },
+          selector: { principal: { type: "apiKey", id: "key_1" } },
           actor: ACTOR,
         }),
       );

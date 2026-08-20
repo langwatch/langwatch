@@ -83,7 +83,7 @@ describe("given a revocation named by filter", () => {
 
       expect(revoked).toBe(0);
       expect((sent[0]!.data as { revocations: unknown[] }).revocations).toEqual(
-        [{ selector: { principal: { type: "api_key", id: "key_1" } } }],
+        [{ selector: { principal: { type: "apiKey", id: "key_1" } } }],
       );
     });
 
