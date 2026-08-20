@@ -9,11 +9,7 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
   isCustomRole,
 } from "../enterprise";
-import {
-  checkOrganizationPermission,
-  checkTeamPermission,
-  hasOrganizationPermission,
-} from "../rbac";
+import { hasOrganizationPermission } from "../rbac";
 
 // Reusable schema for team member role validation
 const teamMemberRoleSchema = z
@@ -56,7 +52,7 @@ const teamMemberRoleSchema = z
 export const teamRouter = createTRPCRouter({
   getBySlug: protectedProcedure
     .input(z.object({ organizationId: z.string(), slug: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .query(async ({ input, ctx }) => {
       const service = new TeamService({ prisma: ctx.prisma });
       return service.getTeamBySlugForUser({
@@ -73,7 +69,7 @@ export const teamRouter = createTRPCRouter({
     // emails are PII and get redacted below for non-admin callers,
     // and other users' personal-workspace teams are filtered out
     // entirely (their existence is itself private).
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .query(async ({ input, ctx }) => {
       const callerId = ctx.session.user.id;
       const callerHasManage = await hasOrganizationPermission(
@@ -117,7 +113,7 @@ export const teamRouter = createTRPCRouter({
     // direct members + role bindings + per-project access maps,
     // which is admin-surface authorization data. Sole TS caller is
     // settings/teams.tsx, an admin-only page.
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .query(async ({ input, ctx }) => {
       const service = new TeamService({ prisma: ctx.prisma });
       return service.getTeamsWithRoleBindings({
@@ -132,7 +128,7 @@ export const teamRouter = createTRPCRouter({
     // Member emails are redacted below for non-admin callers, and a
     // non-admin lookup of someone else's personal workspace returns
     // NOT_FOUND (existence itself is private).
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .query(async ({ input, ctx }) => {
       const callerId = ctx.session.user.id;
       const callerHasManage = await hasOrganizationPermission(
@@ -182,7 +178,7 @@ export const teamRouter = createTRPCRouter({
         members: z.array(teamMemberRoleSchema),
       }),
     )
-    .use(checkTeamPermission("team:manage"))
+    .permission("team:manage")
     .mutation(async ({ input, ctx }) => {
       const hasCustomRoleMember = input.members.some((m) =>
         isCustomRole(m.role),
@@ -220,7 +216,7 @@ export const teamRouter = createTRPCRouter({
         members: z.array(teamMemberRoleSchema),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ input, ctx }) => {
       const hasCustomRoleMember = input.members.some((m) =>
         isCustomRole(m.role),
@@ -242,7 +238,7 @@ export const teamRouter = createTRPCRouter({
     }),
   archiveById: protectedProcedure
     .input(z.object({ teamId: z.string() }))
-    .use(checkTeamPermission("team:delete"))
+    .permission("team:manage")
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
@@ -281,7 +277,7 @@ export const teamRouter = createTRPCRouter({
         userId: z.string(),
       }),
     )
-    .use(checkTeamPermission("team:manage"))
+    .permission("team:manage")
     .mutation(async ({ input, ctx }) => {
       const service = new TeamService({ prisma: ctx.prisma });
       return service.removeMember({

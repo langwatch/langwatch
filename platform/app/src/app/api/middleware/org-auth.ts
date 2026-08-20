@@ -1,3 +1,4 @@
+import type { AuthzPermission } from "@langwatch/authz";
 import { HandledError } from "@langwatch/handled-error";
 import type { Context, MiddlewareHandler } from "hono";
 import {
@@ -5,7 +6,6 @@ import {
   authRefusalBody,
 } from "~/app/api/shared/canonical-error";
 import type { Organization } from "~/generated/prisma/client";
-import type { Permission } from "~/server/api/rbac";
 import { createOrgAuthMiddleware } from "~/server/api-key/auth-middleware";
 import type { OrgResolvedToken } from "~/server/api-key/token-resolver";
 import { remediation } from "~/server/app-layer/error-remediation";
@@ -45,7 +45,7 @@ export function requireProjectPermission({
   param,
   errorEnvelope = "legacy",
 }: {
-  permission: Permission;
+  permission: AuthzPermission;
   param: string;
   errorEnvelope?: ApiErrorEnvelope;
 }): MiddlewareHandler {
@@ -109,7 +109,7 @@ export function requireProjectPermission({
  */
 async function orgPermissionAllowed(
   c: Context,
-  permission: Permission,
+  permission: AuthzPermission,
 ): Promise<boolean> {
   const apiKeyId = c.get("apiKeyId") as string;
   const userId = c.get("apiKeyUserId") as string | null;
@@ -132,7 +132,7 @@ async function orgPermissionAllowed(
 }
 
 export function requireOrgPermission(
-  permission: Permission,
+  permission: AuthzPermission,
   errorEnvelope: ApiErrorEnvelope = "legacy",
 ): MiddlewareHandler {
   const refusal = authRefusalBody(errorEnvelope);
@@ -162,7 +162,7 @@ export function requireOrgPermission(
 export class InsufficientPermissionsError extends HandledError {
   declare readonly code: "insufficient_permissions";
 
-  constructor(permission: Permission) {
+  constructor(permission: AuthzPermission) {
     super(
       "insufficient_permissions",
       `Insufficient permissions. Required: ${permission}`,
@@ -185,7 +185,7 @@ export class InsufficientPermissionsError extends HandledError {
  * publishes, with no second copy of the refusal body to drift.
  */
 export function requireOrgPermissionOrThrow(
-  permission: Permission,
+  permission: AuthzPermission,
 ): MiddlewareHandler {
   return async (c, next) => {
     if (!(await orgPermissionAllowed(c, permission))) {

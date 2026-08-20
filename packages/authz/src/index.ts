@@ -51,6 +51,25 @@ export type {
   ShareableResourceKind,
 } from "./registry";
 export {
+  declaredScopeId,
+  isPlatformTierPermission,
+  permissionGrantTiers,
+  SCOPE_TIER_FIELDS,
+  SCOPE_TIER_ORDER,
+} from "./declaration";
+export type {
+  DeclaredScopeId,
+  InputScopeTier,
+  NoPermissionOptions,
+  PermissionDeclarationError,
+  PermissionGrantTiers,
+  PermissionScopeArg,
+  PlatformTierPermission,
+  ScopeTierField,
+  ValidatePermissionForInput,
+  ViaFieldFor,
+} from "./declaration";
+export {
   builtinRoleGrants,
   builtinRolePermissions,
   roleKeyForTeamRole,

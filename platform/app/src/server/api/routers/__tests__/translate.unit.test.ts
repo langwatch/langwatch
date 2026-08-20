@@ -38,24 +38,13 @@ vi.mock("../../rbac", async (importOriginal) => {
   return {
     ...actual,
     hasProjectPermission: vi.fn(() => Promise.resolve(true)),
-    checkProjectPermission:
-      () =>
-      async ({ ctx, next }: MiddlewareParams) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-    checkOrganizationPermission:
-      () =>
-      async ({ ctx, next }: MiddlewareParams) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-    checkTeamPermission:
-      () =>
-      async ({ ctx, next }: MiddlewareParams) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
+    resolveProjectPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    resolveTeamPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    hasOrganizationPermission: vi.fn().mockResolvedValue(true),
     skipPermissionCheck: ({ ctx, next }: MiddlewareParams) => {
       ctx.permissionChecked = true;
       return next();

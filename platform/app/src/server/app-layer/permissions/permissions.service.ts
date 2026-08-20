@@ -1,7 +1,16 @@
+import {
+  type AuthzPermission,
+  PermissionDeniedError,
+  type PermissionScopeArg,
+} from "@langwatch/authz";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { OrganizationUserRole } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
-import { resolveProjectPermission } from "~/server/api/rbac";
+import {
+  hasOrganizationPermission,
+  resolveProjectPermission,
+  resolveTeamPermission,
+} from "~/server/api/rbac";
 import type { Session } from "~/server/auth";
 import {
   LiteMemberRestrictedError,
@@ -61,5 +70,98 @@ export class PermissionsService {
       }
       throw new ProjectPermissionDeniedError(permission);
     }
+  }
+
+  /**
+   * ADR-092 decision 25 — the typed imperative check. The scope argument is
+   * derived from the permission's registry tiers: exactly one id, at a tier
+   * the permission can be granted at, or the call does not compile. Decides
+   * through the same fork-aware resolvers every declared `.permission()`
+   * runs, so an imperative site and a declared one can never disagree.
+   */
+  async hasPermission<P extends AuthzPermission>(
+    check: { userId: string; permission: P } & PermissionScopeArg<P>,
+  ): Promise<boolean> {
+    const { permitted } = await this.decide(check);
+    return permitted;
+  }
+
+  /**
+   * The asserting form of {@link hasPermission}: throws the engine's one
+   * denial (`permission_denied`, with the permission and tier in `meta`), or
+   * the lite-member restriction where that is the cause.
+   */
+  async requirePermission<P extends AuthzPermission>(
+    check: { userId: string; permission: P } & PermissionScopeArg<P>,
+  ): Promise<void> {
+    const { tier, id, permitted, organizationRole } = await this.decide(check);
+    if (permitted) return;
+    if (organizationRole === OrganizationUserRole.EXTERNAL) {
+      throw new LiteMemberRestrictedError(
+        check.permission.split(":")[0] ?? "unknown",
+      );
+    }
+    throw new PermissionDeniedError({
+      permission: check.permission,
+      scope: { type: tier, id },
+      denialReason: "no-binding",
+    });
+  }
+
+  private async decide({
+    userId,
+    permission,
+    ...scope
+  }: {
+    userId: string;
+    permission: AuthzPermission;
+  } & Partial<
+    Record<"projectId" | "teamId" | "organizationId", string>
+  >): Promise<{
+    tier: "project" | "team" | "organization";
+    id: string;
+    permitted: boolean;
+    organizationRole: OrganizationUserRole | null;
+  }> {
+    const ctx = {
+      prisma: this.prisma,
+      session: { user: { id: userId }, expires: "" } as Session,
+    };
+    if (scope.projectId) {
+      const decision = await resolveProjectPermission(
+        ctx,
+        scope.projectId,
+        permission,
+      );
+      return { tier: "project", id: scope.projectId, ...decision };
+    }
+    if (scope.teamId) {
+      const decision = await resolveTeamPermission(
+        ctx,
+        scope.teamId,
+        permission,
+      );
+      return { tier: "team", id: scope.teamId, ...decision };
+    }
+    if (scope.organizationId) {
+      const permitted = await hasOrganizationPermission(
+        ctx as { prisma: PrismaClient; session: Session },
+        scope.organizationId,
+        permission,
+      );
+      return {
+        tier: "organization",
+        id: scope.organizationId,
+        permitted,
+        organizationRole: null,
+      };
+    }
+    // The types make this unreachable; fail closed if they are bypassed.
+    return {
+      tier: "project",
+      id: "unresolved",
+      permitted: false,
+      organizationRole: null,
+    };
   }
 }

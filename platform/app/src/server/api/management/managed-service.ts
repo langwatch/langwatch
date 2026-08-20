@@ -16,11 +16,10 @@
  * serves nothing but a 404 for unknown version segments.
  */
 import { createService, type MountedRoute } from "@langwatch/api";
-
+import type { AuthzPermission } from "@langwatch/authz";
 import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
 import { requireOrgPermissionOrThrow } from "~/app/api/middleware/org-auth";
 import type { EnterpriseFeature } from "~/server/api/enterprise";
-import type { Permission } from "~/server/api/rbac";
 import {
   type AccessPolicy,
   credentialClassFor,
@@ -85,7 +84,7 @@ export function createManagementService({
     onRouteMounted: (route) => registerMountedRoute({ route, family }),
   });
 
-  const guard = (permission: Permission) => ({
+  const guard = (permission: AuthzPermission) => ({
     meta: { policy: requires(permission) } satisfies ManagementEndpointMeta,
     middleware: [
       requireOrgPermissionOrThrow(permission),

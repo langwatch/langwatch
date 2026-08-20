@@ -49,11 +49,12 @@ vi.mock("../langyAccessMiddleware", () => ({
 
 vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
-  const passthrough = async ({ ctx, next }: any) => {
-    ctx.permissionChecked = true;
-    return next();
+  return {
+    ...actual,
+    resolveProjectPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
   };
-  return { ...actual, checkProjectPermission: () => passthrough };
 });
 
 import { LangyRateLimitedError } from "~/server/app-layer/langy/errors";

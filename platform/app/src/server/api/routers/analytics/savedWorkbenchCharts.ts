@@ -27,7 +27,6 @@ import { z } from "zod";
 
 import { SavedWorkbenchChartService } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
 
-import { checkProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getUserProtectionsForProject } from "../../utils";
 
@@ -42,7 +41,7 @@ const nameSchema = z.string().min(1).max(200);
 /** Every saved workbench chart in the project. */
 const getAll = protectedProcedure
   .input(projectScopeSchema)
-  .use(checkProjectPermission("analytics:view"))
+  .permission("analytics:view")
   .use(enforceWorkbenchEnabled)
   .query(async ({ ctx, input }) => {
     return await SavedWorkbenchChartService.create(ctx.prisma).getAll({
@@ -53,7 +52,7 @@ const getAll = protectedProcedure
 /** One saved chart, with its query, parameters and specification. */
 const getById = protectedProcedure
   .input(chartScopeSchema)
-  .use(checkProjectPermission("analytics:view"))
+  .permission("analytics:view")
   .use(enforceWorkbenchEnabled)
   .query(async ({ ctx, input }) => {
     return await SavedWorkbenchChartService.create(ctx.prisma).getById({
@@ -78,7 +77,7 @@ const create = protectedProcedure
       definition: z.unknown(),
     }),
   )
-  .use(checkProjectPermission("analytics:create"))
+  .permission("analytics:create")
   .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
     return await SavedWorkbenchChartService.create(ctx.prisma).createChart({
@@ -104,7 +103,7 @@ const update = protectedProcedure
       definition: z.unknown().optional(),
     }),
   )
-  .use(checkProjectPermission("analytics:update"))
+  .permission("analytics:update")
   .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
     return await SavedWorkbenchChartService.create(ctx.prisma).updateChart({
@@ -124,7 +123,7 @@ const update = protectedProcedure
 
 const deleteChart = protectedProcedure
   .input(chartScopeSchema)
-  .use(checkProjectPermission("analytics:delete"))
+  .permission("analytics:delete")
   .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
     await SavedWorkbenchChartService.create(ctx.prisma).deleteChart({

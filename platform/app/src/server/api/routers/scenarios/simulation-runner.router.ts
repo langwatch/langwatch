@@ -22,7 +22,6 @@ import { resolveRunParameters } from "~/server/scenarios/resolve-run-parameters"
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
 
 const logger = createLogger("SimulationRunnerRouter");
@@ -144,7 +143,7 @@ export const simulationRunnerRouter = createTRPCRouter({
    */
   run: protectedProcedure
     .input(runScenarioSchema)
-    .use(checkProjectPermission("scenarios:manage"))
+    .permission("scenarios:manage")
     .mutation(async ({ ctx, input }) => {
       const setId = input.setId ?? getOnPlatformSetId(input.projectId);
       const batchRunId = input.batchRunId ?? generateBatchRunId();

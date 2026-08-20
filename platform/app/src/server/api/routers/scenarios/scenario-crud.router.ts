@@ -8,7 +8,6 @@ import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import { scenarioParameterDefinitionsSchema } from "~/server/scenarios/parameters";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { captureException } from "~/utils/posthogErrorCapture";
-import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
 
 const logger = createLogger("langwatch:api:scenarios:crud");
@@ -49,7 +48,7 @@ const updateScenarioSchema = projectSchema.extend({
 export const scenarioCrudRouter = createTRPCRouter({
   create: protectedProcedure
     .input(createScenarioSchema)
-    .use(checkProjectPermission("scenarios:manage"))
+    .permission("scenarios:manage")
     .mutation(async ({ ctx, input }) => {
       logger.info({ projectId: input.projectId }, "Creating scenario");
 
@@ -88,7 +87,7 @@ export const scenarioCrudRouter = createTRPCRouter({
 
   getAll: protectedProcedure
     .input(projectSchema)
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ ctx, input }) => {
       logger.debug({ projectId: input.projectId }, "Fetching all scenarios");
       const service = ScenarioService.create(ctx.prisma);
@@ -97,7 +96,7 @@ export const scenarioCrudRouter = createTRPCRouter({
 
   getById: protectedProcedure
     .input(projectSchema.extend({ id: z.string() }))
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ ctx, input }) => {
       logger.debug(
         { projectId: input.projectId, scenarioId: input.id },
@@ -116,7 +115,7 @@ export const scenarioCrudRouter = createTRPCRouter({
 
   getByIdIncludingArchived: protectedProcedure
     .input(projectSchema.extend({ id: z.string() }))
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ ctx, input }) => {
       logger.debug(
         { projectId: input.projectId, scenarioId: input.id },
@@ -128,7 +127,7 @@ export const scenarioCrudRouter = createTRPCRouter({
 
   update: protectedProcedure
     .input(updateScenarioSchema)
-    .use(checkProjectPermission("scenarios:manage"))
+    .permission("scenarios:manage")
     .mutation(async ({ ctx, input }) => {
       logger.info(
         { projectId: input.projectId, scenarioId: input.id },
@@ -148,7 +147,7 @@ export const scenarioCrudRouter = createTRPCRouter({
 
   archive: protectedProcedure
     .input(projectSchema.extend({ id: z.string() }))
-    .use(checkProjectPermission("scenarios:manage"))
+    .permission("scenarios:manage")
     .mutation(async ({ ctx, input }) => {
       logger.info(
         { projectId: input.projectId, scenarioId: input.id },
@@ -176,7 +175,7 @@ export const scenarioCrudRouter = createTRPCRouter({
 
   batchArchive: protectedProcedure
     .input(projectSchema.extend({ ids: z.array(z.string()).min(1) }))
-    .use(checkProjectPermission("scenarios:manage"))
+    .permission("scenarios:manage")
     .mutation(async ({ ctx, input }) => {
       logger.info(
         { projectId: input.projectId, count: input.ids.length },

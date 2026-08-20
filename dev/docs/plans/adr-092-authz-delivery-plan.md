@@ -50,6 +50,7 @@ work already merged (A = the engine #6894, B = the self-migration #7079).
 | 22 | **Resource-tier facts live on `Grant`; accounting does not.** `token`, `permission`, `expiresAt`, `maxViews` are fact columns set by the mint event, fold-owned like every other column. `viewCount` has a different writer (ShareService, per view), so it moves to a ShareService-owned accounting row (`GrantUsage { grantId, viewCount, lastViewedAt }`) when ShareService moves onto the ledger in PR 3 — never onto the projection table. |
 | 23 | **Event idempotency is commandId-based.** Every command mints a random `commandId` at the boundary; retries reuse it; each emitted event carries `idempotencyKey = <commandId>:<index>`. Legitimate repeats (same action twice in a second) can never be deduped away, and retries always are. Migrations derive commandIds deterministically — but from chunk position over the id-sorted source rows, not from row identity: the genesis import emits `genesis:<kind>:<org>:<index>` and the stage-B backfill `backfill-b:<org>:<index>` plus `backfill-b:parity:<org>`; that is what ships today. Runtime commandIds are caller-minted KSUIDs; imports adopt the legacy row's own id as the grant/role id, never as the commandId. OPEN: whether migration commandIds should be re-keyed per source row — chunk membership can shift when a source row is deleted between an aborted pass and its retry — is under discussion on PR 2's review (comment 3802500637) and not yet decided. Where an upstream system id exists (the general house pattern, e.g. trace ids) it remains the key; commandId is for facts born from direct user action. Grant ids stay content-derived on top, so re-imports converge by upsert regardless. |
 | 24 | *(2026-08-18)* **Write paths fork per org.** The ledger becomes the writer for an organization only when its genesis import completes; everyone else keeps the imperative path. Deploy changes nothing until an org migrates. |
+| 25 | *(2026-08-20)* **The declared surface ships before the contract (revises the tail of decision 5).** The `.permission()` codemod stops waiting for 100 % finalization: PR 4 becomes the *declared surface* — every check on every stack (tRPC builder, Hono `AccessPolicy`, the imperative facade) is declared in the registry vocabulary with registry-derived scope typing, and every declarative site is codemodded onto ONE cutover-aware seam. The seam runs exactly the per-org fork the ten legacy seams run today (legacy decides for a non-cut-over org with the engine as shadow; engine decides for a cut-over org with legacy as reverse-shadow), so the sweep is decision-neutral at deploy and the per-org rollout lever survives intact. What used to make the codemod wait was decision-path risk; routing the new sugar through the same fork removes it. The contract keeps the deletions only (legacy walk, quirk branches, compat projection, old tables, fork, gates) — and shrinks from a 400-site sweep to deleting one branch in one seam. Scope typing is strict: an input id from a tier the permission's resource is not grantable at is a compile error, a missing id likewise, and derivations are written at the call site (`{ via: "teamId" }`), never inferred. |
 
 ## The final data structure
 
@@ -162,7 +163,7 @@ dependency on the identity PR, and nothing to build beyond the enforcement
 write itself — which ships as a ready seam in PR 1 and gains its caller
 when PR 2 moves the revoke/offboard write paths.
 
-## The PR map (4 + 1)
+## The PR map (5 + 1)
 
 ### PR 1 — same position, event-sourced
 
@@ -264,9 +265,61 @@ becomes the ledger. Bill of materials:
 - effectivePermissions / useCan / Access-surface reads can ride here or trail
   as a small follow-up — they are per-org gated like everything else.
 
-### PR 4 — the contract (only at 100 % finalized)
+### PR 4 — the declared surface (decision 25, ships now)
 
-- `.permission()` codemod (~380 sites, now cosmetic), Hono edge identity.
+Every permission check on every stack becomes a *declaration* in the registry
+vocabulary, typed against the input it reads its scope from, and every
+declarative site funnels through one cutover-aware seam. Decision-neutral at
+deploy: the seam runs the same per-org fork the ten legacy seams run today.
+
+```
+                 BEFORE                                  AFTER
+  .use(checkProjectPermission("x:y"))   ─┐
+  .use(checkOrganizationPermission(…))   ├─►   .permission("x:y")        ─┐
+  .use(checkTeamPermission(…))          ─┘     .permission(p, {via:…})    │
+  .use(checkProjectPermissionAny(…))    ───►   .permissionAny(…)          ├─► ONE seam
+  .use(skipPermissionCheck(…))          ───►   .noPermission({reason})    │   (cutover-aware:
+  AccessPolicy{permission: Permission}  ───►   AccessPolicy{AuthzPermission,  │    fork per org)
+                                                scope-checked vs registry}│
+  hasProjectPermission(ctx, id, p) ×85  ───►   typed imperative facade   ─┘
+```
+
+- **Typed `.permission()`** on the pending-permission builder: the permission
+  parameter is constrained by the validated input — an input id from a tier
+  the permission's resource is not grantable at is a compile error, a missing
+  id likewise; platform-tier permissions (`ops:*`) require no id and refuse
+  one. Template-literal diagnostics name the offending field.
+- **The oddball inventory, each with a designed home** (mapped 2026-08-20):
+  `checkProjectPermissionAny` → `.permissionAny()`;
+  `checkTeamPermission("organization:manage")` ×2 (input carries only
+  `teamId`) → `.permission("organization:manage", { via: "teamId" })` —
+  derivation written at the call site; `checkTeamPermission("team:delete")` →
+  `.permission("team:manage")` (no bag grants `team:delete`; only the
+  manage-implication satisfies it, so the two are provably identical);
+  `checkProjectOrOrganizationPermission` ×3 → union input, the typed check
+  distributes; `checkProviderValidationPermission` and
+  `checkCapturedDataVisibilityPermission` → declared custom markers;
+  `skipPermissionCheck` (57 sites) → `.noPermission({ reason })` whose
+  sensitive-key guard moves from a runtime throw to a compile error;
+  `authorizeInResolver` → declared marker carrying the permissions the
+  service enforces; `checkPermissionOrPubliclyShared` → already dead (ADR-057
+  consolidated public reads onto `sharedTrace`), its stale test mocks deleted.
+- **Hono**: `AccessPolicy` speaks `AuthzPermission`; the policy kind × app
+  scope pair is checked against the registry (an org-only permission on a
+  project-scoped app is a compile error). Runtime chains unchanged — already
+  fork-aware.
+- **Imperative facade**: the ~85 direct `has*Permission` calls (routers,
+  `*.authz.ts` modules, Hono handlers, MCP tools) move to one registry-typed
+  require/check facade with the same scope-key typing.
+- **The sweep test**: every tRPC procedure declares a permission or an
+  explicit marker with a written reason — binds the fail-closed
+  `@unimplemented` scenario in `unified-authorization-engine.feature`.
+- The four legacy tRPC middlewares are deleted from `rbac.ts`; the fork-aware
+  *resolvers* stay (they are the seam's runtime) until contract.
+
+### PR 6 — the contract (only at 100 % finalized)
+
+- Hono edge identity.
 - Delete: `rbac.ts`, `role-binding-resolver.ts`, the four quirk branches,
   the compat projection and the `RoleBinding`/`CustomRole`/`TeamUser` tables
   themselves, the fork, the gate. No renames — `Grant` and `Role` were born

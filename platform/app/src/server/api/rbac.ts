@@ -1,3 +1,4 @@
+import type { AuthzPermission } from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
 import {
@@ -7,6 +8,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { cutoverOnEngine } from "~/server/app-layer/authz/cutover-gate";
+import { declareAuthzMiddleware } from "~/server/app-layer/authz/declared-middleware";
 import { authzForkFor } from "~/server/app-layer/authz/fork";
 import { authzShadowFor } from "~/server/app-layer/authz/shadow";
 import {
@@ -143,10 +145,11 @@ export const Resources = {
 export type Resource = (typeof Resources)[keyof typeof Resources];
 
 /**
- * Permission is a combination of resource and action
- * Format: "resource:action" (e.g., "analytics:view", "datasets:manage")
+ * ADR-092 decision 25: the legacy cross-product type is retired — Permission
+ * IS the registry vocabulary now. Sites that legitimately handle unregistered
+ * legacy custom-role strings do so as plain strings, never as Permission.
  */
-export type Permission = `${Resource}:${Action}`;
+export type Permission = AuthzPermission;
 
 /**
  * Resources that only exist at the organization tier — there is no team- or
@@ -676,7 +679,12 @@ export type PermissionMiddleware<InputType> = (
 ) => Promise<any>;
 
 /**
- * Check if user has permission for a project
+ * Check if user has permission for a project.
+ *
+ * ADR-092 decision 25: procedures declare `.permission("…")` now — this
+ * middleware survives only as a building block for the declared-custom
+ * compositions that branch on their input (modelProviders' tenant anchor,
+ * project creation). Do not `.use()` it on a new procedure.
  */
 export const checkProjectPermission =
   (permission: Permission) =>
@@ -722,53 +730,6 @@ export const checkProjectPermission =
     ctx.organizationRole = organizationRole;
     ctx.permissionChecked = true;
     return next();
-  };
-
-/**
- * Permit when the caller holds ANY ONE of `permissions` on the project.
- *
- * For resources a caller can legitimately reach from more than one feature.
- * Stored objects are the case in point: the same object is trace media for one
- * viewer and scenario media for another, `traces:view` and `scenarios:view`
- * are separate categories a custom role can hold one of, and the file route
- * itself already accepts either. A single-permission gate on a sibling
- * surface (the existence probe) refuses viewers the bytes are served to.
- *
- * The refusal names the FIRST permission, so list the one the surface is
- * primarily reached through first: granting it resolves the denial whichever
- * feature the caller came from.
- */
-export const checkProjectPermissionAny =
-  (...permissions: [Permission, ...Permission[]]) =>
-  async ({
-    ctx,
-    input,
-    next,
-  }: PermissionMiddlewareParams<{ projectId: string }>) => {
-    const { permitted, organizationRole } = await resolveProjectPermissionAny(
-      ctx,
-      input.projectId,
-      permissions,
-    );
-    if (permitted) {
-      ctx.organizationRole = organizationRole;
-      ctx.permissionChecked = true;
-      return next();
-    }
-
-    const named = permissions[0];
-    if (organizationRole === OrganizationUserRole.EXTERNAL) {
-      throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "This feature is not available for your account",
-        cause: new LiteMemberRestrictedError(named.split(":")[0] ?? "unknown"),
-      });
-    }
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "You do not have permission to access this project resource",
-      cause: new ProjectPermissionDeniedError(named),
-    });
   };
 
 /**
@@ -1205,7 +1166,7 @@ export async function resolveProjectPermission(
  * same for every permission, so they are read once and only the binding check
  * repeats.
  */
-async function resolveProjectPermissionAny(
+export async function resolveProjectPermissionAny(
   ctx: { prisma: PrismaClient; session: Session | null },
   projectId: string,
   permissions: readonly Permission[],
@@ -2129,103 +2090,31 @@ export function isDemoProject(
   );
 }
 
-// ============================================================================
-// SKIP PERMISSION CHECK (for public/special routes)
-// ============================================================================
-
-const SENSITIVE_KEYS = ["organizationId", "teamId", "projectId"] as const;
-type SensitiveKey = (typeof SENSITIVE_KEYS)[number];
-type SkipPermissionCheckOptions = {
-  allow?: Partial<Record<SensitiveKey, string>>;
-};
-
-function isMiddlewareParams(
-  value: unknown,
-): value is PermissionMiddlewareParams<object> {
-  return typeof value === "object" && value !== null && "ctx" in value;
-}
-
-/**
- * Permission middleware for endpoints that need authentication but not resource-level access.
- *
- * Use this when:
- * - User must be logged in (via `protectedProcedure`)
- * - No project/team/org-scoped data is accessed
- * - Examples: user preferences, feature flags, global settings
- *
- * By default, blocks `projectId`, `organizationId`, and `teamId` in the input
- * to prevent accidental resource access without permission checks.
- *
- * @param options.allow - Map of keys to reasons explaining why they're allowed
- */
-export function skipPermissionCheck(
-  options?: SkipPermissionCheckOptions,
-): (
-  params: PermissionMiddlewareParams<object>,
-) => ReturnType<typeof params.next>;
-export function skipPermissionCheck(
-  params: PermissionMiddlewareParams<object>,
-): ReturnType<typeof params.next>;
-export function skipPermissionCheck(
-  paramsOrOptions?:
-    | PermissionMiddlewareParams<object>
-    | SkipPermissionCheckOptions,
-) {
-  if (isMiddlewareParams(paramsOrOptions)) {
-    const { ctx, next, input } = paramsOrOptions;
-    ctx.permissionChecked = true;
-
-    for (const key of SENSITIVE_KEYS) {
-      if (key in input) {
-        throw new Error(
-          `${key} is not allowed to be used without permission check`,
-        );
-      }
-    }
-
-    return next();
-  }
-
-  const allowedKeys = Object.keys(paramsOrOptions?.allow ?? {});
-  return ({ ctx, next, input }: PermissionMiddlewareParams<object>) => {
-    ctx.permissionChecked = true;
-
-    for (const key of SENSITIVE_KEYS) {
-      if (key in input && !allowedKeys.includes(key)) {
-        throw new Error(
-          `${key} is not allowed to be used without permission check`,
-        );
-      }
-    }
-
-    return next();
-  };
-}
-
-export const skipPermissionCheckProjectCreation = ({
-  ctx,
-  next,
-}: PermissionMiddlewareParams<object>) => {
-  ctx.permissionChecked = true;
-  return next();
-};
-
 /**
  * For procedures that authorize against data-dependent scopes resolved at
  * runtime (e.g. a row's own scope set, loaded by id) rather than a fixed
- * input scope a `checkXxxPermission` could read. It satisfies the builder's
- * fail-closed `enforcePermissionCheck` while keeping `protectedProcedure`'s
- * auth + audit + domain-error handling. The resolver/service MUST perform
- * the real authorization — this only defers WHERE the check happens, never
- * whether it happens.
+ * input scope a declared `.permission()` could read. It satisfies the
+ * builder's fail-closed `enforcePermissionCheck` while keeping
+ * `protectedProcedure`'s auth + audit + domain-error handling. The
+ * resolver/service MUST perform the real authorization — this only defers
+ * WHERE the check happens, never whether it happens.
+ *
+ * Declared generically for the sweep; new procedures prefer
+ * `.authorizeInService({ reason, permissions })`, which names what the
+ * service enforces at the call site.
  */
-export const authorizeInResolver = ({
-  ctx,
-  next,
-}: PermissionMiddlewareParams<object>) => {
-  ctx.permissionChecked = true;
-  return next();
-};
+export const authorizeInResolver = declareAuthzMiddleware(
+  {
+    kind: "service-authorized",
+    reason:
+      "the scope is data the resolver loads at runtime; the service performs the authorization (see the call site)",
+    permissions: [],
+  },
+  ({ ctx, next }: PermissionMiddlewareParams<object>) => {
+    ctx.permissionChecked = true;
+    return next();
+  },
+);
 
 // ============================================================================
 // OPS PERMISSION
@@ -2273,41 +2162,48 @@ export function resolveOpsScope({
   return { kind: "none" };
 }
 
-export const checkOpsPermission =
-  ({
-    permission,
-    throwOnDeny = true,
-  }: {
-    permission: Permission;
-    throwOnDeny?: boolean;
-  }) =>
-  async ({ ctx, next }: PermissionMiddlewareParams<unknown>) => {
-    const user = ctx.session?.user;
-    if (!user) {
-      throw new TRPCError({ code: "UNAUTHORIZED" });
-    }
+export const checkOpsPermission = ({
+  permission,
+  throwOnDeny = true,
+}: {
+  permission: Permission;
+  throwOnDeny?: boolean;
+}) =>
+  declareAuthzMiddleware(
+    {
+      kind: "custom",
+      reason:
+        "platform-tier operator check: resolves the admin allow-list into an ops scope no procedure input carries",
+      permissions: [permission],
+    },
+    async ({ ctx, next }: PermissionMiddlewareParams<unknown>) => {
+      const user = ctx.session?.user;
+      if (!user) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
 
-    const opsScope = await resolveOpsScope({
-      userId: user.id,
-      userEmail: user.email,
-      impersonatorEmail: user.impersonator?.email,
-      permission,
-      prisma: ctx.prisma,
-    });
-
-    // For mutating endpoints, `kind: "none"` is a hard FORBIDDEN. For status
-    // probes that want to *report* "no access" without throwing (lw#3584
-    // — see ops.getScope), pass `{ throwOnDeny: false }` so the middleware
-    // populates `ctx.opsScope = { kind: "none" }` and the procedure handler
-    // can branch on it.
-    if (opsScope.kind === "none" && throwOnDeny) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "You do not have permission to access ops resources",
+      const opsScope = await resolveOpsScope({
+        userId: user.id,
+        userEmail: user.email,
+        impersonatorEmail: user.impersonator?.email,
+        permission,
+        prisma: ctx.prisma,
       });
-    }
 
-    ctx.opsScope = opsScope;
-    ctx.permissionChecked = true;
-    return next();
-  };
+      // For mutating endpoints, `kind: "none"` is a hard FORBIDDEN. For status
+      // probes that want to *report* "no access" without throwing (lw#3584
+      // — see ops.getScope), pass `{ throwOnDeny: false }` so the middleware
+      // populates `ctx.opsScope = { kind: "none" }` and the procedure handler
+      // can branch on it.
+      if (opsScope.kind === "none" && throwOnDeny) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have permission to access ops resources",
+        });
+      }
+
+      ctx.opsScope = opsScope;
+      ctx.permissionChecked = true;
+      return next();
+    },
+  );

@@ -19,7 +19,6 @@ import {
   resolveProviderLabels,
 } from "~/server/gateway/providerLabels";
 
-import { checkOrganizationPermission, checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const scopeSchema = z.discriminatedUnion("kind", [
@@ -54,7 +53,7 @@ async function requireOrgAccess(
 export const gatewayBudgetsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("gatewayBudgets:view"))
+    .permission("gatewayBudgets:view")
     .query(async ({ ctx, input }) => {
       await requireOrgAccess(ctx, input.organizationId);
       const service = GatewayBudgetService.create(
@@ -86,7 +85,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
 
   listForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("gatewayBudgets:view"))
+    .permission("gatewayBudgets:view")
     .query(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,
@@ -121,7 +120,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
 
   get: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .use(checkOrganizationPermission("gatewayBudgets:view"))
+    .permission("gatewayBudgets:view")
     .query(async ({ ctx, input }) => {
       await requireOrgAccess(ctx, input.organizationId);
       const service = GatewayBudgetService.create(
@@ -166,7 +165,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
    */
   groupTargets: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("gatewayBudgets:create"))
+    .permission("gatewayBudgets:create")
     .query(async ({ ctx, input }) => {
       const groups = await ctx.prisma.group.findMany({
         where: { organizationId: input.organizationId },
@@ -231,7 +230,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
         allowUnreachable: z.boolean().optional(),
       }),
     )
-    .use(checkOrganizationPermission("gatewayBudgets:create"))
+    .permission("gatewayBudgets:create")
     .mutation(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,
@@ -266,7 +265,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
         timezone: z.string().nullable().optional(),
       }),
     )
-    .use(checkOrganizationPermission("gatewayBudgets:update"))
+    .permission("gatewayBudgets:update")
     .mutation(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,
@@ -281,7 +280,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
 
   archive: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .use(checkOrganizationPermission("gatewayBudgets:delete"))
+    .permission("gatewayBudgets:delete")
     .mutation(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,
@@ -303,7 +302,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
         reason: z.string().max(500).optional(),
       }),
     )
-    .use(checkOrganizationPermission("gatewayBudgets:update"))
+    .permission("gatewayBudgets:update")
     .mutation(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,

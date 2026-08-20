@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { resetCutoverGateForTesting } from "~/server/app-layer/authz/cutover-gate";
+import { declaredNoPermission } from "~/server/app-layer/authz/trpc-middleware";
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
 import {
   checkOrganizationPermission,
@@ -14,8 +15,6 @@ import {
   type Permission,
   resolveProjectPermission,
   resolveTeamPermission,
-  skipPermissionCheck,
-  skipPermissionCheckProjectCreation,
 } from "../rbac";
 
 // Mock Prisma client
@@ -761,41 +760,28 @@ describe("RBAC Integration Tests", () => {
       });
     });
 
-    describe("skipPermissionCheck", () => {
+    describe("declaredNoPermission (skipPermissionCheck's successor)", () => {
       it("calls next and set permissionChecked to true", async () => {
-        const result = await skipPermissionCheck({
+        const result = await declaredNoPermission({ reason: "test opt-out" })({
           ctx: mockCtx,
           input: {},
           next: mockNext,
-        });
+        } as never);
 
         expect(result).toBe("success");
         expect(mockCtx.permissionChecked).toBe(true);
       });
 
-      it("throws error when sensitive keys are present", () => {
-        expect(() =>
-          skipPermissionCheck({
+      it("throws error when sensitive keys are present", async () => {
+        await expect(
+          declaredNoPermission({ reason: "test opt-out" })({
             ctx: mockCtx,
             input: { projectId: "project-123" },
             next: mockNext,
-          }),
-        ).toThrow(
+          } as never),
+        ).rejects.toThrow(
           "projectId is not allowed to be used without permission check",
         );
-      });
-    });
-
-    describe("skipPermissionCheckProjectCreation", () => {
-      it("calls next and set permissionChecked to true", async () => {
-        const result = await skipPermissionCheckProjectCreation({
-          ctx: mockCtx,
-          input: {},
-          next: mockNext,
-        });
-
-        expect(result).toBe("success");
-        expect(mockCtx.permissionChecked).toBe(true);
       });
     });
   });
