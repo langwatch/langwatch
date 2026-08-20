@@ -158,3 +158,60 @@ export async function listTriggers(): Promise<
 > {
   return toArray(await lwGet("/api/triggers"));
 }
+
+/**
+ * Seeds application-origin traffic into the project so data questions
+ * ("how much traffic", "what's my p95") have a true answer.
+ *
+ * Without this, a fresh local project only contains Langy's own mirrored
+ * runs (origin: langy), which rule 27 makes Langy exclude — so "no traces
+ * in the last 24h" is CORRECT, and any judge that expects a non-zero count
+ * is grading against data that does not exist. Spans carry no
+ * langwatch.origin, which the platform coalesces to "application".
+ */
+export async function seedApplicationTraces(count = 8): Promise<void> {
+  const now = Date.now();
+  const posts = Array.from({ length: count }, (_, i) => {
+    const startedAt = now - (i + 1) * 60_000;
+    // Varied latencies (0.8s–9.6s) so p95 is a real figure, one error span.
+    const durationMs = 800 + i * 1_100 + (i % 3) * 200;
+    return lwPost({
+      path: "/api/collector",
+      body: {
+        spans: [
+          {
+            trace_id: `trace_e2e_seed_${now}_${i}`,
+            span_id: `span_e2e_seed_${now}_${i}`,
+            type: "llm",
+            model: "gpt-5-mini",
+            input: {
+              type: "text",
+              value: `customer support question #${i}: where is my order?`,
+            },
+            output:
+              i === count - 1
+                ? undefined
+                : {
+                    type: "text",
+                    value: `Your order #10${i} is out for delivery.`,
+                  },
+            error:
+              i === count - 1
+                ? {
+                    message: "upstream model timeout after 30s",
+                    stacktrace: [],
+                    has_error: true,
+                  }
+                : undefined,
+            timestamps: {
+              started_at: startedAt,
+              finished_at: startedAt + durationMs,
+            },
+          },
+        ],
+        metadata: { labels: ["e2e-seed"] },
+      },
+    });
+  });
+  await Promise.all(posts);
+}

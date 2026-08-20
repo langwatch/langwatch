@@ -79,6 +79,31 @@ npx vitest run langy-dogfood.scenario.test.ts --reporter=verbose
 
 (same env vars as above — defaults already point at the local haven seed identity.)
 
+## Quality bar (langy-quality.scenario.test.ts)
+
+`langy-quality.scenario.test.ts` is a regression set derived from measured
+production behaviour rather than from named user flows. Each scenario maps 1:1
+to a filed defect and is expected to FAIL until that defect is fixed:
+
+| Scenario | Defect it guards | Issue |
+|---|---|---|
+| never ends a turn with nothing rendered | 27 of 260 completed turns render no text at all | `langwatch-saas#1097` |
+| answers from the project, not from memory | 40% of completed turns make zero tool calls; 58% answer under 120 chars | `langwatch-saas#1098` |
+| owns the tools it actually has | `AGENTS.md:149` calls the working `langwatch.*` tools hallucinations | `langwatch-saas#1099` |
+| stays a platform assistant | opencode coding-agent persona bleeding through (`read` 144, `edit` 68 calls) | `langwatch-saas#1100` |
+| a monitor it says it made really exists | `langwatch.monitor.create` errors on 48% of calls | `langwatch-saas#1101` |
+| answers a single lookup inside the budget | p90 380s, p99 1,868s | `langwatch-saas#1102` |
+
+Three of the six assert structurally as well as through the judge (empty-string
+length, a digit in a "how much" answer, a Layer-2 `listMonitors()` diff) —
+an LLM judge will rationalise an empty or unsourced reply as terseness, so the
+bar cannot rest on the judge alone.
+
+Run it the same way as the others, and point it at Langy's own production
+project (the source of the measurements) by overriding `LANGY_APP_URL`,
+`LANGY_PROJECT_ID`, `LW_BASE_URL` and the credentials — see the file header.
+The monitor scenario performs a real create, prefixed `e2e-quality-`.
+
 ## Red team
 
 `langy-redteam.scenario.test.ts` uses `@langwatch/scenario`'s `redTeamCrescendo()`
