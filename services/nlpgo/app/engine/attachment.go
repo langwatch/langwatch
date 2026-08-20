@@ -401,6 +401,8 @@ func messagesForTracing(messages []app.ChatMessage) []app.ChatMessage {
 
 // partForTracing carries one content part into the trace, summarizing its
 // inline bytes only when they do not fit. Every other part shape is untouched.
+// Each shape has its own function, and each returns the part unchanged when it
+// carries no inline bytes or when the budget still has room for them.
 func partForTracing(p any, budget *traceAttachmentBudget) any {
 	block, ok := p.(map[string]any)
 	if !ok {
@@ -408,39 +410,59 @@ func partForTracing(p any, budget *traceAttachmentBudget) any {
 	}
 	switch block["type"] {
 	case "image_url":
-		if img, ok := block["image_url"].(map[string]any); ok {
-			if u, _ := img["url"].(string); strings.HasPrefix(u, "data:") {
-				if budget.admit(dataURLPayload(u)) {
-					return p
-				}
-				return map[string]any{"type": "image_url", "image_url": map[string]any{"url": summarizeDataURL(u)}}
-			}
-		}
+		return imageURLForTracing(p, block, budget)
 	case "file":
-		if file, ok := block["file"].(map[string]any); ok {
-			if fd, _ := file["file_data"].(string); strings.HasPrefix(fd, "data:") {
-				if budget.admit(dataURLPayload(fd)) {
-					return p
-				}
-				return map[string]any{"type": "file", "file": map[string]any{
-					"filename": file["filename"], "file_data": summarizeDataURL(fd),
-				}}
-			}
-		}
+		return fileForTracing(p, block, budget)
 	case "input_audio":
-		if audio, ok := block["input_audio"].(map[string]any); ok {
-			if data, _ := audio["data"].(string); data != "" {
-				if budget.admit(data) {
-					return p
-				}
-				format, _ := audio["format"].(string)
-				return map[string]any{"type": "input_audio", "input_audio": map[string]any{
-					"data": fmt.Sprintf("[audio, %d bytes]", approxBase64Bytes(data)), "format": format,
-				}}
-			}
-		}
+		return inputAudioForTracing(p, block, budget)
+	default:
+		return p
 	}
-	return p
+}
+
+func imageURLForTracing(p any, block map[string]any, budget *traceAttachmentBudget) any {
+	img, ok := block["image_url"].(map[string]any)
+	if !ok {
+		return p
+	}
+	u, _ := img["url"].(string)
+	if !strings.HasPrefix(u, "data:") || budget.admit(dataURLPayload(u)) {
+		return p
+	}
+	return map[string]any{
+		"type":      "image_url",
+		"image_url": map[string]any{"url": summarizeDataURL(u)},
+	}
+}
+
+func fileForTracing(p any, block map[string]any, budget *traceAttachmentBudget) any {
+	file, ok := block["file"].(map[string]any)
+	if !ok {
+		return p
+	}
+	fd, _ := file["file_data"].(string)
+	if !strings.HasPrefix(fd, "data:") || budget.admit(dataURLPayload(fd)) {
+		return p
+	}
+	return map[string]any{"type": "file", "file": map[string]any{
+		"filename": file["filename"], "file_data": summarizeDataURL(fd),
+	}}
+}
+
+func inputAudioForTracing(p any, block map[string]any, budget *traceAttachmentBudget) any {
+	audio, ok := block["input_audio"].(map[string]any)
+	if !ok {
+		return p
+	}
+	data, _ := audio["data"].(string)
+	if data == "" || budget.admit(data) {
+		return p
+	}
+	format, _ := audio["format"].(string)
+	return map[string]any{"type": "input_audio", "input_audio": map[string]any{
+		"data":   fmt.Sprintf("[audio, %d bytes]", approxBase64Bytes(data)),
+		"format": format,
+	}}
 }
 
 // dataURLPayload returns the base64 payload of a data URL, or "" when it has none.

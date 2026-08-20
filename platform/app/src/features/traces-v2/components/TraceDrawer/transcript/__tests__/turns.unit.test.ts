@@ -6,8 +6,8 @@
  * still the user speaking).
  */
 import { describe, expect, it } from "vitest";
-import type { ChatMessage } from "../types";
 import { groupMessagesIntoTurns } from "../turns";
+import type { ChatMessage } from "../types";
 
 const kindsOf = (messages: ChatMessage[]) =>
   groupMessagesIntoTurns(messages).map((turn) => turn.kind);

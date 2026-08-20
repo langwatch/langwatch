@@ -138,7 +138,9 @@ describe("IOPreview media badges", () => {
       // only thing that can put a thumbnail on the row. The image itself lives
       // on a child model-call span the list never loads.
       const { getByTestId } = renderPreview("what is this?", null, {
-        input: [{ kind: "image", url: "/api/files/p1/child-img", role: "user" }],
+        input: [
+          { kind: "image", url: "/api/files/p1/child-img", role: "user" },
+        ],
       });
 
       expect(getByTestId("io-preview-thumbnail")).toHaveAttribute(
