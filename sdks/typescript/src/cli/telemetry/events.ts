@@ -220,11 +220,10 @@ const createOtlpSink = async (endpoint: string): Promise<EventSink> => {
 
   const provider = new LoggerProvider({
     resource,
-    forceFlushTimeoutMillis: FLUSH_TIMEOUT_MS,
     processors: [
-      new SimpleLogRecordProcessor(
-        new OTLPLogExporter({ url: endpoint, timeoutMillis: EXPORT_TIMEOUT_MS }),
-      ),
+      new SimpleLogRecordProcessor({
+        exporter: new OTLPLogExporter({ url: endpoint, timeoutMillis: EXPORT_TIMEOUT_MS }),
+      }),
     ],
   });
 
@@ -241,7 +240,9 @@ const createOtlpSink = async (endpoint: string): Promise<EventSink> => {
       });
     },
     flush: async () => {
-      await provider.forceFlush();
+      // `forceFlushTimeoutMillis` moved off `LoggerProviderOptions` and onto this
+      // call in @opentelemetry/sdk-logs 0.221 — pass it here instead.
+      await provider.forceFlush({ timeoutMillis: FLUSH_TIMEOUT_MS });
       // Shutting the provider down aborts anything still in flight, so the process
       // can exit instead of waiting out the exporter's own timeout.
       await provider.shutdown();
