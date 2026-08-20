@@ -2,7 +2,7 @@
  * @vitest-environment node
  *
  * The route -> service seam for the migration enrollment procedures: the ops
- * router validates the stage vocabulary at the boundary, stamps the acting
+ * router names the migration at the boundary, stamps the acting
  * user from the session, and delegates everything else to
  * `systemMigrationsService`. Corresponds to
  * specs/rbac/in-place-authz-migration.feature (the enrollment scenarios).
@@ -17,6 +17,15 @@ const service = vi.hoisted(() => ({
   getOverview: vi.fn(),
   startPass: vi.fn(),
   rollBack: vi.fn(),
+  runForOrganization: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  searchOrganizations: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  // Declared by the migration itself in production, so the stub answers
+  // the way the registered migrations do: only the cutover changes how
+  // the fleet behaves, and only it takes the typed confirmation.
+  requiresOperatorConfirmation: vi.fn(
+    ({ migrationName }: { migrationName: string }) =>
+      migrationName === "authz-grants-cutover",
+  ),
 }));
 
 vi.mock("~/server/app-layer/system-migrations/runtime", () => ({
@@ -86,13 +95,13 @@ describe("ops migration enrollment procedures", () => {
 
       const result = await caller.enrollMigrationTenant({
         organizationId: "org_acme",
-        stage: "migrations",
+        migrationName: "authz-team-user-backfill",
       });
 
       expect(result).toEqual({ enrolled: true });
       expect(service.enroll).toHaveBeenCalledWith({
         organizationId: "org_acme",
-        stage: "migrations",
+        migrationName: "authz-team-user-backfill",
         actorUserId: "user_alex",
       });
       expect(demandedPermissions.get("enrollMigrationTenant")).toBe(
@@ -109,35 +118,94 @@ describe("ops migration enrollment procedures", () => {
       await expect(
         caller.enrollMigrationTenant({
           organizationId: "org_acme",
-          stage: "cutover",
+          migrationName: "authz-grants-cutover",
         }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
       expect(service.enroll).not.toHaveBeenCalled();
 
       const result = await caller.enrollMigrationTenant({
         organizationId: "org_acme",
-        stage: "cutover",
+        migrationName: "authz-grants-cutover",
         confirm: "ENROLL",
       });
       expect(result).toEqual({ enrolled: true });
       expect(service.enroll).toHaveBeenCalledWith({
         organizationId: "org_acme",
-        stage: "cutover",
+        migrationName: "authz-grants-cutover",
         actorUserId: "user_alex",
       });
     });
+  });
 
-    it("refuses a stage outside the vocabulary at the boundary", async () => {
+  describe("when an operator runs one migration for one organization", () => {
+    /** @scenario "An operator runs one migration for one organization now" */
+    it("delegates to the service and demands ops:manage", async () => {
+      service.runForOrganization.mockResolvedValue({
+        status: "finalized",
+        waiting: false,
+      });
+      const caller = buildCaller();
+
+      const result = await caller.runSystemMigrationForOrganization({
+        organizationId: "org_acme",
+        migrationName: "authz-team-user-backfill",
+      });
+
+      expect(result).toEqual({ status: "finalized", waiting: false });
+      expect(service.runForOrganization).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        migrationName: "authz-team-user-backfill",
+        actorUserId: "user_alex",
+      });
+      expect(demandedPermissions.get("runSystemMigrationForOrganization")).toBe(
+        "ops:manage",
+      );
+    });
+
+    /** @scenario "A targeted cutover run takes the typed confirmation" */
+    it("runs the cutover only behind its typed confirmation", async () => {
+      service.runForOrganization.mockResolvedValue({
+        status: "finalized",
+        waiting: false,
+      });
       const caller = buildCaller();
 
       await expect(
-        caller.enrollMigrationTenant({
+        caller.runSystemMigrationForOrganization({
           organizationId: "org_acme",
-          // Deliberately invalid input - the router's schema must refuse it.
-          stage: "everything" as unknown as "migrations",
+          migrationName: "authz-grants-cutover",
         }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
-      expect(service.enroll).not.toHaveBeenCalled();
+      expect(service.runForOrganization).not.toHaveBeenCalled();
+
+      await caller.runSystemMigrationForOrganization({
+        organizationId: "org_acme",
+        migrationName: "authz-grants-cutover",
+        confirm: "RUN",
+      });
+      expect(service.runForOrganization).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when an operator searches organizations", () => {
+    /** @scenario "An operator finds an organization by name to act on it" */
+    it("delegates to the service and demands ops:view", async () => {
+      service.searchOrganizations.mockResolvedValue([
+        { id: "org_acme", name: "Acme Corporation" },
+      ]);
+      const caller = buildCaller();
+
+      const result = await caller.searchMigrationOrganizations({
+        query: "acme",
+      });
+
+      expect(result).toEqual([{ id: "org_acme", name: "Acme Corporation" }]);
+      expect(service.searchOrganizations).toHaveBeenCalledWith({
+        query: "acme",
+      });
+      expect(demandedPermissions.get("searchMigrationOrganizations")).toBe(
+        "ops:view",
+      );
     });
   });
 
@@ -148,13 +216,13 @@ describe("ops migration enrollment procedures", () => {
 
       const result = await caller.withdrawMigrationTenant({
         organizationId: "org_acme",
-        stage: "migrations",
+        migrationName: "authz-team-user-backfill",
       });
 
       expect(result).toEqual({ withdrawn: true });
       expect(service.withdraw).toHaveBeenCalledWith({
         organizationId: "org_acme",
-        stage: "migrations",
+        migrationName: "authz-team-user-backfill",
         actorUserId: "user_alex",
       });
       expect(demandedPermissions.get("withdrawMigrationTenant")).toBe(

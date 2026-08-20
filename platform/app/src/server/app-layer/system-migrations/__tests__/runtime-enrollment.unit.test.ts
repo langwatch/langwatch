@@ -73,54 +73,74 @@ describe("migrationPassCohort on cloud", () => {
   describe("when an organization is enrolled between two passes", () => {
     /** @scenario "Enrolling an organization takes effect on the next pass" */
     it("reads enrollment fresh per pass, so the next pass picks the change up", async () => {
+      const backfill = "authz-team-user-backfill";
       stubs.enrollmentFindMany.mockResolvedValueOnce([]);
       const firstPass = await migrationPassCohort();
-      expect(firstPass("org_acme")).toBe(false);
+      expect(firstPass({ tenantId: "org_acme", migrationName: backfill })).toBe(
+        false,
+      );
 
       // The operator enrolls (and later withdraws) with no restart anywhere.
       stubs.enrollmentFindMany.mockResolvedValueOnce([
-        { organizationId: "org_acme" },
+        { organizationId: "org_acme", migrationName: backfill },
       ]);
       const secondPass = await migrationPassCohort();
-      expect(secondPass("org_acme")).toBe(true);
-      expect(secondPass("org_globex")).toBe(false);
+      expect(
+        secondPass({ tenantId: "org_acme", migrationName: backfill }),
+      ).toBe(true);
+      expect(
+        secondPass({ tenantId: "org_globex", migrationName: backfill }),
+      ).toBe(false);
 
       stubs.enrollmentFindMany.mockResolvedValueOnce([]);
       const thirdPass = await migrationPassCohort();
-      expect(thirdPass("org_acme")).toBe(false);
+      expect(thirdPass({ tenantId: "org_acme", migrationName: backfill })).toBe(
+        false,
+      );
 
       expect(stubs.enrollmentFindMany).toHaveBeenCalledTimes(3);
-      expect(stubs.enrollmentFindMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { stage: "migrations" } }),
-      );
     });
   });
 
-  describe("when an organization is enrolled for migration but not for cutover", () => {
-    /** @scenario "Migration and cutover enrollment pace independently" */
-    it("admits it to the pass while the cutover stage still refuses it", async () => {
+  describe("when an organization is enrolled for one migration but not another", () => {
+    /** @scenario "Each migration is enrolled separately and paces independently" */
+    it("admits exactly the enrolled (organization, migration) pairs", async () => {
       stubs.enrollmentFindMany.mockResolvedValueOnce([
-        { organizationId: "org_acme" },
+        {
+          organizationId: "org_acme",
+          migrationName: "authz-team-user-backfill",
+        },
       ]);
       stubs.enrollmentFindUnique.mockResolvedValueOnce(null);
 
       const cohort = await migrationPassCohort();
-      expect(cohort("org_acme")).toBe(true);
+      expect(
+        cohort({
+          tenantId: "org_acme",
+          migrationName: "authz-team-user-backfill",
+        }),
+      ).toBe(true);
+      expect(
+        cohort({
+          tenantId: "org_acme",
+          migrationName: "authz-grants-cutover",
+        }),
+      ).toBe(false);
       await expect(cutoverEnrollmentCohort("org_acme")).resolves.toBe(false);
 
       expect(stubs.enrollmentFindUnique).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
-            organizationId_stage: {
+            organizationId_migrationName: {
               organizationId: "org_acme",
-              stage: "cutover",
+              migrationName: "authz-grants-cutover",
             },
           },
         }),
       );
     });
 
-    it("admits the cutover once its own stage is enrolled", async () => {
+    it("admits the cutover once it is enrolled itself", async () => {
       stubs.enrollmentFindUnique.mockResolvedValueOnce({
         organizationId: "org_acme",
       });
@@ -150,9 +170,7 @@ describe("migrationPassCohort on cloud", () => {
       expect(warned).toContain("AUTHZ_CUTOVER_COHORT");
       // "all" did not widen anything and "none" did not narrow anything:
       // the cohort still came from the enrollment table.
-      expect(stubs.enrollmentFindMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { stage: "migrations" } }),
-      );
+      expect(stubs.enrollmentFindMany).toHaveBeenCalled();
     });
   });
 });

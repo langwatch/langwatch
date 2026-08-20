@@ -92,7 +92,14 @@ function migrationOf(
   name: string,
   migrateTenant: SystemMigration["migrateTenant"],
 ): SystemMigration {
-  return { name, runsAutomaticallyOnSelfHosted: true, migrateTenant };
+  return {
+    name,
+    title: name,
+    description: name,
+    requiresOperatorConfirmation: false,
+    runsAutomaticallyOnSelfHosted: true,
+    migrateTenant,
+  };
 }
 
 const finalized: TenantMigrationOutcome = { status: "finalized" };
@@ -152,7 +159,7 @@ describe("SystemMigrationRunnerService", () => {
         state,
         lease: new FakeLeaseRepository(),
         tenants: tenantSourceOf(["acme", "globex"]),
-        cohort: (tenantId) => tenantId === "acme",
+        cohort: ({ tenantId }) => tenantId === "acme",
         migrations: [migrationOf("m1", migrate)],
       });
 

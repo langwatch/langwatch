@@ -7,8 +7,12 @@ import type {
 import {
   MigrationEnrollmentCloudOnlyError,
   MigrationEnrollmentOrganizationNotFoundError,
+  MigrationNotAvailableOnInstallationError,
+  MigrationPassAlreadyRunningError,
   MigrationRollbackRequiresMigratedOrFinalizedError,
+  MigrationRunRequiresEnrollmentError,
   MigrationStateNotFoundError,
+  MigrationUnknownError,
 } from "./errors";
 
 /**
@@ -42,23 +46,13 @@ const logger = createLogger("langwatch:ops:system-migrations");
  * only human-driven edge) and, on cloud, the enrollment rows that pace who
  * migrates at all.
  */
-/**
- * The two independently paced enrollment stages of the cloud rollout:
- * "migrations" is the preparation work (the team-user backfill and the
- * genesis import), "cutover" is the flip onto the engine. A plain string
- * vocabulary validated at the boundary, like the status column.
- */
-export const MIGRATION_ENROLLMENT_STAGES = ["migrations", "cutover"] as const;
-
-export type MigrationEnrollmentStage =
-  (typeof MIGRATION_ENROLLMENT_STAGES)[number];
-
 /** One enrollment row as the ops page lists it. */
 export type MigrationEnrollmentRecord = {
   organizationId: string;
   /** Null when the organization has since been deleted. */
   organizationName: string | null;
-  stage: MigrationEnrollmentStage;
+  /** The stable name of the migration this row enrolls the organization in. */
+  migrationName: string;
   enrolledByUserId: string;
   /** The enroller's display name; null when it no longer resolves (the user
    *  id above still identifies them). Never the email - the name is the one
@@ -74,20 +68,27 @@ export type MigrationEnrollmentRecord = {
  * is the only race-free check - and both surface as handled errors.
  */
 export interface SystemMigrationEnrollmentStore {
-  findAllByStage(args: {
-    stage: MigrationEnrollmentStage;
-  }): Promise<MigrationEnrollmentRecord[]>;
+  findAll(): Promise<MigrationEnrollmentRecord[]>;
   findOrganizationById(args: {
     organizationId: string;
   }): Promise<{ id: string; name: string } | null>;
+  isEnrolled(args: {
+    organizationId: string;
+    migrationName: string;
+  }): Promise<boolean>;
+  countEnrolledByMigration(): Promise<Map<string, number>>;
+  countOrganizations(): Promise<number>;
+  searchOrganizations(args: {
+    query: string;
+  }): Promise<Array<{ id: string; name: string }>>;
   create(args: {
     organizationId: string;
-    stage: MigrationEnrollmentStage;
+    migrationName: string;
     enrolledByUserId: string;
   }): Promise<void>;
   delete(args: {
     organizationId: string;
-    stage: MigrationEnrollmentStage;
+    migrationName: string;
   }): Promise<void>;
 }
 
@@ -115,6 +116,16 @@ const ATTENTION_LIMIT = 50;
 
 export type MigrationOverview = {
   name: string;
+  /** The name operators read; presentation over the stable `name`. */
+  title: string;
+  /** What the migration does for an organization, in the operator's language. */
+  description: string;
+  /**
+   * Whether acting on this migration takes the typed destructive
+   * confirmation, so the page asks for it exactly where the server requires
+   * it rather than deciding for itself which migration is dangerous.
+   */
+  requiresOperatorConfirmation: boolean;
   /**
    * False only on self-hosted, for a migration whose
    * `runsAutomaticallyOnSelfHosted` declaration has not been released yet:
@@ -124,6 +135,15 @@ export type MigrationOverview = {
    */
   availableOnThisInstallation: boolean;
   counts: Record<TenantMigrationStatus, number>;
+  /**
+   * The rollout gauge, cloud only (null off cloud, where enrollment does
+   * not exist): how many organizations are enrolled for this migration, and
+   * how many are not. Enrollment only - an organization counts as not
+   * enrolled whether or not its prerequisites have finalized, because
+   * enrolling early is legitimate (the migration waits), so this must never
+   * be read as "ready to run".
+   */
+  enrollment: { enrolledCount: number; notEnrolledCount: number } | null;
   attention: Array<TenantMigrationRecord & { updatedAt: Date }>;
 };
 
@@ -139,6 +159,9 @@ export class SystemMigrationsService {
       /** Every registered migration's listing-facing declaration, cutover last. */
       migrations: () => Array<{
         name: string;
+        title: string;
+        description: string;
+        requiresOperatorConfirmation: boolean;
         runsAutomaticallyOnSelfHosted: boolean;
       }>;
       /** Read per call, so the answer is never a boot-time capture. */
@@ -158,6 +181,26 @@ export class SystemMigrationsService {
         args?: Record<string, unknown>;
       }) => Promise<void>;
       runPass: () => Promise<MigrationPassSummary | null>;
+      /**
+       * One migration for one organization, now, under the same fleet-wide
+       * lease as a full pass (null when another pass holds it). The
+       * composition supplies it because only the composition can build a
+       * runner scoped to a single (tenant, migration) pair.
+       */
+      runTargetedPass: (args: {
+        organizationId: string;
+        migrationName: string;
+      }) => Promise<MigrationPassSummary | null>;
+      /**
+       * Whether a migration's stored report means it merely WAITED, per
+       * migration name. The state machine has no waiting status, so a
+       * migration that is waiting on something records `migrated` exactly
+       * as a held one does, and only the migration's own composition can
+       * tell the two apart by reading its report - so the predicate lives
+       * there, like `rollbackGuards`. A migration that never waits has no
+       * entry, and its `migrated` always means held.
+       */
+      waitingReports?: Record<string, (report: unknown) => boolean>;
       /**
        * What else a rollback has to DO, per migration name. The generic
        * rollback is a state write; a migration whose finalization changed
@@ -211,65 +254,105 @@ export class SystemMigrationsService {
    */
   async getOverview(): Promise<MigrationOverview[]> {
     const isSaaS = this.deps.isSaaS();
+    // One pair of queries for every migration's gauge, not a pair per
+    // migration: the page polls this.
+    const [enrolledByMigration, totalOrganizations] = isSaaS
+      ? await Promise.all([
+          this.deps.enrollments.countEnrolledByMigration(),
+          this.deps.enrollments.countOrganizations(),
+        ])
+      : [null, 0];
     return Promise.all(
-      this.deps.migrations().map(async (migration) => ({
-        name: migration.name,
-        availableOnThisInstallation:
-          isSaaS || migration.runsAutomaticallyOnSelfHosted,
-        counts: await this.deps.state.findStatusCounts({
-          migrationName: migration.name,
-        }),
-        attention: await this.deps.state.findRecordsByStatus({
-          migrationName: migration.name,
-          statuses: ["migrated", "parked"],
-          limit: ATTENTION_LIMIT,
-        }),
-      })),
+      this.deps.migrations().map(async (migration) => {
+        const enrolledCount = enrolledByMigration?.get(migration.name) ?? 0;
+        // Together, not one after the other: the page polls this, and the
+        // rollup does not feed the listing.
+        const [counts, attention] = await Promise.all([
+          this.deps.state.findStatusCounts({ migrationName: migration.name }),
+          this.deps.state.findRecordsByStatus({
+            migrationName: migration.name,
+            statuses: ["migrated", "parked"],
+            limit: ATTENTION_LIMIT,
+          }),
+        ]);
+        return {
+          name: migration.name,
+          title: migration.title,
+          description: migration.description,
+          requiresOperatorConfirmation: migration.requiresOperatorConfirmation,
+          availableOnThisInstallation:
+            isSaaS || migration.runsAutomaticallyOnSelfHosted,
+          counts,
+          enrollment: enrolledByMigration
+            ? {
+                enrolledCount,
+                notEnrolledCount: Math.max(
+                  0,
+                  totalOrganizations - enrolledCount,
+                ),
+              }
+            : null,
+          attention,
+        };
+      }),
     );
   }
 
   /**
-   * The enrollment listing for the ops page: both stages, newest first, with
-   * whatever names still resolve. `isSaaS` rides along so the page can say
-   * honestly that a self-hosted installation has nothing to enroll. The
-   * read is audited because the records carry the enrollers' display names -
-   * personal data leaves through here, so the trail says who read it.
+   * The enrollment listing for the ops page: every migration's, newest
+   * first, with whatever names still resolve. `isSaaS` rides along so the
+   * page can say honestly that a self-hosted installation has nothing to
+   * enroll. The read is audited because the records carry the enrollers'
+   * display names - personal data leaves through here, so the trail says
+   * who read it.
    */
   async getEnrollments({ requestedBy }: { requestedBy: string }): Promise<{
     isSaaS: boolean;
     enrollments: MigrationEnrollmentRecord[];
   }> {
-    const perStage = await Promise.all(
-      MIGRATION_ENROLLMENT_STAGES.map((stage) =>
-        this.deps.enrollments.findAllByStage({ stage }),
-      ),
-    );
+    const enrollments = await this.deps.enrollments.findAll();
     await this.deps.audit({
       userId: requestedBy,
       action: "systemMigrations.listEnrollments",
     });
-    return { isSaaS: this.deps.isSaaS(), enrollments: perStage.flat() };
+    return { isSaaS: this.deps.isSaaS(), enrollments };
   }
 
   /**
-   * Enroll one organization for one stage of the cloud rollout
+   * The operator's organization lookup for the page's pickers - enroll,
+   * targeted run and rollback all act on an organization the operator found
+   * by name rather than by pasting an id.
+   */
+  async searchOrganizations({
+    query,
+  }: {
+    query: string;
+  }): Promise<Array<{ id: string; name: string }>> {
+    const trimmed = query.trim();
+    if (trimmed.length === 0) return [];
+    return this.deps.enrollments.searchOrganizations({ query: trimmed });
+  }
+
+  /**
+   * Enroll one organization for one registered migration
    * (specs/rbac/in-place-authz-migration.feature, the enrollment scenarios).
    * Takes effect on the next pass - the runner reads enrollment fresh each
    * time - and refuses rather than lies: off cloud (where a row would change
-   * nothing, see MigrationEnrollmentCloudOnlyError), for an organization
-   * that does not exist, and for one already enrolled (the store's unique
-   * key raises that refusal).
+   * nothing, see MigrationEnrollmentCloudOnlyError), for a migration nothing
+   * registered answers to, for an organization that does not exist, and for
+   * one already enrolled (the store's unique key raises that refusal).
    */
   async enroll({
     organizationId,
-    stage,
+    migrationName,
     actorUserId,
   }: {
     organizationId: string;
-    stage: MigrationEnrollmentStage;
+    migrationName: string;
     actorUserId: string;
   }): Promise<void> {
     if (!this.deps.isSaaS()) throw new MigrationEnrollmentCloudOnlyError();
+    this.requireRegisteredMigration(migrationName);
     const organization = await this.deps.enrollments.findOrganizationById({
       organizationId,
     });
@@ -278,48 +361,144 @@ export class SystemMigrationsService {
     }
     await this.deps.enrollments.create({
       organizationId,
-      stage,
+      migrationName,
       enrolledByUserId: actorUserId,
     });
     logger.info(
-      { organizationId, stage, actorUserId },
+      { organizationId, migrationName, actorUserId },
       "operator enrolled an organization for the in-place migration rollout",
     );
     await this.deps.audit({
       userId: actorUserId,
       organizationId,
       action: "systemMigrations.enroll",
-      args: { stage },
+      args: { migrationName },
     });
   }
 
   /**
    * Withdraw an enrollment: the row is deleted, and the next pass simply no
-   * longer processes the organization for that stage. State already recorded
-   * stays exactly as it is - withdrawal pauses the rollout, it does not roll
-   * anything back (that is the operator rollback's job).
+   * longer processes the organization for that migration. State already
+   * recorded stays exactly as it is - withdrawal pauses the rollout, it does
+   * not roll anything back (that is the operator rollback's job).
    */
   async withdraw({
     organizationId,
-    stage,
+    migrationName,
     actorUserId,
   }: {
     organizationId: string;
-    stage: MigrationEnrollmentStage;
+    migrationName: string;
     actorUserId: string;
   }): Promise<void> {
     if (!this.deps.isSaaS()) throw new MigrationEnrollmentCloudOnlyError();
-    await this.deps.enrollments.delete({ organizationId, stage });
+    await this.deps.enrollments.delete({ organizationId, migrationName });
     logger.info(
-      { organizationId, stage, actorUserId },
+      { organizationId, migrationName, actorUserId },
       "operator withdrew an organization from the in-place migration rollout",
     );
     await this.deps.audit({
       userId: actorUserId,
       organizationId,
       action: "systemMigrations.withdraw",
-      args: { stage },
+      args: { migrationName },
     });
+  }
+
+  /**
+   * Run one migration for one organization now
+   * (specs/rbac/in-place-authz-migration.feature, "An operator runs one
+   * migration for one organization now"). Awaited rather than
+   * fire-and-forget - the operator asked about one organization and wants
+   * its outcome. Enrollment stays the pacing source of truth on cloud: an
+   * unenrolled organization is refused, never quietly migrated. The
+   * fleet-wide lease still applies, so a run during a full pass is refused
+   * with a retry-shaped error instead of double-driving the organization.
+   */
+  async runForOrganization({
+    organizationId,
+    migrationName,
+    actorUserId,
+  }: {
+    organizationId: string;
+    migrationName: string;
+    actorUserId: string;
+  }): Promise<{ status: TenantMigrationStatus | null; waiting: boolean }> {
+    const migration = this.requireRegisteredMigration(migrationName);
+    if (!this.deps.isSaaS() && !migration.runsAutomaticallyOnSelfHosted) {
+      throw new MigrationNotAvailableOnInstallationError();
+    }
+    const organization = await this.deps.enrollments.findOrganizationById({
+      organizationId,
+    });
+    if (!organization) {
+      throw new MigrationEnrollmentOrganizationNotFoundError();
+    }
+    if (this.deps.isSaaS()) {
+      const enrolled = await this.deps.enrollments.isEnrolled({
+        organizationId,
+        migrationName,
+      });
+      if (!enrolled) {
+        throw new MigrationRunRequiresEnrollmentError({ migrationName });
+      }
+    }
+    await this.deps.audit({
+      userId: actorUserId,
+      organizationId,
+      action: "systemMigrations.runForOrganization",
+      args: { migrationName },
+    });
+    const summary = await this.deps.runTargetedPass({
+      organizationId,
+      migrationName,
+    });
+    if (summary === null) throw new MigrationPassAlreadyRunningError();
+    const record = await this.deps.state.findRecord({
+      migrationName,
+      tenantId: organizationId,
+    });
+    // `migrated` covers two outcomes an operator must not confuse: the
+    // migration ran and is held for review, or it did nothing because it is
+    // still waiting. Only the migration's own report tells them apart, so
+    // the status alone would report a waiting cutover as a held one.
+    return {
+      status: record?.status ?? null,
+      waiting:
+        record != null &&
+        (this.deps.waitingReports?.[migrationName]?.(record.report) ?? false),
+    };
+  }
+
+  /**
+   * Whether acting on this migration takes the typed destructive
+   * confirmation. Read from the migration's own declaration so the gate and
+   * the page that renders it can never disagree about which migration is
+   * dangerous; an unknown name is refused before any confirmation question
+   * arises.
+   */
+  requiresOperatorConfirmation({
+    migrationName,
+  }: {
+    migrationName: string;
+  }): boolean {
+    return this.requireRegisteredMigration(migrationName)
+      .requiresOperatorConfirmation;
+  }
+
+  /** The migration a name refers to, or the refusal the operator can act on. */
+  private requireRegisteredMigration(migrationName: string): {
+    name: string;
+    title: string;
+    description: string;
+    requiresOperatorConfirmation: boolean;
+    runsAutomaticallyOnSelfHosted: boolean;
+  } {
+    const migration = this.deps
+      .migrations()
+      .find((candidate) => candidate.name === migrationName);
+    if (!migration) throw new MigrationUnknownError();
+    return migration;
   }
 
   /**

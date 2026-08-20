@@ -353,6 +353,7 @@ describe("GrantsCutoverMigration", () => {
 
   describe("given an organization whose earlier migrations have not finished", () => {
     describe("when the cutover runs", () => {
+      /** @scenario "An organization enrolled only for a later migration waits on its prerequisites" */
       it("holds it, naming what it is waiting for, and emits nothing", async () => {
         repository.prerequisiteStatuses = {
           [TEAM_USER_BACKFILL_MIGRATION_NAME]: "finalized",

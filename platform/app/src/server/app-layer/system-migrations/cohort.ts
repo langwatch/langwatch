@@ -7,14 +7,13 @@
  * pass logs a warning when either is still set - and pacing lives in two
  * places instead:
  *
- * CLOUD is paced per organization, at runtime, by ENROLLMENT: rows an
- * operator writes from the ops migrations page (`SystemMigrationEnrollment`,
- * one row per organization and stage). An organization that nobody enrolled
- * is simply not processed - no state is recorded for it, so "not enrolled
- * yet" and "not started" are the same pending state, which is what lets the
- * rollout widen later. The two stages pace independently: "migrations"
- * enrolls the preparation work (backfill + genesis import), "cutover"
- * enrolls the flip onto the engine.
+ * CLOUD is paced per organization AND per migration, at runtime, by
+ * ENROLLMENT: rows an operator writes from the ops migrations page
+ * (`SystemMigrationEnrollment`, one row per organization and migration). A
+ * (organization, migration) pair nobody enrolled is simply not processed -
+ * no state is recorded for it, so "not enrolled yet" and "not started" are
+ * the same pending state, which is what lets the rollout widen later. Each
+ * migration paces independently of the others.
  *
  * SELF-HOSTED is paced per migration, at release time, by the migration's
  * own `runsAutomaticallyOnSelfHosted` declaration. There is no enrollment
@@ -29,10 +28,10 @@
  */
 
 /**
- * Whether one organization is in this pass's cohort. On cloud that is its
- * enrollment for the pass's stage, read fresh at the start of every pass;
- * self-hosted includes everything (which migrations run there is
- * `migrationRunsOnThisInstallation`'s question, not this one's).
+ * Whether one organization is in this pass's cohort for one migration. On
+ * cloud that is its enrollment for that migration, read fresh at the start
+ * of every pass; self-hosted includes everything (which migrations run
+ * there is `migrationRunsOnThisInstallation`'s question, not this one's).
  */
 export function organizationMigrates({
   isSaaS,

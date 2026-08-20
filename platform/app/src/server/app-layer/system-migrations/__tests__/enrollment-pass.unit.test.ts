@@ -85,12 +85,18 @@ function migrationOf({
 }): SystemMigration & { migrateTenant: ReturnType<typeof vi.fn> } {
   return {
     name,
+    title: name,
+    description: name,
+    requiresOperatorConfirmation: false,
     runsAutomaticallyOnSelfHosted,
     migrateTenant: vi.fn(async () => ({ status: "finalized" as const })),
   };
 }
 
-/** The pass, composed exactly as runtime.ts composes it. */
+/**
+ * The pass, composed exactly as runtime.ts composes it: enrollment is per
+ * (organization, migration), read into a map the cohort probes.
+ */
 function passOn({
   isSaaS,
   tenants,
@@ -100,7 +106,7 @@ function passOn({
 }: {
   isSaaS: boolean;
   tenants: string[];
-  enrolled: Set<string>;
+  enrolled: Map<string, Set<string>>;
   migrations: SystemMigration[];
   state: SystemMigrationStateRepository;
 }) {
@@ -108,8 +114,11 @@ function passOn({
     state,
     lease: grantedLease,
     tenants: tenantSourceOf(tenants),
-    cohort: (tenantId) =>
-      organizationMigrates({ isSaaS, enrolled: enrolled.has(tenantId) }),
+    cohort: ({ tenantId, migrationName }) =>
+      organizationMigrates({
+        isSaaS,
+        enrolled: enrolled.get(migrationName)?.has(tenantId) ?? false,
+      }),
     migrations: migrations.filter((migration) =>
       migrationRunsOnThisInstallation({
         isSaaS,
@@ -136,7 +145,7 @@ describe("the migration pass under enrollment pacing", () => {
       const summary = await passOn({
         isSaaS: false,
         tenants: ["acme", "globex"],
-        enrolled: new Set(),
+        enrolled: new Map(),
         migrations: [released, unreleased],
         state,
       });
@@ -166,7 +175,7 @@ describe("the migration pass under enrollment pacing", () => {
       await passOn({
         isSaaS: false,
         tenants: ["acme", "globex"],
-        enrolled: new Set(),
+        enrolled: new Map(),
         migrations: [nowReleased],
         state: new InMemoryStateRepository(),
       });
@@ -197,7 +206,10 @@ describe("the migration pass under enrollment pacing", () => {
       await passOn({
         isSaaS: true,
         tenants: ["acme", "globex"],
-        enrolled: new Set(["acme"]),
+        enrolled: new Map([
+          ["released", new Set(["acme"])],
+          ["unreleased", new Set(["acme"])],
+        ]),
         migrations: [releasedForSelfHosting, notReleasedForSelfHosting],
         state,
       });
@@ -215,6 +227,38 @@ describe("the migration pass under enrollment pacing", () => {
       // the enrolled organization holds records. A bare count of 2 could
       // also be one record per organization, which would mean globex ran.
       expect(state.tenantIdsWithRecords()).toEqual(["acme"]);
+    });
+
+    /** @scenario "Each migration is enrolled separately and paces independently" */
+    it("drives only the migrations an organization is enrolled for, recording nothing for the others", async () => {
+      const backfillLike = migrationOf({
+        name: "backfill-like",
+        runsAutomaticallyOnSelfHosted: true,
+      });
+      const cutoverLike = migrationOf({
+        name: "cutover-like",
+        runsAutomaticallyOnSelfHosted: false,
+      });
+      const state = new InMemoryStateRepository();
+
+      await passOn({
+        isSaaS: true,
+        tenants: ["acme"],
+        enrolled: new Map([["backfill-like", new Set(["acme"])]]),
+        migrations: [backfillLike, cutoverLike],
+        state,
+      });
+
+      expect(backfillLike.migrateTenant).toHaveBeenCalledTimes(1);
+      expect(cutoverLike.migrateTenant).not.toHaveBeenCalled();
+      // Untouched means no state either: "not enrolled yet" and "not
+      // started" stay the same pending state for the unenrolled migration.
+      expect(
+        await state.findRecord({
+          migrationName: "cutover-like",
+          tenantId: "acme",
+        }),
+      ).toBeNull();
     });
   });
 });

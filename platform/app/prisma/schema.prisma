@@ -4189,13 +4189,15 @@ model SystemMigrationTenantState {
 
 model SystemMigrationEnrollment {
   organizationId   String
-  // "migrations" (the backfill + genesis preparation work) or "cutover" (the
-  // flip onto the engine). A plain string column validated in code, like the
-  // status column above - the vocabulary is internal and small.
-  stage            String
+  // The stable name of one registered migration (e.g.
+  // "authz-team-user-backfill"). A plain string column validated in code
+  // against the registered migrations, like the status column above - each
+  // migration is enrolled separately, so the rollout paces per
+  // (organization, migration).
+  migrationName    String
   enrolledByUserId String
   createdAt        DateTime @default(now())
 
-  @@id([organizationId, stage])
-  @@index([stage])
+  @@id([organizationId, migrationName])
+  @@index([migrationName])
 }

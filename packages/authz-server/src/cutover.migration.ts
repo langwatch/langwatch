@@ -229,6 +229,14 @@ type CutoverCounts = {
 
 export class GrantsCutoverMigration implements SystemMigration {
   readonly name = GRANTS_CUTOVER_MIGRATION_NAME;
+  readonly title = "Authorization engine cutover";
+  readonly description =
+    "Proves the new authorization engine answers permission checks exactly " +
+    "like the legacy path, then switches the organization onto it. The one " +
+    "step that changes who answers permission checks.";
+  // The one migration that changes how the fleet behaves, so enrolling an
+  // organization for it and running it both take the typed confirmation.
+  readonly requiresOperatorConfirmation = true;
   // NOT yet released for self-hosting: the cutover is the one migration that
   // changes who decides permissions, and OSS releases can ship this code
   // while cloud is still migrating and soaking. Until a later release flips

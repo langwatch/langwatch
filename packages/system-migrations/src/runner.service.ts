@@ -15,15 +15,19 @@ const DEFAULT_LEASE_TTL_MS = 60_000;
 const DEFAULT_LEASE_RENEW_INTERVAL_MS = 20_000;
 
 /**
- * Which tenants a pass may touch. The app composes this: self-hosted
- * installations answer true for every tenant (migration just happens, in
- * the background, no configuration), cloud answers from the organizations
- * operators have enrolled, read fresh each pass. A tenant outside the
- * cohort is skipped without even a state record - "not started" and "not
- * enrolled yet" are the same pending state, which is what lets the rollout
- * widen later.
+ * Which (tenant, migration) pairs a pass may touch. The app composes this:
+ * self-hosted installations answer true for every tenant (migration just
+ * happens, in the background, no configuration), cloud answers from the
+ * per-migration enrollments operators have written, read fresh each pass.
+ * A pair outside the cohort is skipped without even a state record - "not
+ * started" and "not enrolled yet" are the same pending state, which is what
+ * lets the rollout widen later, and what lets each migration pace
+ * independently of the others.
  */
-export type MigrationCohort = (tenantId: string) => boolean | Promise<boolean>;
+export type MigrationCohort = (args: {
+  tenantId: string;
+  migrationName: string;
+}) => boolean | Promise<boolean>;
 
 export type SystemMigrationRunnerDeps = {
   state: SystemMigrationStateRepository;
@@ -160,12 +164,11 @@ export class SystemMigrationRunnerService {
       }
 
       summary.tenantsSeen += 1;
-      if (!(await cohort(tenantId))) {
-        summary.skipped += 1;
-        continue;
-      }
-
       for (const migration of migrations) {
+        if (!(await cohort({ tenantId, migrationName: migration.name }))) {
+          summary.skipped += 1;
+          continue;
+        }
         await this.runMigrationForTenant({
           migration,
           tenantId,
