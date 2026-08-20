@@ -127,42 +127,40 @@ export function normalizeContentSource(source: unknown): ContentSource | null {
   if (typeof source !== "object" || source === null) return null;
   const s = source as Record<string, unknown>;
 
-  const mimeType =
-    typeof s.mimeType === "string"
-      ? s.mimeType.toLowerCase()
-      : typeof s.media_type === "string"
-        ? s.media_type.toLowerCase()
-        : undefined;
+  // AG-UI names the media type `mimeType`, Anthropic names it `media_type`.
+  const mimeType = firstString(s, "mimeType", "media_type")?.toLowerCase();
 
+  // AG-UI carries the payload in `value` either way. Anthropic carries an
+  // address in `url` and inline bytes in `data`.
   if (s.type === "url") {
-    // AG-UI puts the address in `value`, Anthropic in `url`.
-    const url =
-      typeof s.value === "string"
-        ? s.value
-        : typeof s.url === "string"
-          ? s.url
-          : undefined;
-    if (url === undefined) return null;
-    return mimeType
-      ? { type: "url", value: url, mimeType }
-      : { type: "url", value: url };
+    return typedSource("url", firstString(s, "value", "url"), mimeType);
   }
-
   if (s.type === "data" || s.type === "base64") {
-    // AG-UI puts the payload in `value`, Anthropic in `data`.
-    const data =
-      typeof s.value === "string"
-        ? s.value
-        : typeof s.data === "string"
-          ? s.data
-          : undefined;
-    if (data === undefined) return null;
-    return mimeType
-      ? { type: "data", value: data, mimeType }
-      : { type: "data", value: data };
+    return typedSource("data", firstString(s, "value", "data"), mimeType);
   }
-
   return null;
+}
+
+/** A source of one kind, or null when the payload is absent. */
+function typedSource(
+  type: "url" | "data",
+  value: string | undefined,
+  mimeType: string | undefined,
+): ContentSource | null {
+  if (value === undefined) return null;
+  return mimeType ? { type, value, mimeType } : { type, value };
+}
+
+/** The first of the named keys holding a string, or undefined when none does. */
+function firstString(
+  o: Record<string, unknown>,
+  ...keys: string[]
+): string | undefined {
+  for (const key of keys) {
+    const value = o[key];
+    if (typeof value === "string") return value;
+  }
+  return undefined;
 }
 
 /**
