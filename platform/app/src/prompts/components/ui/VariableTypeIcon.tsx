@@ -25,7 +25,7 @@ export const VariableTypeIcon = ({
   const iconProps = {
     size,
     strokeWidth: 2.5,
-    color: "var(--chakra-colors-gray-500)",
+    color: "var(--chakra-colors-fg-muted)",
   };
 
   switch (type) {
