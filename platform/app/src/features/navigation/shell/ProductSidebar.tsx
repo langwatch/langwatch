@@ -24,6 +24,7 @@ import {
   governanceNavItems,
   type SectionNavItemData,
 } from "../sectionNavItems";
+import { useLlmOpsProjectSlug } from "../useLlmOpsProjectSlug";
 import { useReachableProducts } from "../useReachableProducts";
 import { useSettingsMenu } from "../useSettingsMenu";
 import { QUIET_SIDEBAR_CHIP } from "./quietChipStyle";
@@ -99,11 +100,11 @@ function SidebarBottomBlock({
       borderTopWidth="1px"
       borderTopColor="border"
       paddingTop={2}
-      marginTop={2}
-      // The rule reads as the edge of the block, so it runs a little
-      // wider than the items it separates.
-      marginX="-4px"
-      paddingX="4px"
+      // The rule is the block's top edge, so it runs a step wider than the
+      // entries it separates. That step is padding, not a negative margin:
+      // the box already fills the column, so a negative margin would move
+      // its left edge and leave the right one where it was.
+      paddingX={1}
     >
       <UsageIndicator showLabel={showExpanded} />
       {shouldIncludeSettingsLink && hasPermission("organization:view") && (
@@ -132,27 +133,28 @@ function SidebarBottomBlock({
  * Spec: specs/navigation/settings-shell-v2.feature
  */
 function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
-  const { organization, project } = useOrganizationTeamProject({
+  const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
   const { reachableProducts } = useReachableProducts();
+  const projectSlug = useLlmOpsProjectSlug();
   const target = resolveSettingsBackTarget({
     organizationId: organization?.id ?? null,
     rememberedProduct: organization
       ? readLastVisitedProduct({ organizationId: organization.id })
       : null,
     reachableProducts,
-    projectSlug: project && !project.isPersonal ? project.slug : null,
+    projectSlug,
   });
 
   return (
     <Box
       width="full"
+      paddingX={1}
       borderBottomWidth="1px"
       borderBottomColor="border"
       paddingBottom={2.5}
-      marginBottom={1.5}
     >
       <SideMenuLink
         icon={ArrowLeft}
@@ -321,19 +323,26 @@ function SidebarContent({
       {/* The way back out of Settings sits above the scroll region, so a
           long settings menu never scrolls it out of the column. */}
       {surface === "settings" && (
-        <Box width="full" paddingX={3}>
+        <Box width="full" paddingX={2}>
           <SettingsBackEntry showLabel={showExpanded} />
         </Box>
       )}
 
       {/* The scroll region spans the full column and carries the
           horizontal inset itself, so its scrollbar runs against the
-          content panel instead of floating a padding away from it. */}
+          content panel instead of floating a padding away from it.
+
+          Its edges meet the rules above and below it, so the entries are
+          cut exactly at a line rather than a few pixels before it. The
+          space that holds them off those lines is padding in here, which
+          the entries travel through as the menu moves. */}
       <VStack
         ref={scrollRegionRef}
         data-testid="sidebar-scroll-region"
         width="full"
         paddingX={3}
+        paddingTop={surface === "settings" ? 1.5 : 0}
+        paddingBottom={2}
         gap={0.5}
         align="start"
         flex={1}
@@ -358,7 +367,7 @@ function SidebarContent({
         <ProductSidebarBody surface={surface} showExpanded={showExpanded} />
       </VStack>
 
-      <Box width="full" paddingX={3}>
+      <Box width="full" paddingX={2}>
         <SidebarBottomBlock
           showExpanded={showExpanded}
           shouldIncludeSettingsLink={surface !== "settings"}

@@ -3,10 +3,10 @@ import type { LucideIcon } from "lucide-react";
 import { Settings as SettingsIcon } from "lucide-react";
 import { LogoIcon } from "~/components/icons/LogoIcon";
 import { Link } from "~/components/ui/link";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRouter } from "~/utils/compat/next-router";
 import { trackEvent } from "~/utils/tracking";
 import { PRODUCTS, type ProductDefinition, type ProductId } from "../products";
+import { useLlmOpsProjectSlug } from "../useLlmOpsProjectSlug";
 import { useReachableProducts } from "../useReachableProducts";
 
 export const ICON_RAIL_WIDTH = "64px";
@@ -93,11 +93,7 @@ export function IconRail({
 }) {
   const router = useRouter();
   const { reachableProducts } = useReachableProducts();
-  const { project } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-    redirectToProjectOnboarding: false,
-  });
-  const projectSlug = project && !project.isPersonal ? project.slug : null;
+  const projectSlug = useLlmOpsProjectSlug();
 
   const options = PRODUCTS.filter(
     (product) =>

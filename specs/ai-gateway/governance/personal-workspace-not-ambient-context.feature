@@ -232,6 +232,14 @@ Feature: A personal workspace is never the ambient context for organization work
     not exist, even though nothing in the address bar or the remembered
     selection asked for that.
 
+    The remembered selection is held to this from both sides. A remembered
+    team OR project carried in from an earlier organization-scoped page never
+    decides `/me`, and `/me` never writes its own team and project back over
+    that selection. The write is what made the personal workspace the last
+    thing the reader worked on, so leaving it sent them to another team's
+    project on the app root and greyed out LLM Ops in the product switcher,
+    which has no project to open while the remembered one is private.
+
     @integration
     Scenario: Visiting the personal-workspace page resolves the personal team
       Given jane's personal team is listed before the shared team
@@ -267,6 +275,23 @@ Feature: A personal workspace is never the ambient context for organization work
       # selection must not follow her onto the personal-workspace page
       # either, because that page can never mean anything but her own
       # workspace.
+
+    @integration
+    Scenario: A project remembered from an earlier organization-scoped visit does not follow jane onto the personal-workspace page
+      Given jane's last remembered project selection is "acme-app", from an
+        earlier organization-scoped page
+      When jane opens her personal-workspace page
+      Then the ambient team is her personal team
+      And the ambient project is her personal project
+      # The remembered project resolved before any personal-workspace
+      # preference could apply, so /me ran every personal feature against the
+      # shared project.
+
+    @integration
+    Scenario: The personal-workspace page leaves the remembered selection alone
+      Given jane's remembered selection names the shared team and "acme-app"
+      When jane opens her personal-workspace page
+      Then the remembered team and project are still the shared ones
 
     @integration
     Scenario: A member with no personal workspace of their own falls back to the ambient team

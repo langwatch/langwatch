@@ -36,12 +36,31 @@ const teamA = {
     },
   ],
 };
+/** The reader's own workspace, which is what the Me pages resolve. */
+const personalTeam = {
+  id: "team_personal",
+  name: "Ada's Workspace",
+  slug: "personal-ada",
+  isPersonal: true,
+  ownerUserId: "user_1",
+  members: [{ userId: "user_1", role: "ADMIN" }],
+  projects: [
+    {
+      id: "project_personal",
+      slug: "personal-ada-abc123",
+      name: "Personal Workspace",
+      isPersonal: true,
+    },
+  ],
+};
 const orgA = {
   id: "org_1",
   name: "ACME",
   members: [{ userId: "user_1", role: "ADMIN" }],
-  teams: [teamA],
+  teams: [teamA, personalTeam],
 };
+/** The team the page being rendered resolves to. */
+let mockAmbientTeam: typeof teamA | typeof personalTeam = teamA;
 const orgB = {
   id: "org_2",
   name: "Beta Corp",
@@ -90,14 +109,16 @@ vi.mock("~/hooks/useRequiredSession", () => ({
   }),
 }));
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  userBelongsToTeam: () => true,
+// Only the hook is stubbed. The access helpers beside it are pure, and the
+// fixture holds the membership rows they read, so the real ones answer.
+vi.mock("~/hooks/useOrganizationTeamProject", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   useOrganizationTeamProject: () => ({
     isLoading: false,
     organization: mockOrganizations[0],
     organizations: mockOrganizations,
-    team: teamA,
-    project: teamA.projects[0],
+    team: mockAmbientTeam,
+    project: mockAmbientTeam.projects[0],
     organizationRole: "ADMIN",
     hasPermission: () => true,
   }),
@@ -270,6 +291,11 @@ function renderShell(props: Partial<DashboardLayoutProps> = {}) {
   );
 }
 
+/** The switcher row for a product, which is what carries its state. */
+function productMenuItem(label: string) {
+  return screen.getByText(label).closest("[role='menuitem']");
+}
+
 async function openProductSwitcher() {
   const user = userEvent.setup();
   await user.click(screen.getByRole("button", { name: "Switch product" }));
@@ -285,6 +311,7 @@ beforeEach(() => {
   mockPathname = "/[project]";
   mockGovernanceFlagEnabled = true;
   mockOrganizations = [orgA];
+  mockAmbientTeam = teamA;
   pushMock.mockClear();
   trackEventMock.mockReset();
   commandBarOpenMock.mockReset();
@@ -429,9 +456,15 @@ describe("the product-switcher top bar", () => {
   });
 
   describe("when on a Me page", () => {
+    beforeEach(() => {
+      mockPathname = "/me";
+      // The Me pages resolve the personal workspace, so the project the
+      // chrome carries there is a private one LLM Ops can never open.
+      mockAmbientTeam = personalTeam;
+    });
+
     /** @scenario The Me scope shows my name with a Personal badge */
     it("shows the user name with a Personal badge", () => {
-      mockPathname = "/me";
       renderShell({ personalScope: true });
 
       expect(screen.getByText("Ada")).toBeInTheDocument();
@@ -439,6 +472,47 @@ describe("the product-switcher top bar", () => {
       expect(
         screen.queryByRole("button", { name: "Switch project" }),
       ).not.toBeInTheDocument();
+    });
+
+    /** @scenario LLM Ops opens from the personal workspace */
+    it("offers LLM Ops and opens the project last worked in", async () => {
+      localStorage.setItem(
+        "selectedProjectSlug",
+        JSON.stringify("support-bot"),
+      );
+      renderShell({ personalScope: true });
+      const user = await openProductSwitcher();
+
+      expect(productMenuItem("LLM Ops")).not.toHaveAttribute("data-disabled");
+
+      await user.click(screen.getByText("LLM Ops"));
+
+      await waitFor(() => {
+        expect(pushMock).toHaveBeenCalledWith("/support-bot");
+      });
+    });
+
+    /** @scenario LLM Ops opens a project I can reach when I have opened none yet */
+    it("opens a project of a team it can open when nothing is remembered", async () => {
+      renderShell({ personalScope: true });
+      const user = await openProductSwitcher();
+
+      await user.click(screen.getByText("LLM Ops"));
+
+      await waitFor(() => {
+        expect(pushMock).toHaveBeenCalledWith("/demo");
+      });
+    });
+
+    /** @scenario LLM Ops stays closed when the organization holds no project for me */
+    it("greys LLM Ops out when no team it can open holds a project", async () => {
+      mockOrganizations = [
+        { ...orgA, teams: [{ ...teamA, projects: [] }, personalTeam] },
+      ];
+      renderShell({ personalScope: true });
+      await openProductSwitcher();
+
+      expect(productMenuItem("LLM Ops")).toHaveAttribute("data-disabled");
     });
   });
 

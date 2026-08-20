@@ -39,7 +39,10 @@ vi.mock("~/features/navigation/useReachableProducts", () => ({
   }),
 }));
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+// Only the hook is stubbed. The access helpers beside it are pure, and the
+// project this fixture resolves is the organization's, so they answer with it.
+vi.mock("~/hooks/useOrganizationTeamProject", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   useOrganizationTeamProject: () => ({
     isLoading: false,
     organization: { id: "org_1" },

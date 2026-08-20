@@ -362,14 +362,21 @@ export const useOrganizationTeamProject = (
       ? slugMatches.find((match) => userBelongsToTeam(match.team, userId))
       : undefined) ?? slugMatches[0];
 
+  // `/me` and its sub-routes ARE the personal workspace, which is the one
+  // place a project of the organization must never resolve unless the address
+  // bar names it. Read before the slug is resolved, so the whole chain below
+  // can hold the persisted selection to it.
+  const isPersonalScopeRoute = router.pathname.startsWith("/me");
+
   // A slug that resolved off the persisted selection rather than off the URL
   // is stickiness, not intent: it survives from the last visit to
   // /[some-slug]/* into every organization-scoped page that carries no project
-  // of its own. Two kinds have to be dropped there. A personal workspace is a
-  // private context the caller never asked to work in, and a team the caller
-  // cannot be shown is one the chrome refuses outright. Both let the ambient
-  // resolution below pick again, which also re-persists what it picks so the
-  // stale selection heals itself.
+  // of its own. Three kinds have to be dropped there. A personal workspace is
+  // a private context the caller never asked to work in, a team the caller
+  // cannot be shown is one the chrome refuses outright, and any project at all
+  // is the wrong answer on the personal-workspace pages. All three let the
+  // ambient resolution below pick again, which also re-persists what it picks
+  // on the pages that write, so the stale selection heals itself.
   //
   // An organization admin passes the second test on their role, so the project
   // they picked in a team they hold no membership row in stays picked. Dropping
@@ -382,7 +389,8 @@ export const useOrganizationTeamProject = (
   const stickySlugIsUnusable =
     !!slugMatch &&
     !isAddressedBySlug &&
-    (!!slugMatch.team.isPersonal ||
+    (isPersonalScopeRoute ||
+      !!slugMatch.team.isPersonal ||
       !userCanOpenTeam({
         team: slugMatch.team,
         userId,
@@ -410,24 +418,21 @@ export const useOrganizationTeamProject = (
             ) ?? organizations.data[0])
           : undefined;
 
-  // `/me` and its sub-routes are the one place "no project slug in the URL"
-  // does NOT mean "organization-level work", it means the user's own
-  // personal workspace, the opposite of the ambient/shared team `selectAmbientTeam`
-  // exists to prefer. Checked BEFORE the localStorage-remembered-team lookup,
-  // not just added as a further fallback after it: a member who visited any
-  // organization-scoped page earlier in the session has a non-personal team
-  // id already persisted there, and that stale selection legitimately wins
-  // on THOSE pages (see the stickiness handling above) but must never win on
-  // /me itself, which is unambiguously about the personal workspace and
-  // cannot mean anything else. Left as a fallback-only check, that persisted
-  // selection matched before this was ever reached, and /me resolved to the
-  // shared team's first (or, if it holds no project yet, undefined) project,
-  // which then read every personal-scope feature (Langy chief among them) as
-  // running in a context that either belonged to someone else or did not
-  // exist. Gated on the same `/me` prefix DashboardLayout already uses for
-  // `isPersonalScopeRoute`, so every other caller (settings pages,
-  // project-slug pages, demo mode) is unaffected.
-  const isPersonalScopeRoute = router.pathname.startsWith("/me");
+  // The personal workspace itself, on the pages that are about it. Checked
+  // BEFORE the localStorage-remembered-team lookup, not just added as a
+  // further fallback after it: a member who visited any organization-scoped
+  // page earlier in the session has a non-personal team id already persisted
+  // there, and that stale selection legitimately wins on THOSE pages (see the
+  // stickiness handling above) but must never win on /me itself, which is
+  // unambiguously about the personal workspace and cannot mean anything else.
+  // Left as a fallback-only check, that persisted selection matched before
+  // this was ever reached, and /me resolved to the shared team's first (or, if
+  // it holds no project yet, undefined) project, which then read every
+  // personal-scope feature (Langy chief among them) as running in a context
+  // that either belonged to someone else or did not exist. Gated on the same
+  // `/me` prefix DashboardLayout already uses for `isPersonalScopeRoute`, so
+  // every other caller (settings pages, project-slug pages, demo mode) is
+  // unaffected.
   const ownPersonalTeam = isPersonalScopeRoute
     ? organization?.teams.find(
         (team) => team.isPersonal && team.ownerUserId === userId,
@@ -498,11 +503,20 @@ export const useOrganizationTeamProject = (
     if (organization && organization.id !== localStorageOrganizationId) {
       setLocalStorageOrganizationId(organization.id);
     }
-    if (team && team.id !== localStorageTeamId) {
-      setLocalStorageTeamId(team.id);
-    }
-    if (project && project.slug !== localStorageProjectSlug) {
-      setLocalStorageProjectSlug(project.slug);
+    // The remembered selection answers "where was I working", which is a
+    // question about the organization's teams and projects. A personal
+    // workspace is not one of them: written here it replaced the project the
+    // reader had open, so the app root sent them to another team's project
+    // afterwards and the product switcher had no project to open LLM Ops
+    // with. The private context is resolved from the /me address every time,
+    // so it needs nothing remembered.
+    if (!team?.isPersonal) {
+      if (team && team.id !== localStorageTeamId) {
+        setLocalStorageTeamId(team.id);
+      }
+      if (project && project.slug !== localStorageProjectSlug) {
+        setLocalStorageProjectSlug(project.slug);
+      }
     }
     // Visiting an actual /[project]/* page marks the implicit home preference
     // as "project". Pairs with MyLayout's "personal" marker so the `/` index

@@ -98,6 +98,12 @@ function organizationGroup({
         isExactMatch: true,
         icon: Settings2,
       },
+      // Keys sit here rather than in Access, where four enterprise entries
+      // came first and left a page most readers use at the bottom of a group
+      // they cannot open.
+      ...(!isLiteMember
+        ? [{ label: "API Keys", href: "/settings/api-keys", icon: KeyRound }]
+        : []),
       {
         label: "Authentication",
         href: "/settings/authentication",
@@ -152,9 +158,6 @@ function accessGroup({
         icon: FolderKanban,
       },
       ...(showEnterpriseNav && !isLiteMember ? enterpriseAccessItems() : []),
-      ...(!isLiteMember
-        ? [{ label: "API Keys", href: "/settings/api-keys", icon: KeyRound }]
-        : []),
     ],
   };
 }

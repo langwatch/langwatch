@@ -96,8 +96,10 @@ vi.mock("~/hooks/useRequiredSession", () => ({
   }),
 }));
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  userBelongsToTeam: () => true,
+// Only the hook is stubbed. The access helpers beside it are pure, and the
+// fixture holds the membership rows they read, so the real ones answer.
+vi.mock("~/hooks/useOrganizationTeamProject", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   useOrganizationTeamProject: () => ({
     isLoading: false,
     organization: mockOrganizations[0],

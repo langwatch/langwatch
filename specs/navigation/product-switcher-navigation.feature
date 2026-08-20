@@ -76,6 +76,30 @@ Feature: Product switcher navigation
     Then the top bar shows my name with a "Personal" badge
 
   @integration
+  Scenario: LLM Ops opens from the personal workspace
+    Given I am on a Me page in the product-switcher mode
+    When I open the product switcher
+    Then LLM Ops is offered rather than greyed out
+    And picking it opens the project I last worked in
+    # The Me pages run in the personal workspace, and LLM Ops opens a
+    # project of the organization. Reading the personal project as "no
+    # project" left the way back into LLM Ops closed.
+
+  @integration
+  Scenario: LLM Ops opens a project I can reach when I have opened none yet
+    Given I am on a Me page in the product-switcher mode
+    And I have opened no project on this device
+    When I pick "LLM Ops" in the product switcher
+    Then I am sent to a project of a team I am allowed to open
+
+  @integration
+  Scenario: LLM Ops stays closed when the organization holds no project for me
+    Given I am on a Me page in the product-switcher mode
+    And no team I am allowed to open holds a project
+    When I open the product switcher
+    Then LLM Ops is greyed out
+
+  @integration
   Scenario: Gateway and Governance carry no scope control
     Given I am on a Gateway page in the product-switcher mode
     Then the top bar shows no project chip and no personal badge

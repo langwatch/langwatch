@@ -377,6 +377,51 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
     });
   });
 
+  describe("given /me and a stale project remembered from an earlier organization-scoped visit", () => {
+    beforeEach(() => {
+      mockRouter.route = "/me";
+      mockRouter.pathname = "/me";
+      mockRouter.asPath = "/me";
+      mockLocalStorage.selectedTeamId = "team-shared";
+      mockLocalStorage.selectedProjectSlug = "acme-app";
+    });
+
+    // The remembered slug resolved before any personal-workspace preference
+    // could apply, so /me ran Langy and every other personal feature against
+    // the shared project.
+    /** @scenario A project remembered from an earlier organization-scoped visit does not follow jane onto the personal-workspace page */
+    it("resolves the personal team and project, not the remembered shared ones", () => {
+      const { result } = renderResolution();
+
+      expect(result.current.team?.id).toBe("team-personal");
+      expect(result.current.project?.id).toBe("proj-personal");
+    });
+
+    /** @scenario The personal-workspace page leaves the remembered selection alone */
+    it("leaves the remembered team and project where they were", () => {
+      renderResolution();
+
+      expect(mockLocalStorage.selectedTeamId).toBe("team-shared");
+      expect(mockLocalStorage.selectedProjectSlug).toBe("acme-app");
+    });
+  });
+
+  describe("given /me and nothing remembered yet", () => {
+    beforeEach(() => {
+      mockRouter.route = "/me";
+      mockRouter.pathname = "/me";
+      mockRouter.asPath = "/me";
+    });
+
+    /** @scenario The personal-workspace page leaves the remembered selection alone */
+    it("writes no personal selection for the pages that follow to read", () => {
+      renderResolution();
+
+      expect(mockLocalStorage.selectedTeamId).toBe("");
+      expect(mockLocalStorage.selectedProjectSlug).toBe("");
+    });
+  });
+
   describe("given /me but the organization has no personal team at all", () => {
     beforeEach(() => {
       mockRouter.route = "/me";
