@@ -365,8 +365,8 @@ Feature: Unified authorization engine
   @unit
   Scenario: A listing row keeps its identity across the cutover
     Given "acme" has a binding imported into the ledger
-    When the organization's bindings are listed before and after the cutover
-    Then the same row is listed under the same id on both sides
+    When the organization's bindings are listed from each head
+    Then both heads list the row under the same id
     # The imported grant ADOPTS the binding's row id, so a bookmarked or
     # cached row reference survives the head swap.
 

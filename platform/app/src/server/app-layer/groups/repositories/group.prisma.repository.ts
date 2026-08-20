@@ -39,16 +39,15 @@ function attachFor(binding: CreateBindingInput) {
 }
 
 export class PrismaGroupRepository implements GroupRepository {
-  // Listing reads go through the per-organization fork (ADR-092,
-  // delivery-plan PR 3 follow-up).
-  private readonly accessListing: AccessListingRepository;
-
   constructor(
     private readonly prisma: PrismaClient,
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-  ) {
-    this.accessListing = new CutoverAwareAccessListingRepository(prisma);
-  }
+    // Listing reads go through the per-organization fork (ADR-092,
+    // delivery-plan PR 3 follow-up).
+    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
+      prisma,
+    ),
+  ) {}
 
   async findAllByOrganization({
     organizationId,

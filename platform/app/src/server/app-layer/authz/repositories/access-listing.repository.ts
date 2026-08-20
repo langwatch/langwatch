@@ -134,9 +134,11 @@ export interface AccessListingRepository {
   findUserCreatedRoles(args: { organizationId: string }): Promise<CustomRole[]>;
 }
 
-/** Shared select shapes, so the legacy implementation and the grants
- *  implementation's decoration lookups can never drift on which columns the
- *  surface renders. */
+/** Shared select shapes for the principal decoration lookups (user, group,
+ *  API key), so the legacy and grants implementations can never drift on
+ *  which columns the surface renders. The custom-role select is used by the
+ *  legacy side only — the grants side builds the same shape by hand from the
+ *  `Role` model, and the paired listing tests are what hold them together. */
 export const ACCESS_LISTING_USER_SELECT = {
   id: true,
   name: true,

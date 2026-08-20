@@ -9,9 +9,14 @@
  *
  * Unlike the decision reader (`authz-read.cutover.repository.ts`), there is
  * no pass pinning here: every port method is one delegated call, and the
- * delegate finishes its own reads on the head it started on. The one
- * multi-organization method partitions its organizations by the gate's answer
- * and asks both heads, each only about its own organizations.
+ * delegate finishes its own reads on the head it started on. A caller that
+ * issues more than one call for a single page snapshot (the team detail view
+ * asks for TEAM and PROJECT scope bindings separately) can therefore straddle
+ * a gate flip — tolerated because the calls run concurrently inside the
+ * gate's 60-second coalescing window, row ids are stable across the heads,
+ * and a mixed render is a transient display artifact, never a decision. The
+ * one multi-organization method partitions its organizations by the gate's
+ * answer and asks both heads, each only about its own organizations.
  *
  * Browser-safety: like everything else under ./authz, this composes from a
  * caller-supplied Prisma handle and holds no module-scope storage.
@@ -26,12 +31,12 @@ import type {
   TeamScopedMemberBinding,
 } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import { cutoverOnEngine } from "../cutover-gate";
+import { GrantsAccessListingRepository } from "./access-listing.grants.repository";
+import { PrismaAccessListingRepository } from "./access-listing.prisma.repository";
 import type {
   AccessListingBindingRow,
   AccessListingRepository,
 } from "./access-listing.repository";
-import { GrantsAccessListingRepository } from "./access-listing.grants.repository";
-import { PrismaAccessListingRepository } from "./access-listing.prisma.repository";
 
 export class CutoverAwareAccessListingRepository
   implements AccessListingRepository
@@ -107,12 +112,18 @@ export class CutoverAwareAccessListingRepository
     userId: string;
   }): Promise<RoleBindingForSynthesis[]> {
     if (orgIds.length === 0) return [];
-    const onEngine: string[] = [];
-    const onLegacy: string[] = [];
-    for (const organizationId of orgIds) {
-      if (await this.onEngine(organizationId)) onEngine.push(organizationId);
-      else onLegacy.push(organizationId);
-    }
+    const answers = await Promise.all(
+      orgIds.map(async (organizationId) => ({
+        organizationId,
+        onEngine: await this.onEngine(organizationId),
+      })),
+    );
+    const onEngine = answers
+      .filter((answer) => answer.onEngine)
+      .map((answer) => answer.organizationId);
+    const onLegacy = answers
+      .filter((answer) => !answer.onEngine)
+      .map((answer) => answer.organizationId);
     const [legacyRows, grantsRows] = await Promise.all([
       onLegacy.length > 0
         ? this.repositories.legacy.findBindingsForSynthesis({

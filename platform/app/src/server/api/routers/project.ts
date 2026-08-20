@@ -138,7 +138,7 @@ export const projectRouter = createTRPCRouter({
         // The team and the ADMIN binding that comes with it belong to the team
         // service: the binding is a grants-ledger fact, and a route is not
         // where the ledger is driven from.
-        const team = await new TeamService(prisma).createWithFoundingAdmin({
+        const team = await new TeamService({ prisma }).createWithFoundingAdmin({
           organizationId: input.organizationId,
           name: input.newTeamName ?? input.name,
           adminUserId: userId,

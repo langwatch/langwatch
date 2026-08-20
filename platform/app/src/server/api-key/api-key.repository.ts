@@ -37,10 +37,6 @@ export type ApiKeyWithBindings = ApiKey & {
 export type ApiKeyPrismaDelegate = PrismaClient | Prisma.TransactionClient;
 
 export class ApiKeyRepository {
-  // Listing reads go through the per-organization fork (ADR-092,
-  // delivery-plan PR 3 follow-up).
-  private readonly accessListing: AccessListingRepository;
-
   constructor(
     private readonly prisma: ApiKeyPrismaDelegate,
     /**
@@ -49,9 +45,12 @@ export class ApiKeyRepository {
      * rather than `prisma` above, which may be one.
      */
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-  ) {
-    this.accessListing = new CutoverAwareAccessListingRepository(prisma);
-  }
+    // Listing reads go through the per-organization fork (ADR-092,
+    // delivery-plan PR 3 follow-up).
+    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
+      prisma,
+    ),
+  ) {}
 
   static create(prisma: ApiKeyPrismaDelegate): ApiKeyRepository {
     return new ApiKeyRepository(prisma);

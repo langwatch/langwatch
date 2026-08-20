@@ -176,7 +176,7 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
     return this.decorate({
       organizationId,
       grants: listableGrants(rows),
-      dropUndecoratedPrincipals: true,
+      shouldDropUndecoratedPrincipals: true,
     });
   }
 
@@ -225,7 +225,7 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
     return this.decorate({
       organizationId,
       grants: listableGrants(rows),
-      dropUndecoratedPrincipals: true,
+      shouldDropUndecoratedPrincipals: true,
     });
   }
 
@@ -324,20 +324,10 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
   }): Promise<RoleBindingForSynthesis[]> {
     if (orgIds.length === 0) return [];
 
-    // The user's group memberships, resolved per organization so a grant
-    // naming a group can be tied back to "a group this user is in, in the
-    // grant's own organization" - the legacy relation predicate's shape.
-    const memberships = await this.prisma.groupMembership.findMany({
-      where: { userId, group: { organizationId: { in: [...orgIds] } } },
-      select: { groupId: true, group: { select: { organizationId: true } } },
+    const { groupIdsByOrg, allGroupIds } = await this.groupMembershipsFor({
+      userId,
+      orgIds,
     });
-    const groupIdsByOrg = new Map<string, Set<string>>();
-    for (const membership of memberships) {
-      const orgId = membership.group.organizationId;
-      if (!groupIdsByOrg.has(orgId)) groupIdsByOrg.set(orgId, new Set());
-      groupIdsByOrg.get(orgId)?.add(membership.groupId);
-    }
-    const allGroupIds = memberships.map((membership) => membership.groupId);
 
     const rows = await this.prisma.grant.findMany({
       where: {
@@ -365,27 +355,7 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
           groupIdsByOrg.get(row.organizationId)?.has(row.principalId) === true),
     );
 
-    // Role decoration carries the full role for the synthesized member shape.
-    // Per organization: `Role` is a projection with no relations, so the
-    // organization bound is the query's own predicate.
-    const roleIdsByOrg = new Map<string, Set<string>>();
-    for (const { row, customRoleId } of grants) {
-      if (!customRoleId) continue;
-      if (!roleIdsByOrg.has(row.organizationId)) {
-        roleIdsByOrg.set(row.organizationId, new Set());
-      }
-      roleIdsByOrg.get(row.organizationId)?.add(customRoleId);
-    }
-    const rolesByOrg = new Map<string, Map<string, CustomRole>>();
-    await Promise.all(
-      [...roleIdsByOrg.entries()].map(async ([orgId, roleIds]) => {
-        const roles = await this.findRolesAsCustomRoles({
-          organizationId: orgId,
-          roleIds: [...roleIds],
-        });
-        rolesByOrg.set(orgId, new Map(roles.map((role) => [role.id, role])));
-      }),
-    );
+    const rolesByOrg = await this.rolesByOrganizationFor(grants);
 
     return grants.map(({ row, role, customRoleId, scopeType }) => {
       const customRole = customRoleId
@@ -410,6 +380,60 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
           : null,
       };
     });
+  }
+
+  /** The user's group memberships, resolved per organization so a grant
+   *  naming a group can be tied back to "a group this user is in, in the
+   *  grant's own organization" - the legacy relation predicate's shape. */
+  private async groupMembershipsFor({
+    userId,
+    orgIds,
+  }: {
+    userId: string;
+    orgIds: readonly string[];
+  }): Promise<{
+    groupIdsByOrg: Map<string, Set<string>>;
+    allGroupIds: string[];
+  }> {
+    const memberships = await this.prisma.groupMembership.findMany({
+      where: { userId, group: { organizationId: { in: [...orgIds] } } },
+      select: { groupId: true, group: { select: { organizationId: true } } },
+    });
+    const groupIdsByOrg = new Map<string, Set<string>>();
+    for (const membership of memberships) {
+      const orgId = membership.group.organizationId;
+      if (!groupIdsByOrg.has(orgId)) groupIdsByOrg.set(orgId, new Set());
+      groupIdsByOrg.get(orgId)?.add(membership.groupId);
+    }
+    const allGroupIds = memberships.map((membership) => membership.groupId);
+    return { groupIdsByOrg, allGroupIds };
+  }
+
+  /** Role decoration carries the full role for the synthesized member shape.
+   *  Per organization: `Role` is a projection with no relations, so the
+   *  organization bound is the query's own predicate. */
+  private async rolesByOrganizationFor(
+    grants: readonly ListableGrant[],
+  ): Promise<Map<string, Map<string, CustomRole>>> {
+    const roleIdsByOrg = new Map<string, Set<string>>();
+    for (const { row, customRoleId } of grants) {
+      if (!customRoleId) continue;
+      if (!roleIdsByOrg.has(row.organizationId)) {
+        roleIdsByOrg.set(row.organizationId, new Set());
+      }
+      roleIdsByOrg.get(row.organizationId)?.add(customRoleId);
+    }
+    const rolesByOrg = new Map<string, Map<string, CustomRole>>();
+    await Promise.all(
+      [...roleIdsByOrg.entries()].map(async ([orgId, roleIds]) => {
+        const roles = await this.findRolesAsCustomRoles({
+          organizationId: orgId,
+          roleIds: [...roleIds],
+        });
+        rolesByOrg.set(orgId, new Map(roles.map((role) => [role.id, role])));
+      }),
+    );
+    return rolesByOrg;
   }
 
   async findUserCreatedRoles({
@@ -467,7 +491,7 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
 
   /** The principal and role decoration for `AccessListingBindingRow`s, read
    *  from the tables those things live in. With
-   *  `dropUndecoratedPrincipals` the row is dropped when its principal no
+   *  `shouldDropUndecoratedPrincipals` the row is dropped when its principal no
    *  longer resolves within the organization - the equivalent of the legacy
    *  whole-table query's relation predicates (a departed member, a foreign
    *  group or key). Without it a missing principal decorates to null and the
@@ -475,38 +499,50 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
   private async decorate({
     organizationId,
     grants,
-    dropUndecoratedPrincipals = false,
+    shouldDropUndecoratedPrincipals = false,
   }: {
     organizationId: string;
     grants: readonly ListableGrant[];
-    dropUndecoratedPrincipals?: boolean;
+    shouldDropUndecoratedPrincipals?: boolean;
   }): Promise<AccessListingBindingRow[]> {
-    const ids = {
-      user: new Set<string>(),
-      group: new Set<string>(),
-      apiKey: new Set<string>(),
-    };
-    const roleIds = new Set<string>();
+    const decoration = await this.fetchDecoration({
+      organizationId,
+      ids: collectDecorationIds(grants),
+      shouldDropUndecoratedPrincipals,
+    });
+    const listed: AccessListingBindingRow[] = [];
     for (const grant of grants) {
-      if (grant.customRoleId) roleIds.add(grant.customRoleId);
-      if (!grant.row.principalId) continue;
-      if (grant.row.principalType === "USER")
-        ids.user.add(grant.row.principalId);
-      else if (grant.row.principalType === "GROUP")
-        ids.group.add(grant.row.principalId);
-      else if (grant.row.principalType === "API_KEY")
-        ids.apiKey.add(grant.row.principalId);
+      const row = toListedRow({
+        grant,
+        decoration,
+        shouldDropUndecoratedPrincipals,
+      });
+      if (row) listed.push(row);
     }
+    return listed;
+  }
 
+  private async fetchDecoration({
+    organizationId,
+    ids,
+    shouldDropUndecoratedPrincipals,
+  }: {
+    organizationId: string;
+    ids: DecorationIds;
+    shouldDropUndecoratedPrincipals: boolean;
+  }): Promise<Decoration> {
     const [users, groups, apiKeys, roles] = await Promise.all([
       ids.user.size > 0
         ? this.prisma.user.findMany({
             where: {
               id: { in: [...ids.user] },
-              // The membership fence only matters where rows are dropped on
-              // it; for the per-user reads it is harmless and saves nothing
-              // to vary, so it is applied uniformly.
-              ...(dropUndecoratedPrincipals
+              // The membership fence applies only on the drop paths — the
+              // whole-table and scope listings, where the legacy queries
+              // exclude departed members via their relation predicates. The
+              // per-user reads stay unfenced on purpose: legacy decorates a
+              // departed member's own rows via an unfenced include, and the
+              // ids there always come from the caller, never from discovery.
+              ...(shouldDropUndecoratedPrincipals
                 ? { orgMemberships: { some: { organizationId } } }
                 : {}),
             },
@@ -525,58 +561,116 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
             select: ACCESS_LISTING_API_KEY_SELECT,
           })
         : [],
-      this.findRolesAsCustomRoles({ organizationId, roleIds: [...roleIds] }),
+      this.findRolesAsCustomRoles({ organizationId, roleIds: [...ids.role] }),
     ]);
-    const userById = new Map(users.map((user) => [user.id, user]));
-    const groupById = new Map(groups.map((group) => [group.id, group]));
-    const apiKeyById = new Map(apiKeys.map((apiKey) => [apiKey.id, apiKey]));
-    const roleById = new Map(roles.map((role) => [role.id, role]));
-
-    const listed: AccessListingBindingRow[] = [];
-    for (const grant of grants) {
-      const { row } = grant;
-      const user =
-        row.principalType === "USER" && row.principalId
-          ? (userById.get(row.principalId) ?? null)
-          : null;
-      const group =
-        row.principalType === "GROUP" && row.principalId
-          ? (groupById.get(row.principalId) ?? null)
-          : null;
-      const apiKey =
-        row.principalType === "API_KEY" && row.principalId
-          ? (apiKeyById.get(row.principalId) ?? null)
-          : null;
-      if (dropUndecoratedPrincipals && !user && !group && !apiKey) continue;
-
-      const customRole = grant.customRoleId
-        ? (roleById.get(grant.customRoleId) ?? null)
-        : null;
-      listed.push({
-        id: row.id,
-        organizationId: row.organizationId,
-        userId: row.principalType === "USER" ? row.principalId : null,
-        groupId: row.principalType === "GROUP" ? row.principalId : null,
-        apiKeyId: row.principalType === "API_KEY" ? row.principalId : null,
-        role: grant.role,
-        customRoleId: grant.customRoleId,
-        scopeType: grant.scopeType,
-        scopeId: row.scopeId,
-        createdAt: row.occurredAt,
-        user,
-        group,
-        apiKey,
-        customRole: customRole
-          ? {
-              id: customRole.id,
-              name: customRole.name,
-              permissions: customRole.permissions,
-            }
-          : null,
-      });
-    }
-    return listed;
+    return {
+      userById: new Map(users.map((user) => [user.id, user])),
+      groupById: new Map(groups.map((group) => [group.id, group])),
+      apiKeyById: new Map(apiKeys.map((apiKey) => [apiKey.id, apiKey])),
+      roleById: new Map(roles.map((role) => [role.id, role])),
+    };
   }
+}
+
+type DecorationIds = {
+  user: Set<string>;
+  group: Set<string>;
+  apiKey: Set<string>;
+  role: Set<string>;
+};
+
+type Decoration = {
+  userById: Map<string, NonNullable<AccessListingBindingRow["user"]>>;
+  groupById: Map<string, NonNullable<AccessListingBindingRow["group"]>>;
+  apiKeyById: Map<string, NonNullable<AccessListingBindingRow["apiKey"]>>;
+  roleById: Map<string, CustomRole>;
+};
+
+function collectDecorationIds(grants: readonly ListableGrant[]): DecorationIds {
+  const ids: DecorationIds = {
+    user: new Set(),
+    group: new Set(),
+    apiKey: new Set(),
+    role: new Set(),
+  };
+  const byPrincipalType: Partial<Record<string, Set<string>>> = {
+    USER: ids.user,
+    GROUP: ids.group,
+    API_KEY: ids.apiKey,
+  };
+  for (const grant of grants) {
+    if (grant.customRoleId) ids.role.add(grant.customRoleId);
+    if (grant.row.principalId) {
+      byPrincipalType[grant.row.principalType]?.add(grant.row.principalId);
+    }
+  }
+  return ids;
+}
+
+function principalOf({
+  row,
+  decoration,
+}: {
+  row: ListableGrant["row"];
+  decoration: Decoration;
+}): Pick<AccessListingBindingRow, "user" | "group" | "apiKey"> {
+  const { principalId } = row;
+  if (!principalId) return { user: null, group: null, apiKey: null };
+  return {
+    user:
+      row.principalType === "USER"
+        ? (decoration.userById.get(principalId) ?? null)
+        : null,
+    group:
+      row.principalType === "GROUP"
+        ? (decoration.groupById.get(principalId) ?? null)
+        : null,
+    apiKey:
+      row.principalType === "API_KEY"
+        ? (decoration.apiKeyById.get(principalId) ?? null)
+        : null,
+  };
+}
+
+function toListedRow({
+  grant,
+  decoration,
+  shouldDropUndecoratedPrincipals,
+}: {
+  grant: ListableGrant;
+  decoration: Decoration;
+  shouldDropUndecoratedPrincipals: boolean;
+}): AccessListingBindingRow | null {
+  const { row } = grant;
+  const { user, group, apiKey } = principalOf({ row, decoration });
+  if (shouldDropUndecoratedPrincipals && !user && !group && !apiKey)
+    return null;
+
+  const customRole = grant.customRoleId
+    ? (decoration.roleById.get(grant.customRoleId) ?? null)
+    : null;
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    userId: row.principalType === "USER" ? row.principalId : null,
+    groupId: row.principalType === "GROUP" ? row.principalId : null,
+    apiKeyId: row.principalType === "API_KEY" ? row.principalId : null,
+    role: grant.role,
+    customRoleId: grant.customRoleId,
+    scopeType: grant.scopeType,
+    scopeId: row.scopeId,
+    createdAt: row.occurredAt,
+    user,
+    group,
+    apiKey,
+    customRole: customRole
+      ? {
+          id: customRole.id,
+          name: customRole.name,
+          permissions: customRole.permissions,
+        }
+      : null,
+  };
 }
 
 /** A `Role` head row in the `CustomRole` column shape. The two heads share

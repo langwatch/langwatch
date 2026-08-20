@@ -25,7 +25,7 @@ import { TeamService } from "../team.service";
 
 describe("TeamService.removeMember", () => {
   const ns = `team-last-admin-${nanoid(8)}`;
-  const service = new TeamService(prisma);
+  const service = new TeamService({ prisma });
 
   let organizationId: string;
   let teamId: string;

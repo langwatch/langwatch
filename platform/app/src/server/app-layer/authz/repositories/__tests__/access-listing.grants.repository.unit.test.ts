@@ -110,11 +110,12 @@ describe("GrantsAccessListingRepository", () => {
       await repository.findOrganizationBindings({ organizationId: ORG });
 
       const where = prisma.grant.findMany.mock.calls[0]?.[0]?.where;
+      expect(where).toBeDefined();
       expect(where.scopeType).toEqual({
         in: ["ORGANIZATION", "TEAM", "PROJECT"],
       });
       expect(where.principalType).toEqual({ in: ["USER", "GROUP", "API_KEY"] });
-      expect(where.AND[0]).toEqual({
+      expect(where.AND).toContainEqual({
         OR: [
           { roleKey: { in: ["admin", "member", "viewer"] } },
           { roleKey: { startsWith: "custom:" } },
@@ -168,7 +169,7 @@ describe("GrantsAccessListingRepository", () => {
 
   describe("when the listing is the organization's whole table", () => {
     it("drops a row whose principal no longer resolves within the organization", async () => {
-      const { repository } = prismaWith({
+      const { prisma, repository } = prismaWith({
         grants: [
           grantRow({
             id: "g-member",
@@ -197,6 +198,16 @@ describe("GrantsAccessListingRepository", () => {
       });
 
       expect(rows.map((row) => row.id)).toEqual(["g-member"]);
+      // In production a departed member's User row still exists and only the
+      // membership predicate excludes it, so pin the predicate itself — the
+      // row-drop above only proves drop-on-missing-decoration.
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            orgMemberships: { some: { organizationId: ORG } },
+          }),
+        }),
+      );
     });
 
     it("keeps a per-user row whose decoration is missing, like the legacy per-user read", async () => {
@@ -338,7 +349,7 @@ describe("GrantsAccessListingRepository", () => {
 
   describe("when team member bindings are listed", () => {
     it("pre-seeds every requested team and fences on current membership", async () => {
-      const { repository } = prismaWith({
+      const { prisma, repository } = prismaWith({
         grants: [
           grantRow({
             id: "g-1",
@@ -370,6 +381,13 @@ describe("GrantsAccessListingRepository", () => {
       expect(byTeam.get("team-1")?.map((member) => member.userId)).toEqual([
         "alice",
       ]);
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            orgMemberships: { some: { organizationId: ORG } },
+          }),
+        }),
+      );
     });
   });
 

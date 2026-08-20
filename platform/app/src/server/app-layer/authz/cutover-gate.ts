@@ -41,12 +41,12 @@ import { perOrganizationCachedFlag } from "./per-organization-cached-gate";
  * constant rather than two: an organization mid-flip must converge in bounded
  * time whichever way it is moving.
  */
-const CACHE_TTL_MS = 60_000;
+export const CUTOVER_GATE_CACHE_TTL_MS = 60_000;
 
 const gate = perOrganizationCachedFlag({
   name: "cutover-gate",
-  positiveTtlMs: CACHE_TTL_MS,
-  negativeTtlMs: CACHE_TTL_MS,
+  positiveTtlMs: CUTOVER_GATE_CACHE_TTL_MS,
+  negativeTtlMs: CUTOVER_GATE_CACHE_TTL_MS,
 });
 
 /**

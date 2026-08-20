@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Prisma } from "~/generated/prisma/client";
-import { resetCutoverGateForTesting } from "../../cutover-gate";
+import {
+  CUTOVER_GATE_CACHE_TTL_MS,
+  resetCutoverGateForTesting,
+} from "../../cutover-gate";
 import { CutoverAwareAccessListingRepository } from "../access-listing.cutover.repository";
 import type { AccessListingRepository } from "../access-listing.repository";
 
@@ -49,7 +52,6 @@ const repositoryFor = (onEngineByOrg: Record<string, boolean>) => {
   return {
     legacy,
     grants,
-    findUnique,
     repository: new CutoverAwareAccessListingRepository(prisma, {
       legacy,
       grants,
@@ -157,9 +159,15 @@ describe("CutoverAwareAccessListingRepository", () => {
         orgIds: ["org-engine"],
         userId: "alice",
       });
-      expect(rows.map((row) => row.organizationId).sort()).toEqual([
-        "org-engine",
-        "org-legacy",
+      const tagged = rows as unknown as Array<{
+        organizationId: string;
+        head: string;
+      }>;
+      expect(
+        tagged.map(({ organizationId, head }) => ({ organizationId, head })),
+      ).toEqual([
+        { organizationId: "org-legacy", head: "legacy" },
+        { organizationId: "org-engine", head: "grants" },
       ]);
     });
 
@@ -187,7 +195,8 @@ describe("CutoverAwareAccessListingRepository", () => {
       const findUnique = vi
         .fn()
         .mockResolvedValueOnce({ onEngine: true })
-        .mockResolvedValueOnce({ onEngine: false });
+        .mockResolvedValueOnce({ onEngine: false })
+        .mockResolvedValue({ onEngine: false });
       const prisma = {
         authzCutoverProjection: { findUnique },
       } as unknown as Prisma.TransactionClient;
@@ -199,7 +208,7 @@ describe("CutoverAwareAccessListingRepository", () => {
       await repository.findOrganizationBindings({ organizationId: "org-1" });
       expect(grants.findOrganizationBindings).toHaveBeenCalledTimes(1);
 
-      vi.advanceTimersByTime(61_000);
+      vi.advanceTimersByTime(CUTOVER_GATE_CACHE_TTL_MS + 1_000);
 
       await repository.findOrganizationBindings({ organizationId: "org-1" });
       expect(legacy.findOrganizationBindings).toHaveBeenCalledTimes(1);

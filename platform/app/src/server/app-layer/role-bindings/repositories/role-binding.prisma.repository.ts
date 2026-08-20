@@ -12,15 +12,16 @@ import type {
 } from "./role-binding.repository";
 
 export class PrismaRoleBindingRepository implements RoleBindingRepository {
-  // The listing reads go through the per-organization fork (ADR-092,
-  // delivery-plan PR 3 follow-up): a cut-over organization's member lists are
-  // served from the ledger's own head, everyone else's from the legacy
-  // tables, behind the same gate the decision fork reads.
-  private readonly accessListing: AccessListingRepository;
-
-  constructor(private readonly prisma: PrismaClient) {
-    this.accessListing = new CutoverAwareAccessListingRepository(prisma);
-  }
+  constructor(
+    private readonly prisma: PrismaClient,
+    // The listing reads go through the per-organization fork (ADR-092,
+    // delivery-plan PR 3 follow-up): a cut-over organization's member lists
+    // are served from the ledger's own head, everyone else's from the legacy
+    // tables, behind the same gate the decision fork reads.
+    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
+      prisma,
+    ),
+  ) {}
 
   async listForOrganizationsAndUser({
     orgIds,
