@@ -22,6 +22,22 @@ import type { GuardMiddleware, GuardParams } from "./dbGuardMiddleware";
 
 type OrgScopedModelConfig = {
   /**
+   * Actions admitted with NO single-organization predicate at all — the narrow
+   * case of a table whose rows are platform bookkeeping rather than tenant
+   * data, and whose reads are across-organizations by design.
+   *
+   * This is deliberately separate from `extraBound`, which can only ever
+   * narrow a WHERE clause that exists: the guard rejects a missing or
+   * non-object `where` before any bound is consulted, so a bare `findMany()`
+   * is unreachable from there no matter what the bound says. A model that
+   * genuinely has no predicate to offer has to say so here, by action, where
+   * it reads as the exemption it is.
+   *
+   * Grant this to READ actions only, and only to a model carrying no customer
+   * data. It is the widest thing in this file.
+   */
+  platformScopeActions?: readonly string[];
+  /**
    * Extra single-org-bounding predicates beyond organizationId / row id /
    * composite-org key. Used for parent foreign keys and globally-unique
    * secret columns that each resolve to exactly one organization.
@@ -286,15 +302,27 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // Which organizations the in-place migration runner processes on cloud
   // (specs/rbac/in-place-authz-migration.feature, the enrollment scenarios).
   // The runner's per-pass read and the ops listing are platform-scope by
-  // design - they list one STAGE across organizations, the same posture as
-  // the ops rollup over SystemMigrationTenantState - so a stage-string
-  // predicate is admitted for reads only. Writes stay bounded to one
-  // organization: enroll carries organizationId in its data, withdraw names
-  // the compound (organizationId, stage) key, and a stage-wide bulk write
-  // (which would withdraw every organization at once) has no admitted shape.
+  // design - the same posture as the ops rollup over
+  // SystemMigrationTenantState - so READS are admitted unbounded.
+  //
+  // They used to be admitted only alongside a `stage` string, back when
+  // enrollment was one row per (organization, stage) and every read named the
+  // stage it was about. Enrollment is now per MIGRATION, and all three reads
+  // span migrations as well as organizations: the ops listing shows every
+  // enrollment, the pass reads the whole table once to probe per (tenant,
+  // migration) in memory, and the rollout gauge groups by migration name.
+  // There is no narrowing predicate left to require, and going on requiring
+  // the departed column meant the guard refused every one of them.
+  //
+  // Reads only, and the action gate is what keeps that honest. Writes stay
+  // bounded to one organization: enroll carries organizationId in its data,
+  // withdraw names the compound (organizationId, migrationName) key, the
+  // organization purge deletes by organizationId, and a migration-wide bulk
+  // write - which would withdraw every organization at once - has no admitted
+  // shape. The rows themselves are operator bookkeeping: an organization id, a
+  // migration name, and who enrolled it.
   SystemMigrationEnrollment: {
-    extraBound: ({ clause, action }) =>
-      action === "findMany" && typeof clauseField(clause, "stage") === "string",
+    platformScopeActions: ["findMany", "groupBy"],
   },
   AuthzProjectionCursor: {},
   AuthzCutoverProjection: {},
@@ -475,6 +503,12 @@ const _guardOrganizationId = ({ params }: { params: GuardParams }) => {
     }
     return;
   }
+
+  // The platform-scope exemption, granted per action and read before any
+  // predicate is looked at — which is the whole point of it, since the reads it
+  // covers carry no predicate to look at. Placed after the create branch so it
+  // can never admit a write that declares no owner.
+  if (config.platformScopeActions?.includes(action)) return;
 
   const where = params.args?.where;
   if (!where || typeof where !== "object") {
