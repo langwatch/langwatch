@@ -15,11 +15,31 @@ import type { DisplayPart } from "./types";
  * rather than holding every layout decision in one switch.
  */
 
-export const alignForRole = (role?: string): "flex-start" | "flex-end" =>
-  role === "assistant" ? "flex-start" : "flex-end";
+/**
+ * Which side of the thread a role's content sits on.
+ *
+ * Derived from the DISPLAY role, not the wire role, for two reasons. A scenario
+ * run swaps the sides (`roleMode`), so the wire role alone points at the wrong
+ * edge there. And `Bubble` already picks its side from the display role — when
+ * this disagreed with it, a message's own hover actions landed against the
+ * opposite edge of the thread from the bubble they belong to.
+ */
+export function alignForRole(
+  role?: string,
+  roleMode: "chat" | "scenario" = "chat",
+): "flex-start" | "flex-end" {
+  const { displayRole } = getDisplayRoleVisuals(
+    role === "assistant" ? "assistant" : "user",
+    { isScenario: roleMode === "scenario" },
+  );
+  return displayRole === "user" ? "flex-start" : "flex-end";
+}
 
-const textAlignForRole = (role?: string): "left" | "right" =>
-  role === "assistant" ? "left" : "right";
+const textAlignForRole = (
+  role?: string,
+  roleMode: "chat" | "scenario" = "chat",
+): "left" | "right" =>
+  alignForRole(role, roleMode) === "flex-start" ? "left" : "right";
 
 export function TextPart({
   part,
@@ -63,14 +83,10 @@ export function TextPart({
     { isScenario: roleMode === "scenario" },
   );
   const RoleIcon = visuals.Icon;
+  const align = alignForRole(part.role, roleMode);
 
   return (
-    <VStack
-      align={alignForRole(part.role)}
-      data-align={alignForRole(part.role)}
-      gap={1}
-      width="100%"
-    >
+    <VStack align={align} data-align={align} gap={1} width="100%">
       <Bubble
         side={visuals.displayRole === "user" ? "left" : "right"}
         tone={visuals.displayRole}
@@ -81,21 +97,54 @@ export function TextPart({
         size={compact ? "compact" : "regular"}
         maxChars={compact ? 320 : 800}
       />
-      {actions}
+      {actions && (
+        <PartActionsRow align={align} compact={compact}>
+          {actions}
+        </PartActionsRow>
+      )}
     </VStack>
+  );
+}
+
+/**
+ * The width the avatar column occupies beside a bubble — the circle plus the
+ * flex gap `Bubble` sets between it and the message.
+ *
+ * A message's actions belong under the message, not under its avatar, so the
+ * row is inset by exactly this much on whichever side the avatar sits.
+ */
+const AVATAR_COLUMN = { regular: "34px", compact: "30px" } as const;
+
+function PartActionsRow({
+  align,
+  compact = false,
+  children,
+}: {
+  align: "flex-start" | "flex-end";
+  compact?: boolean;
+  children: ReactNode;
+}) {
+  const inset = AVATAR_COLUMN[compact ? "compact" : "regular"];
+  return (
+    <Box
+      paddingStart={align === "flex-start" ? inset : 0}
+      paddingEnd={align === "flex-end" ? inset : 0}
+    >
+      {children}
+    </Box>
   );
 }
 
 export function ImagePart({
   part,
+  roleMode = "chat",
 }: {
   part: Extract<DisplayPart, { kind: "image" }>;
+  roleMode?: "chat" | "scenario";
 }) {
+  const align = alignForRole(part.role, roleMode);
   return (
-    <VStack
-      align={alignForRole(part.role)}
-      data-align={alignForRole(part.role)}
-    >
+    <VStack align={align} data-align={align}>
       <Image src={part.src} maxH="200px" borderRadius="md" />
     </VStack>
   );
@@ -105,25 +154,21 @@ export function MediaRow({
   part,
   projectId,
   audioPlayback,
+  roleMode = "chat",
 }: {
   part: Extract<DisplayPart, { kind: "media" }>;
   projectId: string;
   audioPlayback?: AudioPlaybackProps;
+  roleMode?: "chat" | "scenario";
 }) {
+  const align = alignForRole(part.role, roleMode);
   // Players stretch to the container; attachment chips hug the side the message
   // came from, the way a bubble would. Mirrored into `data-media-align` because
   // jsdom cannot read compiled flex styles.
-  const innerAlign =
-    part.part.type === "binary"
-      ? alignForRole(part.role)
-      : ("stretch" as const);
+  const innerAlign = part.part.type === "binary" ? align : ("stretch" as const);
 
   return (
-    <VStack
-      align={alignForRole(part.role)}
-      data-align={alignForRole(part.role)}
-      width="100%"
-    >
+    <VStack align={align} data-align={align} width="100%">
       <VStack
         align={innerAlign}
         data-media-align={innerAlign}
@@ -141,7 +186,7 @@ export function MediaRow({
             color="fg.muted"
             fontStyle="italic"
             paddingX={2}
-            textAlign={textAlignForRole(part.role)}
+            textAlign={textAlignForRole(part.role, roleMode)}
           >
             {part.transcript}
           </Text>

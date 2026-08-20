@@ -75,7 +75,12 @@ export function TurnSeparator({
   traceId,
 }: {
   index: number;
-  traceId: string;
+  /**
+   * Absent until the run that produced this turn has been traced. The turn is
+   * numbered either way — the exchange exists from the moment it is sent — and
+   * only the affordance waits for somewhere to go.
+   */
+  traceId?: string;
 }) {
   const { project } = useOrganizationTeamProject();
   const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
@@ -84,30 +89,42 @@ export function TurnSeparator({
   // after the message snapshot, so retry quietly and only advertise the
   // affordance once the trace actually exists.
   const traceQuery = api.traces.getById.useQuery(
-    { projectId: project?.id ?? "", traceId },
+    { projectId: project?.id ?? "", traceId: traceId ?? "" },
     {
       enabled: !!project && !!traceId,
       ...TRACE_QUERY_CONFIG,
     },
   );
-  const hasTrace = !!traceQuery.data;
+  // One value carries both facts the render needs: that a trace exists, and
+  // which one — so the click handler cannot be built without an id to open.
+  const linkedTraceId = traceQuery.data && traceId ? traceId : undefined;
+  const hasTrace = !!linkedTraceId;
 
   const separator = (
     <Flex
       align="center"
       gap={2}
       width="100%"
+      // Room above, none below: the separator belongs to the exchange it opens,
+      // so it reads as attached to what follows it rather than floating equally
+      // between two turns. Same placement the trace drawer's conversation view
+      // uses — the label leads its turn there too.
+      paddingTop={4}
       role={hasTrace ? "button" : undefined}
       aria-label={hasTrace ? `View trace for turn ${index}` : undefined}
       tabIndex={hasTrace ? 0 : undefined}
       cursor={hasTrace ? "pointer" : "default"}
-      onClick={hasTrace ? () => openTraceDetailsDrawer({ traceId }) : undefined}
+      onClick={
+        linkedTraceId
+          ? () => openTraceDetailsDrawer({ traceId: linkedTraceId })
+          : undefined
+      }
       onKeyDown={
-        hasTrace
+        linkedTraceId
           ? (e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
-                openTraceDetailsDrawer({ traceId });
+                openTraceDetailsDrawer({ traceId: linkedTraceId });
               }
             }
           : undefined
@@ -139,8 +156,10 @@ export function TurnSeparator({
     </Flex>
   );
 
-  if (!hasTrace) return separator;
+  if (!linkedTraceId) return separator;
   return (
-    <TracePreviewHoverCard traceId={traceId}>{separator}</TracePreviewHoverCard>
+    <TracePreviewHoverCard traceId={linkedTraceId}>
+      {separator}
+    </TracePreviewHoverCard>
   );
 }

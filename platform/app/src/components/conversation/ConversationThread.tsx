@@ -1,8 +1,9 @@
-import { VStack } from "@chakra-ui/react";
+import { Box, VStack } from "@chakra-ui/react";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import type { AudioPlaybackProps } from "../simulations/useSequentialAudioPlayback";
 import { useSequentialAudioPlayback } from "../simulations/useSequentialAudioPlayback";
 import { groupIntoTurns } from "./flattenMessages";
+import { PendingReply } from "./PendingReply";
 import { ErrorPart, ImagePart, MediaRow, TextPart, ToolPart } from "./parts";
 import { TurnSeparator } from "./TurnSeparator";
 import type { DisplayPart } from "./types";
@@ -46,6 +47,33 @@ interface ConversationThreadProps {
    * wrote and should read as they wrote it.
    */
   structuredOutput?: boolean;
+  /**
+   * Frames the thread as a standalone chat panel rather than a section inside
+   * a drawer: the scrollbar sits at the panel's own edge while the messages
+   * stay centred at `contentMaxWidth`, and there is room above the first
+   * message and below the last.
+   *
+   * The simulations drawer supplies its own frame and padding, so it leaves
+   * this off and keeps the section behaviour it already had.
+   */
+  panel?: { contentMaxWidth: string };
+  /**
+   * A reply has been asked for and has not begun arriving. Draws the waiting
+   * state at the end of the thread, where the reply itself will appear — the
+   * gap between sending and the first token is otherwise silent, and a silent
+   * gap reads as nothing having happened.
+   */
+  pendingReply?: boolean;
+  /**
+   * The conversation is being written now rather than read back. A turn is
+   * then numbered from the moment it starts, and its trace affordance appears
+   * when the trace lands — instead of the whole separator waiting on a trace
+   * that arrives after the reply it belongs to.
+   *
+   * Off for a recorded transcript, where an untraced message is simply one
+   * that has no trace to offer.
+   */
+  live?: boolean;
 }
 
 /** Dispatches one part to the component that knows how to draw it. */
@@ -78,13 +106,14 @@ function ConversationPart({
         />
       );
     case "image":
-      return <ImagePart part={part} />;
+      return <ImagePart part={part} roleMode={roleMode} />;
     case "media":
       return (
         <MediaRow
           part={part}
           projectId={projectId}
           audioPlayback={audioPlayback}
+          roleMode={roleMode}
         />
       );
     case "tool":
@@ -104,16 +133,22 @@ export function ConversationThread({
   renderPartActions,
   autoScroll = true,
   structuredOutput = false,
+  panel,
+  pendingReply = false,
+  live = false,
 }: ConversationThreadProps) {
   const compact = variant === "compact";
   const endRef = useRef<HTMLDivElement>(null);
 
-  const turns = useMemo(() => groupIntoTurns(parts), [parts]);
+  const turns = useMemo(() => groupIntoTurns(parts, { live }), [parts, live]);
 
   useEffect(() => {
     if (!autoScroll) return;
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [parts, autoScroll]);
+    // `pendingReply` is a dependency because the waiting state is the newest
+    // thing in the thread the moment it appears, and it appears before any
+    // part of the reply does.
+  }, [parts, pendingReply, autoScroll]);
 
   // Ordered audio ids drive sequential playback: one clip finishing starts the
   // next. Filtered to audio so a sibling video or attachment cannot offset the
@@ -150,28 +185,48 @@ export function ConversationThread({
     />
   );
 
-  return (
+  const body = (
     <VStack
       align="stretch"
       gap={compact ? 2 : 4}
-      // The drawer's section already pads; the grid cell does not.
+      // The drawer's section already pads; the grid cell does not. A panel
+      // pads itself, so neither the first message nor the avatars beside the
+      // messages sit flush against its edges — the horizontal room matches
+      // what a bubble sets inside itself.
       padding={compact ? 2 : 0}
+      paddingX={panel ? 4 : undefined}
+      paddingY={panel ? 6 : undefined}
       fontSize={compact ? "xs" : "sm"}
       width="100%"
-      height="100%"
-      overflowY="auto"
+      maxWidth={panel?.contentMaxWidth}
+      marginX={panel ? "auto" : undefined}
+      // A panel's height comes from its content inside the scroll box; a
+      // section fills the box it was handed and scrolls inside it.
+      height={panel ? undefined : "100%"}
+      overflowY={panel ? undefined : "auto"}
     >
       {compact
         ? parts.map(renderPart)
         : turns.map((turn) => (
             <VStack key={turn.key} align="stretch" gap={4} width="100%">
-              {turn.traceId && turn.turnNumber != null && (
+              {turn.turnNumber != null && (
                 <TurnSeparator index={turn.turnNumber} traceId={turn.traceId} />
               )}
               {turn.parts.map(renderPart)}
             </VStack>
           ))}
+      {pendingReply && <PendingReply compact={compact} roleMode={roleMode} />}
       <div ref={endRef} />
     </VStack>
+  );
+
+  // The scroll box is the whole panel, not the centred column, so the
+  // scrollbar rides the panel's edge instead of appearing mid-content beside
+  // the text.
+  if (!panel) return body;
+  return (
+    <Box width="100%" height="100%" overflowY="auto">
+      {body}
+    </Box>
   );
 }
