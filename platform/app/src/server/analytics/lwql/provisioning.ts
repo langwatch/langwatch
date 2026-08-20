@@ -494,13 +494,26 @@ export function lwqlClickHouseSetupStatements({
     lwqlKeyMapTableStatement({ names }),
     lwqlSettingsProfileStatement({ names, limits }),
     lwqlRestrictedUserStatement({ names, password }),
-    lwqlGrantStatement({ names, table: names.keyMapTable }),
-    ...lwqlTables.map((lwqlTable) =>
-      lwqlGrantStatement({ names, table: lwqlTable.table }),
-    ),
+    // Each table's row policy before its grant, and the order is load-bearing.
+    // A table carrying a SELECT grant and no row policy returns every row in
+    // ClickHouse, so granting first opens a window in which the restricted
+    // identity reads across every tenant — and this list is executed statement
+    // by statement, not atomically. A caller that dies partway (a dropped
+    // connection, one refused statement) leaves that window standing, and
+    // `provisionLwql`'s self-provisioning path deliberately swallows the error
+    // and continues booting, so nothing downstream would close it.
+    //
+    // Policy-first inverts the failure: a partial run leaves the identity
+    // policed but not yet granted, which refuses reads rather than widening
+    // them. Safe because every table named already exists by this point — the
+    // key map is created above, and `lwqlTables` are migration-owned.
     lwqlKeyMapRowPolicyStatement({ names }),
     ...lwqlTables.map((lwqlTable) =>
       lwqlRowPolicyStatement({ names, lwqlTable }),
+    ),
+    lwqlGrantStatement({ names, table: names.keyMapTable }),
+    ...lwqlTables.map((lwqlTable) =>
+      lwqlGrantStatement({ names, table: lwqlTable.table }),
     ),
   ];
 }

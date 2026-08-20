@@ -242,25 +242,50 @@ describe("selfHostedClickHouseProvisioningStatements", () => {
     }
   });
 
-  // The tenant boundary, pinned as an ordering property rather than a
-  // presence one. A table carrying a SELECT grant and no row policy returns
-  // every row, and provisioning is not atomic, so grants-first would leave a
-  // partial run readable across tenants — the one failure mode the design
-  // rules out. Policies-first makes the same partial run refuse instead.
-  it("creates every row policy before any grant, so a partial run refuses rather than leaks", () => {
-    const statements = selfHostedStatements();
-    const lastPolicyIndex = statements.reduce(
-      (last, statement, index) =>
-        statement.startsWith("CREATE ROW POLICY") ? index : last,
-      -1,
-    );
-    const firstGrantIndex = statements.findIndex((statement) =>
-      statement.startsWith("GRANT"),
-    );
+  // The tenant boundary, pinned as an ordering property rather than a presence
+  // one. A table carrying a SELECT grant and no row policy returns every row,
+  // and this list executes statement by statement, so grant-first would leave
+  // a partial run readable across tenants — the one failure the design rules
+  // out. Policy-first makes the same partial run refuse instead.
+  //
+  // Asserted per table rather than globally: the statements arrive in two
+  // blocks (identity + key map, then the views), so "every policy precedes
+  // every grant" is false by construction and would say nothing about whether
+  // any individual table is exposed. Per table is the real property.
+  it("creates each table's row policy before that table's grant", () => {
+    const targetOf = (statement: string): string | null =>
+      / ON ([A-Za-z0-9_]+\.[A-Za-z0-9_]+)/.exec(statement)?.[1] ?? null;
 
-    expect(lastPolicyIndex).toBeGreaterThanOrEqual(0);
-    expect(firstGrantIndex).toBeGreaterThanOrEqual(0);
-    expect(lastPolicyIndex).toBeLessThan(firstGrantIndex);
+    const firstGrant = new Map<string, number>();
+    const firstPolicy = new Map<string, number>();
+    selfHostedStatements().forEach((statement, index) => {
+      const target = targetOf(statement);
+      if (!target) return;
+      if (statement.startsWith("GRANT") && !firstGrant.has(target)) {
+        firstGrant.set(target, index);
+      }
+      if (
+        statement.startsWith("CREATE ROW POLICY") &&
+        !firstPolicy.has(target)
+      ) {
+        firstPolicy.set(target, index);
+      }
+    });
+
+    // Only tables carrying BOTH. A view is granted but never policed — the
+    // policies sit on the *source* tables it reads, which is what filters it —
+    // so "every granted object is policed" would be false by design. The
+    // property that matters is that wherever both exist, the policy lands
+    // first.
+    const policedAndGranted = [...firstGrant.keys()].filter((table) =>
+      firstPolicy.has(table),
+    );
+    expect(policedAndGranted.length).toBeGreaterThan(0);
+    expect(
+      policedAndGranted.filter(
+        (table) => (firstPolicy.get(table) ?? 0) > (firstGrant.get(table) ?? 0),
+      ),
+    ).toEqual([]);
   });
 
   it("creates the named collection before the engine tables referencing it, dropping stale tables first", () => {
@@ -306,12 +331,15 @@ describe("selfHostedClickHouseProvisioningStatements", () => {
     const statements = selfHostedStatements();
     const target = qualified(NAMES, view.name);
 
+    // Anchored, with a trailing non-identifier guard, rather than a substring
+    // match: view names nest (`trace_metrics` is a prefix of
+    // `trace_metrics_by_minute`), so `includes` matches two statements and the
+    // assertion fails against a perfectly correct catalog.
+    const createsTarget = new RegExp(
+      `^CREATE OR REPLACE VIEW ${target.replace(/\./g, "\\.")}(?![A-Za-z0-9_])`,
+    );
     expect(
-      statements.filter(
-        (statement) =>
-          statement.startsWith("CREATE OR REPLACE VIEW") &&
-          statement.includes(target),
-      ),
+      statements.filter((statement) => createsTarget.test(statement)),
     ).toHaveLength(1);
     expect(statements).toContain(
       `GRANT SELECT ON ${target} TO ${NAMES.restrictedUser}`,
