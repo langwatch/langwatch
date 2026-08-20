@@ -96,8 +96,8 @@ export const grantsLedgerActorSchema = z.object({
 });
 
 export const resourceGrantTermsSchema = z.object({
-  token: z.string(),
-  permission: z.string(),
+  token: z.string().min(1),
+  permission: z.string().min(1),
   expiresAtMs: z.number().int().nonnegative().optional(),
   maxViews: z.number().int().nonnegative().optional(),
 });
@@ -154,9 +154,9 @@ export const grantAttachedEventSchema = EventSchema.extend({
   type: z.literal(GRANT_ATTACHED_EVENT_TYPE),
   data: z
     .object({
-      grantId: z.string(),
+      grantId: z.string().min(1),
       principal: ledgerPrincipalSchema,
-      roleKey: z.string().nullable(),
+      roleKey: z.string().min(1).nullable(),
       scope: ledgerScopeSchema,
       resource: resourceGrantTermsSchema.optional(),
       legacyRole: legacyBindingRoleSchema.optional(),
@@ -173,31 +173,63 @@ export type GrantAttachedEvent = z.infer<typeof grantAttachedEventSchema>;
 export const grantRoleChangedEventSchema = EventSchema.extend({
   type: z.literal(GRANT_ROLE_CHANGED_EVENT_TYPE),
   data: z.object({
-    grantId: z.string(),
-    from: z.string().nullable(),
-    to: z.string(),
+    grantId: z.string().min(1),
+    from: z.string().min(1).nullable(),
+    to: z.string().min(1),
     actor: grantsLedgerActorSchema,
   }),
 });
 export type GrantRoleChangedEvent = z.infer<typeof grantRoleChangedEventSchema>;
 
+/**
+ * Which grants a revocation names by IDENTITY rather than by id.
+ *
+ * A revoke-by-filter resolves its ids from the compat projection, and that
+ * projection lags the ledger by a fold: a grant appended a moment earlier is
+ * invisible to the query, so an id list alone leaves it standing. Carrying the
+ * identity the caller filtered on lets the FOLD — which sees what the stream
+ * itself produced — remove every grant that matches. The reducer applies it
+ * against the state at that point in the stream, so a replay reproduces the
+ * same removal (`GrantRevocationSelector` in @langwatch/authz-server).
+ */
+export const grantRevocationSelectorSchema = z.object({
+  principal: ledgerPrincipalSchema,
+  /** Present when the caller filtered on one scope; absent means the
+   *  principal's grants at every scope. */
+  scope: ledgerScopeSchema.optional(),
+});
+
 export const grantRevokedEventSchema = EventSchema.extend({
   type: z.literal(GRANT_REVOKED_EVENT_TYPE),
-  data: z.object({
-    grantId: z.string(),
-    reason: z.string().optional(),
-    actor: grantsLedgerActorSchema,
-  }),
+  data: z
+    .object({
+      /** Absent only on a revoke-by-identity whose lagging projection listed
+       *  no id at all — the selector is then the whole instruction. */
+      grantId: z.string().min(1).optional(),
+      selector: grantRevocationSelectorSchema.optional(),
+      reason: z.string().min(1).optional(),
+      actor: grantsLedgerActorSchema,
+    })
+    .refine(
+      (data) => data.grantId !== undefined || data.selector !== undefined,
+      {
+        message:
+          "a revocation names a grant id, an identity selector, or both — never neither",
+        path: ["grantId"],
+      },
+    ),
 });
 export type GrantRevokedEvent = z.infer<typeof grantRevokedEventSchema>;
 
 export const roleDefinedEventSchema = EventSchema.extend({
   type: z.literal(ROLE_DEFINED_EVENT_TYPE),
   data: z.object({
-    roleId: z.string(),
-    name: z.string(),
+    roleId: z.string().min(1),
+    name: z.string().min(1),
+    /** No `.min(1)`: an imported role may carry an empty description, and
+     *  refusing it would park a genesis import over a blank field. */
     description: z.string().optional(),
-    permissions: z.array(z.string()),
+    permissions: z.array(z.string().min(1)),
     kind: z.enum(["custom", "system_api_key"]),
     actor: grantsLedgerActorSchema,
   }),
@@ -207,8 +239,8 @@ export type RoleDefinedEvent = z.infer<typeof roleDefinedEventSchema>;
 export const rolePermissionsChangedEventSchema = EventSchema.extend({
   type: z.literal(ROLE_PERMISSIONS_CHANGED_EVENT_TYPE),
   data: z.object({
-    roleId: z.string(),
-    permissions: z.array(z.string()),
+    roleId: z.string().min(1),
+    permissions: z.array(z.string().min(1)),
     actor: grantsLedgerActorSchema,
   }),
 });
@@ -219,7 +251,7 @@ export type RolePermissionsChangedEvent = z.infer<
 export const roleDeletedEventSchema = EventSchema.extend({
   type: z.literal(ROLE_DELETED_EVENT_TYPE),
   data: z.object({
-    roleId: z.string(),
+    roleId: z.string().min(1),
     actor: grantsLedgerActorSchema,
   }),
 });
@@ -228,8 +260,12 @@ export type RoleDeletedEvent = z.infer<typeof roleDeletedEventSchema>;
 export const memberOffboardedEventSchema = EventSchema.extend({
   type: z.literal(MEMBER_OFFBOARDED_EVENT_TYPE),
   data: z.object({
-    userId: z.string(),
-    revokedGrantIds: z.array(z.string()),
+    userId: z.string().min(1),
+    /** The ids the writer could see — the audit trail's record of the
+     *  revocation. The fold does not depend on the list being complete: it
+     *  sweeps every grant the principal holds (ADR-092 §13, the reducer's
+     *  `grantIdsForUser`). */
+    revokedGrantIds: z.array(z.string().min(1)),
     actor: grantsLedgerActorSchema,
   }),
 });
@@ -239,7 +275,7 @@ export const migrationParityProvedEventSchema = EventSchema.extend({
   type: z.literal(MIGRATION_PARITY_PROVED_EVENT_TYPE),
   data: z.object({
     /** Empty means clean — the organization may finalize. */
-    diffs: z.array(z.string()),
+    diffs: z.array(z.string().min(1)),
   }),
 });
 export type MigrationParityProvedEvent = z.infer<
@@ -257,7 +293,7 @@ export type CutoverCompletedEvent = z.infer<typeof cutoverCompletedEventSchema>;
 export const cutoverRolledBackEventSchema = EventSchema.extend({
   type: z.literal(CUTOVER_ROLLED_BACK_EVENT_TYPE),
   data: z.object({
-    reason: z.string().optional(),
+    reason: z.string().min(1).optional(),
     actor: grantsLedgerActorSchema,
   }),
 });
@@ -278,7 +314,7 @@ export const migrationTenantStatusSchema = z.enum([
 export const migrationTenantStateChangedEventSchema = EventSchema.extend({
   type: z.literal(MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE),
   data: z.object({
-    migrationName: z.string(),
+    migrationName: z.string().min(1),
     status: migrationTenantStatusSchema,
     /** The runner's report for the transition, JSON as stored. */
     report: z.unknown().nullish(),

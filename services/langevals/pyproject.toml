@@ -131,11 +131,14 @@ override-dependencies = [
     #   langchain / langchain-openai / langchain-community
     #     — this workspace is on the 0.3.x line and every patched version is on
     #       1.x, so clearing those alerts is a breaking major upgrade of the
-    #       evaluator surface, not a floor bump. langchain-community additionally
-    #       can't move independently of the other two (see the pin above) until
-    #       ragas fixes its vertexai import. Tracked separately. langchain-core
-    #       and langchain-text-splitters are not in this list: their floors
-    #       above (0.3.86 and 0.3.11) already carry the GHSA-pjwx-r37v-7724 fix
+    #       evaluator surface, not a floor bump. langchain-community carries the
+    #       rest of the family with it: 0.4.2 requires langchain-core>=1.4.0 and
+    #       langchain-classic>=1.0.7, so crossing 0.4 is the same 1.x migration
+    #       by another route, not an isolated bump — and separately, the ragas
+    #       vertexai import (see the pin above) blocks it even once the family
+    #       does move. Tracked separately.
+    #       langchain-core and langchain-text-splitters are not in this list:
+    #       their floors above (0.3.86 and 0.3.11) already carry the GHSA-pjwx-r37v-7724 fix
     #       (patched at 0.3.85) and the GHSA-m42m-m8cr-8m58 fix (patched at
     #       0.3.9) respectively.
     #   ragas, diskcache — no patched release exists upstream yet.

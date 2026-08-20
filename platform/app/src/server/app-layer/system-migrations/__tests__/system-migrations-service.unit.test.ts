@@ -1,7 +1,7 @@
 import type { TenantMigrationRecord } from "@langwatch/system-migrations";
 import { describe, expect, it, vi } from "vitest";
 import {
-  MigrationRollbackRequiresFinalizedError,
+  MigrationRollbackRequiresMigratedOrFinalizedError,
   MigrationStateNotFoundError,
 } from "../errors";
 import { SystemMigrationsService } from "../system-migrations.service";
@@ -55,6 +55,33 @@ describe("SystemMigrationsService.rollBack", () => {
     });
   });
 
+  describe("given a migrated organization", () => {
+    const migrated: TenantMigrationRecord = {
+      migrationName: MIGRATION,
+      tenantId: TENANT,
+      status: "migrated",
+      report: { diffs: ["budgets:view at org"] },
+    };
+
+    describe("when an operator rolls it back", () => {
+      /** @scenario "An operator rolls a migrated organization back to its legacy path" */
+      it("writes rolled_back and records who did it, keeping the prior report", async () => {
+        const { service, upserts } = serviceWith({ record: migrated });
+        await service.rollBack({
+          migrationName: MIGRATION,
+          tenantId: TENANT,
+          actorUserId: "user_alex",
+        });
+        expect(upserts).toHaveLength(1);
+        const written = upserts[0]!;
+        expect(written.status).toBe("rolled_back");
+        const report = written.report as Record<string, unknown>;
+        expect(report.diffs).toEqual(["budgets:view at org"]);
+        expect(report.rolledBack).toMatchObject({ by: "user_alex" });
+      });
+    });
+  });
+
   describe("given an organization the migration never processed", () => {
     it("refuses with migration_state_not_found and writes nothing", async () => {
       const { service, upserts } = serviceWith({ record: null });
@@ -69,13 +96,13 @@ describe("SystemMigrationsService.rollBack", () => {
     });
   });
 
-  describe("given an organization that is held rather than finalized", () => {
-    it("refuses with migration_rollback_requires_finalized, naming the actual status", async () => {
+  describe("given an organization that is parked rather than migrated or finalized", () => {
+    it("refuses with migration_rollback_requires_migrated_or_finalized, naming the actual status", async () => {
       const { service, upserts } = serviceWith({
         record: {
           migrationName: MIGRATION,
           tenantId: TENANT,
-          status: "migrated",
+          status: "parked",
           report: null,
         },
       });
@@ -85,12 +112,37 @@ describe("SystemMigrationsService.rollBack", () => {
         actorUserId: "user_alex",
       });
       await expect(attempt).rejects.toThrow(
-        MigrationRollbackRequiresFinalizedError,
+        MigrationRollbackRequiresMigratedOrFinalizedError,
       );
-      await attempt.catch((error: MigrationRollbackRequiresFinalizedError) => {
-        expect(error.code).toBe("migration_rollback_requires_finalized");
-        expect(error.meta).toMatchObject({ status: "migrated" });
+      await attempt.catch(
+        (error: MigrationRollbackRequiresMigratedOrFinalizedError) => {
+          expect(error.code).toBe(
+            "migration_rollback_requires_migrated_or_finalized",
+          );
+          expect(error.meta).toMatchObject({ status: "parked" });
+        },
+      );
+      expect(upserts).toHaveLength(0);
+    });
+  });
+
+  describe("given an organization that is already rolled back", () => {
+    it("refuses with migration_rollback_requires_migrated_or_finalized and writes nothing", async () => {
+      const { service, upserts } = serviceWith({
+        record: {
+          migrationName: MIGRATION,
+          tenantId: TENANT,
+          status: "rolled_back",
+          report: null,
+        },
       });
+      await expect(
+        service.rollBack({
+          migrationName: MIGRATION,
+          tenantId: TENANT,
+          actorUserId: "user_alex",
+        }),
+      ).rejects.toThrow(MigrationRollbackRequiresMigratedOrFinalizedError);
       expect(upserts).toHaveLength(0);
     });
   });

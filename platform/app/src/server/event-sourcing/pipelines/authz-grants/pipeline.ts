@@ -2,9 +2,14 @@ import { definePipeline } from "../..";
 import type { StateProjectionStore } from "../../projections/stateProjection.types";
 import {
   AttachGrantsCommand,
+  ChangeGrantRoleCommand,
   CompleteCutoverCommand,
+  DefineRolesCommand,
+  DeleteRoleCommand,
+  OffboardMemberCommand,
   ProveMigrationParityCommand,
   RecordMigrationTenantStateCommand,
+  RevokeGrantsCommand,
   RollBackCutoverCommand,
 } from "./commands/grantsLedgerCommands";
 import {
@@ -16,9 +21,17 @@ import {
   AUTHZ_GRANTS_PIPELINE_NAME,
 } from "./schemas/constants";
 import type { AuthzGrantsEvent } from "./schemas/events";
+import {
+  type AuthzAuditTrailStore,
+  createAuthzAuditTrailSubscriber,
+} from "./subscribers/authzAuditTrail.subscriber";
 
 export interface AuthzGrantsPipelineDeps {
   authzGrantsProjectionStore: StateProjectionStore<AuthzGrantsFoldState>;
+  /** Insert-only sink for the audit trail (ADR-092 decision 17). An
+   *  interface with one method, so the pipeline never names a storage
+   *  engine — the Prisma implementation lives in the app layer. */
+  authzAuditTrailStore: AuthzAuditTrailStore;
 }
 
 /**
@@ -39,7 +52,18 @@ export function createAuthzGrantsPipeline(deps: AuthzGrantsPipelineDeps) {
         store: deps.authzGrantsProjectionStore,
       }),
     )
+    .withSubscriber(
+      "auditTrail",
+      createAuthzAuditTrailSubscriber({
+        store: deps.authzAuditTrailStore,
+      }),
+    )
     .withCommand("attachGrants", AttachGrantsCommand)
+    .withCommand("changeGrantRole", ChangeGrantRoleCommand)
+    .withCommand("revokeGrants", RevokeGrantsCommand)
+    .withCommand("defineRoles", DefineRolesCommand)
+    .withCommand("deleteRole", DeleteRoleCommand)
+    .withCommand("offboardMember", OffboardMemberCommand)
     .withCommand("proveMigrationParity", ProveMigrationParityCommand)
     .withCommand("completeCutover", CompleteCutoverCommand)
     .withCommand("rollBackCutover", RollBackCutoverCommand)

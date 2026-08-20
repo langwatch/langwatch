@@ -259,6 +259,44 @@ describe("SystemMigrationRunnerService", () => {
     });
   });
 
+  describe("when an operator rolled back a tenant that was only migrated, never finalized", () => {
+    /** @scenario "An operator rolls a migrated organization back to its legacy path" */
+    it("skips it exactly as it would a rolled-back finalized tenant", async () => {
+      await state.upsertRecord({
+        migrationName: "m1",
+        tenantId: "acme",
+        status: "migrated",
+        report: { diffs: ["budgets:view at org"] },
+      });
+      await state.upsertRecord({
+        migrationName: "m1",
+        tenantId: "acme",
+        status: "rolled_back",
+        report: { diffs: ["budgets:view at org"] },
+      });
+      const migrate = vi.fn(async () => finalized);
+      const runner = new SystemMigrationRunnerService({
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(["acme"]),
+        cohort: () => true,
+        migrations: [migrationOf("m1", migrate)],
+      });
+
+      const summary = await runner.runPass();
+
+      // A held (migrated) tenant is normally re-run every pass; rolled_back
+      // pins it exactly like a rolled-back finalized tenant, whatever state
+      // it came from.
+      expect(migrate).not.toHaveBeenCalled();
+      expect(summary?.skipped).toBe(1);
+      expect(
+        (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))
+          ?.status,
+      ).toBe("rolled_back");
+    });
+  });
+
   describe("when the previous attempt for a tenant parked", () => {
     it("hands the migration that record so it can finish stranded work", async () => {
       await state.upsertRecord({

@@ -1,6 +1,6 @@
-import { generate } from "@langwatch/ksuid";
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
+import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 import {
   type Organization,
   RoleBindingScopeType,
@@ -9,16 +9,10 @@ import {
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import {
-  PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
-  PersonalTeamProtectedError,
-  TeamMemberAlreadyAddedError,
-  TeamMembershipNotFoundError,
   TeamNotFoundError,
   type TeamRestService,
 } from "~/server/app-layer/teams/team.service";
 import { prisma } from "~/server/db";
-import { UserNotInOrganizationError } from "~/server/role-bindings/errors";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { TeamServiceMiddlewareVariables } from "../../middleware/team-service";
 import { teamServiceMiddleware } from "../../middleware/team-service";
@@ -241,47 +235,13 @@ secured
       const body = c.req.valid("json");
       const service = c.get("teamService") as TeamRestService;
 
-      const team = await service.getById({
+      await service.addMember({
         id,
         organizationId: organization.id,
+        userId: body.userId,
+        role: body.role,
+        actor: orgRequestLedgerActor(c),
       });
-      if (!team) throw new TeamNotFoundError(id);
-      // A personal team holds exactly its owner, which is why plan limits
-      // exempt it. A second member would contradict that, so the request is
-      // refused rather than the team quietly becoming something else.
-      if (team.isPersonal) {
-        throw new PersonalTeamProtectedError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
-      }
-
-      const orgMember = await prisma.organizationUser.findFirst({
-        where: { organizationId: organization.id, userId: body.userId },
-        select: { userId: true },
-      });
-      if (!orgMember) {
-        throw new UserNotInOrganizationError(body.userId);
-      }
-
-      try {
-        await prisma.roleBinding.create({
-          data: {
-            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            organizationId: organization.id,
-            userId: body.userId,
-            role: body.role,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: id,
-          },
-        });
-      } catch (error) {
-        if (
-          error instanceof Error &&
-          "code" in error &&
-          (error as { code: string }).code === "P2002"
-        ) {
-          throw new TeamMemberAlreadyAddedError(body.userId);
-        }
-        throw error;
-      }
 
       return c.json({ success: true }, 201);
     },
@@ -298,33 +258,12 @@ secured
       const organization = c.get("organization") as Organization;
       const service = c.get("teamService") as TeamRestService;
 
-      const team = await service.getById({
+      await service.removeMember({
         id,
         organizationId: organization.id,
+        userId,
+        actor: orgRequestLedgerActor(c),
       });
-      if (!team) throw new TeamNotFoundError(id);
-      // The one member of a personal team is its owner, and nothing puts that
-      // binding back, so removal is refused rather than leaving the owner
-      // locked out of their own workspace.
-      if (team.isPersonal) {
-        throw new PersonalTeamProtectedError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
-      }
-
-      // Every team-scoped binding this member holds, not the first one found:
-      // permissions at a scope are the union of the roles held there, so a
-      // member granted both Member and Viewer would otherwise keep the team
-      // through the binding the delete did not reach.
-      const removed = await prisma.roleBinding.deleteMany({
-        where: {
-          organizationId: organization.id,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: id,
-          userId,
-        },
-      });
-      if (removed.count === 0) {
-        throw new TeamMembershipNotFoundError(userId);
-      }
 
       return c.json({ success: true });
     },

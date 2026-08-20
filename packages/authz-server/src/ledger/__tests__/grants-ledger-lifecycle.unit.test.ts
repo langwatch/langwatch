@@ -124,5 +124,76 @@ describe("grants ledger reducer, migration lifecycle", () => {
         });
       });
     });
+
+    describe("when a witness arrives after a newer one", () => {
+      /** @scenario "A backdated witness cannot rewrite a migration's status backwards" */
+      it("ignores it rather than rewriting the witnessed status backwards", () => {
+        // Same last-write-wins shape as the cutover fields: without the
+        // guard, a redelivered or reordered witness at an older timestamp
+        // would win on arrival order alone and rewrite "finalized" back to
+        // "parked".
+        const state = apply([
+          {
+            kind: "migration_tenant_state_changed",
+            migrationName: "authz-team-user-backfill",
+            status: "finalized",
+            actor: ACTOR,
+            occurredAtMs: 20,
+          },
+          {
+            kind: "migration_tenant_state_changed",
+            migrationName: "authz-team-user-backfill",
+            status: "parked",
+            report: { kind: "error", message: "stale redelivery" },
+            actor: ACTOR,
+            occurredAtMs: 10,
+          },
+        ]);
+        expect(state.migrationStates["authz-team-user-backfill"]).toEqual({
+          status: "finalized",
+          occurredAtMs: 20,
+        });
+      });
+
+      it("keeps each migration's guard independent of the others", () => {
+        const state = apply([
+          {
+            kind: "migration_tenant_state_changed",
+            migrationName: "authz-team-user-backfill",
+            status: "finalized",
+            actor: ACTOR,
+            occurredAtMs: 20,
+          },
+          {
+            kind: "migration_tenant_state_changed",
+            migrationName: "authz-grants-genesis-import",
+            status: "parked",
+            actor: ACTOR,
+            occurredAtMs: 1,
+          },
+        ]);
+        expect(state.migrationStates["authz-team-user-backfill"]?.status).toBe(
+          "finalized",
+        );
+        expect(
+          state.migrationStates["authz-grants-genesis-import"]?.status,
+        ).toBe("parked");
+      });
+    });
+
+    describe("when the same witness is folded twice", () => {
+      it("converges rather than dropping the fact that produced the state", () => {
+        const event = {
+          kind: "migration_tenant_state_changed" as const,
+          migrationName: "authz-team-user-backfill",
+          status: "finalized" as const,
+          actor: ACTOR,
+          occurredAtMs: 20,
+        };
+        const once = apply([event]);
+        const twice = apply([event, event]);
+        expect(twice.migrationStates).toEqual(once.migrationStates);
+      });
+    });
   });
 });
