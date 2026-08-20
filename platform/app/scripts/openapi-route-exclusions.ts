@@ -61,11 +61,6 @@ export const UNPUBLISHED = [
     why: "server-sent event channels the dashboard subscribes to, with no stable per-message contract to publish",
   },
   {
-    match: "/api/prompt-playground",
-    category: "internal",
-    why: "browser SSE stream for the prompt playground, with no stable per-message contract to publish",
-  },
-  {
     match: "/api/playground",
     category: "internal",
     why: "backs the in-app model playground and takes whatever the playground UI currently sends",

@@ -115,7 +115,7 @@ export function createApiRouter() {
   api.route("/", analyticsApp);
   api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/* — governed SQL
   api.route("/", codingAgentApp);
-  api.route("/", promptPlaygroundApp); // /api/prompt-playground/execute — browser SSE
+  api.route("/", promptPlaygroundApp); // /api/prompt-playground/<version>/prompt.execute — browser SSE
   api.route("/", dashboardsApp);
   api.route("/", datasetApp);
   api.route("/", evaluatorsApp);

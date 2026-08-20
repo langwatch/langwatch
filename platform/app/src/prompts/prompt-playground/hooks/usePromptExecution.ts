@@ -14,7 +14,10 @@
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { z } from "zod";
-import type { PlaygroundStreamEvent } from "~/app/api/prompt-playground/[[...route]]/app";
+import {
+  type PlaygroundStreamEvent,
+  PROMPT_EXECUTE_ENDPOINT,
+} from "~/prompts/prompt-playground/executeContract";
 import type { runtimeInputsSchema } from "~/prompts/schemas/field-schemas";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import type { ChatMessage } from "~/server/tracer/types";
@@ -89,7 +92,7 @@ async function streamExecution({
   onFailure: (error: ParsedLLMError) => void;
 }): Promise<void> {
   await fetchSSE<PlaygroundStreamEvent>({
-    endpoint: "/api/prompt-playground/execute",
+    endpoint: PROMPT_EXECUTE_ENDPOINT,
     signal,
     timeout: 20_000,
     payload,
