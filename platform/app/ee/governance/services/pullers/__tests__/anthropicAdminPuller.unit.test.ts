@@ -182,6 +182,36 @@ describe("the Anthropic Admin puller", () => {
         result.events[1]!.source_event_id,
       );
     });
+
+    it("falls back to the legacy flat cache-creation field when the nested object is absent", async () => {
+      const { cache_creation: _nested, ...row } =
+        USAGE_PAGE.data[0]!.results[0]!;
+      fetchMock.mockResolvedValue(
+        jsonResponse({
+          ...USAGE_PAGE,
+          data: [
+            {
+              ...USAGE_PAGE.data[0]!,
+              results: [{ ...row, cache_creation_input_tokens: 2_345 }],
+            },
+          ],
+        }),
+      );
+
+      const result = await new AnthropicAdminPuller().runOnce(RUN_OPTIONS, {
+        adapter: "anthropic_admin",
+        report: "usage",
+        bucketWidth: "1d",
+        schedule: "0 * * * *",
+      });
+
+      const record = buildPulledUsageRecord({
+        event: result.events[0]!,
+        source: SOURCE,
+        observedAt: OBSERVED_AT,
+      });
+      expect(record?.tokensCacheWrite).toBe(2_345);
+    });
   });
 
   describe("when the source pulls the cost report", () => {

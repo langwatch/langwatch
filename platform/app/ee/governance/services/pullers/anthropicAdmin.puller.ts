@@ -134,10 +134,13 @@ function queryIdentity(config: AnthropicAdminPullConfig): string {
     : `cost:${COST_REPORT_BUCKET_WIDTH}:${COST_GROUP_BY.join(",")}`;
 }
 
-function parseCursor(
-  cursor: string | null,
-  config: AnthropicAdminPullConfig,
-): { startingAt: string; page: string | null } {
+function parseCursor({
+  cursor,
+  config,
+}: {
+  cursor: string | null;
+  config: AnthropicAdminPullConfig;
+}): { startingAt: string; page: string | null } {
   if (cursor) {
     try {
       const parsed = cursorSchema.parse(JSON.parse(cursor));
@@ -165,11 +168,15 @@ function parseCursor(
   };
 }
 
-function encodeCursor(
-  startingAt: string,
-  page: string | null,
-  query: string,
-): string {
+function encodeCursor({
+  startingAt,
+  page,
+  query,
+}: {
+  startingAt: string;
+  page: string | null;
+  query: string;
+}): string {
   return JSON.stringify({ startingAt, page, query });
 }
 
@@ -402,7 +409,7 @@ export class AnthropicAdminPuller
     // The window's watermark does not move within a run; only the page token
     // does. Two variables rather than one reassigned object, so a page advance
     // mid-run can never quietly carry a different `startingAt` with it.
-    const cursor = parseCursor(options.cursor, config);
+    const cursor = parseCursor({ cursor: options.cursor, config });
     const startingAt = cursor.startingAt;
     const query = queryIdentity(config);
     let page = cursor.page;
@@ -413,7 +420,7 @@ export class AnthropicAdminPuller
         // so a deadline costs latency rather than a window.
         return {
           events,
-          cursor: encodeCursor(startingAt, page, query),
+          cursor: encodeCursor({ startingAt, page, query }),
           errorCount: 0,
         };
       }
@@ -431,7 +438,11 @@ export class AnthropicAdminPuller
         // watermark only ever moves forward.
         return {
           events,
-          cursor: encodeCursor(read.watermark ?? startingAt, null, query),
+          cursor: encodeCursor({
+            startingAt: read.watermark ?? startingAt,
+            page: null,
+            query,
+          }),
           errorCount: 0,
         };
       }
@@ -444,7 +455,7 @@ export class AnthropicAdminPuller
     );
     return {
       events,
-      cursor: encodeCursor(startingAt, page, query),
+      cursor: encodeCursor({ startingAt, page, query }),
       errorCount: 0,
     };
   }
