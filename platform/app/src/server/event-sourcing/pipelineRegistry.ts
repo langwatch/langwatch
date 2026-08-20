@@ -1656,7 +1656,7 @@ export interface ProjectionMetadata {
   aggregateType: string;
   source: "pipeline" | "global";
   pauseKey: string;
-  kind: "fold" | "map";
+  kind: "fold" | "map" | "state";
 }
 
 export interface SubscriberMetadata {
@@ -1712,7 +1712,19 @@ export function getProjectionMetadata(): ProjectionMetadata[] {
         kind: "map" as const,
       }),
     );
-    return [...folds, ...maps];
+    const states = Array.from(def.stateProjections?.entries() ?? []).map(
+      ([name]) => ({
+        projectionName: name,
+        pipelineName,
+        aggregateType,
+        source: "pipeline" as const,
+        // State projections enqueue with `__jobType=stateProjection`; the
+        // dispatcher matches the pause key against that raw segment.
+        pauseKey: `${pipelineName}/stateProjection/${name}`,
+        kind: "state" as const,
+      }),
+    );
+    return [...folds, ...maps, ...states];
   });
 }
 
@@ -1831,6 +1843,21 @@ export function getKillSwitchDescriptors(): KillSwitchDescriptor[] {
         aggregateType,
         componentType: "mapProjection",
         componentName: definition.name,
+        pipelineName,
+      });
+    }
+    // State projections check `componentType: "projection"` at runtime (the
+    // router reuses the fold-shaped key), so the descriptor must match it —
+    // a "stateProjection" segment here would list a switch nothing reads.
+    // Same for a custom key: emit the one the router consults.
+    for (const [name, definition] of def.stateProjections?.entries() ?? []) {
+      out.push({
+        key:
+          definition.options?.killSwitch?.customKey ??
+          generateKillSwitchKey(aggregateType, "projection", name),
+        aggregateType,
+        componentType: "projection",
+        componentName: name,
         pipelineName,
       });
     }
