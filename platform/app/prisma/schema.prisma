@@ -2524,37 +2524,6 @@ model Role {
   @@index([organizationId])
 }
 
-// One row per organization: how far the authz_grants fold has applied.
-// Advanced by the projection writer itself - the write IS the version bump,
-// so no write path can skip it. Replaces the hand-bumped epoch at contract.
-model AuthzProjectionCursor {
-  organizationId    String   @id
-  lastEventId       String
-  acceptedAt        DateTime
-  occurredAt        DateTime
-  projectionVersion String
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @default(now()) @updatedAt
-}
-
-// Projected from the ledger's cutover_* process events. What the per-org
-// permission fork and the legacy-fallback gate read.
-model AuthzCutoverProjection {
-  organizationId          String    @id
-  onEngine                Boolean   @default(false)
-  provedAt                DateTime?
-  parityDiffs             Json?
-  // Why the newest cutover_completed fact did NOT put this organization on
-  // the engine, or null when none was refused. The fold is a pure reducer
-  // and cannot log, so a refusal is state - and this column is what carries
-  // it to the operator surface. "parity_unproven" | "parity_diffs_outstanding".
-  completionRefusedReason String?
-  // Business time of the newest cutover fact folded here - the reducer's
-  // monotonic guard, persisted so a reload does not reset it.
-  changedAt               DateTime?
-  updatedAt               DateTime  @default(now()) @updatedAt
-}
-
 model ApiKey {
   id              String        @id @default(nanoid())
   name            String
