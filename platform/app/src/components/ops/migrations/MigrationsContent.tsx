@@ -14,6 +14,7 @@ import {
 } from "@chakra-ui/react";
 import { Play, Undo2, UserPlus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
+import { ListTable } from "~/components/ui/ListTable";
 import { toaster } from "~/components/ui/toaster";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
@@ -197,6 +198,29 @@ export function MigrationsContent() {
   );
 }
 
+/**
+ * One status figure. A zero is fine and stays gray and quiet; a non-zero
+ * count takes its palette, so the eye lands only on what moved.
+ */
+function CountBadge({
+  label,
+  count,
+  palette,
+}: {
+  label: string;
+  count: number;
+  palette: string;
+}) {
+  return (
+    <Badge
+      colorPalette={count === 0 ? "gray" : palette}
+      variant={count === 0 ? "subtle" : "solid"}
+    >
+      {label} {count}
+    </Badge>
+  );
+}
+
 function MigrationSection({
   step,
   migration,
@@ -215,34 +239,19 @@ function MigrationSection({
   // requires it rather than recognising a step by its name.
   const requiresConfirmation = migration.requiresOperatorConfirmation;
   return (
-    <Box>
-      <HStack marginBottom={1} flexWrap="wrap">
+    <Box
+      borderWidth="1px"
+      borderColor="border.emphasized"
+      borderRadius="lg"
+      padding={5}
+    >
+      <HStack marginBottom={1} flexWrap="wrap" gap={3}>
         <Heading size="md">
           Step {step} · {migration.title}
         </Heading>
         <Text fontFamily="mono" fontSize="xs" color="fg.muted">
           {migration.name}
         </Text>
-        <Badge colorPalette="green">
-          Finalized {migration.counts.finalized}
-        </Badge>
-        <Badge colorPalette="orange">Held {migration.counts.migrated}</Badge>
-        <Badge colorPalette="red">Parked {migration.counts.parked}</Badge>
-        {migration.counts.rolled_back > 0 && (
-          <Badge colorPalette="gray">
-            Rolled back {migration.counts.rolled_back}
-          </Badge>
-        )}
-        {migration.enrollment && (
-          <>
-            <Badge colorPalette="blue">
-              Enrolled {migration.enrollment.enrolledCount}
-            </Badge>
-            <Badge colorPalette="purple">
-              Not enrolled {migration.enrollment.notEnrolledCount}
-            </Badge>
-          </>
-        )}
         <Spacer />
         {canManage && migration.availableOnThisInstallation && (
           <HStack>
@@ -275,6 +284,44 @@ function MigrationSection({
       <Text fontSize="sm" color="fg.muted" maxWidth="720px" marginBottom={3}>
         {migration.description}
       </Text>
+      {/* Space proportional to trouble: a zero reads as one quiet gray chip,
+          a non-zero Held or Parked is the loud one. */}
+      <HStack marginBottom={4} flexWrap="wrap" gap={2}>
+        <CountBadge
+          label="Finalized"
+          count={migration.counts.finalized}
+          palette="green"
+        />
+        <CountBadge
+          label="Held"
+          count={migration.counts.migrated}
+          palette="orange"
+        />
+        <CountBadge
+          label="Parked"
+          count={migration.counts.parked}
+          palette="red"
+        />
+        {migration.counts.rolled_back > 0 && (
+          <CountBadge
+            label="Rolled back"
+            count={migration.counts.rolled_back}
+            palette="gray"
+          />
+        )}
+        {migration.enrollment && (
+          <>
+            <CountBadge
+              label="Enrolled"
+              count={migration.enrollment.enrolledCount}
+              palette="blue"
+            />
+            <Badge colorPalette="gray" variant="subtle">
+              Not enrolled {migration.enrollment.notEnrolledCount}
+            </Badge>
+          </>
+        )}
+      </HStack>
       {!migration.availableOnThisInstallation ? (
         <Text fontSize="sm" color="fg.muted">
           Not yet available for self-hosted installations. It will run
@@ -291,7 +338,7 @@ function MigrationSection({
               No organizations need attention.
             </Text>
           ) : (
-            <Table.Root size="sm">
+            <ListTable size="sm">
               <Table.Header>
                 <Table.Row>
                   <Table.ColumnHeader>Organization</Table.ColumnHeader>
@@ -308,7 +355,7 @@ function MigrationSection({
                   />
                 ))}
               </Table.Body>
-            </Table.Root>
+            </ListTable>
           )}
         </Stack>
       )}
@@ -699,6 +746,10 @@ function RollBackAction({
   );
 }
 
+/** Enrolled-and-fine rows are fine, so past a handful they fold away behind
+ *  a count - a cohort of hundreds must not turn the page into a scroll. */
+const ENROLLMENT_PREVIEW_ROWS = 8;
+
 function EnrollmentTable({
   enrollments,
   canManage,
@@ -706,6 +757,7 @@ function EnrollmentTable({
   enrollments: EnrollmentRecord[];
   canManage: boolean;
 }) {
+  const [showAll, setShowAll] = useState(false);
   if (enrollments.length === 0) {
     return (
       <Text fontSize="sm" color="fg.muted">
@@ -713,26 +765,45 @@ function EnrollmentTable({
       </Text>
     );
   }
+  const visible = showAll
+    ? enrollments
+    : enrollments.slice(0, ENROLLMENT_PREVIEW_ROWS);
+  const hiddenCount = enrollments.length - visible.length;
   return (
-    <Table.Root size="sm">
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Enrolled organization</Table.ColumnHeader>
-          <Table.ColumnHeader>Enrolled by</Table.ColumnHeader>
-          <Table.ColumnHeader>Enrolled at</Table.ColumnHeader>
-          {canManage && <Table.ColumnHeader />}
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
-        {enrollments.map((enrollment) => (
-          <EnrollmentRow
-            key={`${enrollment.organizationId}:${enrollment.migrationName}`}
-            enrollment={enrollment}
-            canManage={canManage}
-          />
-        ))}
-      </Table.Body>
-    </Table.Root>
+    <Stack gap={2}>
+      <ListTable size="sm">
+        <Table.Header>
+          <Table.Row>
+            <Table.ColumnHeader>Enrolled organization</Table.ColumnHeader>
+            <Table.ColumnHeader>Enrolled by</Table.ColumnHeader>
+            <Table.ColumnHeader>Enrolled at</Table.ColumnHeader>
+            {canManage && <Table.ColumnHeader />}
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {visible.map((enrollment) => (
+            <EnrollmentRow
+              key={`${enrollment.organizationId}:${enrollment.migrationName}`}
+              enrollment={enrollment}
+              canManage={canManage}
+            />
+          ))}
+        </Table.Body>
+      </ListTable>
+      {(hiddenCount > 0 || showAll) &&
+        enrollments.length > ENROLLMENT_PREVIEW_ROWS && (
+          <Button
+            size="xs"
+            variant="ghost"
+            alignSelf="flex-start"
+            onClick={() => setShowAll((value) => !value)}
+          >
+            {showAll
+              ? "Show fewer"
+              : `Show all ${enrollments.length} enrolled organizations`}
+          </Button>
+        )}
+    </Stack>
   );
 }
 
