@@ -6,15 +6,23 @@ model saw. The point is to prove that an attachment sent through each
 shipped SDK integration actually reaches the model and shows up on the
 trace, not just that the code compiles.
 
-The assets live in `assets/`:
+The attachments are built by `python/make_assets.py` into `assets/`, which
+is not tracked:
 
-- `langwatch-shapes.png`, an image with the words LANGWATCH and MULTIMODAL
-  DOGFOOD, a blue circle, and a green triangle.
+- `langwatch-shapes.png` and `.jpg`, an image with the words LANGWATCH and
+  MULTIMODAL DOGFOOD, a blue circle, and a green triangle.
 - `langwatch-invoice.pdf`, an invoice with number `LW-DOGFOOD-7339` and
   total `1337.42 EUR`.
 
 A correct answer names those details. A generic or empty answer means the
 attachment did not reach the model.
+
+The Python cells build whatever is missing on the first run. The TypeScript
+cell reads the files, so build them once first:
+
+```bash
+cd python && uv run --with pillow --with reportlab python make_assets.py
+```
 
 ## Environment
 

@@ -105,7 +105,9 @@ describe("visitContentPart", () => {
       expect(
         decode({ inlineData: { mimeType: "application/pdf", data: PNG_B64 } }),
       ).toEqual(
-        decode({ inline_data: { mime_type: "application/pdf", data: PNG_B64 } }),
+        decode({
+          inline_data: { mime_type: "application/pdf", data: PNG_B64 },
+        }),
       );
     });
 

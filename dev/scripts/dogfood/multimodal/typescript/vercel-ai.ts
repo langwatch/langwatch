@@ -11,7 +11,7 @@
  * LangWatch AI Gateway, reached through OPENAI_BASE_URL, can serve it.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { openai } from "@ai-sdk/openai";
@@ -39,9 +39,21 @@ function modality(): Modality {
 }
 
 function attachment(kind: Modality): Attachment {
-  return kind === "image"
-    ? { path: join(ASSETS, "langwatch-shapes.png"), mediaType: "image/png" }
-    : { path: join(ASSETS, "langwatch-invoice.pdf"), mediaType: "application/pdf" };
+  const chosen: Attachment =
+    kind === "image"
+      ? { path: join(ASSETS, "langwatch-shapes.png"), mediaType: "image/png" }
+      : {
+          path: join(ASSETS, "langwatch-invoice.pdf"),
+          mediaType: "application/pdf",
+        };
+  if (!existsSync(chosen.path)) {
+    // The fixtures are generated, not committed. The Python cells build them
+    // on demand; from here the generator has to be run once by hand.
+    throw new Error(
+      `missing ${chosen.path}: run "uv run --with pillow --with reportlab python ../python/make_assets.py" first`,
+    );
+  }
+  return chosen;
 }
 
 function question(kind: Modality): string {

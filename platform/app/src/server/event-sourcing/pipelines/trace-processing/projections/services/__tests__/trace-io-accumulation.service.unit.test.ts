@@ -389,7 +389,10 @@ describe("TraceIOAccumulationService: media refs", () => {
       name: parentSpanId === null ? "root" : "llm",
       spanAttributes: {
         "langwatch.input": JSON.stringify([
-          { role: "user", content: [{ type: "image_url", image_url: { url } }] },
+          {
+            role: "user",
+            content: [{ type: "image_url", image_url: { url } }],
+          },
         ]),
       },
     } as never);

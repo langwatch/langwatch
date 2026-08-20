@@ -11,10 +11,7 @@ import os
 import sys
 from pathlib import Path
 
-ASSETS = Path(__file__).resolve().parent.parent / "assets"
-
-IMAGE = ASSETS / "langwatch-shapes.png"
-PDF = ASSETS / "langwatch-invoice.pdf"
+from make_assets import IMAGE_PNG as IMAGE, PDF, build_missing
 
 IMAGE_QUESTION = "What does this image show? Name the words and the shapes."
 PDF_QUESTION = "What is the invoice number and the total due in this document?"
@@ -29,7 +26,8 @@ def modality() -> str:
 
 
 def attachment(kind: str) -> tuple[Path, str]:
-    """The file for a modality, with its media type."""
+    """The file for a modality, with its media type. Builds it if it is missing."""
+    build_missing()
     return (IMAGE, "image/png") if kind == "image" else (PDF, "application/pdf")
 
 
