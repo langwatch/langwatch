@@ -232,6 +232,14 @@ Feature: A personal workspace is never the ambient context for organization work
     not exist, even though nothing in the address bar or the remembered
     selection asked for that.
 
+    The personal workspace is held apart from organization-scoped work on both
+    sides. Work carried in from an earlier organization-scoped page never
+    decides `/me`, and a visit to `/me` never becomes the organization-scoped
+    work the reader returns to. When it did, the reader came back to another
+    team's project on the app root, and LLM Ops was greyed out in the product
+    switcher, which had no project to open while the private one was the last
+    one open.
+
     @integration
     Scenario: Visiting the personal-workspace page resolves the personal team
       Given jane's personal team is listed before the shared team
@@ -267,6 +275,34 @@ Feature: A personal workspace is never the ambient context for organization work
       # selection must not follow her onto the personal-workspace page
       # either, because that page can never mean anything but her own
       # workspace.
+
+    @integration
+    Scenario: A project remembered from an earlier organization-scoped visit does not follow jane onto the personal-workspace page
+      Given jane's last remembered project selection is "acme-app", from an
+        earlier organization-scoped page
+      When jane opens her personal-workspace page
+      Then the ambient team is her personal team
+      And the ambient project is her personal project
+      # The remembered project resolved before any personal-workspace
+      # preference could apply, so /me ran every personal feature against the
+      # shared project.
+
+    @integration
+    Scenario: Organization-scoped work goes on in the project jane left, after a visit to the personal-workspace page
+      Given jane was last working in "acme-app", the second project of the
+        shared team
+      When jane opens her personal-workspace page
+      And she opens an organization-scoped page again
+      Then that page is about "acme-app", the project she left
+      # With one project in the team, coming back to the first one and coming
+      # back to the one she left look the same, so the team holds two here.
+
+    @integration
+    Scenario: The personal workspace is not what the next organization-scoped page is about
+      Given jane has not opened any project yet
+      When jane opens her personal-workspace page
+      And she opens an organization-scoped page again
+      Then that page is about the shared team, not her personal workspace
 
     @integration
     Scenario: A member with no personal workspace of their own falls back to the ambient team

@@ -448,6 +448,56 @@ describe("the product sidebar", () => {
       );
       expect(block).toHaveStyle({ borderTopWidth: "1px" });
     });
+
+    /** @scenario "The rule keeps the same distance from both edges of the column" */
+    it("draws the rule from a box that fills the column", () => {
+      renderSidebar("governance");
+
+      // A box already at the full width of its parent cannot be widened by a
+      // negative margin: only its left edge moves, which is what put the rule
+      // 8px from the left of the column and 16px from the right. The inset
+      // belongs to the wrapper, where both edges get it. An unset logical
+      // margin reads as "" here, where a set one reads as its length.
+      expect(
+        getComputedStyle(screen.getByTestId("sidebar-bottom-block"))
+          .marginInline,
+      ).toBe("");
+    });
+
+    /** @scenario "The rule keeps the same distance from both edges of the column" */
+    it("lines the block's entries up with the entries above them", () => {
+      renderSidebar("governance");
+
+      const block = screen.getByTestId("sidebar-bottom-block");
+      const inset = (element: HTMLElement) =>
+        getComputedStyle(element).paddingInline;
+
+      // Two steps of the spacing scale to the rule and one more to the
+      // entries under it, which is the one step the entries above them take.
+      expect(inset(block.parentElement!)).toBe("var(--chakra-spacing-2)");
+      expect(inset(block)).toBe("var(--chakra-spacing-1)");
+      expect(inset(screen.getByTestId("sidebar-scroll-region"))).toBe(
+        "var(--chakra-spacing-3)",
+      );
+    });
+
+    /** @scenario "The entries are cut at the rule as they scroll under it" */
+    it("ends the scrolling part at the rule and keeps the gap inside it", () => {
+      renderSidebar("governance");
+
+      const block = screen.getByTestId("sidebar-bottom-block");
+      const region = screen.getByTestId("sidebar-scroll-region");
+      // A margin between the two is a strip the entries disappear in before
+      // they reach the line. As padding inside the scrolling part, the same
+      // space holds the last entry off the rule at rest and the entries
+      // travel through it as the menu moves.
+      // An unset margin reads as "0" here; a spacing step would read as the
+      // variable the scale is written with, as the region's padding does.
+      expect(getComputedStyle(block).marginTop).toBe("0");
+      expect(getComputedStyle(region).paddingBottom).toBe(
+        "var(--chakra-spacing-2)",
+      );
+    });
   });
 
   describe("when the sidebar column renders", () => {

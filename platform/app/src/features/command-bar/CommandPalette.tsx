@@ -568,6 +568,10 @@ export function CommandPalette({
       easterEggItem={easterEggItem}
       askLangyItem={askLangyItem}
       isLoading={searchLoading}
+      // The dialog holds the field and the list in one card, so the list
+      // draws the line between them. The inline panel is its own box under
+      // the field, and already has an edge there.
+      showTopDivider={!inline}
     />
   );
 
