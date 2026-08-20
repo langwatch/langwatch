@@ -171,8 +171,11 @@ export class PrismaSystemMigrationEnrollmentRepository {
             ...enrolled.map((row) => row.organizationId),
           ],
         },
+        // PENDING rides along with ACTIVE: a just-signed enterprise whose
+        // subscription has not settled is exactly the organization the
+        // exclusion exists to keep out of an experimental cohort.
         subscriptions: {
-          none: { status: "ACTIVE", plan: "ENTERPRISE" },
+          none: { status: { in: ["ACTIVE", "PENDING"] }, plan: "ENTERPRISE" },
         },
       },
       select: { id: true, name: true },
@@ -182,7 +185,9 @@ export class PrismaSystemMigrationEnrollmentRepository {
   /**
    * The cohort's write: every picked organization in one statement.
    * `skipDuplicates` covers the race with a concurrent single enrollment -
-   * a row that appeared since the pool was read is simply not re-created.
+   * a row that appeared since the pool was read is simply not re-created,
+   * and the returned count is what actually landed, so the caller reports
+   * what happened rather than what it attempted.
    */
   async createMany({
     organizationIds,
@@ -192,9 +197,9 @@ export class PrismaSystemMigrationEnrollmentRepository {
     organizationIds: string[];
     migrationName: string;
     enrolledByUserId: string;
-  }): Promise<void> {
-    if (organizationIds.length === 0) return;
-    await this.prisma.systemMigrationEnrollment.createMany({
+  }): Promise<{ insertedCount: number }> {
+    if (organizationIds.length === 0) return { insertedCount: 0 };
+    const result = await this.prisma.systemMigrationEnrollment.createMany({
       data: organizationIds.map((organizationId) => ({
         organizationId,
         migrationName,
@@ -202,6 +207,7 @@ export class PrismaSystemMigrationEnrollmentRepository {
       })),
       skipDuplicates: true,
     });
+    return { insertedCount: result.count };
   }
 
   async create({

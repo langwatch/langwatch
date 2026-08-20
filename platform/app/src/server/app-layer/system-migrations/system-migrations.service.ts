@@ -94,7 +94,7 @@ export interface SystemMigrationEnrollmentStore {
     organizationIds: string[];
     migrationName: string;
     enrolledByUserId: string;
-  }): Promise<void>;
+  }): Promise<{ insertedCount: number }>;
   delete(args: {
     organizationId: string;
     migrationName: string;
@@ -439,7 +439,7 @@ export class SystemMigrationsService {
         excludeOrganizationIds: this.deps.privateDataplaneOrganizationIds(),
       });
     const picked = sample({ pool: eligible, count: sampleSize });
-    await this.deps.enrollments.createMany({
+    const { insertedCount } = await this.deps.enrollments.createMany({
       organizationIds: picked.map((organization) => organization.id),
       migrationName,
       enrolledByUserId: actorUserId,
@@ -449,21 +449,27 @@ export class SystemMigrationsService {
         migrationName,
         actorUserId,
         sampleSize,
-        enrolledCount: picked.length,
+        // Both counts on purpose: `skipDuplicates` drops a row a concurrent
+        // single enrollment already wrote, and the trail must not overclaim.
+        pickedCount: picked.length,
+        insertedCount,
         eligibleCount: eligible.length,
         organizationIds: picked.map((organization) => organization.id),
       },
       "operator enrolled a cohort for the in-place migration rollout",
     );
-    await this.deps.audit({
-      userId: actorUserId,
-      action: "systemMigrations.enrollCohort",
-      args: {
-        migrationName,
-        sampleSize,
-        organizationIds: picked.map((organization) => organization.id),
-      },
-    });
+    // One audit row PER organization, mirroring `enroll`'s shape: the row's
+    // indexed organizationId column is how "what touched org X" is answered,
+    // and a single row holding a thousand-id array loses every id to the
+    // audit writer's size cap.
+    for (const organization of picked) {
+      await this.deps.audit({
+        userId: actorUserId,
+        organizationId: organization.id,
+        action: "systemMigrations.enrollCohort",
+        args: { migrationName, sampleSize, cohortSize: picked.length },
+      });
+    }
     return { enrolled: picked, eligibleCount: eligible.length };
   }
 

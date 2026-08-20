@@ -93,7 +93,7 @@ describe("given a cut-over organization rolled back with the queue stopped", () 
         searchOrganizations: async () => [],
         create: async () => undefined,
         findCohortEligibleOrganizations: async () => [],
-        createMany: async () => undefined,
+        createMany: async () => ({ insertedCount: 0 }),
         delete: async () => undefined,
       },
       privateDataplaneOrganizationIds: () => [],

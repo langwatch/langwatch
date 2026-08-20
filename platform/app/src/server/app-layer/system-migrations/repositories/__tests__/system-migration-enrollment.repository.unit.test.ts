@@ -20,7 +20,7 @@ function repositoryWith(overrides: {
       findUnique: vi.fn().mockResolvedValue(null),
       groupBy: vi.fn().mockResolvedValue([]),
       create: vi.fn().mockResolvedValue(undefined),
-      createMany: vi.fn().mockResolvedValue(undefined),
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
       delete: vi.fn().mockResolvedValue(undefined),
       ...overrides.enrollment,
     },
@@ -180,7 +180,10 @@ describe("PrismaSystemMigrationEnrollmentRepository", () => {
         where: {
           id: { notIn: ["org_isolated_inc", "org_enrolled"] },
           subscriptions: {
-            none: { status: "ACTIVE", plan: "ENTERPRISE" },
+            none: {
+              status: { in: ["ACTIVE", "PENDING"] },
+              plan: "ENTERPRISE",
+            },
           },
         },
         select: { id: true, name: true },
@@ -189,7 +192,7 @@ describe("PrismaSystemMigrationEnrollmentRepository", () => {
   });
 
   describe("when a cohort is written", () => {
-    it("creates every row in one statement, skipping rows a race already wrote", async () => {
+    it("creates every row in one statement and passes skipDuplicates for the enrollment race", async () => {
       const { prisma, repository } = repositoryWith({});
 
       await repository.createMany({

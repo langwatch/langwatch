@@ -65,9 +65,6 @@ const RESOLVES_CLIENT =
 const CLIENT_MODULE = "src/server/clickhouse/clickhouseClient.ts";
 
 const CLIENT_MODULE_VALUE_EXPORTS = new Set([
-  // Not a client and not a resolver: the id of the one tenant that belongs to
-  // no customer, exported so a test can pin it against the ledger's own copy.
-  "PLATFORM_TENANT_ID",
   "getClickHouseClientForTenant",
   "getClickHouseClientForOrganization",
   "getAllClickHouseInstances",

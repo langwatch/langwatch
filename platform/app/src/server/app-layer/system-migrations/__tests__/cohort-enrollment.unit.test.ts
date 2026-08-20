@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import { MigrationEnrollmentCloudOnlyError } from "../errors";
 import {
   type SystemMigrationEnrollmentStore,
   SystemMigrationsService,
@@ -28,7 +27,9 @@ function serviceWith({
     .mockResolvedValue(eligible);
   const createMany = vi
     .fn<SystemMigrationEnrollmentStore["createMany"]>()
-    .mockResolvedValue(undefined);
+    .mockImplementation(async ({ organizationIds }) => ({
+      insertedCount: organizationIds.length,
+    }));
   const audit = vi.fn().mockResolvedValue(undefined);
   const service = new SystemMigrationsService({
     state: {
@@ -84,6 +85,17 @@ describe("SystemMigrationsService.enrollCohort", () => {
 
         expect(result.enrolled).toHaveLength(50);
         expect(result.eligibleCount).toBe(200);
+        // A sample, not an echo: no repeats, and every pick from the pool.
+        const pickedIds = result.enrolled.map(
+          (organization) => organization.id,
+        );
+        expect(new Set(pickedIds).size).toBe(50);
+        const poolIds = new Set(
+          organizations(200).map((organization) => organization.id),
+        );
+        for (const id of pickedIds) {
+          expect(poolIds.has(id)).toBe(true);
+        }
         expect(createMany).toHaveBeenCalledTimes(1);
         expect(createMany.mock.calls[0]?.[0]).toMatchObject({
           migrationName: MIGRATION,
@@ -130,7 +142,7 @@ describe("SystemMigrationsService.enrollCohort", () => {
     });
 
     describe("when the cohort action is audited", () => {
-      it("records the picked organization ids on the trail", async () => {
+      it("records one row per organization, carrying that organization's id", async () => {
         const { service, audit } = serviceWith({
           eligible: organizations(2),
         });
@@ -141,17 +153,23 @@ describe("SystemMigrationsService.enrollCohort", () => {
           actorUserId: "user_ops",
         });
 
-        expect(audit).toHaveBeenCalledWith(
-          expect.objectContaining({
-            userId: "user_ops",
-            action: "systemMigrations.enrollCohort",
-            args: expect.objectContaining({
-              organizationIds: result.enrolled.map(
-                (organization) => organization.id,
-              ),
+        // Per-organization rows, never one row holding an id array: the
+        // indexed organizationId column is how the trail answers "what
+        // touched org X", and a single row's args are size-capped.
+        expect(audit).toHaveBeenCalledTimes(2);
+        for (const organization of result.enrolled) {
+          expect(audit).toHaveBeenCalledWith(
+            expect.objectContaining({
+              userId: "user_ops",
+              organizationId: organization.id,
+              action: "systemMigrations.enrollCohort",
+              args: expect.objectContaining({
+                migrationName: MIGRATION,
+                cohortSize: 2,
+              }),
             }),
-          }),
-        );
+          );
+        }
       });
     });
   });
@@ -168,7 +186,7 @@ describe("SystemMigrationsService.enrollCohort", () => {
             sampleSize: 5,
             actorUserId: "user_ops",
           }),
-        ).rejects.toBeInstanceOf(MigrationEnrollmentCloudOnlyError);
+        ).rejects.toMatchObject({ code: "migration_enrollment_cloud_only" });
         expect(createMany).not.toHaveBeenCalled();
       });
     });

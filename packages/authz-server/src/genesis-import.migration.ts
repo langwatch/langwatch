@@ -109,7 +109,6 @@ const GENESIS_CHUNK = 500;
 /** Reports stay bounded however far the projection has drifted. */
 const MAX_REPORTED_DIFFS = 50;
 
-
 /** One way the projection failed to reproduce a legacy row - the ALLOW
  *  direction (`binding_missing`, `binding_changed`, `role_missing`,
  *  `role_changed`) - or a way it holds a fact the legacy side no longer

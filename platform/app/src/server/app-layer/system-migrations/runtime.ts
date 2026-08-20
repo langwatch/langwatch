@@ -6,7 +6,6 @@
  *
  * Server-only - this graph reaches Prisma, Redis and the EE audit writer.
  */
-import { adminEmailList } from "@ee/admin/isAdmin";
 import { auditLog } from "@ee/audit-log/auditLog";
 import {
   AuthzCollectorService,
@@ -519,11 +518,6 @@ export function registeredMigrations(): SystemMigration[] {
       // `runSystemMigrationPass`), so answering true here is the released
       // behavior, not a bypass.
       cutoverCohort: (tenantId) => cutoverEnrollmentCohort(tenantId),
-      // The live platform-admin check's own parse (`adminEmailList`), read
-      // per pass rather than captured, so widening ADMIN_EMAILS needs no
-      // restart and the cutover import can never see a different admitted
-      // set than `isAdmin()` does.
-      adminEmails: adminEmailList,
       now: () => Date.now(),
     }),
   ];

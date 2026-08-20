@@ -273,7 +273,7 @@ export function inlineGrantsLedger(prisma: PrismaClient): InlineLedger {
  * `system-migrations/runtime.ts` composes them, with two deps injected rather
  * than composed from the App: the cutover cohort (a per-organization
  * enrollment read in production - the ops page's `SystemMigrationEnrollment`
- * rows) and the platform-admin email list.
+ * rows).
  *
  * The epoch bump is a no-op here. It is Redis work stage B already proves, and
  * this pass is about which facts land and who decides afterwards.
@@ -282,12 +282,10 @@ export function cutoverMigrations({
   prisma,
   ledger,
   cutoverCohort = () => true,
-  adminEmails = () => [],
 }: {
   prisma: PrismaClient;
   ledger: GrantsLedgerEmitter;
   cutoverCohort?: (tenantId: string) => boolean;
-  adminEmails?: () => string[];
 }): SystemMigration[] {
   const repository = new PrismaAuthzMigrationRepository(prisma);
   return [
@@ -324,7 +322,6 @@ export function cutoverMigrations({
       // legacy body because the organization is not on the engine yet.
       legacyDecide: legacyOrganizationDecide(prisma),
       cutoverCohort,
-      adminEmails,
       now: () => Date.now(),
       poll: IMMEDIATE_POLL,
     }),

@@ -17,10 +17,7 @@
  *
  * @see specs/rbac/in-place-authz-migration.feature
  */
-import {
-  GRANTS_CUTOVER_MIGRATION_NAME,
-  PLATFORM_AUTHZ_TENANT_ID,
-} from "@langwatch/authz-server/migration";
+import { GRANTS_CUTOVER_MIGRATION_NAME } from "@langwatch/authz-server/migration";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -43,12 +40,9 @@ import {
 
 const ns = `authz-cutover-import-${nanoid(8)}`;
 
-const OPERATOR_EMAIL = `operator-${ns}@example.com`;
-
 /** Fixed business times, so "carries the row's own time" is checkable. */
 const MEMBERSHIP_AT = new Date("2024-03-01T09:00:00.000Z");
 const SHARE_LINK_AT = new Date("2024-05-17T13:45:00.000Z");
-const OPERATOR_AT = new Date("2023-11-02T08:15:00.000Z");
 const PROJECT_AT = new Date("2024-01-09T07:30:00.000Z");
 const SHARE_EXPIRES_AT = new Date("2026-12-31T23:59:00.000Z");
 
@@ -61,7 +55,6 @@ describe("given an organization whose legacy facts live outside its bindings", (
   let team: Team;
   let project: Project;
   let adminUserId: string;
-  let operatorUserId: string;
   let shareLinkId: string;
 
   beforeAll(async () => {
@@ -104,16 +97,6 @@ describe("given an organization whose legacy facts live outside its bindings", (
       },
     });
 
-    // The operator whose access is an entry in ADMIN_EMAILS and nothing else.
-    const operator = await prisma.user.create({
-      data: {
-        name: "Platform Operator",
-        email: OPERATOR_EMAIL,
-        createdAt: OPERATOR_AT,
-      },
-    });
-    operatorUserId = operator.id;
-
     // The share link, with the terms a customer is holding: a token, an
     // expiry and a view cap.
     const shareLink = await prisma.shareLink.create({
@@ -135,10 +118,6 @@ describe("given an organization whose legacy facts live outside its bindings", (
       prisma,
       ledger: ledger.emitter,
       cutoverCohort: (tenantId) => tenantId === organization.id,
-      // Injected rather than read from ADMIN_EMAILS: the list is a
-      // process.env read in production, and this suite is about what the
-      // import does with the operators it names.
-      adminEmails: () => [OPERATOR_EMAIL],
     });
     // A silent exit from this loop leaves every assertion below failing on
     // a missing grant, which reads as "the import did not state the fact"
@@ -180,23 +159,10 @@ describe("given an organization whose legacy facts live outside its bindings", (
     // Every sibling fixture guards itself: a `beforeAll` that failed partway
     // leaves later fixtures undefined, and a TypeError here would bury the
     // failure that actually broke the suite.
-    const userIds = [adminUserId, operatorUserId].filter(
+    const userIds = [adminUserId].filter(
       (id): id is string => typeof id === "string",
     );
     await cleanupTestRows(prisma, [
-      // The sentinel aggregate is shared by every organization's cutover, so
-      // only this operator's rows are swept from it.
-      ...(operatorUserId
-        ? ([
-            [
-              "grant",
-              {
-                organizationId: PLATFORM_AUTHZ_TENANT_ID,
-                principalId: operatorUserId,
-              },
-            ],
-          ] as const)
-        : []),
       ["grantUsage", { organizationId: organization.id }],
       ...(project?.id
         ? ([["shareLink", { projectId: project.id }]] as const)
@@ -258,22 +224,16 @@ describe("given an organization whose legacy facts live outside its bindings", (
     expect(resourceGrant?.expiresAt).toEqual(SHARE_EXPIRES_AT);
     expect(resourceGrant?.occurredAt).toEqual(SHARE_LINK_AT);
 
-    // The operator, on the sentinel aggregate every organization's cutover
-    // addresses - never on the organization that happened to emit it.
-    const platformGrant = await prisma.grant.findFirst({
+    // Operator access is the live admin list, never a ledger fact: nothing
+    // the cutover stated lives on any aggregate but this organization's own.
+    const strayGrants = await prisma.grant.findMany({
       where: {
-        organizationId: PLATFORM_AUTHZ_TENANT_ID,
-        principalType: GrantPrincipalType.USER,
-        principalId: operatorUserId,
+        source: "cutover-import",
+        organizationId: { not: organization.id },
         scopeType: GrantScopeType.PLATFORM,
       },
     });
-    expect(platformGrant).toMatchObject({
-      scopeId: PLATFORM_AUTHZ_TENANT_ID,
-      roleKey: "admin",
-      source: "cutover-import",
-    });
-    expect(platformGrant?.occurredAt).toEqual(OPERATOR_AT);
+    expect(strayGrants).toEqual([]);
 
     // Nothing the import stated carries the time it was stated. The
     // organization's two imported facts - the share link and the project's

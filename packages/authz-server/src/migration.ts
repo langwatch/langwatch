@@ -12,13 +12,10 @@ export { GRANTS_CUTOVER_MIGRATION_NAME } from "./cutover.name";
 export {
   CUTOVER_WAITING_REPORT_KINDS,
   GrantsCutoverMigration,
-  normalizedAdminEmails,
-  PLATFORM_AUTHZ_TENANT_ID,
 } from "./cutover.migration";
 export type {
   CutoverDeps,
   CutoverResourceDiff,
-  UnmatchedAdminEmailsReport,
 } from "./cutover.migration";
 export { GRANTS_GENESIS_IMPORT_MIGRATION_NAME } from "./genesis-import.name";
 export {

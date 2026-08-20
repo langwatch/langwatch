@@ -9,7 +9,6 @@ import type {
   LegacyTeamRow,
   OrganizationMemberFact,
   OrganizationScopeInventory,
-  PlatformAdminUserFact,
   ProjectCredentialFact,
   ResourceGrantRow,
   ResourceGrantUsageSeed,
@@ -441,35 +440,6 @@ export class PrismaAuthzMigrationRepository
       projectId: row.id,
       createdAtMs: row.createdAt.getTime(),
     }));
-  }
-
-  async findUsersByEmail({
-    emails,
-  }: {
-    emails: readonly string[];
-  }): Promise<PlatformAdminUserFact[]> {
-    if (emails.length === 0) return [];
-    // Case-insensitive, exactly as the live admin check compares: a stored
-    // address that differs only in case is the same operator.
-    const rows = await this.prisma.user.findMany({
-      where: {
-        OR: emails.map((email) => ({
-          email: { equals: email, mode: "insensitive" as const },
-        })),
-      },
-      select: { id: true, email: true, createdAt: true },
-    });
-    return rows.flatMap((row) =>
-      row.email === null
-        ? []
-        : [
-            {
-              userId: row.id,
-              email: row.email.toLowerCase(),
-              createdAtMs: row.createdAt.getTime(),
-            },
-          ],
-    );
   }
 
   async findResourceGrantRows({

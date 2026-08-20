@@ -487,23 +487,34 @@ function EnrollCohortAction({
 }) {
   const [open, setOpen] = useState(false);
   const [sampleSizeText, setSampleSizeText] = useState("50");
-  const sampleSize = Number.parseInt(sampleSizeText, 10);
+  // Number, not parseInt: "1e3" and "50.5" must disable Confirm rather than
+  // be silently reinterpreted as 1 and 50.
+  const sampleSize = Number(sampleSizeText);
   const sampleSizeValid =
     Number.isInteger(sampleSize) && sampleSize >= 1 && sampleSize <= 1000;
   const utils = api.useUtils();
   const enrollCohort = api.ops.enrollMigrationCohort.useMutation({
     onSuccess: async (result) => {
-      toaster.create({
-        title:
-          result.enrolled.length === 1
-            ? "1 organization enrolled"
-            : `${result.enrolled.length} organizations enrolled`,
-        description:
-          result.enrolled.length < sampleSize
-            ? "Fewer eligible organizations remained than the requested cohort size, so every remaining one was enrolled. The next migration pass picks them up automatically."
-            : "The next migration pass picks the cohort up automatically.",
-        type: "success",
-      });
+      toaster.create(
+        result.enrolled.length === 0
+          ? {
+              title: "No organizations enrolled",
+              description:
+                "No eligible organizations remained to enroll for this step.",
+              type: "info",
+            }
+          : {
+              title:
+                result.enrolled.length === 1
+                  ? "1 organization enrolled"
+                  : `${result.enrolled.length} organizations enrolled`,
+              description:
+                result.enrolled.length < sampleSize
+                  ? "Fewer eligible organizations remained than the requested cohort size, so every remaining one was enrolled. The next migration pass picks them up automatically."
+                  : "The next migration pass picks the cohort up automatically.",
+              type: "success",
+            },
+      );
       setOpen(false);
       await Promise.all([
         utils.ops.listMigrationEnrollments.invalidate(),
@@ -531,7 +542,11 @@ function EnrollCohortAction({
           });
         }}
         title={`Enroll a cohort for the ${migrationTitle.toLowerCase()}`}
-        description="Enrolls a random sample of organizations not yet enrolled for this step. Organizations on an enterprise plan or with a dedicated data plane are always left out."
+        description={
+          requiresConfirmation
+            ? "Enrolls a random sample of organizations not yet enrolled for this step. Once their earlier steps finish, the next pass proves parity and moves every enrolled organization's permission checks onto the new engine. Organizations on an enterprise plan or with a dedicated data plane are always left out."
+            : "Enrolls a random sample of organizations not yet enrolled for this step. It changes nothing about who answers permission checks. Organizations on an enterprise plan or with a dedicated data plane are always left out."
+        }
         isLoading={enrollCohort.isPending}
         confirmDisabled={!sampleSizeValid}
       >

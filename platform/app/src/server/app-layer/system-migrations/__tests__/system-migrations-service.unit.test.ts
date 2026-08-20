@@ -66,7 +66,7 @@ function enrollmentStoreStub() {
       .mockResolvedValue([]),
     createMany: vi
       .fn<SystemMigrationEnrollmentStore["createMany"]>()
-      .mockResolvedValue(undefined),
+      .mockResolvedValue({ insertedCount: 0 }),
     delete: vi
       .fn<SystemMigrationEnrollmentStore["delete"]>()
       .mockResolvedValue(undefined),

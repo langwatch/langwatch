@@ -97,14 +97,6 @@ Feature: Private ClickHouse Routing
     And no project needs to exist for that id
 
   @integration
-  Scenario: The platform tenant routes like an organization
-    Given the grants ledger's platform aggregate, which belongs to no customer
-    When a client is resolved for the tenant "platform"
-    Then it routes by that name through the same path an organization takes
-    And a CLICKHOUSE_URL__<label>__platform env var would give it its own instance
-    And absent one it falls back to the shared ClickHouse, like any other org
-
-  @integration
   Scenario: A tenant that names neither a project nor an organization is refused
     Given an id that matches no project and no organization
     When a client is resolved for that tenant

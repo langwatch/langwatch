@@ -203,7 +203,7 @@ Feature: In-place authorization data migration
 
   @unit
   Scenario: A cohort never includes an enterprise organization
-    Given "bigcorp" holds an active enterprise subscription
+    Given "bigcorp" holds an active or pending enterprise subscription
     And "isolated-inc" routes to a private ClickHouse instance via the environment
     When an operator enrolls a cohort for the grants import
     Then neither "bigcorp" nor "isolated-inc" is in the cohort
@@ -529,12 +529,18 @@ Feature: In-place authorization data migration
   @integration
   Scenario: Cutover imports the legacy facts that only exist outside bindings
     Given "acme" has a member whose only admin fact is a legacy organization ADMIN row
-    And "acme" has a share link and an operator listed in the platform admin list
+    And "acme" has a share link
     When "acme" is cut over
     Then the legacy admin holds an organization-scoped admin grant
     And the share link is a resource-scope grant with its token and expiry intact
-    And the operator holds a platform-scope grant
     And every imported grant carries the business time of the fact it came from
+
+  @unit
+  Scenario: Platform operator access is never a ledger fact
+    Given the admin list in the environment is the live authority for operator access
+    When an organization is cut over
+    Then every fact the cutover states belongs to that organization's own aggregate
+    And no fact is stated for any tenant that is not an organization
 
   @unit
   Scenario: A share grant no legacy link accounts for holds the cutover
@@ -603,7 +609,14 @@ Feature: In-place authorization data migration
     Given "acme"'s genesis import states more facts than the base wait could fold
     When the import waits for the projection to land its facts
     Then the wait's deadline scales with the number of facts it is waiting on
-    And an organization is never parked purely for being large
+    And an organization within the ceiling's budget is never parked for being large
+
+  @unit
+  Scenario: The convergence wait's budget has a ceiling
+    Given an organization whose import is larger than the ceiling's budget
+    When the import waits for the projection
+    Then the wait stops growing at the ceiling, so one organization cannot hold the pass indefinitely
+    And past it the organization parks and finishes on a later pass, as every organization did before
 
   @unit
   Scenario: Running the genesis import twice states the same facts

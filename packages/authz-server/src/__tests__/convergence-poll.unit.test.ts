@@ -24,6 +24,7 @@ describe("convergenceTimeoutMs", () => {
         expect(large).toBeGreaterThan(175_000);
       });
 
+      /** @scenario "The convergence wait's budget has a ceiling" */
       it("stops growing at the ceiling", () => {
         const enormous = convergenceTimeoutMs({
           poll: DEFAULT_CONVERGENCE_POLL,

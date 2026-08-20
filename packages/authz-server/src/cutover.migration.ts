@@ -44,9 +44,7 @@
  * organization: the parity fact is keyed on its diff set (so hold → fix →
  * re-prove records the fix rather than keeping the failure forever), the
  * completion on the pass's own timestamp (so an organization rolled back and
- * cut over again can actually flip a second time), and the platform chunk on
- * its contents (so a changed ADMIN_EMAILS is a new command rather than a
- * duplicate of the old one). See `parityCommandId`.
+ * cut over again can actually flip a second time). See `parityCommandId`.
  *
  * Dormant facts (decision 13): the lite-member, project-credential and
  * PLATFORM rows this import writes are STORED but no PR-3 decision reads
@@ -72,7 +70,6 @@ import type {
   AuthzCutoverRepository,
   ExternalMemberFact,
   OrganizationScopeInventory,
-  PlatformAdminUserFact,
   ProjectCredentialFact,
   ResourceGrantRow,
   ShareLinkFactRow,
@@ -98,22 +95,6 @@ import type {
 import { TEAM_USER_BACKFILL_MIGRATION_NAME } from "./team-user-backfill.name";
 
 const logger = createLogger("langwatch:authz:cutover");
-
-/**
- * The aggregate platform-scope facts live on.
- *
- * A PLATFORM grant is tenantless by definition — an operator's access is not
- * an organization's fact, and copying one row per organization would make
- * the same access N facts that can drift apart. One reserved aggregate keeps
- * platform facts event-sourced like everything else, and because every
- * organization's cutover emits them with IDENTICAL deterministic command ids
- * and grant ids, the hundredth cutover to reach this step appends nothing:
- * the event store dedupes on the key it has already seen.
- *
- * "platform" is not an organization id and can never collide with one (ids
- * are prefixed KSUIDs), which is what lets it share the table.
- */
-export const PLATFORM_AUTHZ_TENANT_ID = "platform";
 
 /** The actor on every fact this migration authors: no human performed it. */
 const CUTOVER_ACTOR: GrantsLedgerActor = {
@@ -161,20 +142,6 @@ export type CutoverResourceDiff = {
   actual?: string | null;
 };
 
-/**
- * What the report says about admin addresses with no account behind them.
- *
- * An email address is personal data and a migration report is a stored JSON
- * blob on an ops page, so the report carries a COUNT and a masked digest per
- * address - enough for an operator to recognise the typo they made, not
- * enough to be a list of email addresses at rest. The full list goes to one
- * log line, where retention and access are already governed.
- */
-export type UnmatchedAdminEmailsReport = {
-  count: number;
-  digests: string[];
-};
-
 export type CutoverDeps = {
   repository: AuthzCutoverRepository;
   ledger: GrantsLedgerEmitter;
@@ -216,8 +183,6 @@ export type CutoverDeps = {
    * be asynchronous; the package reads no configuration of its own.
    */
   cutoverCohort: (tenantId: string) => boolean | Promise<boolean>;
-  /** The platform-admin email list, as the live admin check parses it. */
-  adminEmails: () => string[];
   now: () => number;
   /** How long to wait for the projection before parking. */
   poll?: ConvergencePoll;
@@ -228,7 +193,6 @@ type CutoverCounts = {
   shareLinks: number;
   liteMembers: number;
   projectCredentials: number;
-  platformGrants: number;
 };
 
 export class GrantsCutoverMigration implements SystemMigration {
@@ -277,14 +241,13 @@ export class GrantsCutoverMigration implements SystemMigration {
       };
     }
 
-    const { emissions, unmatchedAdminEmails } = await this.planImport({
+    const { emissions } = await this.planImport({
       organizationId,
     });
     const counts: CutoverCounts = {
       shareLinks: emissions.shareLinks.length,
       liteMembers: emissions.liteMembers.length,
       projectCredentials: emissions.projectCredentials.length,
-      platformGrants: emissions.platform.length,
     };
 
     await this.emit({ organizationId, emissions, signal });
@@ -298,7 +261,6 @@ export class GrantsCutoverMigration implements SystemMigration {
         report: {
           kind: "cutover_resource_drift",
           ...counts,
-          unmatchedAdminEmails,
           totalDiffs: resourceDiffs.length,
           diffs: resourceDiffs.slice(0, MAX_REPORTED_DIFFS),
         },
@@ -329,7 +291,6 @@ export class GrantsCutoverMigration implements SystemMigration {
           kind: "cutover_parity_diffs",
           ...counts,
           ...parity.verified,
-          unmatchedAdminEmails,
           totalDiffs: sortedDiffs.length,
           diffs: sortedDiffs.slice(0, MAX_REPORTED_DIFFS),
         },
@@ -363,7 +324,6 @@ export class GrantsCutoverMigration implements SystemMigration {
         kind: "cutover_clean",
         ...counts,
         ...parity.verified,
-        unmatchedAdminEmails,
       },
     };
   }
@@ -398,32 +358,13 @@ export class GrantsCutoverMigration implements SystemMigration {
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<{
-    emissions: PlannedEmissions;
-    unmatchedAdminEmails: UnmatchedAdminEmailsReport;
-  }> {
+  }): Promise<{ emissions: PlannedEmissions }> {
     const [shareLinkRows, externalMembers, projectCredentials] =
       await Promise.all([
         this.deps.repository.findShareLinkRows({ organizationId }),
         this.deps.repository.findExternalMemberFacts({ organizationId }),
         this.deps.repository.findProjectCredentialFacts({ organizationId }),
       ]);
-    const emails = normalizedAdminEmails(this.deps.adminEmails());
-    const admins =
-      emails.length === 0
-        ? []
-        : await this.deps.repository.findUsersByEmail({ emails });
-    const matched = new Set(admins.map((user) => user.email.toLowerCase()));
-    const unmatched = emails.filter((email) => !matched.has(email));
-    if (unmatched.length > 0) {
-      // The full list lives HERE and only here. It is operational detail an
-      // engineer needs once, on a surface that already governs retention -
-      // not a permanent JSON column on a report an ops page renders.
-      logger.warn(
-        { organizationId, unmatchedAdminEmails: unmatched },
-        "cutover found platform-admin addresses with no account behind them",
-      );
-    }
 
     return {
       emissions: {
@@ -439,19 +380,6 @@ export class GrantsCutoverMigration implements SystemMigration {
           .slice()
           .sort((a, b) => a.projectId.localeCompare(b.projectId))
           .map((project) => projectCredentialEmission({ organizationId, project })),
-        platform: admins
-          .slice()
-          .sort((a, b) => a.userId.localeCompare(b.userId))
-          .map((user) => platformEmission({ user })),
-      },
-      // Not fatal, and deliberately so: ADMIN_EMAILS stays the LIVE authority
-      // for platform access until contract (decision 13), so an address with
-      // no account behind it changes nothing about who can do what. It is
-      // reported because it is almost always a typo or a departed colleague -
-      // masked, because the report is stored (see UnmatchedAdminEmailsReport).
-      unmatchedAdminEmails: {
-        count: unmatched.length,
-        digests: unmatched.map(maskEmail),
       },
     };
   }
@@ -471,8 +399,7 @@ export class GrantsCutoverMigration implements SystemMigration {
       ["lite-members", emissions.liteMembers],
       ["project-keys", emissions.projectCredentials],
     ];
-    // Each command id carries a hash of its chunk's contents, for the same
-    // reason the platform family's does (below): these are LIVE tables. A
+    // Each command id carries a hash of its chunk's contents: these are LIVE tables. A
     // held organization is re-imported on every pass, and a member added or
     // a link minted meanwhile SHIFTS the chunks - keyed on the index alone,
     // the shifted chunk deduped against the old event, the new fact never
@@ -490,25 +417,6 @@ export class GrantsCutoverMigration implements SystemMigration {
           grants: chunk,
         });
       }
-    }
-    // The sentinel aggregate, addressed as its own tenant. The commandId
-    // carries no organization on purpose - every organization's cutover
-    // emits the same operators and the event store dedupes them - but it
-    // DOES carry a hash of the chunk's contents, because ADMIN_EMAILS is a
-    // live list that changes between cutovers. Keyed on the index alone,
-    // the first organization to cut over after an operator was added
-    // emitted `cutover:platform:0` with a different membership and the
-    // store swallowed it: the new operator's PLATFORM fact never landed,
-    // and nothing anywhere said so.
-    for (const [index, chunk] of chunked(emissions.platform).entries()) {
-      this.assertNotAborted(signal);
-      await this.deps.ledger.attachGrants({
-        organizationId: PLATFORM_AUTHZ_TENANT_ID,
-        commandId: `cutover:platform:${contentHash(
-          chunk.map((grant) => grant.grantId),
-        )}:${index}`,
-        grants: chunk,
-      });
     }
   }
 
@@ -532,30 +440,19 @@ export class GrantsCutoverMigration implements SystemMigration {
       ...emissions.liteMembers,
       ...emissions.projectCredentials,
     ].map((grant) => grant.grantId);
-    const platformGrantIds = emissions.platform.map((grant) => grant.grantId);
-    if (organizationGrantIds.length === 0 && platformGrantIds.length === 0) {
+    if (organizationGrantIds.length === 0) {
       return;
     }
 
     await this.pollUntil({
       what: `the cutover import for ${organizationId}`,
-      factCount: organizationGrantIds.length + platformGrantIds.length,
+      factCount: organizationGrantIds.length,
       signal,
       check: async () => {
-        const [organizationHeads, platformHeads] = await Promise.all([
-          organizationGrantIds.length === 0
-            ? Promise.resolve<string[]>([])
-            : this.deps.repository.findGrantHeadIds({ organizationId }),
-          platformGrantIds.length === 0
-            ? Promise.resolve<string[]>([])
-            : this.deps.repository.findGrantHeadIds({
-                organizationId: PLATFORM_AUTHZ_TENANT_ID,
-              }),
-        ]);
-        const present = new Set([...organizationHeads, ...platformHeads]);
-        return [...organizationGrantIds, ...platformGrantIds].every((id) =>
-          present.has(id),
+        const present = new Set(
+          await this.deps.repository.findGrantHeadIds({ organizationId }),
         );
+        return organizationGrantIds.every((id) => present.has(id));
       },
     });
   }
@@ -903,7 +800,6 @@ type PlannedEmissions = {
   shareLinks: BackfillGrantEmission[];
   liteMembers: BackfillGrantEmission[];
   projectCredentials: BackfillGrantEmission[];
-  platform: BackfillGrantEmission[];
 };
 
 /**
@@ -961,19 +857,6 @@ export function parityCommandId({
   diffs: readonly string[];
 }): string {
   return `cutover:parity:${organizationId}:${contentHash(diffs)}`;
-}
-
-/**
- * An address as the report may keep it: the first two characters of the local
- * part, its domain, and a digest of the whole. Enough for an operator to
- * recognise `op**@langwatch.ai` as the entry they mistyped; not a mailing
- * list at rest. An address with no `@` is masked whole.
- */
-function maskEmail(email: string): string {
-  const at = email.lastIndexOf("@");
-  const digest = contentHash([email]);
-  if (at <= 0) return `***:${digest}`;
-  return `${email.slice(0, Math.min(2, at))}***${email.slice(at)}:${digest}`;
 }
 
 function chunked<T>(items: T[]): T[][] {
@@ -1085,55 +968,6 @@ function projectCredentialEmission({
     occurredAtMs: project.createdAtMs,
     actor: CUTOVER_ACTOR,
   };
-}
-
-/**
- * A platform operator, on the sentinel aggregate. Everything about this
- * fact — the aggregate, the derived grant id, the command id — is a
- * function of the user alone, never of the organization whose cutover
- * happened to emit it, which is what makes the hundredth emission a no-op.
- */
-function platformEmission({
-  user,
-}: {
-  user: PlatformAdminUserFact;
-}): BackfillGrantEmission {
-  const principal = { type: "user" as const, id: user.userId };
-  const scope = {
-    type: "PLATFORM" as const,
-    id: PLATFORM_AUTHZ_TENANT_ID,
-  };
-  return {
-    grantId: deriveGrantId({
-      organizationId: PLATFORM_AUTHZ_TENANT_ID,
-      principal,
-      scope,
-      occurredAtMs: user.createdAtMs,
-    }),
-    principal,
-    roleKey: "admin",
-    scope,
-    source: "cutover-import",
-    occurredAtMs: user.createdAtMs,
-    actor: CUTOVER_ACTOR,
-  };
-}
-
-/**
- * The admin list as the live check (`ee/admin/isAdmin.ts`'s `adminEmailList`)
- * reads it: comma-separated, trimmed, case-insensitive, blanks dropped.
- *
- * A separate implementation of the same parse rather than a shared one - this
- * package cannot import the platform's `ee/` tree. Exported so a pinning test
- * on the platform side (which CAN import both) can assert the two never
- * disagree on the same input; see `adminEmailList`'s own tests.
- */
-export function normalizedAdminEmails(raw: string[]): string[] {
-  return [
-    ...new Set(
-      raw.map((email) => email.trim().toLowerCase()).filter((email) => email),
-    ),
-  ];
 }
 
 /** Every scope in the organization, with the lineage the engine's walk

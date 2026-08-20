@@ -6,7 +6,6 @@ import type {
   AuthzCutoverRepository,
   ExternalMemberFact,
   OrganizationScopeInventory,
-  PlatformAdminUserFact,
   ProjectCredentialFact,
   ResourceGrantRow,
   ResourceGrantUsageSeed,
@@ -16,7 +15,6 @@ import {
   type CutoverResourceDiff,
   GrantsCutoverMigration,
   parityCommandId,
-  PLATFORM_AUTHZ_TENANT_ID,
 } from "../cutover.migration";
 import { GRANTS_GENESIS_IMPORT_MIGRATION_NAME } from "../genesis-import.name";
 import {
@@ -35,7 +33,6 @@ const ORG = "org_acme";
 const SHARE_CREATED_AT_MS = 1_700_000_000_000;
 const MEMBER_CREATED_AT_MS = 1_690_000_000_000;
 const PROJECT_CREATED_AT_MS = 1_680_000_000_000;
-const ADMIN_CREATED_AT_MS = 1_670_000_000_000;
 
 /**
  * The heads as the fold would leave them: an attach lands its grant id on
@@ -50,11 +47,10 @@ class FakeCutoverRepository implements AuthzCutoverRepository {
   shareLinkRows: ShareLinkFactRow[] = [];
   externalMembers: ExternalMemberFact[] = [];
   projectCredentials: ProjectCredentialFact[] = [];
-  adminUsers: PlatformAdminUserFact[] = [];
   memberIds: string[] = [];
   apiKeyIds: string[] = [];
   inventory: OrganizationScopeInventory = { teamIds: [], projects: [] };
-  /** Grant head ids per aggregate — the organization's and the sentinel's. */
+  /** Grant head ids per aggregate. */
   grantHeadIds = new Map<string, string[]>();
   /** What the resource proof's re-read sees; null means "derive it from
    *  what the ledger landed", which is the converged case. */
@@ -91,13 +87,6 @@ class FakeCutoverRepository implements AuthzCutoverRepository {
   }
   async findProjectCredentialFacts(): Promise<ProjectCredentialFact[]> {
     return this.projectCredentials;
-  }
-  async findUsersByEmail({
-    emails,
-  }: {
-    emails: readonly string[];
-  }): Promise<PlatformAdminUserFact[]> {
-    return this.adminUsers.filter((user) => emails.includes(user.email));
   }
   async findResourceGrantRows(): Promise<ResourceGrantRow[]> {
     // An explicit list IS what the head says, drift and all. Otherwise the
@@ -322,7 +311,6 @@ describe("GrantsCutoverMigration", () => {
   let repository: FakeCutoverRepository;
   let ledger: FakeLedger;
   let cohort: boolean;
-  let adminEmails: string[];
   /** A clock that only ever moves forward, so two passes in the same
    *  millisecond are still two passes. */
   let clock: number;
@@ -333,7 +321,6 @@ describe("GrantsCutoverMigration", () => {
       ledger,
       collectors: { legacy: collectorOf(), grants: collectorOf() },
       cutoverCohort: () => cohort,
-      adminEmails: () => adminEmails,
       now: () => clock++,
       poll: { intervalMs: 1, timeoutMs: 50 },
     });
@@ -347,7 +334,6 @@ describe("GrantsCutoverMigration", () => {
     repository = new FakeCutoverRepository();
     ledger = new FakeLedger(repository);
     cohort = true;
-    adminEmails = [];
     clock = 1_700_000_000_000;
   });
 
@@ -424,14 +410,6 @@ describe("GrantsCutoverMigration", () => {
       ];
       repository.projectCredentials = [
         { projectId: "proj_chatbot", createdAtMs: PROJECT_CREATED_AT_MS },
-      ];
-      adminEmails = ["Ops@langwatch.ai"];
-      repository.adminUsers = [
-        {
-          userId: "user_ops",
-          email: "ops@langwatch.ai",
-          createdAtMs: ADMIN_CREATED_AT_MS,
-        },
       ];
     });
 
@@ -510,32 +488,16 @@ describe("GrantsCutoverMigration", () => {
         ]);
       });
 
-      it("puts platform operators on the sentinel aggregate, not on the organization", async () => {
+      /** @scenario "Platform operator access is never a ledger fact" */
+      it("states every fact on the organization's own aggregate and none elsewhere", async () => {
         await migration().migrateTenant({ tenantId: ORG });
 
-        const platformCalls = ledger.calls.filter(
-          (call) =>
-            call.verb === "attachGrants" &&
-            call.organizationId === PLATFORM_AUTHZ_TENANT_ID,
+        const tenants = new Set(
+          ledger.calls
+            .filter((call) => call.verb === "attachGrants")
+            .map((call) => call.organizationId),
         );
-        expect(platformCalls).toEqual([
-          expect.objectContaining({
-            organizationId: "platform",
-            // No organization in the id - every organization's cutover
-            // emits the same operators and the store dedupes them - but a
-            // hash of the chunk, so a CHANGED operator list is a new
-            // command rather than a duplicate of the old one.
-            commandId: expect.stringMatching(/^cutover:platform:[^:]+:0$/),
-            grants: [
-              expect.objectContaining({
-                principal: { type: "user", id: "user_ops" },
-                roleKey: "admin",
-                scope: { type: "PLATFORM", id: "platform" },
-                occurredAtMs: ADMIN_CREATED_AT_MS,
-              }),
-            ],
-          }),
-        ]);
+        expect(tenants).toEqual(new Set([ORG]));
       });
 
       it("names every chunk deterministically so a retry appends the same events", async () => {
@@ -559,7 +521,6 @@ describe("GrantsCutoverMigration", () => {
           expect.stringMatching(
             new RegExp(`^cutover:project-keys:${ORG}:[^:]+:0$`),
           ),
-          expect.stringMatching(/^cutover:platform:[^:]+:0$/),
         ]);
       });
 
@@ -617,30 +578,7 @@ describe("GrantsCutoverMigration", () => {
           shareLinks: 3,
           liteMembers: 1,
           projectCredentials: 1,
-          platformGrants: 1,
         });
-      });
-    });
-
-    describe("when an admin email matches no account", () => {
-      it("reports it and cuts over anyway", async () => {
-        adminEmails = ["ops@langwatch.ai", " Gone@langwatch.ai ", ""];
-
-        const outcome = await migration().migrateTenant({ tenantId: ORG });
-
-        expect(outcome.status).toBe("finalized");
-        const report = outcome.report as {
-          unmatchedAdminEmails: { count: number; digests: string[] };
-        };
-        expect(report.unmatchedAdminEmails.count).toBe(1);
-        // Masked, because the report is stored: enough to recognise the
-        // typo, not a list of addresses at rest.
-        expect(report.unmatchedAdminEmails.digests).toHaveLength(1);
-        expect(report.unmatchedAdminEmails.digests[0]).toMatch(
-          /^go\*\*\*@langwatch\.ai:/,
-        );
-        expect(JSON.stringify(report)).not.toContain("gone@langwatch.ai");
-        expect(outcome.report).toMatchObject({ platformGrants: 1 });
       });
     });
 
@@ -790,7 +728,6 @@ describe("GrantsCutoverMigration", () => {
           grants: collectorOf(),
         },
         cutoverCohort: () => cohort,
-        adminEmails: () => adminEmails,
         now: () => clock++,
         poll: { intervalMs: 1, timeoutMs: 50 },
       });
@@ -960,7 +897,6 @@ describe("GrantsCutoverMigration", () => {
               grants: collectorOf(),
             },
             cutoverCohort: () => cohort,
-            adminEmails: () => adminEmails,
             now: () => clock++,
             poll: { intervalMs: 1, timeoutMs: 50 },
           });
@@ -1014,51 +950,6 @@ describe("GrantsCutoverMigration", () => {
         );
         expect(completions).toHaveLength(2);
         expect(completions[0]!.commandId).not.toBe(completions[1]!.commandId);
-      });
-    });
-  });
-
-  describe("given the platform-admin list changed between two cutovers", () => {
-    describe("when the second organization cuts over", () => {
-      it("names a different command, so the new operator's fact lands", async () => {
-        repository.adminUsers = [
-          { userId: "user_ops", email: "ops@langwatch.ai", createdAtMs: 1 },
-          { userId: "user_new", email: "new@langwatch.ai", createdAtMs: 2 },
-        ];
-
-        adminEmails = ["ops@langwatch.ai"];
-        await migration().migrateTenant({ tenantId: ORG });
-        adminEmails = ["ops@langwatch.ai", "new@langwatch.ai"];
-        await migration().migrateTenant({ tenantId: "org_other" });
-
-        const platformCommands = ledger.calls
-          .filter(
-            (call) =>
-              call.verb === "attachGrants" &&
-              call.organizationId === PLATFORM_AUTHZ_TENANT_ID,
-          )
-          .map((call) => call.commandId);
-        expect(platformCommands).toHaveLength(2);
-        expect(platformCommands[0]).not.toBe(platformCommands[1]);
-      });
-
-      it("names the same command when the list did not change", async () => {
-        adminEmails = ["ops@langwatch.ai"];
-        repository.adminUsers = [
-          { userId: "user_ops", email: "ops@langwatch.ai", createdAtMs: 1 },
-        ];
-
-        await migration().migrateTenant({ tenantId: ORG });
-        await migration().migrateTenant({ tenantId: "org_other" });
-
-        const platformCommands = ledger.calls
-          .filter(
-            (call) =>
-              call.verb === "attachGrants" &&
-              call.organizationId === PLATFORM_AUTHZ_TENANT_ID,
-          )
-          .map((call) => call.commandId);
-        expect(platformCommands[0]).toBe(platformCommands[1]);
       });
     });
   });
@@ -1182,7 +1073,6 @@ describe("GrantsCutoverMigration", () => {
         collectors: { legacy: collectorOf(), grants: collectorOf() },
         legacyDecide,
         cutoverCohort: () => cohort,
-        adminEmails: () => adminEmails,
         now: () => clock++,
         poll: { intervalMs: 1, timeoutMs: 50 },
       });
