@@ -779,6 +779,7 @@ export class GrantsLedgerWriter {
     await this.enforcement.enforceGrantRevocation({
       organizationId,
       grantIds: bindingIds,
+      reason: "revocation",
     });
     await bumpAuthzEpoch({ organizationId });
   }
@@ -1263,6 +1264,7 @@ export class GrantsLedgerWriter {
     await this.enforcement.enforceGrantRevocation({
       organizationId,
       grantIds: revokedGrantIds,
+      reason: "offboard",
     });
     await bumpAuthzEpoch({ organizationId });
   }

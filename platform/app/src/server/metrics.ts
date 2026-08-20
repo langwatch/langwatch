@@ -231,6 +231,31 @@ export const getEdgeMediaExtractFailOpenCounter = (
     | "part_store",
 ) => edgeMediaExtractFailOpenCounter.labels(reason);
 
+// Authorization writes that reach the projection WITHOUT going through the
+// group queue. Every other authz write is queued; these three are deliberate
+// exceptions, and each one only ever makes a denial true earlier:
+// a revocation, an offboarding, and a cutover rollback.
+//
+// The reason to count them is that a direct write is the one path whose
+// effect is NOT recorded as an event when Redis is down — the deny lands in
+// Postgres, the event never appends, and a later projection replay would
+// resurrect the access. This counter is how you know that window happened
+// and how wide it was; a replay run without checking it is unsafe.
+//
+// A healthy fleet emits this at a low, human-paced rate (it tracks people
+// revoking and offboarding). A spike means a bulk revocation; increments
+// while the queue is down are the ones that matter.
+register.removeSingleMetric("langwatch_authz_direct_projection_write_total");
+const authzDirectProjectionWriteCounter = new Counter({
+  name: "langwatch_authz_direct_projection_write_total",
+  help: "Authorization projection writes that bypassed the group queue, by cause",
+  labelNames: ["reason"] as const,
+});
+
+export const getAuthzDirectProjectionWriteCounter = (
+  reason: "revocation" | "offboard" | "cutover_rollback",
+) => authzDirectProjectionWriteCounter.labels(reason);
+
 // Online-evaluator loop guard counter (post-2026-05-11 incident). A healthy
 // fleet emits this at ~zero rate. Sustained increments indicate either
 // causality_depth propagation is broken on the evaluator side or a customer

@@ -15,6 +15,7 @@ import {
 } from "@langwatch/authz-server";
 import { createLogger } from "@langwatch/observability";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
+import { getAuthzDirectProjectionWriteCounter } from "~/server/metrics";
 import type { AuthzGrantsFoldState } from "~/server/event-sourcing/pipelines/authz-grants/projections/authzGrantsState.foldProjection";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {
@@ -285,11 +286,25 @@ export class PrismaAuthzGrantsProjectionRepository
   async enforceGrantRevocation({
     organizationId,
     grantIds,
+    reason,
   }: {
     organizationId: string;
     grantIds: string[];
+    /** Why the queue is being bypassed. Counted and logged, never branched
+     *  on — the write is identical either way; this is only how an operator
+     *  finds these afterwards. */
+    reason: "revocation" | "offboard";
   }): Promise<void> {
     if (grantIds.length === 0) return;
+    // Counted and logged HERE rather than at the call sites: this is the one
+    // authz write that reaches the projection without an event behind it, and
+    // a caller that forgot to record it is exactly the case that leaves a
+    // replay able to resurrect revoked access.
+    getAuthzDirectProjectionWriteCounter(reason).inc();
+    logger.info(
+      { organizationId, reason, grantCount: grantIds.length },
+      "authz projection written directly, bypassing the queue",
+    );
     // ShareLink's tenancy column is projectId, not organizationId, and the
     // multitenancy guard requires it on every bulk write. The Grant rows are
     // where that projectId lives, so it is read BEFORE they are deleted. No
@@ -348,6 +363,11 @@ export class PrismaAuthzGrantsProjectionRepository
   }: {
     organizationId: string;
   }): Promise<void> {
+    getAuthzDirectProjectionWriteCounter("cutover_rollback").inc();
+    logger.info(
+      { organizationId, reason: "cutover_rollback" },
+      "authz projection written directly, bypassing the queue",
+    );
     await this.prisma.authzCutoverProjection.upsert({
       where: { organizationId },
       create: { organizationId, onEngine: false },
