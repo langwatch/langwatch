@@ -30,28 +30,26 @@ export type StoredCredential =
  * without a key looks like.
  */
 export function readStoredCredential(customKeys: unknown): StoredCredential {
-  if (customKeys === null || customKeys === undefined) {
-    return { state: "absent" };
+  if (typeof customKeys === "string") return readEncrypted(customKeys);
+  if (typeof customKeys === "object" && customKeys !== null) {
+    return fromKeys(customKeys as Record<string, unknown>);
   }
-
-  if (typeof customKeys === "string") {
-    if (customKeys.trim() === "") return { state: "absent" };
-    try {
-      const parsed = JSON.parse(decrypt(customKeys)) as Record<string, unknown>;
-      return hasAnyValue(parsed)
-        ? { state: "present", keys: parsed }
-        : { state: "absent" };
-    } catch {
-      return { state: "unreadable" };
-    }
-  }
-
-  if (typeof customKeys === "object") {
-    const keys = customKeys as Record<string, unknown>;
-    return hasAnyValue(keys) ? { state: "present", keys } : { state: "absent" };
-  }
-
   return { state: "absent" };
+}
+
+/** An encrypted blob, or a row written before encryption arrived. */
+function readEncrypted(blob: string): StoredCredential {
+  if (blob.trim() === "") return { state: "absent" };
+  try {
+    return fromKeys(JSON.parse(decrypt(blob)) as Record<string, unknown>);
+  } catch {
+    return { state: "unreadable" };
+  }
+}
+
+/** A record counts as a credential only if some key actually holds a value. */
+function fromKeys(keys: Record<string, unknown>): StoredCredential {
+  return hasAnyValue(keys) ? { state: "present", keys } : { state: "absent" };
 }
 
 function hasAnyValue(keys: Record<string, unknown>): boolean {
@@ -93,29 +91,57 @@ export function decideCredentialWrite({
   replacement: Record<string, unknown> | null;
   shouldForce: boolean;
 }): CredentialWriteDecision {
-  // Nothing to seed. Forcing swaps one key for another and is never a way to
-  // empty the column, so a run with an unset environment variable leaves the
-  // row exactly as it found it. This is the rule, in one place, because both
-  // seeders and their tests have to agree on it.
-  const hasReplacement =
-    Boolean(replacement) && Object.keys(replacement ?? {}).length > 0;
-  if (!hasReplacement) {
-    // Nothing stored and nothing to write leaves a row that cannot serve a
-    // request. It is skipped rather than kept, so a seeder does not enable it
-    // or route to it on the strength of having left it alone.
-    if (stored.state === "absent") {
-      return { action: "skip", reason: "nothing to write" };
-    }
-    if (stored.state === "unreadable") {
-      return { action: "skip", reason: "the stored credential cannot be read" };
-    }
-    return { action: "keep", reason: "a credential is already stored" };
-  }
+  // Two different questions, so two functions. With a key in hand the question
+  // is whether it may replace what is there; with no key it is only whether
+  // the row can serve a request at all. Forcing belongs to the first question
+  // and has no meaning in the second, which is what keeps a run with an unset
+  // environment variable from emptying the column.
+  return hasSomethingToWrite(replacement)
+    ? decideWithReplacement({ stored, shouldForce })
+    : decideWithoutReplacement(stored);
+}
 
+function hasSomethingToWrite(
+  replacement: Record<string, unknown> | null,
+): boolean {
+  return replacement !== null && Object.keys(replacement).length > 0;
+}
+
+/**
+ * Nothing to seed, so nothing is written. A row that already holds a working
+ * credential is left alone; one that holds nothing, or something nothing can
+ * read, cannot serve a request and is skipped so no seeder enables it or
+ * routes to it.
+ */
+function decideWithoutReplacement(
+  stored: StoredCredential,
+): CredentialWriteDecision {
+  if (stored.state === "absent") {
+    return { action: "skip", reason: "nothing to write" };
+  }
+  if (stored.state === "unreadable") {
+    return { action: "skip", reason: "the stored credential cannot be read" };
+  }
+  return { action: "keep", reason: "a credential is already stored" };
+}
+
+/**
+ * A key is in hand. It fills an empty row, replaces an existing one only on an
+ * explicit force, and otherwise leaves what is stored alone.
+ */
+function decideWithReplacement({
+  stored,
+  shouldForce,
+}: {
+  stored: StoredCredential;
+  shouldForce: boolean;
+}): CredentialWriteDecision {
   if (stored.state === "absent") {
     return { action: "write", reason: "no stored credential" };
   }
-  if (shouldForce) return { action: "write", reason: "forced" };
+  if (shouldForce) {
+    return { action: "write", reason: "forced" };
+  }
   if (stored.state === "unreadable") {
     return { action: "skip", reason: "the stored credential cannot be read" };
   }
