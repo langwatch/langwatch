@@ -3,6 +3,10 @@ import { useRef } from "react";
 import type { Tab } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { PromptTabSwitcher } from "./switcher/PromptTabSwitcher";
 import { PromptBrowserTab } from "./tab/PromptBrowserTab";
+import {
+  TAB_STRIP_INLINE_PADDING,
+  TAB_STRIP_TOP_PADDING,
+} from "./ui/cardSurface";
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
 import { TabIdProvider } from "./ui/TabContext";
 import { useIsOverflowing } from "./useIsOverflowing";
@@ -50,10 +54,18 @@ export function PromptTabStrip({
       <HStack
         ref={scrollerRef}
         gap={0}
-        overflow="auto"
+        // Only sideways. `overflow: auto` on both axes can reserve a horizontal
+        // scrollbar's height out of the row, which would lift the tabs off the
+        // card's top edge by exactly the pixels the join depends on.
+        overflowX="auto"
+        overflowY="hidden"
         height="full"
-        paddingY={1.5}
-        paddingX={1.5}
+        alignItems="stretch"
+        paddingTop={TAB_STRIP_TOP_PADDING}
+        // No bottom padding: a tab has to reach the bottom of the strip, which
+        // is where the card's top edge is.
+        paddingBottom={0}
+        paddingX={TAB_STRIP_INLINE_PADDING}
         // Tabs shrink to share this row before it ever scrolls, so `flex` lets
         // the strip claim the width the toolbar is not using.
         flex="1 1 0"
