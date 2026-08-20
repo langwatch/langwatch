@@ -48,13 +48,17 @@ SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose Down
 -- +goose ENVSUB ON
 
--- Executable Down is safe here, unlike the data tables above it in this
--- directory: every row is derived from PostgreSQL (`Project.lwqlKey`), and the
--- deploy-time backfill (src/tasks/provisionLwql.ts) regenerates the full set
--- on the next run, so dropping the table loses nothing irrecoverable.
+-- Down migrations are intentionally commented out to prevent accidental data
+-- loss. To roll back, uncomment and run manually.
+--
+-- The rows here are regenerable from PostgreSQL (`Project.lwqlKey`), but the
+-- table is not: the SaaS row filters on all 8 LangWatchQL source tables join
+-- against it by a hard-coded name, so an unattended `goose down` takes every
+-- LangWatchQL query to zero rows until the next deploy-time backfill runs.
+-- That is an outage, not a rollback.
 
 -- +goose StatementBegin
-DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.lwql_api_key_tenant_map;
+-- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.lwql_api_key_tenant_map;
 -- +goose StatementEnd
 
 -- +goose ENVSUB OFF
