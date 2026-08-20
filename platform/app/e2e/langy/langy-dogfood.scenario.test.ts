@@ -244,7 +244,13 @@ describe("Langy dogfood: named flows", () => {
           scenario.judgeAgent({
             model,
             criteria: [
-              "On the follow-up, Langy drills into a specific trace it already surfaced (using the concrete id from the prior turn), rather than re-listing or asking which one.",
+              // "From the prior turn" cannot mean "printed in the prior turn's
+              // text". The command card carries the ids and the prompt tells
+              // Langy not to repeat what the card already shows, so a judge
+              // reading only the transcript sees an id appear for the first
+              // time in the follow-up and calls that inventing one. It is the
+              // opposite: it is Langy using context the user can see.
+              "On the follow-up, Langy drills straight into one of the failing traces from the prior turn, rather than re-listing them, starting the search over, or asking the user which one. The id does not have to have appeared in the prior turn's text, since the command results carry the ids. What fails here is asking which trace to look at, or drilling into something that was not among the failures.",
               ...LANGY_FAILING_TRACES_CRITERIA,
             ],
           }),

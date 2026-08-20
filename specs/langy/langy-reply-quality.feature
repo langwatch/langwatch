@@ -17,6 +17,14 @@ Feature: Langy reply quality
       turn that completed a write is not repeated blindly
 
   @unit
+  Scenario: A stream that ends without the turn finishing says nothing
+    Given the user stops the turn, or the worker checkpoints and hands it off
+    When the live stream ends
+    Then no line claims the turn finished without writing a reply
+    And a partial answer already on screen is left as it is, since a stop
+      usually lands on one and a handoff is re-driven on a fresh worker
+
+  @unit
   Scenario: The card shapes the prompt teaches are shapes the panel renders
     Given the derived-card examples written in Langy's prompt
     When each one is checked against the card contract
