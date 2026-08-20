@@ -14,7 +14,7 @@
  * project in the organization - so excluding them would make a surface
  * promise more headroom than the enforcement path actually allows.
  */
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 export async function organizationSpendTenantIds(
   prisma: PrismaClient,

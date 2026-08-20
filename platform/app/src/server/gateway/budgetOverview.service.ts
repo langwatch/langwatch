@@ -25,6 +25,7 @@
  * Spec: specs/ai-gateway/budget-overview.feature
  */
 
+import type { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
 import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
@@ -58,9 +59,10 @@ export const BUDGET_SCOPE_RANK = {
   PRINCIPAL: 0,
   VIRTUAL_KEY: 1,
   GROUP: 2,
-  PROJECT: 3,
-  TEAM: 4,
-  ORGANIZATION: 5,
+  ATTRIBUTED_USER: 3,
+  PROJECT: 4,
+  TEAM: 5,
+  ORGANIZATION: 6,
 } as const satisfies Record<GatewayBudgetScopeType, number>;
 
 /**
@@ -118,13 +120,15 @@ export class BudgetOverviewService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly chRepo?: GatewayBudgetClickHouseRepository,
+    private readonly personalUsageRepo?: PersonalUsageClickHouseRepository,
   ) {}
 
   static create(
     prisma: PrismaClient,
     chRepo?: GatewayBudgetClickHouseRepository,
+    personalUsageRepo?: PersonalUsageClickHouseRepository,
   ): BudgetOverviewService {
-    return new BudgetOverviewService(prisma, chRepo);
+    return new BudgetOverviewService(prisma, chRepo, personalUsageRepo);
   }
 
   /**
@@ -299,7 +303,9 @@ export class BudgetOverviewService {
   }): Promise<Array<{ model: string; spentUsd: number }>> {
     if (!input.personalProjectId) return [];
     try {
-      const breakdown = await new PersonalUsageService().breakdownByModel(
+      const breakdown = await PersonalUsageService.create(
+        this.personalUsageRepo,
+      ).breakdownByModel(
         { personalProjectId: input.personalProjectId, userId: input.userId },
         3,
       );
@@ -367,6 +373,10 @@ const SCOPE_CLASS_BY_TYPE = {
   VIRTUAL_KEY: "key",
   PRINCIPAL: "personal",
   GROUP: "department",
+  // Per-end-user attributed budgets do not bind a member's own keys, so
+  // they never surface in a member overview; name the target rather than
+  // assert a member-relative scope for the exhaustive-map fallback.
+  ATTRIBUTED_USER: "other",
 } as const satisfies Record<GatewayBudgetScopeType, BudgetOverviewScopeClass>;
 
 /**

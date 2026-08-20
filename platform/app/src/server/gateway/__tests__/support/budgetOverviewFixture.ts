@@ -9,6 +9,7 @@
  * copying 300 lines of seed.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 
 import { prisma } from "~/server/db";
@@ -20,6 +21,7 @@ import {
 import { GatewayBudgetClickHouseRepository } from "../../budget.clickhouse.repository";
 import { BudgetOverviewService } from "../../budgetOverview.service";
 import { groupBucketScopeId } from "../../budgetResolution.service";
+import { usdToNanoUsd } from "../../wireMoney";
 
 export const suffix = nanoid(8);
 export const ORG_ID = `org-bov-${suffix}`;
@@ -42,6 +44,10 @@ export const BUDGET_ARCHIVED_ID = `bdg-bov-archived-${suffix}`;
 export const ACCESS_TOKEN = `lw_at_bov-${suffix}`;
 
 const TENANTS = [WORK_PROJECT_ID, PERSONAL_PROJECT_ID, ARCHIVED_PROJECT_ID];
+
+// The test container's Redis, captured from startTestContainers so the seed
+// and teardown share the connection the app routes read through.
+let redisConnection: Redis | null = null;
 
 export function chRepo(): GatewayBudgetClickHouseRepository {
   const ch = getTestClickHouseClient();
@@ -72,7 +78,7 @@ async function seedDebit(input: {
       window: input.window,
       virtualKeyId: VK_PERSONAL_ID,
       gatewayRequestId: input.requestId,
-      amountUsd: input.amountUsd,
+      amountNanoUsd: Number(usdToNanoUsd(input.amountUsd)),
       tokensInput: 10,
       tokensOutput: 5,
       tokensCacheRead: 0,
@@ -86,7 +92,7 @@ async function seedDebit(input: {
 
 /** Stand the world up. Bracketed by `startTestContainers`. */
 export async function seedBudgetOverviewFixture(): Promise<void> {
-  await startTestContainers();
+  ({ redisConnection } = await startTestContainers());
 
   await prisma.organization.create({
     data: { id: ORG_ID, name: `ACME ${suffix}`, slug: `bov-${suffix}` },
@@ -366,9 +372,10 @@ export async function seedBudgetOverviewFixture(): Promise<void> {
 
   // The device-session record the CLI's bearer token resolves through,
   // so any test here can call the REST endpoint the CLI calls.
-  const { connection: redis } = await import("~/server/redis");
-  if (!redis) throw new Error("these tests need a real Redis connection");
-  await redis.set(
+  if (!redisConnection) {
+    throw new Error("these tests need a real Redis connection");
+  }
+  await redisConnection.set(
     `lwcli:access:${ACCESS_TOKEN}`,
     JSON.stringify({
       user_id: USER_ID,
@@ -399,8 +406,7 @@ export async function teardownBudgetOverviewFixture(): Promise<void> {
       });
     }
   }
-  const { connection: redis } = await import("~/server/redis");
-  if (redis) await redis.del(`lwcli:access:${ACCESS_TOKEN}`);
+  if (redisConnection) await redisConnection.del(`lwcli:access:${ACCESS_TOKEN}`);
   await prisma.gatewayBudget.deleteMany({
     where: { organizationId: ORG_ID },
   });

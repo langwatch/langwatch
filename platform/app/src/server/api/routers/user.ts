@@ -884,6 +884,7 @@ export const userRouter = createTRPCRouter({
       const service = BudgetOverviewService.create(
         ctx.prisma,
         getApp().gateway.budgets,
+        getApp().governance.personalUsage,
       );
       return await service.overviewForUser({
         organizationId: input.organizationId,
