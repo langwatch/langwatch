@@ -10,7 +10,7 @@
  * every path answers 404; the reference documents the self-hosted
  * capability.
  */
-import type { DescribeRouteOptions, OpenApiSpecsOptions } from "hono-openapi";
+import type { DescribeRouteOptions, GenerateSpecOptions } from "hono-openapi";
 
 type ResponseSpec = NonNullable<DescribeRouteOptions["responses"]>[string];
 
@@ -26,7 +26,7 @@ const INSTANCE_KEY_SECURITY: DescribeRouteOptions["security"] = [
  * a client generator resolving `#/components/securitySchemes/...` finds
  * nothing there.
  */
-export const ORGANIZATIONS_SPEC_OPTIONS: OpenApiSpecsOptions = {
+export const ORGANIZATIONS_SPEC_OPTIONS: Partial<GenerateSpecOptions> = {
   documentation: {
     components: {
       securitySchemes: {

@@ -29,8 +29,7 @@
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { LWQL_VEGA_LIMITS } from "~/features/analytics-query/visualization/vegaLitePolicy";
 import { measureSpecBytes } from "~/features/analytics-query/visualization/vegaLiteStructure";
