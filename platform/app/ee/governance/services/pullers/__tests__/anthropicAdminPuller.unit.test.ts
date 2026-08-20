@@ -687,6 +687,75 @@ describe("the Anthropic Admin puller", () => {
       // current query identity.
       expect(JSON.parse(result.cursor ?? "{}").query).toContain("cost:");
     });
+
+    it("rewinds a cost source again when startingAt is widened after its first run", async () => {
+      // The legacy-source remediation: a source with no configured
+      // `startingAt` first repairs only the default window, THEN the operator
+      // sets a deeper start. The configured start is part of the cost cursor
+      // identity, so the edit mints a mismatch and the rewind fires once more
+      // — without this, the cursor would match forever and the deeper 100x
+      // rows would be unreachable short of deleting the cursor by hand.
+      fetchMock.mockResolvedValue(jsonResponse(COST_PAGE));
+      const puller = new AnthropicAdminPuller();
+
+      const firstRun = await puller.runOnce(RUN_OPTIONS, {
+        adapter: "anthropic_admin",
+        report: "cost",
+        bucketWidth: "1d",
+        schedule: "0 * * * *",
+      });
+      fetchMock.mockClear();
+      fetchMock.mockResolvedValue(jsonResponse(COST_PAGE));
+
+      await puller.runOnce(
+        { ...RUN_OPTIONS, cursor: firstRun.cursor },
+        {
+          adapter: "anthropic_admin",
+          report: "cost",
+          bucketWidth: "1d",
+          schedule: "0 * * * *",
+          startingAt: "2026-01-01T00:00:00.000Z",
+        },
+      );
+
+      const url = String(fetchMock.mock.calls[0]?.[0]);
+      expect(url).toContain(
+        `starting_at=${encodeURIComponent("2026-01-01T00:00:00.000Z")}`,
+      );
+    });
+
+    it("keeps replaying a cost page token while the config is unchanged", async () => {
+      // Guards the identity's stability: what `runOnce` mints must be what
+      // `parseCursor` computes for the same config, or every scheduled run
+      // would discard its cursor and re-read from the start.
+      fetchMock.mockResolvedValue(
+        jsonResponse({ ...COST_PAGE, has_more: true, next_page: "page_2" }),
+      );
+      const puller = new AnthropicAdminPuller();
+      const costConfig = {
+        adapter: "anthropic_admin" as const,
+        report: "cost" as const,
+        bucketWidth: "1d" as const,
+        schedule: "0 * * * *",
+        startingAt: "2026-08-01T00:00:00.000Z",
+      };
+
+      const firstRun = await puller.runOnce(RUN_OPTIONS, costConfig);
+      if (!firstRun.cursor?.includes("page_2")) {
+        throw new Error(
+          `expected a mid-window cursor holding page_2, got ${String(firstRun.cursor)}`,
+        );
+      }
+      fetchMock.mockClear();
+      fetchMock.mockResolvedValue(jsonResponse(COST_PAGE));
+
+      await puller.runOnce(
+        { ...RUN_OPTIONS, cursor: firstRun.cursor },
+        costConfig,
+      );
+
+      expect(String(fetchMock.mock.calls[0]?.[0])).toContain("page=page_2");
+    });
   });
 
   describe("when a page claims more pages but names none", () => {

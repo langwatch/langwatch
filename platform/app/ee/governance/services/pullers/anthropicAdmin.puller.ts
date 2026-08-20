@@ -126,7 +126,11 @@ export type AnthropicAdminPullConfig = z.infer<
  * old rows in place. That is what repairs the 100x figures — mature sources
  * resume from their watermark, so the wrong rows behind it would otherwise
  * never be re-read. After the first re-pull the cursor carries the current
- * identity and the rewind never fires again.
+ * identity and the rewind never fires again — until the configuration itself
+ * changes: the configured `startingAt` is part of the cost identity, so
+ * WIDENING it later mints a mismatch and the rewind fires once more, reaching
+ * the deeper window. That is the operator's repair lever for sources whose
+ * first post-deploy run only covered the default window.
  *
  * USAGE sources drop only the unsafe page token and KEEP the watermark.
  * Usage identity is NOT stable across a query change — it embeds the config
@@ -144,13 +148,23 @@ const cursorSchema = z.object({
 });
 
 /**
- * What Anthropic would reject a replayed page token over: the endpoint and
- * every query parameter that rides beside `page`.
+ * The configuration a cursor is bound to. Two concerns share it:
+ *
+ * 1. What Anthropic would reject a replayed page token over: the endpoint and
+ *    every query parameter that rides beside `page`.
+ * 2. For COST sources only, the repair window. The configured `startingAt`
+ *    decides how far back a stale-cursor rewind reaches, so widening it on a
+ *    source that has already run must mint a new identity — otherwise the
+ *    cursor matches forever, the watermark replays, and the deeper history
+ *    stays wrong with no way to reach it short of deleting the cursor by
+ *    hand. Usage deliberately excludes it: usage never rewinds (see
+ *    `cursorSchema`), so binding it there would only drop a live page token
+ *    over an edit that changes nothing.
  */
 function queryIdentity(config: AnthropicAdminPullConfig): string {
   return config.report === "usage"
     ? `usage:${config.bucketWidth}:${USAGE_GROUP_BY.join(",")}`
-    : `cost:${COST_REPORT_BUCKET_WIDTH}:${COST_GROUP_BY.join(",")}`;
+    : `cost:${COST_REPORT_BUCKET_WIDTH}:${COST_GROUP_BY.join(",")}:${config.startingAt ?? ""}`;
 }
 
 function parseCursor({
@@ -214,7 +228,7 @@ function staleCursorRestart({
   }
   logger.warn(
     { adapter: ANTHROPIC_ADMIN_ADAPTER_ID, report: config.report },
-    "anthropic admin cost cursor was minted under a different query; discarding it and re-reading from the start",
+    "anthropic admin cost cursor was minted under a different query or repair window; discarding it and re-reading from the start",
   );
   const configuredStart = config.startingAt ?? defaultStartingAt(config.report);
   // The EARLIER of the stored watermark and the configured start: the
