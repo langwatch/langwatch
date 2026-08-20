@@ -125,6 +125,10 @@ function isBindingScope(scopeType: string): scopeType is RoleBindingScopeType {
   return (BINDING_SCOPE_TYPES as readonly string[]).includes(scopeType);
 }
 
+function isBindingPrincipal(principalType: string): boolean {
+  return (BINDING_PRINCIPAL_TYPES as readonly string[]).includes(principalType);
+}
+
 type ListableGrant = {
   row: GrantListRow;
   role: TeamUserRole;
@@ -136,6 +140,7 @@ function listableGrants(rows: readonly GrantListRow[]): ListableGrant[] {
   const listable: ListableGrant[] = [];
   for (const row of rows) {
     if (!isBindingScope(row.scopeType)) continue;
+    if (!isBindingPrincipal(row.principalType)) continue;
     const translated = compatRole(row);
     if (!translated) continue;
     listable.push({
@@ -347,6 +352,7 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
         ],
       },
       select: GRANT_ROW_SELECT,
+      orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
     });
     const grants = listableGrants(rows).filter(
       ({ row }) =>

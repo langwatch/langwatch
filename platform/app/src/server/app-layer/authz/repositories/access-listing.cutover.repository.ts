@@ -12,11 +12,12 @@
  * delegate finishes its own reads on the head it started on. A caller that
  * issues more than one call for a single page snapshot (the team detail view
  * asks for TEAM and PROJECT scope bindings separately) can therefore straddle
- * a gate flip — tolerated because the calls run concurrently inside the
- * gate's 60-second coalescing window, row ids are stable across the heads,
- * and a mixed render is a transient display artifact, never a decision. The
- * one multi-organization method partitions its organizations by the gate's
- * answer and asks both heads, each only about its own organizations.
+ * a gate flip — tolerated because the calls run concurrently and the gate's
+ * 60-second cache bounds how long a straddle lasts, row ids are stable across
+ * the heads, and a mixed render is a transient display artifact, never a
+ * decision. The one multi-organization method partitions its organizations by
+ * the gate's answer and asks both heads, each only about its own
+ * organizations.
  *
  * Browser-safety: like everything else under ./authz, this composes from a
  * caller-supplied Prisma handle and holds no module-scope storage.

@@ -66,7 +66,7 @@ const prismaWith = (data: {
 describe("GrantsAccessListingRepository", () => {
   describe("when the grant rows carry facts the legacy vocabulary cannot express", () => {
     /** @scenario "Dormant facts never appear as bindings in a listing" */
-    it("skips lite-member and unknown role keys instead of defaulting them", async () => {
+    it("skips every fact the legacy vocabulary cannot carry instead of defaulting it", async () => {
       const { repository } = prismaWith({
         grants: [
           grantRow({
@@ -82,6 +82,26 @@ describe("GrantsAccessListingRepository", () => {
             principalType: "USER",
             principalId: "alice",
             roleKey: null,
+          }),
+          // The project-credential fact is the one the roleKey and scope
+          // filters do NOT catch: a listable PROJECT scope and a listable
+          // "admin" key, dormant only because its principal is collective.
+          // Listed, it would render as an ADMIN binding belonging to nobody.
+          grantRow({
+            id: "g-project-credential",
+            principalType: "PROJECT",
+            principalId: "project-1",
+            roleKey: "admin",
+            scopeType: "PROJECT",
+            scopeId: "project-1",
+          }),
+          grantRow({
+            id: "g-platform",
+            principalType: "USER",
+            principalId: "alice",
+            roleKey: "admin",
+            scopeType: "PLATFORM",
+            scopeId: "platform",
           }),
           grantRow({
             id: "g-member",
@@ -104,13 +124,16 @@ describe("GrantsAccessListingRepository", () => {
       expect(rows.map((row) => row.id)).toEqual(["g-member"]);
     });
 
+    /** @scenario "Dormant facts never appear as bindings in a listing" */
     it("asks the query itself to exclude resource, platform and dormant rows", async () => {
       const { prisma, repository } = prismaWith({});
 
       await repository.findOrganizationBindings({ organizationId: ORG });
 
-      const where = prisma.grant.findMany.mock.calls[0]?.[0]?.where;
+      const call = prisma.grant.findMany.mock.calls[0]?.[0];
+      const where = call?.where;
       expect(where).toBeDefined();
+      expect(where.organizationId).toBe(ORG);
       expect(where.scopeType).toEqual({
         in: ["ORGANIZATION", "TEAM", "PROJECT"],
       });
@@ -121,6 +144,10 @@ describe("GrantsAccessListingRepository", () => {
           { roleKey: { startsWith: "custom:" } },
         ],
       });
+      // Business time, then id as the tiebreak: rows imported in one batch
+      // share an occurredAt, and without the second key they would reshuffle
+      // between reads of the same unchanged page.
+      expect(call?.orderBy).toEqual([{ occurredAt: "asc" }, { id: "asc" }]);
     });
   });
 
@@ -313,8 +340,14 @@ describe("GrantsAccessListingRepository", () => {
 
       expect(legacyRows[0]?.id).toBe(sharedId);
       expect(grantRows[0]?.id).toBe(sharedId);
-      expect(legacyRows[0]?.role).toBe(grantRows[0]?.role);
-      expect(legacyRows[0]?.scopeId).toBe(grantRows[0]?.scopeId);
+      // Not just the id: the whole rendered row. The two heads are read by
+      // one page, so any column that differs is a cell that changes on the
+      // day the organization cuts over. `createdAt` is the one to watch -
+      // legacy reports the binding's own createdAt, the grants head reports
+      // the fact's occurredAt, and they agree only because the import
+      // backdates it. Stamped at import time instead, every "since when" on
+      // the Access page would jump to cutover day.
+      expect(grantRows[0]).toEqual(legacyRows[0]);
     });
   });
 
@@ -472,6 +505,125 @@ describe("GrantsAccessListingRepository", () => {
           where: { organizationId: ORG, kind: "custom" },
         }),
       );
+    });
+  });
+
+  describe("when the listing is one group's own bindings", () => {
+    it("renders the row against the group and fences the name lookup to the organization", async () => {
+      const { prisma, repository } = prismaWith({
+        grants: [
+          grantRow({
+            id: "g-group",
+            principalType: "GROUP",
+            principalId: "group-1",
+            roleKey: "member",
+          }),
+        ],
+        groups: [{ id: "group-1", name: "SRE", scimSource: null }],
+      });
+
+      const rows = await repository.findGroupBindings({
+        organizationId: ORG,
+        groupId: "group-1",
+      });
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.groupId).toBe("group-1");
+      expect(rows[0]?.group).toEqual({
+        id: "group-1",
+        name: "SRE",
+        scimSource: null,
+      });
+      expect(rows[0]?.userId).toBeNull();
+      expect(rows[0]?.apiKeyId).toBeNull();
+      // The fence that stops another organization's group name rendering on
+      // this page - the only thing bounding a lookup keyed by a bare id.
+      expect(prisma.group.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: { in: ["group-1"] }, organizationId: ORG },
+        }),
+      );
+    });
+  });
+
+  describe("when the listing is a scope's own bindings", () => {
+    it("asks nothing at all when there are no scopes to ask about", async () => {
+      const { prisma, repository } = prismaWith({});
+
+      const rows = await repository.findScopeBindings({
+        organizationId: ORG,
+        scopeType: "TEAM",
+        scopeIds: [],
+      });
+
+      expect(rows).toEqual([]);
+      expect(prisma.grant.findMany).not.toHaveBeenCalled();
+    });
+
+    it("drops a row whose principal no longer resolves in the organization", async () => {
+      const { repository } = prismaWith({
+        grants: [
+          grantRow({
+            id: "g-present",
+            principalType: "USER",
+            principalId: "alice",
+            roleKey: "member",
+          }),
+          grantRow({
+            id: "g-departed",
+            principalType: "USER",
+            principalId: "departed-dave",
+            roleKey: "admin",
+          }),
+        ],
+        users: [{ id: "alice", name: "Alice", email: "a@x.io", image: null }],
+      });
+
+      const rows = await repository.findScopeBindings({
+        organizationId: ORG,
+        scopeType: "TEAM",
+        scopeIds: ["team-1"],
+      });
+
+      expect(rows.map((row) => row.id)).toEqual(["g-present"]);
+    });
+  });
+
+  describe("when the listing is a member's own access breakdown", () => {
+    it("asks about the member's groups as well as the member", async () => {
+      const { prisma, repository } = prismaWith({});
+
+      await repository.findUserAndGroupBindings({
+        organizationId: ORG,
+        userId: "alice",
+        groupIds: ["group-1", "group-2"],
+      });
+
+      const where = prisma.grant.findMany.mock.calls[0]?.[0]?.where;
+      expect(where.AND).toContainEqual({
+        OR: [
+          { principalType: "USER", principalId: "alice" },
+          {
+            principalType: "GROUP",
+            principalId: { in: ["group-1", "group-2"] },
+          },
+        ],
+      });
+    });
+
+    it("asks only about the member when they belong to no group", async () => {
+      const { prisma, repository } = prismaWith({});
+
+      await repository.findUserAndGroupBindings({
+        organizationId: ORG,
+        userId: "alice",
+        groupIds: [],
+      });
+
+      const where = prisma.grant.findMany.mock.calls[0]?.[0]?.where;
+      expect(where.AND).toContainEqual({
+        OR: [{ principalType: "USER", principalId: "alice" }],
+      });
     });
   });
 });

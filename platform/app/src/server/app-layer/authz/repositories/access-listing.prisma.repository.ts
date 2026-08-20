@@ -1,11 +1,16 @@
 /**
  * ADR-092 delivery-plan PR 3 follow-up — the Access surface's legacy reader.
  *
- * These are the exact queries the settings pages ran inline before the port
- * existed (`RoleBindingService`, `TeamService`, the role-binding repository,
- * the group and API-key repositories), moved here verbatim so the per-org
- * fork has a legacy side to delegate to. Behaviour for a non-cut-over
- * organization is therefore byte-identical to what shipped before this seam.
+ * These are the queries the settings pages ran inline before the port existed
+ * (`RoleBindingService`, `TeamService`, the role-binding repository, the group
+ * and API-key repositories), moved here so the per-org fork has a legacy side
+ * to delegate to. The WHERE predicates carry over unchanged, with one
+ * exception: the group listing gained the organization bound it never had.
+ * The row shapes did not - they were consolidated onto one row type and one
+ * decoration include, so three reads differ from their inline originals. The
+ * API-key read joins where it selected five scalars, `listForOrg`'s role
+ * select gained `permissions`, and the synthesis read drops the `group` key
+ * it only ever used to filter on.
  *
  * Deliberately independent of `access-listing.grants.repository.ts`, for the
  * same reason the decision readers are: the two answer the same questions of
@@ -248,6 +253,7 @@ export class PrismaAccessListingRepository implements AccessListingRepository {
         },
         group: { select: { organizationId: true } },
       },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
 
     return bindings

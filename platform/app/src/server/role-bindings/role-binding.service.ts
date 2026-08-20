@@ -376,7 +376,7 @@ export class RoleBindingService {
     const [orgs, teams, projects] = await Promise.all([
       orgIds.length > 0
         ? this.prisma.organization.findMany({
-            where: { id: { in: orgIds } },
+            where: { id: { in: orgIds.filter((id) => id === organizationId) } },
             select: { id: true, name: true },
           })
         : [],
