@@ -129,6 +129,13 @@ claim the change was made, no command handed over for the user to run (AGENTS.md
 — "the recipe is the action"), and no second route to the same effect. Three of
 the four also read the world back to prove nothing changed.
 
+**Run the scenario suites one file at a time.** Vitest runs test files in
+parallel by default, and two concurrent Langy conversations exhaust the local
+worker pool: every turn comes back `langy_worker_stopped` (503,
+`fault: platform`), which surfaces as nine red scenarios that have nothing to do
+with agent quality. Either invoke one file per `vitest run`, or pass
+`--no-file-parallelism`.
+
 Monitors are deliberately NOT on this list. `POST /api/monitors` used to demand
 `evaluations:manage` while the tRPC route behind the product's own create button
 asked only for `evaluations:create` — a route bug that looked like a boundary.
