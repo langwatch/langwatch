@@ -53,7 +53,11 @@ jobs:
     # a dispatch from any other ref cannot read the credential at all, whatever
     # the workflow file on that ref says.
     environment: boxd-golden
-    if: github.ref == 'refs/heads/main'
+    # The repository check keeps this off forks. A fork pushing to its own main
+    # has neither the environment nor the credential, so the job could only ever
+    # fail there — and this workflow's whole contract is that a red run means
+    # staging is broken.
+    if: github.ref == 'refs/heads/main' && github.repository == 'langwatch/langwatch'
     runs-on: ubuntu-latest
     # 45 + 45 + 15 minutes of polling, plus room for the CLI install, the two
     # HTTP gates and the SHA check.
