@@ -35,14 +35,14 @@
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { prisma } from "~/server/db";
-import { encrypt } from "~/utils/encryption";
 import {
   credentialWriteLog,
   decideCredentialWrite,
   keepHint,
   readStoredCredential,
   skipHint,
-} from "../seedProviderCredential";
+} from "~/server/modelProviders/seedProviderCredential";
+import { encrypt } from "~/utils/encryption";
 
 interface Args {
   email: string;
@@ -103,7 +103,7 @@ async function ensureProvider({
   name: string;
   keys: Record<string, string>;
   shouldForceKeys: boolean;
-}): Promise<string | null> {
+}): Promise<{ id: string; usable: boolean }> {
   // Deterministic pick: oldest row first, and be loud when the org carries
   // more than one row for the provider, since only one is considered.
   const existingRows = await prisma.modelProvider.findMany({
@@ -136,12 +136,13 @@ async function ensureProvider({
       }),
     );
     if (decision.action === "skip") {
-      // The row holds something nothing can decrypt. Enabling it would put a
-      // provider in the routing chain that fails at credential
+      // The row cannot serve a request: either nothing can decrypt it, or it
+      // has no credential and this run has none to give it. Enabling it would
+      // put a provider in the routing chain that fails at credential
       // materialisation on every request, which reads as the gateway being
       // broken rather than as this row needing attention.
-      process.stderr.write(skipHint("seed-audio"));
-      return null;
+      process.stderr.write(skipHint("seed-audio", decision.reason));
+      return { id: existing.id, usable: false };
     }
     if (decision.action === "keep") {
       process.stderr.write(keepHint("seed-audio"));
@@ -151,13 +152,13 @@ async function ensureProvider({
         where: { id: existing.id },
         data: { enabled: true },
       });
-      return existing.id;
+      return { id: existing.id, usable: true };
     }
     await prisma.modelProvider.update({
       where: { id: existing.id },
       data: { enabled: true, customKeys: encrypt(JSON.stringify(keys)) },
     });
-    return existing.id;
+    return { id: existing.id, usable: true };
   }
   const created = await prisma.modelProvider.create({
     data: {
@@ -174,7 +175,7 @@ async function ensureProvider({
   process.stderr.write(
     `[seed-audio] created ${provider} provider ${created.id}\n`,
   );
-  return created.id;
+  return { id: created.id, usable: true };
 }
 
 async function main() {
@@ -218,19 +219,22 @@ async function main() {
     `[seed-audio] user=${user.id} org=${org.id} (${org.name})\n`,
   );
 
-  // A skipped row returns null and stays out of the policy, so the chain
-  // never carries a provider the gateway cannot build a credential for.
+  // A skipped row stays out of the policy, so the chain never carries a
+  // provider the gateway cannot build a credential for. Its id is remembered
+  // too, because an earlier run may already have put it in the policy and a
+  // merge that only adds would leave it there.
   const providerIds: string[] = [];
+  const unusableIds: string[] = [];
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
-    const openaiId = await ensureProvider({
+    const openai = await ensureProvider({
       organizationId: org.id,
       provider: "openai",
       name: "OpenAI",
       keys: { OPENAI_API_KEY: openaiKey },
       shouldForceKeys: args.shouldForceKeys,
     });
-    if (openaiId) providerIds.push(openaiId);
+    (openai.usable ? providerIds : unusableIds).push(openai.id);
   } else {
     process.stderr.write(
       "[seed-audio] OPENAI_API_KEY unset, skipping openai provider\n",
@@ -238,14 +242,14 @@ async function main() {
   }
   const elevenKey = process.env.ELEVENLABS_API_KEY;
   if (elevenKey) {
-    const elevenId = await ensureProvider({
+    const eleven = await ensureProvider({
       organizationId: org.id,
       provider: "elevenlabs",
       name: "ElevenLabs",
       keys: { ELEVENLABS_API_KEY: elevenKey },
       shouldForceKeys: args.shouldForceKeys,
     });
-    if (elevenId) providerIds.push(elevenId);
+    (eleven.usable ? providerIds : unusableIds).push(eleven.id);
   } else {
     process.stderr.write(
       "[seed-audio] ELEVENLABS_API_KEY unset, skipping elevenlabs provider\n",
@@ -270,7 +274,12 @@ async function main() {
           (id): id is string => typeof id === "string",
         )
       : [];
-    const merged = Array.from(new Set([...priorIds, ...providerIds]));
+    // Adding this run's providers is not enough: a provider the policy
+    // already names may have become unreadable since, and leaving it in the
+    // chain sends traffic to a credential that cannot materialise.
+    const merged = Array.from(new Set([...priorIds, ...providerIds])).filter(
+      (id) => !unusableIds.includes(id),
+    );
     await prisma.routingPolicy.update({
       where: { id: existingPolicy.id },
       data: { modelProviderIds: merged },

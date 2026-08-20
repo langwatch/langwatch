@@ -108,14 +108,17 @@ describe("decideCredentialWrite", () => {
     ).toEqual({ action: "keep", reason: "a credential is already stored" });
   });
 
-  it("has nothing to do when there is neither a stored key nor a replacement", () => {
+  // An empty row this run cannot fill is not "left alone", it is unusable.
+  // Reporting it as keep let the seeders enable a row with no credential and
+  // route to it.
+  it("skips a row that has no key and no replacement, so it is never enabled", () => {
     expect(
       decideCredentialWrite({
         stored: { state: "absent" },
         replacement: null,
         shouldForce: true,
       }),
-    ).toEqual({ action: "keep", reason: "nothing to write" });
+    ).toEqual({ action: "skip", reason: "nothing to write" });
   });
 
   it.each([
@@ -136,6 +139,18 @@ describe("decideCredentialWrite", () => {
 });
 
 describe("maskSecret", () => {
+  // A one or two character value is entirely head, so a head-and-ellipsis
+  // mask would print the whole credential into the log line.
+  it.each([
+    ["a one-character value", "x"],
+    ["a two-character value", "ab"],
+  ])("refuses to show %s at all", (_label, value) => {
+    const masked = maskSecret(value);
+
+    expect(masked).toBe("(too short to mask)");
+    expect(masked).not.toContain(value);
+  });
+
   it("keeps enough of a long key to tell two apart", () => {
     expect(maskSecret("fake-proj-abcdefghijklmnop")).toBe("fake...mnop");
   });

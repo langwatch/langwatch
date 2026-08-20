@@ -273,9 +273,17 @@ export function providerRowServesModel({
  * Framework-agnostic - no tRPC dependencies.
  */
 export class ModelProviderService {
-  constructor(
-    private readonly prisma: PrismaClient,
-    private readonly repository: ModelProviderRepository,
+  private readonly prisma: PrismaClient;
+  private readonly repository: ModelProviderRepository;
+  private readonly changeEvents: ChangeEventRepository;
+
+  constructor({
+    prisma,
+    repository,
+    changeEvents,
+  }: {
+    prisma: PrismaClient;
+    repository: ModelProviderRepository;
     /**
      * The gateway's cache-invalidation feed. Every write that changes a
      * stored credential has to land here: the gateway holds the decrypted
@@ -283,21 +291,23 @@ export class ModelProviderService {
      * `MODEL_PROVIDER_UPDATED` event is what evicts the bundles that carry
      * this provider id so the next request resolves the new key.
      */
-    private readonly changeEvents: ChangeEventRepository = new ChangeEventRepository(
-      prisma,
-    ),
-  ) {}
+    changeEvents?: ChangeEventRepository;
+  }) {
+    this.prisma = prisma;
+    this.repository = repository;
+    this.changeEvents = changeEvents ?? new ChangeEventRepository(prisma);
+  }
 
   /**
    * Static factory method for creating a ModelProviderService with proper DI.
    */
   static create(prisma: PrismaClient): ModelProviderService {
     const repository = new ModelProviderRepository(prisma);
-    return new ModelProviderService(
+    return new ModelProviderService({
       prisma,
       repository,
-      new ChangeEventRepository(prisma),
-    );
+      changeEvents: new ChangeEventRepository(prisma),
+    });
   }
 
   /**

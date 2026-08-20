@@ -77,8 +77,8 @@ export type CredentialWriteDecision =
   | { action: "write"; reason: "no stored credential" }
   | { action: "write"; reason: "forced" }
   | { action: "keep"; reason: "a credential is already stored" }
-  | { action: "keep"; reason: "nothing to write" }
-  | { action: "skip"; reason: "the stored credential cannot be read" };
+  | { action: "skip"; reason: "the stored credential cannot be read" }
+  | { action: "skip"; reason: "nothing to write" };
 
 export function decideCredentialWrite({
   stored,
@@ -100,8 +100,11 @@ export function decideCredentialWrite({
   const hasReplacement =
     Boolean(replacement) && Object.keys(replacement ?? {}).length > 0;
   if (!hasReplacement) {
+    // Nothing stored and nothing to write leaves a row that cannot serve a
+    // request. It is skipped rather than kept, so a seeder does not enable it
+    // or route to it on the strength of having left it alone.
     if (stored.state === "absent") {
-      return { action: "keep", reason: "nothing to write" };
+      return { action: "skip", reason: "nothing to write" };
     }
     if (stored.state === "unreadable") {
       return { action: "skip", reason: "the stored credential cannot be read" };
@@ -124,6 +127,9 @@ export function decideCredentialWrite({
  */
 export function maskSecret(value: unknown): string {
   if (typeof value !== "string" || value === "") return "(empty)";
+  // A one or two character value is entirely head, so a head-and-ellipsis
+  // mask would print the whole thing. Nothing about it is worth showing.
+  if (value.length <= 2) return "(too short to mask)";
   if (value.length <= 8) return `${value.slice(0, 2)}...`;
   return `${value.slice(0, 4)}...${value.slice(-4)}`;
 }
@@ -202,10 +208,13 @@ export function keepHint(tag: string): string {
  * The warning printed when a row is skipped. The row keeps whatever it holds
  * and stays out of the seeded routing chain, so the operator has to decide.
  */
-export function skipHint(tag: string): string {
-  return (
-    `[${tag}] leaving the row disabled and out of the routing policy. It was ` +
-    `probably written under a different CREDENTIALS_SECRET. Re-enter the key ` +
-    `through the UI, or pass --force-keys to overwrite it.\n`
-  );
+export function skipHint(
+  tag: string,
+  reason: Extract<CredentialWriteDecision, { action: "skip" }>["reason"],
+): string {
+  const cause =
+    reason === "nothing to write"
+      ? "The row holds no credential and this run has none to give it. Set the provider's environment variable, or enter the key through the UI."
+      : "It was probably written under a different CREDENTIALS_SECRET. Re-enter the key through the UI, or pass --force-keys to overwrite it.";
+  return `[${tag}] leaving the row out of the routing policy, and not enabling it. ${cause}\n`;
 }

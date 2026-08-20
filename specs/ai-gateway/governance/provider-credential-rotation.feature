@@ -11,9 +11,9 @@ Feature: A changed provider credential reaches a running gateway
 
   Two things carry the change, and they cover different writes.
 
-  The change feed is the fast path. A write through the provider service
-  appends MODEL_PROVIDER_UPDATED, the gateway's poller evicts every cached
-  bundle holding that provider id, and the next request re-materialises.
+  The change feed is the fast path. A write through the provider service tells
+  every gateway that the provider changed, and the next request through an
+  affected key is answered with the new credential.
 
   The config version token is the backstop. The gateway revalidates a cached
   bundle on a short clock, and the control plane answers "still current" by
@@ -29,18 +29,18 @@ Feature: A changed provider credential reaches a running gateway
   @integration
   Scenario: replacing a stored credential tells the gateway to drop its copy
     When an administrator saves a new key on that provider
-    Then a MODEL_PROVIDER_UPDATED change event names that provider
-    And the gateway evicts every cached bundle carrying it
+    Then the gateway is told that provider changed
+    And it stops serving the credential it had cached for it
 
   @integration
   Scenario: disabling a provider tells the gateway to drop its copy
     When an administrator disables that provider
-    Then a MODEL_PROVIDER_UPDATED change event names that provider
+    Then the gateway is told that provider changed
 
   @integration
   Scenario: deleting a provider tells the gateway to drop its copy
     When an administrator deletes that provider
-    Then a MODEL_PROVIDER_UPDATED change event names that provider
+    Then the gateway is told that provider changed
 
   @integration
   Scenario: a credential written straight to the row still moves the version token

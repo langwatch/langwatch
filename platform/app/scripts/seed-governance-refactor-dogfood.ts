@@ -59,15 +59,15 @@ import {
   hashVirtualKeySecret,
   mintVirtualKeySecret,
 } from "../src/server/gateway/virtualKey.crypto";
-import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
-import { encrypt } from "../src/utils/encryption";
 import {
   credentialWriteLog,
   decideCredentialWrite,
   keepHint,
   readStoredCredential,
   skipHint,
-} from "./dogfood/seedProviderCredential";
+} from "../src/server/modelProviders/seedProviderCredential";
+import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
+import { encrypt } from "../src/utils/encryption";
 
 /**
  * Replacing a provider credential that is already stored takes an explicit
@@ -348,11 +348,12 @@ async function upsertModelProviderByName(input: {
         decision,
       }),
     );
-    // A row nothing can decrypt is left exactly as it is. Enabling it would
-    // put a provider in the chain that fails at credential materialisation on
-    // every request.
+    // A row that cannot serve a request is left exactly as it is, whether
+    // because nothing can decrypt it or because it holds no credential and
+    // this run has none to give it. Enabling it would put a provider in the
+    // chain that fails at credential materialisation on every request.
     if (decision.action === "skip") {
-      process.stderr.write(skipHint("seed-governance"));
+      process.stderr.write(skipHint("seed-governance", decision.reason));
       return existing;
     }
     if (decision.action === "keep") {

@@ -200,6 +200,29 @@ describe("seeding a provider credential onto a shared organization", () => {
     expect(await storedKey()).toBe(WORKING_KEY);
   });
 
+  // An earlier run can leave a row with no credential when the provider's
+  // environment variable was unset. The next run must not enable it just
+  // because it left it alone: an enabled row with no key routes traffic to a
+  // provider that cannot build a credential.
+  it("skips a row that has no credential and no replacement", async () => {
+    await prisma.modelProvider.update({
+      where: { id: MP_ID },
+      data: { customKeys: {}, enabled: false },
+    });
+
+    const decision = await seedCredential({
+      shouldForce: false,
+      replacement: null,
+    });
+
+    expect(decision).toEqual({ action: "skip", reason: "nothing to write" });
+    const row = await prisma.modelProvider.findUniqueOrThrow({
+      where: { id: MP_ID },
+      select: { enabled: true },
+    });
+    expect(row.enabled).toBe(false);
+  });
+
   it("replaces a working credential only when forced", async () => {
     await storeWorkingKey();
 

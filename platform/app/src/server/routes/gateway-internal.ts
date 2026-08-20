@@ -41,7 +41,6 @@ import {
 } from "~/server/gateway/budgetResolution.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
-import { computeConfigETag } from "~/server/gateway/configETag";
 import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
 import {
   GatewayGuardrailEvaluationService,
@@ -571,8 +570,13 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
     );
   }
 
+  const materialiser = new GatewayConfigMaterialiser(
+    prisma,
+    getApp().gateway.budgets ?? null,
+  );
+
   const ifNoneMatch = c.req.header("If-None-Match");
-  const currentETag = await computeConfigETag({ prisma, virtualKey: vk });
+  const currentETag = await materialiser.versionToken(vk);
   if (ifNoneMatch && ifNoneMatch === currentETag) {
     return c.body(null, 304, {
       ETag: currentETag,
@@ -586,10 +590,7 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
   // then sees fresh state on every re-materialise after a BUDGET_UPDATED
   // eviction. Without this the wire output reads the stale
   // `GatewayBudget.spentUsd` PG column that no writer updates.
-  const payload = await new GatewayConfigMaterialiser(
-    prisma,
-    getApp().gateway.budgets ?? null,
-  ).materialise(vk);
+  const payload = await materialiser.materialise(vk);
   return c.json(payload, 200, {
     ETag: currentETag,
     "Cache-Control": "no-store",

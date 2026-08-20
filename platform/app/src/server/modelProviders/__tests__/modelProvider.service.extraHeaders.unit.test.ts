@@ -46,11 +46,11 @@ function makeService() {
     $transaction: (fn: (tx: unknown) => Promise<unknown>) => fn({}),
   };
   const changeEvents = { append: vi.fn().mockResolvedValue({ revision: 1n }) };
-  const service = new ModelProviderService(
-    prisma as unknown as PrismaClient,
-    repository as unknown as ModelProviderRepository,
-    changeEvents as unknown as ChangeEventRepository,
-  );
+  const service = new ModelProviderService({
+    prisma: prisma as unknown as PrismaClient,
+    repository: repository as unknown as ModelProviderRepository,
+    changeEvents: changeEvents as unknown as ChangeEventRepository,
+  });
   return { service, repository, changeEvents };
 }
 
