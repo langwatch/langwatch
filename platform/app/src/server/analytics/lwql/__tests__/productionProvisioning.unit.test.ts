@@ -194,6 +194,14 @@ describe("given lwqlPostgresSchemaFromDatabaseUrl", () => {
     expect(lwqlPostgresSchemaFromDatabaseUrl(undefined)).toBe("public");
   });
 
+  it("treats a bare ?schema= as no schema named, like prismaPgAdapter does", () => {
+    expect(
+      lwqlPostgresSchemaFromDatabaseUrl(
+        "postgresql://user:pass@db.internal:5432/mydb?schema=",
+      ),
+    ).toBe("public");
+  });
+
   it("throws on a present-but-unparseable URL instead of silently provisioning into public", () => {
     expect(() => lwqlPostgresSchemaFromDatabaseUrl("not a url")).toThrow(
       /not a parseable URL/,

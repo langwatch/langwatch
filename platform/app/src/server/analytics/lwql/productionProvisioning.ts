@@ -77,7 +77,9 @@ export function lwqlPostgresSchemaFromDatabaseUrl(
       "lwql provisioning: DATABASE_URL is set but not a parseable URL, cannot determine the PostgreSQL schema for the approved views",
     );
   }
-  return url.searchParams.get("schema") ?? LWQL_POSTGRES_SCHEMA;
+  // `||`, not `??`: a bare `?schema=` means "no schema named", the same way
+  // `prismaPgAdapter.ts` reads this URL — not a request for a view named "".
+  return url.searchParams.get("schema") || LWQL_POSTGRES_SCHEMA;
 }
 
 /**
