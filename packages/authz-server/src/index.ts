@@ -83,7 +83,6 @@ export type {
 } from "./grants.service";
 export { OffboardIncompleteError } from "./offboard";
 export type { OffboardResult } from "./offboard";
-export { TEAM_USER_BACKFILL_MIGRATION_NAME } from "./team-user-backfill.name";
 export {
   grantFactToCompatBinding,
   grantFactToCompatShareLink,
