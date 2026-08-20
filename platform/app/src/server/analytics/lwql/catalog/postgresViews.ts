@@ -14,7 +14,7 @@
  * and nothing else. Cost by *name* needs `projects`, `prompts` and
  * `prompt_versions`, because the fact tables carry only the identifiers.
  * Annotation-versus-evaluation agreement needs `annotations`. Experiment run
- * comparisons need `experiments` and `experiment_runs`. Models are already
+ * comparisons need `experiments` and `batch_evaluations`. Models are already
  * names on the fact tables (`traces.Models` carries `openai/gpt-5-mini`, not an
  * id), so no dimension is mapped for them — mapping one would put load on the
  * primary to resolve a name ClickHouse already has.
@@ -345,7 +345,7 @@ const EXPERIMENTS: LangWatchQLViewDefinition = {
     {
       name: "ExperimentId",
       type: "String",
-      description: "Experiment identifier. Join key to `experiment_runs`.",
+      description: "Experiment identifier. Join key to `batch_evaluations`.",
       gates: [],
       sourceColumns: ["id"],
     },
@@ -389,13 +389,22 @@ const EXPERIMENTS: LangWatchQLViewDefinition = {
   ],
 };
 
-/** Experiment runs: one row per batch evaluation of an experiment. */
-const EXPERIMENT_RUNS: LangWatchQLViewDefinition = {
-  name: "experiment_runs",
-  sourceTable: "experiment_runs_pg",
+/**
+ * Batch evaluations: one row per batch evaluation (run) of an experiment.
+ *
+ * Named for its base relation, NOT `experiment_runs`: that name is taken by
+ * a live product table in the same ClickHouse database (migration 00002's
+ * experiment-run aggregates), and every catalog view name becomes a
+ * ClickHouse object in that database. The collision guard in
+ * `__tests__/lwqlCatalogCollision.unit.test.ts` enforces this for every
+ * entry.
+ */
+const BATCH_EVALUATIONS: LangWatchQLViewDefinition = {
+  name: "batch_evaluations",
+  sourceTable: "batch_evaluations_pg",
   postgres: {
     baseRelation: "BatchEvaluation",
-    approvedView: "lwql_experiment_runs",
+    approvedView: "lwql_batch_evaluations",
     tenantSourceColumn: "projectId",
   },
   description:
@@ -503,7 +512,7 @@ const EXPERIMENT_RUNS: LangWatchQLViewDefinition = {
 export const LWQL_POSTGRES_CATALOG: readonly LangWatchQLViewDefinition[] = [
   ANNOTATIONS,
   EXPERIMENTS,
-  EXPERIMENT_RUNS,
+  BATCH_EVALUATIONS,
   PROJECTS,
   PROMPTS,
   PROMPT_VERSIONS,

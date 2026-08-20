@@ -1300,7 +1300,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
                 r.Score AS score,
                 r.Passed AS passed,
                 round(r.Score - avg(r.Score) OVER (PARTITION BY e.ExperimentId), 4) AS score_vs_experiment_mean
-         FROM ${database}.experiment_runs AS r
+         FROM ${database}.batch_evaluations AS r
          INNER JOIN ${database}.experiments AS e ON e.ExperimentId = r.ExperimentId
          ORDER BY run`,
       );
@@ -1339,7 +1339,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
       const fanout = diagnostic(body, "POSSIBLE_FANOUT");
       expect(fanout, JSON.stringify(codes(body))).toBeDefined();
       expect(fanout.meta.dataset).toBe(`${database}.experiments`);
-      expect(fanout.meta.multipliedBy).toBe(`${database}.experiment_runs`);
+      expect(fanout.meta.multipliedBy).toBe(`${database}.batch_evaluations`);
       expect(fanout.meta.unmatchedGrainColumns).toEqual(["ExperimentRunId"]);
     });
   });
