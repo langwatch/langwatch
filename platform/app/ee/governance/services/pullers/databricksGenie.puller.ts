@@ -61,6 +61,7 @@ import {
   allocateWarehouseCost,
   costReadFloorMs,
   GENIE_CLIENT_APPLICATION,
+  mergeWarehouseCost,
   WAREHOUSE_COST_MAX_HOLD_MS,
   WAREHOUSE_COST_STRADDLE_LOOKBACK_MS,
   type WarehousePricedStatement,
@@ -462,6 +463,19 @@ sliced AS (
   -- Hours outside the window are dropped after the split, not before it: the
   -- split needs the statement's real span to divide, the totals only want the
   -- hours this read is answering for.
+  --
+  -- This clip is also what decides which chunk answers for which row, and it
+  -- has to be the HOUR rather than the statement's start. Chunks tile the
+  -- window, so every hour falls in exactly one of them and every statement-hour
+  -- is emitted exactly once — a statement that begins near the end of a chunk
+  -- comes back from the next one too, carrying the hours it burned there.
+  -- Gating on \`start_time\` instead looks like the same duplicate-avoidance
+  -- rule and is not: it hands the straddler wholly to the chunk it began in,
+  -- which has already dropped every hour past its own end, while the next chunk
+  -- counts that statement in its denominators and then excludes it from its
+  -- rows. Those hours are then billed to nobody and still dilute every other
+  -- question's share of them, permanently and silently, at every interior chunk
+  -- boundary a backfill crosses.
   WHERE h.usage_hour >= :from_ts
     AND h.usage_hour < :to_ts
 ),
@@ -533,12 +547,6 @@ LEFT JOIN priced pr
 -- guaranteed. Either change alone silently shrinks the priced set to zero —
 -- together, both have to break at once.
 WHERE (w.genie_space_id IS NOT NULL OR w.client_application = :genie_app)
-  -- The look-back exists to feed the denominators, not to re-emit statements a
-  -- previous chunk already priced. A statement is EMITTED for the chunk its
-  -- start falls in and counted in the totals of every chunk it burns compute in,
-  -- so no two chunks answer for the same statement.
-  AND w.start_time >= :from_ts
-  AND w.start_time < :to_ts
 LIMIT ${WAREHOUSE_COST_ROW_LIMIT}
 `;
 
@@ -734,14 +742,6 @@ const WAREHOUSE_COST_UNFINISHED_STATES = new Set([
  */
 function unpricedFloor(chunk: { fromMs: number }): number {
   return chunk.fromMs - 1;
-}
-
-/** Fold one chunk's priced statements into the sweep's running total. */
-function mergeWarehouseCost(
-  into: Map<string, WarehousePricedStatement>,
-  from: Map<string, WarehousePricedStatement>,
-): void {
-  for (const [statementId, priced] of from) into.set(statementId, priced);
 }
 
 /**
@@ -2753,11 +2753,11 @@ export class DatabricksGeniePuller
     }
 
     if (read.outcome === "priced") {
-      // A statement is EMITTED for the chunk its `start_time` falls in, even
-      // though it may be counted in the totals of the next chunk too, so no two
-      // chunks answer for the same one. The overwrite is still deliberate: the
-      // settling lag re-reads the newest hours, and the later answer is the
-      // better one because it sees bills that had not landed the first time.
+      // A statement is emitted for every chunk it burned compute in, carrying
+      // that chunk's hours only, so a statement running across a boundary
+      // arrives here twice with a different part of itself. `mergeWarehouseCost`
+      // adds rather than replaces for exactly that reason — see the ownership
+      // note on the hour clip in `WAREHOUSE_COST_STATEMENT`.
       mergeWarehouseCost(costByStatementId, read.costByStatementId);
       // Priced, but not wholly: a statement here was seen and has no bill yet.
       // Hold the watermark at the chunk's start so the whole chunk is re-read

@@ -635,3 +635,48 @@ export function costReadFloorMs({
   if (!costEnabled) return sinceMs;
   return Math.min(sinceMs, nowMs - WAREHOUSE_COST_SETTLING_LAG_MS);
 }
+
+/**
+ * Fold one chunk's priced statements into the sweep's running total.
+ *
+ * Added, not replaced, and that is the half of the chunk-boundary fix that
+ * lives outside the SQL. Each chunk emits the hours it owns, so a statement
+ * that ran across a boundary arrives twice with a different part of itself.
+ * The sweep emits its question exactly once, with whatever this map holds by
+ * the end — so replacing would ship the last chunk's slice as the whole cost,
+ * which is the same under-count the start-time ownership rule used to produce.
+ *
+ * All three fields add for the same reason: each is already a sum over the
+ * hours the statement ran through, and the chunks partition those hours. The
+ * money adds in nanoUSD and leaves as an exact decimal string, so no float ever
+ * touches it.
+ *
+ * Chunks never overlap and a refused chunk is merged only as its pieces, so no
+ * hour is ever read twice inside one sweep. Adding therefore cannot double a
+ * cost that was already counted.
+ */
+export function mergeWarehouseCost(
+  into: Map<string, WarehousePricedStatement>,
+  from: Map<string, WarehousePricedStatement>,
+): void {
+  for (const [statementId, priced] of from) {
+    const already = into.get(statementId);
+    if (already === undefined) {
+      into.set(statementId, priced);
+      continue;
+    }
+    into.set(statementId, {
+      costUsd: nanoUsdToDecimalString(
+        usdToNanoUsd(already.costUsd) + usdToNanoUsd(priced.costUsd),
+      ),
+      hourTotalExecutionMs: (
+        BigInt(already.hourTotalExecutionMs) +
+        BigInt(priced.hourTotalExecutionMs)
+      ).toString(),
+      hourBillableUsd: nanoUsdToDecimalString(
+        usdToNanoUsd(already.hourBillableUsd) +
+          usdToNanoUsd(priced.hourBillableUsd),
+      ),
+    });
+  }
+}

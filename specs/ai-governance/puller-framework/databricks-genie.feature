@@ -391,6 +391,21 @@ Feature: Databricks AI/BI Genie puller
       # total. The same rule as an entirely unbilled question, applied per
       # hour.
 
+    @unit @integration
+    Scenario: A statement that runs across a chunk boundary keeps both halves
+      Given a query still running when one read chunk ends
+      And the next chunk prices the hours it ran into
+      When the puller allocates warehouse cost
+      Then the query is charged for both chunks together
+      # The window is read oldest-first in chunks that tile it, and each chunk
+      # answers only for the hours it owns, so a straddler comes back once per
+      # chunk with a different part of itself. The sweep emits its question
+      # once, so the parts are added. Deciding ownership by the statement's
+      # start instead hands it wholly to the chunk it began in — which has
+      # already dropped every hour past its own end — and the hours it ran into
+      # are then billed to nobody while still diluting every other question's
+      # share of them.
+
     @unit
     Scenario: An hour a statement did no work in cannot hold it
       Given a query that ends exactly on the hour

@@ -19,8 +19,10 @@ import {
   allocateWarehouseCost,
   costReadFloorMs,
   GENIE_FREE_USAGE_SKU_MARKER,
+  mergeWarehouseCost,
   WAREHOUSE_COST_CHUNK_MS,
   WAREHOUSE_COST_SETTLING_LAG_MS,
+  type WarehousePricedStatement,
   warehouseCostChunks,
   warehouseCostPieces,
 } from "../databricksWarehouseCost";
@@ -588,5 +590,68 @@ describe("splitting the window into readable pieces", () => {
     // A clock or a stored watermark that arrived unreadable. Returning nothing
     // prices nothing, where looping on NaN would hang the run.
     expect(warehouseCostChunks({ fromMs: NaN, toMs: HOUR_START })).toEqual([]);
+  });
+});
+
+describe("mergeWarehouseCost", () => {
+  /** @scenario "A statement that runs across a chunk boundary keeps both halves" */
+  it("adds a straddler's two chunks together instead of replacing one with the other", () => {
+    // The window is read oldest-first in chunks, and a statement that begins
+    // near the end of one burns compute in the next. Each chunk prices the
+    // hours it owns, so the same statement comes back twice with a different
+    // part of itself — and the sweep emits its question exactly once, with
+    // whatever this map holds. Replacing would ship the later chunk's slice as
+    // if it were the whole cost.
+    const total = new Map<string, WarehousePricedStatement>();
+
+    mergeWarehouseCost(
+      total,
+      new Map([
+        [
+          "straddler",
+          {
+            costUsd: "0.25",
+            hourTotalExecutionMs: "1800000",
+            hourBillableUsd: "6",
+          },
+        ],
+      ]),
+    );
+    mergeWarehouseCost(
+      total,
+      new Map([
+        [
+          "straddler",
+          {
+            costUsd: "1.75",
+            hourTotalExecutionMs: "3600000",
+            hourBillableUsd: "12",
+          },
+        ],
+      ]),
+    );
+
+    // Exact strings, both halves. The ingredients are sums over the hours the
+    // statement ran through, so they add across chunks for the same reason the
+    // cost does.
+    expect(total.get("straddler")).toEqual({
+      costUsd: "2",
+      hourTotalExecutionMs: "5400000",
+      hourBillableUsd: "18",
+    });
+  });
+
+  /** @scenario "A statement that runs across a chunk boundary keeps both halves" */
+  it("leaves a statement only one chunk answered for exactly as it arrived", () => {
+    const total = new Map<string, WarehousePricedStatement>();
+    const priced: WarehousePricedStatement = {
+      costUsd: "0.002630425",
+      hourTotalExecutionMs: "2401000",
+      hourBillableUsd: "12",
+    };
+
+    mergeWarehouseCost(total, new Map([["question", priced]]));
+
+    expect(total.get("question")).toEqual(priced);
   });
 });
