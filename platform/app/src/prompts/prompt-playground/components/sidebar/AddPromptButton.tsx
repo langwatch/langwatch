@@ -42,7 +42,9 @@ export function AddPromptButton({
         {...buttonProps}
       >
         <LuPlus size={14} />
-        {!iconOnly && "New Prompt"}
+        {/* Sentence case, and the same words as the accessible name, so what
+            the button is called out loud is what it says. */}
+        {!iconOnly && "New prompt"}
       </PageLayout.HeaderButton>
     </Tooltip>
   );

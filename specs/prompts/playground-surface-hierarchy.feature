@@ -12,6 +12,17 @@ Feature: Prompt playground surface hierarchy
   Background:
     Given I am authenticated in project "my-project"
 
+  # Each surface owns the actions that belong to it. The rail is the surface
+  # that enumerates the project's prompts, so adding one is the rail's action.
+  # It used to sit in the tab strip on the opposite edge of the screen, which
+  # asked the user to cross the whole workspace to add a row to a list on the
+  # left. The strip keeps only what acts on the prompts already open there.
+
+  @integration
+  Scenario: Adding a prompt is offered by the list of prompts
+    When I open the playground
+    Then the prompts rail offers to start a new prompt, beside its heading
+
   @unit
   Scenario: The prompts list marks the prompt the workspace is showing
     Given "search-agent" and "summariser" are open in the playground
