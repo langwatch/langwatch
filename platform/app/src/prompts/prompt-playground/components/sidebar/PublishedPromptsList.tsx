@@ -1,14 +1,16 @@
 import { Skeleton } from "@chakra-ui/react";
 import { groupBy } from "lodash-es";
 import { useMemo } from "react";
-import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
+import { ProviderIconGlyph } from "~/components/modelProviders/iconsMap";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { promptContextChip } from "~/features/langy/logic/langyContextChips";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
+import type { modelProviders } from "~/server/modelProviders/registry";
 import { api } from "~/utils/api";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
+import { activePromptId } from "./activePromptId";
 import { PublishedPromptContent } from "./PublishedPromptContent";
 import { Sidebar } from "./ui/Sidebar";
 import { SidebarEmptyState } from "./ui/SidebarEmptyState";
@@ -21,6 +23,10 @@ export function PublishedPromptsList() {
   const { data, isLoading } = useAllPromptsForProject();
   const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
   const { project } = useOrganizationTeamProject();
+
+  // Which row the list marks as selected. The selector returns a string, so it
+  // stays referentially stable across store writes that don't change it.
+  const selectedPromptId = useDraggableTabsBrowserStore(activePromptId);
 
   // Cascade-resolved model for new-tab prompt defaults.
   const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
@@ -52,7 +58,7 @@ export function PublishedPromptsList() {
     return (
       <Sidebar.List>
         {[1, 2, 3, 4].map((i) => (
-          <Sidebar.Item key={i} paddingY={1} paddingLeft={2}>
+          <Sidebar.Item key={i}>
             <Skeleton width="full" height="20px" borderRadius="sm" />
           </Sidebar.Item>
         ))}
@@ -85,12 +91,14 @@ export function PublishedPromptsList() {
               })}
             >
               <Sidebar.Item
+                active={prompt.id === selectedPromptId}
                 icon={
-                  modelProviderIcons[
-                    prompt.model?.split(
-                      "/",
-                    )[0] as keyof typeof modelProviderIcons
-                  ]
+                  <ProviderIconGlyph
+                    provider={
+                      prompt.model?.split("/")[0] as keyof typeof modelProviders
+                    }
+                    size="16px"
+                  />
                 }
                 onClick={() => {
                   const defaultValues = computeInitialFormValuesForPrompt({
@@ -115,8 +123,6 @@ export function PublishedPromptsList() {
                     },
                   });
                 }}
-                paddingY={1}
-                paddingLeft={2}
               >
                 <PublishedPromptContent
                   promptId={prompt.id}

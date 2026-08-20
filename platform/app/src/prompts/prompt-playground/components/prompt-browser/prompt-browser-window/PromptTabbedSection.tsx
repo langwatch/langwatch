@@ -17,6 +17,7 @@ import {
 import { useTabId } from "../ui/TabContext";
 import { DemonstrationsTabContent } from "./DemonstrationsTabContent";
 import type { LayoutMode } from "./PromptBrowserWindowContent";
+import { PANE_BAR_MIN_HEIGHT } from "./paneBar";
 import { ResizableDivider } from "./ResizableDivider";
 
 /** The default "input" variable is locked - cannot be removed or renamed */
@@ -165,7 +166,11 @@ export function PromptTabbedSection({
       colorPalette="orange"
       size="sm"
       minHeight={0}
-      paddingTop={1}
+      // The bar below owns the only rule under this row. Chakra's `line` root
+      // would draw a second one, which is what left the selected tab's
+      // underline hovering above a separate line instead of sitting on it —
+      // the same suppression `LensTabs` makes on the traces toolbar.
+      borderBottomWidth={0}
       // lazyMount (no unmountOnExit): a sub-tab isn't rendered until first
       // opened, but once mounted it stays. Critically, this keeps the chat
       // (inside the Conversation panel) alive when the user switches to
@@ -174,20 +179,42 @@ export function PromptTabbedSection({
       // DraggableTabsBrowser, which is where the memory win comes from.
       lazyMount
     >
+      {/* Resize handle for the prompt above — it belongs directly under what it
+          resizes, which puts it above the tab bar rather than straddling it. */}
+      {layoutMode === "vertical" && (
+        <ResizableDivider
+          isExpanded={isPromptExpanded}
+          onPositionChange={onPositionChange}
+          onDragEnd={onDragEnd}
+          onToggle={onToggle}
+        />
+      )}
+
+      {/* The bar that carries the sub-tabs. It keeps the card's own surface —
+          the conversation below it is the recessed one — and closes with the
+          hairline the selected tab's underline sits on. It carried 8px of
+          bottom padding before, which pushed both the underline and the reset
+          button up off the bar's centre line. */}
       <Tabs.List
         display="flex"
-        alignItems="center"
+        alignItems="stretch"
         flexShrink={0}
-        minHeight="32px"
-        borderBottom={layoutMode === "horizontal" ? "1px solid" : undefined}
-        borderColor={layoutMode === "horizontal" ? "border" : undefined}
-        paddingBottom={2}
+        minHeight={PANE_BAR_MIN_HEIGHT}
+        background="bg.panel"
+        borderBottom="1px solid"
+        borderColor="border.muted"
       >
+        {/* The triggers run the full height of the bar so the selected one's
+            underline lands on the bar's own hairline rather than floating
+            above it. Anything that is not a tab opts back out with
+            `alignSelf`. */}
         <HStack
           width="full"
           maxWidth={layoutMode === "horizontal" ? "full" : "768px"}
           margin="0 auto"
           paddingX={3}
+          alignItems="stretch"
+          gap={1}
         >
           <Tabs.Trigger value={PromptTab.Conversation}>
             Conversation
@@ -214,6 +241,8 @@ export function PromptTabbedSection({
                     <Button
                       size="xs"
                       variant="outline"
+                      alignSelf="center"
+                      flexShrink={0}
                       onClick={() => {
                         chatRef.current?.resetChat();
                         chatRef.current?.focusInput();
@@ -231,17 +260,11 @@ export function PromptTabbedSection({
         </HStack>
       </Tabs.List>
 
-      {/* Resizable divider - only in vertical mode */}
-      {layoutMode === "vertical" && (
-        <ResizableDivider
-          isExpanded={isPromptExpanded}
-          onPositionChange={onPositionChange}
-          onDragEnd={onDragEnd}
-          onToggle={onToggle}
-        />
-      )}
-
       <HStack flex={1} width="full" margin="0 auto" overflow="hidden">
+        {/* The thread sits one step below the card surface, so the bar above it
+            and the prompt editor beside it read as the raised chrome around a
+            recessed well. It is also what the composer was drawn for — that
+            card keeps `bg.panel` and now has something to sit on. */}
         <Tabs.Content
           value={PromptTab.Conversation}
           flex={1}
@@ -249,6 +272,7 @@ export function PromptTabbedSection({
           height="full"
           display="flex"
           position="relative"
+          background="bg.subtle"
         >
           <Box
             position="absolute"
