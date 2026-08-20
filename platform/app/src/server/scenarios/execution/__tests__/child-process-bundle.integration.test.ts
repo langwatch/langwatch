@@ -123,6 +123,29 @@ describe("Pre-compiled Scenario Child Process", () => {
       expect(content).not.toContain('require("@langwatch/scenario")');
     });
 
+    /** @scenario 'The vendored SDK can act on the remote-trace configuration' */
+    it("bundles an SDK that can act on the remote-trace run configuration", () => {
+      // The platform's half of remote-trace judging is configuration only
+      // (remote-trace-run-config.ts): it sets `fetchRemoteTraces` and the wait
+      // budgets and trusts the SDK to do the fetching. The SDK's run-config
+      // schema treats unknown keys as optional, so a vendored SDK from before
+      // the capability existed accepts the exact same configuration and
+      // silently ignores it — no type error, no runtime error, every http
+      // target's judge just goes blind to the agent's reported spans. The
+      // 1.2.0 re-vendor did precisely that: the judge kept asking for turns a
+      // conversation that had already ended, or failed runs claiming the
+      // agent "hallucinated" tool calls whose spans were sitting in the span
+      // store the whole time.
+      //
+      // `wait_for_traces` is the judge's verdict-time extension tool and
+      // exists only in SDK builds that carry the capability; it is a tool
+      // *name*, so it survives bundling as a string literal. Its presence is
+      // the cheapest end-to-end proof that the inlined SDK can consume what
+      // remote-trace-run-config.ts produces.
+      const content = fs.readFileSync(BUNDLE_PATH, "utf8");
+      expect(content).toContain("wait_for_traces");
+    });
+
     /** @scenario 'Configuring log output does not stop a simulation starting' */
     it.each([
       ["pretty console logs", { LOG_FORMAT: "pretty" }],

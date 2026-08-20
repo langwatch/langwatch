@@ -116,10 +116,10 @@ overrides:
   # module init. The published SDK still calls it; the workspace one already
   # moved to `createNoopLogger`, so scenario reads from the same copy the app
   # does instead of a second, older one resolved from npm.
-  # Pinned to the vendored 1.2.0 specifically: mcp/typescript and skills are on
+  # Pinned to the vendored 1.3.0 specifically: mcp/typescript and skills are on
   # @langwatch/scenario 0.4.x, which pins langwatch to 0.16.1 exactly, and they
   # are not built through the inlining bundle that breaks.
-  "@langwatch/scenario@1.2.0>langwatch": "workspace:*"
+  "@langwatch/scenario@1.3.0>langwatch": "workspace:*"
 
   # --- Security ---
   # shell-quote quote() newline escaping (CRITICAL), then a further escaping
