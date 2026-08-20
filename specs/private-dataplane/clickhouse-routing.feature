@@ -68,14 +68,14 @@ Feature: Private ClickHouse Routing
   Scenario: Project in a private-CH org routes to the private instance
     Given org "org123" has a private ClickHouse configured
     And a project exists under org "org123"
-    When getClickHouseClientForProject(projectId) is called
+    When getClickHouseClientForTenant(projectId) is called
     Then the returned client connects to the private ClickHouse
 
   @integration
   Scenario: Project in a standard org routes to the shared instance
     Given org "org456" has no private ClickHouse configured
     And a project exists under org "org456"
-    When getClickHouseClientForProject(projectId) is called
+    When getClickHouseClientForTenant(projectId) is called
     Then the returned client connects to the shared ClickHouse
 
   # ---------------------------------------------------------------------------

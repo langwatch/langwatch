@@ -370,10 +370,9 @@ describe("experiments.deleteExperiment", () => {
   // The most reliable proof is a source-level check: with the imports gone
   // there is no path by which the archive procedure can reach those
   // services. Runtime fail-on-call mocks were considered but rejected
-  // because getClickHouseClientForTenant is still used by sibling
-  // list/enrichment procedures in the same router and globally mocking it
-  // would break unrelated tests.
-  describe("the router source file", () => {
+  // because the resolver is reached from sibling list/enrichment paths and
+  // globally mocking it would break unrelated tests.
+  describe("when checking the router source file", () => {
     /** @scenario The delete-experiment code path does NOT contact ClickHouse */
     it("does not import getClickHouseClientForTenant", async () => {
       const src = await import("node:fs/promises").then((fs) =>
