@@ -87,6 +87,7 @@ function migrationOf({
     name,
     title: name,
     description: name,
+    requiresOperatorConfirmation: false,
     runsAutomaticallyOnSelfHosted,
     migrateTenant: vi.fn(async () => ({ status: "finalized" as const })),
   };
