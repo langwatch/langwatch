@@ -36,6 +36,12 @@ import {
   selfHostedPostgresReaderStatements,
 } from "../selfProvisioning";
 
+// Single character class, reused rather than interpolated into a pattern:
+// building a RegExp out of an identifier means escaping it, and a hand-rolled
+// escape that misses backslashes is exactly what CodeQL flags as incomplete
+// sanitization.
+const IDENTIFIER_CHARACTER = /[A-Za-z0-9_]/;
+
 const ENABLED_ENV: NodeJS.ProcessEnv = {
   LWQL_SELF_PROVISION: "true",
   LWQL_CLICKHOUSE_PASSWORD: "restricted-secret",
@@ -334,13 +340,16 @@ describe("selfHostedClickHouseProvisioningStatements", () => {
     // Anchored, with a trailing non-identifier guard, rather than a substring
     // match: view names nest (`trace_metrics` is a prefix of
     // `trace_metrics_by_minute`), so `includes` matches two statements and the
-    // assertion fails against a perfectly correct catalog.
-    const createsTarget = new RegExp(
-      `^CREATE OR REPLACE VIEW ${target.replace(/\./g, "\\.")}(?![A-Za-z0-9_])`,
-    );
-    expect(
-      statements.filter((statement) => createsTarget.test(statement)),
-    ).toHaveLength(1);
+    // assertion fails against a perfectly correct catalog. Plain string
+    // comparison rather than an interpolated RegExp so the identifier never
+    // has to be escaped into a pattern.
+    const prefix = `CREATE OR REPLACE VIEW ${target}`;
+    const createsTarget = (statement: string) => {
+      if (!statement.startsWith(prefix)) return false;
+      const next = statement.charAt(prefix.length);
+      return next === "" || !IDENTIFIER_CHARACTER.test(next);
+    };
+    expect(statements.filter(createsTarget)).toHaveLength(1);
     expect(statements).toContain(
       `GRANT SELECT ON ${target} TO ${NAMES.restrictedUser}`,
     );
