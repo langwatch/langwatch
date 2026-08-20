@@ -18,18 +18,20 @@ LOCK=/tmp/golden-refresh.lock
 # Single-flight on the machine itself. GitHub's concurrency group serializes
 # the jobs, but a cancelled job leaves this script running detached, and two
 # refreshes sharing one checkout and one dev stack corrupt each other.
-if ! mkdir "$LOCK" 2>/dev/null; then
-  if [ -n "$(find "$LOCK" -maxdepth 0 -mmin +90 2>/dev/null)" ]; then
-    echo "lock older than 90 min — assuming abandoned, taking over"
-  else
-    echo "another refresh is in flight — refusing to start"
-    echo failed > "$STATUS"
-    exit 1
-  fi
+#
+# The lock is kernel-held: flock is bound to this process through fd 9 and the
+# kernel drops it when the process dies, however it dies. Nothing times a lock
+# out or reclaims one, so a refresh that runs long is never overtaken, and a
+# refresh that is killed never leaves a lock behind.
+exec 9> "$LOCK"
+if ! flock -n 9; then
+  echo "another refresh holds $LOCK — refusing to start"
+  echo failed > "$STATUS"
+  exit 1
 fi
-echo "$EXPECTED_SHA" > "$LOCK/sha"
+echo "$EXPECTED_SHA $$" >&9
 
-trap 'code=$?; if [ "$code" -ne 0 ]; then echo failed > "$STATUS"; fi; rm -rf "$LOCK"' EXIT
+trap 'code=$?; if [ "$code" -ne 0 ]; then echo failed > "$STATUS"; fi' EXIT
 
 # no TTY here: pnpm refuses destructive steps without CI=true
 export CI=true
@@ -67,6 +69,8 @@ pkill -9 -f "bin/pnpm de[v]" 2>/dev/null || true
 pkill -9 -f "concurrentl[y]" 2>/dev/null || true
 pkill -9 -f "start:ap[p]" 2>/dev/null || true
 sleep 3
-nohup pnpm dev > /tmp/pnpm-dev.log 2>&1 &
+# 9>&- matters: the dev stack outlives this script, and an inherited lock fd
+# would keep the flock held for the life of the machine.
+nohup pnpm dev > /tmp/pnpm-dev.log 2>&1 9>&- &
 
 echo done > "$STATUS"

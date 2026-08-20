@@ -67,9 +67,11 @@ jobs:
       - name: Per-run remote paths
         run: |
           RUN="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          echo "REMOTE_SCRIPT=/tmp/golden-refresh.$RUN.sh" >> "$GITHUB_ENV"
-          echo "REMOTE_STATUS=/tmp/golden-refresh.$RUN.status" >> "$GITHUB_ENV"
-          echo "REMOTE_LOG=/tmp/golden-refresh.$RUN.log" >> "$GITHUB_ENV"
+          {
+            echo "REMOTE_SCRIPT=/tmp/golden-refresh.$RUN.sh"
+            echo "REMOTE_STATUS=/tmp/golden-refresh.$RUN.status"
+            echo "REMOTE_LOG=/tmp/golden-refresh.$RUN.log"
+          } >> "$GITHUB_ENV"
 
       - name: Golden is running and exec channel works
         env:
@@ -141,13 +143,15 @@ jobs:
           boxd snapshots save "$GOLDEN" "$SNAPSHOT" --json
           boxd snapshots list
 
-      # Best effort: on cancellation the runner kills the steps above but the
-      # detached refresh keeps running on the golden and keeps its lock. The
-      # script's own stale-lock takeover is the backstop if this never runs.
-      - name: Release remote lock if this run was cancelled
+      # Best effort: on cancellation the runner kills the steps above, but the
+      # detached refresh keeps running on the golden. Kill only this run's own
+      # process — never the lock file. The lock is kernel-held, so killing the
+      # owner releases it; deleting it by hand would free it while another
+      # run's refresh was still live.
+      - name: Stop this run's remote refresh if cancelled
         if: cancelled()
         env:
           BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
         run: |
-          boxd machine exec --timeout 30 "$GOLDEN" -- bash -c \
-            "pkill -9 -f 'golden-refresh.${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.s[h]' || true; rm -rf /tmp/golden-refresh.lock" || true
+          boxd machine exec --timeout 30 "$GOLDEN" -- \
+            pkill -9 -f "golden-refresh.${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.s[h]" || true
