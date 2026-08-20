@@ -54,7 +54,7 @@ Feature: OTTL-driven OTLP ingestion source — extract usage + spend
   # Source creation — Use this template flow (claude_code)
   # -------------------------------------------------------------------
   Scenario: Admin creates a Claude Code source — clicks Use this template
-    When Alex visits "/governance/ingestion-sources" and clicks
+    When Alex visits "/governance/catalog" and clicks
       "Add ingestion source"
     And selects source type "Claude Code (OTLP)"
     Then the OTTL editor renders empty with a callout offering the

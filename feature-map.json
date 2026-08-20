@@ -1062,7 +1062,7 @@
               "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
             },
             "platform": {
-              "ui": "/governance/ingestion-sources",
+              "ui": "/governance/catalog",
               "mcp": null,
               "skill": null,
               "docs": null

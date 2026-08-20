@@ -1,7 +1,7 @@
 Feature: Governance home — route, nav promotion, persona detection
   The governance product surface lives at top-level `/governance` (a
   daily-use org-scoped home), NOT under Settings. The whole family
-  lives there: `/governance/ingestion-sources*`, `/governance/anomaly-rules`,
+  lives there: `/governance/catalog*`, `/governance/anomaly-rules`,
   `/governance/tool-catalog`, `/governance/departments`. Routing policies
   are gateway behavior and live at `/gateway/routing-policies` instead. The
   legacy `/settings/governance*` and `/settings/routing-policies` addresses
@@ -40,12 +40,60 @@ Feature: Governance home — route, nav promotion, persona detection
 
   @bdd @ui @governance-home @route @sub-routes
   Scenario: Admin-authoring sub-routes live under /governance
-    Then "/governance/ingestion-sources" is the list page
-    And "/governance/ingestion-sources/<id>" is the per-source
+    Then "/governance/catalog" is the list page
+    And "/governance/catalog/<id>" is the per-source
       detail page
     And "/governance/anomaly-rules" is the rule authoring surface
     # The daily-use dashboard at /governance links into them, and into the
     # routing-policy surface the gateway owns at /gateway/routing-policies.
+
+  @bdd @ui @governance-home @route @alias @integration
+  Scenario: The retired ingestion sources address lands on the catalog
+    When the admin cold-loads "/governance/ingestion-sources"
+    Then they land on "/governance/catalog"
+    And the old address is not kept in the browser history
+
+  @bdd @ui @governance-home @route @alias @integration
+  Scenario: An old ingestion source deep link lands on the catalog detail page
+    When the admin cold-loads "/governance/ingestion-sources/src_123?range=30d"
+    Then they land on "/governance/catalog/src_123?range=30d"
+
+  # ---------------------------------------------------------------------------
+  # Catalog tab shell — the catalog page is a tabbed surface; Sources is the
+  # only tab today and therefore the default. Which tab is open is part of
+  # the address (?tab=), but the default stays out of it so the canonical
+  # link never grows a redundant parameter.
+  # ---------------------------------------------------------------------------
+
+  @bdd @ui @governance-home @catalog-tabs @integration
+  Scenario: The catalog default tab stays out of the address
+    When the admin opens "/governance/catalog"
+    Then the Sources tab is selected and the sources table renders inside it
+    And the address carries no "tab" parameter
+
+  @bdd @ui @governance-home @catalog-tabs @integration
+  Scenario: An unknown tab value falls back to Sources
+    When the admin opens "/governance/catalog?tab=nonsense"
+    Then the Sources tab is selected and the sources table renders
+    # Never a blank pane: a stale or mistyped tab value degrades to the
+    # default instead of selecting nothing.
+
+  @bdd @ui @governance-home @bypass-project-redirect @unit
+  Scenario: The catalog is exempt from the no-organization onboarding bouncer
+    Given a session that belongs to no organization yet
+    When it sits on "/governance/catalog" or "/governance/catalog/<id>"
+    Then the route is recognized as bouncer-exempt, like every sibling
+      governance route, instead of bouncing to "/onboarding/welcome"
+    # The bounce fires only for zero-ORG sessions (an org with zero
+    # projects never bounces — useOrganizationTeamProject returns early).
+    # The exemption is an exact-match lookup over noOrgBouncerRoutes
+    # against the pattern resolvePathname derives from ROUTE_PATTERNS,
+    # which falls back to the raw pathname when no pattern matches — so
+    # /governance/catalog/<id> needs BOTH lists or the exemption misses.
+    # The old ingestion-sources entries stay listed too, so the redirect
+    # route renders before the bouncer fires (cost-centers precedent).
+    # Sibling pages also carry withPermissionGuard's
+    # bypassOnboardingRedirect as a third layer; the catalog page keeps it.
 
   # ---------------------------------------------------------------------------
   # Persona / nav promotion via api.governance.setupState
@@ -141,13 +189,13 @@ Feature: Governance home — route, nav promotion, persona detection
       sub-routes:
       | label             | href                                          |
       | Overview          | /governance                                   |
-      | Catalog           | /governance/ingestion-sources                 |
+      | Catalog           | /governance/catalog                           |
       | Anomaly Rules     | /governance/anomaly-rules                     |
 
   @bdd @ui @governance-home @layout @sub-routes
   Scenario: Admin-authoring sub-routes share the GovernanceLayout chrome
     When the admin clicks "Catalog" in the GovernanceLayout
-      left rail and lands on "/governance/ingestion-sources"
+      left rail and lands on "/governance/catalog"
     Then the page renders inside GovernanceLayout, the same chrome as
       the daily-use home
     And the same applies to "/governance/anomaly-rules"

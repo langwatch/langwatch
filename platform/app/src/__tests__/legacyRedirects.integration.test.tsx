@@ -64,6 +64,8 @@ function renderRouterAt(initialEntries: string[]) {
       ),
     },
     { path: "/governance/departments", element: <div>departments</div> },
+    { path: "/governance/catalog", element: <div>catalog page</div> },
+    { path: "/governance/catalog/:id", element: <div>catalog detail</div> },
   ];
   const router = createMemoryRouter(routes, {
     initialEntries,
@@ -188,6 +190,39 @@ describe("legacy governance redirects", () => {
       });
       expect(router.state.location.search).toBe("?scope=team");
       expect(router.state.location.hash).toBe("#policy_1");
+    });
+  });
+
+  describe("when the retired ingestion sources address is cold-loaded", () => {
+    /** @scenario The retired ingestion sources address lands on the catalog */
+    it("lands on the catalog and replaces the history entry", async () => {
+      const router = renderRouterAt([
+        "/start",
+        "/governance/ingestion-sources",
+      ]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/catalog");
+      });
+
+      await act(async () => {
+        await router.navigate(-1);
+      });
+      expect(router.state.location.pathname).toBe("/start");
+    });
+
+    /** @scenario An old ingestion source deep link lands on the catalog detail page */
+    it("lands on the catalog detail page with the query intact", async () => {
+      const router = renderRouterAt([
+        "/governance/ingestion-sources/src_123?range=30d",
+      ]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe(
+          "/governance/catalog/src_123",
+        );
+      });
+      expect(router.state.location.search).toBe("?range=30d");
     });
   });
 

@@ -18,6 +18,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -141,8 +142,8 @@ import UserDetailPage from "../users/[id]";
 /** Every page the Governance section navigation lists, plus its drill-ins. */
 const GOVERNANCE_PAGES: Array<[string, React.ComponentType]> = [
   ["/governance", GovernanceOverviewPage],
-  ["/governance/ingestion-sources", IngestionSourcesPage],
-  ["/governance/ingestion-sources/:id", IngestionSourceDetailPage],
+  ["/governance/catalog", IngestionSourcesPage],
+  ["/governance/catalog/:id", IngestionSourceDetailPage],
   ["/governance/anomaly-rules", AnomalyRulesPage],
   ["/governance/tool-catalog", ToolCatalogPage],
   ["/governance/departments", DepartmentsPage],
@@ -183,9 +184,14 @@ const ORGANIZATION_ADMIN: string[] = [
 ];
 
 function renderPage(Page: React.ComponentType) {
+  // The catalog page reads its ?tab= from the router's search params, so
+  // every page mounts inside a memory router; the compat next-router stays
+  // mocked above.
   return render(
     <ChakraProvider value={defaultSystem}>
-      <Page />
+      <MemoryRouter initialEntries={["/governance"]}>
+        <Page />
+      </MemoryRouter>
     </ChakraProvider>,
   );
 }

@@ -71,6 +71,10 @@ const ROUTE_PATTERNS = [
   "/me/pull-requests",
   "/cli/auth",
   "/governance",
+  "/governance/catalog/:id",
+  "/governance/catalog",
+  // Retired addresses — kept so the redirect route resolves to a known
+  // pattern while it forwards to /governance/catalog.
   "/governance/ingestion-sources/:id",
   "/governance/ingestion-sources",
   "/governance/anomaly-rules",

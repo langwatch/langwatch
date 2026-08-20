@@ -7,9 +7,29 @@ import { LegacyPrefixRedirect } from "~/components/LegacyPrefixRedirect";
  * query and hash intact, and the history entry is replaced. Shared as data
  * so the redirect tests exercise the same wiring routes.tsx mounts.
  *
- * Spec: specs/navigation/gateway-url-move.feature
+ * Spec: specs/navigation/gateway-url-move.feature and
+ * specs/ai-gateway/governance/governance-home-routing.feature (the retired
+ * ingestion-sources prefix).
  */
 export const legacyRedirectRoutes: RouteObject[] = [
+  {
+    path: "/governance/ingestion-sources/*",
+    element: (
+      <LegacyPrefixRedirect
+        from="/governance/ingestion-sources"
+        to="/governance/catalog"
+      />
+    ),
+  },
+  {
+    path: "/governance/ingestion-sources",
+    element: (
+      <LegacyPrefixRedirect
+        from="/governance/ingestion-sources"
+        to="/governance/catalog"
+      />
+    ),
+  },
   {
     path: "/settings/gateway/*",
     element: <LegacyPrefixRedirect from="/settings/gateway" to="/gateway" />,
