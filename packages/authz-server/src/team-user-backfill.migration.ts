@@ -51,6 +51,11 @@ import type {
   AuthzMigrationRepository,
   LegacyTeamRow,
 } from "./authz-migration.repository";
+import {
+  type ConvergencePoll,
+  convergenceTimeoutMs,
+  DEFAULT_CONVERGENCE_POLL,
+} from "./convergence-poll";
 import type { AuthzAuditWriter, AuthzEpochBumper } from "./grants.service";
 import { bindingIdentityKey, deriveGrantId } from "./ledger/grant-identity";
 import type {
@@ -175,10 +180,8 @@ export type TeamUserBackfillDeps = {
   bumpEpoch: AuthzEpochBumper;
   now: () => number;
   /** How long to wait for the projection's compat rows before parking. */
-  poll?: { intervalMs: number; timeoutMs: number };
+  poll?: ConvergencePoll;
 };
-
-const DEFAULT_POLL = { intervalMs: 500, timeoutMs: 120_000 };
 
 export class TeamUserBackfillMigration implements SystemMigration {
   readonly name = TEAM_USER_BACKFILL_MIGRATION_NAME;
@@ -328,9 +331,10 @@ export class TeamUserBackfillMigration implements SystemMigration {
     missing: LegacyTeamRow[];
     signal?: AbortSignal;
   }): Promise<void> {
-    const poll = this.deps.poll ?? DEFAULT_POLL;
-    const deadline = this.deps.now() + poll.timeoutMs;
+    const poll = this.deps.poll ?? DEFAULT_CONVERGENCE_POLL;
     const wanted = new Set(missing.map(bindingKey));
+    const timeoutMs = convergenceTimeoutMs({ poll, factCount: wanted.size });
+    const deadline = this.deps.now() + timeoutMs;
     for (;;) {
       if (signal?.aborted) {
         throw new Error(
@@ -344,7 +348,7 @@ export class TeamUserBackfillMigration implements SystemMigration {
       if ([...wanted].every((key) => present.has(key))) return;
       if (this.deps.now() >= deadline) {
         throw new Error(
-          `grants projection did not land ${wanted.size} backfilled row(s) within ${poll.timeoutMs}ms; tenant parked for retry`,
+          `grants projection did not land ${wanted.size} backfilled row(s) within ${timeoutMs}ms; tenant parked for retry`,
         );
       }
       await new Promise((resolve) => setTimeout(resolve, poll.intervalMs));

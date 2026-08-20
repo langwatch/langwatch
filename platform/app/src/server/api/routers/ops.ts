@@ -1532,6 +1532,37 @@ export const opsRouter = createTRPCRouter({
     }),
 
   /**
+   * Enroll a sampled cohort of organizations for one migration in a single
+   * action. The service draws the sample from organizations not yet
+   * enrolled, excluding enterprise plans and private-dataplane routes by
+   * data rather than by any list in code. The cutover keeps its typed
+   * confirmation: a cohort of cutovers is the same flip N times over.
+   */
+  enrollMigrationCohort: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        migrationName: z.string().min(1).max(200),
+        sampleSize: z.number().int().min(1).max(1000),
+        confirm: z.literal("ENROLL").optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (
+        systemMigrationsService.requiresOperatorConfirmation({
+          migrationName: input.migrationName,
+        })
+      ) {
+        requireDestructiveOpsAuth(ctx, input.confirm);
+      }
+      return systemMigrationsService.enrollCohort({
+        migrationName: input.migrationName,
+        sampleSize: input.sampleSize,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  /**
    * Withdraw an enrollment: later passes stop processing the organization
    * for that migration. State already recorded stays exactly as it is -
    * pausing the rollout is this action's whole job; undoing it is the

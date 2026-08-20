@@ -77,6 +77,11 @@ import type {
   ResourceGrantRow,
   ShareLinkFactRow,
 } from "./authz-migration.repository";
+import {
+  type ConvergencePoll,
+  convergenceTimeoutMs,
+  DEFAULT_CONVERGENCE_POLL,
+} from "./convergence-poll";
 import { GRANTS_CUTOVER_MIGRATION_NAME } from "./cutover.name";
 import { GRANTS_GENESIS_IMPORT_MIGRATION_NAME } from "./genesis-import.name";
 import { deriveGrantId } from "./ledger/grant-identity";
@@ -126,7 +131,6 @@ const MAX_REPORTED_DIFFS = 50;
  *  not a dump. The report names the total either way. */
 const MAX_PROVEN_DIFFS = 200;
 
-const DEFAULT_POLL = { intervalMs: 500, timeoutMs: 120_000 };
 
 /**
  * The report kinds that mean the cutover has DONE nothing for this tenant
@@ -216,7 +220,7 @@ export type CutoverDeps = {
   adminEmails: () => string[];
   now: () => number;
   /** How long to wait for the projection before parking. */
-  poll?: { intervalMs: number; timeoutMs: number };
+  poll?: ConvergencePoll;
 };
 
 /** What one pass imported, for the tenant's report. */
@@ -535,6 +539,7 @@ export class GrantsCutoverMigration implements SystemMigration {
 
     await this.pollUntil({
       what: `the cutover import for ${organizationId}`,
+      factCount: organizationGrantIds.length + platformGrantIds.length,
       signal,
       check: async () => {
         const [organizationHeads, platformHeads] = await Promise.all([
@@ -615,21 +620,25 @@ export class GrantsCutoverMigration implements SystemMigration {
 
   private async pollUntil({
     what,
+    factCount = 0,
     check,
     signal,
   }: {
     what: string;
+    /** How many facts the wait is on — scales the deadline (0 for a flag). */
+    factCount?: number;
     check: () => Promise<boolean>;
     signal?: AbortSignal;
   }): Promise<void> {
-    const poll = this.deps.poll ?? DEFAULT_POLL;
-    const deadline = this.deps.now() + poll.timeoutMs;
+    const poll = this.deps.poll ?? DEFAULT_CONVERGENCE_POLL;
+    const timeoutMs = convergenceTimeoutMs({ poll, factCount });
+    const deadline = this.deps.now() + timeoutMs;
     for (;;) {
       this.assertNotAborted(signal);
       if (await check()) return;
       if (this.deps.now() >= deadline) {
         throw new Error(
-          `grants projection did not land ${what} within ${poll.timeoutMs}ms; tenant parked for retry`,
+          `grants projection did not land ${what} within ${timeoutMs}ms; tenant parked for retry`,
         );
       }
       await new Promise((resolve) => setTimeout(resolve, poll.intervalMs));

@@ -184,6 +184,57 @@ Feature: In-place authorization data migration
     Then the action is refused with error code "migration_enrollment_cloud_only"
     And the ops page explains that released migrations run automatically instead
 
+  # ----------------------------------------------------------------------------
+  # Cohort enrollment - sampling the long tail without touching the big fish
+  # ----------------------------------------------------------------------------
+  # One organization at a time paces a rollout of ten; it does not pace a
+  # rollout of seven thousand. A cohort enrolls a sample in one action - and
+  # the organizations it must never sweep up are the ones the platform
+  # already knows by data, not by a list an operator maintains: an enterprise
+  # plan on the subscription, or a private ClickHouse route in the
+  # environment. Neither signal names an id in code.
+
+  @unit
+  Scenario: An operator enrolls a sampled cohort in one action
+    Given the installation is cloud with organizations not yet enrolled for the grants import
+    When an operator enrolls a cohort of 50 for the grants import
+    Then 50 eligible organizations are enrolled in one action
+    And the result names every organization it picked, so the action is auditable
+
+  @unit
+  Scenario: A cohort never includes an enterprise organization
+    Given "bigcorp" holds an active enterprise subscription
+    And "isolated-inc" routes to a private ClickHouse instance via the environment
+    When an operator enrolls a cohort for the grants import
+    Then neither "bigcorp" nor "isolated-inc" is in the cohort
+    And no organization id was named in code to exclude them
+
+  @unit
+  Scenario: A cohort samples only organizations not already enrolled
+    Given "acme" is already enrolled for the grants import
+    When an operator enrolls a cohort for the grants import
+    Then "acme" is not picked again
+    And the cohort is drawn entirely from organizations with no enrollment row
+
+  @unit
+  Scenario: A cohort larger than the eligible pool enrolls the whole pool
+    Given fewer eligible organizations remain than the requested cohort size
+    When an operator enrolls the cohort
+    Then every remaining eligible organization is enrolled
+    And the result says how many were enrolled rather than erroring
+
+  @unit
+  Scenario: A cutover cohort takes the typed confirmation
+    Given the cutover migration requires operator confirmation
+    When an operator enrolls a cohort for the cutover without typing the confirmation
+    Then the cohort is refused the same way a single cutover enrollment is
+
+  @unit
+  Scenario: Cohort enrollment does not apply to self-hosted installations
+    Given the installation is self-hosted
+    When an operator enrolls a cohort
+    Then the action is refused with error code "migration_enrollment_cloud_only"
+
   @unit
   Scenario: A migration not yet released for self-hosting never runs there
     Given the installation is self-hosted
@@ -546,6 +597,13 @@ Feature: In-place authorization data migration
     When the genesis import runs for "acme"
     Then that user holds an organization-scoped admin grant
     And a member with no bindings gains nothing beyond the floor
+
+  @unit
+  Scenario: The convergence wait grows with the size of the import
+    Given "acme"'s genesis import states more facts than the base wait could fold
+    When the import waits for the projection to land its facts
+    Then the wait's deadline scales with the number of facts it is waiting on
+    And an organization is never parked purely for being large
 
   @unit
   Scenario: Running the genesis import twice states the same facts

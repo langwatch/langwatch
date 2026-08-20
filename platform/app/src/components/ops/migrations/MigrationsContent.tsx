@@ -12,7 +12,7 @@ import {
   Table,
   Text,
 } from "@chakra-ui/react";
-import { Play, Undo2, UserPlus } from "lucide-react";
+import { Play, Undo2, UserPlus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
@@ -247,11 +247,18 @@ function MigrationSection({
         {canManage && migration.availableOnThisInstallation && (
           <HStack>
             {isSaaS && (
-              <EnrollAction
-                migrationName={migration.name}
-                migrationTitle={migration.title}
-                requiresConfirmation={requiresConfirmation}
-              />
+              <>
+                <EnrollAction
+                  migrationName={migration.name}
+                  migrationTitle={migration.title}
+                  requiresConfirmation={requiresConfirmation}
+                />
+                <EnrollCohortAction
+                  migrationName={migration.name}
+                  migrationTitle={migration.title}
+                  requiresConfirmation={requiresConfirmation}
+                />
+              </>
             )}
             <RunForOrganizationAction
               migrationName={migration.name}
@@ -457,6 +464,88 @@ function EnrollAction({
         confirmDisabled={organization === null}
       >
         <OrganizationPicker value={organization} onChange={setOrganization} />
+      </ConfirmDialog>
+    </>
+  );
+}
+
+/**
+ * Enroll a sampled cohort for THIS migration in one action. The sample is
+ * drawn from organizations not yet enrolled, and the platform excludes the
+ * ones it already knows to leave alone by data: an active enterprise
+ * subscription, or a dedicated data plane configured in the environment.
+ * No organization is ever named in code to exclude it.
+ */
+function EnrollCohortAction({
+  migrationName,
+  migrationTitle,
+  requiresConfirmation,
+}: {
+  migrationName: string;
+  migrationTitle: string;
+  requiresConfirmation: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [sampleSizeText, setSampleSizeText] = useState("50");
+  const sampleSize = Number.parseInt(sampleSizeText, 10);
+  const sampleSizeValid =
+    Number.isInteger(sampleSize) && sampleSize >= 1 && sampleSize <= 1000;
+  const utils = api.useUtils();
+  const enrollCohort = api.ops.enrollMigrationCohort.useMutation({
+    onSuccess: async (result) => {
+      toaster.create({
+        title:
+          result.enrolled.length === 1
+            ? "1 organization enrolled"
+            : `${result.enrolled.length} organizations enrolled`,
+        description:
+          result.enrolled.length < sampleSize
+            ? "Fewer eligible organizations remained than the requested cohort size, so every remaining one was enrolled. The next migration pass picks them up automatically."
+            : "The next migration pass picks the cohort up automatically.",
+        type: "success",
+      });
+      setOpen(false);
+      await Promise.all([
+        utils.ops.listMigrationEnrollments.invalidate(),
+        utils.ops.listSystemMigrations.invalidate(),
+      ]);
+    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't enroll the cohort" }),
+  });
+
+  return (
+    <>
+      <Button size="xs" variant="outline" onClick={() => setOpen(true)}>
+        <Users size={13} /> Enroll cohort…
+      </Button>
+      <ConfirmDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        onConfirm={() => {
+          if (!sampleSizeValid) return;
+          enrollCohort.mutate({
+            migrationName,
+            sampleSize,
+            ...(requiresConfirmation ? { confirm: "ENROLL" as const } : {}),
+          });
+        }}
+        title={`Enroll a cohort for the ${migrationTitle.toLowerCase()}`}
+        description="Enrolls a random sample of organizations not yet enrolled for this step. Organizations on an enterprise plan or with a dedicated data plane are always left out."
+        isLoading={enrollCohort.isPending}
+        confirmDisabled={!sampleSizeValid}
+      >
+        <Stack gap={1}>
+          <Text fontSize="sm">How many organizations to enroll</Text>
+          <Input
+            size="sm"
+            type="number"
+            min={1}
+            max={1000}
+            value={sampleSizeText}
+            onChange={(event) => setSampleSizeText(event.target.value)}
+          />
+        </Stack>
       </ConfirmDialog>
     </>
   );

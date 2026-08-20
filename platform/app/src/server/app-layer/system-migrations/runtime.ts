@@ -31,6 +31,7 @@ import {
 import type { Cluster, Redis } from "ioredis";
 import { env } from "~/env.mjs";
 import type { Prisma } from "~/generated/prisma/client";
+import { getPrivateClickHouseUrls } from "../../clickhouse/clickhouseClient";
 import { prisma } from "../../db";
 import { tryGetApp } from "../app";
 import {
@@ -120,6 +121,11 @@ export const systemMigrationsService = new SystemMigrationsService({
     })),
   isSaaS: () => env.IS_SAAS === true,
   enrollments: enrollmentRepository,
+  // The environment's private ClickHouse routing table doubles as the list
+  // of private-dataplane organizations a cohort must never sweep up - the
+  // same env vars that route their data are what exclude them, so no id
+  // lives in code.
+  privateDataplaneOrganizationIds: () => [...getPrivateClickHouseUrls().keys()],
   audit: (entry) =>
     auditLog({
       userId: entry.userId,
