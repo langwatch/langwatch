@@ -56,6 +56,22 @@ Feature: Pre-compiled Scenario Child Process
     And no copy of the OpenTelemetry API is inlined into the bundle
 
   @regression
+  Scenario: An inlined dependency binds only exports the external OTEL packages still have
+    Inlining the SDK while keeping OpenTelemetry external means the SDK's OTEL
+    bindings are resolved against whatever version the application depends on,
+    not the one the SDK was published against. When those disagree about an
+    export, the child dies at module scope and every simulation fails before it
+    starts.
+
+    A missing export is invisible to a check for unresolved modules, and the
+    exit code is the same whether the child crashed on load or read its input
+    and rejected it. Only a result on stdout distinguishes the two.
+
+    When the child process build step runs
+    And a child process is started with input that is not valid job data
+    Then the child reports that it could not parse the job data
+
+  @regression
   Scenario: Configuring log output does not stop a simulation starting
     A package that locates a FILE relative to its own directory cannot be
     inlined, because inlining is what moves that directory. The logger is one:
