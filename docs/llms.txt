@@ -181,6 +181,17 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Getting Started](https://langwatch.ai/docs/integration/overview.md): LangWatch integrates with all major LLM providers, frameworks, and tools. See our complete list of integrations below.
 - [Choosing the right OTel endpoint](https://langwatch.ai/docs/observability/trace-vs-activity-ingestion.md): LangWatch exposes two OpenTelemetry-shaped URLs. They share the same internal pipeline; the split is auth + routing convenience. Trace ingestion (`/api/otel/v1/traces`) authenticates as a project; governance ingestion (`/api/ingest/otel/:sourceId`) authenticates as an IngestionSource the org admin authored. Both land in the same trace store, distinguished by origin metadata.
 
+## LangWatchQL (LWQL)
+
+- [LangWatchQL (LWQL)](https://langwatch.ai/docs/observability/lwql/introduction.md): Query your LLM observability data directly with SQL — traces, spans, evaluations, costs, and more — through a safe, tenant-isolated analytics API
+- [Writing LWQL Queries](https://langwatch.ai/docs/observability/lwql/writing-queries.md): The LangWatchQL dialect, schema discovery, bound parameters, time windows, result limits, and error codes
+- [Handing the Reins to Your Agent](https://langwatch.ai/docs/observability/lwql/querying-with-agents.md): Teach Claude Code, Cursor, or your own agent to answer observability questions by writing and running LWQL queries
+- [LWQL MCP Server](https://langwatch.ai/docs/observability/lwql/mcp.md): A first-party MCP server for LangWatchQL — coming soon
+- [LWQL CLI](https://langwatch.ai/docs/observability/lwql/cli.md): Query LangWatch from your terminal — coming soon
+- [LWQL on Self-Hosted LangWatch](https://langwatch.ai/docs/observability/lwql/self-hosted.md): Architecture, environment contract, provisioning, and gotchas for running LangWatchQL on your own deployment
+- [LWQL Privacy & RBAC](https://langwatch.ai/docs/observability/lwql/privacy-and-rbac.md): How LangWatchQL enforces tenant isolation, permission-gated columns, and content protection on arbitrary SQL
+- [LWQL Use Cases](https://langwatch.ai/docs/observability/lwql/use-cases.md): Copy-paste LangWatchQL queries for cost attribution, latency, quality, adoption, and experiment analysis
+
 ## SDKs
 
 ### Python

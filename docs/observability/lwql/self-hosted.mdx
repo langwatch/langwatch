@@ -1,0 +1,71 @@
+---
+title: "LWQL on Self-Hosted LangWatch"
+description: "Architecture, environment contract, provisioning, and gotchas for running LangWatchQL on your own deployment"
+sidebarTitle: Self-hosted / on-prem
+keywords: langwatchql, lwql, self-hosted, on-prem, clickhouse, provisioning, setup
+---
+
+<Note>
+LWQL support for self-hosted deployments is early. This page documents the architecture and the contract the application expects; the pieces marked *operator-provisioned* are not yet packaged into the Helm chart, so expect some assembly. If you're setting this up, [talk to us](/support) — we'll help, and it feeds directly into the packaged version.
+</Note>
+
+## Architecture in one paragraph
+
+Customer SQL never runs as the application. It runs as a dedicated **restricted ClickHouse identity** whose settings profile pins `readonly = 1` and all resource ceilings as constants, and which holds `SELECT` on a set of **LWQL views** in a dedicated analytics database — and on nothing else. **Row policies** on those views scope every read to the calling project, resolved through a tenant capability the application sends per query as a custom setting. PostgreSQL-resident datasets (prompts, experiments, annotations, ...) reach ClickHouse through **approved views** in PostgreSQL read by **PostgreSQL-engine tables** in the analytics database, so the same row policies apply to them too.
+
+A deployment that provisions none of this simply has no LWQL: the API answers `503 lwql_unavailable` and everything else works normally.
+
+## The environment contract
+
+The application looks for five variables. **All five are required** — with any subset missing, the executor is not built and every query is refused:
+
+| Variable | Meaning |
+|---|---|
+| `LWQL_CLICKHOUSE_URL` | ClickHouse HTTP endpoint the restricted identity connects to |
+| `LWQL_CLICKHOUSE_USER` | The restricted identity. **Never** an admin account — the isolation model assumes this user can only see the LWQL views |
+| `LWQL_CLICKHOUSE_PASSWORD` | Its password |
+| `LWQL_DATABASE` | The database the LWQL views live in; unqualified names in queries resolve here |
+| `LWQL_TENANT_SETTING` | The custom setting carrying the tenant capability. Must start with `custom_` |
+
+If you set *some* of these, the app logs a warning naming exactly which are absent (variable names only, never values) — check for it when queries unexpectedly return `lwql_unavailable`.
+
+## What the application provisions itself
+
+On startup (`start:prepare:db`), after ClickHouse migrations run:
+
+1. **Migrations** create the key-map table that resolves tenant capabilities to project ids.
+2. **The `provisionLwql` task** creates the LWQL views in ClickHouse, creates the approved views in PostgreSQL, and backfills the key map from every project's LWQL key. It is idempotent (`CREATE OR REPLACE` / `IF NOT EXISTS` throughout) and exits immediately when the `LWQL_*` environment is absent.
+
+The task runs DDL as the application's own ClickHouse connection (`CLICKHOUSE_URL`) — the restricted identity deliberately has no DDL privileges.
+
+## What the operator provisions
+
+The access model itself is deployed out of band (in LangWatch Cloud, by Terraform):
+
+- The **restricted user** and its **settings profile** — `readonly = 1`, `max_execution_time`, `max_memory_usage`, `max_threads`, `max_concurrent_queries_for_user`, `max_rows_to_read`, `max_bytes_to_read`, all `CONST`, plus the tenant setting declared `CHANGEABLE_IN_READONLY`
+- **Grants** — `SELECT` on the LWQL views (and the exact source columns the views read), nothing else
+- **Row policies** binding each view to the tenant capability
+- For PostgreSQL-resident datasets: a **read-only PostgreSQL role** granted `SELECT` on the approved views only, a ClickHouse **named collection** holding that role's connection, and the **PostgreSQL-engine tables** mapping the approved views into the analytics database
+
+## Gotchas
+
+<AccordionGroup>
+  <Accordion title="The tenant setting needs a server-side prefix allowance">
+    `LWQL_TENANT_SETTING` must begin with `custom_`, and your ClickHouse server config must allow that prefix via `custom_settings_prefixes`. Without it, every query fails at the server with an unknown-setting error.
+  </Accordion>
+  <Accordion title="Raising the execution-time ceiling has a second half">
+    The application's HTTP client waits slightly longer than the default 10-second `max_execution_time`, so server-side timeouts surface as a clean, coded `query_timeout`. If you provision a profile with a **higher** execution ceiling, the driver will abandon the socket first and callers get an anonymous transport failure instead of the coded error. Keep the profile at the default, or raise both together.
+  </Accordion>
+  <Accordion title="503 lwql_unavailable with the environment fully set">
+    This also fires when the configured identity exists but the database objects don't — the server answered `UNKNOWN_TABLE`/`UNKNOWN_DATABASE`/`ACCESS_DENIED` for a name the validator had already approved, which can't be the caller's SQL. Check that migrations and `provisionLwql` ran, and that the grants match the current catalog. The underlying reason is in the application logs, never in the API response.
+  </Accordion>
+  <Accordion title="Distinguishing the three refusals">
+    `401 invalid_credentials` — the key is wrong. `403 lwql_not_enabled` — key is fine, but the `release_lwql_workbench` feature flag is off for the project (a product switch, not a fault). `503 lwql_unavailable` — the deployment has no working LWQL execution path (an operator problem).
+  </Accordion>
+  <Accordion title="Connection budgets are shared">
+    The LWQL executor keeps its own pool (up to 10 connections) beside the application's ClickHouse client, and each PostgreSQL-engine table keeps a small pool against PostgreSQL. Count both against your servers' connection limits — particularly the PostgreSQL side, where the read-only role's connection limit should leave headroom for the application itself.
+  </Accordion>
+  <Accordion title="Never substitute the application's ClickHouse user">
+    If LWQL provisioning feels like too much, the tempting shortcut is pointing `LWQL_CLICKHOUSE_USER` at the app's own account. Don't: that account is not read-only, carries no row policies, and would run customer SQL with admin visibility. The application refuses to fall back to it internally for exactly this reason.
+  </Accordion>
+</AccordionGroup>

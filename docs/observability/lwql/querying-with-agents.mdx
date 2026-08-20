@@ -1,0 +1,77 @@
+---
+title: "Handing the Reins to Your Agent"
+description: "Teach Claude Code, Cursor, or your own agent to answer observability questions by writing and running LWQL queries"
+sidebarTitle: Handing the reins to your agent
+keywords: langwatchql, lwql, agent, claude code, cursor, llm, sql, analytics
+---
+
+LWQL was designed to be driven by an agent as much as by a person. Every part of the surface is machine-legible: the schema endpoint describes each dataset down to column descriptions and units, errors carry stable codes with the exact parameter names that were missing, and diagnostics tell the agent when its answer is technically correct but probably not what was meant.
+
+That means you can hand your coding agent — Claude Code, Cursor, or anything that can make HTTP calls — an API key and a question like *"why did our LLM costs spike on Tuesday?"* and let it figure out the SQL.
+
+## The loop that works
+
+Teach your agent this loop; it's the same one the API was designed around:
+
+1. **Discover** — `GET /analytics/schema` once, and cache it. It lists every dataset, every column with its type and description, the grain, the join keys, the time column, and a runnable `exampleSql` per dataset.
+2. **Query** — `POST /analytics/query/clickhouse` with one `SELECT`. Filter the dataset's `timeColumn`; prefer the `*_by_minute` datasets for trends.
+3. **Repair** — on a 4xx, read the `code` and `meta`. `lwql_parameter_missing` names the parameters to add; validation violations name the exact table, column, or function that was refused. One edit, retry.
+4. **Sanity-check** — read `diagnostics` before trusting the rows. `POSSIBLE_FANOUT` means a join inflated the aggregates; `UNBOUNDED_TIME_RANGE` means the query read all of history; `RESULT_TRUNCATED` means the answer is incomplete.
+
+## A system prompt that teaches it
+
+Drop something like this into your agent's instructions (CLAUDE.md, .cursorrules, or a system prompt):
+
+````markdown
+## Querying LangWatch observability data
+
+You can answer questions about our LLM app (costs, latency, errors, evaluation
+quality, usage) by running SQL against LangWatch's LWQL API.
+
+- Schema discovery: GET https://app.langwatch.ai/api/v1/projects/{PROJECT_ID}/analytics/schema
+- Run a query:      POST https://app.langwatch.ai/api/v1/projects/{PROJECT_ID}/analytics/query/clickhouse
+  with JSON body {"sql": "...", "parameters": {...}}
+- Auth header:      X-Auth-Token: $LANGWATCH_API_KEY   (read it from the environment; never print it)
+
+Rules:
+- ClickHouse dialect, single SELECT only. No writes, no SETTINGS, no system tables.
+- ALWAYS call the schema endpoint first if you haven't this session; use only
+  datasets and columns it lists, and start from each dataset's exampleSql.
+- ALWAYS filter each dataset's timeColumn (e.g. OccurredAt) — unfiltered
+  queries scan all history and may hit scan limits.
+- Use bound parameters ({name:DateTime}) instead of interpolating values.
+- For time series, prefer trace_metrics_by_minute / model_usage_by_minute /
+  evaluation_metrics_by_minute — they are pre-aggregated and fast.
+- On errors, read the "code" and "meta" fields and fix precisely that.
+- After each result, check "diagnostics" and "truncated" before presenting
+  numbers; mention any diagnostic that affects the answer.
+````
+
+Two things make this reliable in practice:
+
+- **Keep the key in the environment.** The agent only needs to know the header name. LWQL keys are read-only over one project's analytics, which bounds the blast radius of a leaked prompt — but there's no reason to put the secret itself in one.
+- **Don't paste the schema into the prompt.** It's large, it changes, and the endpoint is cheap. Let the agent fetch it.
+
+## Why this is safe to do
+
+Handing an agent free-form SQL access normally means trusting it not to write, not to escape its tenant, and not to take the database down. LWQL removes all three from the trust equation:
+
+- The statement is validated against a default-deny allowlist before execution — an agent that hallucinates `INSERT`, a system table, or an exotic function gets a structured refusal, not a database error.
+- Tenant isolation is enforced by database row policies, not by anything the SQL says. There is no query the agent can write that reads another project.
+- Execution time, memory, and scan volume are capped server-side as constants. A runaway `CROSS JOIN` costs one killed query, not a cluster.
+
+The failure mode of a confused agent is a 400 with instructions for fixing itself — which is exactly what agents are good at consuming.
+
+## What the agent can answer
+
+With the loop above, questions like these become one or two queries (see [Use cases](/observability/lwql/use-cases) for the SQL):
+
+- "What did each model cost us per day this week, and which one drove the spike?"
+- "What's our p95 latency by trace name, and did it regress after yesterday's deploy?"
+- "Which evaluator is failing most, and on which conversations?"
+- "Which customers generate the most cost per message?"
+- "How did the pass rate of our simulations change across the last five batches?"
+
+## MCP and CLI
+
+A first-party MCP server and CLI for LWQL are coming soon — see [MCP](/observability/lwql/mcp) and [CLI](/observability/lwql/cli). Until then, the two HTTP endpoints plus the prompt above are all an agent needs.

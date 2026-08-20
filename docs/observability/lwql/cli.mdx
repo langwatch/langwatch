@@ -1,0 +1,38 @@
+---
+title: "LWQL CLI"
+description: "Query LangWatch from your terminal — coming soon"
+sidebarTitle: "CLI (coming soon)"
+keywords: langwatchql, lwql, cli, terminal, sql
+---
+
+<Note>
+The LWQL CLI is **coming soon**.
+</Note>
+
+We're building a CLI that brings LWQL to your terminal and your scripts:
+
+```bash
+# The shape of things to come
+langwatch query "SELECT toStartOfDay(OccurredAt) AS Day, sum(TotalCost) AS Cost \
+                 FROM traces WHERE OccurredAt >= now() - INTERVAL 7 DAY \
+                 GROUP BY Day ORDER BY Day"
+
+langwatch schema            # browse datasets and columns
+langwatch query --format csv ... > costs.csv
+```
+
+Planned niceties: schema-aware autocomplete, `--format table|json|csv`, reading SQL from a file or stdin, and profile-based auth so your key stays out of shell history.
+
+## Until then
+
+`curl` and `jq` cover the same ground — the API is two endpoints:
+
+```bash
+curl -s -X POST "https://app.langwatch.ai/api/v1/projects/$PROJECT_ID/analytics/query/clickhouse" \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sql": "SELECT count() AS Traces FROM traces WHERE OccurredAt >= now() - INTERVAL 1 DAY"}' \
+  | jq -r '.rows'
+```
+
+See [Writing queries](/observability/lwql/writing-queries) for the full request and response shapes.

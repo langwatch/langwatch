@@ -1,0 +1,52 @@
+---
+title: "LWQL Privacy & RBAC"
+description: "How LangWatchQL enforces tenant isolation, permission-gated columns, and content protection on arbitrary SQL"
+sidebarTitle: Privacy & RBAC
+keywords: langwatchql, lwql, rbac, privacy, permissions, tenant isolation, security
+---
+
+LWQL accepts arbitrary SQL from customers and agents, so its access model is layered: every guarantee is enforced in at least two independent places, and the innermost one is always the database itself.
+
+## Tenant isolation lives in the database
+
+Every query runs as a restricted ClickHouse identity, and every LWQL view carries a **row policy** that scopes reads to the calling project. The tenant is resolved from a capability derived from your project's key, sent by the server — never from the SQL, never from the request body, and never from the project id in the URL (that one is only a cross-check; naming a different project returns 404).
+
+The consequence: there is no statement you can write that reads another tenant's rows. A bug in the API gateway can cost a caller a wrong refusal or acceptance of a malformed query — it cannot cross tenants, because the gateway was never the boundary.
+
+## What a key can do
+
+- LWQL requires an API key with the **`analytics:view`** scope, and the project must have LWQL enabled.
+- Access is **read-only by construction**: the database identity has `readonly = 1` pinned as a constant, and the validator refuses every write and DDL form before it ever reaches the database anyway.
+- The identity can see **only the LWQL views**. Raw tables, other databases, `system.*`, and `information_schema` are unreachable at the database and refused by name at the gateway.
+
+## Column-level permission gates
+
+Individual columns are gated on the same visibility permissions that govern the rest of LangWatch, resolved server-side per request:
+
+| Gate | Governs | Example columns |
+|---|---|---|
+| `input` | Captured user input | `traces.CapturedInput`, `spans.CapturedInput`, `evaluations.CapturedInputs` |
+| `output` | Captured model output | `traces.CapturedOutput`, `spans.CapturedOutput`, `simulations.MessageContents` |
+| `costs` | Cost figures | `traces.TotalCost`, `spans.Cost`, `trace_metrics_by_minute.CostSum` |
+
+The gates compose fail-closed:
+
+- The **schema endpoint** publishes each column's `gates` and whether *your* key holds them (`available`), so an agent can plan around what it may read. A dataset you can read nothing in disappears from the schema entirely.
+- The **validator refuses** any reference to a gated column — including unqualified references and columns of hidden datasets — with a structured violation, before execution.
+- If the permission resolver is unavailable, everything gated is withheld rather than granted.
+
+So a teammate (or agent) without content permissions can still count traces, chart costs they're allowed to see, group by model, and read evaluation verdicts — they just cannot select the captured conversations.
+
+## Attribute filtering inside allowed columns
+
+Even for callers *with* content permissions, span and trace attribute maps are content-filtered in the view definitions themselves: attribute keys known to carry captured content are separated from operational metadata, so `Attributes`/`SpanAttributes` stay useful for filtering and grouping without becoming a side-channel around the `CapturedInput`/`CapturedOutput` gates.
+
+## What errors and results reveal
+
+- Error messages never name hosts, credentials, server settings, physical tables, or other tenants. Validation refusals speak in terms of the published catalog.
+- Introspection functions (`currentUser`, `hostName`, `version`, `getSetting`, ...) are absent from the function allowlist — refused because they're not listed, not because someone remembered to deny them.
+- Whether *another* project exists is not discoverable: a URL naming one answers 404 identical to a nonexistent id.
+
+## Operational guardrails
+
+Abuse and accidents are bounded server-side, per query, as constants no caller can change: 10 s execution time, 1 GB memory, 1B rows / 10 GB scanned, 4 threads, and at most 10 concurrent queries across the identity. Responses are additionally capped at 10,000 rows / ~8 MB and marked `truncated` when cut. Every executed query is logged with its datasets, scan cost, and outcome — but never with the SQL's parameter values or your key.
