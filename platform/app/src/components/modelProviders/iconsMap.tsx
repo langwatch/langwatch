@@ -90,6 +90,7 @@ export function ProviderIconGlyph({
         isMonochrome ? { filter: "invert(1) brightness(0.92)" } : undefined
       }
       aria-hidden="true"
+      data-testid={`provider-icon-${provider}`}
     >
       {icon}
     </Box>
