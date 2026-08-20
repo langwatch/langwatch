@@ -374,7 +374,13 @@ export const VariableInsertMenu = ({
                         gap={2}
                         cursor="pointer"
                         borderRadius="4px"
-                        background={isHighlighted ? "blue.50" : undefined}
+                        // Semantic, not a fixed light shade. `blue.50` has no
+                        // dark counterpart, so the highlighted row stayed
+                        // near-white while the name inherited the dark theme's
+                        // near-white text colour. The row the menu opens on was
+                        // the one row you could not read.
+                        background={isHighlighted ? "blue.subtle" : undefined}
+                        color={isHighlighted ? "blue.fg" : undefined}
                         onMouseMove={() => {
                           if (
                             isKeyboardNav ||
@@ -407,7 +413,12 @@ export const VariableInsertMenu = ({
                   borderRadius="4px"
                   background={
                     highlightedIndex === createOptionIndex
-                      ? "blue.50"
+                      ? "blue.subtle"
+                      : undefined
+                  }
+                  color={
+                    highlightedIndex === createOptionIndex
+                      ? "blue.fg"
                       : undefined
                   }
                   onMouseMove={() => {
