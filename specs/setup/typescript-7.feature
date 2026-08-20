@@ -62,6 +62,7 @@ Feature: TypeScript 7 is the compiler
     Then no file that was checked before is left unchecked
 
   @unit
-  Scenario: The combined project keeps its own incremental cache
-    Given three projects can be warm at the same time
-    Then none of them writes the build information of another
+  Scenario: Checking one project does not cool another
+    Given a contributor checks more than one of the projects
+    Then each keeps what it learned
+    And no run makes another start from cold again

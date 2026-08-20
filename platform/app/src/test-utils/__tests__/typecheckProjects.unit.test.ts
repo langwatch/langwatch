@@ -70,9 +70,14 @@ describe("given the repository's typecheck projects", () => {
       const pkg = JSON.parse(
         readFileSync(resolve(APP_ROOT, "package.json"), "utf8"),
       );
-      expect(pkg.scripts["typecheck:all"]).toContain(ALL_PROJECT);
+      const script = pkg.scripts["typecheck:all"];
+      // Naming the project is not enough: it has to be handed to the compiler
+      // as the project to check, with no emit.
+      expect(script).toMatch(/(^|[/\s])tsc\b/);
+      expect(script).toContain("--noEmit");
+      expect(script).toContain(`--project ./${ALL_PROJECT}`);
       // Two invocations chained would be the two-program shape again.
-      expect(pkg.scripts["typecheck:all"]).not.toContain("&&");
+      expect(script).not.toContain("&&");
     });
 
     // @scenario "The whole repository is typechecked as one program"
@@ -85,7 +90,7 @@ describe("given the repository's typecheck projects", () => {
       expect(workflow).not.toContain("pnpm run typecheck:tests");
     });
 
-    // @scenario "The combined project keeps its own incremental cache"
+    // @scenario "Checking one project does not cool another"
     it("gives each project a build info file of its own", () => {
       const paths = [APP_PROJECT, TESTS_PROJECT, ALL_PROJECT].map(
         (p) => readProject(p).compilerOptions?.tsBuildInfoFile,
