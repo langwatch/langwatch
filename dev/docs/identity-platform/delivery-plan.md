@@ -144,6 +144,8 @@ The program starts here. Same shape as the authz program's plan (`dev/docs/plans
 
 D11 (invitations) forks off after PR 2 for a second engineer; D03/D13 start only when the Wave 1 gates are green.
 
+> **Landed 2026-08-20:** PR 1, PR 2 and PR 3 shipped together in a single PR alongside the program docs (Alex's call). The per-PR gates above still hold slice by slice and remain the review map; the one outstanding exit-gate step is the dev-compose Redis-kill run, which needs a running stack.
+
 # ADRs to write (before or with the gated deliverable)
 
 Plain design docs, written before the code they cover:
