@@ -171,10 +171,12 @@ export function summarizePullCadence(parts: PullCadenceParts): string {
 
 /**
  * Why this cron can't be saved, or null when it's fine. Mirrors the server's
- * `pullScheduleSchema` (five fields + croner parse) without importing the
- * event-sourcing module chain into the client bundle — croner is the same
- * library the scheduler computes next-run-at with, so a cron this accepts is
- * a cron the scheduler can register.
+ * `pullScheduleSchema` — five fields, croner parse, AND a reachable next run
+ * (the server computes next-run-at and refuses a cron that never fires, e.g.
+ * February 30th) — without importing the event-sourcing module chain into
+ * the client bundle. Croner is the same library the scheduler uses, so a
+ * cron this accepts is a cron the scheduler can register, never-firing
+ * shapes included.
  */
 export function pullCadenceCronError(cron: string): string | null {
   if (cron.trim() === "") return "Enter a schedule.";
@@ -182,7 +184,10 @@ export function pullCadenceCronError(cron: string): string | null {
     return "A cron schedule has five fields: minute, hour, day of month, month, day of week.";
   }
   try {
-    new Cron(cron, { timezone: "UTC" });
+    const next = new Cron(cron, { timezone: "UTC" }).nextRun();
+    if (next === null) {
+      return "This schedule never comes around — it names a date that does not exist.";
+    }
     return null;
   } catch {
     return "This schedule can't run as written. Minutes go 0-59, hours 0-23.";

@@ -127,6 +127,9 @@ describe("given the pull-cadence cron mapping", () => {
       expect(pullCadenceCronError("")).not.toBeNull();
       expect(pullCadenceCronError("not a cron")).not.toBeNull();
       expect(pullCadenceCronError("99 * * * *")).not.toBeNull();
+      // Parses fine but never fires (February 30th): the server refuses it,
+      // so the client must too — that is the whole point of "before create".
+      expect(pullCadenceCronError("0 9 30 2 *")).not.toBeNull();
       expect(pullCadenceCronError("*/15 * * * *")).toBeNull();
       // Shapes the picker can't say must still be saveable from cron mode.
       expect(pullCadenceCronError("0 9 1 * *")).toBeNull();
