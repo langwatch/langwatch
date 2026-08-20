@@ -1,15 +1,13 @@
 /**
- * How the repository's TypeScript is split into projects, and what that costs.
+ * How the repository's TypeScript is split into projects.
  *
- * The app project and the tests project overlap almost entirely, because every
- * test file imports the app it tests. Run back to back they parsed, bound and
- * checked the app's ~17k files twice: 38,046 file loads and 35.1M type
- * instantiations, against 20,980 and 18.9M for a single program over the union.
+ * There are three: the app alone, the tests alone, and the union that
+ * `typecheck:all` runs. The union exists because every test file imports the
+ * app, so checking the two separately loads the app's files twice.
  *
- * The risk in merging them is silent coverage loss, so the parity check below
- * loads all three programs and asserts the combined one is a superset. It is
- * the only assertion that actually proves it; the structural ones alongside it
- * only say the config still looks the way it was written.
+ * The parity check is the assertion that matters: it loads all three programs
+ * and fails if the union leaves any file unchecked. The others alongside it
+ * only say the config still reads the way it was written.
  *
  * Spec: specs/setup/typescript-7.feature
  */

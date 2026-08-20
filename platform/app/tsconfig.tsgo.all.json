@@ -5,12 +5,11 @@
 		// tests-only caches. All three can be warm at the same time.
 		"tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/tsgo-all.tsbuildinfo"
 	},
-	// The app project and the tests project overlap almost entirely: every test
-	// file imports the app, so running them as two programs parses, binds and
-	// checks the app's 17k files twice. This project is the union, so the whole
-	// repo is checked once. `**/*.ts` and `**/*.tsx` already reach the test
-	// files once the test exclusions below are gone, so `./e2e/**/*` is the
-	// only entry the tests project adds.
+	// The union of the app project and the tests project. Every test file
+	// imports the app, so checking them as two programs loads the app's files
+	// twice. `**/*.ts` and `**/*.tsx` already reach the test files once the
+	// test exclusions below are gone, so `./e2e/**/*` is the only entry the
+	// tests project adds.
 	// An include glob drops a `.d.ts` when a `.ts` of the same name sits beside
 	// it, and `vegaLiteSchema.ts` does. The tests project keeps the declaration
 	// only because it never roots the `.ts`. A `files` entry is not subject to
