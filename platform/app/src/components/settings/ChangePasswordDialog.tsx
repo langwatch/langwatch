@@ -1,7 +1,7 @@
 import { Button, Field, HStack, Input, Stack, Text } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   applyHandledErrorToForm,
@@ -26,6 +26,45 @@ const changePasswordSchema = z
   });
 
 type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
+
+/**
+ * Binds through `Controller` rather than `{...register(name)}`. `register` is a
+ * stable reference, so the React Compiler memoizes the call and the field is
+ * never re-registered after a `reset()` — typing then stops reaching form state
+ * while the input still shows it. See specs/setup/react-compiler.feature.
+ */
+function PasswordField({
+  form,
+  name,
+  label,
+  autoComplete,
+}: {
+  form: UseFormReturn<ChangePasswordFormValues>;
+  name: keyof ChangePasswordFormValues;
+  label: string;
+  autoComplete: "current-password" | "new-password";
+}) {
+  return (
+    <Field.Root invalid={!!form.formState.errors[name]}>
+      <Field.Label>{label}</Field.Label>
+      <Controller
+        name={name}
+        control={form.control}
+        render={({ field }) => (
+          <Input
+            {...field}
+            value={field.value ?? ""}
+            type="password"
+            autoComplete={autoComplete}
+          />
+        )}
+      />
+      {form.formState.errors[name] && (
+        <Field.ErrorText>{form.formState.errors[name].message}</Field.ErrorText>
+      )}
+    </Field.Root>
+  );
+}
 
 interface ChangePasswordDialogProps {
   open: boolean;
@@ -110,45 +149,24 @@ export function ChangePasswordDialog({
               <Text fontSize="sm" color="fg.muted">
                 Password must be at least 8 characters long.
               </Text>
-              <Field.Root invalid={!!form.formState.errors.currentPassword}>
-                <Field.Label>Current Password</Field.Label>
-                <Input
-                  type="password"
-                  autoComplete="current-password"
-                  {...form.register("currentPassword")}
-                />
-                {form.formState.errors.currentPassword && (
-                  <Field.ErrorText>
-                    {form.formState.errors.currentPassword.message}
-                  </Field.ErrorText>
-                )}
-              </Field.Root>
-              <Field.Root invalid={!!form.formState.errors.newPassword}>
-                <Field.Label>New Password</Field.Label>
-                <Input
-                  type="password"
-                  autoComplete="new-password"
-                  {...form.register("newPassword")}
-                />
-                {form.formState.errors.newPassword && (
-                  <Field.ErrorText>
-                    {form.formState.errors.newPassword.message}
-                  </Field.ErrorText>
-                )}
-              </Field.Root>
-              <Field.Root invalid={!!form.formState.errors.confirmPassword}>
-                <Field.Label>Confirm New Password</Field.Label>
-                <Input
-                  type="password"
-                  autoComplete="new-password"
-                  {...form.register("confirmPassword")}
-                />
-                {form.formState.errors.confirmPassword && (
-                  <Field.ErrorText>
-                    {form.formState.errors.confirmPassword.message}
-                  </Field.ErrorText>
-                )}
-              </Field.Root>
+              <PasswordField
+                form={form}
+                name="currentPassword"
+                label="Current Password"
+                autoComplete="current-password"
+              />
+              <PasswordField
+                form={form}
+                name="newPassword"
+                label="New Password"
+                autoComplete="new-password"
+              />
+              <PasswordField
+                form={form}
+                name="confirmPassword"
+                label="Confirm New Password"
+                autoComplete="new-password"
+              />
             </Stack>
           </Dialog.Body>
           <Dialog.Footer>

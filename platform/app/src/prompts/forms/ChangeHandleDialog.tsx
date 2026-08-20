@@ -42,7 +42,6 @@ export function ChangeHandleDialog({
   const scope = currentScope ?? PromptScope.PROJECT;
 
   const {
-    register,
     handleSubmit,
     formState: { errors, isSubmitting, isDirty },
     reset,
@@ -81,10 +80,6 @@ export function ChangeHandleDialog({
     [onSubmit, reset],
   );
 
-  const handleHandler = register("handle", {
-    required: "Prompt identifier is required",
-  });
-
   return (
     <Dialog.Root
       open={isOpen}
@@ -122,18 +117,27 @@ export function ChangeHandleDialog({
               )}
               <Field.Root invalid={!!errors.handle}>
                 <Field.Label>Prompt Identifier</Field.Label>
-                <Input
-                  placeholder="prompt-name"
-                  autoFocus
-                  data-1p-ignore
-                  {...handleHandler}
-                  onChange={(e) => {
-                    e.target.value = e.target.value
-                      .toLowerCase()
-                      .replace(/ /g, "-")
-                      .replace(/[^a-z0-9_\-/]/g, "");
-                    void handleHandler.onChange(e);
-                  }}
+                <Controller
+                  name="handle"
+                  control={control}
+                  rules={{ required: "Prompt identifier is required" }}
+                  render={({ field }) => (
+                    <Input
+                      {...field}
+                      value={field.value ?? ""}
+                      placeholder="prompt-name"
+                      autoFocus
+                      data-1p-ignore
+                      onChange={(e) => {
+                        field.onChange(
+                          e.target.value
+                            .toLowerCase()
+                            .replace(/ /g, "-")
+                            .replace(/[^a-z0-9_\-/]/g, ""),
+                        );
+                      }}
+                    />
+                  )}
                 />
                 {errors.handle ? (
                   <Field.ErrorText>

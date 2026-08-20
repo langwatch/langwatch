@@ -1,7 +1,7 @@
 import { Button, Field, Input } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCallback } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Dialog } from "~/components/ui/dialog";
@@ -34,7 +34,7 @@ export function SaveVersionDialog({
   nextVersion,
 }: SaveVersionDialogProps) {
   const {
-    register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting, isDirty },
     reset,
@@ -80,13 +80,19 @@ export function SaveVersionDialog({
           >
             <Field.Root>
               <Field.Label>Description</Field.Label>
-              <Input
-                placeholder="Enter a description for this version"
-                autoFocus
-                maxLength={200}
-                {...register("commitMessage", {
-                  required: "Description is required",
-                })}
+              <Controller
+                name="commitMessage"
+                control={control}
+                rules={{ required: "Description is required" }}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    value={field.value ?? ""}
+                    placeholder="Enter a description for this version"
+                    autoFocus
+                    maxLength={200}
+                  />
+                )}
               />
               {errors.commitMessage && (
                 <Field.ErrorText>

@@ -13,7 +13,7 @@ import {
 import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
 
@@ -705,7 +705,18 @@ function DbAgentPanel({
             {typeBadge}
           </Badge>
         </HStack>
-        <Input {...form.register("name")} size="sm" placeholder="Agent name" />
+        <Controller
+          name="name"
+          control={form.control}
+          render={({ field }) => (
+            <Input
+              {...field}
+              value={field.value ?? ""}
+              size="sm"
+              placeholder="Agent name"
+            />
+          )}
+        />
       </VStack>
 
       {/* Inline HTTP editor */}
