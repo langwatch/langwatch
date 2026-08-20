@@ -102,9 +102,13 @@ describe("LLMModelDisplay", () => {
       expect(screen.getByText("unknown/custom-model")).toBeInTheDocument();
     });
 
-    it("displays provider icon when available", () => {
+    it("draws the provider mark for the model's own provider", () => {
       renderComponent({ model: "openai/gpt-4.1" });
-      expect(screen.getByTestId("openai-icon")).toBeInTheDocument();
+      // Keyed on the provider in the model id, not on the icon node the
+      // option list happens to carry: the option list is empty whenever the
+      // provider has been removed from the project, and the mark still has to
+      // render there.
+      expect(screen.getByTestId("provider-icon-openai")).toBeInTheDocument();
     });
   });
 

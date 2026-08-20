@@ -18,6 +18,7 @@ import {
   type OutputType,
 } from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
+import { MODEL_ICON_SIZE_SM } from "~/components/llmPromptConfigs/constants";
 import {
   allModelOptions,
   useModelSelectionOptions,
@@ -164,6 +165,7 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
                 <LLMModelDisplay
                   model={field.value?.model ?? ""}
                   fontSize="13px"
+                  iconSize={MODEL_ICON_SIZE_SM}
                   minWidth={0}
                 />
                 <Box color="fg.subtle" flexShrink={0} display="flex">
