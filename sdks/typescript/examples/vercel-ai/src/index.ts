@@ -6,7 +6,6 @@ import * as readline from "readline";
 import cliMarkdown from "cli-markdown";
 import { setupObservability } from "langwatch/observability/node";
 
-// Use LangWatch observability setup
 setupObservability();
 
 // AI SDK 7 emits no OpenTelemetry spans until an integration is registered.

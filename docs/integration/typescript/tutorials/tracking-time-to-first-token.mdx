@@ -32,7 +32,7 @@ If your instrumentation already emits any of the signals below, TTFT shows up wi
 When more than one LLM span in a trace reports a TTFT, the trace-level value is the smallest one, the first token the user could have seen.
 
 <Note>
-  If you stream through the Vercel AI SDK, TTFT is captured automatically, nothing to do. On AI SDK 7 this requires `registerTelemetry(new OpenTelemetry())` from `@ai-sdk/otel` at startup — without it the SDK emits no spans at all.
+  If you stream through the Vercel AI SDK, no per-call instrumentation is needed. On AI SDK 7, register the integration once at startup with `registerTelemetry(new OpenTelemetry())` from `@ai-sdk/otel` — without it the SDK emits no spans at all. Every streamed call then reports TTFT on its own.
 </Note>
 
 ## Setting TTFT manually

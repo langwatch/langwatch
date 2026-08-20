@@ -318,24 +318,41 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // summary TTFT and the span first_token timing both populate. An explicit
     // time_to_first_token already on the span wins.
     // ─────────────────────────────────────────────────────────────────────────
-    const timeToFirstChunkKey = attrs.has(
-      ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK,
-    )
-      ? ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK
-      : ATTR_KEYS.GEN_AI_CLIENT_OPERATION_TIME_TO_FIRST_CHUNK;
-    const timeToFirstChunkSeconds = asNumber(attrs.get(timeToFirstChunkKey));
+    // The semconv v1.41 response key wins over the @ai-sdk/otel client key, but
+    // only when it actually carries a usable value: a present-but-invalid
+    // response value must not mask a valid client one. Each candidate is
+    // therefore validated before it is selected, and the recorded rule names
+    // the key the value really came from.
+    const timeToFirstChunkCandidates = [
+      {
+        key: ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK,
+        rule: "response.time_to_first_chunk",
+      },
+      {
+        key: ATTR_KEYS.GEN_AI_CLIENT_OPERATION_TIME_TO_FIRST_CHUNK,
+        rule: "client.operation.time_to_first_chunk",
+      },
+    ];
+    const timeToFirstChunkSource = timeToFirstChunkCandidates
+      .map((candidate) => ({
+        ...candidate,
+        seconds: asNumber(attrs.get(candidate.key)),
+      }))
+      .find(
+        (candidate): candidate is typeof candidate & { seconds: number } =>
+          candidate.seconds !== null && candidate.seconds >= 0,
+      );
     if (
-      timeToFirstChunkSeconds !== null &&
-      timeToFirstChunkSeconds >= 0 &&
+      timeToFirstChunkSource !== undefined &&
       ctx.out[ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN] === undefined &&
       !attrs.has(ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN)
     ) {
-      attrs.delete(timeToFirstChunkKey);
+      attrs.delete(timeToFirstChunkSource.key);
       ctx.setAttr(
         ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN,
-        timeToFirstChunkSeconds * 1000,
+        timeToFirstChunkSource.seconds * 1000,
       );
-      ctx.recordRule(`${this.id}:response.time_to_first_chunk`);
+      ctx.recordRule(`${this.id}:${timeToFirstChunkSource.rule}`);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

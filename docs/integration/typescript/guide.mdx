@@ -44,11 +44,11 @@ Before you start, make sure you have:
 
 ```bash
 npm install langwatch @opentelemetry/sdk-node @opentelemetry/context-async-hooks
-npm install @ai-sdk/openai ai
+npm install @ai-sdk/openai ai @ai-sdk/otel
 ```
 
 <Note>
-The `@ai-sdk/openai` and `ai` packages are only required for the example in this guide. You can skip this step if you're only looking to install the LangWatch SDK.
+The `@ai-sdk/openai`, `ai` and `@ai-sdk/otel` packages are only required for the example in this guide. You can skip this step if you're only looking to install the LangWatch SDK. On AI SDK 7, `@ai-sdk/otel` is what makes the SDK emit spans at all.
 </Note>
 
 ### Step 2: Set Up API Keys

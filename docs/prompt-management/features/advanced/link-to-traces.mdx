@@ -63,7 +63,12 @@ result = customer_support_generation()
 ```typescript
 import { LangWatch, getLangWatchTracer } from "langwatch";
 import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
+import { generateText, registerTelemetry } from "ai";
+import { OpenTelemetry } from "@ai-sdk/otel";
+
+// AI SDK 7 emits no spans until an integration is registered. Do this once,
+// at startup, before any generateText call.
+registerTelemetry(new OpenTelemetry());
 
 // Initialize LangWatch client
 const langwatch = new LangWatch({

@@ -18,7 +18,6 @@ import { generateText, registerTelemetry } from "ai";
 import { OpenTelemetry } from "@ai-sdk/otel";
 import { setupObservability } from "langwatch/observability/node";
 
-// Initialize LangWatch observability
 setupObservability();
 
 // AI SDK 7 emits no OpenTelemetry spans until an integration is registered.
@@ -99,7 +98,7 @@ async function handleUserMessage(
 
       // You can also add/update metadata during the span
       span.setAttribute("output.tokens", result.usage?.outputTokens ?? 0);
-      span.setAttribute("input.tokens", result.usage?.promptTokens ?? 0);
+      span.setAttribute("input.tokens", result.usage?.inputTokens ?? 0);
 
       return result.text;
     }

@@ -224,6 +224,111 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           500,
         );
       });
+
+      it("leaves the chunk source key on the span", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.server.time_to_first_token": 500,
+            "gen_ai.response.time_to_first_chunk": 0.8,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.response.time_to_first_chunk"]).toBe(
+          0.8,
+        );
+      });
+    });
+
+    describe("when both the response and client chunk keys are present", () => {
+      const bothKeys = {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "gpt-4",
+        "gen_ai.response.time_to_first_chunk": 0.65,
+        "gen_ai.client.operation.time_to_first_chunk": 0.9,
+      };
+
+      it("takes the response key in preference to the client key", () => {
+        const result = service.canonicalize(bothKeys, [], clientSpan);
+
+        expect(
+          result.attributes["gen_ai.server.time_to_first_token"],
+        ).toBeCloseTo(650, 5);
+      });
+
+      it("deletes only the consumed source key", () => {
+        const result = service.canonicalize(bothKeys, [], clientSpan);
+
+        expect(
+          result.attributes["gen_ai.response.time_to_first_chunk"],
+        ).toBeUndefined();
+        expect(
+          result.attributes["gen_ai.client.operation.time_to_first_chunk"],
+        ).toBe(0.9);
+      });
+
+      it("records the response rule as the applied one", () => {
+        const result = service.canonicalize(bothKeys, [], clientSpan);
+
+        expect(result.appliedRules).toContain(
+          "genai:response.time_to_first_chunk",
+        );
+      });
+    });
+
+    describe("when only the client chunk key carries a usable value", () => {
+      it("names the client key in the applied rule", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.client.operation.time_to_first_chunk": 0.65,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.appliedRules).toContain(
+          "genai:client.operation.time_to_first_chunk",
+        );
+      });
+
+      it("falls back past a response key that is not a number", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.response.time_to_first_chunk": "fast",
+            "gen_ai.client.operation.time_to_first_chunk": 0.65,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(
+          result.attributes["gen_ai.server.time_to_first_token"],
+        ).toBeCloseTo(650, 5);
+      });
+
+      it("falls back past a negative response key", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.response.time_to_first_chunk": -1,
+            "gen_ai.client.operation.time_to_first_chunk": 0.65,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(
+          result.attributes["gen_ai.server.time_to_first_token"],
+        ).toBeCloseTo(650, 5);
+      });
     });
 
     describe("when the span carries gen_ai.request.stream", () => {

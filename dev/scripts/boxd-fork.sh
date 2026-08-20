@@ -650,9 +650,12 @@ EOF
     echo "ERROR: BOXD_FORK_REPO ('${BOXD_FORK_REPO:-}') is not a valid <owner>/<repo>." >&2
     return 1
   fi
-  # Provision: install Node 20 from NodeSource (apt's `nodejs` ships Node
+  # Provision: install Node 24 from NodeSource (apt's `nodejs` ships Node
   # 12.x on Ubuntu 22.04 — older than corepack's 16.9.0 minimum, which
-  # would silently abort the rest of the recipe under `set -e`). Then
+  # would silently abort the rest of the recipe under `set -e`). The floor
+  # matches the workspace engines: `>=22` at the repo root and
+  # `24.x || 25.x || 26.x` in platform/app, so anything older fails the
+  # engines check during `pnpm -w install`. Then
   # clone repo and install deps. The `set -e` is INSIDE the remote shell
   # only; we additionally check the host-side `boxd exec` exit code so
   # provisioning failures don't slip past the success printf.
@@ -666,8 +669,8 @@ EOF
   if ! "$BOXD_BIN" exec "$vm" -- bash -c "
     set -euo pipefail
     if ! command -v node >/dev/null 2>&1 \\
-       || [ \"\$(node --version 2>/dev/null | cut -d. -f1 | tr -d v)\" -lt 18 ]; then
-      curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+       || [ \"\$(node --version 2>/dev/null | cut -d. -f1 | tr -d v)\" -lt 22 ]; then
+      curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
       sudo apt-get install -y nodejs
     fi
     if [ ! -d langwatch ]; then
