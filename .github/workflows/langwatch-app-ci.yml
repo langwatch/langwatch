@@ -286,18 +286,14 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: platform/app/node_modules/.cache/tsbuildinfo
-          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json') }}-${{ github.sha }}
+          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json', 'platform/app/tsconfig.tsgo.all.json') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json') }}-
+            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json', 'platform/app/tsconfig.tsgo.all.json') }}-
             ${{ runner.os }}-tsbuildinfo-
 
-      - name: Run typecheck
+      - name: Run typecheck (app and tests in one program)
         working-directory: platform/app
-        run: pnpm typecheck
-
-      - name: Run typecheck (tests)
-        working-directory: platform/app
-        run: pnpm run typecheck:tests
+        run: pnpm run typecheck:all
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'

@@ -41,7 +41,7 @@
     "start:workers:dev": "tsx src/workers.ts",
     "typecheck": "node ../../dev/scripts/check-queue.mjs ./node_modules/.bin/tsc --noEmit --project ./tsconfig.tsgo.json",
     "typecheck:tests": "node ../../dev/scripts/check-queue.mjs ./node_modules/.bin/tsc --noEmit --project ./tsconfig.tsgo.tests.json",
-    "typecheck:all": "pnpm run typecheck && pnpm run typecheck:tests",
+    "typecheck:all": "node ../../dev/scripts/check-queue.mjs ./node_modules/.bin/tsc --noEmit --project ./tsconfig.tsgo.all.json",
     "test:unit": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest",
     "test:browser": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest -c vitest.browser.config.ts",
     "test:ci": "pnpm run test:unit",
