@@ -15,6 +15,13 @@ export interface LLMModelDisplayProps extends StackProps {
   fontSize?: string;
   /** Optional subtitle to display below the model name (e.g., "Temp 0.7") */
   subtitle?: string;
+  /**
+   * Size of the provider mark. Defaults to MODEL_ICON_SIZE, which is what the
+   * model tables and pickers use; the compact selector in the prompt editor
+   * passes MODEL_ICON_SIZE_SM so the mark does not outweigh the model name it
+   * sits beside.
+   */
+  iconSize?: string;
 }
 
 /**
@@ -26,6 +33,7 @@ export function LLMModelDisplay({
   model,
   fontSize = "14px",
   subtitle,
+  iconSize = MODEL_ICON_SIZE,
   ...props
 }: LLMModelDisplayProps) {
   const { modelOption, groupedByProvider, isLoading } =
@@ -60,7 +68,7 @@ export function LLMModelDisplay({
       {hasIcon && (
         <ProviderIconGlyph
           provider={providerKey as keyof typeof modelProviderIcons}
-          size={MODEL_ICON_SIZE}
+          size={iconSize}
         />
       )}
       <VStack gap={0} align="start">
