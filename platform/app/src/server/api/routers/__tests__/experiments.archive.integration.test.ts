@@ -370,16 +370,16 @@ describe("experiments.deleteExperiment", () => {
   // The most reliable proof is a source-level check: with the imports gone
   // there is no path by which the archive procedure can reach those
   // services. Runtime fail-on-call mocks were considered but rejected
-  // because getClickHouseClientForProject is still used by sibling
+  // because getClickHouseClientForTenant is still used by sibling
   // list/enrichment procedures in the same router and globally mocking it
   // would break unrelated tests.
   describe("the router source file", () => {
     /** @scenario The delete-experiment code path does NOT contact ClickHouse */
-    it("does not import getClickHouseClientForProject", async () => {
+    it("does not import getClickHouseClientForTenant", async () => {
       const src = await import("node:fs/promises").then((fs) =>
         fs.readFile(require.resolve("../experiments.ts"), "utf8"),
       );
-      expect(src).not.toMatch(/getClickHouseClientForProject/);
+      expect(src).not.toMatch(/getClickHouseClientForTenant/);
     });
 
     /** @scenario The delete-experiment code path does NOT call the DSpy step cleanup */

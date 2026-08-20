@@ -63,7 +63,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
     >();
   return {
     ...original,
-    getClickHouseClientForProject: async () => chClient,
+    getClickHouseClientForTenant: async () => chClient,
   };
 });
 

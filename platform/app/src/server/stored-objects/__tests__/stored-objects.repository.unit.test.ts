@@ -23,7 +23,7 @@ const { mockInsert, mockQuery, mockQueryResult } = vi.hoisted(() => {
 });
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: () =>
+  getClickHouseClientForTenant: () =>
     Promise.resolve({ insert: mockInsert, query: mockQuery }),
 }));
 

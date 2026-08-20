@@ -79,6 +79,31 @@ Feature: Private ClickHouse Routing
     Then the returned client connects to the shared ClickHouse
 
   # ---------------------------------------------------------------------------
+  # Tenant-level routing
+  #
+  # A tenant was a project and nothing else until the grants ledger put an
+  # aggregate per organization into the same event store, at which point every
+  # one of its writes asked to be routed by an id no project carries. Routing
+  # is per-organization either way, so both kinds resolve — and an id that is
+  # neither still refuses, because a tenant nobody can place is exactly the one
+  # whose data must not land on another customer's instance.
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: An organization is a tenant in its own right
+    Given org "org123" has a private ClickHouse configured
+    When a client is resolved for the tenant "org123"
+    Then the returned client connects to the private ClickHouse
+    And no project needs to exist for that id
+
+  @integration
+  Scenario: A tenant that names neither a project nor an organization is refused
+    Given an id that matches no project and no organization
+    When a client is resolved for that tenant
+    Then resolution fails with an error naming the tenant
+    And the shared client is not returned
+
+  # ---------------------------------------------------------------------------
   # Admin / migration operations
   # ---------------------------------------------------------------------------
 

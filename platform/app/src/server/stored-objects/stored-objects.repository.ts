@@ -6,7 +6,7 @@
  */
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import type { StoredObject } from "./stored-object";
 import { storedObjectSchema } from "./stored-object";
 
@@ -17,7 +17,7 @@ const tracer = getLangWatchTracer("langwatch.stored-objects.repository");
 /**
  * ClickHouse repository for stored_objects rows.
  *
- * Clients are resolved at call time via `getClickHouseClientForProject` so
+ * Clients are resolved at call time via `getClickHouseClientForTenant` so
  * per-tenant private ClickHouse routing is always respected.
  */
 export class StoredObjectsRepository {
@@ -46,7 +46,7 @@ export class StoredObjectsRepository {
         },
       },
       async () => {
-        const client = await getClickHouseClientForProject(projectId);
+        const client = await getClickHouseClientForTenant(projectId);
         if (!client) {
           throw new Error(
             "ClickHouse is not configured — cannot insert stored object",
@@ -110,7 +110,7 @@ export class StoredObjectsRepository {
         },
       },
       async (span) => {
-        const client = await getClickHouseClientForProject(projectId);
+        const client = await getClickHouseClientForTenant(projectId);
         if (!client) {
           throw new Error(
             "ClickHouse is not configured — cannot find stored object by id",
@@ -199,7 +199,7 @@ export class StoredObjectsRepository {
         },
       },
       async (span) => {
-        const client = await getClickHouseClientForProject(projectId);
+        const client = await getClickHouseClientForTenant(projectId);
         if (!client) {
           throw new Error(
             "ClickHouse is not configured — cannot enumerate stored objects",
@@ -263,7 +263,7 @@ export class StoredObjectsRepository {
     afterId?: string;
     limit: number;
   }): Promise<StoredObject[]> {
-    const client = await getClickHouseClientForProject(projectId);
+    const client = await getClickHouseClientForTenant(projectId);
     if (!client) {
       throw new Error(
         "ClickHouse is not configured — cannot enumerate stored objects",
@@ -340,7 +340,7 @@ export class StoredObjectsRepository {
         },
       },
       async (span) => {
-        const client = await getClickHouseClientForProject(projectId);
+        const client = await getClickHouseClientForTenant(projectId);
         if (!client) {
           throw new Error(
             "ClickHouse is not configured - cannot sum stored object sizes",
@@ -417,7 +417,7 @@ export class StoredObjectsRepository {
         },
       },
       async () => {
-        const client = await getClickHouseClientForProject(projectId);
+        const client = await getClickHouseClientForTenant(projectId);
         if (!client) {
           throw new Error(
             "ClickHouse is not configured — cannot delete stored objects",
@@ -477,7 +477,7 @@ export class StoredObjectsRepository {
         },
       },
       async () => {
-        const client = await getClickHouseClientForProject(projectId);
+        const client = await getClickHouseClientForTenant(projectId);
         if (!client) {
           throw new Error(
             "ClickHouse is not configured — cannot delete stored objects",

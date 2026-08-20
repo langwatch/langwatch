@@ -16,7 +16,7 @@
  * Uses:
  *  - testcontainers ClickHouse (via startTestContainers) for real SQL
  *  - LocalFilesystemDriver pointed at a per-test temp dir for real byte storage
- *  - vi.mock to wire getClickHouseClientForProject to the test container client
+ *  - vi.mock to wire getClickHouseClientForTenant to the test container client
  */
 
 import crypto from "node:crypto";
@@ -51,10 +51,10 @@ import { mintFileUri } from "../uri";
 // Hoisted mocks — must be declared before any imports that trigger module load
 // ---------------------------------------------------------------------------
 
-// Wire getClickHouseClientForProject to return the test container client.
+// Wire getClickHouseClientForTenant to return the test container client.
 // The actual client reference is replaced in beforeAll once the container starts.
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
+  getClickHouseClientForTenant: vi.fn(),
   getSharedClickHouseClient: vi.fn(),
 }));
 
@@ -171,7 +171,7 @@ beforeAll(async () => {
   // replaced these exports with mock fns at module-load; we only need
   // to set their return values here, not re-import.
   vi.mocked(
-    clickhouseClientModule.getClickHouseClientForProject,
+    clickhouseClientModule.getClickHouseClientForTenant,
   ).mockResolvedValue(ch);
   vi.mocked(clickhouseClientModule.getSharedClickHouseClient).mockReturnValue(
     ch,

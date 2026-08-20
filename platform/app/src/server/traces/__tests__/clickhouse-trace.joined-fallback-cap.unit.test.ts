@@ -19,7 +19,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockClickHouseQuery = vi.hoisted(() => vi.fn());
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: () =>
+  getClickHouseClientForTenant: () =>
     Promise.resolve({ query: mockClickHouseQuery }),
 }));
 

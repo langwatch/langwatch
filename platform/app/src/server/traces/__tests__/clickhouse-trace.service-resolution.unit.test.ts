@@ -1,7 +1,7 @@
 /**
  * Unit tests for the ClickHouseTraceService → blob-resolution seam (ADR-022).
  *
- * Mocks only the lowest-level CH driver (getClickHouseClientForProject) and
+ * Mocks only the lowest-level CH driver (getClickHouseClientForTenant) and
  * wires a real BlobStore (via getFromEventLog stub) + real TraceIOExtractionService
  * so the full resolution + recomputed-IO pipeline fires end-to-end.
  *
@@ -26,7 +26,7 @@ const { mockClickHouseQuery } = vi.hoisted(() => ({
 }));
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: () =>
+  getClickHouseClientForTenant: () =>
     Promise.resolve({ query: mockClickHouseQuery }),
 }));
 

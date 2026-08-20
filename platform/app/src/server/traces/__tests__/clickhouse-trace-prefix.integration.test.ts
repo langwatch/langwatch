@@ -78,7 +78,7 @@ let ch: ClickHouseClient;
 let service: ClickHouseTraceService;
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
+  getClickHouseClientForTenant: vi.fn(),
 }));
 
 vi.mock("~/server/db", () => ({
@@ -94,10 +94,10 @@ beforeAll(async () => {
   ch = containers.clickHouseClient;
 
   const chModule = await import("~/server/clickhouse/clickhouseClient");
-  const getClickHouseClientForProject = vi.mocked(
-    chModule.getClickHouseClientForProject,
+  const getClickHouseClientForTenant = vi.mocked(
+    chModule.getClickHouseClientForTenant,
   );
-  getClickHouseClientForProject.mockResolvedValue(ch);
+  getClickHouseClientForTenant.mockResolvedValue(ch);
 
   const { prisma } = await import("~/server/db");
   service = new ClickHouseTraceService({
