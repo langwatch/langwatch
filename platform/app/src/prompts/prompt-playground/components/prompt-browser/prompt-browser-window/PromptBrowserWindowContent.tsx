@@ -393,7 +393,12 @@ function PromptBrowserWindowInner(props: {
                   ? `${messagesMaxHeight}px`
                   : undefined
             }
-            overflow="hidden"
+            // Scrolls rather than clips: the prompt's variables and parameters
+            // sit below its messages, and this region is capped at whatever
+            // room the conversation leaves. Clipping put them out of reach on
+            // a short window with no way to tell they were there.
+            overflowX="hidden"
+            overflowY={isCollapsed ? "hidden" : "auto"}
             position="relative"
             flexShrink={0}
             transition={isCollapsed ? "max-height 0.15s ease-out" : undefined}
