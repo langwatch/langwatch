@@ -273,7 +273,7 @@ function GovernanceOverviewPage() {
                 }
                 title="Connect an ingestion source"
                 description="Map an external AI platform into the activity monitor via OTel push, webhook, or S3 audit drop."
-                href="/governance/ingestion-sources"
+                href="/governance/catalog"
                 ctaLabel={
                   hasSources
                     ? `${sources.length} source${sources.length === 1 ? "" : "s"} configured`
@@ -512,7 +512,7 @@ function GovernanceOverviewPage() {
                   </Text>
                   {/* An invitation to write, so only for whoever can. */}
                   {canManageSources && (
-                    <Link href="/governance/ingestion-sources" color="blue.600">
+                    <Link href="/governance/catalog" color="blue.600">
                       + Add a source
                     </Link>
                   )}
@@ -888,10 +888,7 @@ function SourceChip({ source }: { source: SourceHealth }) {
     ] ?? "fg.muted";
 
   return (
-    <Link
-      href="/governance/ingestion-sources"
-      _hover={{ textDecoration: "none" }}
-    >
+    <Link href="/governance/catalog" _hover={{ textDecoration: "none" }}>
       <HStack
         borderWidth="1px"
         borderColor="border.muted"

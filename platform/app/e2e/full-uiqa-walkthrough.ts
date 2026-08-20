@@ -159,7 +159,7 @@ void (async () => {
     await page.waitForTimeout(500);
   }
 
-  await tryGoto(page, "C4-ingestion", "/governance/ingestion-sources");
+  await tryGoto(page, "C4-ingestion", "/governance/catalog");
   await shoot(page, "C4-ingestion-sources-list", true);
 
   await tryGoto(page, "C5-routing", "/gateway/routing-policies");

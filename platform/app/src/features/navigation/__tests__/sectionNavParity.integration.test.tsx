@@ -87,7 +87,7 @@ describe("given the governance section navigation data", () => {
         capturedItems.map((item) => ({ label: item.label, href: item.href })),
       ).toEqual([
         { label: "Overview", href: "/governance" },
-        { label: "Catalog", href: "/governance/ingestion-sources" },
+        { label: "Catalog", href: "/governance/catalog" },
         { label: "Anomaly Rules", href: "/governance/anomaly-rules" },
         { label: "Tool Tiles", href: "/governance/tool-catalog" },
         { label: "Departments", href: "/governance/departments" },

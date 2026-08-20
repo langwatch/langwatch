@@ -11,6 +11,7 @@ import {
   Input,
   Spacer,
   Spinner,
+  Tabs,
   Text,
   Textarea,
   VStack,
@@ -46,7 +47,8 @@ import {
   RotateCw,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import {
@@ -565,6 +567,59 @@ function useIngestionSourcesPage() {
   };
 }
 
+/**
+ * The catalog's tabs. Sources is the only one today and therefore the
+ * default; later tabs (the tool grid) hang off this list.
+ */
+const CATALOG_TABS = ["sources"] as const;
+type CatalogTab = (typeof CATALOG_TABS)[number];
+const DEFAULT_CATALOG_TAB: CatalogTab = "sources";
+
+const isCatalogTab = (value: string | null): value is CatalogTab =>
+  CATALOG_TABS.some((tab) => tab === value);
+
+/**
+ * Which tab is open is part of the address (?tab=), so a shared link lands
+ * on the same pane. The default stays out of the address entirely, and an
+ * unknown or stale value degrades to the default instead of a blank pane.
+ */
+function useCatalogTab() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const catalogTab = isCatalogTab(requestedTab)
+    ? requestedTab
+    : DEFAULT_CATALOG_TAB;
+  const selectCatalogTab = (tab: string) =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (tab === DEFAULT_CATALOG_TAB) next.delete("tab");
+        else next.set("tab", tab);
+        return next;
+      },
+      { replace: true },
+    );
+  return { catalogTab, selectCatalogTab };
+}
+
+/** The catalog's tab shell; the sources table is the only pane today. */
+function CatalogTabs({ children }: { children: ReactNode }) {
+  const { catalogTab, selectCatalogTab } = useCatalogTab();
+  return (
+    <Tabs.Root
+      value={catalogTab}
+      onValueChange={({ value }) => selectCatalogTab(value)}
+      variant="line"
+      lazyMount
+    >
+      <Tabs.List>
+        <Tabs.Trigger value="sources">Sources</Tabs.Trigger>
+      </Tabs.List>
+      <Tabs.Content value="sources">{children}</Tabs.Content>
+    </Tabs.Root>
+  );
+}
+
 function IngestionSourcesPage() {
   const {
     orgId,
@@ -614,22 +669,24 @@ function IngestionSourcesPage() {
           }}
         />
 
-        <IngestionSourceList
-          canRead={canRead}
-          canManage={canManage}
-          isLoading={sourcesQuery.isLoading}
-          error={sourcesQuery.error}
-          grouped={grouped}
-          rotatingId={pendingId(mutations.rotate)}
-          archivingId={pendingId(mutations.archive)}
-          onEdit={setEditingSourceId}
-          onRotate={(id) =>
-            mutations.rotate.mutate({ organizationId: orgId, id })
-          }
-          onArchive={(id) =>
-            mutations.archive.mutate({ organizationId: orgId, id })
-          }
-        />
+        <CatalogTabs>
+          <IngestionSourceList
+            canRead={canRead}
+            canManage={canManage}
+            isLoading={sourcesQuery.isLoading}
+            error={sourcesQuery.error}
+            grouped={grouped}
+            rotatingId={pendingId(mutations.rotate)}
+            archivingId={pendingId(mutations.archive)}
+            onEdit={setEditingSourceId}
+            onRotate={(id) =>
+              mutations.rotate.mutate({ organizationId: orgId, id })
+            }
+            onArchive={(id) =>
+              mutations.archive.mutate({ organizationId: orgId, id })
+            }
+          />
+        </CatalogTabs>
       </VStack>
 
       <SecretModal details={secretModal} onClose={() => setSecretModal(null)} />
@@ -716,7 +773,7 @@ function SourceRow({
       <VStack align="start" gap={0} flex={1} minWidth={0}>
         <HStack gap={2}>
           <Link
-            href={`/governance/ingestion-sources/${source.id}`}
+            href={`/governance/catalog/${source.id}`}
             color="fg"
             _hover={{ color: "orange.600" }}
           >
@@ -2252,7 +2309,7 @@ function SecretModal({
           </VStack>
         </DialogBody>
         <DialogFooter>
-          <Link href={`/governance/ingestion-sources/${details.sourceId}`}>
+          <Link href={`/governance/catalog/${details.sourceId}`}>
             <Button variant="outline">View source page →</Button>
           </Link>
           <Button colorPalette="blue" onClick={onClose}>

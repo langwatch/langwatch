@@ -43,6 +43,10 @@ export const noOrgBouncerRoutes = [
   // just haven't created a project yet (and may never need to; governance
   // is org-scoped).
   "/governance",
+  "/governance/catalog",
+  "/governance/catalog/[id]",
+  // The retired ingestion-sources addresses stay exempt so their redirect
+  // route renders before the bouncer fires (cost-centers precedent below).
   "/governance/ingestion-sources",
   "/governance/ingestion-sources/[id]",
   "/governance/anomaly-rules",

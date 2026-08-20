@@ -97,8 +97,8 @@ export const governanceNavItems: readonly SectionNavItemData[] = [
   },
   {
     label: "Catalog",
-    href: "/governance/ingestion-sources",
-    includePath: "/governance/ingestion-sources",
+    href: "/governance/catalog",
+    includePath: "/governance/catalog",
     icon: PlugZap,
   },
   {
