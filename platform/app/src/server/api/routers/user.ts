@@ -30,7 +30,6 @@ import { UserService } from "~/server/users/user.service";
 import { getClientIp } from "~/utils/getClientIp";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { env } from "../../../env.mjs";
-import { checkOrganizationPermission, skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 const logger = createLogger("langwatch:user-router");
@@ -38,7 +37,9 @@ const logger = createLogger("langwatch:user-router");
 export const userRouter = createTRPCRouter({
   getTraceExplorerTourPreference: protectedProcedure
     .input(z.object({}))
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason: "operates on the session user's own account, no tenant scope",
+    })
     .query(async ({ ctx }) => {
       const userId = ctx.session.user.impersonator?.id ?? ctx.session.user.id;
       const user = await ctx.prisma.user.findUniqueOrThrow({
@@ -53,7 +54,9 @@ export const userRouter = createTRPCRouter({
     }),
   dismissTraceExplorerTour: protectedProcedure
     .input(z.object({}))
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason: "operates on the session user's own account, no tenant scope",
+    })
     .mutation(async ({ ctx }) => {
       const userId = ctx.session.user.impersonator?.id ?? ctx.session.user.id;
       const user = await ctx.prisma.user.update({
@@ -75,7 +78,9 @@ export const userRouter = createTRPCRouter({
    */
   isAdmin: protectedProcedure
     .input(z.object({}))
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason: "operates on the session user's own account, no tenant scope",
+    })
     .query(({ ctx }) => {
       const user = ctx.session.user.impersonator ?? ctx.session.user;
       return { isAdmin: checkIsAdmin({ email: user.email }) };
@@ -93,7 +98,9 @@ export const userRouter = createTRPCRouter({
         password: z.string().min(8, "Password must be at least 8 characters"),
       }),
     )
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason: "operates on the session user's own account, no tenant scope",
+    })
     .mutation(async ({ ctx, input }) => {
       const { name, password } = input;
       // BetterAuth lowercases the email on every one of its lookups and
@@ -175,7 +182,9 @@ export const userRouter = createTRPCRouter({
     }),
   updateLastLogin: protectedProcedure
     .input(z.object({}))
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason: "operates on the session user's own account, no tenant scope",
+    })
     .mutation(async ({ ctx }) => {
       // Don't update lastLoginAt for impersonated sessions — an admin
       // browsing as another user should not overwrite that user's
@@ -193,7 +202,9 @@ export const userRouter = createTRPCRouter({
     }),
   getSsoStatus: protectedProcedure
     .input(z.object({}))
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason: "operates on the session user's own account, no tenant scope",
+    })
     .query(async ({ ctx }) => {
       return UserService.create(ctx.prisma).getSsoStatus({
         id: ctx.session.user.id,
@@ -201,7 +212,9 @@ export const userRouter = createTRPCRouter({
     }),
   getAccountInfo: protectedProcedure
     .input(z.object({}))
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason: "operates on the session user's own account, no tenant scope",
+    })
     .query(async ({ ctx }) => {
       return UserService.create(ctx.prisma).getAccountInfo({
         id: ctx.session.user.id,
@@ -209,7 +222,9 @@ export const userRouter = createTRPCRouter({
     }),
   getLinkedAccounts: protectedProcedure
     .input(z.object({}))
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason: "operates on the session user's own account, no tenant scope",
+    })
     .query(async ({ ctx }) => {
       const accounts = await ctx.prisma.account.findMany({
         where: {
@@ -230,7 +245,9 @@ export const userRouter = createTRPCRouter({
         accountId: z.string(),
       }),
     )
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason: "operates on the session user's own account, no tenant scope",
+    })
     .mutation(async ({ ctx, input }) => {
       // Wrap the count + delete in a serializable transaction. The
       // previous implementation did the count and delete as separate
@@ -284,7 +301,9 @@ export const userRouter = createTRPCRouter({
           .min(8, "Password must be at least 8 characters"),
       }),
     )
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason: "operates on the session user's own account, no tenant scope",
+    })
     .mutation(async ({ ctx, input }) => {
       // Resolved provider, not raw env (ADR-027): on a denied SSO deployment
       // the platform gate coerces to email mode, and a user who recovered via
@@ -476,7 +495,10 @@ export const userRouter = createTRPCRouter({
     }),
   deactivate: protectedProcedure
     .input(z.object({ userId: z.string() }))
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason:
+        "self-service for the named user; the handler enforces self-or-instance-admin itself",
+    })
     .mutation(async ({ ctx, input }) => {
       const user = ctx.session.user.impersonator ?? ctx.session.user;
       if (
@@ -493,7 +515,10 @@ export const userRouter = createTRPCRouter({
     }),
   reactivate: protectedProcedure
     .input(z.object({ userId: z.string() }))
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason:
+        "self-service for the named user; the handler enforces self-or-instance-admin itself",
+    })
     .mutation(async ({ ctx, input }) => {
       const user = ctx.session.user.impersonator ?? ctx.session.user;
       if (!checkIsAdmin({ email: user.email })) {
@@ -527,7 +552,7 @@ export const userRouter = createTRPCRouter({
         imageDataUrl: z.string().min(1),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .mutation(async ({ ctx, input }) => {
       // Throttle uploads per user — each writes bytes to object storage and
       // updates the row; mirrors the changePassword budget shape.
@@ -561,7 +586,9 @@ export const userRouter = createTRPCRouter({
    */
   removeAvatar: protectedProcedure
     .input(z.object({}))
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason: "operates on the session user's own account, no tenant scope",
+    })
     .mutation(async ({ ctx }) => {
       await new UserAvatarService(ctx.prisma).removeAvatar({
         userId: ctx.session.user.id,
@@ -586,7 +613,7 @@ export const userRouter = createTRPCRouter({
    */
   personalContext: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
@@ -647,7 +674,7 @@ export const userRouter = createTRPCRouter({
         windowEndMs: z.number().optional(),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
       const membership = await ctx.prisma.organizationUser.findUnique({
@@ -766,7 +793,7 @@ export const userRouter = createTRPCRouter({
    */
   personalBudget: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
@@ -915,7 +942,7 @@ export const userRouter = createTRPCRouter({
    */
   cliBootstrap: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .query(async ({ ctx, input }) => {
       const service = CliBootstrapService.create({
         prisma: ctx.prisma,
@@ -947,7 +974,7 @@ export const userRouter = createTRPCRouter({
         message: z.string().max(2000).optional(),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .mutation(async ({ ctx, input }) => {
       const adminEmail = await resolveOrgAdminEmail({
         prisma: ctx.prisma,
@@ -1016,7 +1043,9 @@ export const userRouter = createTRPCRouter({
           .nullable(),
       }),
     )
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason: "operates on the session user's own account, no tenant scope",
+    })
     .mutation(async ({ ctx, input }) => {
       await ctx.prisma.user.update({
         where: { id: ctx.session.user.id },
@@ -1035,7 +1064,7 @@ export const userRouter = createTRPCRouter({
    */
   homePagePickerState: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
       const [user, firstProject] = await Promise.all([

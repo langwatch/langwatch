@@ -26,22 +26,14 @@ vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 
-type MiddlewareParams = {
-  ctx: Record<string, unknown>;
-  next: () => Promise<unknown>;
-};
-
 vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
     hasProjectPermission: vi.fn(() => Promise.resolve(true)),
-    checkProjectPermission:
-      () =>
-      async ({ ctx, next }: MiddlewareParams) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
+    resolveProjectPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
   };
 });
 

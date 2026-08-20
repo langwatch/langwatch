@@ -11,7 +11,7 @@ import { SCOPE_TIERS, type ScopeTier } from "~/server/scopes/scope.types";
 import { isSafeRegex } from "~/utils/safeRegex";
 import { getModelLimits } from "../../../utils/modelLimits";
 import { getLLMModelCosts } from "../../modelProviders/llmModelCost";
-import { authorizeInResolver, checkProjectPermission } from "../rbac";
+import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -45,7 +45,7 @@ export const llmModelCostsRouter = createTRPCRouter({
         projectId: z.string(),
       }),
     )
-    .use(checkProjectPermission("project:view"))
+    .permission("project:view")
     .query(async ({ input }) => {
       return await getLLMModelCosts(input);
     }),
@@ -189,7 +189,7 @@ export const llmModelCostsRouter = createTRPCRouter({
    */
   getModelLimits: protectedProcedure
     .input(z.object({ projectId: z.string(), model: z.string() }))
-    .use(checkProjectPermission("project:view"))
+    .permission("project:view")
     .query(async ({ input }) => getModelLimits(input.model)),
 
   /**
@@ -218,7 +218,7 @@ export const llmModelCostsRouter = createTRPCRouter({
         cacheCreation1hCostPerToken: z.number().nonnegative().optional(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input }) =>
       previewCostRuleMatchingSpans({ spans: getApp().traces.spans, input }),
     ),

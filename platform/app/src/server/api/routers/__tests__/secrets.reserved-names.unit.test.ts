@@ -35,8 +35,9 @@ vi.mock("~/server/db", () => ({
 // Permission enforcement is covered by rbac.secrets.test.ts; this suite is
 // about what a correctly-permissioned caller may still not touch.
 vi.mock("../../rbac", () => ({
-  checkProjectPermission: () => async (opts: { next: () => unknown }) =>
-    opts.next(),
+  resolveProjectPermission: vi
+    .fn()
+    .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
 }));
 
 vi.mock("~/utils/encryption", () => ({

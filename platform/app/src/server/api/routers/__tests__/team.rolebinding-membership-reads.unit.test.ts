@@ -20,12 +20,7 @@ vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
-    checkOrganizationPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
+    hasOrganizationPermission: vi.fn().mockResolvedValue(true),
     hasOrganizationPermission: vi.fn().mockResolvedValue(true),
   };
 });

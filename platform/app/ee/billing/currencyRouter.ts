@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { skipPermissionCheck } from "../../src/server/api/rbac";
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -10,7 +9,7 @@ export const createCurrencyRouter = () => {
   return createTRPCRouter({
     detectCurrency: protectedProcedure
       .input(z.object({}).passthrough())
-      .use(skipPermissionCheck)
+      .noPermission({ reason: "currency catalog is public reference data" })
       .query(async ({ ctx }) => {
         return detectCurrencyFromRequest(ctx.req);
       }),

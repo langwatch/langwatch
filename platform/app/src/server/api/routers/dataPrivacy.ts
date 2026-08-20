@@ -12,7 +12,7 @@ import {
   InvalidDataPrivacyConfigError,
   ScopeTargetNotFoundError,
 } from "~/server/data-privacy/dataPrivacyPolicy.service";
-import { authorizeInResolver, checkProjectPermission } from "../rbac";
+import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const scopeInput = z.object({
@@ -29,7 +29,7 @@ export const dataPrivacyRouter = createTRPCRouter({
    */
   getSnapshot: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("project:view"))
+    .permission("project:view")
     .query(async ({ input, ctx }) => {
       return getDataPrivacySnapshot(
         { prisma: ctx.prisma, session: ctx.session },

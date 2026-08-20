@@ -15,11 +15,7 @@ import { applyDerivedTraceEventProtections } from "~/server/traces/mappers/redac
 import type { Protections } from "~/server/traces/protections";
 import { TraceService } from "~/server/traces/trace.service";
 import { getClientIp } from "~/utils/getClientIp";
-import {
-  hasOrganizationPermission,
-  hasProjectPermission,
-  skipPermissionCheck,
-} from "../rbac";
+import { hasOrganizationPermission, hasProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 import type { SharedTraceDto } from "./sharedTrace.schemas";
 import {
@@ -112,7 +108,10 @@ export const sharedTraceRouter = createTRPCRouter({
     // `.output()` comes after `.use()`: the app's permission builder exposes
     // only `input`/`use` so every procedure is forced through the permission
     // middleware, and it is that `use` which hands back the full tRPC builder.
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason:
+        "the share token in the input is the whole authorization; see ADR-057",
+    })
     .output(sharedTraceDtoSchema)
     .query(async ({ input, ctx }) => {
       const viewer: ShareViewer = {

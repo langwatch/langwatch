@@ -47,13 +47,7 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
   isCustomRole,
 } from "../enterprise";
-import {
-  batchScopePermissions,
-  checkOrganizationPermission,
-  checkTeamPermission,
-  hasOrganizationPermission,
-  skipPermissionCheck,
-} from "../rbac";
+import { batchScopePermissions, hasOrganizationPermission } from "../rbac";
 
 const customTeamRoleInputSchema = z
   .string()
@@ -81,7 +75,10 @@ export const organizationRouter = createTRPCRouter({
         primaryIntent: z.enum(["AGENT_GOVERNANCE", "LLM_OPS"]).optional(),
       }),
     )
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason:
+        "runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite",
+    })
     .mutation(async ({ input, ctx }) => {
       const result = await getApp().organizations.createAndAssign({
         userId: ctx.session.user.id,
@@ -101,7 +98,7 @@ export const organizationRouter = createTRPCRouter({
 
   deleteMember: protectedProcedure
     .input(z.object({ userId: z.string(), organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ input, ctx }) => {
       // The self-removal guard lives in the service now; it refuses with
       // `cannot_remove_self`, which the handled-error middleware puts on the
@@ -127,7 +124,7 @@ export const organizationRouter = createTRPCRouter({
         disabled: z.boolean(),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ input, ctx }) => {
       try {
         await getApp().organizations.setMemberDisabled({
@@ -164,7 +161,10 @@ export const organizationRouter = createTRPCRouter({
         isDemo: z.boolean().optional(),
       }),
     )
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason:
+        "runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite",
+    })
     .query(async ({ ctx, input }) => {
       const isDemo = input?.isDemo ?? false;
       const userId = ctx.session.user.id;
@@ -414,7 +414,7 @@ export const organizationRouter = createTRPCRouter({
           },
         ),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ input }) => {
       // The settings form round-trips every S3 field on save, so an absent
       // credential means "clear it". `updateSettings` is a partial update
@@ -450,7 +450,7 @@ export const organizationRouter = createTRPCRouter({
     // need to enumerate org members by name. The full record contains
     // member emails, which are admin-surface PII — we redact them on
     // the way out for non-admin callers below.
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .query(async ({ input, ctx }) => {
       const organization =
         await getApp().organizations.getOrganizationWithMembers({
@@ -509,7 +509,7 @@ export const organizationRouter = createTRPCRouter({
     // member's full record (role assignments, team memberships) is an
     // admin-surface read, not a peer-context read. No TS callers
     // currently depend on member-role access to this procedure.
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .query(async ({ input, ctx }) => {
       const member = await getApp().organizations.getMemberById({
         organizationId: input.organizationId,
@@ -549,7 +549,7 @@ export const organizationRouter = createTRPCRouter({
         ),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ input, ctx }) => {
       const hasCustomRoleInvite = input.invites.some((invite) =>
         (invite.teams ?? []).some(
@@ -624,7 +624,7 @@ export const organizationRouter = createTRPCRouter({
     }),
   deleteInvite: protectedProcedure
     .input(z.object({ inviteId: z.string(), organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ input, ctx }) => {
       const inviteService = InviteService.create(ctx.prisma);
       await inviteService.revokeInvite({
@@ -642,7 +642,7 @@ export const organizationRouter = createTRPCRouter({
     // expose admin intent (who's being added, with what role / to
     // which teams). MEMBER reading this is a leak. Both TS callers
     // (settings/members, SubscriptionPage) are admin-only surfaces.
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .query(async ({ input, ctx }) => {
       const inviteService = InviteService.create(ctx.prisma);
       return inviteService.listInvites({
@@ -679,7 +679,7 @@ export const organizationRouter = createTRPCRouter({
         ),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .mutation(async ({ input, ctx }) => {
       const hasCustomRoleInvite = input.invites.some((invite) =>
         (invite.teams ?? []).some(
@@ -881,7 +881,7 @@ export const organizationRouter = createTRPCRouter({
         organizationId: z.string(),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       const inviteService = InviteService.create(prisma);
@@ -946,7 +946,10 @@ export const organizationRouter = createTRPCRouter({
         inviteCode: z.string(),
       }),
     )
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason:
+        "runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite",
+    })
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       const session = ctx.session;
@@ -1098,7 +1101,7 @@ export const organizationRouter = createTRPCRouter({
           }
         }),
     )
-    .use(checkTeamPermission("organization:manage"))
+    .permission("organization:manage", { via: "teamId" })
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       await assertNoPersonalTeamScope({
@@ -1219,7 +1222,7 @@ export const organizationRouter = createTRPCRouter({
     // depend on this procedure; documented here so a future picker
     // UX that needs member names knows to use a basic-view variant
     // rather than re-loosening the permission.
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .query(async ({ input }) => {
       return getApp().organizations.getAllMembers(input.organizationId);
     }),
@@ -1241,7 +1244,7 @@ export const organizationRouter = createTRPCRouter({
           .optional(),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ input, ctx }) => {
       // The whole orchestration (personal-workspace assertion, shared-team
       // scoping, seat classification, Enterprise gate for custom roles)
@@ -1281,7 +1284,7 @@ export const organizationRouter = createTRPCRouter({
         targetId: z.string().optional(),
       }),
     )
-    .use(checkOrganizationPermission("auditLog:view"))
+    .permission("auditLog:view")
     .query(async ({ ctx, input }) => {
       await assertEnterprisePlan({
         organizationId: input.organizationId,

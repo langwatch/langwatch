@@ -34,10 +34,7 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
   requireEnterprisePlan,
 } from "~/server/api/enterprise";
-import {
-  checkOrganizationPermission,
-  hasOrganizationPermission,
-} from "~/server/api/rbac";
+import { hasOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { featureFlagService } from "~/server/featureFlag";
@@ -58,7 +55,7 @@ export const governanceRouter = createTRPCRouter({
    */
   setupState: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("governance:view"))
+    .permission("governance:view")
     .query(async ({ ctx, input }) => {
       const service = GovernanceSetupStateService.create({
         prisma: ctx.prisma,
@@ -85,7 +82,7 @@ export const governanceRouter = createTRPCRouter({
    */
   resolveHome: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .query(async ({ ctx, input }): Promise<PersonaResolution> => {
       const userId = ctx.session.user.id;
       const setupService = GovernanceSetupStateService.create({
@@ -223,7 +220,7 @@ export const governanceRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(1000).default(500),
       }),
     )
-    .use(checkOrganizationPermission("complianceExport:view"))
+    .permission("complianceExport:view")
     .use(requireEnterprisePlan(ENTERPRISE_FEATURE_ERRORS.OCSF_EXPORT))
     .query(async ({ ctx, input }) => {
       const service = GovernanceOcsfExportService.create({
@@ -289,7 +286,7 @@ export const governanceRouter = createTRPCRouter({
         workspaceLabel: z.string().max(256).optional(),
       }),
     )
-    .use(checkOrganizationPermission("governance:view"))
+    .permission("governance:view")
     .mutation(async ({ ctx, input }) => {
       const service = AdminWorkspaceViewAuditService.create({
         prisma: ctx.prisma,
@@ -331,7 +328,7 @@ export const governanceRouter = createTRPCRouter({
         actor: z.string().min(1).max(512),
       }),
     )
-    .use(checkOrganizationPermission("governance:view"))
+    .permission("governance:view")
     .query(async ({ ctx, input }) => {
       // Match by email (CH-stamped actor is typically the email) OR
       // by id directly. Two-step: resolve User first, then ask
@@ -389,7 +386,7 @@ export const governanceRouter = createTRPCRouter({
           .default(QUARANTINE_DEFAULT_THRESHOLD),
       }),
     )
-    .use(checkOrganizationPermission("governance:view"))
+    .permission("governance:view")
     .query(async ({ ctx, input }) => {
       const evaluator = QuarantineFillEvaluator.create({
         prisma: ctx.prisma,

@@ -23,12 +23,9 @@ vi.mock("../../rbac", async (importOriginal) => {
   return {
     ...actual,
     hasProjectPermission: mockHasSetupPermission,
-    checkProjectPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
+    resolveProjectPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
   };
 });
 

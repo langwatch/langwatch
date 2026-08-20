@@ -45,7 +45,7 @@ import {
   retentionDaysInputSchema,
 } from "~/server/data-retention/retentionPolicy.schema";
 import { SCOPE_TIERS } from "~/server/scopes/scope.types";
-import { authorizeInResolver, checkProjectPermission } from "../rbac";
+import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const scopeInput = z.object({
@@ -62,7 +62,7 @@ export const dataRetentionRouter = createTRPCRouter({
    */
   getRules: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("project:view"))
+    .permission("project:view")
     .query(async ({ input, ctx }) => {
       return getRetentionPolicySnapshot(ctx, { projectId: input.projectId });
     }),
@@ -171,7 +171,7 @@ export const dataRetentionRouter = createTRPCRouter({
         category: retentionCategorySchema,
       }),
     )
-    .use(checkProjectPermission("project:update"))
+    .permission("project:update")
     .mutation(async ({ input, ctx }) => {
       await assertRetentionPlanForProject(ctx, input.projectId);
       // Resolve the retention value server-side. Trusting a client-supplied
@@ -207,7 +207,7 @@ export const dataRetentionRouter = createTRPCRouter({
 
   getMutationProgress: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input }) => {
       return getApp().dataRetention.retroactive.getMutationProgress({
         projectId: input.projectId,
@@ -221,7 +221,7 @@ export const dataRetentionRouter = createTRPCRouter({
         mutationId: z.string(),
       }),
     )
-    .use(checkProjectPermission("project:update"))
+    .permission("project:update")
     .mutation(async ({ input, ctx }) => {
       await assertRetentionPlanForProject(ctx, input.projectId);
       await getApp().dataRetention.retroactive.killMutation({
@@ -240,7 +240,7 @@ export const dataRetentionRouter = createTRPCRouter({
    */
   getScopeStorageUsage: protectedProcedure
     .input(z.object({ projectId: z.string(), scope: scopeInput }))
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       return resolveScopeStorageUsage(ctx, {
         projectId: input.projectId,

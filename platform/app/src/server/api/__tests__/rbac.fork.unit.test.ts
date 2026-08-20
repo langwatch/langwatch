@@ -17,7 +17,8 @@
  * stage-A4 shadow comparison, untouched.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/cutover-gate";
+import { resetCutoverGateForTesting } from "~/server/app-layer/authz/cutover-gate";
+import { checkDeclaredPermissionAny } from "~/server/app-layer/authz/trpc-middleware";
 import type { Session } from "~/server/auth";
 
 const { userPermissionCheck, userBatchPermissionCheck, apiKeyPermissionCheck } =
@@ -42,7 +43,6 @@ vi.mock("~/server/app-layer/authz/shadow", () => ({
 
 import {
   batchScopePermissions,
-  checkProjectPermissionAny,
   hasOrganizationPermission,
   resolveProjectPermission,
   resolveTeamPermission,
@@ -140,14 +140,22 @@ describe("the fork at the permission seams", () => {
     });
 
     describe("when any of several permissions is enough", () => {
+      /** @scenario "A declared check decides exactly as the middleware it replaced" */
       it("returns the engine's answer for the gate", async () => {
         const { ctx } = buildPrisma({ onEngine: true });
         const next = vi.fn().mockResolvedValue("permitted");
 
-        const outcome = await checkProjectPermissionAny(
+        const outcome = await checkDeclaredPermissionAny([
           "annotations:update",
           "traces:view",
-        )({ ctx, input: { projectId: PROJECT_ID }, next } as never);
+        ])({
+          ctx: {
+            ...(ctx as Record<string, unknown>),
+            permissionChecked: false,
+          },
+          input: { projectId: PROJECT_ID },
+          next,
+        } as never);
 
         expect(outcome).toBe("permitted");
         expect(next).toHaveBeenCalledTimes(1);

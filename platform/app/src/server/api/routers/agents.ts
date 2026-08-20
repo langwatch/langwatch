@@ -14,7 +14,7 @@ import {
   agentTypeSchema,
 } from "../../agents/agent.repository";
 import { AgentService } from "../../agents/agent.service";
-import { checkProjectPermission, hasProjectPermission } from "../rbac";
+import { hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   copyWorkflowWithDatasets,
@@ -59,7 +59,7 @@ export const agentsRouter = createTRPCRouter({
    */
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("evaluations:view"))
+    .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
       return await agentService.getAll({ projectId: input.projectId });
@@ -71,7 +71,7 @@ export const agentsRouter = createTRPCRouter({
    */
   getById: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("evaluations:view"))
+    .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
       return await agentService.getById({
@@ -111,7 +111,7 @@ export const agentsRouter = createTRPCRouter({
           },
         ),
     )
-    .use(checkProjectPermission("evaluations:manage"))
+    .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
       // Config is validated by the refine above, safe to cast
@@ -141,7 +141,7 @@ export const agentsRouter = createTRPCRouter({
         workflowId: z.string().nullable().optional(),
       }),
     )
-    .use(checkProjectPermission("evaluations:manage"))
+    .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
 
@@ -168,7 +168,7 @@ export const agentsRouter = createTRPCRouter({
    */
   getRelatedEntities: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("evaluations:view"))
+    .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
       const agent = await ctx.prisma.agent.findFirst({
         where: {
@@ -199,7 +199,7 @@ export const agentsRouter = createTRPCRouter({
    */
   cascadeArchive: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("evaluations:manage"))
+    .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.$transaction(async (tx) => {
         // 1. Get the agent to find linked workflow
@@ -246,7 +246,7 @@ export const agentsRouter = createTRPCRouter({
    */
   delete: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("evaluations:manage"))
+    .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
       return await agentService.softDelete({
@@ -265,7 +265,7 @@ export const agentsRouter = createTRPCRouter({
         agentId: z.string(),
       }),
     )
-    .use(checkProjectPermission("evaluations:view"))
+    .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
       const source = await agentService.getById({
@@ -314,7 +314,7 @@ export const agentsRouter = createTRPCRouter({
         newAgentId: z.string().default(() => `agent_${nanoid()}`),
       }),
     )
-    .use(checkProjectPermission("evaluations:manage"))
+    .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
       const hasSourcePermission = await hasProjectPermission(
         ctx,
@@ -390,7 +390,7 @@ export const agentsRouter = createTRPCRouter({
         copyIds: z.array(z.string()).optional(),
       }),
     )
-    .use(checkProjectPermission("evaluations:manage"))
+    .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
       const copies = await agentService.getCopies(input.agentId);
@@ -451,7 +451,7 @@ export const agentsRouter = createTRPCRouter({
         agentId: z.string(),
       }),
     )
-    .use(checkProjectPermission("evaluations:manage"))
+    .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
       const copy = await agentService.getById({
@@ -513,7 +513,7 @@ export const agentsRouter = createTRPCRouter({
    */
   getHistory: protectedProcedure
     .input(z.object({ agentId: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("evaluations:view"))
+    .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
       const service = AgentService.create(ctx.prisma);
       return service.getHistory(input.agentId, input.projectId);

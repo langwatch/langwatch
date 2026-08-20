@@ -19,16 +19,15 @@ vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
-    checkProjectPermission:
-      (permission: string) =>
-      async ({ ctx, next }: any) => {
+    resolveProjectPermission: vi.fn(
+      async (_ctx: unknown, _projectId: string, permission: string) => {
         seenPermissions.push(permission);
-        if (denied.has(permission)) {
-          throw Object.assign(new Error("denied"), { code: "UNAUTHORIZED" });
-        }
-        ctx.permissionChecked = true;
-        return next();
+        return {
+          permitted: !denied.has(permission),
+          organizationRole: "MEMBER",
+        };
       },
+    ),
   };
 });
 
@@ -185,7 +184,9 @@ describe("gatewaySpendEventsRouter", () => {
   it("denies without the gateway usage view scope", async () => {
     denied.add("gatewayUsage:view");
     const caller = buildCaller();
-    await expect(caller.list(BASE_INPUT)).rejects.toThrow("denied");
+    await expect(caller.list(BASE_INPUT)).rejects.toThrow(
+      "You do not have permission",
+    );
     expect(readSpendEventsPage).not.toHaveBeenCalled();
   });
 });

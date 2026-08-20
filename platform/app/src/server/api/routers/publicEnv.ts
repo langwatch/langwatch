@@ -4,7 +4,6 @@ import { RUM_DEFAULT_SAMPLE_RATIO } from "@langwatch/react-rum/constants";
 import { z } from "zod";
 import { env } from "../../../env.mjs";
 import { hasEmailProvider } from "../../mailer/providers";
-import { skipPermissionCheck } from "../rbac";
 import { publicProcedure } from "../trpc";
 
 const isOpsSidebarEmail = (userEmail: string | null | undefined) => {
@@ -18,7 +17,9 @@ const isOpsSidebarEmail = (userEmail: string | null | undefined) => {
 
 export const publicEnvRouter = publicProcedure
   .input(z.object({}).passthrough())
-  .use(skipPermissionCheck)
+  .noPermission({
+    reason: "exposes only the PUBLIC_* env allowlist; no tenant data",
+  })
   .query(async ({ ctx }) => {
     // Warning: be very careful with the env vars you expose here
 

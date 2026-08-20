@@ -14,7 +14,7 @@ import {
 } from "~/prompts/schemas";
 import { hoistSystemMessage, PromptService } from "~/server/prompt-config";
 import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
-import { checkProjectPermission, hasProjectPermission } from "../../rbac";
+import { hasProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
 /**
@@ -26,7 +26,7 @@ export const promptsRouter = createTRPCRouter({
    */
   getAllPromptsForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("prompts:view"))
+    .permission("prompts:view")
     .query(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.getAllPrompts(input);
@@ -42,7 +42,7 @@ export const promptsRouter = createTRPCRouter({
         idOrHandle: z.string(),
       }),
     )
-    .use(checkProjectPermission("prompts:view"))
+    .permission("prompts:view")
     .query(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       const prompt = await service.getPromptByIdOrHandle({
@@ -122,7 +122,7 @@ export const promptsRouter = createTRPCRouter({
         projectId: z.string(),
       }),
     )
-    .use(checkProjectPermission("prompts:update"))
+    .permission("prompts:update")
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
@@ -170,7 +170,7 @@ export const promptsRouter = createTRPCRouter({
         }),
       }),
     )
-    .use(checkProjectPermission("prompts:create"))
+    .permission("prompts:create")
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
@@ -229,7 +229,7 @@ export const promptsRouter = createTRPCRouter({
         }),
       }),
     )
-    .use(checkProjectPermission("prompts:update"))
+    .permission("prompts:update")
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
@@ -258,7 +258,7 @@ export const promptsRouter = createTRPCRouter({
         }),
       }),
     )
-    .use(checkProjectPermission("prompts:update"))
+    .permission("prompts:update")
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.updateHandle({
@@ -284,7 +284,7 @@ export const promptsRouter = createTRPCRouter({
         tag: z.string().optional(),
       }),
     )
-    .use(checkProjectPermission("prompts:view"))
+    .permission("prompts:view")
     .query(async ({ ctx, input }) => {
       try {
         const service = new PromptService(ctx.prisma);
@@ -315,7 +315,7 @@ export const promptsRouter = createTRPCRouter({
         scope: z.nativeEnum(PromptScope),
       }),
     )
-    .use(checkProjectPermission("prompts:view"))
+    .permission("prompts:view")
     .query(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.checkHandleUniqueness(input);
@@ -331,7 +331,7 @@ export const promptsRouter = createTRPCRouter({
         projectId: z.string(),
       }),
     )
-    .use(checkProjectPermission("prompts:view"))
+    .permission("prompts:view")
     .query(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.checkModifyPermission(input);
@@ -347,7 +347,7 @@ export const promptsRouter = createTRPCRouter({
         projectId: z.string(),
       }),
     )
-    .use(checkProjectPermission("prompts:view"))
+    .permission("prompts:view")
     .query(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.getAllVersions(input);
@@ -363,7 +363,7 @@ export const promptsRouter = createTRPCRouter({
         projectId: z.string(),
       }),
     )
-    .use(checkProjectPermission("prompts:delete"))
+    .permission("prompts:delete")
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.deletePrompt(input);
@@ -380,7 +380,7 @@ export const promptsRouter = createTRPCRouter({
         sourceProjectId: z.string(),
       }),
     )
-    .use(checkProjectPermission("prompts:create"))
+    .permission("prompts:create")
     .mutation(async ({ ctx, input }) => {
       // Check that the user has at least prompts:create permission on the source project
       const hasSourcePermission = await hasProjectPermission(
@@ -430,7 +430,7 @@ export const promptsRouter = createTRPCRouter({
         projectId: z.string(),
       }),
     )
-    .use(checkProjectPermission("prompts:create"))
+    .permission("prompts:create")
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
@@ -460,7 +460,7 @@ export const promptsRouter = createTRPCRouter({
         idOrHandle: z.string(),
       }),
     )
-    .use(checkProjectPermission("prompts:update"))
+    .permission("prompts:update")
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
@@ -611,7 +611,7 @@ export const promptsRouter = createTRPCRouter({
         copyIds: z.array(z.string()).optional(), // Optional: if provided, only push to selected copies
       }),
     )
-    .use(checkProjectPermission("prompts:update"))
+    .permission("prompts:update")
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
@@ -774,7 +774,7 @@ export const promptsRouter = createTRPCRouter({
    */
   getTagsForConfig: protectedProcedure
     .input(z.object({ projectId: z.string(), configId: z.string() }))
-    .use(checkProjectPermission("prompts:view"))
+    .permission("prompts:view")
     .query(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return service.getTagsForConfig({
@@ -796,7 +796,7 @@ export const promptsRouter = createTRPCRouter({
         tag: z.string().min(1),
       }),
     )
-    .use(checkProjectPermission("prompts:update"))
+    .permission("prompts:update")
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
 
