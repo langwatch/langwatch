@@ -26,9 +26,18 @@ env:
   # Re-pin when boxd ships a new installer:
   #   curl -fsSL https://boxd.sh/downloads/cli/install.sh | sha256sum
   BOXD_INSTALLER_SHA256: 935d59706c090a6ed8276c6a8635b1e24b5d9748cf14625365bccd445ee16343
+  # Poll budgets, in seconds. They must sum to less than timeout-minutes below,
+  # with headroom for the gates and the snapshot save, so that a stuck refresh
+  # ends in this workflow's own diagnostics instead of a bare job cancellation.
+  REFRESH_WAIT_SECONDS: "3300" # 55 min
+  HEALTH_WAIT_SECONDS: "1200" # 20 min
 
 jobs:
   refresh-golden:
+    # BOXD_API_KEY can exec on the shared golden, so it is never exposed to a
+    # ref other than main. Without this, a write-access user could point
+    # workflow_dispatch at a modified branch and run arbitrary code with it.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
@@ -52,6 +61,16 @@ jobs:
           sh /tmp/boxd-install.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
+      # Per-run paths: a run cancelled by the job timeout can leave its detached
+      # refresh alive on the golden, and shared file names would let the next
+      # run read the dead run's status.
+      - name: Per-run remote paths
+        run: |
+          RUN="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "REMOTE_SCRIPT=/tmp/golden-refresh.$RUN.sh" >> "$GITHUB_ENV"
+          echo "REMOTE_STATUS=/tmp/golden-refresh.$RUN.status" >> "$GITHUB_ENV"
+          echo "REMOTE_LOG=/tmp/golden-refresh.$RUN.log" >> "$GITHUB_ENV"
+
       - name: Golden is running and exec channel works
         env:
           BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
@@ -65,38 +84,40 @@ jobs:
         run: |
           B64=$(base64 -w0 .github/scripts/boxd-golden-refresh.sh)
           boxd machine exec --timeout 60 "$GOLDEN" -- bash -c \
-            "echo $B64 | base64 -d > /tmp/golden-refresh.sh && chmod +x /tmp/golden-refresh.sh && rm -f /tmp/golden-refresh.status"
+            "echo $B64 | base64 -d > $REMOTE_SCRIPT && chmod +x $REMOTE_SCRIPT && rm -f $REMOTE_STATUS"
           boxd machine exec --timeout 30 "$GOLDEN" -- bash -c \
-            "nohup /tmp/golden-refresh.sh '$GITHUB_SHA' > /tmp/golden-refresh.log 2>&1 & echo launched"
+            "nohup $REMOTE_SCRIPT '$GITHUB_SHA' '$REMOTE_STATUS' > $REMOTE_LOG 2>&1 & echo launched"
 
       - name: Wait for refresh to finish
         env:
           BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
         run: |
-          for i in $(seq 1 120); do
-            S=$(boxd machine exec --timeout 30 "$GOLDEN" -- cat /tmp/golden-refresh.status 2>/dev/null || true)
+          DEADLINE=$(( $(date +%s) + REFRESH_WAIT_SECONDS ))
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            S=$(boxd machine exec --timeout 30 "$GOLDEN" -- cat "$REMOTE_STATUS" 2>/dev/null || true)
             case "$S" in
               *done*) echo "refresh done"; exit 0 ;;
               *failed*)
                 echo "refresh FAILED — log tail:"
-                boxd machine exec --timeout 60 "$GOLDEN" -- tail -50 /tmp/golden-refresh.log || true
+                boxd machine exec --timeout 60 "$GOLDEN" -- tail -50 "$REMOTE_LOG" || true
                 exit 1 ;;
             esac
             sleep 20
           done
-          echo "refresh timed out — log tail:"
-          boxd machine exec --timeout 60 "$GOLDEN" -- tail -50 /tmp/golden-refresh.log || true
+          echo "refresh timed out after ${REFRESH_WAIT_SECONDS}s — log tail:"
+          boxd machine exec --timeout 60 "$GOLDEN" -- tail -50 "$REMOTE_LOG" || true
           exit 1
 
       - name: Wait for /api/health 204
         run: |
-          for i in $(seq 1 120); do
+          DEADLINE=$(( $(date +%s) + HEALTH_WAIT_SECONDS ))
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
             CODE=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' "$GOLDEN_URL/api/health" || true)
             echo "health: $CODE"
             [ "$CODE" = "204" ] && exit 0
             sleep 15
           done
-          echo "app never became healthy"
+          echo "app never became healthy within ${HEALTH_WAIT_SECONDS}s"
           exit 1
 
       - name: Verify golden serves this exact commit
@@ -119,3 +140,14 @@ jobs:
         run: |
           boxd snapshots save "$GOLDEN" "$SNAPSHOT" --json
           boxd snapshots list
+
+      # Best effort: on cancellation the runner kills the steps above but the
+      # detached refresh keeps running on the golden and keeps its lock. The
+      # script's own stale-lock takeover is the backstop if this never runs.
+      - name: Release remote lock if this run was cancelled
+        if: cancelled()
+        env:
+          BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
+        run: |
+          boxd machine exec --timeout 30 "$GOLDEN" -- bash -c \
+            "pkill -9 -f 'golden-refresh.${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.s[h]' || true; rm -rf /tmp/golden-refresh.lock" || true
