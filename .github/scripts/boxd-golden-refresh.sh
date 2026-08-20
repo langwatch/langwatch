@@ -127,20 +127,29 @@ pkill -9 -f "exe/service aigatewa[y]" 2>/dev/null || true
 pkill -9 -f "make -C ../.. servic[e]" 2>/dev/null || true
 sleep 3
 
-# Nothing may still hold the app ports, or the new stack's check-ports step
-# blocks and the refresh reports done while the app never boots.
+# The new stack's check-ports step blocks if anything still holds its ports, and
+# the refresh would report done while the app never boots. Ask about the ports
+# themselves rather than about process names: a name pattern broad enough to
+# catch the Go services also matches the Go linker, whose -o argument contains
+# the binary path, and that is a compile step which exits on its own.
+APP_PORTS="5560 5561"
+port_holders() {
+  local p held=""
+  for p in $APP_PORTS; do
+    if ss -lnt "sport = :$p" 2>/dev/null | grep -q LISTEN; then held="$held $p"; fi
+  done
+  echo "$held"
+}
 for _ in $(seq 1 15); do
-  # `|| true` inside the substitution: pgrep exits 1 when nothing matches, and
-  # under `set -o pipefail` that failure would abort the whole refresh at the
-  # exact moment the loop has succeeded.
-  HOLDERS="$( { pgrep -f "src/server.mt[s]|exe/servic[e]|vite/bin/vite.j[s]" || true; } | tr '\n' ' ')"
-  [ -z "${HOLDERS// /}" ] && break
-  echo "waiting for old stack processes to exit: $HOLDERS"
+  BUSY="$(port_holders)"
+  [ -z "${BUSY// /}" ] && break
+  echo "waiting for ports to free up:$BUSY"
   sleep 2
 done
-LEFTOVER="$( { pgrep -f "src/server.mt[s]|exe/servic[e]" || true; } | tr '\n' ' ')"
-if [ -n "${LEFTOVER// /}" ]; then
-  echo "refusing to start: previous stack still holds ports (pids $LEFTOVER)"
+BUSY="$(port_holders)"
+if [ -n "${BUSY// /}" ]; then
+  echo "refusing to start: previous stack still holds port(s)$BUSY"
+  ss -lntp 2>/dev/null | grep -E ":(${APP_PORTS// /|}) " || true
   exit 1
 fi
 # Two deliberate details here:
