@@ -2,9 +2,7 @@
 import {
   Badge,
   Box,
-  Code,
   Heading,
-  SimpleGrid,
   Skeleton,
   Table,
   Text,
@@ -19,6 +17,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { HandledErrorAlert } from "~/features/errors";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
+import { EventDetailRow } from "./SourceEventDetailPanels";
 import type { SourceEventsPager } from "./useSourceEventsPager";
 
 /**
@@ -85,9 +84,18 @@ function EventsTableHeader() {
 }
 
 function EventTimeCell({ iso }: { iso: string }) {
-  const ms = new Date(iso).getTime();
+  const ms = Date.parse(iso);
+  // An unparsable timestamp gets a plain dash — a tooltip would only
+  // have "Invalid Date" to say.
+  if (Number.isNaN(ms)) {
+    return (
+      <Text textStyle="sm" whiteSpace="nowrap">
+        —
+      </Text>
+    );
+  }
   return (
-    <Tooltip content={new Date(iso).toLocaleString()}>
+    <Tooltip content={new Date(ms).toLocaleString()}>
       <Text textStyle="sm" cursor="help" whiteSpace="nowrap">
         {formatTimeAgo(ms) ?? "—"}
       </Text>
@@ -97,11 +105,11 @@ function EventTimeCell({ iso }: { iso: string }) {
 
 function EventDataRow({
   event,
-  expanded,
+  isExpanded,
   onToggle,
 }: {
   event: SourceEventRowData;
-  expanded: boolean;
+  isExpanded: boolean;
   onToggle: () => void;
 }) {
   const hasTokens = event.tokensInput > 0 || event.tokensOutput > 0;
@@ -110,8 +118,18 @@ function EventDataRow({
       data-testid="source-event-row"
       cursor="pointer"
       onClick={onToggle}
+      // A <tr> is not focusable or activatable on its own; the row is a
+      // disclosure control, so it gets the keyboard affordances too.
+      tabIndex={0}
+      aria-expanded={isExpanded}
+      onKeyDown={(keyEvent) => {
+        if (keyEvent.key !== "Enter" && keyEvent.key !== " ") return;
+        keyEvent.preventDefault();
+        onToggle();
+      }}
       _hover={{ bg: "bg.subtle" }}
-      bg={expanded ? "bg.subtle" : undefined}
+      _focusVisible={{ bg: "bg.subtle", outline: "none" }}
+      bg={isExpanded ? "bg.subtle" : undefined}
     >
       <Table.Cell whiteSpace="nowrap">
         <EventTimeCell iso={event.eventTimestampIso} />
@@ -154,97 +172,6 @@ function EventDataRow({
   );
 }
 
-function EventDetailRow({ event }: { event: SourceEventRowData }) {
-  return (
-    <Table.Row>
-      <Table.Cell colSpan={COLUMNS.length} bg="bg.subtle">
-        <SimpleGrid columns={{ base: 1, lg: 2 }} gap={3} paddingY={1}>
-          <NormalisedPanel event={event} />
-          <RawPanel event={event} />
-        </SimpleGrid>
-      </Table.Cell>
-    </Table.Row>
-  );
-}
-
-function NormalisedPanel({ event }: { event: SourceEventRowData }) {
-  return (
-    <Box>
-      <Text
-        fontSize="xs"
-        fontWeight="semibold"
-        color="fg.muted"
-        marginBottom={1}
-      >
-        Normalised (OCSF)
-      </Text>
-      <Code
-        display="block"
-        padding={3}
-        fontSize="xs"
-        whiteSpace="pre-wrap"
-        wordBreak="break-all"
-        backgroundColor="bg.panel"
-      >
-        {JSON.stringify(
-          {
-            eventId: event.eventId,
-            eventType: event.eventType,
-            actor: event.actor,
-            action: event.action,
-            target: event.target,
-            costUsd: event.costUsd,
-            tokensInput: event.tokensInput,
-            tokensOutput: event.tokensOutput,
-            eventTimestamp: event.eventTimestampIso,
-            ingestedAt: event.ingestedAtIso,
-          },
-          null,
-          2,
-        )}
-      </Code>
-    </Box>
-  );
-}
-
-function RawPanel({ event }: { event: SourceEventRowData }) {
-  let parsed: unknown = null;
-  try {
-    parsed = JSON.parse(event.rawPayload);
-  } catch {
-    // not JSON, render as text
-  }
-  return (
-    <Box>
-      <Text
-        fontSize="xs"
-        fontWeight="semibold"
-        color="fg.muted"
-        marginBottom={1}
-      >
-        Raw payload (as ingested)
-      </Text>
-      {event.rawPayload ? (
-        <Code
-          display="block"
-          padding={3}
-          fontSize="xs"
-          whiteSpace="pre-wrap"
-          wordBreak="break-all"
-          backgroundColor="bg.panel"
-        >
-          {parsed != null ? JSON.stringify(parsed, null, 2) : event.rawPayload}
-        </Code>
-      ) : (
-        <Text fontSize="xs" color="fg.muted">
-          The raw body is not stored for this source type — pushed events are
-          normalised at the edge and only the normalised record is kept.
-        </Text>
-      )}
-    </Box>
-  );
-}
-
 function SkeletonRows({ pageSize }: { pageSize: number }) {
   const rowCount = Math.min(pageSize, 5);
   return (
@@ -277,7 +204,7 @@ function EventsTableBody({
         <Fragment key={event.eventId}>
           <EventDataRow
             event={event}
-            expanded={expandedEventId === event.eventId}
+            isExpanded={expandedEventId === event.eventId}
             onToggle={() =>
               setExpandedEventId((current) =>
                 current === event.eventId ? null : event.eventId,
@@ -285,7 +212,7 @@ function EventsTableBody({
             }
           />
           {expandedEventId === event.eventId && (
-            <EventDetailRow event={event} />
+            <EventDetailRow event={event} colSpan={COLUMNS.length} />
           )}
         </Fragment>
       ))}

@@ -25,13 +25,16 @@ import { useSourceEventsPager } from "../useSourceEventsPager";
 
 const BASE_TS = Date.now() - 5 * 60 * 1000; // recent, so times read "ago"
 
-function makeEvent(
-  eventId: string,
-  tsMs: number,
-  overrides: Partial<SourceEventRowData> = {},
-): SourceEventRowData {
+function makeEvent({
+  id,
+  ts,
+  ...overrides
+}: {
+  id: string;
+  ts: number;
+} & Partial<SourceEventRowData>): SourceEventRowData {
   return {
-    eventId,
+    eventId: id,
     eventType: "api_call",
     actor: "dev@acme.test",
     action: "chat.completion",
@@ -39,9 +42,9 @@ function makeEvent(
     costUsd: "0.0250",
     tokensInput: 120,
     tokensOutput: 480,
-    eventTimestampIso: new Date(tsMs).toISOString(),
-    ingestedAtIso: new Date(tsMs + 500).toISOString(),
-    rawPayload: JSON.stringify({ marker: `raw-${eventId}` }),
+    eventTimestampIso: new Date(ts).toISOString(),
+    ingestedAtIso: new Date(ts + 500).toISOString(),
+    rawPayload: JSON.stringify({ marker: `raw-${id}` }),
     ...overrides,
   };
 }
@@ -92,8 +95,8 @@ describe("given a source with ingested events", () => {
   /** @scenario "Events render as a table, newest first" */
   it("renders the events as table rows, newest first, with every column", async () => {
     const events = [
-      makeEvent("new", BASE_TS + 2000, { actor: "newest@acme.test" }),
-      makeEvent("old", BASE_TS + 1000, { actor: "oldest@acme.test" }),
+      makeEvent({ id: "new", ts: BASE_TS + 2000, actor: "newest@acme.test" }),
+      makeEvent({ id: "old", ts: BASE_TS + 1000, actor: "oldest@acme.test" }),
     ];
     renderTable({ fetchPage: fakeServer(events), pageSize: 10 });
 
@@ -123,7 +126,7 @@ describe("given a source with ingested events", () => {
   it("expands a clicked row into raw + normalised detail and folds it on a second click", async () => {
     const user = userEvent.setup();
     renderTable({
-      fetchPage: fakeServer([makeEvent("only", BASE_TS)]),
+      fetchPage: fakeServer([makeEvent({ id: "only", ts: BASE_TS })]),
       pageSize: 10,
     });
     const rowEl = await screen.findByTestId("source-event-row");
@@ -141,7 +144,9 @@ describe("given a source with ingested events", () => {
   it("says a pushed event's raw body was never stored instead of an empty panel", async () => {
     const user = userEvent.setup();
     renderTable({
-      fetchPage: fakeServer([makeEvent("pushed", BASE_TS, { rawPayload: "" })]),
+      fetchPage: fakeServer([
+        makeEvent({ id: "pushed", ts: BASE_TS, rawPayload: "" }),
+      ]),
       pageSize: 10,
     });
     await user.click(await screen.findByTestId("source-event-row"));
@@ -150,11 +155,52 @@ describe("given a source with ingested events", () => {
       screen.getByText(/raw body is not stored for this source type/i),
     ).toBeTruthy();
   });
+
+  /** @scenario "A row opens into raw + normalised detail" */
+  it("opens and closes the detail from the keyboard as well as the mouse", async () => {
+    const user = userEvent.setup();
+    renderTable({
+      fetchPage: fakeServer([makeEvent({ id: "only", ts: BASE_TS })]),
+      pageSize: 10,
+    });
+    const rowEl = await screen.findByTestId("source-event-row");
+
+    rowEl.focus();
+    expect(rowEl).toHaveProperty("tabIndex", 0);
+    await user.keyboard("{Enter}");
+    expect(screen.getByText("Normalised (OCSF)")).toBeTruthy();
+    expect(rowEl.getAttribute("aria-expanded")).toBe("true");
+
+    await user.keyboard("{Enter}");
+    expect(screen.queryByText("Normalised (OCSF)")).toBeNull();
+    expect(rowEl.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("shows a dash, never 'Invalid Date', for a timestamp that does not parse", async () => {
+    const user = userEvent.setup();
+    // Not through fakeServer: its cursor filter needs a parseable
+    // timestamp, and the point here is what the CELL does with a bad one.
+    renderTable({
+      fetchPage: async () => [
+        makeEvent({
+          id: "only",
+          ts: BASE_TS,
+          eventTimestampIso: "not-a-timestamp",
+        }),
+      ],
+      pageSize: 10,
+    });
+    const rowEl = await screen.findByTestId("source-event-row");
+    await user.hover(within(rowEl).getAllByText("—")[0]!);
+    expect(screen.queryByText(/invalid date/i)).toBeNull();
+  });
 });
 
 describe("given more events than one page holds", () => {
   const twelve = Array.from({ length: 12 }, (_, i) =>
-    makeEvent(`e${String(i).padStart(2, "0")}`, BASE_TS - i * 1000, {
+    makeEvent({
+      id: `e${String(i).padStart(2, "0")}`,
+      ts: BASE_TS - i * 1000,
       actor: `actor-e${String(i).padStart(2, "0")}@acme.test`,
     }),
   );
@@ -205,12 +251,14 @@ describe("given events stamped with the same millisecond straddling a page bound
     // 9 distinct + 3 tied at T; page size 10 cuts through the tie: page 1
     // ends with 1 tied row shown, 2 tied rows unreachable to a naive walk.
     const distinct = Array.from({ length: 9 }, (_, i) =>
-      makeEvent(`d${i}`, T + (9 - i) * 1000, {
+      makeEvent({
+        id: `d${i}`,
+        ts: T + (9 - i) * 1000,
         actor: `actor-d${i}@acme.test`,
       }),
     );
     const tied = ["z", "y", "x"].map((s) =>
-      makeEvent(`tie-${s}`, T, { actor: `actor-tie-${s}@acme.test` }),
+      makeEvent({ id: `tie-${s}`, ts: T, actor: `actor-tie-${s}@acme.test` }),
     );
     const server = fakeServer([...distinct, ...tied]);
     renderTable({ fetchPage: server, pageSize: 10 });
@@ -232,10 +280,10 @@ describe("given the page stays mounted while the source it addresses changes", (
     // Multi-hop history navigation lands on another :id without a remount;
     // the pager must not keep showing the previous source's events.
     const sourceA = fakeServer([
-      makeEvent("a1", BASE_TS, { actor: "actor-source-a@acme.test" }),
+      makeEvent({ id: "a1", ts: BASE_TS, actor: "actor-source-a@acme.test" }),
     ]);
     const sourceB = fakeServer([
-      makeEvent("b1", BASE_TS, { actor: "actor-source-b@acme.test" }),
+      makeEvent({ id: "b1", ts: BASE_TS, actor: "actor-source-b@acme.test" }),
     ]);
     const view = renderTable({ fetchPage: sourceA, pageSize: 10 });
     await screen.findByText("actor-source-a@acme.test");
@@ -276,7 +324,7 @@ describe("given the pager can only honour what the cursor gives it", () => {
   /** @scenario "The pager offers no control it cannot honour" */
   it("offers no sort headers, no search box and no grand total", async () => {
     const events = Array.from({ length: 12 }, (_, i) =>
-      makeEvent(`e${i}`, BASE_TS - i * 1000),
+      makeEvent({ id: `e${i}`, ts: BASE_TS - i * 1000 }),
     );
     renderTable({ fetchPage: fakeServer(events), pageSize: 10 });
     const table = await screen.findByRole("table");
