@@ -46,7 +46,41 @@ jobs:
         startsWith(github.head_ref, 'release-please--'))
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+
+      # The `services/**`/`charts/**` trigger paths match every dependency bump
+      # in services/langevals, services/aigateway, services/nlpgo, and every
+      # chart's Chart.lock too. Which of those get an exemption, and why, is
+      # decided by guard-deployment-impact.ts — a plain function with a test,
+      # rather than a `case` statement buried in YAML that nothing can run.
+      #
+      # PR_AUTHOR is the pull request's author, NOT `github.actor`. This
+      # workflow triggers on `edited`, so `github.actor` is whoever last touched
+      # the pull request: a maintainer tidying a dependabot PR's description
+      # would flip the actor away from the bot and silently withdraw the
+      # exemption the PR qualified for when it opened.
+      - name: Determine whether this PR only touches dependency manifests
+        id: manifest-only
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          CHANGED_FILES=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename')
+          export CHANGED_FILES
+          echo "Changed files:"
+          printf '%s\n' "$CHANGED_FILES"
+          echo "Author: $PR_AUTHOR"
+          node --experimental-strip-types .github/scripts/guard-deployment-impact.ts \
+            | tee -a "$GITHUB_OUTPUT"
+
       - name: Verify deployment-impact section in PR description
+        if: steps.manifest-only.outputs.requires_writeup == 'true'
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |

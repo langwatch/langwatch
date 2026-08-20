@@ -24,7 +24,7 @@ import { getHexColorForString } from "~/utils/rotatingColors";
  */
 export interface SpendOverTimeBucket {
   bucketIso: string;
-  points: Array<{ key: string; label: string; spendUsd: number }>;
+  points: Array<{ key: string; label: string; spendUsd: string }>;
 }
 
 export type GroupBy = "team" | "user" | "model";

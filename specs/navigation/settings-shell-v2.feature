@@ -11,7 +11,8 @@ Feature: Settings shell in the new navigation modes
   then the settings menu regrouped with icons: ORGANIZATION, ACCESS,
   AI INFRASTRUCTURE, DATA CONTROLS, PROJECT, and the internal OPS and
   BACKOFFICE groups with their current gates. Enterprise-plan entries
-  carry a violet pill. Every settings page keeps its address, and every
+  carry a quiet grey pill, since it marks a plan rather than asking to
+  be read first. Every settings page keeps its address, and every
   visibility gate keeps its current condition.
 
   Devices on the legacy mode keep the current settings chrome
@@ -30,10 +31,24 @@ Feature: Settings shell in the new navigation modes
     And General and Members keep their current addresses
 
   @integration
-  Scenario: Enterprise entries carry a violet pill
+  Scenario: Enterprise entries carry a quiet grey pill
     Given my plan shows the enterprise settings entries
     When the settings sidebar renders in a new navigation mode
     Then the enterprise entries carry an "ENT" pill
+    And the pill is grey with a hairline border, not a coloured one
+
+  @integration
+  Scenario: The settings groups fold, and start open
+    Given I open Settings in a new navigation mode
+    Then every settings group is open
+    When I press a group heading
+    Then that group folds away and the other groups stay as they are
+    And my choice is kept for the next time I open Settings
+
+  @integration
+  Scenario: A rule separates the way back from the pages below it
+    Given I open Settings in a new navigation mode
+    Then a rule runs under the way back entry
 
   @integration
   Scenario: A lite member sees no restricted settings entries

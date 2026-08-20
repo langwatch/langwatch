@@ -105,6 +105,14 @@ Feature: Landing in the new navigation modes
     When the app resolves my context in legacy mode
     Then I am sent to the other organization's project as today
 
+  @integration
+  Scenario: An organization with the new navigation off gets the teleport back
+    Given my current organization has no project
+    And another organization of mine has one
+    And my device painted a new navigation mode from the last flag answer
+    When the navigation flag answers off for my current organization
+    Then I am sent to the other organization's project
+
   @unit
   Scenario: Switching organization stays in the same product when possible
     Given I am in the Gateway product

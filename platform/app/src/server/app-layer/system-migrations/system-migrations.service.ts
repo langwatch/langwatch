@@ -5,9 +5,21 @@ import type {
   TenantMigrationStatus,
 } from "@langwatch/system-migrations";
 import {
-  MigrationRollbackRequiresFinalizedError,
+  MigrationRollbackRequiresMigratedOrFinalizedError,
   MigrationStateNotFoundError,
 } from "./errors";
+
+/**
+ * The statuses a tenant may be rolled back from. Mirrors
+ * `LEDGER_WRITE_STATUSES` in ../authz/ledger-write-gate.ts: both are already
+ * on the ledger (writes, and possibly reads too), so both are the
+ * operator's to pull back onto the legacy path. `parked` never reached the
+ * ledger, and `rolled_back` already left it.
+ */
+const ROLLBACK_ELIGIBLE_STATUSES: readonly TenantMigrationStatus[] = [
+  "migrated",
+  "finalized",
+];
 
 const logger = createLogger("langwatch:ops:system-migrations");
 
@@ -15,7 +27,8 @@ const logger = createLogger("langwatch:ops:system-migrations");
  * The ops model over stored migration state. Deliberately narrower than the
  * runner's own port: the runner reads and writes one tenant at a time; the
  * dashboard reads across them, and its ONE write is the operator rollback —
- * finalized → rolled_back, the state machine's only human-driven edge.
+ * migrated or finalized → rolled_back, the state machine's only
+ * human-driven edge.
  */
 export interface SystemMigrationStateReader {
   findStatusCounts(args: {
@@ -96,14 +109,19 @@ export class SystemMigrationsService {
   }
 
   /**
-   * The operator's rollback: pin a finalized organization back onto its
-   * legacy path (specs/rbac/in-place-authz-migration.feature, "An operator
-   * rolls a finalized organization back to its legacy path"). Only
-   * `finalized` may roll back — every other status either still IS on the
-   * legacy path or is the runner's to move. The legacy-fallback gate picks
-   * the change up within its cache window; later passes leave the
-   * organization alone (rolled_back is terminal until an operator
-   * intervenes again).
+   * The operator's rollback: pin a migrated or finalized organization back
+   * onto its legacy path (specs/rbac/in-place-authz-migration.feature, "An
+   * operator rolls a finalized organization back to its legacy path", "An
+   * operator rolls a migrated organization back to its legacy path"). Both
+   * statuses are already live on the ledger (ledger-write-gate.ts) — a
+   * migrated-but-not-yet-finalized organization held there by parity drift
+   * is exactly the population most likely to need this route. Every other
+   * status either never reached the ledger or is the runner's to move. The
+   * ledger-write gate always picks the change up within its cache window;
+   * the legacy-fallback gate only mattered once the organization was
+   * finalized, since that is the only status it treats specially. Later
+   * passes leave the organization alone (rolled_back is terminal until an
+   * operator intervenes again).
    */
   async rollBack({
     migrationName,
@@ -119,8 +137,8 @@ export class SystemMigrationsService {
       tenantId,
     });
     if (!record) throw new MigrationStateNotFoundError();
-    if (record.status !== "finalized") {
-      throw new MigrationRollbackRequiresFinalizedError({
+    if (!ROLLBACK_ELIGIBLE_STATUSES.includes(record.status)) {
+      throw new MigrationRollbackRequiresMigratedOrFinalizedError({
         status: record.status,
       });
     }
@@ -137,8 +155,8 @@ export class SystemMigrationsService {
       },
     });
     logger.warn(
-      { migrationName, tenantId, actorUserId },
-      "operator rolled a finalized tenant back to its legacy path",
+      { migrationName, tenantId, actorUserId, priorStatus: record.status },
+      "operator rolled a migrated or finalized tenant back to its legacy path",
     );
   }
 }

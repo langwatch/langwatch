@@ -182,7 +182,7 @@ const usageResultSchema = z
 /** One group-by row inside a cost bucket. `amount` is a decimal string. */
 const costResultSchema = z
   .object({
-    amount: z.union([z.string(), z.number()]),
+    amount: z.union([z.string(), z.number()]).transform(String),
     currency: z.string().default("USD"),
     workspace_id: z.string().nullable().default(null),
     description: z.string().nullable().default(null),
@@ -472,7 +472,7 @@ export class AnthropicAdminPuller
       action: "usage_report",
       target: dimension(result.model),
       // Anthropic reports no cost on this report; we price the quantities.
-      cost_usd: 0,
+      cost_usd: "0",
       tokens_input: result.uncached_input_tokens,
       tokens_output: result.output_tokens,
       raw_payload: JSON.stringify(result),
@@ -522,16 +522,16 @@ export class AnthropicAdminPuller
       );
       return null;
     }
-    const amount = String(result.amount);
+    const amount = result.amount;
     return {
       source_event_id: `cost:${startingAt}:${dimensionPath(dimensions)}`,
       event_timestamp: startingAt,
       actor: "",
       action: "cost_report",
       target: dimension(result.model),
-      // Kept as a number for the canonical shape; the exact string rides the
-      // hint below, and that is the one the record is priced from.
-      cost_usd: Number(amount),
+      // Decimal string — no Number() coercion. The exact value rides through
+      // to the pricing service via the hint below.
+      cost_usd: amount,
       tokens_input: 0,
       tokens_output: 0,
       raw_payload: JSON.stringify(result),

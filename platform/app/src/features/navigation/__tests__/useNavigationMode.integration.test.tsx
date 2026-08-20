@@ -1,10 +1,11 @@
 /**
  * @vitest-environment jsdom
  *
- * The navigation-mode resolution contract: legacy resolves synchronously
- * with no flag check, a stored v2 mode waits for the flag instead of
- * flashing the old chrome, and flag off falls back to legacy without
- * erasing the device preference.
+ * The navigation-mode resolution contract: a picked legacy resolves
+ * synchronously with no flag check, a picked v2 mode waits for the flag
+ * instead of flashing the old chrome, a device that picked nothing
+ * follows the flag without ever waiting, and flag off falls back to
+ * legacy without erasing the device preference.
  *
  * Spec: specs/navigation/navigation-modes.feature
  */
@@ -30,6 +31,7 @@ import {
 import { useNavigationMode } from "../useNavigationMode";
 
 const STORAGE_KEY = "langwatch:navigation-mode:v1";
+const FLAG_STORAGE_KEY = "langwatch:navigation-mode-flag:v1";
 
 function flagQueryRan(): boolean {
   return useFeatureFlagMock.mock.calls.some(
@@ -46,17 +48,61 @@ beforeEach(() => {
     organization: { id: "org_1" },
     isLoading: false,
   });
-  useNavigationModeStore.setState({ storedMode: "legacy" });
+  useNavigationModeStore.setState({
+    storedMode: null,
+    isLastKnownFlagEnabled: null,
+  });
 });
 
 describe("useNavigationMode", () => {
-  describe("when the device has no stored preference", () => {
-    /** @scenario A device with no stored preference stays on the old navigation */
-    it("resolves to legacy immediately without a flag check", () => {
+  describe("when the device picked nothing and the flag is on", () => {
+    /** @scenario "A device with no stored preference runs the product switcher" */
+    it("resolves to the product switcher", () => {
+      useFeatureFlagMock.mockReturnValue({ enabled: true, isLoading: false });
+
+      const { result } = renderHook(() => useNavigationMode());
+
+      expect(result.current).toEqual({
+        status: "ready",
+        mode: "product-switcher",
+      });
+    });
+  });
+
+  describe("when the device picked nothing and the flag has not answered", () => {
+    /** @scenario "A device with no stored preference keeps the old navigation until the flag answers" */
+    it("resolves to legacy without a loading screen", () => {
+      useFeatureFlagMock.mockReturnValue({ enabled: false, isLoading: true });
+
       const { result } = renderHook(() => useNavigationMode());
 
       expect(result.current).toEqual({ status: "ready", mode: "legacy" });
-      expect(flagQueryRan()).toBe(false);
+    });
+
+    /** @scenario "A device that saw the flag on paints the new navigation first" */
+    it("resolves to the product switcher when the flag was on last time", () => {
+      useNavigationModeStore.setState({ isLastKnownFlagEnabled: true });
+      useFeatureFlagMock.mockReturnValue({ enabled: false, isLoading: true });
+
+      const { result } = renderHook(() => useNavigationMode());
+
+      expect(result.current).toEqual({
+        status: "ready",
+        mode: "product-switcher",
+      });
+    });
+  });
+
+  describe("when the flag answers", () => {
+    it("remembers the answer for the next visit", () => {
+      useFeatureFlagMock.mockReturnValue({ enabled: true, isLoading: false });
+
+      renderHook(() => useNavigationMode());
+
+      expect(localStorage.getItem(FLAG_STORAGE_KEY)).toBe("on");
+      expect(useNavigationModeStore.getState().isLastKnownFlagEnabled).toBe(
+        true,
+      );
     });
   });
 
@@ -130,10 +176,10 @@ describe("useNavigationMode", () => {
 
 describe("navigationModeStore", () => {
   describe("when storage holds garbage", () => {
-    /** @scenario Garbage in storage counts as legacy */
-    it("loads as legacy", () => {
+    /** @scenario "Garbage in storage counts as no stored choice" */
+    it("loads as no pick at all", () => {
       localStorage.setItem(STORAGE_KEY, "banana");
-      expect(loadStoredNavigationMode()).toBe("legacy");
+      expect(loadStoredNavigationMode()).toBeNull();
     });
   });
 

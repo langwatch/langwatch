@@ -6,13 +6,14 @@
  * reader proves the effective set resolves to nothing INSIDE the transaction.
  * Anything left rolls the whole thing back.
  *
- * GrantsService keeps the audit record and the epoch bump; this module owns
- * the transaction, the proof, and the manifest.
+ * GrantsService keeps the epoch bump; this module owns the flow, the proof,
+ * and the manifest.
  */
 import { HandledError } from "@langwatch/handled-error";
 import type { AuthzCollectorService } from "./authz-collector.service";
 import type {
   AuthzGrantsRepository,
+  LedgerActor,
   OffboardCounts,
 } from "./authz-grants.repository";
 import type { AuthzReadRepository } from "./authz-read.repository";
@@ -48,17 +49,20 @@ export type OffboardResult = {
 export async function offboardUserFromOrganization({
   repository,
   collectorFor,
+  actor,
   userId,
   organizationId,
 }: {
   repository: AuthzGrantsRepository;
   collectorFor: (reader: AuthzReadRepository) => AuthzCollectorService;
+  actor: LedgerActor;
   userId: string;
   organizationId: string;
 }): Promise<OffboardResult> {
   const removed = await repository.offboardUser({
     userId,
     organizationId,
+    actor,
     prove: (txReader) =>
       proveNothingResolves({
         collector: collectorFor(txReader),

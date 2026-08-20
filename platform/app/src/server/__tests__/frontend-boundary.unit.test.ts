@@ -680,8 +680,8 @@ const SERVER_ONLY_STATE = new Set(
   [
     path.join(SRC, "server/db.ts"),
     path.join(SRC, "server/redis.ts"),
-    path.join(SRC, "server/authz/runtime.ts"),
-    path.join(SRC, "server/authz/epoch.ts"),
+    path.join(SRC, "server/app-layer/authz/runtime.ts"),
+    path.join(SRC, "server/app-layer/authz/epoch.ts"),
     path.join(APP_ROOT, "ee/audit-log/auditLog.ts"),
   ].map((p) => path.resolve(p)),
 );
@@ -792,7 +792,7 @@ describe("client-imported vocabulary never reaches server-only state", () => {
 
   describe("given a server file that reaches the composition root transitively", () => {
     it("reports the chain through runtime.ts", () => {
-      const runtime = path.join(SRC, "server/authz/runtime.ts");
+      const runtime = path.join(SRC, "server/app-layer/authz/runtime.ts");
       const chain = chainToServerModule(
         path.join(SRC, "server/api/routers/authz.ts"),
         runtime,
@@ -811,7 +811,7 @@ describe("client-imported vocabulary never reaches server-only state", () => {
   // future `import { prisma } from "~/server/db"` would break.
   describe("given a server module that composes over a caller-supplied handle", () => {
     it("reports no chain, so a clean root really is clean", () => {
-      const shadow = path.join(SRC, "server/authz/shadow.ts");
+      const shadow = path.join(SRC, "server/app-layer/authz/shadow.ts");
 
       expect(CLIENT_IMPORTED_SERVER_MODULES).not.toContain(shadow);
       expect(chainToServerOnlyState(shadow)).toBeNull();

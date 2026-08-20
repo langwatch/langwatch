@@ -8,21 +8,43 @@ Feature: Navigation modes behind one flag
   as today), product-switcher (a top-bar dropdown switches products) and
   icon-rail (a left rail switches products). The mode is a device
   preference in localStorage, never synced to the account. With the flag
-  off, or the mode legacy, the current chrome renders unchanged.
+  off the current chrome renders unchanged, whatever the stored mode.
 
-  The mode resolves without flicker: a device on legacy must never wait
-  for a flag check, and a device on a new mode must never flash the old
-  chrome while the flag check runs.
+  With the flag on, a device that never picked a mode runs the product
+  switcher. Picking "Old navigation" is an opt-out and keeps the current
+  chrome.
+
+  The mode resolves without flicker. A device that picked legacy never
+  waits for a flag check. A device that picked a new mode never flashes
+  the old chrome while the check runs. A device that picked nothing never
+  waits either: it paints the answer the flag last gave it, which is the
+  current chrome until the flag has answered on at least once.
 
   Background:
     Given I am signed in
 
   @integration
-  Scenario: A device with no stored preference stays on the old navigation
+  Scenario: A device with no stored preference runs the product switcher
     Given my device has no stored navigation mode
+    And the navigation flag is on for me
+    When the app shell resolves the navigation mode
+    Then the mode is "product-switcher"
+
+  @integration
+  Scenario: A device with no stored preference keeps the old navigation until the flag answers
+    Given my device has no stored navigation mode
+    And the navigation flag check has not answered yet
     When the app shell resolves the navigation mode
     Then the mode is "legacy" immediately
-    And no feature flag check runs
+    And no loading screen is shown
+
+  @integration
+  Scenario: A device that saw the flag on paints the new navigation first
+    Given my device has no stored navigation mode
+    And the flag was on the last time this device asked
+    And the navigation flag check has not answered yet
+    When the app shell resolves the navigation mode
+    Then the mode is "product-switcher" immediately
 
   @integration
   Scenario: A device set to legacy never waits for the flag
@@ -55,10 +77,10 @@ Feature: Navigation modes behind one flag
     And the stored preference is still "product-switcher"
 
   @integration
-  Scenario: Garbage in storage counts as legacy
+  Scenario: Garbage in storage counts as no stored choice
     Given my device stored "banana" as the navigation mode
-    When the app shell resolves the navigation mode
-    Then the mode is "legacy" immediately
+    When the app shell reads the stored navigation mode
+    Then the device counts as having picked no mode
 
   @integration
   Scenario: Picking a mode persists on the device
