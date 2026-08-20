@@ -61,6 +61,78 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     And the composer starts from a blank configuration for the picked type,
       even when a different type was being composed moments before
 
+  Rule: The Genie composer leads with the credential that survives a schedule
+
+    Databricks expires pasted workspace tokens about an hour after issuing
+    them, so a token-backed scheduled source dies by the next morning. The
+    service principal (client id + secret) signs itself in at the start of
+    every run. The form therefore presents client id + secret as the way
+    in, and demotes the token — together with the tuning fields most
+    admins never touch — into a collapsed "Advanced" group.
+
+    @integration
+    Scenario: Genie setup asks for the service principal first
+      When the admin picks "Databricks AI/BI Genie" from the Add source menu
+      Then the form asks for the workspace URL, the service principal
+        client ID, and the service principal secret, in that order
+      And the workspace token, Genie space IDs, and SQL warehouse ID
+        are not visible until the admin expands "Advanced"
+
+    @integration
+    Scenario: Advanced options stay collapsed and never block create
+      When the admin fills a display name, the workspace URL, client ID,
+        and secret, leaving "Advanced" closed
+      Then the source can be created
+      And the create request carries an empty space list, which the
+        space IDs hint explains covers every space the credential can see
+
+    @unit
+    Scenario: Field hints name their fields instead of pointing at them
+      Then every Genie field hint that mentions another field names it,
+        and none locates one as "above" or "below"
+
+  Rule: Every scheduled source states its cadence in plain language
+
+    The raw five-field cron input assumed the admin speaks cron. The
+    composer instead offers a "Cadence" section with a friendly picker;
+    cron editing remains behind an explicit toggle for the admins who
+    want it.
+
+    @integration
+    Scenario: The Cadence section opens on a friendly picker, prefilled
+      When the admin composes any pull-mode source
+      Then a section titled "Cadence" shows a frequency picker, not a
+        cron text box
+      And the picker arrives prefilled with that source's recommended
+        schedule (for example "every 15 minutes")
+      And a sentence below states the chosen schedule in plain words
+
+    @unit
+    Scenario: The picker speaks every recommended schedule
+      Then each pull source's recommended schedule round-trips through
+        the friendly picker without falling back to cron editing
+
+    @integration
+    Scenario: Leaving the cadence untouched keeps the recommended schedule
+      When the admin creates a pull-mode source without touching Cadence
+      Then the create request carries that source's recommended schedule
+        (a saved schedule of "none" would mean the source never runs)
+
+    @integration
+    Scenario: Picking a cadence saves exactly that schedule
+      When the admin changes the cadence to hourly
+      Then the create request carries the matching schedule everywhere
+        the schedule travels, including inside the source's pull settings
+      And the summary sentence updates to say so
+
+    @integration
+    Scenario: Cron editing is still there for schedules the picker cannot say
+      When the admin turns on "Edit as a cron expression"
+      And types a cron the friendly picker cannot express
+      Then the value is kept as typed, not clobbered by picker defaults
+      And a cron that can never run shows a plain-language message next
+        to the input, and the create button refuses until it is fixed
+
   @unit
   Scenario: The configured-source list groups under the same two headings
     Given configured sources of push, pull, and s3 modes exist
