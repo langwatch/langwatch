@@ -116,6 +116,15 @@ const PromptPlaygroundChat = forwardRef<
     [messages, errors],
   );
 
+  // The reply opens its turn the moment the first token lands, so the waiting
+  // state is only for the gap before that: an assistant part at the end of the
+  // thread means the answer is already arriving and drawing both would double
+  // it up.
+  const hasStreamingReply =
+    parts.at(-1)?.kind === "text" &&
+    (parts.at(-1) as Extract<DisplayPart, { kind: "text" }>).role ===
+      "assistant";
+
   const renderPartActions = useCallback(
     (part: DisplayPart) => (
       <MessageActions part={part} onDelete={() => deleteMessage(part.id)} />
@@ -131,12 +140,19 @@ const PromptPlaygroundChat = forwardRef<
       flexDirection="column"
       {...boxProps}
     >
-      <Box flex={1} minHeight={0} width="full" maxWidth="768px" margin="0 auto">
+      {/* Full width, so the thread's own scrollbar rides the panel edge; the
+          messages are centred inside it by `panel.contentMaxWidth`. */}
+      <Box flex={1} minHeight={0} width="full">
         <ConversationThread
           parts={parts}
           projectId={project?.id ?? ""}
           renderPartActions={renderPartActions}
           structuredOutput
+          panel={{ contentMaxWidth: "768px" }}
+          live
+          // The gap between sending and the first token belongs to the thread,
+          // where the reply will land — not to the send button going quiet.
+          pendingReply={isRunning && !hasStreamingReply}
         />
       </Box>
       <SyncedChatInput inProgress={isRunning} onSend={send} onStop={stop} />
