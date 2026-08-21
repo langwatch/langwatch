@@ -809,7 +809,7 @@ function FooterParameters({
           <ParameterChip
             key={`${definition.name}-${index}`}
             name={definition.name}
-            secret={definition.secret === true}
+            isSecret={definition.secret === true}
             onOpen={onOpen}
           />
         ))}
@@ -834,11 +834,11 @@ const ChipButton = chakra("button");
 
 function ParameterChip({
   name,
-  secret,
+  isSecret,
   onOpen,
 }: {
   name: string;
-  secret: boolean;
+  isSecret: boolean;
   onOpen: () => void;
 }) {
   return (
@@ -846,7 +846,7 @@ function ParameterChip({
       type="button"
       onClick={onOpen}
       aria-label={
-        secret ? `Edit secret parameter ${name}` : `Edit parameter ${name}`
+        isSecret ? `Edit secret parameter ${name}` : `Edit parameter ${name}`
       }
       data-testid={`scenario-parameter-chip-${name}`}
       bg="bg.muted"
@@ -860,7 +860,7 @@ function ParameterChip({
       gap={1}
       _hover={{ bg: "bg.emphasized" }}
     >
-      {secret && <Lock size={10} />}
+      {isSecret && <Lock size={10} />}
       {name}
     </ChipButton>
   );

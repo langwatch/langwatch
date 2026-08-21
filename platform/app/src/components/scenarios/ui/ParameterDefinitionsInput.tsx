@@ -146,10 +146,7 @@ function ParameterRow({
   definition: ScenarioParameterDefinition;
   error?: string;
   disabled: boolean;
-  onUpdate: (
-    index: number,
-    patch: Partial<ScenarioParameterDefinition>,
-  ) => void;
+  onUpdate: UpdateRow;
   onRemove: (index: number) => void;
 }) {
   const isSecret = definition.secret === true;
@@ -183,57 +180,19 @@ function ParameterRow({
           aria-label={`Parameter ${index + 1} description`}
           data-testid={`scenario-parameter-description-${index}`}
         />
-        <Tooltip
-          content={SECRET_DEFAULT_TOOLTIP}
-          disabled={!isSecret}
-          positioning={{ placement: "top" }}
-        >
-          <Box flex={DEFAULT_VALUE_FLEX} minWidth={0}>
-            <Input
-              value={displayOptionalValue(definition.defaultValue)}
-              onChange={(e) =>
-                onUpdate(index, {
-                  defaultValue: serializeOptionalScalarValue(e.target.value),
-                })
-              }
-              placeholder={isSecret ? "" : "gold"}
-              size="sm"
-              width="full"
-              fontFamily="mono"
-              fontSize="13px"
-              disabled={disabled || isSecret}
-              aria-label={`Parameter ${index + 1} default value`}
-              data-testid={`scenario-parameter-default-${index}`}
-            />
-          </Box>
-        </Tooltip>
-        <Tooltip
-          content={SECRET_SWITCH_TOOLTIP}
-          positioning={{ placement: "top" }}
-        >
-          <Box width={SECRET_WIDTH} flexShrink={0}>
-            <Switch
-              size="sm"
-              checked={isSecret}
-              disabled={disabled}
-              onCheckedChange={({ checked }) =>
-                onUpdate(
-                  index,
-                  // A secret carries no default: the value is supplied when the
-                  // run starts, so whatever was typed is dropped here rather
-                  // than kept out of sight until the save is refused.
-                  checked
-                    ? { secret: true, defaultValue: undefined }
-                    : { secret: undefined },
-                )
-              }
-              inputProps={{
-                "aria-label": `Parameter ${index + 1} secret`,
-                "data-testid": `scenario-parameter-secret-${index}`,
-              }}
-            />
-          </Box>
-        </Tooltip>
+        <DefaultValueCell
+          index={index}
+          definition={definition}
+          disabled={disabled}
+          isSecret={isSecret}
+          onUpdate={onUpdate}
+        />
+        <SecretSwitchCell
+          index={index}
+          disabled={disabled}
+          isSecret={isSecret}
+          onUpdate={onUpdate}
+        />
         {!disabled && (
           <Tooltip
             content="Remove parameter"
@@ -264,6 +223,92 @@ function ParameterRow({
         </Text>
       )}
     </VStack>
+  );
+}
+
+/** Update callback a row cell calls with the fields it owns. */
+type UpdateRow = (
+  index: number,
+  patch: Partial<ScenarioParameterDefinition>,
+) => void;
+
+function DefaultValueCell({
+  index,
+  definition,
+  disabled,
+  isSecret,
+  onUpdate,
+}: {
+  index: number;
+  definition: ScenarioParameterDefinition;
+  disabled: boolean;
+  isSecret: boolean;
+  onUpdate: UpdateRow;
+}) {
+  return (
+    <Tooltip
+      content={SECRET_DEFAULT_TOOLTIP}
+      disabled={!isSecret}
+      positioning={{ placement: "top" }}
+    >
+      <Box flex={DEFAULT_VALUE_FLEX} minWidth={0}>
+        <Input
+          value={displayOptionalValue(definition.defaultValue)}
+          onChange={(e) =>
+            onUpdate(index, {
+              defaultValue: serializeOptionalScalarValue(e.target.value),
+            })
+          }
+          placeholder={isSecret ? "" : "gold"}
+          size="sm"
+          width="full"
+          fontFamily="mono"
+          fontSize="13px"
+          disabled={disabled || isSecret}
+          aria-label={`Parameter ${index + 1} default value`}
+          data-testid={`scenario-parameter-default-${index}`}
+        />
+      </Box>
+    </Tooltip>
+  );
+}
+
+function SecretSwitchCell({
+  index,
+  disabled,
+  isSecret,
+  onUpdate,
+}: {
+  index: number;
+  disabled: boolean;
+  isSecret: boolean;
+  onUpdate: UpdateRow;
+}) {
+  return (
+    <Tooltip content={SECRET_SWITCH_TOOLTIP} positioning={{ placement: "top" }}>
+      <Box width={SECRET_WIDTH} flexShrink={0}>
+        <Switch
+          size="sm"
+          checked={isSecret}
+          disabled={disabled}
+          onCheckedChange={({ checked }) =>
+            onUpdate(
+              index,
+              // A secret carries no default: the value is supplied when the
+              // run starts, so whatever was typed is dropped here rather than
+              // kept out of sight until the save is refused.
+              checked
+                ? { secret: true, defaultValue: undefined }
+                : { secret: undefined },
+            )
+          }
+          inputProps={{
+            "aria-label": `Parameter ${index + 1} secret`,
+            "data-testid": `scenario-parameter-secret-${index}`,
+          }}
+        />
+      </Box>
+    </Tooltip>
   );
 }
 

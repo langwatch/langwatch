@@ -21305,7 +21305,9 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                             secret?: boolean;
                         }[];
                         /** Format: uri */
@@ -21383,7 +21385,9 @@ export interface operations {
                     parameters?: {
                         name: string;
                         description?: string;
+                        /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                         defaultValue?: string | number | boolean;
+                        /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                         secret?: boolean;
                     }[];
                 };
@@ -21405,7 +21409,9 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                             secret?: boolean;
                         }[];
                         /** Format: uri */
@@ -21489,7 +21495,9 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                             secret?: boolean;
                         }[];
                         /** Format: uri */
@@ -21579,7 +21587,9 @@ export interface operations {
                     parameters?: {
                         name: string;
                         description?: string;
+                        /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                         defaultValue?: string | number | boolean;
+                        /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                         secret?: boolean;
                     }[];
                 };
@@ -21601,7 +21611,9 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                             secret?: boolean;
                         }[];
                         /** Format: uri */
@@ -22784,7 +22796,10 @@ export interface operations {
                             lastRunAt: number;
                             lastUpdatedAt: number;
                             firstCompletedAt: number | null;
-                            /** @description Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running. */
+                            /**
+                             * @deprecated
+                             * @description Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running.
+                             */
                             allCompletedAt: number | null;
                             /** @description True when every run of the batch reached a terminal status. */
                             isComplete: boolean;
@@ -22872,7 +22887,10 @@ export interface operations {
                         lastRunAt: number;
                         lastUpdatedAt: number;
                         firstCompletedAt: number | null;
-                        /** @description Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running. */
+                        /**
+                         * @deprecated
+                         * @description Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running.
+                         */
                         allCompletedAt: number | null;
                         /** @description True when every run of the batch reached a terminal status. */
                         isComplete: boolean;

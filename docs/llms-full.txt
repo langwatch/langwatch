@@ -27598,7 +27598,7 @@ sidebarTitle: "Manual Control"
 description: "Use LangWatch TypeScript manual instrumentation for fine-grained tracing control during AI agent testing."
 ---
 
-## In This Guide
+## Manual span management
 
 Manual span management gives TypeScript and JavaScript applications fine-grained control over observability, beyond what the automatic `withActiveSpan` method provides.
 
@@ -28142,7 +28142,7 @@ title: OpenTelemetry Migration
 description: "Migrate from OpenTelemetry to LangWatch while preserving custom tracing to support more advanced AI agent testing."
 ---
 
-## In This Guide
+## Migrate an OpenTelemetry setup
 
 You can migrate an existing OpenTelemetry setup to LangWatch and keep your custom configurations, instrumentations, and advanced features.
 
@@ -28600,7 +28600,7 @@ description: "Learn about OpenTelemetry semantic conventions and LangWatch's cus
 keywords: langwatch, typescript, sdk, guide, observability, attributes, semantic conventions, opentelemetry, standards, naming
 ---
 
-## In This Guide
+## Attribute naming standards
 
 LangWatch follows the OpenTelemetry semantic conventions and adds its own attributes for LLM-specific observability.
 
@@ -35405,7 +35405,33 @@ curl "https://app.langwatch.ai/api/simulation-runs/batches/batch_xyz789" \
 
 Stop the poll when `isComplete` is true **and** `totalCount` is at least `jobCount`. The two conditions go together: the platform creates the runs asynchronously, so a batch read right after the trigger can hold fewer runs than `jobCount`, and a batch of two created runs out of six reports itself complete.
 
-The batch is finished when the counts settle. Read `failCount` to decide the exit code of the CI job, and open the batch in the platform for the run details.
+The same asynchronous creation makes the first read answer `404`. The batch becomes readable when its first run is stored, which is a moment after the trigger returns. Treat a `404` as "not stored yet" and poll again until your own timeout expires. A `404` is a missing batch only after that timeout.
+
+Exit the CI job nonzero when `failCount` is above zero **or** `stalledCount` is above zero. A stalled run settles without passing, so it counts in `settledCount` but not in `failCount`, and a job that reads `failCount` alone reports success for a batch that never finished its work. Open the batch in the platform for the run details.
+
+```bash
+# Poll until the batch is complete, then set the exit code.
+deadline=$(( $(date +%s) + 1800 ))
+while [ "$(date +%s)" -lt "$deadline" ]; do
+  body=$(curl -s -w '\n%{http_code}' \
+    "https://app.langwatch.ai/api/simulation-runs/batches/${BATCH_RUN_ID}" \
+    -H "X-Auth-Token: ${LANGWATCH_API_KEY}")
+  status=$(printf '%s' "$body" | tail -n1)
+  summary=$(printf '%s' "$body" | sed '$d')
+
+  # 404 means the first run is not stored yet. Keep polling.
+  if [ "$status" = "200" ] \
+    && [ "$(printf '%s' "$summary" | jq '.isComplete')" = "true" ] \
+    && [ "$(printf '%s' "$summary" | jq ".totalCount >= ${JOB_COUNT}")" = "true" ]; then
+    printf '%s' "$summary" | jq -e '.failCount == 0 and .stalledCount == 0'
+    exit $?
+  fi
+  sleep 10
+done
+
+echo "The batch did not finish before the timeout."
+exit 1
+```
 
 ## Or let the CLI wait
 
@@ -35642,7 +35668,7 @@ console.log(result.batchRunId);
 
 ## Secret parameters
 
-A secret parameter is a run parameter whose value the platform never stores and never shows in clear. Use one for an API key, a bearer token, or a password that changes per run.
+A secret parameter is a run parameter whose value the platform encrypts before it stores anything, and never shows in clear. Use one for an API key, a bearer token, or a password that changes per run.
 
 Declare it in the same editor: add the row, then turn on the **Secret** switch. A secret parameter takes no default value, so the field for it is empty and disabled.
 
@@ -35657,10 +35683,12 @@ Bearer {{ secrets.api_token }}
 ```
 
 ```bash
-langwatch suite run <suite-id> --param api_token=tok-live-1
+langwatch suite run <suite-id> --param api_token="$TENANT_API_TOKEN"
 ```
 
-The run records the name `api_token` and no value. The run detail drawer lists the name with a mask, and the CSV export leaves the parameter out.
+Read the value from a CI secret variable, as above. A value typed in full on the command line stays in the shell history and in the process list of the machine that runs it, which is outside what the platform can protect.
+
+The run records the name `api_token`. The value is encrypted on its way to the target under test, and no plain copy of it is kept: it is not in the stored run, the runs API, the CSV export or the audit log. The run detail drawer lists the name with a mask.
 
 A run value takes the place of a project secret of the same name, for that run only. The project secret keeps its value for every other run.
 

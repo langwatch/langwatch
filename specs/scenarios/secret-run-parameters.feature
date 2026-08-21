@@ -1,8 +1,8 @@
 Feature: Secret run parameters
   As someone who starts a scenario run against a real system
-  I want to supply a credential the run needs without storing it anywhere
-  So that the target under test can authenticate as a real caller, and the
-  value is gone from every record the run leaves behind.
+  I want to supply a credential the run needs without it appearing in clear
+  So that the target under test can authenticate as a real caller, and no
+  record the run leaves behind holds a readable value.
 
   Background: how a secret parameter differs from a plain one.
     A scenario declares a parameter as secret. A secret parameter carries no
@@ -11,8 +11,9 @@ Feature: Secret run parameters
     target under test through the same "secrets" namespace project secrets use:
     "{{ secrets.NAME }}" in an http template, "secrets.NAME" in a code target.
     The scenario's own situation and criteria cannot read it. The names are
-    recorded so a person can see which credentials a run needed; the values are
-    not recorded anywhere.
+    recorded so a person can see which credentials a run needed. The value is
+    encrypted before it is stored, and it is kept out of the runs store, the
+    APIs, the exports, the audit log and everything the platform displays.
 
   # --- Declaring ---
 
@@ -51,7 +52,7 @@ Feature: Secret run parameters
 
   @unit
   Scenario: A secret value reaches targets through the secrets namespace
-    Given an http target whose header reads "secrets.api_token"
+    Given an http target whose header reads "{{ secrets.api_token }}"
     And the run supplies "api_token" as "tok-live-1"
     When the target takes a turn
     Then the request it sends carries "tok-live-1" in that header
@@ -113,7 +114,7 @@ Feature: Secret run parameters
     And the run cannot start until the field holds a value
 
   @integration
-  Scenario: The run detail drawer masks secret parameter names
+  Scenario: The run detail drawer masks secret parameter values
     Given a recorded run that used a secret parameter
     When its detail drawer opens
     Then the parameters section names the parameter after the plain ones

@@ -144,7 +144,7 @@ describe("<ScenarioRunDetailDrawer/> parameters", () => {
 
   describe("given a run that used a secret parameter", () => {
     describe("when the drawer opens", () => {
-      /** @scenario "The run detail drawer masks secret parameter names" */
+      /** @scenario "The run detail drawer masks secret parameter values" */
       it("names the secret and shows a mask in place of a value", () => {
         mocks.runState = buildRunState({
           parameters: { account_tier: "platinum" },
@@ -159,7 +159,7 @@ describe("<ScenarioRunDetailDrawer/> parameters", () => {
         expect(section).toHaveTextContent("account_tier");
       });
 
-      /** @scenario "The run detail drawer masks secret parameter names" */
+      /** @scenario "The run detail drawer masks secret parameter values" */
       it("carries no value for the secret anywhere in the section", () => {
         mocks.runState = buildRunState({
           secretParameterNames: ["api_token"],

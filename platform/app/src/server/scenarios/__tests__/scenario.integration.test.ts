@@ -97,7 +97,7 @@ describe("ScenarioService", () => {
       ]);
     });
 
-    /** @scenario "A parameter declared secret cannot carry a default value" */
+    /** @scenario "Parameter definitions are persisted on a scenario" */
     it("reads a secret declaration back as secret", async () => {
       const created = await service.create({
         projectId,

@@ -94,7 +94,9 @@ function assertNoSecretConflict({
  * Refuses the run when a declared secret has no text value for this run.
  *
  * A secret carries no default, so there is nothing to fall back to, and a
- * number or a boolean is not a credential.
+ * number or a boolean is not a credential. An empty string is refused with
+ * them: the run dialog cannot send one, but a caller that goes straight to the
+ * API can, and it would reach the target as a credential of no length.
  */
 function assertEverySecretHasAValue({
   secretNames,
@@ -103,9 +105,10 @@ function assertEverySecretHasAValue({
   secretNames: Set<string>;
   values?: RunParameterValues;
 }): void {
-  const missing = [...secretNames].filter(
-    (name) => typeof values?.[name] !== "string",
-  );
+  const missing = [...secretNames].filter((name) => {
+    const value = values?.[name];
+    return typeof value !== "string" || value.length === 0;
+  });
   if (missing.length === 0) return;
   throw new ScenarioSecretParameterMissingError({ names: missing });
 }

@@ -99,13 +99,22 @@ export const scenarioParameterDefinitionSchema = z.object({
       message: RESERVED_NAME_MESSAGE,
     }),
   description: z.string().max(MAX_PARAMETER_DESCRIPTION_LENGTH).optional(),
-  defaultValue: parameterValueSchema.optional(),
+  defaultValue: parameterValueSchema
+    .optional()
+    .describe(
+      "The value the run uses when it supplies none. A secret parameter cannot carry one.",
+    ),
   /**
    * Whether the value is a credential. A secret value is supplied per run,
    * encrypted before it is recorded, and read by the target as
    * `secrets.NAME` rather than `params.NAME`.
    */
-  secret: z.boolean().optional(),
+  secret: z
+    .boolean()
+    .optional()
+    .describe(
+      "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue.",
+    ),
 });
 
 /**

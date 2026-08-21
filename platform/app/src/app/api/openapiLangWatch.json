@@ -46054,10 +46054,12 @@
                                 {
                                   "type": "boolean"
                                 }
-                              ]
+                              ],
+                              "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
                             },
                             "secret": {
-                              "type": "boolean"
+                              "type": "boolean",
+                              "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
                             }
                           },
                           "required": [
@@ -46234,10 +46236,12 @@
                               {
                                 "type": "boolean"
                               }
-                            ]
+                            ],
+                            "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
                           },
                           "secret": {
-                            "type": "boolean"
+                            "type": "boolean",
+                            "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
                           }
                         },
                         "required": [
@@ -46403,10 +46407,12 @@
                             {
                               "type": "boolean"
                             }
-                          ]
+                          ],
+                          "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
                         },
                         "secret": {
-                          "type": "boolean"
+                          "type": "boolean",
+                          "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
                         }
                       },
                       "required": [
@@ -46492,10 +46498,12 @@
                               {
                                 "type": "boolean"
                               }
-                            ]
+                            ],
+                            "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
                           },
                           "secret": {
-                            "type": "boolean"
+                            "type": "boolean",
+                            "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
                           }
                         },
                         "required": [
@@ -46702,10 +46710,12 @@
                               {
                                 "type": "boolean"
                               }
-                            ]
+                            ],
+                            "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
                           },
                           "secret": {
-                            "type": "boolean"
+                            "type": "boolean",
+                            "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
                           }
                         },
                         "required": [
@@ -46890,10 +46900,12 @@
                             {
                               "type": "boolean"
                             }
-                          ]
+                          ],
+                          "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
                         },
                         "secret": {
-                          "type": "boolean"
+                          "type": "boolean",
+                          "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
                         }
                       },
                       "required": [
@@ -48881,7 +48893,8 @@
                               "number",
                               "null"
                             ],
-                            "description": "Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running."
+                            "description": "Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running.",
+                            "deprecated": true
                           },
                           "isComplete": {
                             "type": "boolean",
@@ -49087,7 +49100,8 @@
                         "number",
                         "null"
                       ],
-                      "description": "Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running."
+                      "description": "Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running.",
+                      "deprecated": true
                     },
                     "isComplete": {
                       "type": "boolean",

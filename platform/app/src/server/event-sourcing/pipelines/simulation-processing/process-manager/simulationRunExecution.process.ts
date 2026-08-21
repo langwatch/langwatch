@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import type {
   EventHandler,
   ProcessHandlerContext,
@@ -98,6 +100,16 @@ export function buildSimulationRunEventView(
     Object.keys(parsedSecretParameters.data).length > 0
       ? parsedSecretParameters.data
       : null;
+  // The names ride the metadata in clear. They say what the ciphertext beside
+  // them has to cover, so a queued event whose secret values were lost or
+  // written by another CREDENTIALS_SECRET is caught before the run starts.
+  const parsedSecretNames = z
+    .array(z.string())
+    .safeParse(metadata?.secretParameterNames);
+  const secretParameterNames =
+    parsedSecretNames.success && parsedSecretNames.data.length > 0
+      ? parsedSecretNames.data
+      : null;
   return {
     eventType: event.type,
     occurredAt: event.occurredAt,
@@ -109,6 +121,7 @@ export function buildSimulationRunEventView(
     target,
     parameters,
     secretParameters,
+    secretParameterNames,
   };
 }
 
@@ -146,6 +159,48 @@ function finishCancelledIntent(ctx: Ctx) {
  */
 function schedulingRef(ctx: Ctx): number {
   return Math.max(ctx.at, ctx.now);
+}
+
+/**
+ * The declared secret names the queued event carries no usable ciphertext for.
+ *
+ * An event that declares nothing secret returns nothing, which is the shape
+ * every run had before secret parameters and the shape an older event has.
+ * A name is missing when the ciphertext record has no entry for it, or holds
+ * an empty one.
+ */
+function declaredSecretsWithoutCiphertext(
+  view: SimulationRunProcessEventView,
+): string[] {
+  if (view.secretParameterNames === null) return [];
+  const ciphertext = view.secretParameters ?? {};
+  return view.secretParameterNames.filter(
+    (name) => (ciphertext[name] ?? "").length === 0,
+  );
+}
+
+/** Finishes the run ERROR without submitting it, and clears every wake. */
+function finishUnexecutable({
+  ctx,
+  base,
+  error,
+}: {
+  ctx: Ctx;
+  base: SimulationRunExecutionProcessState;
+  error: string;
+}) {
+  return {
+    state: { ...base, phase: "terminal" as const },
+    nextWakeAt: null,
+    intents: [
+      ctx.intents.finish(finishUnexecutableKey(ctx.key), {
+        scenarioRunId: ctx.key,
+        projectId: ctx.projectId,
+        status: ScenarioRunStatus.ERROR,
+        error,
+      }),
+    ],
+  };
 }
 
 export const handleRunQueued: EventHandler<
@@ -191,28 +246,34 @@ export const handleRunQueued: EventHandler<
     };
   }
 
+  // The queued event predates the execution target (or lost its identity):
+  // there is nothing to submit. Failing the run now beats pinning it until
+  // the stall wake — a run that can never start is not "stalled", it is
+  // unexecutable.
   if (
     view.scenarioId === null ||
     view.batchRunId === null ||
     view.scenarioSetId === null ||
     view.target === null
   ) {
-    // The queued event predates the execution target (or lost its identity):
-    // there is nothing to submit. Failing the run now beats pinning it until
-    // the stall wake — a run that can never start is not "stalled", it is
-    // unexecutable.
-    return {
-      state: { ...base, phase: "terminal" },
-      nextWakeAt: null,
-      intents: [
-        ctx.intents.finish(finishUnexecutableKey(ctx.key), {
-          scenarioRunId: ctx.key,
-          projectId: ctx.projectId,
-          status: ScenarioRunStatus.ERROR,
-          error: "queued event carries no execution target",
-        }),
-      ],
-    };
+    return finishUnexecutable({
+      ctx,
+      base,
+      error: "queued event carries no execution target",
+    });
+  }
+
+  // Fail closed on a secret the run cannot deliver. The run was started for a
+  // target that authenticates with this credential, so executing it without
+  // one, or with the project value of the same name, reports a result about
+  // the credential rather than about the scenario.
+  const missingSecrets = declaredSecretsWithoutCiphertext(view);
+  if (missingSecrets.length > 0) {
+    return finishUnexecutable({
+      ctx,
+      base,
+      error: `queued event carries no value for secret parameters: ${missingSecrets.join(", ")}`,
+    });
   }
 
   return {

@@ -82,6 +82,18 @@ describe("resolveRunParameters", () => {
           code: "scenario_secret_parameter_missing",
         });
       });
+
+      // The run dialog cannot send an empty field, but a caller that goes
+      // straight to the API can, and a credential of no length is not one.
+      /** @scenario "A secret parameter value must be supplied when the run starts" */
+      it("rejects an empty value the same way", async () => {
+        await expect(
+          resolve({ scenarios: [declaring], values: { api_token: "" } }),
+        ).rejects.toMatchObject({
+          code: "scenario_secret_parameter_missing",
+          meta: { names: ["api_token"] },
+        });
+      });
     });
 
     describe("when the rejection is read back", () => {
@@ -107,107 +119,117 @@ describe("resolveRunParameters", () => {
   });
 
   describe("given a scenario whose own text reads a secret parameter", () => {
-    /** @scenario "Scenario text cannot read a secret parameter" */
-    it("rejects the run with the dedicated error", async () => {
-      await expect(
-        resolve({
-          scenarios: [
-            scenario({
-              situation: "Use {{ params.api_token }} to call the API",
-              parameters: [{ name: "api_token", secret: true }],
-            }),
-          ],
-          values: { api_token: SECRET_VALUE },
-        }),
-      ).rejects.toMatchObject({
-        code: "scenario_secret_parameter_in_text",
-        meta: { names: ["api_token"], field: "situation" },
+    describe("when the run is started", () => {
+      /** @scenario "Scenario text cannot read a secret parameter" */
+      it("rejects the run with the dedicated error", async () => {
+        await expect(
+          resolve({
+            scenarios: [
+              scenario({
+                situation: "Use {{ params.api_token }} to call the API",
+                parameters: [{ name: "api_token", secret: true }],
+              }),
+            ],
+            values: { api_token: SECRET_VALUE },
+          }),
+        ).rejects.toMatchObject({
+          code: "scenario_secret_parameter_in_text",
+          meta: { names: ["api_token"], field: "situation" },
+        });
+      });
+
+      /** @scenario "Scenario text cannot read a secret parameter" */
+      it("names the criterion that reads it", async () => {
+        await expect(
+          resolve({
+            scenarios: [
+              scenario({
+                criteria: ["Answers", "Sends {{ params.api_token }}"],
+                parameters: [{ name: "api_token", secret: true }],
+              }),
+            ],
+            values: { api_token: SECRET_VALUE },
+          }),
+        ).rejects.toMatchObject({
+          code: "scenario_secret_parameter_in_text",
+          meta: { field: "criteria[1]" },
+        });
       });
     });
 
-    /** @scenario "Scenario text cannot read a secret parameter" */
-    it("names the criterion that reads it", async () => {
-      await expect(
-        resolve({
-          scenarios: [
-            scenario({
-              criteria: ["Answers", "Sends {{ params.api_token }}"],
-              parameters: [{ name: "api_token", secret: true }],
-            }),
-          ],
-          values: { api_token: SECRET_VALUE },
-        }),
-      ).rejects.toMatchObject({
-        code: "scenario_secret_parameter_in_text",
-        meta: { field: "criteria[1]" },
+    describe("when the missing name is a plain one", () => {
+      it("still reports it as a plain missing name", async () => {
+        await expect(
+          resolve({
+            scenarios: [
+              scenario({
+                situation: "A {{ params.account_tier }} customer",
+                parameters: [{ name: "account_tier" }],
+              }),
+            ],
+          }),
+        ).rejects.toMatchObject({ code: "scenario_parameter_missing" });
       });
-    });
-
-    it("still reports a plain missing name as a plain missing name", async () => {
-      await expect(
-        resolve({
-          scenarios: [
-            scenario({
-              situation: "A {{ params.account_tier }} customer",
-              parameters: [{ name: "account_tier" }],
-            }),
-          ],
-        }),
-      ).rejects.toMatchObject({ code: "scenario_parameter_missing" });
     });
   });
 
   describe("given two scenarios in one run declaring the same name", () => {
-    /** @scenario "A name declared secret in one scenario and plain in another rejects the run" */
-    it("rejects the run when one calls it secret and the other plain", async () => {
-      await expect(
-        resolve({
+    describe("when one calls it secret and the other plain", () => {
+      /** @scenario "A name declared secret in one scenario and plain in another rejects the run" */
+      it("rejects the run", async () => {
+        await expect(
+          resolve({
+            scenarios: [
+              scenario({
+                id: "scen_secret",
+                parameters: [{ name: "api_token", secret: true }],
+              }),
+              scenario({
+                id: "scen_plain",
+                parameters: [{ name: "api_token", defaultValue: "public" }],
+              }),
+            ],
+            values: { api_token: SECRET_VALUE },
+          }),
+        ).rejects.toMatchObject({
+          code: "scenario_secret_parameter_conflict",
+          meta: { names: ["api_token"] },
+        });
+      });
+    });
+
+    describe("when only one scenario declares it secret", () => {
+      it("resolves the secret only for the scenario that declares it", async () => {
+        const resolved = await resolve({
           scenarios: [
             scenario({
               id: "scen_secret",
               parameters: [{ name: "api_token", secret: true }],
             }),
-            scenario({
-              id: "scen_plain",
-              parameters: [{ name: "api_token", defaultValue: "public" }],
-            }),
+            scenario({ id: "scen_none", parameters: [] }),
           ],
           values: { api_token: SECRET_VALUE },
-        }),
-      ).rejects.toMatchObject({
-        code: "scenario_secret_parameter_conflict",
-        meta: { names: ["api_token"] },
-      });
-    });
+        });
 
-    it("resolves the secret only for the scenario that declares it", async () => {
-      const resolved = await resolve({
-        scenarios: [
-          scenario({
-            id: "scen_secret",
-            parameters: [{ name: "api_token", secret: true }],
-          }),
-          scenario({ id: "scen_none", parameters: [] }),
-        ],
-        values: { api_token: SECRET_VALUE },
+        expect(resolved.get("scen_secret")?.secretParameters).toEqual({
+          api_token: SECRET_VALUE,
+        });
+        expect(resolved.get("scen_none")?.secretParameters).toEqual({});
+        expect(resolved.get("scen_none")?.parameters).toEqual({});
       });
-
-      expect(resolved.get("scen_secret")?.secretParameters).toEqual({
-        api_token: SECRET_VALUE,
-      });
-      expect(resolved.get("scen_none")?.secretParameters).toEqual({});
-      expect(resolved.get("scen_none")?.parameters).toEqual({});
     });
   });
 
   describe("given a run supplying a name no scenario declares", () => {
-    it("still rejects with the unknown-name error", async () => {
-      await expect(
-        resolve({
-          scenarios: [scenario({ parameters: [{ name: "region" }] })],
-          values: { regoin: "us-east" },
-        }),
-      ).rejects.toMatchObject({ code: "scenario_parameter_unknown" });
+    describe("when the run is started", () => {
+      it("still rejects with the unknown-name error", async () => {
+        await expect(
+          resolve({
+            scenarios: [scenario({ parameters: [{ name: "region" }] })],
+            values: { regoin: "us-east" },
+          }),
+        ).rejects.toMatchObject({ code: "scenario_parameter_unknown" });
+      });
     });
   });
 });

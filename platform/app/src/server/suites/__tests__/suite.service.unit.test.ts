@@ -342,7 +342,10 @@ describe("SuiteService", () => {
           ),
         };
 
-        /** @scenario "A secret value is never written to the simulation runs store" */
+        // The store boundary itself is covered where it is crossed, in
+        // suite-run-parameters.integration.test.ts. What this pins is the
+        // handoff: the value leaves the suite service encrypted, and the plain
+        // record it travels beside never holds it.
         it("hands the secret to suiteRunService encrypted and out of the plain values", async () => {
           const { service, suiteRunService } = createService({
             scenarioRepository: declaringSecret,

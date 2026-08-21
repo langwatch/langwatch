@@ -41,7 +41,12 @@ const testRouter = createTRPCRouter({
       .input(runInput)
       .use(grantPermission as any)
       .mutation(async () => ({ scheduled: true })),
-    rejects: protectedProcedure
+  }),
+  scenarios: createTRPCRouter({
+    // A query at a path the rules cover, so the error middleware is the one
+    // that records it: that middleware skips a mutation whose permission check
+    // ran, which is the case the success test above covers.
+    run: protectedProcedure
       .input(runInput)
       .use(grantPermission as any)
       .query(async () => {
@@ -84,14 +89,20 @@ describe("audit middlewares", () => {
       });
     });
 
-    describe("when a query is refused", () => {
+    describe("when a call at the same path is refused", () => {
+      // The error middleware sits before the input parser, so it holds no
+      // input to store and the redaction call it makes is a guard for a chain
+      // that changes. The record it writes must still carry no value, and this
+      // is the assertion that says so at the path the rules cover.
       /** @scenario "Audit log entries never record a secret value" */
-      it("records no value on the error path either", async () => {
+      it("records no parameter value on the error path either", async () => {
         await expect(
-          caller().suites.rejects({ projectId: "proj-1", parameters }),
+          caller().scenarios.run({ projectId: "proj-1", parameters }),
         ).rejects.toThrow();
 
         expect(mockAuditLog).toHaveBeenCalledTimes(1);
+        const call = mockAuditLog.mock.calls[0]?.[0];
+        expect(call?.action).toBe("scenarios.run");
         expect(JSON.stringify(recordedArgs() ?? null)).not.toContain(
           "tok-live-1",
         );

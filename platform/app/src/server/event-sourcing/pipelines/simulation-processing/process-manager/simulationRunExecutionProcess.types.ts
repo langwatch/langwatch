@@ -150,6 +150,12 @@ export const simulationRunProcessEventViewSchema = z.object({
    * only the encrypted form may travel here.
    */
   secretParameters: runSecretCiphertextSchema.nullable().default(null),
+  /**
+   * The names the queued event declared secret, from `metadata`. They are what
+   * the ciphertext beside them is checked against: a run that declares a
+   * credential and carries no readable value for it must not execute.
+   */
+  secretParameterNames: z.array(z.string()).nullable().default(null),
 });
 export type SimulationRunProcessEventView = z.infer<
   typeof simulationRunProcessEventViewSchema

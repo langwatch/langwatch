@@ -63,7 +63,10 @@ const batchSummarySchema = z.object({
     .nullable()
     .describe(
       "Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running.",
-    ),
+    )
+    // Machine-readable beside the sentence: a generated client marks the field
+    // deprecated from this, not from the prose.
+    .openapi({ deprecated: true }),
   isComplete: z
     .boolean()
     .describe("True when every run of the batch reached a terminal status."),

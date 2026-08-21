@@ -4,12 +4,8 @@ Feature: A batch of simulation runs reports when it is complete
   I want the batch to report a settled count and a completion flag
   So that a CI job knows when every run of the batch is finished
 
-  # The batch aggregate counted only IN_PROGRESS and PENDING as running, so a
-  # batch whose runs were still QUEUED reported zero running runs and carried a
-  # completion timestamp while the queue held the work. The aggregate now names
-  # every non-terminal status, and the complement of that same list gives the
-  # settled count. The list is written out in SQL on purpose: ClickHouse stores
-  # a raw FAILURE status that the terminal status enum does not carry.
+  # A run that waits in the queue is not finished, so a batch that holds one is
+  # not complete and carries no completion time.
 
   Scenario: A batch with queued runs is not complete
     Given a batch holds one finished run and one queued run

@@ -106,11 +106,16 @@ describe("Feature: a batch of simulation runs reports when it is complete", () =
     return repository;
   }
 
-  const get = (path: string, headers: Record<string, string> = {}) =>
-    app.request(path, { headers });
+  const get = ({
+    path,
+    headers = {},
+  }: {
+    path: string;
+    headers?: Record<string, string>;
+  }) => app.request(path, { headers });
 
   const getAuthenticated = (path: string) =>
-    get(path, { "X-Auth-Token": testApiKey });
+    get({ path, headers: { "X-Auth-Token": testApiKey } });
 
   describe("when the batch still holds a queued run", () => {
     /** @scenario "A batch summary is addressable by its batch run id" */
@@ -169,7 +174,7 @@ describe("Feature: a batch of simulation runs reports when it is complete", () =
     it("answers 401", async () => {
       withSummary(makeSummary());
 
-      const res = await get("/api/simulation-runs/batches/batch_1");
+      const res = await get({ path: "/api/simulation-runs/batches/batch_1" });
 
       expect(res.status).toBe(401);
     });

@@ -444,9 +444,10 @@ const auditLogTRPCErrors = t.middleware(
         projectId: (input as any)?.projectId,
         action: path,
         // Through the same redaction as the success path. This middleware
-        // records the calls the other one does not, so it must not be able to
-        // store in clear what the other one takes out.
-        args: redactAuditArgs(input, path),
+        // sits before the input parser, so `input` is unset here today; the
+        // call is what keeps a chain that changes from storing in clear what
+        // the other middleware takes out.
+        args: redactAuditArgs({ input, action: path }),
         error: result.error,
         req: ctx.req,
         // When an admin is impersonating, `session.user.id` reflects the
@@ -613,6 +614,44 @@ function redactValues(source: Record<string, unknown>): Record<string, string> {
   );
 }
 
+/** The object fields whose values this action must not store. */
+function redactedObjectFieldsFor(action?: string): readonly string[] {
+  if (!action) return CREDENTIAL_OBJECT_FIELDS;
+  return [
+    ...CREDENTIAL_OBJECT_FIELDS,
+    ...(REDACTED_VALUE_FIELDS_BY_ACTION[action] ?? []),
+  ];
+}
+
+/**
+ * The redacted form of one field, or undefined when the field holds nothing to
+ * redact.
+ *
+ * No schema produces an array here, but a redactor has to fail safe on a shape
+ * it did not expect rather than wave it through: the cost of guessing wrong is
+ * a secret in a durable table.
+ */
+function redactObjectField(value: unknown): unknown {
+  if (typeof value !== "object" || value === null) return undefined;
+  return Array.isArray(value)
+    ? value.map(() => "[redacted]")
+    : redactValues(value as Record<string, unknown>);
+}
+
+/**
+ * The redacted form of an `extraHeaders` list.
+ *
+ * A list of `{ key, value }` pairs rather than an object, so the header name
+ * survives and only what it carries is dropped.
+ */
+function redactHeaderValues(headers: readonly unknown[]): unknown[] {
+  return headers.map((header) =>
+    typeof header === "object" && header !== null && "value" in header
+      ? { ...header, value: "[redacted]" }
+      : header,
+  );
+}
+
 /**
  * Strips credential values out of what the audit trail persists.
  *
@@ -625,7 +664,13 @@ function redactValues(source: Record<string, unknown>): Record<string, string> {
  * `action` is the tRPC path. It selects the rules that only apply to one
  * mutation, such as a run's parameter values.
  */
-export function redactAuditArgs(input: unknown, action?: string): unknown {
+export function redactAuditArgs({
+  input,
+  action,
+}: {
+  input: unknown;
+  action?: string;
+}): unknown {
   if (typeof input !== "object" || input === null) return input;
 
   const record = input as Record<string, unknown>;
@@ -638,37 +683,13 @@ export function redactAuditArgs(input: unknown, action?: string): unknown {
     redacted[field] = value;
   };
 
-  const objectFields = [
-    ...CREDENTIAL_OBJECT_FIELDS,
-    ...(action ? (REDACTED_VALUE_FIELDS_BY_ACTION[action] ?? []) : []),
-  ];
-
-  for (const field of objectFields) {
-    const value = record[field];
-    if (typeof value !== "object" || value === null) continue;
-
-    // No schema produces an array here, but a redactor has to fail safe on a
-    // shape it did not expect rather than wave it through — the cost of
-    // guessing wrong is a secret in a durable table.
-    replace(
-      field,
-      Array.isArray(value)
-        ? value.map(() => "[redacted]")
-        : redactValues(value as Record<string, unknown>),
-    );
+  for (const field of redactedObjectFieldsFor(action)) {
+    const value = redactObjectField(record[field]);
+    if (value !== undefined) replace(field, value);
   }
 
-  // A list of `{ key, value }` pairs rather than an object, so the header
-  // name survives and only what it carries is dropped.
   if (Array.isArray(record.extraHeaders)) {
-    replace(
-      "extraHeaders",
-      record.extraHeaders.map((header) =>
-        typeof header === "object" && header !== null && "value" in header
-          ? { ...header, value: "[redacted]" }
-          : header,
-      ),
-    );
+    replace("extraHeaders", redactHeaderValues(record.extraHeaders));
   }
 
   return redacted ?? input;
@@ -689,7 +710,7 @@ const auditLogMutations = t.middleware(
       organizationId: (input as any)?.organizationId,
       projectId: (input as any)?.projectId,
       action: path,
-      args: redactAuditArgs(input, path),
+      args: redactAuditArgs({ input, action: path }),
       error: !result.ok ? result.error : undefined,
       req: ctx.req,
       targetKind: target.targetKind,

@@ -1323,7 +1323,13 @@ describe("SimulationClickHouseRepository (integration)", () => {
       return { setId, batchRunId };
     }
 
-    async function readBatch(setId: string, batchRunId: string) {
+    async function readBatch({
+      setId,
+      batchRunId,
+    }: {
+      setId: string;
+      batchRunId: string;
+    }) {
       const result = await repo.getBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId: setId,
@@ -1339,7 +1345,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
       it("counts the queued run as running and the finished one as settled", async () => {
         const { setId, batchRunId } = await seedBatch(["SUCCESS", "QUEUED"]);
 
-        const batch = await readBatch(setId, batchRunId);
+        const batch = await readBatch({ setId, batchRunId });
 
         expect(batch.totalCount).toBe(2);
         expect(batch.runningCount).toBe(1);
@@ -1350,7 +1356,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
       it("leaves allCompletedAt null while the queued run waits", async () => {
         const { setId, batchRunId } = await seedBatch(["SUCCESS", "QUEUED"]);
 
-        const batch = await readBatch(setId, batchRunId);
+        const batch = await readBatch({ setId, batchRunId });
 
         expect(batch.allCompletedAt).toBeNull();
       });
@@ -1361,7 +1367,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
       it("settles every run and carries a completion timestamp", async () => {
         const { setId, batchRunId } = await seedBatch(["SUCCESS", "FAILURE"]);
 
-        const batch = await readBatch(setId, batchRunId);
+        const batch = await readBatch({ setId, batchRunId });
 
         expect(batch.totalCount).toBe(2);
         expect(batch.runningCount).toBe(0);
