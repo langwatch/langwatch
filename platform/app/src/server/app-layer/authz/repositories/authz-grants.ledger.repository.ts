@@ -361,7 +361,17 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
       // revocation facts stand (fail-safe: the retry converges).
       const [remainingGrantHeads, remainingCompatRows] = await Promise.all([
         tx.grant.count({
-          where: { organizationId, principalType: "USER", principalId: userId },
+          where: {
+            organizationId,
+            principalType: "USER",
+            principalId: userId,
+            // A revoke MARKS its row now. Without this the check counts the
+            // rows the revocation just ended, so a departing member who held
+            // any grant at all fails their own offboarding and the membership
+            // deletes roll back — the postcondition inverted by the very
+            // change that was supposed to satisfy it.
+            revokedAt: null,
+          },
         }),
         tx.roleBinding.count({ where: { organizationId, userId } }),
       ]);

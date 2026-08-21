@@ -6,29 +6,120 @@
  * guard lives in the WHERE clause, so a stale write loses in the database
  * rather than in a read-modify-write race.
  *
- * The guard is `occurredAt <= :occurredAt` on every statement. Events are
- * delivered at least once, and a redelivered older event must not undo a
- * newer one: a re-applied `role_changed` from before a `revoke` matches no
- * row and writes nothing.
+ * The guard is on every statement, and its comparison differs by what the
+ * write states — which is the whole of how equal timestamps are made safe:
+ *
+ *   - A write that states the WHOLE row (`attached`, `defined`) must be
+ *     strictly newer: `occurredAt < EXCLUDED."occurredAt"`. Two writes can
+ *     share a millisecond — `attachBindings` stamps one `occurredAtMs` for a
+ *     whole batch — and on equality a full-row write re-states every column,
+ *     so admitting it would let a redelivered `attached` revert a same-
+ *     millisecond `role_changed` and restore `legacyRole`. That is the
+ *     escalation the projection's own comment describes. Refusing on equality
+ *     costs nothing: the only same-millisecond full-row write for one grant is
+ *     a redelivery of that same event, and re-applying it is a no-op anyway.
+ *
+ *   - A write that states ONE field (`role_changed`, `revoked`, and the role
+ *     equivalents) may tie: `occurredAt <= :occurredAt`. It touches only the
+ *     field it names, so applying it on equality cannot revert anything, and
+ *     refusing would drop a genuine same-millisecond change.
+ *
+ * Either way a redelivered OLDER event loses: a re-applied `role_changed`
+ * from before a `revoke` matches no row and writes nothing.
  *
  * The two upserts are raw SQL because the guard has to be part of the same
  * statement. Prisma's `upsert` takes no condition on its update branch, so
  * expressing it as read-then-write would reintroduce exactly the race this
  * design removes; `ON CONFLICT DO UPDATE ... WHERE` is atomic.
  */
+import {
+  grantFactToCompatBinding,
+  grantFactToCompatShareLink,
+  grantRowToFact,
+} from "@langwatch/authz-server";
+import { createLogger } from "@langwatch/observability";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import type {
   GrantProjectionWrite,
   GrantProjectionWriteStore,
 } from "~/server/event-sourcing/pipelines/authz-grants/projections/authzGrantsWrite.projection";
 
+const logger = createLogger("langwatch:authz:projection-compat");
+
 type GrantRow = Extract<GrantProjectionWrite, { kind: "grant.upsert" }>["row"];
 type RoleRow = Extract<GrantProjectionWrite, { kind: "role.upsert" }>["row"];
 
 type PrismaLike = Pick<
   PrismaClient,
-  "grant" | "role" | "$transaction" | "$executeRaw"
+  | "grant"
+  | "role"
+  | "roleBinding"
+  | "customRole"
+  | "shareLink"
+  | "$transaction"
+  | "$executeRaw"
 >;
+
+/** Exactly the columns `grantRowToFact` reads, so the re-read a compat write
+ *  needs cannot drift from the mapper it feeds. */
+const GRANT_FACT_COLUMNS = {
+  id: true,
+  organizationId: true,
+  principalType: true,
+  principalId: true,
+  roleKey: true,
+  legacyRole: true,
+  source: true,
+  scopeType: true,
+  scopeId: true,
+  token: true,
+  permission: true,
+  resourceKind: true,
+  projectId: true,
+  createdByUserId: true,
+  expiresAt: true,
+  maxViews: true,
+  occurredAt: true,
+} as const;
+
+/**
+ * A partial update that matched no row, said out loud.
+ *
+ * The four field-setting writes are `updateMany`, which writes nothing when
+ * the row is absent instead of failing. Ordinarily the row IS there, because
+ * a grant is its own aggregate and the group queue gives one aggregate FIFO
+ * delivery (`${tenantId}:${aggregateType}:${aggregateId}`) — an `attached`
+ * always lands before the `revoked` that follows it.
+ *
+ * The exception is a BACK-DATED append: a migration replaying an
+ * organization's history states `attached` with the grant's original
+ * `occurredAt`, and if it appends that after a live `revoked` for the same
+ * grant, the revoke arrives first, matches nothing, and the attach then
+ * inserts a live row that no revocation contradicts.
+ *
+ * There is no honest fix at this layer. A tombstone would need
+ * `principalType`, `scopeType` and `scopeId`, none of which a revocation
+ * event carries, and inventing them would put a fabricated scope into the
+ * table that DECIDES access — worse than the miss. The fix belongs to the
+ * migration: it must not state a back-dated `attached` for a grant that has
+ * already been revoked. This log is what makes a violation of that findable
+ * rather than silent.
+ */
+function reportMissedRow(write: GrantProjectionWrite, result: unknown): void {
+  if (write.kind === "grant.upsert" || write.kind === "role.upsert") return;
+  const count = (result as { count?: unknown } | null)?.count;
+  if (count !== 0) return;
+  logger.warn(
+    { write: write.kind, occurredAt: write.occurredAt },
+    "authz projection write matched no row; the grant it names is absent or newer",
+  );
+}
+
+/** Prisma's codes for "a unique or foreign key says no". */
+function isCompatConflict(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === "P2002" || code === "P2003";
+}
 
 export class PrismaAuthzGrantsWriteRepository
   implements GrantProjectionWriteStore
@@ -36,16 +127,165 @@ export class PrismaAuthzGrantsWriteRepository
   constructor(private readonly prisma: PrismaLike) {}
 
   async append(write: GrantProjectionWrite): Promise<void> {
-    await this.statementFor(write);
+    reportMissedRow(write, await this.statementFor(write));
+    await this.writeCompatHeads([write]);
   }
 
   async bulkAppend(writes: GrantProjectionWrite[]): Promise<void> {
     // Each write names one row and they are independent, so batching is only
     // about round trips. One transaction keeps a partial batch from leaving
     // the model half-written.
-    await this.prisma.$transaction(
+    const results = await this.prisma.$transaction(
       writes.map((write) => this.statementFor(write)),
     );
+    writes.forEach((write, index) => reportMissedRow(write, results[index]));
+    await this.writeCompatHeads(writes);
+  }
+
+  /**
+   * The legacy heads — `RoleBinding`, `ShareLink`, `CustomRole` — kept in step
+   * with the authoritative ones.
+   *
+   * ADR-110 left "whether the projection's compat writes survive at all" open.
+   * They survive, because rollback-to-legacy has to stay possible after an
+   * organization switches: the legacy resolver, the settings screens, the
+   * share tier and the revoke-by-filter path all still read these tables, and
+   * an organization whose grants exist only in `Grant` cannot be rolled back
+   * to a head that never saw them.
+   *
+   * Deliberately OUTSIDE the transaction above, and deliberately best-effort.
+   * `Grant`/`Role` are the authority and this is a view of them, so a compat
+   * row that cannot be written must not fail the authoritative write or park
+   * the aggregate's queue lane — a unique or foreign-key conflict here is
+   * warned and stepped over, exactly as the fold this replaced did. Anything
+   * else still raises.
+   *
+   * Every compat row shares its grant's id, so an upsert is idempotent and a
+   * delete can only ever remove a row the ledger itself authored.
+   */
+  private async writeCompatHeads(
+    writes: GrantProjectionWrite[],
+  ): Promise<void> {
+    for (const write of writes) {
+      try {
+        await this.writeCompatHead(write);
+      } catch (error) {
+        if (!isCompatConflict(error)) throw error;
+        logger.warn(
+          { write: write.kind, error },
+          "could not write a compat row; the authoritative head still holds the grant",
+        );
+      }
+    }
+  }
+
+  private async writeCompatHead(write: GrantProjectionWrite): Promise<void> {
+    switch (write.kind) {
+      case "grant.upsert":
+        return this.compatForGrant(write.row);
+      case "grant.setRole":
+        return this.compatForRoleChange(write.grantId);
+      case "grant.revoke":
+        return this.compatForRevoke(write.grantId);
+      case "role.upsert":
+        return this.compatForRole(write.row);
+      case "role.setPermissions":
+        await this.prisma.customRole.updateMany({
+          where: { id: write.roleId },
+          data: { permissions: write.permissions as Prisma.InputJsonValue },
+        });
+        return;
+      case "role.delete":
+        await this.prisma.customRole.deleteMany({
+          where: { id: write.roleId },
+        });
+        return;
+    }
+  }
+
+  /** A grant reaches whichever legacy head can express it — a binding, a
+   *  share link, or neither. The mappers decide; `null` means the legacy
+   *  tables never represented this shape and their silence is correct. */
+  private async compatForGrant(row: GrantRow): Promise<void> {
+    const organizationId = row.organizationId;
+    const grant = grantRowToFact(row);
+
+    const binding = grantFactToCompatBinding({ grant, organizationId });
+    if (binding) {
+      const { id, ...rest } = binding;
+      await this.prisma.roleBinding.upsert({
+        where: { organizationId, id },
+        create: binding,
+        update: rest,
+      });
+    }
+
+    const link = grantFactToCompatShareLink({ grant, organizationId });
+    if (link) {
+      const { id, ...rest } = link;
+      await this.prisma.shareLink.upsert({
+        where: { projectId: link.projectId, id },
+        create: link,
+        // `viewCount` is named in neither branch: the create leans on the
+        // column default and the update leaves the running total alone, so a
+        // re-applied attach cannot reset a link's accounting.
+        update: rest,
+      });
+    }
+  }
+
+  /**
+   * The compat row carries `(role, customRoleId)`, so a roleKey change has to
+   * be translated rather than copied. Re-reading the grant and going back
+   * through the mapper keeps that translation — including the `legacyRole`
+   * rule the reassignment clears — in exactly one place.
+   */
+  private async compatForRoleChange(grantId: string): Promise<void> {
+    const row = await this.prisma.grant.findUnique({
+      where: { id: grantId },
+      select: GRANT_FACT_COLUMNS,
+    });
+    if (!row) return;
+    const binding = grantFactToCompatBinding({
+      grant: grantRowToFact(row),
+      organizationId: row.organizationId,
+    });
+    if (!binding) return;
+    await this.prisma.roleBinding.updateMany({
+      where: { organizationId: row.organizationId, id: grantId },
+      data: { role: binding.role, customRoleId: binding.customRoleId },
+    });
+  }
+
+  /**
+   * The authoritative row is MARKED and the compat row is REMOVED. The legacy
+   * tables have nowhere to record "ended", so a surviving row would leave the
+   * legacy resolver answering yes to access that has already ended.
+   */
+  private async compatForRevoke(grantId: string): Promise<void> {
+    const row = await this.prisma.grant.findUnique({
+      where: { id: grantId },
+      select: { organizationId: true, projectId: true },
+    });
+    if (!row) return;
+    await this.prisma.roleBinding.deleteMany({
+      where: { organizationId: row.organizationId, id: grantId },
+    });
+    if (row.projectId) {
+      await this.prisma.shareLink.deleteMany({
+        where: { projectId: row.projectId, id: grantId },
+      });
+    }
+  }
+
+  private async compatForRole(row: RoleRow): Promise<void> {
+    const { id, organizationId, name, description, permissions, kind } = row;
+    const compat = { name, description, permissions, kind };
+    await this.prisma.customRole.upsert({
+      where: { organizationId, id },
+      create: { id, organizationId, ...compat },
+      update: compat,
+    });
   }
 
   private statementFor(
@@ -152,7 +392,7 @@ export class PrismaAuthzGrantsWriteRepository
         "maxViews"        = EXCLUDED."maxViews",
         "occurredAt"      = EXCLUDED."occurredAt",
         "updatedAt"       = NOW()
-      WHERE "Grant"."occurredAt" <= EXCLUDED."occurredAt"
+      WHERE "Grant"."occurredAt" < EXCLUDED."occurredAt"
     `;
   }
 
@@ -176,7 +416,7 @@ export class PrismaAuthzGrantsWriteRepository
         "kind"           = EXCLUDED."kind",
         "occurredAt"     = EXCLUDED."occurredAt",
         "updatedAt"      = NOW()
-      WHERE "Role"."occurredAt" <= EXCLUDED."occurredAt"
+      WHERE "Role"."occurredAt" < EXCLUDED."occurredAt"
     `;
   }
 }
