@@ -1,160 +1,86 @@
-Feature: AI Gateway — model disambiguation when a VK has multiple providers
+Feature: AI Gateway — which provider a model name reaches when a key has several
 
-  # All scenarios in this file describe gateway model-resolution
-  # behaviour (bare model name on multi-provider VK → 400, prefix
-  # resolution, ambiguity logging, Prometheus counters). Implemented in
-  # the Go gateway service (services/aigateway/adapters/modelresolver),
-  # out of scope for the TS parity check.
+  # All scenarios in this file describe gateway model-resolution behaviour.
+  # Implemented in the Go gateway service
+  # (services/aigateway/adapters/modelresolver + services/aigateway/app), so
+  # the scenarios bind to Go tests.
 
   As a developer calling the LangWatch AI Gateway with a multi-provider virtual key
-  I want a clear 400 error when my model name could match multiple providers
-  So that the gateway doesn't silently route my request to the wrong provider slot
+  I want a model name to reach one provider by a rule I can read
+  So that I never have to guess which provider served my request
 
-  # Lane A iter 65 smoke surfaced that a multi-provider VK with a bare model
-  # name (e.g. "gpt-5-mini") returns a spec-intended 400. The gateway does NOT
-  # guess; the caller must disambiguate via either (a) a provider-qualified
-  # prefix (`openai/gpt-5-mini`), or (b) a `config.model_aliases` entry on the
-  # VK that maps the bare name to a specific `provider_slot/model`.
+  # This file described a "model_ambiguous" 400 that was never built. The
+  # product went the other way: a name resolves through one ordered rule, the
+  # order is stated, and a name that matches more than one instance is
+  # disambiguated by a routing handle rather than by a refusal. The catalog and
+  # handle behaviour live in model-routing-catalog.feature and
+  # instance-routing-handle.feature; what stays here is the order itself and
+  # what a caller is told.
 
-  Background:
-    Given organization "acme" exists with project "acme-api"
-    And project "acme-api" has provider bindings:
-      | slot        | provider  | model_pattern     |
-      | primary     | openai    | gpt-*             |
-      | fallback-1  | anthropic | claude-*          |
-    And a virtual key "vk_multi" is created with both provider slots active
+  Rule: One ordered rule decides the provider
 
-  # ============================================================================
-  # Bare model name on a multi-provider VK
-  # ============================================================================
+    The resolver reads a model name in a fixed order, and the first step that
+    matches wins. Anything else would make the answer depend on which check
+    happened to run first.
 
-  @integration @v1 @unimplemented
-  Scenario: Bare gpt-5-mini on a multi-provider VK returns 400 with actionable envelope
-    When I POST to "/v1/chat/completions" using "vk_multi" with body:
-      """
-      {
-        "model": "gpt-5-mini",
-        "messages": [{"role": "user", "content": "hi"}]
-      }
-      """
-    Then the response status is 400
-    And the response body.type is "model_ambiguous"
-    And the response body.message matches "model .* matched multiple provider slots"
-    And the response body.hint contains "prefix the model with provider slot (e.g. `openai/gpt-5-mini`) or add a model_alias to the VK config"
-    And the `X-LangWatch-Gateway-Request-Id` header is present
-    # We don't leak the exact providers bound — enumerate-style error disclosure
-    # is a footgun. Keep the hint abstract so operators don't accidentally
-    # reveal per-tenant fleet structure.
+    @unit
+    Scenario: The resolution order is alias, then handle, then family, then catalog, then guess
+      Given a key whose providers declare models and hold routing handles
+      When a request names a model
+      Then the key's own alias is applied first
+      And a first segment naming a routing handle pins that provider instance
+      And a first segment naming a provider family selects that family
+      And the whole name is matched against the providers' declared models
+      And only then is the provider guessed from the model-name table
 
-  @integration @v1 @unimplemented
-  Scenario: Provider-qualified prefix resolves cleanly
-    When I POST to "/v1/chat/completions" using "vk_multi" with body:
-      """
-      {
-        "model": "openai/gpt-5-mini",
-        "messages": [{"role": "user", "content": "hi"}]
-      }
-      """
-    Then the response status is 200
-    And the dispatcher used provider slot "primary"
-    And the `langwatch.model_source` span attr is "prefix"
+    @unit
+    Scenario: An alias is applied before anything else is read
+      Given the key aliases "gpt-5-mini" to "openai/gpt-5-mini"
+      When a request names model "gpt-5-mini"
+      Then the alias decides the provider
+      And no catalog is consulted
 
-  @integration @v1 @unimplemented
-  Scenario: Provider-slot prefix also works (distinct from provider-name prefix)
-    Given the VK config includes `model_aliases: { "claude-fast": "fallback-1/claude-haiku-4-5" }`
-    When I POST with body `{"model": "claude-fast", ...}`
-    Then the response status is 200
-    And the dispatcher used provider slot "fallback-1"
-    And the model sent upstream is "claude-haiku-4-5"
-    And the `langwatch.model_source` span attr is "alias"
+  Rule: A name matching several instances follows the key's chain order
 
-  @integration @v1 @unimplemented
-  Scenario: Ambiguous model name becomes unambiguous after alias resolution
-    Given the VK config includes `model_aliases: { "gpt-5-mini": "primary/gpt-5-mini" }`
-    When I POST with body `{"model": "gpt-5-mini", ...}`
-    Then the response status is 200
-    # Alias lookup happens BEFORE ambiguity check. The VK operator has
-    # explicitly disambiguated this model name with the alias — no 400.
+    A provider family names a kind, not an instance, so "anthropic/..." on a
+    key with two Anthropic instances matches both. The gateway does not
+    refuse: it takes the key's own chain order, which is the routing policy
+    order when the key has one, then the global fallback priority, then the
+    creation date. Failover then walks the rest of the matches.
 
-  # ============================================================================
-  # Single-provider VK — no ambiguity, no prefix needed
-  # ============================================================================
+    @unit
+    Scenario: The first matching instance in chain order serves the request
+      Given two Anthropic providers bound to one key
+      When a request names model "anthropic/claude-sonnet-5"
+      Then the first of the two in chain order serves the request
+      And the second remains available for failover
 
-  @integration @v1 @unimplemented
-  Scenario: Single-provider VK accepts bare model name
-    Given a virtual key "vk_solo" with only "primary: openai" bound
-    When I POST to "/v1/chat/completions" using "vk_solo" with body `{"model": "gpt-5-mini", ...}`
-    Then the response status is 200
-    And the dispatcher used provider slot "primary"
-    And the `langwatch.model_source` span attr is "single_provider"
+    @unit
+    Scenario: A routing handle overrides the chain order
+      Given two Anthropic providers bound to one key, the second with handle "eu"
+      When a request names model "eu/claude-sonnet-5"
+      Then the second provider serves the request
 
-  # ============================================================================
-  # Unknown model — different failure class
-  # ============================================================================
+  Rule: A refusal names what this key can reach
 
-  @integration @v1 @unimplemented
-  Scenario: Known provider prefix but unknown model returns upstream 400, not ambiguity
-    When I POST with body `{"model": "openai/gpt-does-not-exist", ...}`
-    Then the response status is 400
-    And the response body.type is "upstream_4xx"
-    And the response body.type is NOT "model_ambiguous"
-    # The provider is clear (openai/), the MODEL is invalid. Ambiguity check
-    # passed; upstream error pass-through takes over.
+    An earlier note here said the gateway must not enumerate the providers a
+    key holds, to avoid disclosing tenant structure. That reasoning does not
+    apply: the caller already holds the virtual key, and GET /v1/models on the
+    same key already lists its models. Withholding the list only left the
+    caller with a refusal they could not act on.
 
-  @integration @v1
-  Scenario: Unknown provider prefix on VK returns 400 with clear envelope
-    When I POST with body `{"model": "bedrock/claude-3-haiku", ...}` on "vk_multi" (no bedrock slot)
-    Then the response status is 400
-    # The provider-binding failure is exposed through the nested error envelope.
-    And the response body.error.code is "model_provider_not_bound"
-    And the response body.error.hint contains "bind a \"bedrock\" provider slot to this virtual key"
-    # Without this hard-fail the request would dispatch with a mismatched
-    # credential; Bifrost's model-prefix provider override then reads that
-    # credential through the wrong provider's key-config shape, surfacing
-    # opaque errors ("deployments not set", "no keys found that support
-    # model", raw HTML error pages) instead of the real problem.
+    @unit
+    Scenario: A family prefix with no credential names the reachable families
+      Given a key holding OpenAI and Anthropic credentials and no Bedrock credential
+      When a request names model "bedrock/claude-3-haiku"
+      Then the request is refused with code "model_provider_not_bound"
+      And the refusal names the provider families the key can reach
+      And it names the routing handles the key can reach
 
-  # ============================================================================
-  # Observability — operators should be able to measure ambiguity incidence
-  # ============================================================================
-
-  @unit @v1 @unimplemented
-  Scenario: Ambiguity rejection emits a structured log at WARN
-    When the gateway rejects a request with `model_ambiguous`
-    Then a structured log is written at WARN with `reason=model_ambiguous`
-    And the log includes `virtual_key_id`, `model_requested`, `candidate_slot_count`, `gateway_request_id`
-    And the log does NOT include the provider slot names (avoid fleet disclosure)
-
-  @unit @v1 @unimplemented
-  Scenario: Prometheus counter tracks the ambiguity tail
-    Given `gateway_http_requests_total{status="400", reason="model_ambiguous"}` is a declared metric
-    When a bare model name hits a multi-provider VK
-    Then the counter increments by 1
-    # Ops can rate(...[5m]) to decide if this is a widespread client-config gap
-    # worth tooling (e.g. warn-only header for a migration period).
-
-  # ============================================================================
-  # v1.1 — convenience auto-resolution with explicit opt-in
-  # ============================================================================
-
-  @out_of_scope @v1.1
-  Scenario: VK config.auto_resolve_model_prefix defaults disambiguation heuristic
-    Given the VK has `config.auto_resolve_model_prefix: true`
-    And the organization defines a policy: "gpt-*" prefers "primary" slot
-    When a bare `gpt-5-mini` hits the VK
-    Then the gateway applies the policy automatically
-    And the response sets `X-LangWatch-Model-Auto-Resolved: primary`
-    # Adds an operator-controlled "be less strict" mode. Default stays strict
-    # (current v1 behaviour) because silent routing is the classic footgun.
-
-  @out_of_scope @v1.1
-  Scenario: Warn-only disambiguation for migration periods
-    Given the VK has `config.disambiguation_mode: warn`
-    When a bare model hits the ambiguous path
-    Then the gateway chooses a slot (by first-bound-priority) and succeeds
-    And the response sets `X-LangWatch-Model-Warn: ambiguous: chose primary of [primary, fallback-1]`
-    # Gives migration teams a soft-landing window to update client configs
-    # without 400-ing every request. Strict mode is the default.
+    @unit
+    Scenario: The refusal states the caller can fix it
+      When a request names a provider family the key does not hold
+      Then the refusal is attributed to the caller
 
   # ============================================================================
   # models_allowed and aliases

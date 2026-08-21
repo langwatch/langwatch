@@ -489,7 +489,7 @@ func (r *BifrostRouter) discoverModels(ctx context.Context, creds []domain.Crede
 				continue
 			}
 			seen[id] = true
-			out.models = append(out.models, domain.Model{ID: id, Name: id, ProviderID: creds[i].ProviderID})
+			out.models = append(out.models, domain.Model{ID: id, Name: id, ProviderID: creds[i].ProviderID, Handle: creds[i].Handle})
 		}
 	}
 	seenGaps := make(map[domain.ModelDiscoveryGap]bool)

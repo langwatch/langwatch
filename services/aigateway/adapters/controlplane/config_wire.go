@@ -87,6 +87,10 @@ func (w *configWire) keyExpiry() (time.Time, bool, error) {
 type excludedProviderWire struct {
 	ID   string `json:"id"`
 	Type string `json:"type"`
+	// Handle is the row's routing handle, carried so a request naming the
+	// handle of a dropped provider is told which setting dropped it instead of
+	// being told the handle means nothing.
+	Handle string `json:"handle,omitempty"`
 }
 
 type providerSlotWire struct {
@@ -103,6 +107,15 @@ type providerSlotWire struct {
 	// etc.). Emitted by the control-plane materialiser as a top-level
 	// sibling of credentials — see config.materialiser.ts:buildProviderSlot.
 	DeploymentMap map[string]string `json:"deployment_map,omitempty"`
+	// Handle is the operator-chosen routing handle of this ModelProvider row
+	// (ModelProvider.routingHandle), unique inside the organization. Absent
+	// when the operator set none.
+	Handle string `json:"handle,omitempty"`
+	// Models is what this provider declares it serves: the customer's declared
+	// custom models and embeddings models, and for the hosted families the
+	// model catalog the platform ships. Used for ROUTING a bare model name to
+	// the provider that owns it; authorization stays with models_allowed.
+	Models []string `json:"models,omitempty"`
 }
 
 // fallbackWire is the fallback block of the config payload. Only max_attempts
@@ -329,12 +342,17 @@ func failsClosed(g guardrailWire) bool {
 // provider a model name it has never heard of. A bare target carries no
 // provider and resolves against the credential chain like any other
 // unqualified model.
+// The prefix has to name a provider family the gateway knows. A target whose
+// first segment is a routing handle, or a model id that simply contains a
+// slash, is left whole for the resolver, which holds the key's config and can
+// tell the two apart. Splitting those here produced an alias pointing at a
+// provider nobody holds, so no request for it could ever be served.
 func buildModelAlias(target string) domain.ModelAlias {
 	provider, model, found := strings.Cut(target, "/")
-	if !found || provider == "" || model == "" {
+	if !found || provider == "" || model == "" || !domain.KnownProviderFamily(provider) {
 		return domain.ModelAlias{Model: target}
 	}
-	return domain.ModelAlias{ProviderID: domain.NormalizeProviderID(provider), Model: model}
+	return domain.ModelAlias{ProviderID: domain.NormalizeProviderID(strings.ToLower(provider)), Model: model}
 }
 
 func buildPolicyRules(pr policyRulesWire) []domain.PolicyRule {
@@ -445,6 +463,7 @@ func toExcludedProviders(ws []excludedProviderWire) []domain.ExcludedModelProvid
 		out = append(out, domain.ExcludedModelProvider{
 			ID:         w.ID,
 			ProviderID: domain.NormalizeProviderID(w.Type),
+			Handle:     strings.ToLower(w.Handle),
 		})
 	}
 	return out
@@ -454,6 +473,8 @@ func providerSlotToCredential(p providerSlotWire) domain.Credential {
 	cred := domain.Credential{
 		ID:         p.ID,
 		ProviderID: domain.NormalizeProviderID(p.Type),
+		Handle:     strings.ToLower(p.Handle),
+		Models:     p.Models,
 	}
 
 	getString := func(key string) string {

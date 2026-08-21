@@ -887,7 +887,14 @@ func modelsHandler(deps RouterDeps) http.HandlerFunc {
 // instance) are attributed to the gateway rather than to an empty string:
 // `owned_by` is a required string in the OpenAI Model object, and a
 // blank one renders as an unlabelled row in model pickers.
+// A model served by an instance carrying a routing handle is attributed to
+// that handle instead of to the family: the handle is the prefix that reaches
+// that exact instance, so it is both the truer owner and the spelling the
+// caller needs when the key holds two instances of one family.
 func modelOwnedBy(m domain.Model) string {
+	if m.Handle != "" {
+		return m.Handle
+	}
 	if m.ProviderID == "" {
 		return "langwatch"
 	}
@@ -1470,6 +1477,7 @@ func registerErrorStatusesOnce() {
 	herr.RegisterStatus(domain.ErrPolicyViolation, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrModelNotAllowed, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrProviderNotBound, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrModelNotRecognized, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrProviderError, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrProviderTimeout, http.StatusGatewayTimeout)
 	herr.RegisterStatus(domain.ErrBadRequest, http.StatusBadRequest)

@@ -89,68 +89,99 @@ func (r *Resolver) Resolve(ctx context.Context, req *domain.Request, config doma
 		})
 	}
 
-	target := rawModel
-	source := domain.ModelSourceImplicit
-
 	// 1. Check aliases. The allowlist judges the model the alias resolves to,
 	// not the name the caller typed: an alias is a convenience for naming a
 	// model, never a way to reach one this key may not use. Returning here
 	// without the check is what let an alias route around models_allowed.
+	//
+	// The alias target is read with the SAME vocabulary as a request, so an
+	// alias pointing at a routing handle or at a model id containing a slash
+	// resolves the way its author meant. Before that, any alias target whose
+	// first segment was not a provider family became a request for a provider
+	// nobody holds, which no key could ever serve.
 	if alias, ok := config.ModelAliases[rawModel]; ok {
-		if !config.AllowsResolvedModel(alias.ProviderID, alias.Model) {
+		// A target the wire decode already split into a family and a model is
+		// a routing instruction the key's owner wrote, and it stands. A target
+		// it left whole is read here, where the key's handles are known.
+		resolved := domain.ResolvedModel{ModelID: alias.Model, ProviderID: alias.ProviderID}
+		if alias.ProviderID == "" {
+			resolved = readSpelling(config, alias.Model)
+		}
+		if !config.AllowsResolvedModel(resolved.ProviderID, resolved.ModelID) {
 			return nil, herr.New(ctx, domain.ErrModelNotAllowed, herr.M{
-				"message": "model not allowed: " + alias.Model + ` (named "` + rawModel + `" by this key)`,
+				"message": "model not allowed: " + resolved.ModelID + ` (named "` + rawModel + `" by this key)`,
 				"fault":   "customer",
 			})
 		}
-		target = alias.Model
-		source = domain.ModelSourceAlias
-		return &domain.ResolvedModel{
-			ModelID:    target,
-			ProviderID: alias.ProviderID,
-			Source:     source,
-		}, nil
+		resolved.Source = domain.ModelSourceAlias
+		return &resolved, nil
 	}
 
-	// 2. Check explicit provider/model format
-	if strings.Contains(target, "/") {
-		source = domain.ModelSourceExplicit
-		parts := strings.SplitN(target, "/", 2)
-		providerID := domain.NormalizeProviderID(parts[0])
-		modelID := parts[1]
+	// 2. Read the spelling: a routing handle pins one instance, a known
+	// provider family selects a kind, and anything else is a whole model id
+	// that credential selection matches against the providers' own catalogs.
+	resolved := readSpelling(config, rawModel)
 
-		if !config.AllowsResolvedModel(providerID, modelID) {
-			// Echo the spelling the caller sent. Naming the bare model here
-			// reads as a different refusal than the one they asked for, since
-			// the same model under another provider is a separate allowance.
-			return nil, herr.New(ctx, domain.ErrModelNotAllowed, herr.M{
-				"message": "model not allowed: " + target,
-				"fault":   "customer",
-			})
-		}
-
-		return &domain.ResolvedModel{
-			ModelID:    modelID,
-			ProviderID: providerID,
-			Source:     source,
-		}, nil
+	// Echo the spelling the caller sent when a qualifier was read. Naming the
+	// bare model reads as a different refusal than the one they asked for,
+	// since the same model under another provider is a separate allowance.
+	refused := resolved.ModelID
+	if resolved.Source == domain.ModelSourceExplicit {
+		refused = rawModel
 	}
-
-	// 3. Implicit: infer provider from first credential
-	if !modelAllowed(config, target) {
+	if !config.AllowsResolvedModel(resolved.ProviderID, resolved.ModelID) {
 		return nil, herr.New(ctx, domain.ErrModelNotAllowed, herr.M{
-			"message": "model not allowed: " + target,
+			"message": "model not allowed: " + refused,
 			"fault":   "customer",
 		})
 	}
 
-	return &domain.ResolvedModel{
-		ModelID:    target,
-		ProviderID: "", // will be filled by credential selection
-		Source:     source,
-	}, nil
+	return &resolved, nil
 }
 
-func modelAllowed(config domain.BundleConfig, model string) bool {
-	return config.AllowsModel(model)
+// readSpelling turns a model string into the provider it names and the model
+// id that reaches the provider.
+//
+// The first segment is a qualifier only when it names something real: a
+// routing handle on one of the key's provider rows, or a provider family the
+// gateway knows. Everything else is a model id in full, slashes and all,
+// because self-hosted servers and proxies serve models whose own ids contain
+// one ("stealth/ox-alpha", "meta-llama/Llama-3-70B").
+//
+// A handle belonging to a row the key's routing policy or provider access
+// dropped is recognized too, and returns that row's id. Credential selection
+// then finds no dispatchable credential for it and reports which setting
+// removed the provider, which is a far better answer than treating the
+// operator's own handle as an unknown prefix.
+func readSpelling(config domain.BundleConfig, spelling string) domain.ResolvedModel {
+	qualifier, remainder, found := strings.Cut(spelling, "/")
+	if !found || qualifier == "" || remainder == "" {
+		return domain.ResolvedModel{ModelID: spelling, Source: domain.ModelSourceImplicit}
+	}
+
+	if cred, ok := config.CredentialByHandle(qualifier); ok {
+		return domain.ResolvedModel{
+			ModelID:      remainder,
+			ProviderID:   cred.ProviderID,
+			CredentialID: cred.ID,
+			Source:       domain.ModelSourceExplicit,
+		}
+	}
+	if excluded, ok := config.ExcludedByHandle(qualifier); ok {
+		return domain.ResolvedModel{
+			ModelID:      remainder,
+			ProviderID:   excluded.ProviderID,
+			CredentialID: excluded.ID,
+			Source:       domain.ModelSourceExplicit,
+		}
+	}
+	if domain.KnownProviderFamily(qualifier) {
+		return domain.ResolvedModel{
+			ModelID:    remainder,
+			ProviderID: domain.NormalizeProviderID(strings.ToLower(qualifier)),
+			Source:     domain.ModelSourceExplicit,
+		}
+	}
+
+	return domain.ResolvedModel{ModelID: spelling, Source: domain.ModelSourceImplicit}
 }

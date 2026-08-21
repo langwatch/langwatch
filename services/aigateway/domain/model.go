@@ -5,6 +5,12 @@ type Model struct {
 	ID         string
 	Name       string
 	ProviderID ProviderID
+	// Handle is the routing handle of the provider instance that served this
+	// model, when the operator set one. Reported as the model's owner in
+	// GET /v1/models so a key holding two instances of one family shows which
+	// instance a model came from, and shows the caller the prefix that reaches
+	// it. Empty when the instance has no handle.
+	Handle string
 }
 
 // ModelDiscoveryGapReason says why a provider in the credential chain
@@ -38,6 +44,10 @@ type ResolvedModel struct {
 	ModelID    string      // the canonical model ID sent to the provider
 	ProviderID ProviderID  // which provider serves this model
 	Source     ModelSource // how the model was resolved
+	// CredentialID pins ONE ModelProvider row when the caller named a routing
+	// handle. Empty means the request named a family or a bare model, and the
+	// chain order picks the instance as it always has.
+	CredentialID string
 }
 
 // ModelSource tracks how a model was resolved (for observability).

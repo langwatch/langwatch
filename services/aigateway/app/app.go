@@ -211,6 +211,7 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 			ID:         listed,
 			Name:       listed,
 			ProviderID: target.ProviderID,
+			Handle:     target.Handle,
 		})
 	}
 

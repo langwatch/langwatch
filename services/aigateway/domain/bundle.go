@@ -2,6 +2,7 @@ package domain
 
 import (
 	"slices"
+	"sort"
 	"strings"
 	"time"
 )
@@ -150,6 +151,84 @@ type ExcludedModelProvider struct {
 	// ProviderID is the provider kind (openai, anthropic, ...), the axis a
 	// resolved request is matched on.
 	ProviderID ProviderID
+	// Handle is the row's routing handle, carried so a request that names the
+	// handle of a dropped row is told WHY it was dropped rather than being
+	// told the handle means nothing. Empty when the row has no handle.
+	Handle string
+}
+
+// CredentialByHandle finds the dispatchable credential a routing handle names.
+// The handle is compared lowercased, the form the control plane stores.
+func (c BundleConfig) CredentialByHandle(handle string) (Credential, bool) {
+	if handle == "" {
+		return Credential{}, false
+	}
+	for _, cred := range c.Credentials {
+		if cred.Handle != "" && strings.EqualFold(cred.Handle, handle) {
+			return cred, true
+		}
+	}
+	return Credential{}, false
+}
+
+// ExcludedByHandle finds a NON-dispatchable provider row a routing handle
+// names. A handle the key's routing policy or provider access dropped is still
+// a real name the operator chose, so recognizing it here is what lets the
+// refusal say which setting removed the provider instead of reporting the
+// handle as an unknown prefix.
+func (c BundleConfig) ExcludedByHandle(handle string) (ExcludedModelProvider, bool) {
+	if handle == "" {
+		return ExcludedModelProvider{}, false
+	}
+	for _, group := range [][]ExcludedModelProvider{c.RoutingExcludedProviders, c.AccessExcludedProviders} {
+		for _, row := range group {
+			if row.Handle != "" && strings.EqualFold(row.Handle, handle) {
+				return row, true
+			}
+		}
+	}
+	return ExcludedModelProvider{}, false
+}
+
+// RoutingHandles lists every handle this key can address, dispatchable first,
+// sorted inside each group so an error message reads the same twice.
+func (c BundleConfig) RoutingHandles() []string {
+	seen := make(map[string]bool)
+	var out []string
+	add := func(handle string) {
+		if handle == "" || seen[handle] {
+			return
+		}
+		seen[handle] = true
+		out = append(out, handle)
+	}
+	for _, cred := range c.Credentials {
+		add(cred.Handle)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// BlockedRowReason reports why one specific ModelProvider row is absent from
+// the dispatch chain. Distinct from BlockedProviderReason, which answers for a
+// provider KIND: a routing handle names one row, and a key holding two
+// Anthropic rows must not borrow the surviving row's answer for the dropped
+// one.
+func (c BundleConfig) BlockedRowReason(id string) ProviderBlockReason {
+	if id == "" {
+		return ProviderBlockNone
+	}
+	for _, e := range c.RoutingExcludedProviders {
+		if e.ID == id {
+			return ProviderBlockRouting
+		}
+	}
+	for _, e := range c.AccessExcludedProviders {
+		if e.ID == id {
+			return ProviderBlockAccess
+		}
+	}
+	return ProviderBlockNone
 }
 
 // ProviderBlockReason names why a provider a request resolved to is not in the
@@ -303,9 +382,19 @@ func ModelSpellings(providerID ProviderID, modelID string) []string {
 // One function so the model listing and the dispatcher cannot disagree about
 // which provider a name means, which is how a listing came to advertise names
 // that dispatch refused.
+//
+// The qualifier has to name a family the gateway knows. Without that check
+// every model id containing a slash read as a provider prefix, so an
+// allowlist entry naming a real self-hosted model was attributed to a
+// provider that does not exist. This function knows no key, so it cannot
+// recognize a routing handle; callers holding a BundleConfig resolve handles
+// through CredentialByHandle first.
 func SplitModelSpelling(spelling string) (ProviderID, string, bool) {
 	qualifier, model, ok := strings.Cut(spelling, "/")
 	if !ok || qualifier == "" || model == "" {
+		return "", spelling, false
+	}
+	if !KnownProviderFamily(qualifier) {
 		return "", spelling, false
 	}
 	return NormalizeProviderID(qualifier), model, true
