@@ -7,8 +7,9 @@ import { UserService } from "~/server/users/user.service";
 
 /**
  * How the membership itself changes when a person is offboarded from one
- * organization. SCIM `active: false` disables the row; SCIM DELETE removes it
- * along with the role bindings that hang off it.
+ * organization. SCIM `active: false` disables the row; SCIM DELETE removes it.
+ * Neither touches the person's grants — those are the grants ledger's, and the
+ * caller revokes them through it before the membership change.
  */
 export type MembershipChange = "disable" | "remove";
 
@@ -69,6 +70,11 @@ const activeMembershipsOf = async ({
  * Reactivation restores the membership and never restores links: an admin
  * relinks, because silently re-attaching money to a person we un-attached it
  * from is the guess this ADR exists to refuse.
+ *
+ * What this transaction owns is membership state and closing link rows, and
+ * nothing else. Grant revocation belongs to the grants ledger (ADR-092
+ * decision 18) and is eventually consistent by design — the caller appends
+ * the offboard fact before calling in here.
  */
 export class MembershipLifecycleService {
   private readonly userService: UserService;
@@ -108,7 +114,12 @@ export class MembershipLifecycleService {
         await tx.organizationUser.deleteMany({
           where: { userId, organizationId },
         });
-        await tx.roleBinding.deleteMany({ where: { userId, organizationId } });
+        // Grants are NOT removed here. The grants ledger is their only writer
+        // (ADR-092 decision 18), and the caller offboards through it before
+        // calling this — `offboardMember`'s fold sweeps every grant the
+        // principal holds, including ones this transaction could not see.
+        // Deleting them here as well would race that sweep and put a second
+        // writer on the projection.
       } else {
         // Scoped to still-open memberships so a repeat disable keeps the
         // original timestamp instead of sliding it forward.

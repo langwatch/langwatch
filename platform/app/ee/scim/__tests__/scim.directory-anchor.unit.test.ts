@@ -17,6 +17,21 @@ vi.mock("~/server/app-layer/app", () => ({
   tryGetApp: () => ({ redis: null }),
 }));
 
+// Provisioning reconciles the membership grant through the grants ledger
+// (ADR-092 decision 18), so the writer is the seam this test stubs out — the
+// anchor is what is under test, not the grant.
+const ledger = vi.hoisted(() => ({
+  attachBindings: vi.fn(),
+  revokeBindings: vi.fn(),
+  revokeBindingsWhere: vi.fn(),
+  offboardMember: vi.fn(),
+  defineRole: vi.fn(),
+  deleteRole: vi.fn(),
+}));
+vi.mock("~/server/app-layer/authz/ledger", () => ({
+  grantsLedgerWriter: () => ledger,
+}));
+
 // vi.mock is hoisted above every top-level const, so the spy the logger mock
 // closes over has to be hoisted with it.
 const warn = vi.hoisted(() => vi.fn());
@@ -63,6 +78,8 @@ const createMockPrisma = () => {
     },
     organizationUser,
     roleBinding: {
+      // The reconciler reads the grants this push is authoritative over.
+      findMany: vi.fn().mockResolvedValue([]),
       create: vi.fn().mockResolvedValue({}),
       deleteMany: vi.fn().mockResolvedValue({}),
     },
@@ -92,9 +109,11 @@ describe("the SCIM directory anchor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     prisma = createMockPrisma();
-    service = ScimService.create(
-      prisma as unknown as Parameters<typeof ScimService.create>[0],
-    );
+    service = ScimService.create({
+      prisma: prisma as unknown as Parameters<
+        typeof ScimService.create
+      >[0]["prisma"],
+    });
   });
 
   describe("when a directory queries for one user", () => {
