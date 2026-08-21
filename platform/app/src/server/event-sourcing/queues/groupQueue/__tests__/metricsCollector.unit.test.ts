@@ -81,8 +81,13 @@ function makeRedis(
     stagingDepths?: Record<string, number>;
     /** groupIds whose pipelined HLEN comes back as an error reply. */
     stagingDepthErrors?: string[];
-    /** Members per ZSCAN page, so a rotation can be driven deterministically. */
-    zscanPageSize?: number;
+    /**
+     * The pending-groups index. Defaults to the ready members; set it to
+     * cover groups the ready set does not contain.
+     */
+    pendingGroups?: string[];
+    /** Members per scan page, so a rotation can be driven deterministically. */
+    scanPageSize?: number;
     /**
      * Held by the FIRST `zcard` only, which is the first read `collect` makes.
      * Later calls resolve at once, so a test can hold one cycle open and see
@@ -111,23 +116,32 @@ function makeRedis(
       }),
     ),
     /**
-     * Paged ZSCAN over the ready zset. Cursors are opaque in real Redis; an
-     * index models the one guarantee the sweep relies on, that a member
-     * present for a whole rotation is returned at least once, and lets a test
-     * choose where the page boundary falls. The integration test alongside
-     * this file runs the same sweep against real Redis so the model is not
-     * the only evidence.
+     * Paged SSCAN over the pending-groups index. Cursors are opaque in real
+     * Redis; an index models the one guarantee the sweep relies on, that a
+     * member present for a whole rotation is returned at least once, and lets
+     * a test choose where the page boundary falls.
+     *
+     * Defaults to the ready members when a case does not say otherwise, since
+     * most cases do not care which lifecycle state a group is in. The cases
+     * that do care pass `pendingGroups` with groups that are in no ready set
+     * at all, which is what a parked, blocked or claimed group looks like.
      */
-    zscan: vi.fn(async (...args: unknown[]) => {
-      const entries = opts.readyZset ?? [];
+    sscan: vi.fn(async (...args: unknown[]) => {
+      const readyMembers = (opts.readyZset ?? []).map((e) => e.member);
+      // Answering per key is what makes "swept the wrong index" visible: a
+      // group that is parked, blocked or claimed is in pending-groups and in
+      // no ready set at all.
+      const members = String(args[0]).endsWith("pending-groups")
+        ? (opts.pendingGroups ?? readyMembers)
+        : readyMembers;
       const cursor = Number(args[1]);
       const countIdx = args.indexOf("COUNT");
       const pageSize =
-        opts.zscanPageSize ?? (countIdx >= 0 ? Number(args[countIdx + 1]) : 10);
-      const page = entries.slice(cursor, cursor + pageSize);
+        opts.scanPageSize ?? (countIdx >= 0 ? Number(args[countIdx + 1]) : 10);
+      const page = members.slice(cursor, cursor + pageSize);
       const nextCursor =
-        cursor + pageSize >= entries.length ? "0" : String(cursor + pageSize);
-      return [nextCursor, page.flatMap((e) => [e.member, String(e.score)])];
+        cursor + pageSize >= members.length ? "0" : String(cursor + pageSize);
+      return [nextCursor, page];
     }),
     pipeline: vi.fn(() => {
       const cmds: Array<{ op: "zrange" | "hlen"; key: string }> = [];
@@ -158,7 +172,7 @@ function makeRedis(
     }),
   } as unknown as (IORedis | Cluster) & {
     zrangebyscore: ReturnType<typeof vi.fn>;
-    zscan: ReturnType<typeof vi.fn>;
+    sscan: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -533,7 +547,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
         const redis = makeRedis({
           readyZset: ready("g1", "g2", "g3", "deep"),
           stagingDepths: { g1: 1, g2: 2, g3: 3, deep: 250_000 },
-          zscanPageSize: 2,
+          scanPageSize: 2,
         });
         const collector = makeCollector({ redis });
 
@@ -587,6 +601,30 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
     });
   });
 
+  describe("given a deep group that is parked, blocked or in flight", () => {
+    describe("when the rotation runs", () => {
+      it("still reports it, because those groups are in no ready set", async () => {
+        // A group is in exactly one of ready, parked, blocked or active, and
+        // staging keeps filling the `:data` hash of a group in any of them.
+        // Sweeping ready would report zero here, which is healthy-looking
+        // precisely while something is stopping the group's drainer.
+        const redis = makeRedis({
+          readyZset: ready("draining-normally"),
+          pendingGroups: ["draining-normally", "parked-and-growing"],
+          stagingDepths: {
+            "draining-normally": 4,
+            "parked-and-growing": STAGING_DEPTH_REPORT_FLOOR * 25,
+          },
+        });
+
+        await runCollect(redis);
+
+        expect(await readMax()).toBe(STAGING_DEPTH_REPORT_FLOOR * 25);
+        expect(await readOverThreshold()).toBe(1);
+      });
+    });
+  });
+
   describe("given a cycle that is still running when the next tick fires", () => {
     describe("when the second cycle starts", () => {
       it("skips it, rather than two cycles sharing one rotation", async () => {
@@ -607,12 +645,12 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
         // The first cycle is held before it reaches the sweep. If the second
         // got past the guard it would reach the sweep on its own, read the
         // same cursor, and advance it a second time.
-        expect(redis.zscan).not.toHaveBeenCalled();
+        expect(redis.sscan).not.toHaveBeenCalled();
 
         release();
         await inFlight;
 
-        expect(redis.zscan).toHaveBeenCalledTimes(1);
+        expect(redis.sscan).toHaveBeenCalledTimes(1);
       });
     });
   });
@@ -630,7 +668,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
             other: 1,
             another: 2,
           },
-          zscanPageSize: 2,
+          scanPageSize: 2,
         });
         const collector = makeCollector({ redis });
 

@@ -16,7 +16,11 @@ import {
   STAGING_DEPTH_REPORT_FLOOR,
 } from "./metrics";
 import { isPlausibleReadyScore, MIN_PLAUSIBLE_EPOCH_MS } from "./readyScore";
-import type { DispatchResult, GroupStagingScripts } from "./scripts";
+import {
+  type DispatchResult,
+  type GroupStagingScripts,
+  pendingGroupsKey,
+} from "./scripts";
 
 /**
  * How many of the soonest-future-scored ("nearest deferred") ready groups the
@@ -155,7 +159,7 @@ export class GroupQueueMetricsCollector {
       );
 
       await this.collectOldestAges({ readyKey, keyPrefix });
-      await this.sweepStagingDepth({ readyKey, keyPrefix });
+      await this.sweepStagingDepth({ keyPrefix });
     } catch (error) {
       this.params.logger.debug(
         {
@@ -308,14 +312,31 @@ export class GroupQueueMetricsCollector {
    * Reads one page of groups' staging depth, continuing where the last cycle
    * stopped.
    *
+   * Over `pending-groups`, not over `ready`. A group is in exactly one of
+   * ready, parked, blocked or active, and staging keeps adding fields to the
+   * `:data` hash of a group in any of them: `parkGroup` ZREMs from ready and
+   * `addToReadyOrParked` then routes new work into the parked set, blocking
+   * removes from ready by design ("blocked => not in ready"), and a claimed
+   * group's member is ZREMed at claim time. Sweeping ready would therefore
+   * report zero for a hot group precisely while something is stopping its
+   * drainer, which is the state accumulation is most likely in, and would
+   * recreate the detection gap this exists to close.
+   *
+   * Reading the lifecycle indexes one after another does not fix it either,
+   * for the reason PENDING_INDEX_HELPER_LUA already gives: a group moving
+   * between them mid-read appears in none of the reads. `pending-groups` is
+   * keyed on "has jobs", which no lifecycle transition changes, and is written
+   * in the same atomic script as the job. Its membership is a deliberate
+   * superset, and over-inclusion costs nothing here: a drained group answers
+   * HLEN 0 and is dropped by the same filter that drops a missing key.
+   *
    * A rotation rather than a sample, because a sample cannot find this. The
    * failure being watched for is ONE group out of many holding an enormous
    * staging hash, and the previous version of the age gauge above records what
-   * happens when you look for a per-group outlier in the first N members of
-   * ready: the N most dispatch-eligible groups are not where the outlier is,
-   * and the gauge under-reported for as long as that code existed. Reading a
-   * fixed page per cycle and keeping the cursor covers every group instead of
-   * the same head repeatedly, at the same cost per cycle.
+   * happens when you look for a per-group outlier in the first N members of an
+   * index: the gauge under-reported for as long as that code existed. Reading
+   * a fixed page per cycle and keeping the cursor covers every group instead
+   * of the same head repeatedly, at the same cost per cycle.
    *
    * What that costs is timeliness, and it is worth being exact about it. The
    * gauges report the deepest group seen since the current rotation began, so
@@ -329,27 +350,22 @@ export class GroupQueueMetricsCollector {
    * stops being reported within one rotation rather than pinning the gauge at
    * its high-water mark for ever.
    *
-   * ZSCAN's guarantee is the one this relies on: every member present for the
+   * SSCAN's guarantee is the one this relies on: every member present for the
    * whole rotation is returned at least once. Members added or removed part
    * way through may or may not be, which is why a fresh accumulation is
    * bounded by a rotation and not by a cycle.
    */
   private async sweepStagingDepth({
-    readyKey,
     keyPrefix,
   }: {
-    readyKey: string;
     keyPrefix: string;
   }): Promise<void> {
-    const [nextCursor, flat] = await this.params.redisConnection.zscan(
-      readyKey,
+    const [nextCursor, groupIds] = await this.params.redisConnection.sscan(
+      pendingGroupsKey(keyPrefix),
       this.stagingCursor,
       "COUNT",
       STAGING_DEPTH_GROUPS_PER_CYCLE,
     );
-
-    // ZSCAN returns a flat [member, score, member, score, ...] reply.
-    const groupIds = flat.filter((_, index) => index % 2 === 0);
 
     for (const { groupId, depth } of await this.readStagingDepths({
       groupIds,
