@@ -2809,6 +2809,10 @@ OpenAI-shape `list` object:
 2. **`models_allowed` entries** shown verbatim, including globs like `claude-haiku-*`. Clients that support pattern matching (most) pass these through; simpler pickers render them for the human to edit.
 3. **Provider-type shortcuts**: one entry per provider bound on the VK (`openai/*`, `anthropic/*`, `bedrock/*`, `azure/*`, `vertex/*`, `gemini/*`). Tools like Cursor that let the user type the exact model id can pick a concrete model under the shortcut (e.g. `openai/gpt-5-mini`) without waiting for the alias table to be updated. See [Model Aliases → Aliases always win over explicit form](/ai-gateway/model-aliases#aliases-always-win-over-explicit-form--if-both-are-defined) for how the `provider/model` form interacts with aliases.
 
+### Providers with a routing handle
+
+A discovered model from a provider that has a [routing handle](/ai-gateway/model-naming#routing-handles) is listed under the handle-qualified id, for example `europe/claude-sonnet-5`. That is the name that reaches that exact provider, so two providers of the same type keep separate entries instead of collapsing into one. `owned_by` stays the provider type in both entries, because it is what a picker groups by.
+
 <Note>The list is deliberately permissive, it covers everything the VK could plausibly route, not a strict enumeration. `models_allowed` globs and provider shortcuts may not expand to real upstream models until you send a real request. The gateway's per-request model resolution remains the source of truth for "will this actually route?"</Note>
 
 ## Permissions
@@ -8967,7 +8971,7 @@ The `model` field of a request accepts four kinds of name. The gateway reads the
     `"model": "openai/gpt-5-mini"`. Goes to a provider of that type.
   </Card>
   <Card title="Routing handle" icon="key">
-    `"model": "europe/claude-sonnet-5"`. Goes to one exact provider you named.
+    `"model": "europe/claude-sonnet-5"`. Goes to that exact provider, when the key can reach it.
   </Card>
   <Card title="Alias" icon="arrow-right-arrow-left">
     `"model": "coding-small"`. A per-key redirect. See [Model Aliases](/ai-gateway/model-aliases).
@@ -8979,20 +8983,22 @@ The `model` field of a request accepts four kinds of name. The gateway reads the
 For every request the gateway reads the `model` string once, in this order:
 
 1. **Alias.** If the virtual key defines an alias with that exact name, the alias decides. Nothing after this step runs.
-2. **Routing handle.** If the text before the first `/` is a routing handle on one of the organization's providers, the request goes to that provider, and the rest of the string is the model name.
-3. **Provider type.** If the text before the first `/` is a provider type (`openai`, `anthropic`, `custom`, and the rest of the list below), the request goes to a provider of that type. Everything after the first `/` is the model name, including any further `/`.
-4. **Declared models.** Otherwise the whole string is a model name. It is matched against the models each bound provider declares: the custom models you configured on the provider, its deployment names, and, for the hosted providers, the model catalog LangWatch ships.
+2. **Routing handle.** If the text before the first `/` is a routing handle on one of the organization's providers, the request goes to that provider, and the rest of the string is the model name. The key still has to reach that provider; if it does not, the request is refused with `model_provider_not_bound`.
+3. **Provider type.** If the text before the first `/` is a provider type (`openai`, `anthropic`, `custom`, and the rest of the list under [Provider types](#provider-types)), the request goes to a provider of that type. Everything after the first `/` is the model name, including any further `/`.
+4. **Declared models.** Otherwise the whole string is a model name. It is matched against the models each bound provider declares: the custom models you configured on the provider, the model ids of its deployment mapping, and, for the hosted providers, the model catalog LangWatch ships.
 5. **Model name pattern.** If no provider declares the model, a short built-in table maps a name to the vendor that originated it: `gpt-…` to OpenAI, `claude-…` to Anthropic, `gemini-…` to Google. This is the safety net for a model newer than the shipped catalog.
 6. **Providers that declared nothing.** A provider that has not listed the models it serves cannot be ruled out by a model missing from its list, so those providers stay candidates. A key with only one provider always sends the request to it.
 
 If none of that places the model, the request is refused with `model_not_recognized`, and the message lists the prefixes the key accepts.
 
+The examples below read the order above from the top, so each one assumes no earlier step matched. A name that another provider declares, or a first segment that is also a routing handle, is decided by whichever step comes first.
+
 | Request `model` | Where it goes |
 |---|---|
-| `gpt-5-mini` | The bound OpenAI provider |
+| `gpt-5-mini` | The bound provider that declares `gpt-5-mini`, otherwise the bound OpenAI provider |
 | `openai/gpt-5-mini` | A bound OpenAI provider, model `gpt-5-mini` |
-| `europe/claude-sonnet-5` | The provider whose routing handle is `europe` |
-| `stealth/ox-alpha` | The provider that declares the model `stealth/ox-alpha` |
+| `europe/claude-sonnet-5` | The reachable provider whose routing handle is `europe` |
+| `stealth/ox-alpha` | The provider that declares the model `stealth/ox-alpha`, when `stealth` is not a routing handle |
 | `custom/stealth/ox-alpha` | A bound custom provider, model `stealth/ox-alpha` |
 | `coding-small` | Wherever the key's alias points |
 
@@ -9012,11 +9018,11 @@ One case still needs the prefix: a model whose first segment happens to spell a 
 
 The alternative spellings that SDKs emit are accepted too: `azure_openai`, `aws_bedrock`, `vertex_ai`, `google_vertex`, `google_gemini`.
 
-A provider type names a KIND of provider, not one of them. If a key has two Anthropic providers, `anthropic/claude-sonnet-5` matches both, and the first one in the key's order serves the request. Use a routing handle to choose.
+A provider type names a KIND of provider, not one of them. If a key has two Anthropic providers, `anthropic/claude-sonnet-5` matches both, and the first one in the key's order serves the request, as set out under [Which provider answers first](#which-provider-answers-first). Use a routing handle to choose.
 
 ## Routing handles
 
-A routing handle is a name you give to one model provider. Set it on the provider in **Settings → Model Providers**. It is unique inside your organization, so `europe/claude-sonnet-5` always reaches the same provider whichever key sends it.
+A routing handle is a name you give to one model provider. Set it on the provider in **Settings → Model Providers**. It is unique inside your organization, so `europe/claude-sonnet-5` names the same provider whichever key sends it. A key that cannot reach that provider is refused with `model_provider_not_bound` rather than served by another one.
 
 Use one when you run more than one provider of the same type and you want to choose between them in the request, for example a European and a United States Anthropic account.
 
@@ -9027,6 +9033,8 @@ Rules:
 - Renaming a handle is a breaking change for anyone using it: requests naming the old handle stop reaching that provider immediately.
 
 The virtual key drawer shows, for each provider the key can reach, the names that reach it and which provider answers a bare provider type.
+
+`GET /v1/models` lists a provider that has a handle under the handle-qualified name, so `europe/claude-sonnet-5` appears rather than `claude-sonnet-5`. That is the name that reaches that exact provider, and it is what keeps two providers of the same type apart in the list. The `owned_by` field stays the provider type, so a model picker still groups by vendor.
 
 ## Which provider answers first
 

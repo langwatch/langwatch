@@ -193,7 +193,27 @@ func (choice credentialChoice) pinnedInstance(ctx context.Context) ([]domain.Cre
 			return []domain.Credential{c}, nil
 		}
 	}
+	// The refusal names the HANDLE, not the family. Only one instance is out
+	// of reach here, and the family often is not: a surface trim can drop the
+	// handled row while another row of the same family survives, and naming
+	// the family then contradicts the list of prefixes the same message
+	// offers. The handle is also the thing the caller actually wrote.
+	if handle := choice.pinnedHandle(); handle != "" {
+		return nil, instanceNotReachable(ctx, handle, choice.options())
+	}
 	return nil, choice.notReachable(ctx)
+}
+
+// pinnedHandle is the routing handle of the row the resolver pinned, read off
+// the key's whole chain rather than the trimmed one, because the trim is what
+// removed the row in the first place. Empty when the chain no longer holds it.
+func (choice credentialChoice) pinnedHandle() string {
+	for _, c := range choice.reachable {
+		if c.ID == choice.resolved.CredentialID {
+			return c.Handle
+		}
+	}
+	return ""
 }
 
 // notReachable refuses a provider the caller named that this key cannot reach,
@@ -414,6 +434,24 @@ func providerNotReachable(ctx context.Context, kind domain.ProviderID, options r
 		"fault": "customer",
 		// The list as data, so a client can compose its own copy from it
 		// instead of re-displaying our sentence. Bounded the same way.
+		"options": options.names,
+	})
+}
+
+// instanceNotReachable refuses a routing handle whose provider row this
+// request cannot reach, naming the handle rather than its family. The family
+// may well be reachable through another row, so saying "anthropic is not
+// reachable" while listing "anthropic" as an accepted prefix reads as two
+// contradictory sentences in one message.
+func instanceNotReachable(ctx context.Context, handle string, options reachable) error {
+	return herr.New(ctx, domain.ErrProviderNotBound, herr.M{
+		"message": fmt.Sprintf(
+			"The provider with routing handle %q is not reachable from this request. This key reaches %s. Ask the key's owner to grant the provider, or send the request to one of those.",
+			handle, options.rendered,
+		),
+		"hint":    fmt.Sprintf("prefix the model with one of %s instead of %q", options.rendered, handle),
+		"fault":   "customer",
+		"handle":  handle,
 		"options": options.names,
 	})
 }

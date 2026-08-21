@@ -291,3 +291,36 @@ func TestListModels_LiteralAllowlistReportsNoGaps(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, gaps, "no discovery ran, so no gap applies")
 }
+
+// A handled instance is listed under the handle-qualified spelling, because
+// that is the only name that reaches THAT instance when the key holds two of
+// one family: the bare id reaches whichever the chain order puts first. The
+// listing and the dispatcher have to agree about which provider a name means.
+func TestListModels_QualifiesAHandledInstanceByItsHandle(t *testing.T) {
+	application := New(
+		WithLogger(zap.NewNop()),
+		WithProviders(&mockProvider{
+			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
+				return []domain.Model{
+					{ID: "claude-sonnet-5", ProviderID: domain.ProviderAnthropic},
+					{ID: "claude-sonnet-5", ProviderID: domain.ProviderAnthropic, Handle: "eu"},
+				}, nil, nil
+			},
+		}),
+	)
+
+	models, _, err := application.ListModels(context.Background(), &domain.Bundle{
+		Credentials: []domain.Credential{
+			{ID: "cred-1", ProviderID: domain.ProviderAnthropic},
+			{ID: "cred-2", ProviderID: domain.ProviderAnthropic, Handle: "eu"},
+		},
+	})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"claude-sonnet-5", "eu/claude-sonnet-5"}, modelIDs(models))
+
+	// owned_by is the vendor a client groups its picker by, so both entries
+	// stay attributed to the family rather than to the handle.
+	for _, m := range models {
+		assert.Equal(t, domain.ProviderAnthropic, m.ProviderID, "model %q must keep its family", m.ID)
+	}
+}

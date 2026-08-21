@@ -389,6 +389,11 @@ func ModelSpellings(providerID ProviderID, modelID string) []string {
 // provider that does not exist. This function knows no key, so it cannot
 // recognize a routing handle; callers holding a BundleConfig resolve handles
 // through CredentialByHandle first.
+//
+// The qualifier is lowercased before it becomes a ProviderID. KnownProviderFamily
+// accepts any casing, while NormalizeProviderID matches its aliases literally, so
+// passing the raw segment through turned "OpenAI/gpt-5-mini" into the provider id
+// "OpenAI", which matches no credential.
 func SplitModelSpelling(spelling string) (ProviderID, string, bool) {
 	qualifier, model, ok := strings.Cut(spelling, "/")
 	if !ok || qualifier == "" || model == "" {
@@ -397,7 +402,7 @@ func SplitModelSpelling(spelling string) (ProviderID, string, bool) {
 	if !KnownProviderFamily(qualifier) {
 		return "", spelling, false
 	}
-	return NormalizeProviderID(qualifier), model, true
+	return NormalizeProviderID(strings.ToLower(qualifier)), model, true
 }
 
 // AllowsResolvedModel reports whether a model the resolver settled on

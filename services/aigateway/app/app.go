@@ -282,8 +282,10 @@ func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, add func
 	}
 	for _, m := range discovered {
 		// A discovered model is its own target: the catalog reports the id
-		// the provider serves it under, which is the id a client sends.
-		add(m.ID, m)
+		// the provider serves it under. What a client sends is that id
+		// qualified by the instance's routing handle when it has one, so
+		// the listed name reaches the instance that reported the model.
+		add(m.ListingSpelling(), m)
 	}
 	return gaps, nil
 }

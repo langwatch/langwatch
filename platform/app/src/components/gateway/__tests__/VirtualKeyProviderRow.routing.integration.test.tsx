@@ -50,7 +50,7 @@ const second: OrgModelProvider = {
   routingHandle: "europe",
 };
 
-function renderSection(providers: OrgModelProvider[]) {
+function renderSection({ providers }: { providers: OrgModelProvider[] }) {
   render(
     <Wrapper>
       <VirtualKeyProviderAccessSection
@@ -75,7 +75,7 @@ describe("VirtualKeyProviderRow routing", () => {
   describe("given two providers of the same type on one key", () => {
     describe("when one of them carries a routing handle", () => {
       it("shows the handle as a way to reach that provider", () => {
-        renderSection([first, second]);
+        renderSection({ providers: [first, second] });
 
         expect(
           screen.getByTestId("vk-provider-mp-second-handle-spelling"),
@@ -86,7 +86,7 @@ describe("VirtualKeyProviderRow routing", () => {
       });
 
       it("shows the provider type on every row of that type", () => {
-        renderSection([first, second]);
+        renderSection({ providers: [first, second] });
 
         for (const id of ["mp-first", "mp-second"]) {
           expect(
@@ -96,7 +96,7 @@ describe("VirtualKeyProviderRow routing", () => {
       });
 
       it("marks only the first provider of the type as the one a bare type reaches", () => {
-        renderSection([first, second]);
+        renderSection({ providers: [first, second] });
 
         expect(
           screen.getByTestId("vk-provider-mp-first-first-for-type"),
@@ -110,7 +110,7 @@ describe("VirtualKeyProviderRow routing", () => {
 
   describe("given a provider with no routing handle", () => {
     it("shows only the provider type", () => {
-      renderSection([first]);
+      renderSection({ providers: [first] });
 
       expect(
         screen.getByTestId("vk-provider-mp-first-type-spelling"),

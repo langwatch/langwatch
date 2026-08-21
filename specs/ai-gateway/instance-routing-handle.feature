@@ -107,6 +107,22 @@ Feature: AI Gateway — a routing handle names one provider instance
       When a request names model "eu/claude-sonnet-5"
       Then the request is refused
       And the refusal names the provider families the key can reach
+      And it names the routing handles the key can reach
+
+  Rule: A refusal about one instance does not deny its family
+
+    A key's provider access or routing policy can drop the handled row while
+    another row of the same family survives. Saying the family is unreachable
+    then contradicts the same message's list of prefixes the key accepts, and
+    sends the caller to fix the wrong thing.
+
+    @unit
+    Scenario: A handle the request cannot reach is refused by its own name
+      Given a key reaching one Anthropic provider, and a second one with handle "eu" it does not reach
+      When a request names model "eu/claude-sonnet-5"
+      Then the request is refused
+      And the refusal names the handle "eu" rather than the provider family
+      And it still names "anthropic" among the prefixes the key accepts
 
   Rule: Renaming a handle stops the old spelling
 

@@ -34,6 +34,14 @@ Feature: AI Gateway — which provider a model name reaches when a key has sever
       And only then is the provider guessed from the model-name table
 
     @unit
+    Scenario: A bare model the guess cannot place falls back before it is refused
+      Given a key whose providers declare models the request does not name
+      When a request names a bare model the guess table does not place
+      Then the providers that declared no models stay candidates
+      And a key holding one credential forwards the model to it whatever it declared
+      And only a key holding several declaring providers is refused
+
+    @unit
     Scenario: An alias is applied before anything else is read
       Given the key aliases "gpt-5-mini" to "openai/gpt-5-mini"
       When a request names model "gpt-5-mini"

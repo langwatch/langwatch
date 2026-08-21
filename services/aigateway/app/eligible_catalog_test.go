@@ -236,6 +236,7 @@ func TestAHandleWithNoDispatchableRowIsRefused(t *testing.T) {
 
 	cfg := domain.BundleConfig{Credentials: []domain.Credential{
 		{ID: "anthropic_1", ProviderID: domain.ProviderAnthropic},
+		{ID: "openai_1", ProviderID: domain.ProviderOpenAI, Handle: "main"},
 	}}
 
 	_, err := pick(t, cfg, &domain.ResolvedModel{
@@ -250,6 +251,11 @@ func TestAHandleWithNoDispatchableRowIsRefused(t *testing.T) {
 	text := errMessage(err)
 	if !strings.Contains(text, "anthropic") {
 		t.Errorf("the refusal must name the reachable families: %s", text)
+	}
+	// A caller who named a handle that reaches nothing cannot pick an
+	// available instance unless the refusal names the handles that do.
+	if !strings.Contains(text, `"main"`) {
+		t.Errorf("the refusal must name the reachable routing handles: %s", text)
 	}
 }
 
@@ -363,4 +369,94 @@ func TestADroppedRowDoesNotBorrowASurvivingRowsAnswer(t *testing.T) {
 	if got, err := pick(t, cfg, family); err != nil || len(got) != 1 || got[0].ID != "anthropic_us" {
 		t.Fatalf("the family prefix must reach the surviving row: %v %v", ids(got), err)
 	}
+}
+
+// A surface trim can drop the handled row while another row of the same family
+// survives it. Naming the family then contradicts the same message's list of
+// prefixes the key accepts, so the refusal names the handle the caller wrote.
+//
+// @scenario "A handle the request cannot reach is refused by its own name"
+func TestATrimmedHandleNamesTheHandleNotTheFamily(t *testing.T) {
+	t.Parallel()
+
+	whole := []domain.Credential{
+		{ID: "anthropic_1", ProviderID: domain.ProviderAnthropic},
+		{ID: "anthropic_eu", ProviderID: domain.ProviderAnthropic, Handle: "eu"},
+	}
+	cfg := domain.BundleConfig{Credentials: whole}
+
+	// The surface kept the unhandled Anthropic row and dropped the handled one.
+	_, err := eligibleCredentials(context.Background(), credentialChoice{
+		creds:     whole[:1],
+		reachable: whole,
+		cfg:       cfg,
+		resolved: &domain.ResolvedModel{
+			ModelID:      "claude-sonnet-5",
+			ProviderID:   domain.ProviderAnthropic,
+			CredentialID: "anthropic_eu",
+			Source:       domain.ModelSourceExplicit,
+		},
+	})
+	if !herr.IsCode(err, domain.ErrProviderNotBound) {
+		t.Fatalf("got %v, want model_provider_not_bound", err)
+	}
+	text := errMessage(err)
+	if !strings.Contains(text, `"eu"`) {
+		t.Errorf("the refusal must name the handle: %s", text)
+	}
+	if strings.Contains(text, `The "anthropic" provider is not reachable`) {
+		t.Errorf("the refusal must not deny a family it goes on to offer: %s", text)
+	}
+	if !strings.Contains(text, `"anthropic"`) {
+		t.Errorf("the family is still reachable and must stay on offer: %s", text)
+	}
+}
+
+// The steps after the guess table, in order. A provider that listed its models
+// has already answered for a model it does not list; a provider that listed
+// nothing has not, so silence keeps it a candidate. One door is not a choice
+// between vendors, so a lone credential takes the model whatever it declared.
+// Only a key holding several declaring providers is left with nothing to pick.
+//
+// @scenario "A bare model the guess cannot place falls back before it is refused"
+func TestTheFallbackStepsAfterTheGuessTable(t *testing.T) {
+	t.Parallel()
+
+	t.Run("a provider that declared nothing stays a candidate", func(t *testing.T) {
+		cfg := domain.BundleConfig{Credentials: []domain.Credential{
+			{ID: "xai_1", ProviderID: domain.ProviderID("xai"), Models: []string{"grok-old"}},
+			{ID: "custom_1", ProviderID: domain.ProviderCustom},
+		}}
+		creds, err := pick(t, cfg, bare("some-private-build"))
+		if err != nil {
+			t.Fatalf("got %v, want the silent provider", err)
+		}
+		if got := ids(creds); len(got) != 1 || got[0] != "custom_1" {
+			t.Errorf("got %v, want only the provider that declared nothing", got)
+		}
+	})
+
+	t.Run("a lone credential takes the model whatever it declared", func(t *testing.T) {
+		cfg := domain.BundleConfig{Credentials: []domain.Credential{
+			{ID: "xai_1", ProviderID: domain.ProviderID("xai"), Models: []string{"grok-old"}},
+		}}
+		creds, err := pick(t, cfg, bare("grok-brand-new"))
+		if err != nil {
+			t.Fatalf("got %v, want the only door", err)
+		}
+		if got := ids(creds); len(got) != 1 || got[0] != "xai_1" {
+			t.Errorf("got %v, want the lone credential", got)
+		}
+	})
+
+	t.Run("several declaring providers leave nothing to pick", func(t *testing.T) {
+		cfg := domain.BundleConfig{Credentials: []domain.Credential{
+			{ID: "xai_1", ProviderID: domain.ProviderID("xai"), Models: []string{"grok-old"}},
+			{ID: "deepseek_1", ProviderID: domain.ProviderID("deepseek"), Models: []string{"deepseek-chat-old"}},
+		}}
+		_, err := pick(t, cfg, bare("some-private-build"))
+		if !herr.IsCode(err, domain.ErrModelNotRecognized) {
+			t.Fatalf("got %v, want model_not_recognized", err)
+		}
+	})
 }

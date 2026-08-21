@@ -125,7 +125,7 @@ const missingModelDescriptions = {
 const reachableSentence = (error: HandledErrorShape): string => {
   const options = strList(error, "options");
   if (options.length === 0) return "";
-  return ` This key can reach ${options.join(", ")}.`;
+  return ` This key can reach ${listLabels(options)}.`;
 };
 
 /** Reads a `meta` string and compares it, treating anything unexpected as no match. */

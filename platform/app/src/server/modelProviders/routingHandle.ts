@@ -25,8 +25,7 @@ export const ROUTING_HANDLE_MAX_LENGTH = 32;
 const ROUTING_HANDLE_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
 
 /** Spelled out for the customer, since the pattern itself is not copy. */
-export const ROUTING_HANDLE_RULE =
-  "A routing handle starts with a letter or a number, then uses only letters, numbers, hyphens and underscores, up to 32 characters.";
+export const ROUTING_HANDLE_RULE = `A routing handle starts with a letter or a number, then uses only letters, numbers, hyphens and underscores, up to ${ROUTING_HANDLE_MAX_LENGTH} characters.`;
 
 /**
  * Names a handle may never take.

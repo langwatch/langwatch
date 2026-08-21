@@ -35,7 +35,7 @@ describe.skipIf(!hasCredentialsSecret)(
     let otherProjectId: string;
     let adminUserId: string;
 
-    async function seedTenant(label: string) {
+    async function seedTenant({ label }: { label: string }) {
       const organization = await prisma.organization.create({
         data: { name: `Handle Org ${label}`, slug: `--test-${label}` },
       });
@@ -60,12 +60,12 @@ describe.skipIf(!hasCredentialsSecret)(
     }
 
     beforeAll(async () => {
-      const main = await seedTenant(ns);
+      const main = await seedTenant({ label: ns });
       organizationId = main.organization.id;
       teamId = main.team.id;
       projectId = main.project.id;
 
-      const other = await seedTenant(`${ns}-b`);
+      const other = await seedTenant({ label: `${ns}-b` });
       otherOrganizationId = other.organization.id;
       otherTeamId = other.team.id;
       otherProjectId = other.project.id;
@@ -149,7 +149,7 @@ describe.skipIf(!hasCredentialsSecret)(
       );
     }
 
-    async function setHandle(id: string, handle: string | null) {
+    async function setHandle({ id, handle }: { id: string; handle: string | null }) {
       return await ModelProviderService.create(prisma).updateModelProvider(
         {
           id,
@@ -162,7 +162,7 @@ describe.skipIf(!hasCredentialsSecret)(
       );
     }
 
-    describe("given an administrator sets a handle", () => {
+    describe("when an administrator sets a handle", () => {
       /** @scenario "A handle is stored lowercased" */
       it("stores it lowercased", async () => {
         const created = await createProvider({
@@ -223,7 +223,7 @@ describe.skipIf(!hasCredentialsSecret)(
           suffix: `${ns}-release`,
         });
 
-        await setHandle(holder.id, "");
+        await setHandle({ id: holder.id, handle: "" });
 
         const cleared = await prisma.modelProvider.findUnique({
           where: { id: holder.id },
@@ -257,7 +257,7 @@ describe.skipIf(!hasCredentialsSecret)(
           where: { organizationId, kind: "MODEL_PROVIDER_UPDATED" },
         });
 
-        await setHandle(provider.id, "after");
+        await setHandle({ id: provider.id, handle: "after" });
 
         const stored = await prisma.modelProvider.findUnique({
           where: { id: provider.id },

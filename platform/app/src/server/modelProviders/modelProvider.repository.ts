@@ -69,9 +69,11 @@ function byProviderInProject({
  * Omitting keeps the stored handle; an explicit null clears it and releases
  * the name for another provider in the organization.
  */
-function routingHandleWrite(routingHandle: string | null | undefined): {
-  routingHandle?: string | null;
-} {
+function routingHandleWrite({
+  routingHandle,
+}: {
+  routingHandle: string | null | undefined;
+}): { routingHandle?: string | null } {
   return routingHandle === undefined ? {} : { routingHandle };
 }
 
@@ -298,7 +300,7 @@ export class ModelProviderRepository {
           | Prisma.InputJsonValue
           | undefined,
         extraHeaders: data.extraHeaders ?? [],
-        ...routingHandleWrite(data.routingHandle),
+        ...routingHandleWrite({ routingHandle: data.routingHandle }),
         ...(data.rateLimitRpm !== undefined && {
           rateLimitRpm: data.rateLimitRpm,
         }),

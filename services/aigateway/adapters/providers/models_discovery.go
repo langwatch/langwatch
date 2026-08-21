@@ -314,13 +314,16 @@ func (c *modelsDiscoveryCache) evictLocked(now time.Time) {
 // serving a catalog fetched with the old one; it is hashed with the rest
 // into an opaque key that is only ever compared, never logged. The
 // deployment map is included because its keys are listed as models, so an
-// edit must not serve the previous map's catalog for a full TTL.
+// edit must not serve the previous map's catalog for a full TTL. The routing
+// handle is included for the same reason: it rides on every model this
+// credential contributes, so a rename must not keep serving the old spelling.
 func modelsDiscoveryCacheKey(creds []domain.Credential) string {
 	sum := sha256.New()
 	for _, cred := range creds {
 		for _, field := range []string{
 			cred.ID,
 			string(cred.ProviderID),
+			cred.Handle,
 			credBaseURL(cred),
 			cred.APIKey,
 		} {
@@ -482,13 +485,18 @@ func (r *BifrostRouter) discoverModels(ctx context.Context, creds []domain.Crede
 	wg.Wait()
 
 	var out discoveredCatalog
+	// Deduped per instance, not per model id. Two credentials of one family
+	// serve the same ids, and collapsing them on the id alone dropped the
+	// second instance's catalog entirely, which is exactly the instance a
+	// routing handle exists to address.
 	seen := make(map[string]bool)
 	for i, ids := range perCred {
 		for _, id := range ids {
-			if id == "" || seen[id] {
+			key := creds[i].Handle + "\x1f" + id
+			if id == "" || seen[key] {
 				continue
 			}
-			seen[id] = true
+			seen[key] = true
 			out.models = append(out.models, domain.Model{ID: id, Name: id, ProviderID: creds[i].ProviderID, Handle: creds[i].Handle})
 		}
 	}

@@ -65,7 +65,7 @@ type ModelProviderWrite = {
     ReturnType<ModelProviderService["findExistingProvider"]>
   >;
   createScopes: ScopeInput[] | undefined;
-  handleProvided: boolean;
+  isHandleProvided: boolean;
   normalizedHandle: string | null;
   input: UpdateModelProviderInput;
   validatedKeys: Record<string, unknown> | null;
@@ -644,9 +644,9 @@ export class ModelProviderService {
     // The handle is checked before any database work: a name that is not a
     // handle, or one that already means a provider family, is refused whatever
     // else the save carries.
-    const handleProvided = routingHandle !== undefined;
+    const isHandleProvided = routingHandle !== undefined;
     const normalizedHandle = normalizeRoutingHandle(routingHandle);
-    if (handleProvided) {
+    if (isHandleProvided) {
       const problem = routingHandleProblem(normalizedHandle);
       if (problem) {
         throw new ModelProviderRoutingHandleInvalidError({
@@ -752,7 +752,7 @@ export class ModelProviderService {
       this.writeModelProvider({
         existingProvider,
         createScopes,
-        handleProvided,
+        isHandleProvided,
         normalizedHandle,
         input,
         validatedKeys,
@@ -796,7 +796,7 @@ export class ModelProviderService {
     existingProvider: NonNullable<ModelProviderWrite["existingProvider"]>,
     tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0],
   ) {
-    const { input, handleProvided, normalizedHandle, scopes } = write;
+    const { input, isHandleProvided, normalizedHandle, scopes } = write;
     const result = await this.updateExisting(
       existingProvider,
       {
@@ -807,7 +807,7 @@ export class ModelProviderService {
         customModels: input.customModels ?? [],
         customEmbeddingsModels: input.customEmbeddingsModels ?? [],
         extraHeaders: input.extraHeaders ?? [],
-        ...(handleProvided && { routingHandle: normalizedHandle }),
+        ...(isHandleProvided && { routingHandle: normalizedHandle }),
         advanced: advancedFields(input),
       },
       write.validatedKeys,
@@ -837,7 +837,7 @@ export class ModelProviderService {
     write: ModelProviderWrite,
     tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0],
   ) {
-    const { input, handleProvided, normalizedHandle } = write;
+    const { input, isHandleProvided, normalizedHandle } = write;
     const createScopes = write.createScopes!;
     const result = await this.createNew(
       {
@@ -848,7 +848,7 @@ export class ModelProviderService {
         customModels: input.customModels ?? undefined,
         customEmbeddingsModels: input.customEmbeddingsModels ?? undefined,
         extraHeaders: input.extraHeaders ?? [],
-        ...(handleProvided && { routingHandle: normalizedHandle }),
+        ...(isHandleProvided && { routingHandle: normalizedHandle }),
         advanced: advancedFields(input),
       },
       write.validatedKeys,

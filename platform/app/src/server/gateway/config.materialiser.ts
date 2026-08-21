@@ -798,7 +798,7 @@ function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
     ...(baseURL ? { base_url: baseURL } : {}),
     ...(region ? { region } : {}),
     ...(deploymentMap ? { deployment_map: deploymentMap } : {}),
-    ...routingWire(mp),
+    ...routingWire({ mp }),
     config: buildProviderConfig(mp),
   };
 }
@@ -809,9 +809,11 @@ function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
  * empty when there is nothing to say, which is what the gateway reads as "this
  * provider said nothing" instead of "this provider serves nothing".
  */
-function routingWire(
-  mp: ModelProvider,
-): Pick<ProviderSlot, "handle" | "models"> {
+function routingWire({
+  mp,
+}: {
+  mp: ModelProvider;
+}): Pick<ProviderSlot, "handle" | "models"> {
   const models = declaredModelsForProvider(mp);
   return {
     ...(mp.routingHandle ? { handle: mp.routingHandle } : {}),

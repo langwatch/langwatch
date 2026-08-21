@@ -30,6 +30,10 @@ import {
 } from "../../modelProviders/modelDefaults.service";
 import { assertCanManageAllScopes } from "../../modelProviders/modelProvider.authz";
 import {
+  ROUTING_HANDLE_MAX_LENGTH,
+  ROUTING_HANDLE_RULE,
+} from "../../modelProviders/routingHandle";
+import {
   ModelProviderService,
   testConnectionInputSchema,
 } from "../../modelProviders/modelProvider.service";
@@ -176,9 +180,16 @@ export const modelProviderRouter = createTRPCRouter({
           defaultModel: z.string().optional(),
           // The slug that addresses THIS instance in a gateway model string
           // ("eu/claude-sonnet-5"). Omitted leaves the stored handle alone;
-          // an empty string clears it. The shape and the reserved names are
-          // checked in the service, which owns the rule the gateway reads.
-          routingHandle: z.string().max(64).optional().nullable(),
+          // an empty string clears it. The length and the message both come
+          // from the same module the service validates against, so the schema
+          // cannot start accepting a handle the service will refuse. The shape
+          // and the reserved names are checked in the service, which owns the
+          // rule the gateway reads.
+          routingHandle: z
+            .string()
+            .max(ROUTING_HANDLE_MAX_LENGTH, ROUTING_HANDLE_RULE)
+            .optional()
+            .nullable(),
           // Multi-scope writes (iter 109). `scopes` is the canonical shape;
           // `scopeType`/`scopeId` remain for the transition period so older
           // callers still compile. When both arrive, `scopes` wins. The
