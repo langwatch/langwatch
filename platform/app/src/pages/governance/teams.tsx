@@ -121,9 +121,7 @@ function GovernanceTeamsListPage() {
   return (
     <GovernanceLayout pageTitle="Teams · AI Governance · LangWatch">
       <VStack align="stretch" gap={4} width="full" maxW="container.xl">
-        <HStack alignItems="end">
-          <Heading size="md">All teams by {SORT_LABEL[sortBy]}</Heading>
-        </HStack>
+        <Heading size="md">All teams by {SORT_LABEL[sortBy]}</Heading>
 
         {canReadActivity ? (
           <TeamSpendPanel

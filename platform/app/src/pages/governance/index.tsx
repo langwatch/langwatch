@@ -6,7 +6,6 @@ import {
   HStack,
   Input,
   SimpleGrid,
-  Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -194,14 +193,11 @@ function GovernanceOverviewPage() {
   return (
     <GovernanceLayout pageTitle="AI Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
-        <HStack alignItems="end">
-          <HStack gap={2}>
-            <Heading size="md">AI Governance</Heading>
-            <Badge colorPalette="purple" variant="subtle">
-              Preview
-            </Badge>
-          </HStack>
-          <Spacer />
+        <HStack gap={2}>
+          <Heading size="md">AI Governance</Heading>
+          <Badge colorPalette="purple" variant="subtle">
+            Preview
+          </Badge>
         </HStack>
 
         {orgId && <QuarantineFillAlert organizationId={orgId} />}
