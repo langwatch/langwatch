@@ -348,6 +348,58 @@ async function dispatchEventLifecycles(traces: TraceFixture[]): Promise<void> {
         traceIds: [traceId],
         status: "IN_PROGRESS",
       });
+      // One completed run deliberately carries an OpenAI-style tool call and
+      // its matching tool result. Prompts do not define tools yet, but scenario
+      // and trace transcripts can contain them; this gives the local demo a
+      // concrete rendering example without implying the prompt executed it.
+      if (scenarioIndex === 1 && variant === "improved") {
+        const toolCallId = `${runId}-search-docs`;
+        await app.simulations.messageSnapshot({
+          tenantId: PROJECT_ID,
+          occurredAt: startedAt + 1_500,
+          scenarioRunId: runId,
+          messages: [
+            { id: `${runId}-user`, role: "user", content: scenario.user },
+            {
+              id: `${runId}-tool-call`,
+              role: "assistant",
+              content: "",
+              tool_calls: [
+                {
+                  id: toolCallId,
+                  type: "function",
+                  function: {
+                    name: "search_support_docs",
+                    arguments: JSON.stringify({
+                      query: "exact daily export limit",
+                    }),
+                  },
+                },
+              ],
+              trace_id: traceId,
+            },
+            {
+              id: `${runId}-tool-result`,
+              role: "tool",
+              name: "search_support_docs",
+              tool_call_id: toolCallId,
+              content: JSON.stringify({
+                matches: [],
+                note: "No exact daily export limit is documented.",
+              }),
+              trace_id: traceId,
+            },
+            {
+              id: `${runId}-assistant`,
+              role: "assistant",
+              content: scenario.improved,
+              trace_id: traceId,
+            },
+          ],
+          traceIds: [traceId],
+          status: "IN_PROGRESS",
+        });
+      }
       await app.simulations.finishRun({
         tenantId: PROJECT_ID,
         occurredAt: startedAt + 2_000,
