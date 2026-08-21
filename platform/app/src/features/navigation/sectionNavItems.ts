@@ -96,7 +96,7 @@ export const governanceNavItems: readonly SectionNavItemData[] = [
     icon: Eye,
   },
   {
-    label: "Ingestion Sources",
+    label: "Catalog",
     href: "/governance/ingestion-sources",
     includePath: "/governance/ingestion-sources",
     icon: PlugZap,
@@ -108,7 +108,7 @@ export const governanceNavItems: readonly SectionNavItemData[] = [
     icon: AlertTriangle,
   },
   {
-    label: "Tool Catalog",
+    label: "Tool Tiles",
     href: "/governance/tool-catalog",
     includePath: "/governance/tool-catalog",
     icon: PackageOpen,

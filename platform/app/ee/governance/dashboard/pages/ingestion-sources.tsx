@@ -206,7 +206,7 @@ function IngestionSourcesHeader({
     <HStack alignItems="end">
       <VStack align="start" gap={0}>
         <HStack gap={2}>
-          <Heading size="md">Ingestion Sources</Heading>
+          <Heading size="md">Catalog</Heading>
           <Badge colorPalette="purple" size="sm" variant="surface">
             Preview
           </Badge>
@@ -586,7 +586,7 @@ function IngestionSourcesPage() {
   } = useIngestionSourcesPage();
 
   return (
-    <GovernanceLayout pageTitle="Ingestion Sources · Governance · LangWatch">
+    <GovernanceLayout pageTitle="Catalog · Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <IngestionSourcesHeader
           isEnterprise={isEnterprise}

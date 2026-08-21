@@ -331,9 +331,9 @@ describe("the product sidebar", () => {
       renderSidebar("governance");
 
       expect(screen.getByText("Overview")).toBeInTheDocument();
-      expect(screen.getByText("Ingestion Sources")).toBeInTheDocument();
+      expect(screen.getByText("Catalog")).toBeInTheDocument();
       expect(screen.getByText("Anomaly Rules")).toBeInTheDocument();
-      expect(screen.getByText("Tool Catalog")).toBeInTheDocument();
+      expect(screen.getByText("Tool Tiles")).toBeInTheDocument();
       expect(screen.getByText("Departments")).toBeInTheDocument();
     });
   });
