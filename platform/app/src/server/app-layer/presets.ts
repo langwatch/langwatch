@@ -6,6 +6,7 @@ import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/gove
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
 import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
+import { UsageAttributionLedgerClickHouseRepository } from "@ee/governance/services/usageAttributionLedger.clickhouse.repository";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
@@ -962,6 +963,14 @@ export function initializeDefaultApp(options?: {
     ? { governanceOcsfEventsRepository }
     : undefined;
 
+  // The usage-attribution report's ledger read (ADR-094). It spans both
+  // governance tables — the OCSF events for who acted, `governance_kpis` for
+  // what a pushed trace cost — so it is its own repository rather than a
+  // method on either.
+  const usageAttributionLedgerRepository = clickhouseEnabled
+    ? new UsageAttributionLedgerClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+
   // Governance-domain reads over the shared `trace_summaries` table (the
   // persona-detection activity probe, the quarantine-fill breakdown).
   const governanceTraceActivityRepository = clickhouseEnabled
@@ -1764,6 +1773,7 @@ export function initializeDefaultApp(options?: {
       traceActivity: governanceTraceActivityRepository,
       kpis: governanceKpisRepository,
       personalUsage: personalUsageRepository,
+      usageAttributionLedger: usageAttributionLedgerRepository,
     },
     billableEvents: billableEventsRepository,
     codingAgents: {
@@ -2096,6 +2106,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       traceActivity: undefined,
       kpis: undefined,
       personalUsage: undefined,
+      usageAttributionLedger: undefined,
     },
     billableEvents: undefined,
     codingAgents: {

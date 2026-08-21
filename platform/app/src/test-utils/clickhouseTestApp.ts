@@ -4,6 +4,7 @@ import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/gove
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
 import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
+import { UsageAttributionLedgerClickHouseRepository } from "@ee/governance/services/usageAttributionLedger.clickhouse.repository";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
@@ -101,6 +102,9 @@ export function installClickHouseTestApp({
       traceActivity: new GovernanceTraceActivityClickHouseRepository(required),
       kpis: new GovernanceKpisClickHouseRepository(required),
       personalUsage: new PersonalUsageClickHouseRepository(required),
+      usageAttributionLedger: new UsageAttributionLedgerClickHouseRepository(
+        required,
+      ),
     },
     billableEvents: new BillableEventsClickHouseRepository(
       required,

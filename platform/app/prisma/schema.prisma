@@ -3289,7 +3289,40 @@ model DiscoveredAgent {
   /// erasure (ADR-094 Decision 9).
   snapshot Json?
 
+  /// Set only by erasure, when person references were blanked out of this
+  /// row's snapshot — the same audit trail ProviderIdentityLink carries, so
+  /// "we forgot somebody who appeared here" stays distinguishable from "the
+  /// provider never sent an owner" forever (ADR-094 Decision 9).
+  erasedAt DateTime?
+
   @@unique([organizationId, providerConnectionId, providerAgentKey])
+}
+
+/// One usage-attribution report that left the building. It exists so a
+/// backdated link cannot quietly rewrite who spent already-reported money:
+/// a link appended after an export, effective before that export's period
+/// ended, makes the next report carry a change notice (ADR-094 Decision 3).
+///
+/// Deliberately minimal — it records THAT a period was reported and when,
+/// never the report's contents. Storing the numbers would make this a second
+/// source of truth for attribution, and read-time resolution exists precisely
+/// so there is only one.
+model AttributionReportExport {
+  id String @id @default(nanoid())
+
+  /// Registered in ORG_SCOPED_MODELS.
+  organizationId String
+
+  /// The reported window, half-open [periodFrom, periodTo).
+  periodFrom DateTime
+  periodTo   DateTime
+  exportedAt DateTime @default(now())
+
+  /// Who exported — from the session, never the request body.
+  actorUserId String?
+
+  /// The notice asks for the most recent export, so the index is the query.
+  @@index([organizationId, exportedAt(sort: Desc)])
 }
 
 /// Admin-defined anomaly detection rule. Evaluated server-side at

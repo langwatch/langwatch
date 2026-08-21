@@ -377,6 +377,10 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // them with no extra hatch.
   ProviderIdentityLink: {},
   DiscoveredAgent: {},
+  // ADR-094 Decision 3: which reporting windows have already left the
+  // building. Read only to ask "was this period already reported", written
+  // only by the export procedure — both name the organization.
+  AttributionReportExport: {},
 };
 
 /**

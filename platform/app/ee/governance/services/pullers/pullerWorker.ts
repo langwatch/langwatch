@@ -481,6 +481,13 @@ export function mapToOcsfRow({
     metadata: {
       product: { name: "LangWatch", vendor_name: "LangWatch" },
       extension: {
+        // Adapter-declared passthrough goes FIRST so the reserved keys below
+        // always win. It used to be spread last, which let a mapping that
+        // happened to name `cost_usd` in its `extra` table overwrite the money
+        // field — and the usage report reads exactly that field as a pulled
+        // event's spend (ADR-094), so the clobber would land silently in
+        // somebody's bill rather than in an error.
+        ...(event.extra ?? {}),
         uid: "langwatch.governance",
         source_type: sourceType,
         source_id: ingestionSourceId,
@@ -489,7 +496,6 @@ export function mapToOcsfRow({
         tokens_input: event.tokens_input,
         tokens_output: event.tokens_output,
         raw_event: event.raw_payload,
-        ...(event.extra ?? {}),
       },
     },
   });

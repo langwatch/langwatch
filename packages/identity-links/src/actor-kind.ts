@@ -59,3 +59,48 @@ export const ocsfActorType = (
   type_id: OCSF_USER_TYPE_ID_BY_ACTOR_KIND[actorKind],
   type: actorKind,
 });
+
+/**
+ * Read the bucket back out of a stored OCSF row — the exact inverse of
+ * `ocsfActorType`, deliberately living beside it so ingest and report cannot
+ * drift into two answers about whose money a row is.
+ *
+ * `type` is authoritative and is tried first, because `type_id` is lossy: OCSF
+ * has no separate code for "bot", so a service principal and a bot both write
+ * 3, and a report that read only the id could never tell them apart. `type_id`
+ * is the fallback for rows written before the exact bucket travelled beside it
+ * (and for anything a SIEM rewrote), where 1/2 mean a human and 3 means the
+ * machine side; that fallback cannot recover "bot", so it answers
+ * `service_principal` — both are UNATTRIBUTABLE, so the report's answer is
+ * unchanged either way.
+ *
+ * An unreadable row is a `person` (DEFAULT_ACTOR_KIND): the report must never
+ * invent "can never resolve" for a row it merely failed to parse.
+ */
+export const actorKindFromOcsf = (actor: {
+  type?: unknown;
+  type_id?: unknown;
+}): ActorKind => {
+  if (isActorKind(actor.type)) return actor.type;
+
+  const typeId =
+    typeof actor.type_id === "number"
+      ? actor.type_id
+      : typeof actor.type_id === "string" && actor.type_id.trim() !== ""
+        ? Number(actor.type_id)
+        : Number.NaN;
+
+  if (typeId === OCSF_USER_TYPE_ID_BY_ACTOR_KIND.service_principal)
+    return "service_principal";
+  return DEFAULT_ACTOR_KIND;
+};
+
+/**
+ * Can this actor kind ever resolve to a person? `person` yes — it is either
+ * ATTRIBUTED (a link exists) or UNATTRIBUTED (fixable by linking). Service
+ * principals and bots never can, which is what UNATTRIBUTABLE means (Decision
+ * 5), and is why the report reads the ingest-time mark rather than inferring
+ * anything from a link being absent.
+ */
+export const isPersonKind = (actorKind: ActorKind): boolean =>
+  actorKind === "person";
