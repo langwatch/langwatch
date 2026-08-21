@@ -269,6 +269,39 @@ func (w *Worker) NotifyShutdownImminent(ctx context.Context, deadline time.Time)
 	return w.agent.NotifyShutdownImminent(ctx, w.endpoint, w.openCodeSessionID, deadline)
 }
 
+// AbortTurn asks this worker's agent to abort the named in-flight turn, the
+// worker half of Pool.CancelTurn (ADR-078). turnID-guarded under w.mu: only
+// the turn actually in flight can be aborted, so a stale cancel (the user
+// stopped a turn that already finished, and a new one started) can never halt
+// the wrong generation. An empty turnID is a no-op: a cancel needs a name.
+//
+// The abort is an OPTIONAL agent capability (app.TurnAborter): an agent that
+// does not implement it (opencode today) is a silent no-op, fail-open, so
+// the stop stays truthful on the durable record and only the token burn
+// continues. Best-effort by design: a failed abort is logged, never surfaced.
+func (w *Worker) AbortTurn(ctx context.Context, turnID string) {
+	if turnID == "" {
+		return
+	}
+	w.mu.Lock()
+	claimed := w.inFlight && w.currentTurnID == turnID
+	w.mu.Unlock()
+	if !claimed {
+		return
+	}
+	aborter, ok := w.agent.(app.TurnAborter)
+	if !ok {
+		return
+	}
+	if err := aborter.AbortTurn(ctx, w.endpoint, w.openCodeSessionID, turnID); err != nil {
+		clog.Get(ctx).Warn("abort turn failed, the generation runs to completion on its own",
+			zap.String("conversation", w.conversationID),
+			zap.String("turn_id", turnID),
+			zap.Error(err),
+		)
+	}
+}
+
 // isInFlight reports whether a turn currently owns this worker (Claimed but not
 // yet Released). The shutdown-handoff step waits on this clearing so the
 // in-flight turn's StreamEvents can forward the terminal `handoff` frame to the

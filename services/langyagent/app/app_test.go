@@ -23,6 +23,8 @@ type fakePool struct {
 	worker     Worker
 	killed     []string
 	liveWorker bool
+	// canceled records every CancelTurn as "conversationID/turnID".
+	canceled []string
 }
 
 func (f *fakePool) HasLiveWorker(string, domain.CredentialSignature) bool { return f.liveWorker }
@@ -33,8 +35,11 @@ func (f *fakePool) Acquire(_ context.Context, _ string, _ domain.Credentials) (W
 	}
 	return f.worker, nil
 }
-func (f *fakePool) Status() (int, int)                         { return 0, 0 }
-func (f *fakePool) KillSessionVanished(id string)              { f.killed = append(f.killed, id) }
+func (f *fakePool) Status() (int, int)            { return 0, 0 }
+func (f *fakePool) KillSessionVanished(id string) { f.killed = append(f.killed, id) }
+func (f *fakePool) CancelTurn(conversationID, turnID string) {
+	f.canceled = append(f.canceled, conversationID+"/"+turnID)
+}
 func (f *fakePool) StartReaper()                               {}
 func (f *fakePool) ShutdownHandoff(context.Context, time.Time) {}
 func (f *fakePool) Shutdown()                                  {}
@@ -158,6 +163,20 @@ func TestApp_WarmRefreshesWorkerIdleDeadline(t *testing.T) {
 	}
 	if worker.touched != 1 {
 		t.Fatalf("warm touches = %d, want 1", worker.touched)
+	}
+}
+
+// A cancel is fire-and-forget by contract: the app hands it to the pool and
+// returns nothing: the durable stopped terminal upstream already made the
+// stop truthful, so there is no error a caller could act on.
+func TestApp_CancelTurn_DelegatesToThePool(t *testing.T) {
+	pool := &fakePool{}
+	a := newTestApp(pool, nil)
+
+	a.CancelTurn(context.Background(), "c1", "turn-1")
+
+	if len(pool.canceled) != 1 || pool.canceled[0] != "c1/turn-1" {
+		t.Fatalf("canceled = %v, want exactly c1/turn-1", pool.canceled)
 	}
 }
 

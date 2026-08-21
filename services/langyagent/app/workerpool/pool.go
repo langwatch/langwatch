@@ -416,7 +416,7 @@ func capabilitiesFor(creds domain.Credentials) []app.Capability {
 }
 
 func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.Credentials) (app.Worker, error) {
-	wantedSig := domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)), creds.MirrorTier)
+	wantedSig := domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)), creds.MirrorTier, creds.Harness)
 
 	p.mu.Lock()
 	if w, ok := p.workers[conversationID]; ok {
@@ -515,6 +515,23 @@ func (p *Pool) Status() (active, max int) {
 // longer exists — recycle so the next turn spawns fresh.
 func (p *Pool) KillSessionVanished(conversationID string) {
 	p.kill(conversationID, "opencode session vanished")
+}
+
+// CancelTurn asks the conversation's live worker to abort the named in-flight
+// turn (the token-burn half of the user's Stop, ADR-078). A registry LOOKUP
+// only, never Acquire: Acquire can spawn, and a cancel for a conversation
+// with no worker must find nothing, not boot one. Every miss (no worker, a
+// different turn in flight, an agent that cannot abort) is a silent no-op: the
+// durable stopped terminal is already recorded upstream, so there is nothing
+// to report and nothing to retry.
+func (p *Pool) CancelTurn(conversationID, turnID string) {
+	p.mu.Lock()
+	w := p.workers[conversationID]
+	p.mu.Unlock()
+	if w == nil {
+		return
+	}
+	w.AbortTurn(p.baseCtx, turnID)
 }
 
 // reserveUIDLocked finds a free UID for conversationID. Must be called with

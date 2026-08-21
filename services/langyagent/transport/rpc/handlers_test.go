@@ -53,6 +53,8 @@ type stubPool struct {
 	liveWorker bool
 	lastSig    domain.CredentialSignature
 	lastCreds  domain.Credentials
+	// canceled records every CancelTurn as "conversationID/turnID".
+	canceled []string
 }
 
 func (p *stubPool) HasLiveWorker(_ string, sig domain.CredentialSignature) bool {
@@ -67,8 +69,11 @@ func (p *stubPool) Acquire(_ context.Context, _ string, creds domain.Credentials
 	}
 	return p.worker, nil
 }
-func (p *stubPool) Status() (int, int)                         { return 2, 20 }
-func (p *stubPool) KillSessionVanished(string)                 {}
+func (p *stubPool) Status() (int, int)         { return 2, 20 }
+func (p *stubPool) KillSessionVanished(string) {}
+func (p *stubPool) CancelTurn(conversationID, turnID string) {
+	p.canceled = append(p.canceled, conversationID+"/"+turnID)
+}
 func (p *stubPool) StartReaper()                               {}
 func (p *stubPool) ShutdownHandoff(context.Context, time.Time) {}
 func (p *stubPool) Shutdown()                                  {}

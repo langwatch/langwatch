@@ -68,6 +68,17 @@ type warmRequest struct {
 	ModelOverride  string             `json:"modelOverride,omitempty"`
 }
 
+// cancelRequest names the in-flight turn a user's Stop wants aborted
+// (ADR-078). Mirrors the control plane's caller body (langyWorker.ts cancel):
+// conversationId routes to the worker, turnId guards which turn may die, and
+// projectId rides along for the log line only: the internal secret is the
+// authority, exactly as on every other verb.
+type cancelRequest struct {
+	ConversationID string `json:"conversationId"      validate:"required"`
+	TurnID         string `json:"turnId"              validate:"required"`
+	ProjectID      string `json:"projectId,omitempty"`
+}
+
 // warmTimeout bounds a detached spawn so a wedged warm cannot leak a goroutine.
 // Consumed by RPC.HandleWarm.
 const warmTimeout = 90 * time.Second

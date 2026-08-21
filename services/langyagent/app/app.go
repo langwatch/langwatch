@@ -188,6 +188,20 @@ func (a *App) Warm(ctx context.Context, conversationID string, creds domain.Cred
 	return nil
 }
 
+// CancelTurn asks the conversation's live worker to abort the named in-flight
+// turn (ADR-078: the token-burn half of the user's Stop). Deliberately returns
+// nothing: the control plane treats a cancel as fire-and-forget. The stopped
+// terminal is already on the durable record before the cancel is sent, so a
+// cancel that finds nothing to halt (worker gone, turn finished, harness
+// without abort support) has succeeded at its only job, which is best-effort.
+func (a *App) CancelTurn(ctx context.Context, conversationID, turnID string) {
+	clog.Get(ctx).Info("canceling in-flight turn",
+		zap.String("conversation_id", conversationID),
+		zap.String("turn_id", turnID),
+	)
+	a.pool.CancelTurn(conversationID, turnID)
+}
+
 // HasLiveWorker answers the control plane's pre-flight: is there already a worker
 // for this conversation with these capabilities?
 //

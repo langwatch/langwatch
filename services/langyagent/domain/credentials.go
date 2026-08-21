@@ -70,6 +70,14 @@ type Credentials struct {
 	// turns under a stale one. Empty ⇒ skip (fail-safe: an unset policy mirrors
 	// nothing).
 	MirrorTier string `json:"mirrorTier,omitempty"`
+	// Harness names the coding-agent harness the worker runs on ("opencode" |
+	// "pi"), resolved per project by the control plane and threaded through the
+	// envelope like MirrorTier. Folded into the worker signature (via
+	// NormalizeHarness, see SignatureOf) so a harness change replaces the worker
+	// rather than reusing one built for the other harness. Empty ⇒ opencode, the
+	// default: a control plane that predates harness selection keeps every
+	// running worker.
+	Harness string `json:"harness,omitempty"`
 }
 
 // MirrorTier is the fidelity of the ADR-061 mirror copy, resolved per
@@ -99,6 +107,29 @@ func NormalizeMirrorTier(v string) MirrorTier {
 		return MirrorTierStructural
 	default:
 		return MirrorTierSkip
+	}
+}
+
+// Harness values: the closed vocabulary of coding-agent harnesses a worker
+// can run on. Mirrors the control plane's LangyCredentials.harness.
+const (
+	// HarnessOpenCode is the opencode harness, the default.
+	HarnessOpenCode = "opencode"
+	// HarnessPi is the pi harness (the langy-worker wrapper).
+	HarnessPi = "pi"
+)
+
+// NormalizeHarness maps an envelope value to a known harness. Empty and
+// unknown values map to opencode. Fail-safe: a version skew (or a
+// drifted envelope) runs the harness that always exists, never an unfinished
+// one, and a pre-selection control plane that sends nothing keeps every
+// running worker's signature intact.
+func NormalizeHarness(v string) string {
+	switch v {
+	case HarnessPi:
+		return HarnessPi
+	default:
+		return HarnessOpenCode
 	}
 }
 
@@ -151,6 +182,13 @@ type CredentialSignature struct {
 	// worker so the relay re-registers with the new tier, rather than mirroring
 	// a live worker's remaining turns under the policy it booted with.
 	MirrorTier string
+	// Harness is the normalized coding-agent harness ("opencode" | "pi"). A
+	// worker is BUILT for its harness (different subprocess, different wire
+	// protocol), so a flip must replace it, never reuse it. Canonicalized
+	// through NormalizeHarness so an empty envelope and an explicit "opencode"
+	// produce the SAME signature: workers spawned before harness selection
+	// existed must not respawn on the deploy that introduces it.
+	Harness string
 }
 
 // SignatureOf derives the comparable signature from the parts that must match for
@@ -160,7 +198,7 @@ type CredentialSignature struct {
 // canonicalisation lives in ONE place and the two can never compute subtly
 // different signatures. capabilityKeys carries only capability PRESENCE, never a
 // secret, which is why the probe can supply it from a boolean.
-func SignatureOf(projectID, actorUserID, model string, egressAllowlist, capabilityKeys []string, mirrorTier string) CredentialSignature {
+func SignatureOf(projectID, actorUserID, model string, egressAllowlist, capabilityKeys []string, mirrorTier, harness string) CredentialSignature {
 	return CredentialSignature{
 		ProjectID:       projectID,
 		ActorUserID:     actorUserID,
@@ -171,6 +209,10 @@ func SignatureOf(projectID, actorUserID, model string, egressAllowlist, capabili
 		// explicit "skip" produce the SAME signature — they mean the same thing
 		// (no mirror), and must not spuriously recycle a worker between them.
 		MirrorTier: string(NormalizeMirrorTier(mirrorTier)),
+		// Same canonicalisation rule for the harness: empty and explicit
+		// "opencode" mean the same worker, so they share a signature; "pi" is a
+		// different worker and forces a respawn.
+		Harness: NormalizeHarness(harness),
 	}
 }
 

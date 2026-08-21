@@ -18,7 +18,7 @@ import (
 // path does — capabilitiesFor → app.SignatureKeys → domain.SignatureOf — so tests
 // exercise the real composition rather than a hand-spelled copy that could drift.
 func sigOf(creds domain.Credentials) domain.CredentialSignature {
-	return domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)), creds.MirrorTier)
+	return domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)), creds.MirrorTier, creds.Harness)
 }
 
 type recordingRevoker struct {
@@ -198,6 +198,31 @@ func TestHasLiveWorker_MatchesOnCapabilitySignature(t *testing.T) {
 
 // The signature the probe compares must never depend on the key itself — that is
 // precisely what makes "probe before minting" possible.
+// The harness rides the credential envelope like every other worker-shaping
+// input, so a flip is a signature miss (the worker is built for its harness and
+// must be replaced) while a turn that names the default explicitly keeps hitting
+// a worker spawned before harness selection existed.
+func TestHasLiveWorker_HarnessFlipIsAMiss(t *testing.T) {
+	p := newLifecyclePool(t, nil)
+	t.Cleanup(p.Shutdown)
+
+	// A worker spawned before the control plane sent any harness at all.
+	preSelection := domain.Credentials{LangwatchAPIKey: "k", Model: "openai/gpt-5-mini"}
+	p.mu.Lock()
+	p.workers["conv-h"] = &Worker{conversationID: "conv-h", credSig: sigOf(preSelection)}
+	p.mu.Unlock()
+
+	explicitDefault := preSelection
+	explicitDefault.Harness = "opencode"
+	assert.True(t, p.HasLiveWorker("conv-h", sigOf(explicitDefault)),
+		"an explicit default harness must keep hitting a pre-selection worker")
+
+	pi := preSelection
+	pi.Harness = "pi"
+	assert.False(t, p.HasLiveWorker("conv-h", sigOf(pi)),
+		"a harness flip must be a miss so the turn replaces the worker")
+}
+
 func TestSignatureOf_IgnoresTheSessionKey(t *testing.T) {
 	base := domain.Credentials{Model: "openai/gpt-5-mini", LangwatchAPIKey: "key-one"}
 	rotated := base
