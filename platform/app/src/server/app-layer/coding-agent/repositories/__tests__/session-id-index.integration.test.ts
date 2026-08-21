@@ -79,7 +79,7 @@ interface SessionFixture {
 }
 
 /** One call, one part. Which rows share a part decides what the primary key can prune. */
-async function insertSessions(sessions: SessionFixture[]) {
+async function insertSessions({ sessions }: { sessions: SessionFixture[] }) {
   await ch.insert({
     table: "coding_agent_sessions",
     values: sessions.map((session) => ({
@@ -96,10 +96,6 @@ async function insertSessions(sessions: SessionFixture[]) {
     format: "JSONEachRow",
     clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
   });
-}
-
-async function insertSession(session: SessionFixture) {
-  await insertSessions([session]);
 }
 
 /**
@@ -206,28 +202,32 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
       // single granule whose SessionId range spans ABSENT_SESSION. Two inserts
       // would make two parts, each with a single-point range that the primary
       // key could exclude on its own.
-      await insertSessions([
-        {
-          tenantId,
-          sessionId: BRACKET_LOW,
-          startedAt: BRACKET_WEEK_A,
-          updatedAt: new Date(BRACKET_WEEK_A.getTime() + 1000),
-        },
-        {
-          tenantId,
-          sessionId: BRACKET_HIGH,
-          startedAt: BRACKET_WEEK_B,
-          updatedAt: new Date(BRACKET_WEEK_B.getTime() + 1000),
-        },
-      ]);
-      await insertSessions([
-        {
-          tenantId,
-          sessionId: FAR_SESSION,
-          startedAt: FAR_WEEK,
-          updatedAt: new Date(FAR_WEEK.getTime() + 1000),
-        },
-      ]);
+      await insertSessions({
+        sessions: [
+          {
+            tenantId,
+            sessionId: BRACKET_LOW,
+            startedAt: BRACKET_WEEK_A,
+            updatedAt: new Date(BRACKET_WEEK_A.getTime() + 1000),
+          },
+          {
+            tenantId,
+            sessionId: BRACKET_HIGH,
+            startedAt: BRACKET_WEEK_B,
+            updatedAt: new Date(BRACKET_WEEK_B.getTime() + 1000),
+          },
+        ],
+      });
+      await insertSessions({
+        sessions: [
+          {
+            tenantId,
+            sessionId: FAR_SESSION,
+            startedAt: FAR_WEEK,
+            updatedAt: new Date(FAR_WEEK.getTime() + 1000),
+          },
+        ],
+      });
 
       // With skip indexes off, the granule is still eligible and gets read:
       // the primary key cannot exclude an id inside its range. This is what
@@ -275,19 +275,27 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
       // Same UpdatedAt on both versions, so the tiebreak decides. The index
       // must not disturb which version wins.
       const updatedAt = new Date("2026-03-09T00:00:01.000Z");
-      await insertSession({
-        tenantId,
-        sessionId,
-        startedAt: new Date("2026-03-09T00:00:00.000Z"),
-        updatedAt,
-        modelCalls: 2,
+      await insertSessions({
+        sessions: [
+          {
+            tenantId,
+            sessionId,
+            startedAt: new Date("2026-03-09T00:00:00.000Z"),
+            updatedAt,
+            modelCalls: 2,
+          },
+        ],
       });
-      await insertSession({
-        tenantId,
-        sessionId,
-        startedAt: new Date("2026-03-09T00:00:00.000Z"),
-        updatedAt,
-        modelCalls: 7,
+      await insertSessions({
+        sessions: [
+          {
+            tenantId,
+            sessionId,
+            startedAt: new Date("2026-03-09T00:00:00.000Z"),
+            updatedAt,
+            modelCalls: 7,
+          },
+        ],
       });
 
       expect(await latestVersion({ tenantId, sessionId })).toEqual({
@@ -300,19 +308,27 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
   describe("when two tenants share a session id", () => {
     it("keeps the lookup scoped to the requesting tenant", async () => {
       const sessionId = `${tag}-shared`;
-      await insertSession({
-        tenantId: tenantIdFor("c"),
-        sessionId,
-        startedAt: new Date("2026-04-06T00:00:00.000Z"),
-        updatedAt: new Date("2026-04-06T00:00:01.000Z"),
-        modelCalls: 3,
+      await insertSessions({
+        sessions: [
+          {
+            tenantId: tenantIdFor("c"),
+            sessionId,
+            startedAt: new Date("2026-04-06T00:00:00.000Z"),
+            updatedAt: new Date("2026-04-06T00:00:01.000Z"),
+            modelCalls: 3,
+          },
+        ],
       });
-      await insertSession({
-        tenantId: tenantIdFor("d"),
-        sessionId,
-        startedAt: new Date("2026-05-04T00:00:00.000Z"),
-        updatedAt: new Date("2026-05-04T00:00:01.000Z"),
-        modelCalls: 9,
+      await insertSessions({
+        sessions: [
+          {
+            tenantId: tenantIdFor("d"),
+            sessionId,
+            startedAt: new Date("2026-05-04T00:00:00.000Z"),
+            updatedAt: new Date("2026-05-04T00:00:01.000Z"),
+            modelCalls: 9,
+          },
+        ],
       });
 
       expect(
