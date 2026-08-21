@@ -7,6 +7,8 @@
  * args) and mirrors successful `todowrite` calls as `plan` snapshots.
  */
 
+import { closeSync, openSync, readSync } from "node:fs";
+
 import { boundJsonValue, boundText, type WorkerEvent } from "./protocol.js";
 import { normalizeTodos, TODOWRITE_TOOL_NAME } from "./tools/todowrite.js";
 
@@ -26,6 +28,43 @@ export function contentText(result: unknown): string {
     .filter((block) => block.type === "text" && typeof block.text === "string")
     .map((block) => block.text as string)
     .join("\n");
+}
+
+/**
+ * How much of a truncated tool's saved output the wire frame recovers. The
+ * protocol's own field bound is the ceiling; below it, this keeps a runaway
+ * command's file from being slurped whole into memory.
+ */
+const MAX_RECOVERED_OUTPUT_BYTES = 1024 * 1024;
+
+/**
+ * The frame's output for a settled tool: pi's bash tool truncates big output
+ * to its TAIL and saves the full text to a file named in the result's
+ * details. A tail cut removes the head of a JSON document, which is where its
+ * structure lives, so the manager's structural reduction (built to keep ids,
+ * counts and pagination under its own budget) would be left reducing a
+ * fragment. Recover the saved file for the frame; the model's own context
+ * keeps pi's truncated view.
+ */
+export function settledToolOutput(result: unknown): string {
+  const text = contentText(result);
+  if (typeof result !== "object" || result === null) return text;
+  const details = (result as { details?: unknown }).details;
+  if (typeof details !== "object" || details === null) return text;
+  const path = (details as { fullOutputPath?: unknown }).fullOutputPath;
+  if (typeof path !== "string" || path === "") return text;
+  try {
+    const fd = openSync(path, "r");
+    try {
+      const buffer = Buffer.alloc(MAX_RECOVERED_OUTPUT_BYTES);
+      const read = readSync(fd, buffer, 0, MAX_RECOVERED_OUTPUT_BYTES, 0);
+      return buffer.toString("utf8", 0, read);
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return text;
+  }
 }
 
 export class TurnEventMapper {
@@ -91,7 +130,7 @@ export class TurnEventMapper {
             name,
             input: boundJsonValue(input),
             isError,
-            output: boundText(contentText(event.result)),
+            output: boundText(settledToolOutput(event.result)),
           },
         ];
         if (!isError && name.toLowerCase() === TODOWRITE_TOOL_NAME) {

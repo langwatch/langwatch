@@ -1,5 +1,9 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
-import { TurnEventMapper, contentText } from "./events.js";
+import { TurnEventMapper, contentText, settledToolOutput } from "./events.js";
 import { MAX_FIELD_BYTES, TRUNCATION_MARKER } from "./protocol.js";
 
 describe("contentText", () => {
@@ -9,6 +13,34 @@ describe("contentText", () => {
     ).toBe("a\nb");
     expect(contentText(undefined)).toBe("");
     expect(contentText({ content: "nope" })).toBe("");
+  });
+});
+
+describe("settledToolOutput", () => {
+  describe("when pi truncated the tool output to a saved file", () => {
+    it("recovers the full text from the file the details name", () => {
+      const dir = mkdtempSync(join(tmpdir(), "langyworker-out-"));
+      const full = join(dir, "pi-bash-full.log");
+      const document = `{"traces":[{"id":"t1"}],"pagination":{"totalHits":44}}`;
+      writeFileSync(full, document);
+      const result = {
+        content: [{ type: "text", text: '"tail fragment only"\n[Showing lines 10-20 of 20]' }],
+        details: { truncation: { truncated: true }, fullOutputPath: full },
+      };
+      expect(settledToolOutput(result)).toBe(document);
+    });
+
+    it("falls back to the tail text when the file cannot be read", () => {
+      const result = {
+        content: [{ type: "text", text: "tail fragment" }],
+        details: { truncation: { truncated: true }, fullOutputPath: "/nonexistent/pi-bash.log" },
+      };
+      expect(settledToolOutput(result)).toBe("tail fragment");
+    });
+  });
+
+  it("returns the content text untouched when nothing was truncated", () => {
+    expect(settledToolOutput({ content: [{ type: "text", text: "plain" }] })).toBe("plain");
   });
 });
 
