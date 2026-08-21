@@ -7,17 +7,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
+  ENGINE_GATE_CACHE_TTL_MS,
   organizationOnAuthzEngine,
   readOrganizationOnAuthzEngine,
   resetAuthzEngineGateForTesting,
+  setAuthzEngineGateFailureReporter,
 } from "../engine-gate";
-import { authzEngineGateReadFailuresTotal } from "../metrics";
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "../migration-name";
-
-async function counterValue(): Promise<number> {
-  const metric = await authzEngineGateReadFailuresTotal.get();
-  return metric.values[0]?.value ?? 0;
-}
 
 const ORG_ID = "org_gate";
 
@@ -95,16 +91,31 @@ describe("the authz engine gate", () => {
       ).resolves.toBe(false);
     });
 
-    it("counts the failure so a reopened legacy-fallback window is observable", async () => {
+    /**
+     * The gate cannot count this itself: prom-client runs at import time and
+     * the browser imports this module through `rbac.ts`, so the counter lives
+     * in the server composition and reaches the gate as an installed reporter.
+     * What the gate owes is the CALL — that a failed read is reported at all,
+     * with the organization and the window it reopened.
+     */
+    it("reports the failure so a reopened legacy-fallback window is observable", async () => {
       const findUnique = vi.fn().mockRejectedValue(new Error("pg is down"));
       const prisma = {
         systemMigrationTenantState: { findUnique },
       } as unknown as Pick<PrismaClient, "systemMigrationTenantState">;
-      const before = await counterValue();
+      const reported: unknown[] = [];
+      setAuthzEngineGateFailureReporter((args) => reported.push(args));
 
       await organizationOnAuthzEngine({ organizationId: ORG_ID, prisma });
 
-      expect(await counterValue()).toBe(before + 1);
+      expect(reported).toEqual([
+        {
+          organizationId: ORG_ID,
+          error: expect.any(Error),
+          ttlMs: ENGINE_GATE_CACHE_TTL_MS,
+        },
+      ]);
+      setAuthzEngineGateFailureReporter(() => undefined);
     });
 
     /**

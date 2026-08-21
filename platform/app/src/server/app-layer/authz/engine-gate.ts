@@ -13,17 +13,42 @@
  * tables (`AuthzCutoverProjection` and `SystemMigrationTenantState`), with
  * two caches, two TTLs and two failure directions between them.
  *
- * Browser-safety: no module-scope Prisma or Redis — the caller hands in its
- * client, so `rbac.ts` stays importable for its enums.
+ * BROWSER SAFETY. This module must not import anything Node-only, and that
+ * is a hard constraint rather than a preference: `rbac.ts` imports the gate,
+ * and the browser imports `rbac.ts` for the permission-matching functions the
+ * UI gates on (`useOrganizationTeamProject`, the settings permission picker).
+ * A module-scope logger or metric here therefore does not merely leak — pino
+ * reaches `process.stdout` and prom-client runs `register.removeSingleMetric`
+ * at import time, so the client bundle dies on `process is not defined`
+ * before the app mounts. No Prisma, no Redis, no logger, no metrics: the
+ * caller hands in its client, and the failure reporter is INSTALLED by the
+ * server composition below.
  */
 import type { MigrationTenantStatus } from "@langwatch/authz-server";
-import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { authzEngineGateReadFailuresTotal } from "./metrics";
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "./migration-name";
 import { perOrganizationCachedFlag } from "./per-organization-cached-gate";
 
-const logger = createLogger("langwatch:authz:engine-gate");
+/**
+ * How a failed state read is reported. A no-op by default because this module
+ * has to stay importable from the browser; the server composition installs the
+ * real one at startup (`presets.ts`), and a test asserts it did — an
+ * uninstalled reporter would make a reopened legacy-fallback window silent,
+ * which is the failure this exists to surface.
+ */
+export type AuthzEngineGateFailureReporter = (args: {
+  organizationId: string;
+  error: unknown;
+  ttlMs: number;
+}) => void;
+
+let reportReadFailure: AuthzEngineGateFailureReporter = () => undefined;
+
+export function setAuthzEngineGateFailureReporter(
+  reporter: AuthzEngineGateFailureReporter,
+): void {
+  reportReadFailure = reporter;
+}
 
 /**
  * The statuses that mean this organization's whole grant history is in the
@@ -106,11 +131,11 @@ export async function queryOrganizationOnAuthzEngine({
     // Said out loud because the failure is otherwise silent — a migrated
     // organization pinned back onto legacy for the cache TTL looks exactly
     // like one that never migrated.
-    logger.warn(
-      { organizationId, error, ttlMs: ENGINE_GATE_CACHE_TTL_MS },
-      "could not read the authz migration state; this organization stays on the legacy path until the cache expires",
-    );
-    authzEngineGateReadFailuresTotal.inc();
+    reportReadFailure({
+      organizationId,
+      error,
+      ttlMs: ENGINE_GATE_CACHE_TTL_MS,
+    });
     return false;
   }
 }
