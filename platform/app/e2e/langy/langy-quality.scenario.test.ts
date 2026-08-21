@@ -135,7 +135,21 @@ describe("Langy quality bar", () => {
   }, 90_000);
 
   afterAll(async () => {
-    await Promise.all(createdMonitorIds.map(deleteMonitor));
+    // Discovered, not merely recorded. `createdMonitorIds` is appended to only
+    // after the scenario returns, so a run that creates the monitor and then
+    // throws — a judge failure, a timeout, a transient adapter error — leaves
+    // it live with nothing recorded to delete. Teardown therefore re-lists and
+    // also matches on the run-unique name.
+    const ids = new Set(createdMonitorIds);
+    try {
+      for (const monitor of await listMonitors()) {
+        if (monitor.name?.includes(MONITOR_SCENARIO_NAME)) ids.add(monitor.id);
+      }
+    } catch (error) {
+      // A list that fails must not also cost us the ids we did record.
+      console.error("Could not list monitors during teardown:", error);
+    }
+    await Promise.all([...ids].map((id) => deleteMonitor(id)));
   }, 60_000);
 
   /**
