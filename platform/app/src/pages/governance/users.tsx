@@ -112,9 +112,7 @@ function GovernanceUsersListPage() {
   return (
     <GovernanceLayout pageTitle="Users · AI Governance · LangWatch">
       <VStack align="stretch" gap={4} width="full" maxW="container.xl">
-        <HStack alignItems="end">
-          <Heading size="md">All users by {SORT_LABEL[sortBy]}</Heading>
-        </HStack>
+        <Heading size="md">All users by {SORT_LABEL[sortBy]}</Heading>
 
         {canReadActivity ? (
           <UserSpendPanel

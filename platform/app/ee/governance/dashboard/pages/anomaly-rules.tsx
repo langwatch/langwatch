@@ -195,14 +195,11 @@ const blankComposer = (): ComposerState => ({
 
 function AnomalyRulesHeader() {
   return (
-    <HStack alignItems="end">
-      <HStack gap={2}>
-        <Heading size="md">Anomaly Rules</Heading>
-        <Badge colorPalette="purple" size="sm" variant="surface">
-          Preview
-        </Badge>
-      </HStack>
-      <Spacer />
+    <HStack gap={2}>
+      <Heading size="md">Anomaly Rules</Heading>
+      <Badge colorPalette="purple" size="sm" variant="surface">
+        Preview
+      </Badge>
     </HStack>
   );
 }
