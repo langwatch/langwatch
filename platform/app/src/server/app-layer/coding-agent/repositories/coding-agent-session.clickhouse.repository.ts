@@ -415,8 +415,15 @@ export class CodingAgentSessionClickHouseRepository
    * sits inside) read back as that stale older version — a non-null result no
    * fallback can catch, and folding onto it overwrites the real latest row.
    * Unwindowed, the same case yields an EMPTY outer read, which the caller's
-   * retry recovers. The subquery touches only sort-key columns, so it stays a
-   * cheap keyed seek without partition pruning.
+   * retry recovers.
+   *
+   * What keeps that unwindowed subquery cheap is the `idx_session_id` bloom
+   * filter (migration 00085), NOT the sort key. The sort key is
+   * (TenantId, StartedAt, SessionId) and leads with time, so with StartedAt
+   * unconstrained `SessionId` sits behind an unbounded second key position and
+   * the primary index cannot exclude a granule on it. `UpdatedAt` is not a
+   * sort-key column either. Before the index this read touched a granule in
+   * every part, growing with the tenant's history rather than with the session.
    *
    * ORDER BY breaks UpdatedAt ties. It is NOT the
    * `ORDER BY <version> DESC LIMIT 1` anti-pattern in
