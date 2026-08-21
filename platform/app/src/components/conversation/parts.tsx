@@ -102,42 +102,9 @@ export function TextPart({
         reasoning={part.reasoning}
         size={compact ? "compact" : "regular"}
         maxChars={compact ? 320 : 800}
+        actions={actions}
       />
-      {actions && (
-        <PartActionsRow align={align} compact={compact}>
-          {actions}
-        </PartActionsRow>
-      )}
     </VStack>
-  );
-}
-
-/**
- * The width the avatar column occupies beside a bubble — the circle plus the
- * flex gap `Bubble` sets between it and the message.
- *
- * A message's actions belong under the message, not under its avatar, so the
- * row is inset by exactly this much on whichever side the avatar sits.
- */
-const AVATAR_COLUMN = { regular: "34px", compact: "30px" } as const;
-
-function PartActionsRow({
-  align,
-  compact = false,
-  children,
-}: {
-  align: "flex-start" | "flex-end";
-  compact?: boolean;
-  children: ReactNode;
-}) {
-  const inset = AVATAR_COLUMN[compact ? "compact" : "regular"];
-  return (
-    <Box
-      paddingStart={align === "flex-start" ? inset : 0}
-      paddingEnd={align === "flex-end" ? inset : 0}
-    >
-      {children}
-    </Box>
   );
 }
 

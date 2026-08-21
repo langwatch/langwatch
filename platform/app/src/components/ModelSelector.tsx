@@ -6,6 +6,7 @@ import {
   HStack,
   Input,
   Skeleton,
+  SkeletonCircle,
   Text,
 } from "@chakra-ui/react";
 import { AlertTriangle, Search } from "lucide-react";
@@ -455,11 +456,30 @@ export const ModelSelector = React.memo(function ModelSelector({
   // state doesn't flash before the data resolves.
   if (isLoading) {
     return (
-      <Skeleton
+      <HStack
         width={size === "full" ? "full" : size === "sm" ? "180px" : "240px"}
         height={size === "sm" ? "28px" : "40px"}
-        borderRadius="md"
-      />
+        paddingX={size === "sm" ? 2 : 3}
+        gap={2}
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="lg"
+        background="bg.panel"
+        aria-label="Loading models"
+      >
+        <SkeletonCircle size={size === "sm" ? "14px" : "18px"} />
+        <Skeleton
+          height={size === "sm" ? "9px" : "11px"}
+          width={size === "full" ? "45%" : "55%"}
+          borderRadius="full"
+        />
+        <Skeleton
+          marginLeft="auto"
+          height="8px"
+          width="10px"
+          borderRadius="full"
+        />
+      </HStack>
     );
   }
 

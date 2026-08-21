@@ -1,12 +1,32 @@
 import { HStack, IconButton } from "@chakra-ui/react";
-import { LuColumns2 } from "react-icons/lu";
+import { LuColumns2, LuX } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
+import { getDisplayHandle } from "~/prompts/utils/promptHandle";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { ExperimentFromPlaygroundButton } from "./ExperimentFromPlaygroundButton";
 import { PromptTabStrip } from "./PromptTabStrip";
 import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowserWindowContent";
+import { usePromptBrowserTabController } from "./tab/usePromptBrowserTabController";
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
 import { TabIdProvider } from "./ui/TabContext";
+
+function SingleTabCloseButton() {
+  const { title, handleClose } = usePromptBrowserTabController();
+  const name = getDisplayHandle(title);
+
+  return (
+    <Tooltip content={`Close ${name}`}>
+      <IconButton
+        aria-label={`Close ${name}`}
+        size="xs"
+        variant="ghost"
+        onClick={handleClose}
+      >
+        <LuX size={14} />
+      </IconButton>
+    </Tooltip>
+  );
+}
 
 /**
  * Tabbed browser for the prompt playground with draggable tabs and split-pane support.
@@ -138,6 +158,11 @@ export function PromptPlaygroundBrowser() {
                 size="xs"
                 variant="outline"
               />
+              {tabbedWindow.tabs.length === 1 && tabbedWindow.activeTabId && (
+                <TabIdProvider tabId={tabbedWindow.activeTabId}>
+                  <SingleTabCloseButton />
+                </TabIdProvider>
+              )}
             </HStack>
           </DraggableTabsBrowser.TabBar>
           {/* The card. The strip above stands on the page ground and only the
