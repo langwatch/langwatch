@@ -253,16 +253,9 @@ export class RoleRepository {
   async create({
     params,
     actor,
-    awaitProjection = true,
   }: {
     params: CreateRoleParams;
     actor: LedgerActor;
-    /**
-     * Passed through to the ledger writer. A caller whose next step is
-     * another awaited write on the same organization's queue turns it off;
-     * see `GrantsLedgerWriter.defineRole` for the ordering argument.
-     */
-    awaitProjection?: boolean;
   }): Promise<CustomRole> {
     const roleId = nanoid();
     await this.assertNameFree({
@@ -283,7 +276,6 @@ export class RoleRepository {
       permissions: params.permissions as string[],
       kind: kind as "custom" | "system_api_key",
       actor,
-      awaitProjection,
     });
     const now = new Date();
     return {
@@ -412,7 +404,7 @@ export class RoleRepository {
     apiKeyId: string;
     organizationId: string;
     actor: LedgerActor;
-    /** Same contract as `create`'s parameter of this name. */
+    /** Same contract as `GrantsLedgerWriter.deleteRole`'s parameter of this name. */
     awaitProjection?: boolean;
   }) {
     if (roleIds.length === 0) return;

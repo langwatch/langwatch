@@ -220,8 +220,19 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
         );
       });
 
-      /** @scenario "A restricted key's private role rides the grant attach's hold" */
-      it("defines the private role without its own projection hold", async () => {
+      /** @scenario "A restricted key's private role lands before its binding attaches" */
+      it("finishes the role definition before attaching the binding", async () => {
+        const order: string[] = [];
+        ledger.defineRole.mockImplementation(async () => {
+          // The writer holds for the role projection inside this call.
+          await Promise.resolve();
+          order.push("defineRole");
+        });
+        ledger.attachBindings.mockImplementation(async () => {
+          order.push("attachBindings");
+          return { attached: [], duplicates: [] };
+        });
+
         await service.create({
           name: "Restricted Key",
           userId: USER_ID,
@@ -233,16 +244,10 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           ],
         });
 
-        // The attach that follows holds for its projection (writer default),
-        // and the organization's ledger queue is FIFO, so that one hold
-        // proves the role definition landed too.
-        expect(ledger.defineRole).toHaveBeenCalledWith(
-          expect.objectContaining({ awaitProjection: false }),
-        );
-        expect(ledger.attachBindings).toHaveBeenCalledTimes(1);
-        expect(
-          ledger.attachBindings.mock.calls[0]![0].awaitProjection,
-        ).toBeUndefined();
+        // The binding row carries a foreign key to the role row, so the role
+        // has to be projected first. Command jobs are grouped per command
+        // name, so the attach cannot stand in for the definition's hold.
+        expect(order).toEqual(["defineRole", "attachBindings"]);
       });
     });
 

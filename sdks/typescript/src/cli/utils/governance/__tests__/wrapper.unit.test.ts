@@ -556,7 +556,7 @@ describe("withTelemetrySetupSpinner", () => {
 	});
 
 	describe("when the setup step is in flight", () => {
-		/** @scenario "Mode resolution runs behind a spinner" */
+		/** @scenario "Telemetry setup shows a spinner while it runs" */
 		it("spins while it runs and is gone before the result reaches the caller", async () => {
 			const result = await withTelemetrySetupSpinner({
 				tool: "claude",

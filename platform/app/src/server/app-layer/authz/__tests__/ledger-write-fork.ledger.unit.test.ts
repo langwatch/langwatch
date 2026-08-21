@@ -355,27 +355,8 @@ describe("given an organization whose genesis import has landed", () => {
     expect(db.auditLog.createMany).not.toHaveBeenCalled();
   });
 
-  describe("when a caller leaves the projection hold to a later write", () => {
-    /** @scenario "Defining a role can leave the hold to a later write" */
-    it("appends the definition without polling for the role row", async () => {
-      const { writer, db, sent } = harness({ onLedger: true });
-
-      await writer.defineRole({
-        organizationId: ORG_ID,
-        roleId: "role_1",
-        name: "Auditor",
-        permissions: ["traces:read"],
-        kind: "custom",
-        actor: ACTOR,
-        awaitProjection: false,
-      });
-
-      expect(sent.map((command) => command.verb)).toEqual(["defineRoles"]);
-      expect(db.customRole.findFirst).not.toHaveBeenCalled();
-      expect(bumpAuthzEpoch).toHaveBeenCalledWith({ organizationId: ORG_ID });
-    });
-
-    /** @scenario "Deleting a role can leave the hold to a later write" */
+  describe("when a caller only needs the role retired", () => {
+    /** @scenario "Deleting a role that nothing reads again can skip the hold" */
     it("appends the deletion without polling for the row's disappearance", async () => {
       const { writer, db, sent } = harness({ onLedger: true });
 

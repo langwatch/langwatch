@@ -111,11 +111,12 @@ export class IngestionKeyService {
         callerUserId,
         callerIsAdmin: true,
         organizationId,
-        // The mint below ends with an awaited grant attach on the same
-        // organization's FIFO ledger queue, so that single wait proves this
-        // revoke's writes landed too. Waiting here as well made a rotation
-        // stack fold pickup cycles: the CLI's first `langwatch claude` after
-        // a logout sat well over twenty seconds on this one request.
+        // The prior key is dead the moment its row is revoked, and its
+        // private role is named after that key id, so the mint below never
+        // waits for the name. Holding here for the role deletion to project
+        // only added a fold pickup cycle to a rotation that already waits
+        // for the new key's own writes: the CLI's first `langwatch claude`
+        // after a logout sat well over twenty seconds on this one request.
         awaitProjection: false,
       });
     }

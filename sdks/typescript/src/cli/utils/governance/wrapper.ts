@@ -311,11 +311,12 @@ export function buildShellReapply(args: {
 }
 
 /**
- * Run one setup step behind a spinner. Mode resolution can reach the
- * control plane (confirming the cached ingest key is live, minting a fresh
- * one after a logout), and that used to happen in silence long enough to
- * read as a hang. The spinner is stopped before the result — or the error —
- * reaches the caller, so everything printed after it lands on a clean line.
+ * Run one telemetry setup step behind a spinner. Setting a tool up can
+ * reach the control plane (confirming the cached ingest key is live, minting
+ * a fresh one after a logout), and that used to happen in silence long
+ * enough to read as a hang. The spinner is stopped before the result, or the
+ * error, reaches the caller, so everything printed after it lands on a clean
+ * line.
  *
  * discardStdin:false for the same reason login-flow sets it: ora's default
  * flips stdin to raw mode and swallows Ctrl+C, making the wait unkillable.
@@ -447,18 +448,19 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	const toolEnv = envForTool(cfg, tool);
 	const gatewayVars = toolEnv.vars;
 	const gatewayClears = toolEnv.clears ?? [];
-	const resolveModeWithFeedback = (
-		...args: Parameters<typeof resolveWrapperMode>
-	) => withTelemetrySetupSpinner({ tool, run: () => resolveWrapperMode(...args) });
 	let modeResult;
 	try {
-		modeResult = await resolveModeWithFeedback(
-			cfg,
+		modeResult = await withTelemetrySetupSpinner({
 			tool,
-			gatewayVars,
-			gatewayClears,
-			pathChoice.mode,
-		);
+			run: () =>
+				resolveWrapperMode(
+					cfg,
+					tool,
+					gatewayVars,
+					gatewayClears,
+					pathChoice.mode,
+				),
+		});
 	} catch (err) {
 		// Direct-OTLP setup can fail at mint time: an expired device session,
 		// no personal workspace yet, an unreachable control plane. None of
@@ -481,13 +483,17 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			// derived from the expired session.
 			const refreshedEnv = envForTool(cfg, tool);
 			try {
-				modeResult = await resolveModeWithFeedback(
-					cfg,
+				modeResult = await withTelemetrySetupSpinner({
 					tool,
-					refreshedEnv.vars,
-					refreshedEnv.clears ?? [],
-					"ingestion",
-				);
+					run: () =>
+						resolveWrapperMode(
+							cfg,
+							tool,
+							refreshedEnv.vars,
+							refreshedEnv.clears ?? [],
+							"ingestion",
+						),
+				});
 			} catch (err2) {
 				process.stderr.write(
 					`${lwTag()} still could not set up direct OTLP telemetry for ` +
@@ -497,7 +503,8 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			}
 		} else {
 			process.stderr.write(
-				`mode resolution failed: ${(err as Error).message}\n`,
+				`${lwTag()} could not set up telemetry for ${tool}: ` +
+					`${(err as Error).message}\n`,
 			);
 			process.exit(2);
 		}

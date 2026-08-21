@@ -3,44 +3,37 @@ Feature: An ingestion-key rotation answers within one convergence window
   Rotating an ingestion key rides the grants ledger: revoke the prior key's
   bindings, delete its private role, define the new key's role, attach the
   new key's binding. Every one of those writes used to hold the request
-  until the grants projection landed it, and the organization's ledger
-  queue delivers writes in order, so one rotation stacked up to four full
-  fold pickup cycles. The first `langwatch claude` after a logout sat well
-  over twenty seconds on that one mint request, with no feedback.
+  until the grants projection landed it, so one rotation stacked several
+  full fold pickup cycles. The first `langwatch claude` after a logout sat
+  well over twenty seconds on that one mint request, with no feedback.
 
-  Only the last write of a chain needs the hold. The queue is FIFO per
-  organization, so the final write's projection landing proves every
-  earlier write of the same request landed too. The intermediate writes
-  stay durable either way; skipping their holds changes when the request
-  answers, never what the fold applies.
+  A hold earns its place only where the request, or the write after it,
+  reads what the fold wrote. Deleting the prior key's private role is not
+  such a write: the key row is revoked imperatively, so the credential is
+  dead on the next read, and the role is named after that key id, so the
+  new key's role never waits for the name. Defining the new key's role is
+  such a write: the binding attached right after carries a foreign key to
+  the role row. Commands are queued per command name rather than per
+  organization, so no ordering between two different commands can stand in
+  for a hold.
 
   Background:
     Given an organization whose writes ride the grants ledger
 
-  Rule: a request chains its ledger writes behind one hold, not one each
+  Rule: a request holds where a later read needs the fold, and nowhere else
 
     @unit
-    Scenario: Defining a role can leave the hold to a later write
-      Given a caller that follows the role definition with an awaited write
-        on the same organization's queue
-      When the role is defined without its own projection hold
-      Then the definition command is still appended
-      And the request does not poll for the role row
-
-    @unit
-    Scenario: Deleting a role can leave the hold to a later write
-      Given a caller that follows the role deletion with an awaited write
-        on the same organization's queue
+    Scenario: Deleting a role that nothing reads again can skip the hold
+      Given a caller that only needs the role retired
       When the role is deleted without its own projection hold
       Then the deletion command is still appended
       And the request does not poll for the role row's disappearance
 
     @unit
-    Scenario: A restricted key's private role rides the grant attach's hold
+    Scenario: A restricted key's private role lands before its binding attaches
       Given a restricted API key create with custom permissions
       When the key is created
-      Then the private role definition carries no projection hold of its own
-      And the grant attach that follows it holds as before
+      Then the private role definition finishes before the binding attaches
 
     @unit
     Scenario: A hard-cut rotation holds once, on the new key's grants

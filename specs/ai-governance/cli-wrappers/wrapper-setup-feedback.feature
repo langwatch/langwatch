@@ -9,14 +9,14 @@ Feature: The wrapper shows progress while it sets up telemetry
   Rule: network setup is never silent
 
     @unit
-    Scenario: Mode resolution runs behind a spinner
-      Given `langwatch claude` resolving its telemetry mode
-      When the resolution is in flight
-      Then a spinner says telemetry is being set up
+    Scenario: Telemetry setup shows a spinner while it runs
+      Given `langwatch claude` setting up telemetry for the tool
+      When the setup is in flight
+      Then a spinner says telemetry is being set up for that tool
       And the spinner is gone before the wrapper prints its feedback lines
 
     @unit
     Scenario: The spinner is gone before an error is reported
-      Given `langwatch claude` resolving its telemetry mode
-      When the resolution fails
+      Given `langwatch claude` setting up telemetry for the tool
+      When the setup fails
       Then the spinner is stopped before the failure is printed
