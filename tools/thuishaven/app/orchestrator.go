@@ -312,14 +312,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	// Resolve the langy image tag before anything else: it is pure file hashing,
 	// and the reconcile guard needs it to notice a source edit under an
 	// unchanged selection (same services, new bytes — still a restart).
-	if opts.Selection.Langy && opts.LangyTier.RunsInContainer() {
-		if tag, err := langyImageTag(opts.RepoRoot); err == nil {
-			opts.langyImageTag = tag
-		} else {
-			o.log.Warn("could not derive the langy image tag — using the plain dev tag", zap.Error(err))
-			opts.langyImageTag = langyImage
-		}
-	}
+	o.resolveLangyImageTag(&opts)
 	// Serialize `up` per slug: two concurrent runs could both pass the
 	// already-running guard and then both register the same slug. The lock is
 	// held only through guard + registration — holding it across supervision
@@ -354,6 +347,32 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	endRegistration()
 	fmt.Printf("  %s\n\n", opts.Selection.Describe())
 
+	if err := o.prepareWorktree(ctx, p, st); err != nil {
+		return err
+	}
+	langyDockerHost := o.langyContainerHost(ctx, st, &opts)
+	o.sup.Supervise(ctx, o.planChildren(st, opts, p.LwDir, langyDockerHost))
+	return nil
+}
+
+// resolveLangyImageTag derives the content-addressed langy image tag for a
+// container-tier selection, falling back to the plain dev tag when the hash
+// cannot be computed. No-op when langy is deselected or running on the host.
+func (o *Orchestrator) resolveLangyImageTag(opts *PlanOptions) {
+	if !opts.Selection.Langy || !opts.LangyTier.RunsInContainer() {
+		return
+	}
+	if tag, err := langyImageTag(opts.RepoRoot); err == nil {
+		opts.langyImageTag = tag
+	} else {
+		o.log.Warn("could not derive the langy image tag — using the plain dev tag", zap.Error(err))
+		opts.langyImageTag = langyImage
+	}
+}
+
+// prepareWorktree runs the pre-boot lanes: dependency install, codegen,
+// migrations and the seed. Only a migration failure stops the up.
+func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domain.Stack) error {
 	// Stale dependencies install themselves before anything needs them. Lifecycle
 	// scripts (the repo's postinstall) run for the developer's own worktree and
 	// are suppressed for an untrusted one — `haven pr` sanitises the fork install
@@ -377,44 +396,51 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	if err := o.sup.RunOnce(ctx, "prepare", p.LwDir, "pnpm -s run start:prepare:db", env); err != nil {
 		return fmt.Errorf("migrations failed — nothing was dropped; fix the migration, or run `haven db reset` for a fresh database: %w", err)
 	}
-	// Always seed. The seed is idempotent (a no-op once the stable local project +
-	// API key exist), so every `up` guarantees the same migrations AND the same
-	// seeded credential are in place — a freshly-provisioned DB is immediately
-	// usable with the well-known LANGWATCH_API_KEY, no manual sign-up.
-	//
-	// When haven manages Postgres the overlay carries a per-slug loopback
-	// DATABASE_URL (provably local) and the seed uses it. When it does not — DB
-	// management disabled, or Postgres failed to come up — the seed would inherit
-	// whatever DATABASE_URL is in .env, so guard that inherited URL exactly as
-	// `haven seed` does and skip (never seed a non-local database) rather than
-	// abort the up.
-	if hasEnvKey(env, "DATABASE_URL") {
-		if err := o.sup.RunOnce(ctx, "seed", p.LwDir, seedShell("pnpm -s run prisma:seed", env), env); err != nil {
-			o.log.Warn("seed failed (continuing)", zap.Error(err))
+	o.runSeed(ctx, p, env)
+	return nil
+}
+
+// runSeed always seeds. The seed is idempotent (a no-op once the stable local
+// project + API key exist), so every `up` guarantees the same migrations AND
+// the same seeded credential are in place — a freshly-provisioned DB is
+// immediately usable with the well-known LANGWATCH_API_KEY, no manual sign-up.
+//
+// When haven manages Postgres the overlay carries a per-slug loopback
+// DATABASE_URL (provably local) and the seed uses it. When it does not — DB
+// management disabled, or Postgres failed to come up — the seed would inherit
+// whatever DATABASE_URL is in .env, so guard that inherited URL exactly as
+// `haven seed` does and skip (never seed a non-local database) rather than
+// abort the up.
+func (o *Orchestrator) runSeed(ctx context.Context, p UpParams, env []string) {
+	if !hasEnvKey(env, "DATABASE_URL") {
+		if err := o.guardInheritedSeedEnv(p.LwDir); err != nil {
+			o.log.Warn("skipping seed — inherited database URL is not local", zap.Error(err))
+			fmt.Printf("haven: %v — skipping seed\n", err)
+			return
 		}
-	} else if err := o.guardInheritedSeedEnv(p.LwDir); err != nil {
-		o.log.Warn("skipping seed — inherited database URL is not local", zap.Error(err))
-		fmt.Printf("haven: %v — skipping seed\n", err)
-	} else if err := o.sup.RunOnce(ctx, "seed", p.LwDir, seedShell("pnpm -s run prisma:seed", env), env); err != nil {
+	}
+	if err := o.sup.RunOnce(ctx, "seed", p.LwDir, seedShell("pnpm -s run prisma:seed", env), env); err != nil {
 		o.log.Warn("seed failed (continuing)", zap.Error(err))
 	}
-	// In the container tiers (the sandboxed default and container-unsafe), the
-	// langyagent worker runs on colima rather than the host. Bring the VM up and
-	// ensure its image before planning; on failure, fail closed — skip langy rather
-	// than silently dropping to the unsafe host runner — and tell the user the
-	// explicit opt-in for host mode.
-	langyDockerHost := ""
-	if opts.Selection.Langy && st.LangyTier.RunsInContainer() {
-		if dh, err := o.prepareLangyContainer(ctx, opts.RepoRoot, st.LangyImage, opts.ShouldRebuildImages); err != nil {
-			o.log.Warn("langyagent container unavailable — skipping it (set LANGY_UNSAFE_HOST_ACCESS=1 to run the worker on the host instead)",
-				zap.String("tier", st.LangyTier.String()), zap.Error(err))
-			opts.Selection.Langy = false
-		} else {
-			langyDockerHost = dh
-		}
+}
+
+// langyContainerHost prepares the colima-backed langy runtime for the
+// container tiers (the sandboxed default and container-unsafe), returning the
+// docker socket the worker container should run against. On failure it fails
+// closed — langy is deselected rather than silently dropped to the unsafe
+// host runner — and tells the user the explicit opt-in for host mode.
+func (o *Orchestrator) langyContainerHost(ctx context.Context, st domain.Stack, opts *PlanOptions) string {
+	if !opts.Selection.Langy || !st.LangyTier.RunsInContainer() {
+		return ""
 	}
-	o.sup.Supervise(ctx, o.planChildren(st, opts, p.LwDir, langyDockerHost))
-	return nil
+	dh, err := o.prepareLangyContainer(ctx, opts.RepoRoot, st.LangyImage, opts.ShouldRebuildImages)
+	if err != nil {
+		o.log.Warn("langyagent container unavailable — skipping it (set LANGY_UNSAFE_HOST_ACCESS=1 to run the worker on the host instead)",
+			zap.String("tier", st.LangyTier.String()), zap.Error(err))
+		opts.Selection.Langy = false
+		return ""
+	}
+	return dh
 }
 
 // prepareLangyContainer brings colima up and ensures the stack's
