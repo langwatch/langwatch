@@ -4,9 +4,10 @@
 # surfaces are the generic runner's and live in
 # specs/migration/system-migrations-runner.feature.
 #
-# Scenarios tagged @unimplemented describe the ADR-110 one-shot migration,
-# which is designed but not yet registered (registeredMigrations() returns
-# nothing for it). They become bindable the moment that migration lands.
+# The ADR-110 one-shot migration is registered
+# (platform/app/src/server/app-layer/authz/authz-engine.migration.ts); the
+# scenarios still tagged @unimplemented are the integration-level ones its
+# unit harness cannot honestly bind.
 
 @migration @authz
 Feature: Moving an organization onto the grants projection
@@ -26,7 +27,7 @@ Feature: Moving an organization onto the grants projection
 
   # ═══ What it reads ════════════════════════════════════════════════════
 
-  @unit @unimplemented
+  @unit
   Scenario Outline: Every legacy table is a source of facts
     Given "org_acme" has <source>
     When the migration runs
@@ -43,14 +44,14 @@ Feature: Moving an organization onto the grants projection
       | a share link                  | a resource grant held by anyone     |
       | a project credential          | a project-scoped grant for that key |
 
-  @unit @unimplemented
+  @unit
   Scenario: Team membership is stated directly, not promoted first
     Given "org_acme" has team memberships with no matching role binding
     When the migration runs
     Then each membership is stated as a grant
     And no legacy role binding row is created for it
 
-  @unit @unimplemented
+  @unit
   Scenario: The organization member floor is stated once
     Given "org_acme" has a member holding no binding anywhere
     When the migration runs
@@ -65,14 +66,14 @@ Feature: Moving an organization onto the grants projection
 
   # ═══ How it runs ══════════════════════════════════════════════════════
 
-  @unit @unimplemented
+  @unit
   Scenario: The migration states its facts and checks once
     When the migration runs for "org_acme"
     Then it states every fact
     And it reads the projection once
     And it does not poll waiting for the projection
 
-  @unit @unimplemented
+  @unit
   Scenario: A projection that has not caught up holds the organization
     Given a pass that has stated every fact
     When the projection does not yet hold them
@@ -80,28 +81,28 @@ Feature: Moving an organization onto the grants projection
     And no error is logged
     And a later pass revisits it
 
-  @unit @unimplemented
+  @unit
   Scenario: A held organization names what is outstanding
     Given a pass whose projection is missing facts
     When the organization is reported
     Then the report names how many facts are outstanding
     And it names a sample of the outstanding ids
 
-  @unit @unimplemented
+  @unit
   Scenario: Re-running the migration states the same facts
     Given a pass that already ran for "org_acme"
     When it runs again against the same legacy rows
     Then every restated fact carries the id it carried before
     And no second copy of any fact is appended
 
-  @unit @unimplemented
+  @unit
   Scenario: A pass that failed partway is safe to repeat
     Given a pass that failed after stating some facts
     When the migration runs again
     Then the facts that landed append nothing
     And the facts that did not land append normally
 
-  @unit @unimplemented
+  @unit
   Scenario: A row deleted on the legacy side is revoked, not left behind
     Given a grant the migration stated whose legacy row has since been deleted
     When the migration runs again
@@ -142,7 +143,7 @@ Feature: Moving an organization onto the grants projection
     When the status lookup's cached answer expires
     Then its authorization writes go to the ledger, not the legacy tables
 
-  @unit @unimplemented
+  @unit
   Scenario: The check that precedes finalizing is proven, not assumed
     Given "org_acme" whose projection disagrees with the legacy path
     When the migration runs

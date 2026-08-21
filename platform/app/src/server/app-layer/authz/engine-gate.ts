@@ -51,15 +51,17 @@ export function setAuthzEngineGateFailureReporter(
 }
 
 /**
- * The statuses that mean this organization's whole grant history is in the
- * event log and its projection is fed — so the engine can both answer and be
- * written to. Anything else (absent, pending, parked) means the history is
- * not there, and the organization stays on the legacy path.
+ * Only `finalized` moves an organization onto the engine. `migrated` is the
+ * HELD state (the runner's own contract): the work landed but the
+ * migration's proof found the projection behind or disagreeing, and the ops
+ * page promises the operator such an organization "stays on its legacy
+ * path, behaving exactly as before". Reads from a half-fed projection would
+ * deny access the customer holds; writes fork on this same predicate, and a
+ * held organization's imperative legacy writes are what the next pass
+ * restates, rekeys or revokes — that loop is how it heals into `finalized`.
+ * Anything else (absent, pending, parked, rolled back) is legacy too.
  */
-const ON_ENGINE_STATUSES: readonly MigrationTenantStatus[] = [
-  "migrated",
-  "finalized",
-];
+const ON_ENGINE_STATUSES: readonly MigrationTenantStatus[] = ["finalized"];
 
 /**
  * One bound for both directions. The negative one is what lets a finishing

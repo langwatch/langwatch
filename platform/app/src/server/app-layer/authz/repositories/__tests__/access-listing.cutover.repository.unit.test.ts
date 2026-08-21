@@ -54,7 +54,7 @@ const repositoryFor = (onEngineByOrg: Record<string, boolean>) => {
       where: { migrationName_tenantId: { tenantId: string } };
     }) =>
       onEngineByOrg[where.migrationName_tenantId.tenantId] === true
-        ? { status: "migrated" }
+        ? { status: "finalized" }
         : null,
   );
   const prisma = {
@@ -257,7 +257,7 @@ describe("CutoverAwareAccessListingRepository", () => {
       const grants = spyRepository("grants");
       const findUnique = vi
         .fn()
-        .mockResolvedValueOnce({ status: "migrated" })
+        .mockResolvedValueOnce({ status: "finalized" })
         .mockResolvedValue(null);
       const prisma = {
         systemMigrationTenantState: { findUnique },
@@ -304,7 +304,7 @@ describe("CutoverAwareAccessListingRepository", () => {
         systemMigrationTenantState: {
           findUnique: vi
             .fn()
-            .mockResolvedValue(onEngine ? { status: "migrated" } : null),
+            .mockResolvedValue(onEngine ? { status: "finalized" } : null),
         },
         grant: { findMany: grantFindMany },
         roleBinding: { findMany: roleBindingFindMany },

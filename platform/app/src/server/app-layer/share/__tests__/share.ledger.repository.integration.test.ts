@@ -121,7 +121,7 @@ describe("given a cut-over organization's capped share link", () => {
       data: {
         migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
         tenantId: organization.id,
-        status: "migrated",
+        status: "finalized",
         occurredAt: new Date(),
       },
     });

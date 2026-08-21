@@ -62,6 +62,7 @@ function build() {
     },
     shareLink: {
       upsert: vi.fn().mockResolvedValue(undefined),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     $executeRaw: executeRaw,
@@ -73,7 +74,7 @@ function build() {
     grant: { updateMany: Mock; findUnique: Mock };
     roleBinding: { upsert: Mock; updateMany: Mock; deleteMany: Mock };
     customRole: { upsert: Mock; updateMany: Mock; deleteMany: Mock };
-    shareLink: { upsert: Mock; deleteMany: Mock };
+    shareLink: { upsert: Mock; updateMany: Mock; deleteMany: Mock };
   };
   return {
     prisma: mocks,
@@ -291,6 +292,70 @@ describe("PrismaAuthzGrantsWriteRepository", () => {
           row: grantRow(),
         } as GrantProjectionWrite),
       ).rejects.toThrow("connection lost");
+    });
+  });
+
+  describe("given a migration-sourced grant fact", () => {
+    // ADR-110: nothing legacy changes before an organization finalizes. An
+    // adopted binding converges onto the row it was read from — an update —
+    // while a derived fact (a team membership, the org floor) matches no
+    // row and must not be given one. Update-only is what makes both true.
+    /** @scenario "Nothing legacy changes before an organization finalizes" */
+    it("updates the compat binding in place and never creates one", async () => {
+      const { repository, prisma } = build();
+
+      await repository.append({
+        kind: "grant.upsert",
+        row: grantRow({ source: "migration" }),
+      } as GrantProjectionWrite);
+
+      expect(prisma.roleBinding.upsert).not.toHaveBeenCalled();
+      expect(prisma.roleBinding.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { organizationId: ORG, id: "grant_1" },
+        }),
+      );
+    });
+
+    /** @scenario "Nothing legacy changes before an organization finalizes" */
+    it("updates the compat share link in place and never creates one", async () => {
+      const { repository, prisma } = build();
+
+      await repository.append({
+        kind: "grant.upsert",
+        row: grantRow({
+          source: "migration",
+          principalType: "ANYONE",
+          principalId: null,
+          roleKey: null,
+          scopeType: "RESOURCE",
+          scopeId: "trace_1",
+          token: "token_1",
+          permission: "traces:view",
+          resourceKind: "TRACE",
+          projectId: "project_1",
+        }),
+      } as GrantProjectionWrite);
+
+      expect(prisma.shareLink.upsert).not.toHaveBeenCalled();
+      expect(prisma.shareLink.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { projectId: "project_1", id: "grant_1" },
+        }),
+      );
+    });
+
+    /** A live write keeps the create path: only the migration is dark. */
+    it("still creates compat rows for live-write sources", async () => {
+      const { repository, prisma } = build();
+
+      await repository.append({
+        kind: "grant.upsert",
+        row: grantRow({ source: "grants-service" }),
+      } as GrantProjectionWrite);
+
+      expect(prisma.roleBinding.upsert).toHaveBeenCalled();
+      expect(prisma.roleBinding.updateMany).not.toHaveBeenCalled();
     });
   });
 });

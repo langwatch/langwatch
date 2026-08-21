@@ -43,6 +43,7 @@ import type {
   GrantProjectionWrite,
   GrantProjectionWriteStore,
 } from "~/server/event-sourcing/pipelines/authz-grants/projections/authzGrantsWrite.projection";
+import { MIGRATION_OWNED_SOURCES } from "../authz-engine.migration";
 
 const logger = createLogger("langwatch:authz:projection-compat");
 
@@ -128,6 +129,10 @@ function reportMissedRow(write: GrantProjectionWrite, result: unknown): void {
     { write: write.kind, occurredAt: write.occurredAt },
     "authz projection write matched no row; the grant it names is absent or newer",
   );
+}
+
+function isMigrationOwnedSource(source: string): boolean {
+  return (MIGRATION_OWNED_SOURCES as readonly string[]).includes(source);
 }
 
 /** Prisma's codes for "a unique or foreign key says no". */
@@ -283,27 +288,51 @@ export class PrismaAuthzGrantsWriteRepository
     grant: ReturnType<typeof grantRowToFact>,
     organizationId: string,
   ): Promise<void> {
+    // UPDATE-only for migration-sourced facts (ADR-110: nothing legacy
+    // changes before an organization finalizes). An adopted binding or link
+    // converges onto the very row it was read from — a byte-identical
+    // update — while a fact the legacy schema only inferred (a team
+    // membership, the org floor, a project credential) has no row here and
+    // must not be given one: its legacy representation is the membership or
+    // credential row it came from, and minting a binding for it would be
+    // exactly the visible change the migration promises not to make.
+    const migrationSourced = isMigrationOwnedSource(grant.source);
+
     const binding = grantFactToCompatBinding({ grant, organizationId });
     if (binding) {
       const { id, ...rest } = binding;
-      await this.prisma.roleBinding.upsert({
-        where: { organizationId, id },
-        create: binding,
-        update: rest,
-      });
+      if (migrationSourced) {
+        await this.prisma.roleBinding.updateMany({
+          where: { organizationId, id },
+          data: rest,
+        });
+      } else {
+        await this.prisma.roleBinding.upsert({
+          where: { organizationId, id },
+          create: binding,
+          update: rest,
+        });
+      }
     }
 
     const link = grantFactToCompatShareLink({ grant, organizationId });
     if (link) {
       const { id, ...rest } = link;
-      await this.prisma.shareLink.upsert({
-        where: { projectId: link.projectId, id },
-        create: link,
-        // `viewCount` is named in neither branch: the create leans on the
-        // column default and the update leaves the running total alone, so a
-        // re-applied attach cannot reset a link's accounting.
-        update: rest,
-      });
+      if (migrationSourced) {
+        await this.prisma.shareLink.updateMany({
+          where: { projectId: link.projectId, id },
+          data: rest,
+        });
+      } else {
+        await this.prisma.shareLink.upsert({
+          where: { projectId: link.projectId, id },
+          create: link,
+          // `viewCount` is named in neither branch: the create leans on the
+          // column default and the update leaves the running total alone, so a
+          // re-applied attach cannot reset a link's accounting.
+          update: rest,
+        });
+      }
     }
   }
 

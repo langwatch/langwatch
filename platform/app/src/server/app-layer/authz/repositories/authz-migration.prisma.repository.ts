@@ -18,6 +18,7 @@ import type {
 } from "@langwatch/authz-server";
 import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
+import type { GrantHeadRow } from "../authz-engine.migration";
 import { queryOrganizationOnAuthzEngine } from "../engine-gate";
 
 /**
@@ -149,6 +150,42 @@ export class PrismaAuthzMigrationRepository
       select: { id: true },
     });
     return rows.map((row) => row.id);
+  }
+
+  /** Every non-resource Grant head row, revoked included — the ADR-110
+   *  proof needs both directions: a live row to compare and a revoked one to
+   *  recognize as already denied. Resource rows have their own read
+   *  (`findResourceGrantRows`), which carries the tier's extra columns. */
+  async findGrantHeadRows({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<GrantHeadRow[]> {
+    const rows = await this.prisma.grant.findMany({
+      where: { organizationId, scopeType: { not: "RESOURCE" } },
+      select: {
+        id: true,
+        principalType: true,
+        principalId: true,
+        roleKey: true,
+        legacyRole: true,
+        source: true,
+        scopeType: true,
+        scopeId: true,
+        revokedAt: true,
+      },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      principalType: row.principalType,
+      principalId: row.principalId,
+      roleKey: row.roleKey,
+      legacyRole: row.legacyRole,
+      source: row.source,
+      scopeType: row.scopeType,
+      scopeId: row.scopeId,
+      revoked: row.revokedAt !== null,
+    }));
   }
 
   async findRoleHeads({
@@ -448,7 +485,9 @@ export class PrismaAuthzMigrationRepository
     organizationId: string;
   }): Promise<ResourceGrantRow[]> {
     const rows = await this.prisma.grant.findMany({
-      where: { organizationId, scopeType: "RESOURCE" },
+      // Live rows only: this read serves the ADR-110 proof, and a revoked
+      // link is a deny already applied, not an extra to reconcile.
+      where: { organizationId, scopeType: "RESOURCE", revokedAt: null },
       select: {
         id: true,
         token: true,
