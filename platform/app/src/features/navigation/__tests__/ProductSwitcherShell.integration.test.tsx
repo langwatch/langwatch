@@ -10,7 +10,13 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -519,10 +525,7 @@ describe("the product-switcher top bar", () => {
     });
 
     async function openProjectPicker() {
-      // Ark's combobox input is machine-controlled, so zero-delay typing
-      // outruns the re-render and drops characters; a small delay types
-      // the way a person does.
-      const user = userEvent.setup({ delay: 20 });
+      const user = userEvent.setup();
       await user.click(screen.getByRole("button", { name: "Switch project" }));
       await waitFor(() => {
         expect(
@@ -532,25 +535,33 @@ describe("the product-switcher top bar", () => {
       return user;
     }
 
+    // Ark's combobox input is machine-controlled, so per-character typing
+    // races the re-render and drops characters on a slow runner; one
+    // change event with the whole query is deterministic.
+    function searchFor(text: string) {
+      fireEvent.change(screen.getByPlaceholderText("Search projects"), {
+        target: { value: text },
+      });
+    }
+
     /** @scenario A large project list opens with a focused search field */
     it("opens with a focused search field that filters by project and team name", async () => {
       renderShell();
-      const user = await openProjectPicker();
+      await openProjectPicker();
 
       expect(screen.getByPlaceholderText("Search projects")).toHaveFocus();
       await waitFor(() => {
         expect(screen.getByText("Edge Router")).toBeInTheDocument();
       });
 
-      await user.keyboard("router");
+      searchFor("router");
       await waitFor(() => {
         expect(screen.queryByText("Core App 1")).not.toBeInTheDocument();
       });
       expect(screen.getByText("Edge Router")).toBeInTheDocument();
 
       // Team names match too: "platform" is the team, not a project name.
-      await user.clear(screen.getByPlaceholderText("Search projects"));
-      await user.keyboard("platform");
+      searchFor("platform");
       await waitFor(() => {
         expect(screen.getByText("Billing Sync")).toBeInTheDocument();
       });
@@ -563,7 +574,7 @@ describe("the product-switcher top bar", () => {
       renderShell();
       const user = await openProjectPicker();
 
-      await user.keyboard("billing");
+      searchFor("billing");
       await waitFor(() => {
         expect(screen.getByText("Billing Sync")).toBeInTheDocument();
       });
@@ -579,12 +590,12 @@ describe("the product-switcher top bar", () => {
     /** @scenario Creating a project stays available while the list is unfiltered */
     it("keeps the per-team create entries while nothing is typed and drops them while searching", async () => {
       renderShell();
-      const user = await openProjectPicker();
+      await openProjectPicker();
 
       // One create entry per team the user can create in (org admin: both).
       expect(screen.getAllByText("New Project")).toHaveLength(2);
 
-      await user.keyboard("core");
+      searchFor("core");
       await waitFor(() => {
         expect(screen.queryByText("New Project")).not.toBeInTheDocument();
       });
