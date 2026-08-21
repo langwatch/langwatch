@@ -39,6 +39,7 @@ export function AddPromptButton({
       <PageLayout.HeaderButton
         onClick={handleClick}
         aria-label="New prompt"
+        gap={1}
         {...buttonProps}
       >
         <LuPlus size={14} />

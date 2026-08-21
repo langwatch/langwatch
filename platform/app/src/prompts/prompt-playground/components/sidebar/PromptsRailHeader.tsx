@@ -1,5 +1,4 @@
-import { Spacer } from "@chakra-ui/react";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { HStack, Spacer, Text } from "@chakra-ui/react";
 import { AddPromptButton } from "./AddPromptButton";
 
 /**
@@ -12,16 +11,30 @@ import { AddPromptButton } from "./AddPromptButton";
  * It used to sit in the tab strip on the far side of the workspace, which put
  * the whole width of the screen between the list and the way to add to it.
  *
- * The rail is narrow, so the button runs at the smallest scale that still
- * carries its label. It keeps the label rather than shrinking to a bare "+":
- * this is the action a first-time user is looking for.
+ * Built at the rail's scale rather than the page's. The shared page header
+ * carries a page title and a 24px gutter, which in a 250px rail left the word
+ * "Prompts" set eight pixels off the prompt names underneath it and an
+ * outlined button as the loudest thing on the surface. The heading is now a
+ * section label on the same gutter as the rows, and the action is quiet
+ * enough to sit beside it.
  */
 export function PromptsRailHeader() {
   return (
-    <PageLayout.Header withBorder={false}>
-      <PageLayout.Heading>Prompts</PageLayout.Heading>
+    <HStack
+      height="48px"
+      flexShrink={0}
+      width="full"
+      // Matches where a prompt's name starts: the list's own gutter plus each
+      // row's padding.
+      paddingInlineStart={4}
+      paddingInlineEnd={2}
+      gap={2}
+    >
+      <Text fontSize="sm" fontWeight="semibold" color="fg">
+        Prompts
+      </Text>
       <Spacer />
-      <AddPromptButton size="xs" />
-    </PageLayout.Header>
+      <AddPromptButton size="xs" variant="ghost" color="fg.muted" />
+    </HStack>
   );
 }
