@@ -213,20 +213,11 @@ export function VirtualKeyProviderAccessSection({
               </Text>
             </Checkbox>
           </HStack>
-          {eligible.map((mp, index) => (
+          {eligible.map((mp) => (
             <ProviderRow
               key={mp.id}
               mp={mp}
               raw={providerById.get(mp.id)}
-              // Which provider a bare "<type>/<model>" request reaches is the
-              // key's own chain order, so it can only be answered here, on the
-              // key. The first row of each provider type in this list is the
-              // one that answers.
-              winsProviderTypePrefix={
-                eligible.findIndex(
-                  (other) => other.provider === mp.provider,
-                ) === index
-              }
               allProviders={value.allProviders}
               checked={value.allProviders || selected.has(mp.id)}
               onCheck={(checked) => toggleProvider(mp.id, checked)}

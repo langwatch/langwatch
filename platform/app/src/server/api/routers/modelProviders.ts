@@ -30,10 +30,6 @@ import {
 } from "../../modelProviders/modelDefaults.service";
 import { assertCanManageAllScopes } from "../../modelProviders/modelProvider.authz";
 import {
-  ROUTING_HANDLE_MAX_LENGTH,
-  ROUTING_HANDLE_RULE,
-} from "../../modelProviders/routingHandle";
-import {
   ModelProviderService,
   testConnectionInputSchema,
 } from "../../modelProviders/modelProvider.service";
@@ -41,6 +37,10 @@ import {
   validateKeyWithCustomUrl,
   validateProviderApiKey,
 } from "../../modelProviders/providerValidation";
+import {
+  ROUTING_HANDLE_MAX_LENGTH,
+  ROUTING_HANDLE_RULE,
+} from "../../modelProviders/routingHandle";
 import {
   checkOrganizationPermission,
   checkProjectPermission,

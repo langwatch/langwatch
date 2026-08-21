@@ -33,12 +33,6 @@ export type OrgModelProvider = {
   scopes: ModelProviderScopeEntry[];
   models?: string[] | null;
   customModels?: Array<{ modelId: string }> | null;
-  /**
-   * The slug that addresses THIS provider in a gateway model string. Null when
-   * the operator set none, in which case only the provider type prefix and the
-   * model's own name reach it.
-   */
-  routingHandle?: string | null;
 };
 
 export type EligibleModelProvider = {

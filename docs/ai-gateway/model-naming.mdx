@@ -53,7 +53,7 @@ A model id can contain a `/` of its own, which is normal for self-hosted servers
 
 The gateway only reads the first segment as a prefix when it is a provider type or a routing handle. So once you declare `stealth/ox-alpha` on the provider that serves it, `"model": "stealth/ox-alpha"` works as written. `custom/stealth/ox-alpha` also works and is unambiguous.
 
-One case still needs the prefix: a model whose first segment happens to spell a provider type, such as `openai/my-finetune` on a self-hosted server. The gateway reads `openai` as the provider type, so write `custom/openai/my-finetune` instead. The provider settings page flags a declared model in this shape.
+One case still needs the prefix: a model whose first segment happens to spell a provider type, such as `openai/my-finetune` on a self-hosted server. The gateway reads `openai` as the provider type, so write `custom/openai/my-finetune` instead.
 
 ## Provider types
 

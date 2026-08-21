@@ -2,10 +2,10 @@
  * @vitest-environment node
  *
  * Real-Postgres coverage for the routing handle: the name that addresses ONE
- * model provider instance in a gateway model string. The partial unique index
- * is what actually makes the name unique inside an organization, so it has to
- * be exercised against a real database rather than a mock that would agree
- * with whatever the service believes.
+ * model provider instance in a gateway model string. The unique index over
+ * (organizationId, routingHandle) is what actually makes the name unique
+ * inside an organization, so it has to be exercised against a real database
+ * rather than a mock that would agree with whatever the service believes.
  */
 
 import { nanoid } from "nanoid";
@@ -149,7 +149,13 @@ describe.skipIf(!hasCredentialsSecret)(
       );
     }
 
-    async function setHandle({ id, handle }: { id: string; handle: string | null }) {
+    async function setHandle({
+      id,
+      handle,
+    }: {
+      id: string;
+      handle: string | null;
+    }) {
       return await ModelProviderService.create(prisma).updateModelProvider(
         {
           id,

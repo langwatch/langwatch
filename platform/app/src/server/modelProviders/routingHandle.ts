@@ -69,6 +69,24 @@ export function normalizeRoutingHandle(
 }
 
 /**
+ * Reads what a form field currently holds into what the field should show.
+ *
+ * A handle is stored lowercased and accepts a closed set of characters, so a
+ * field that lets "OpenRouter EU" stand shows the operator a spelling that
+ * never reaches the gateway. Applied on every keystroke, the field only ever
+ * holds a handle that would be stored as written.
+ *
+ * Kept beside the rule it enforces, so the two cannot drift.
+ */
+export function sanitizeRoutingHandleInput(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "")
+    .replace(/^[_-]+/, "")
+    .slice(0, ROUTING_HANDLE_MAX_LENGTH);
+}
+
+/**
  * Checks a normalized handle, returning the problem or null when it is fine.
  * Callers turn the problem into the customer-facing refusal; this function
  * stays free of copy so the same rule can be applied anywhere.

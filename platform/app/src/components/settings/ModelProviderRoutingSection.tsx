@@ -1,5 +1,8 @@
 import { Box, Field, Input, Text } from "@chakra-ui/react";
-import { ROUTING_HANDLE_MAX_LENGTH } from "../../server/modelProviders/routingHandle";
+import {
+  ROUTING_HANDLE_MAX_LENGTH,
+  sanitizeRoutingHandleInput,
+} from "../../server/modelProviders/routingHandle";
 import { SmallLabel } from "../SmallLabel";
 
 /**
@@ -10,6 +13,10 @@ import { SmallLabel } from "../SmallLabel";
  * nothing in the product used to say. This section says it, and gives the
  * operator the one control that makes it explicit: a routing handle that names
  * this instance and nothing else.
+ *
+ * The helper shows one sentence and updates as the operator types, so the
+ * spelling they are creating is on screen while they create it. The provider
+ * type is the placeholder, because it is what the field falls back to.
  */
 export function ModelProviderRoutingSection({
   providerKey,
@@ -20,7 +27,7 @@ export function ModelProviderRoutingSection({
   routingHandle: string;
   onRoutingHandleChange: (routingHandle: string) => void;
 }) {
-  const handle = routingHandle.trim().toLowerCase();
+  const prefix = routingHandle || providerKey;
 
   return (
     <Field.Root width="full">
@@ -28,8 +35,14 @@ export function ModelProviderRoutingSection({
       <Box width="full">
         <Input
           value={routingHandle}
-          onChange={(e) => onRoutingHandleChange(e.target.value)}
-          placeholder="For example: europe"
+          // Sanitized on the way in, not flagged afterwards. A handle is
+          // stored lowercased and refuses spaces, so letting "OpenRouter"
+          // stand in the field promises a spelling that never reaches the
+          // gateway.
+          onChange={(e) =>
+            onRoutingHandleChange(sanitizeRoutingHandleInput(e.target.value))
+          }
+          placeholder={providerKey}
           width="full"
           maxLength={ROUTING_HANDLE_MAX_LENGTH}
         />
@@ -37,21 +50,8 @@ export function ModelProviderRoutingSection({
       <Field.HelperText>
         <Text>
           Requests reach this provider as{" "}
-          <RoutingSpelling spelling={`${providerKey}/<model>`} />
-          {handle ? (
-            <>
-              {" or "}
-              <RoutingSpelling spelling={`${handle}/<model>`} />
-            </>
-          ) : null}
-          , or by the exact model name when this provider is the one that serves
-          it.
+          <RoutingSpelling spelling={`${prefix}/<model>`} />
         </Text>
-      </Field.HelperText>
-      <Field.HelperText>
-        {handle
-          ? "A handle names this provider only, so requests reach it even when another provider of the same type is also available. Changing the handle stops requests that use the old one."
-          : "A handle is optional. Set one when you have more than one provider of this type and you want to choose between them in the request."}
       </Field.HelperText>
     </Field.Root>
   );

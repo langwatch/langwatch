@@ -4,7 +4,9 @@ import {
   isRoutingHandleConflict,
   normalizeRoutingHandle,
   RESERVED_ROUTING_HANDLES,
+  ROUTING_HANDLE_MAX_LENGTH,
   routingHandleProblem,
+  sanitizeRoutingHandleInput,
 } from "../routingHandle";
 
 /** Reads a submitted handle the way the service does. */
@@ -22,6 +24,25 @@ describe("routing handle", () => {
     it("accepts letters, numbers, hyphens and underscores", () => {
       for (const handle of ["eu", "eu-west-1", "team_a", "r2d2", "0main"]) {
         expect(check(handle)).toBeNull();
+      }
+    });
+  });
+
+  describe("when the operator is still typing", () => {
+    it("keeps the field to what would be stored as written", () => {
+      expect(sanitizeRoutingHandleInput("OpenRouter EU")).toBe("openroutereu");
+      expect(sanitizeRoutingHandleInput("eu/west")).toBe("euwest");
+      expect(sanitizeRoutingHandleInput("--leading")).toBe("leading");
+      expect(sanitizeRoutingHandleInput("a".repeat(40))).toHaveLength(
+        ROUTING_HANDLE_MAX_LENGTH,
+      );
+    });
+
+    it("never leaves the field holding a handle the write would refuse", () => {
+      for (const typed of ["OpenRouter EU", "My Router!", "eu/west", "_x"]) {
+        const shown = sanitizeRoutingHandleInput(typed);
+        if (shown === "") continue;
+        expect(routingHandleProblem(shown)).not.toBe("shape");
       }
     });
   });
